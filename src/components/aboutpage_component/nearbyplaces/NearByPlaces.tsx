@@ -10,7 +10,7 @@ const NearByPlaces = () => {
     const data: Place[] = [
         {
             title: "Alibaug Beach",
-            thumbnail: resolveOptimizedAsset('destination_images/mussorie.png'),
+            thumbnail: resolveOptimizedAsset('destination_images/mussorie.webp'),
             description: "A serene beach perfect for relaxing and enjoying the sunset.",
         },
         {
