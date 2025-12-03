@@ -1,4 +1,4 @@
-# Architecture
+
 
 ## High-Level System
 ```mermaid
