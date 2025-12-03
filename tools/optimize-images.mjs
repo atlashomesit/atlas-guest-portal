@@ -10,7 +10,7 @@ import sharp from 'sharp';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, '..');
-const manifestPath = path.join(projectRoot, 'src/assets/optimized-manifest.json');
+const manifestPath = path.resolve(projectRoot, 'src/assets/optimized-manifest.json');
 const sizeCeilingBytes = 500 * 1024; // 500 KiB threshold for raw assets
 
 const sourceGlobs = [
@@ -23,6 +23,11 @@ const ignoreGlobs = ['**/*.webp'];
 function normalizeKey(relativePath) {
   // e.g. src/assets/501/IMG_1.jpg -> 501/IMG_1.jpg
   return relativePath.replace(/^src\/assets\//, '');
+}
+
+async function ensureDirExists(filePath) {
+  const dir = path.dirname(filePath);
+  await fs.mkdir(dir, { recursive: true });
 }
 
 async function removeOutdatedOptimizedFiles(dir, baseName, expectedFile) {
@@ -38,6 +43,7 @@ async function removeOutdatedOptimizedFiles(dir, baseName, expectedFile) {
 async function writeManifest(manifest) {
   const sortedEntries = Object.entries(manifest).sort(([a], [b]) => a.localeCompare(b));
   const json = JSON.stringify(Object.fromEntries(sortedEntries), null, 2);
+  await ensureDirExists(manifestPath);
   await fs.writeFile(manifestPath, `${json}\n`, 'utf8');
 }
 
