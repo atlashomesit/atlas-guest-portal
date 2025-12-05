@@ -8,8 +8,27 @@ interface Property {
 }
 
 const BookingForm = ({ propertyData }: { propertyData: Property }) => {
-  const [checkIn, setCheckIn] = useState('2025-05-16');
-  const [checkOut, setCheckOut] = useState('2025-05-18');
+  // Format date to yyyy-mm-dd for input[type=date]
+  const formatDateForInput = (date: Date) => {
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getDate() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${year}-${month}-${day}`;
+  };
+
+  // Format date to dd-mm-yyyy for display
+  const formatDateForDisplay = (dateStr: string) => {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return `${String(day).padStart(2, '0')}-${String(month).padStart(2, '0')}-${year}`;
+  };
+
+  // Set default dates
+  const today = new Date();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  const [checkIn, setCheckIn] = useState(formatDateForInput(today));
+  const [checkOut, setCheckOut] = useState(formatDateForInput(tomorrow));
   const [name, setName] = useState('');
   const [contactNumber, setContactNumber] = useState('');
   const [email, setEmail] = useState('');
@@ -101,8 +120,10 @@ Total Price: ₹${totalPrice.toLocaleString()}`
       setName('');
       setContactNumber('');
       setEmail('');
-      setCheckIn('2025-05-16');
-      setCheckOut('2025-05-18');
+      setCheckIn(formatDateForInput(new Date()));
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      setCheckOut(formatDateForInput(tomorrow));
       setAdults(1);
       setChildren(0);
       setInfants(0);
@@ -158,8 +179,12 @@ Total Price: ₹${totalPrice.toLocaleString()}`
                 type="date"
                 value={checkIn}
                 onChange={(e) => setCheckIn(e.target.value)}
-                className="w-full text-sm font-medium text-gray-900 bg-transparent border-none outline-none"
+                className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                min={formatDateForInput(new Date())}
               />
+              <div className="text-xs text-gray-500 mt-1">
+                {formatDateForDisplay(checkIn)}
+              </div>
             </div>
             <div className="flex-1 p-3">
               <div className="text-xs font-semibold text-gray-900 uppercase tracking-wide mb-1">CHECKOUT</div>
@@ -167,8 +192,12 @@ Total Price: ₹${totalPrice.toLocaleString()}`
                 type="date"
                 value={checkOut}
                 onChange={(e) => setCheckOut(e.target.value)}
-                className="w-full text-sm font-medium text-gray-900 bg-transparent border-none outline-none"
+                className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                min={checkIn}
               />
+              <div className="text-xs text-gray-500 mt-1">
+                {formatDateForDisplay(checkOut)}
+              </div>
             </div>
           </div>
         </div>
@@ -183,7 +212,30 @@ Total Price: ₹${totalPrice.toLocaleString()}`
             <div className='flex items-center justify-between w-full'>
               <div>
                 <div className="text-xs font-semibold text-gray-900 uppercase tracking-wide mb-1">GUESTS</div>
-                <div className="text-sm font-medium text-gray-900">{totalGuests} guest{totalGuests !== 1 ? 's' : ''}</div>
+                <div className="text-sm font-medium text-gray-900">
+                  {totalGuests === 0 
+                    ? 'Guests' 
+                    : (
+                        <>
+                          {adults + children > 0 && (
+                            `${adults + children} guest${adults + children !== 1 ? 's' : ''}`
+                          )}
+                          {infants > 0 && (
+                            <>
+                              {adults + children > 0 && <>, </>}
+                              {`${infants} infant${infants !== 1 ? 's' : ''}`}
+                            </>
+                          )}
+                          {pets > 0 && (
+                            <>
+                              {(adults + children > 0 || infants > 0) && <>, </>}
+                              {`${pets} pet${pets !== 1 ? 's' : ''}`}
+                            </>
+                          )}
+                        </>
+                      )
+                  }
+                </div>
               </div>
               <div className='transition duration-150 ease-in-out transform active:scale-95  text-white px-4 py-2 rounded '>
                 {showGuestDetails ? (

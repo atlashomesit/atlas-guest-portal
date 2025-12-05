@@ -1,23 +1,21 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { propertyData } from "../../../data.ts";
+import { propertyData, propertyImages } from "../../../data.ts";
 import Heading from "../../commonComponents/heading/Heading";
 import { LISTINGS } from "../../../data/listings";
-import { loadListingImages } from "../../../utils/loadListingImages";
 import "./homepage_location.css";
 
 const HomePage_Locations = () => {
   const navigate = useNavigate();
+  
+  // Debug log
+  console.log('propertyImages:', propertyImages);
+  console.log('propertyData:', propertyData);
 
-  const imagesByUnit = React.useMemo(() => loadListingImages(), []);
-
-  const propertyById = React.useMemo(() => {
-    const map = new Map<string, any>();
-    propertyData.forEach((item) => {
-      map.set(String(item.id), item);
-    });
-    return map;
-  }, []);
+  // Debug log to check the data
+  console.log('HomePage_Locations - propertyData:', propertyData);
+  console.log('HomePage_Locations - LISTINGS:', LISTINGS);
+  console.log('HomePage_Locations - propertyImages:', propertyImages);
 
   // Sort items to have featured (penthouse) first
   const items = React.useMemo(
@@ -29,31 +27,70 @@ const HomePage_Locations = () => {
   const penthouse = items.find(item => item.featured);
   const otherProperties = items.filter(item => !item.featured);
   
+  // Debug log
+  console.log('Penthouse:', penthouse);
+  console.log('Other properties:', otherProperties);
+  
   // Split other properties into chunks for different rows
   // First row will have 3 cards, second row will have remaining cards
   const firstRow = otherProperties.slice(0, 3);
   const secondRow = otherProperties.slice(3);
 
   const handleNavigate = (property: any) => {
-    const checkedLocation = property.property_name.toLowerCase().replace(/\s+/g, "-");
-    navigate(`/property_details/${checkedLocation}`, { state: { property } });
+    try {
+      // Use property_name if available, otherwise fall back to title or id
+      const propertyName = property.property_name || property.title || property.id;
+      if (!propertyName) {
+        console.error('No property name found for navigation:', property);
+        return;
+      }
+      const slug = String(propertyName).toLowerCase().replace(/\s+/g, "-");
+      console.log('Navigating to property:', { slug, property });
+      navigate(`/property_details/${slug}`, { state: { property } });
+    } catch (error) {
+      console.error('Error navigating to property:', error, property);
+    }
   };
 
-  const PropertyCard = ({ property, isPenthouse = false }: { property: any, isPenthouse?: boolean }) => {
-    const listing = property;
-    const propertyData = propertyById.get(listing.id);
-    const imgs = imagesByUnit[listing.id] || [];
-    const cover = imgs[0];
+  const PropertyCard = ({ property: propertyItem, isPenthouse = false }: { property: any, isPenthouse?: boolean }) => {
+    const listing = propertyItem;
+    
+    // Debug log the listing data
+    console.log('PropertyCard - listing:', listing);
+    
+    // Get the property data from propertyData array using the id
+    const propertyDataItem = propertyData.find(p => String(p.id) === String(listing.id));
+    
+    // Debug log the found property data
+    console.log('PropertyCard - propertyDataItem:', propertyDataItem);
+    
+    // Get images for the property
+    const imgs = propertyImages[String(listing.id)] || [];
+    const cover = imgs[0] || '';
+    
+    // Debug log the images
+    console.log('PropertyCard - images:', { imgs, cover });
+    
+    // Get the display name - use property_name from propertyDataItem if available, otherwise fall back to listing.title or id
+    const displayName = propertyDataItem?.property_name || listing.title || `Property ${listing.id}`;
+    
+    // Debug log
+    console.log('Rendering property card:', {
+      listingId: listing.id,
+      propertyData,
+      imgs,
+      cover
+    });
 
-    const interactiveProps: React.HTMLAttributes<HTMLElement> = propertyData
+    const interactiveProps: React.HTMLAttributes<HTMLElement> = propertyDataItem
       ? {
-          onClick: () => handleNavigate(propertyData),
+          onClick: () => handleNavigate(propertyDataItem),
           role: "link",
           tabIndex: 0,
           onKeyDown: (e: React.KeyboardEvent<HTMLElement>) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
-              handleNavigate(propertyData);
+              handleNavigate(propertyDataItem);
             }
           },
         }
@@ -65,31 +102,31 @@ const HomePage_Locations = () => {
         {...interactiveProps}
       >
         <div className="relative">
-          {cover ? (
-            <img 
-              src={cover} 
-              alt={`${listing.title} cover`}
-              className="w-full h-64 object-cover rounded-b-3xl"
-            />
-          ) : (
-            <div className="w-full h-64 bg-gray-200 flex items-center justify-center">
-              No image available
-            </div>
-          )}
+          <img 
+            src={cover}
+            alt={`${listing.property_name} cover`}
+            className="w-full h-64 object-cover rounded-b-3xl"
+            onError={(e) => {
+              const target = e.target as HTMLImageElement;
+              target.onerror = null; // Prevent infinite loop if fallback also fails
+              target.src = `https://atlashomestorage.blob.core.windows.net/listing-images/fallback.jpg`;
+              target.className = "w-full h-64 object-contain bg-gray-100 rounded-b-3xl p-4";
+            }}
+          />
           <div className="absolute top-4 right-4 bg-white px-3 py-1 rounded-full text-sm font-semibold">
             {isPenthouse ? 'Featured' : 'Available'}
           </div>
         </div>
         <div className="p-4">
-          <h2 className="text-xl font-bold text-gray-800 truncate">{listing.title}</h2>
+          <h2 className="text-xl font-bold text-gray-800 truncate">{displayName}</h2>
           <div className="text-gray-600 text-sm mt-1">Hyderabad, Telangana</div>
           <div className="flex items-center mt-2">
             <span className="text-yellow-400 text-lg">⭐</span>
-            <span className="font-semibold ml-1">{propertyData?.property_rating?.toFixed(1) || '4.8'}</span>
-            <span className="text-gray-500 text-sm ml-1">({propertyData?.property_reviews || '0'} reviews)</span>
+            <span className="font-semibold ml-1">{propertyDataItem?.property_rating?.toFixed(1) || '4.8'}</span>
+            <span className="text-gray-500 text-sm ml-1">({propertyDataItem?.property_reviews || '0'} reviews)</span>
           </div>
           <div className="mt-2">
-            <span className="text-xl font-bold">₹{propertyData?.property_price?.toLocaleString() || '4,999'}</span>
+            <span className="text-xl font-bold">₹{propertyDataItem?.property_price?.toLocaleString() || '4,999'}</span>
             <span className="text-gray-600 text-sm ml-1">for 1 night</span>
           </div>
         </div>

@@ -9,9 +9,18 @@ import Slider from "../../components/homepage_components/slider/Slider";
 import { resolveOptimizedAsset } from "../../utils/resolveOptimizedAsset";
 import HomePage_Locations from "../../components/homepage_components/homepage_locations/HomePage_Locations";
 
-const parallaxImage = resolveOptimizedAsset('airbnb301/img_1.jpg');
+const parallaxImage = 'https://atlashomestorage.blob.core.windows.net/listing-images/301/img_1.jpg';
+
+import { useEffect } from 'react';
+import { propertyData, propertyImages } from '../../data';
 
 const Home = () => {
+    useEffect(() => {
+        console.log('Home component mounted');
+        console.log('propertyData:', propertyData);
+        console.log('propertyImages:', propertyImages);
+    }, []);
+    
     return (
         <section className="relative font-roboto select-none">
             <div className="w-full h-fit relative ">
