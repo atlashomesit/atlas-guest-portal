@@ -3,102 +3,135 @@ import { resolveOptimizedAsset, resolveOptimizedGallery } from "./utils/resolveO
 const logo = resolveOptimizedAsset("logo-removebg-preview (3).png");
 
 const propertyImagePaths: Record<string, string[]> = {
-    "501": [
-        '501/IMG_1.jpg',
-        '501/IMG_2.jpg',
-        '501/IMG_3.jpg',
-        '501/IMG_4.jpg',
-        '501/IMG_5.jpg',
-        '501/IMG_6.jpg',
-        '501/IMG_7.jpg',
-        '501/IMG_8.jpg',
-        '501/IMG_10.jpg',
-        '501/IMG_22.JPG',
-        '501/IMG_24.JPG',
-        '501/IMG_31.jpg',
-        '501/IMG_2378.jpg',
-        '501/IMG_2381.jpg',
-        '501/IMG_2390.jpg',
-        '501/IMG_2393.jpg',
-        '501/IMG_1069.jpg',
-    ],
-    "201": [
-        'airbnb201/img_11.jpg',
-        'airbnb201/img_2.jpg',
-        'airbnb201/img_3.jpg',
-        'airbnb201/img_4.jpg',
-        'airbnb201/img_5.jpg',
-        'airbnb201/img_6.jpg',
-        'airbnb201/img_7.jpg',
-        'airbnb201/img_8.jpg',
-        'airbnb201/img_9.jpg',
-        'airbnb201/img_10.jpg',
-    ],
-    "202": [
-        'airbnb202/img_1.jpg',
-        'airbnb202/img_2.jpg',
-        'airbnb202/img_3.jpg',
-        'airbnb202/img_4.jpg',
-        'airbnb202/img_5.jpg',
-        'airbnb202/img_6.jpg',
-        'airbnb202/img_7.jpg',
-        'airbnb202/img_8.jpg',
-        'airbnb202/img_9.jpg',
-        'airbnb202/img_10.jpg',
-    ],
-    "301": [
-        'airbnb301/img_1.jpg',
-        'airbnb301/img_2.jpg',
-        'airbnb301/img_3.jpg',
-        'airbnb301/img_4.jpg',
-        'airbnb301/img_5.jpg',
-        'airbnb301/img_6.jpg',
-        'airbnb301/img_7.jpg',
-        'airbnb301/img_8.jpg',
-        'airbnb301/img_9.jpg',
-        'airbnb301/img_10.jpg',
-    ],
     "101": [
-        '101/img_1.jpg',
-        '101/img_2.jpg',
-        '101/img_3.jpg',
-        '101/img_4.jpg',
-        '101/img_5.jpg',
-        '101/img_6.jpg',
-        '101/img_7.jpg',
-        '101/img_8.jpg',
-        '101/img_9.jpg',
-        '101/img_10.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/101/cover.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/101/img_9.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/101/img_2.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/101/img_3.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/101/img_4.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/101/img_5.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/101/img_6.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/101/img_7.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/101/img_8.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/101/img_1.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/101/img_10.jpg',
     ],
     "102": [
-        '102/img_1.jpg',
-        '102/img_2.jpg',
-        '102/img_3.jpg',
-        '102/img_4.jpg',
-        '102/img_5.jpg',
-        '102/img_6.jpg',
-        '102/img_7.jpg',
-        '102/img_8.jpg',
-        '102/img_9.jpg',
-        '102/img_10.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/102/img_1.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/102/img_1.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/102/img_2.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/102/img_3.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/102/img_4.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/102/img_5.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/102/img_6.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/102/img_7.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/102/img_8.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/102/img_9.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/102/img_10.jpg',
+    ],
+    "201": [
+        'https://atlashomestorage.blob.core.windows.net/listing-images/201/img_11.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/201/img_1.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/201/img_2.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/201/img_3.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/201/img_4.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/201/img_5.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/201/img_6.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/201/img_7.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/201/img_8.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/201/img_9.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/201/img_10.jpg',
+    ],
+    "202": [
+        'https://atlashomestorage.blob.core.windows.net/listing-images/202/cover.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/202/img_1.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/202/img_2.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/202/img_3.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/202/img_4.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/202/img_5.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/202/img_6.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/202/img_7.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/202/img_8.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/202/img_9.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/202/img_10.jpg',
+    ],
+    "301": [
+        'https://atlashomestorage.blob.core.windows.net/listing-images/301/cover.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/301/img_5.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/301/img_2.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/301/img_3.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/301/img_4.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/301/img_1.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/301/img_6.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/301/img_7.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/301/img_8.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/301/img_9.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/301/img_10.jpg',
     ],
     "302": [
-        '302/img_1.jpg',
-        '302/img_2.jpg',
-        '302/img_3.jpg',
-        '302/img_4.jpg',
-        '302/img_5.jpg',
-        '302/img_6.jpg',
-        '302/img_7.jpg',
-        '302/img_8.jpg',
-        '302/img_9.jpg',
-        '302/img_10.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/302/cover.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/302/img_5.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/302/img_2.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/302/img_3.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/302/img_4.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/302/img_1.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/302/img_6.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/302/img_7.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/302/img_8.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/302/img_9.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/302/img_10.jpg',
+    ],
+    "501": [
+        'https://atlashomestorage.blob.core.windows.net/listing-images/501/cover.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/501/IMG_1.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/501/IMG_2.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/501/IMG_3.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/501/IMG_4.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/501/IMG_5.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/501/IMG_6.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/501/IMG_7.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/501/IMG_8.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/501/IMG_10.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/501/IMG_22.JPG',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/501/IMG_24.JPG',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/501/IMG_31.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/501/IMG_2378.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/501/IMG_2381.jpg',
+        'https://atlashomestorage.blob.core.windows.net/listing-images/501/IMG_2390.jpg',
+        '501/IMG_2393.jpg',
+        '501/IMG_1069.jpg',
     ],
 };
 
 const propertyImages: Record<string, string[]> = Object.fromEntries(
-    Object.entries(propertyImagePaths).map(([key, paths]) => [key, resolveOptimizedGallery(paths)])
+    Object.entries(propertyImagePaths).map(([key, paths]) => [
+        key,
+        paths.map(path => {
+            // If the path is already a full URL, return it as is
+            if (path.startsWith('http')) {
+                return path;
+            }
+            // If the path starts with a number (like '101/'), assume it's a property folder
+            if (/^\d+\//.test(path)) {
+                return `https://atlashomestorage.blob.core.windows.net/listing-images/${path}`;
+            }
+            // If the path starts with 'airbnb', it's in a subfolder
+            if (path.startsWith('airbnb')) {
+                const [folder, ...rest] = path.split('/');
+                const propertyId = folder.replace('airbnb', '');
+                return `https://atlashomestorage.blob.core.windows.net/listing-images/${propertyId}/${rest.join('/')}`;
+            }
+            // Default case
+            return `https://atlashomestorage.blob.core.windows.net/listing-images/${path}`;
+        })
+    ])
 );
+
+// Debug log
+console.log('propertyImages:', propertyImages);
+
+// Export the propertyImages object
+export { propertyImages };
 
 export const propertyData = [
     {
@@ -129,7 +162,7 @@ private bar setup, wine chiller, Nespresso machine, washer-dryer, ironing statio
         property_location: "Hyderabad, Telangana",
         property_reviews: 128,
         property_rating: 4.95,
-        property_price: 14999,
+        property_price: 4999,
         property_img: propertyImages["501"],
         property_nearplaces: [
             "Inorbit Mall (3 km)",
@@ -191,7 +224,7 @@ High-speed Wi-Fi (150 Mbps, multiple ISPs), air-conditioning in the bedroom, a f
         property_location: "Hyderabad, Telangana",
         property_reviews: 59,
         property_rating: 4.9,
-        property_price: 4996,
+        property_price: 2999,
         property_img: propertyImages["201"],
         property_nearplaces: [
             "Cyber Towers (2 km)",
@@ -249,7 +282,7 @@ Complimentary Wi-Fi, air-conditioning, inverter backup, daily housekeeping, and 
         property_location: "Hyderabad, Telangana",
         property_reviews: 64,
         property_rating: 4.8,
-        property_price: 5199,
+        property_price: 2999,
         property_img: propertyImages["202"],
         property_nearplaces: [
             "Cyber Towers (2 km)",
@@ -310,7 +343,7 @@ Complimentary Wi-Fi (150 Mbps), fully equipped kitchen (gas stove, microwave, re
         property_location: "Hyderabad, Telangana",
         property_reviews: 72,
         property_rating: 4.7,
-        property_price: 5399,
+        property_price: 2999,
         property_img: propertyImages["301"],
         property_nearplaces: [
             "Cyber Towers (2 km)",
@@ -367,7 +400,7 @@ High-speed Wi-Fi (150 Mbps, multiple ISPs), air-conditioning in the bedroom, a f
         property_location: "Hyderabad, Telangana",
         property_reviews: 85,
         property_rating: 4.9,
-        property_price: 4499,
+        property_price: 2999,
         property_img: propertyImages["101"],
         property_nearplaces: [
             "Cyber Towers (2 km)",
@@ -425,7 +458,7 @@ Enjoy uninterrupted high-speed Wi-Fi, AC, and a fully equipped kitchen with gas 
         property_location: "Hyderabad, Telangana",
         property_reviews: 91,
         property_rating: 4.8,
-        property_price: 4699,
+        property_price: 2999,
         property_img: propertyImages["102"],
         property_nearplaces: [
             "Cyber Towers (2 km)",
@@ -485,7 +518,7 @@ Fully equipped kitchen with microwave, refrigerator, RO water, toaster, and gas 
         property_location: "Hyderabad, Telangana",
         property_reviews: 77,
         property_rating: 4.85,
-        property_price: 4899,
+        property_price: 2999,
         property_img: propertyImages["302"],
         property_nearplaces: [
             "Cyber Towers (2 km)",

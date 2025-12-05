@@ -9,7 +9,7 @@ import { MdOutlineEmojiFoodBeverage, MdOutlineLocalLaundryService, MdOutlineDone
 import { FaCcMastercard, FaLocationDot } from "react-icons/fa6";
 import { X, ChevronRight } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { propertyData } from '../../../data.ts';
+import { propertyData, propertyImages } from '../../../data.ts';
 import Subheading from '../../commonComponents/subheading/Subheading';
 import HotelBooking_Form from '../hotelBooking_form/HotelBooking_Form';
 
@@ -46,14 +46,61 @@ const PropertyDetails = () => {
     const [showAboutMore, setShowAboutMore] = useState(false);
     const [showNeighborhoodMore, setShowNeighborhoodMore] = useState(false);
 
+    // Debug log
+    console.log('PropertyDetails - propertyImages:', propertyImages);
+    console.log('PropertyDetails - propertyData:', propertyData);
+    console.log('PropertyDetails - slug:', slug);
+
     useEffect(() => {
-        propertyData.forEach((item: any) => {
-            const propertyName = item.property_name.toLowerCase().replace(/\s+/g, '-');
-            if (propertyName === slug) {
-                setData(item);
-            }
+        console.log('Searching for property with slug:', slug);
+        
+        // First try to find by slug match
+        const foundBySlug = propertyData.find((item: any) => {
+            const propertySlug = item.property_name.toLowerCase().replace(/\s+/g, '-');
+            return propertySlug === slug;
         });
-    }, [slug]);
+
+        if (foundBySlug) {
+            console.log('Found property by slug match:', foundBySlug);
+            const images = propertyImages[String(foundBySlug.id)] || [];
+            console.log('Setting property data with images:', { foundBySlug, images });
+            setData({
+                ...foundBySlug,
+                property_img: Array.isArray(images) ? images : []
+            });
+            return;
+        }
+
+        // If not found by slug, try to find by ID
+        const propertyId = slug.split('-').pop();
+        if (propertyId) {
+            const foundById = propertyData.find((item: any) => String(item.id) === String(propertyId));
+            if (foundById) {
+                console.log('Found property by ID match:', foundById);
+                const images = propertyImages[String(foundById.id)] || [];
+                console.log('Setting property data with images:', { foundById, images });
+                setData({
+                    ...foundById,
+                    property_img: Array.isArray(images) ? images : []
+                });
+                return;
+            }
+        }
+
+        // If still not found, try to get from location state
+        if (location.state?.property) {
+            console.log('Using property from location state:', location.state.property);
+            const prop = location.state.property;
+            const images = propertyImages[String(prop.id)] || [];
+            setData({
+                ...prop,
+                property_img: Array.isArray(images) ? images : []
+            });
+            return;
+        }
+
+        console.error('No property found for slug:', slug);
+    }, [slug, location.state]);
 
     useEffect(() => {
         if (!data) return;
@@ -97,6 +144,22 @@ const PropertyDetails = () => {
         return name.charAt(0).toUpperCase() + name.slice(1);
     };
 
+    if (!data) {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <div className="text-center">
+                    <div className="text-2xl font-semibold text-gray-700 mb-4">Loading property details...</div>
+                    <div className="text-gray-500">If this takes too long, the property may not exist or there might be a connection issue.</div>
+                    <button 
+                        onClick={() => window.history.back()}
+                        className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                    >
+                        Go Back
+                    </button>
+                </div>
+            </div>
+        );
+    }
     if (!data) return <p className='mt-40 mb-20 text-center text-3xl'>Loading...</p>;
 
     return (
@@ -119,18 +182,27 @@ const PropertyDetails = () => {
                 <div className="flex gap-2 h-64 md:h-96 lg:h-[450px] overflow-hidden ">
                     {/* Main image */}
                     <div className="flex-1 relative h-full">
-                        <a href={data.property_img[0]} data-fancybox="property-gallery">
+                        <a href={propertyImages[data.id]?.[0] || data.property_img[0]} data-fancybox="property-gallery">
                             <img
-                                src={data.property_img[0]}
+                                src={propertyImages[String(data.id)]?.[0] || data.property_img[0]}
                                 alt="Main property"
                                 className="w-full h-full object-cover rounded-md"
+                                onError={(e) => {
+                                    const target = e.target as HTMLImageElement;
+                                    target.onerror = null;
+                                    target.src = data.property_img[0] || '';
+                                }}
                             />
                         </a>
 
                         <button
-                            onClick={() =>
-                                Fancybox.show(data.property_img.map(img => ({ src: img, type: "image" })))
-                            }
+                            onClick={() => {
+                                const images = propertyImages[String(data.id)] || data.property_img;
+                                Fancybox.show(images.map((img: string) => ({
+                                    src: img,
+                                    type: "image"
+                                })));
+                            }}
                             className="absolute bottom-4 right-4 bg-black/60 text-white text-xs md:text-sm px-4 py-2 rounded-full flex items-center gap-2 hover:bg-black/80 transition"
                         >
                             View photos
@@ -139,12 +211,17 @@ const PropertyDetails = () => {
 
                     {/* Thumbnails */}
                     <div className="flex-1 grid grid-cols-2 grid-rows-2 gap-2 h-full">
-                        {data.property_img.slice(1, 5).map((img, index) => (
+                        {(propertyImages[data.id]?.slice(1, 5) || data.property_img.slice(1, 5)).map((img: string, index: number) => (
                             <a key={index} href={img} data-fancybox="property-gallery">
                                 <img
                                     src={img}
                                     alt={`Thumbnail ${index + 1}`}
                                     className="w-full h-full object-cover rounded-md hover:opacity-80 transition"
+                                    onError={(e) => {
+                                        const target = e.target as HTMLImageElement;
+                                        target.onerror = null;
+                                        target.src = data.property_img[index + 1] || '';
+                                    }}
                                 />
                             </a>
                         ))}
@@ -253,7 +330,7 @@ const PropertyDetails = () => {
                     {/* right div  */}
                     <div className="w-full sm:w-1/3">
                         <div className='sticky top-16'>
-                            <HotelBooking_Form />
+                            <HotelBooking_Form propertyId={data.id} />
                         </div>
                     </div>
                 </div>

@@ -26,3 +26,20 @@
 .custom-swiper:hover .swiper-button-prev {
     opacity: 1;
 }
+.justify-between {
+    justify-content: space-evenly;
+    font-size: 30px;
+    padding: 10px;
+}
+.py-1 {
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+}
+
+.px-6 {
+    padding-left: 5rem;
+    padding-right: 5rem;
+}
+#text{
+    font-size: 20px;
+}

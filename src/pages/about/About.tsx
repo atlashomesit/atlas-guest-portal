@@ -3,7 +3,7 @@ import Parallax from "../../components/commonComponents/parallax/Parallax";
 import NearByPlaces from "../../components/aboutpage_component/nearbyplaces/NearByPlaces";
 import { resolveOptimizedAsset } from "../../utils/resolveOptimizedAsset";
 
-const parallaxImage = resolveOptimizedAsset("destination_images/manali.png");
+const parallaxImage = resolveOptimizedAsset("destination_images/manali.webp");
 const bannerImage = resolveOptimizedAsset("banner.jpg");
 
 const About = () => {

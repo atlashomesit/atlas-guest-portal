@@ -15,25 +15,25 @@ const ExclusiveService_Card = () => {
   const data: Room[] = [
     {
       title: "Sanctuary of Serenity",
-      thumbnail: resolveOptimizedAsset('101/img_12.jpg'),
+      thumbnail: "https://atlashomestorage.blob.core.windows.net/listing-images/102/img_13.jpg",
       description: "Retreat to tranquil spaces where comfort meets style, offering you a peaceful escape at the heart of Atlas Homes.",
       link: "/rooms"
     },
     {
       title: "Tailored for Every Journey",
-      thumbnail: resolveOptimizedAsset('airbnb202/img_6.jpg'),
+      thumbnail: "https://atlashomestorage.blob.core.windows.net/listing-images/201/img_15.jpg",
       description: "Find your perfect fit—our diverse accommodations are designed to suit every traveler, every story, every dream.",
       link: "/rooms"
     },
     {
       title: "Moments to Savor",
-      thumbnail: resolveOptimizedAsset('airbnb301/img_11.jpg'),
+      thumbnail: "https://atlashomestorage.blob.core.windows.net/listing-images/302/img_5.jpg",
       description: "Delight in gourmet experiences and cozy corners, where every meal and every sip is a celebration of taste.",
       link: "/dining"
     },
     {
-      title: "Celebrate Life’s Milestones",
-      thumbnail: resolveOptimizedAsset('102/img_14.jpg'),
+      title: "Celebrate Life's Milestones",
+      thumbnail: "https://atlashomestorage.blob.core.windows.net/listing-images/501/IMG_2378.jpg",
       description: "Host unforgettable gatherings in elegant spaces, with every detail crafted to make your special moments shine.",
       link: "/events"
     },

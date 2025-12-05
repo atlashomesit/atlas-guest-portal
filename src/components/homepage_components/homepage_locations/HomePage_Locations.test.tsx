@@ -12,24 +12,25 @@ vi.mock("react-router-dom", async () => {
 });
 
 import { MemoryRouter } from "react-router-dom";
+import HomePage_Locations from "./HomePage_Locations";
 
 vi.mock("../../../styles/listings.css?inline", () => ({ default: "" }));
 
-const loadListingImagesMock = vi.fn(() => ({
-  "501": ["penthouse.jpg"],
-  "101": ["101.jpg"],
-  "102": ["102.jpg"],
-}));
-
-vi.mock("../../../utils/loadListingImages", () => ({
-  loadListingImages: () => loadListingImagesMock(),
-}));
-
-import HomePage_Locations from "./HomePage_Locations";
+// Mock the data module
+vi.mock("../../../data.ts", async () => {
+  const actual = await vi.importActual("../../../data");
+  return {
+    ...actual,
+    propertyImages: {
+      "501": ["https://example.com/penthouse.jpg"],
+      "101": ["https://example.com/101.jpg"],
+      "102": ["https://example.com/102.jpg"],
+    },
+  };
+});
 
 describe("HomePage_Locations", () => {
   beforeEach(() => {
-    loadListingImagesMock.mockClear();
     navigateMock.mockClear();
   });
 

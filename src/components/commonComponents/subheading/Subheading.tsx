@@ -1,7 +1,6 @@
 import { Link } from "react-router-dom";
-import { resolveOptimizedAsset } from '../../../utils/resolveOptimizedAsset';
 
-const logo = resolveOptimizedAsset('logo.jpeg');
+const logo = 'https://atlashomestorage.blob.core.windows.net/listing-images/logo-removebg-preview%20(3).be48d403.webp';
 
 const Subheading = () => {
     return (

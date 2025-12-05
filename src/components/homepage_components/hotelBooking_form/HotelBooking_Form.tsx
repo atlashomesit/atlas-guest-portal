@@ -1,202 +1,383 @@
 import { useState, useRef, useEffect } from 'react';
-import { propertyData } from '../../../data.ts';
-import { useNavigate } from 'react-router-dom';
+import { DateRange } from 'react-date-range';
+import { format } from 'date-fns';
+import { propertyData } from '../../../data';
 
-const HotelBooking_Form = () => {
-    const navigate = useNavigate();
-    const [formData, setFormData] = useState({
-        destination: '',
-        checkIn: '2025-03-26',
-        checkOut: '2025-03-27',
-        guests: '2 adults, 1 room'
+import 'react-date-range/dist/styles.css';
+import 'react-date-range/dist/theme/default.css';
+
+interface BookingCardProps {
+    propertyId: number;
+}
+
+const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
+    const [openCalendar, setOpenCalendar] = useState(false);
+    const [openGuests, setOpenGuests] = useState(false);
+
+    const [dates, setDates] = useState({
+        startDate: new Date(),
+        endDate: new Date(Date.now() + 86400000), // Next day by default
+        key: "selection",
+    });
+    
+    const handleDateChange = (ranges: any) => {
+        const { startDate, endDate } = ranges.selection;
+        
+        // Always update the dates when a selection is made
+        if (startDate && endDate) {
+            // If the same date is selected for both start and end, set end to next day
+            if (startDate.getTime() === endDate.getTime()) {
+                const nextDay = new Date(startDate);
+                nextDay.setDate(nextDay.getDate() + 1);
+                setDates({
+                    startDate: startDate,
+                    endDate: nextDay,
+                    key: 'selection'
+                });
+            } else {
+                setDates({
+                    startDate: startDate,
+                    endDate: endDate,
+                    key: 'selection'
+                });
+            }
+        }
+    };
+
+    interface GuestCounts {
+        adults: number;
+        children: number;
+        childrenAges: number[]; // To track ages of children (5-12)
+        infants: number; // 0-5 years
+        pets: number;
+    }
+
+    const [guests, setGuests] = useState<GuestCounts>({
+        adults: 1, // Start with 1 adult by default
+        children: 0,
+        childrenAges: [],
+        infants: 0,
+        pets: 0,
     });
 
-    const [showSuggestions, setShowSuggestions] = useState(false);
-    const inputRef = useRef<HTMLDivElement>(null);
+    // Convert propertyId to number if it's passed as a string
+    const property = propertyData.find(p => p.id === Number(propertyId));
+    const basePrice = property?.property_price || 0;
+    
+    // Calculate total number of people (adults + children)
+    const totalPeople = guests.adults + guests.children;
+    
+    // Calculate price based on property ID
+    let pricePerNight;
+    if (Number(propertyId) === 501) {
+        // For property 501: Base price for 2 people, ₹700 per additional person (adult or child)
+        const additionalPeople = Math.max(0, totalPeople - 2);
+        pricePerNight = basePrice + (additionalPeople * 700);
+    } else {
+        // For other properties: Base price for 2 people, ₹400 per additional person (adult or child)
+        const additionalPeople = Math.max(0, totalPeople - 2);
+        pricePerNight = basePrice + (additionalPeople * 400);
+    }
+    
+    const originalPrice = Math.round(pricePerNight * 1.1); // 10% higher than the current price
+    
+    // Log for debugging
+    console.log('Property ID:', propertyId, 'Adults:', guests.adults, 'Children:', guests.children, 'Total people:', totalPeople, 'Price per night:', pricePerNight);
 
-    // Unique locations
-    const locations = Array.from(
-        new Set(propertyData.map(item => item.property_location))
-    );
+    const guestMenuRef = useRef<HTMLDivElement | null>(null);
+    const calendarRef = useRef<HTMLDivElement | null>(null);
 
-    const guestOptions = [
-        "1 adult, 1 room",
-        "2 adults, 1 room",
-        "2 adults, 2 rooms",
-        "3 adults, 1 room",
-        "4 adults, 2 rooms"
-    ];
+    const formatGuestLabel = () => {
+        const { adults, children, infants, pets } = guests;
+        const guestCount = adults + children + infants;
+        const guestText = guestCount === 1 ? 'guest' : 'guests';
+        const petText = pets === 1 ? 'pet' : 'pets';
+        
+        let label = `${guestCount} ${guestText}`;
+        if (pets > 0) {
+            label += `, ${pets} ${petText}`;
+        }
+        return label;
+    };
 
-    const filteredLocations = formData.destination
-        ? locations.filter((loc) =>
-            loc.toLowerCase().includes(formData.destination.toLowerCase())
-        )
-        : [];
-
-    const handleInputChange = (e: any) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({
+    const updateChildAge = (index: number, age: number) => {
+        const newAges = [...guests.childrenAges];
+        newAges[index] = age;
+        setGuests(prev => ({
             ...prev,
-            [name]: value
+            childrenAges: newAges
         }));
-
-        if (name === "destination") {
-            setShowSuggestions(true);
-        }
-    };
-
-    const handleSubmit = (e: any) => {
-        e.preventDefault();
-        console.log('Booking Search:', formData);
-
-        const property = propertyData.find(
-            (item) => item.property_location.toLowerCase() === formData.destination.toLowerCase()
-        );
-
-        if (property) {
-            navigate(`/property_LocationDetails/${property.id}`, { state: { property } });
-        } else {
-            alert('No matching location found.');
-        }
-    };
-
-    const formatDate = (dateString: any) => {
-        const date = new Date(dateString);
-        return date.toLocaleDateString('en-GB');
     };
 
     useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
+        const handleClickOutside = (event: any) => {
             if (
-                inputRef.current &&
-                event.target instanceof Node &&
-                !inputRef.current.contains(event.target)
+                guestMenuRef.current &&
+                !guestMenuRef.current.contains(event.target)
             ) {
-                setShowSuggestions(false);
+                setOpenGuests(false);
+            }
+            if (
+                calendarRef.current &&
+                !calendarRef.current.contains(event.target)
+            ) {
+                setOpenCalendar(false);
             }
         };
 
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
+    const modifyGuest = (type: keyof typeof guests, increment: boolean) => {
+        setGuests(prev => ({
+            ...prev,
+            [type]: Math.max(0, prev[type] + (increment ? 1 : -1)),
+        }));
+    };
+
     return (
-        <div className="w-full flex justify-center">
-            <form
-                onSubmit={handleSubmit}
-                className="bg-white rounded-2xl shadow-lg p-6 w-full max-w-md space-y-6"
-            >
-                {/* Destination */}
-                <div className="relative" ref={inputRef}>
-                    <label className="text-sm text-gray-500 mb-1 block">Where do you want to stay?</label>
-                    <input
-                        type="text"
-                        name="destination"
-                        value={formData.destination}
-                        onChange={handleInputChange}
-                        placeholder="Enter destination or hotel name"
-                        className="w-full text-gray-800 placeholder-gray-500 border-b focus:outline-none pb-1"
+        <div className="max-w-md mx-auto p-6 bg-white shadow-xl rounded-2xl relative">
+
+            {/* PRICE SECTION */}
+            <p className="text-[30px] font-bold">
+                ₹{pricePerNight.toLocaleString()}
+                
+                <span className="text-base ml-1">/night</span>
+            </p>
+
+            <p className="text-yellow-500 text-sm mb-4">★ 4.78 (21 reviews)</p>
+
+
+            <div className="grid grid-cols-2 gap-3 mb-4">
+                <div
+                    onClick={() => setOpenCalendar(true)}
+                    className="border rounded-xl p-3 cursor-pointer"
+                >
+                    <p className="text-sm text-gray-500">Check-In Date</p>
+                    <p className="font-semibold">
+                        {format(dates.startDate, "dd-MM-yyyy")}
+                    </p>
+                </div>
+
+                <div
+                    onClick={() => setOpenCalendar(true)}
+                    className="border rounded-xl p-3 cursor-pointer"
+                    title={dates.startDate.getTime() === dates.endDate.getTime() ? "Check-out date must be after check-in date" : ""}
+                >
+                    <p className="text-sm text-gray-500">Check-Out Date</p>
+                    <p className="font-semibold">
+                        {format(dates.endDate, "dd-MM-yyyy")}
+                    </p>
+                </div>
+            </div>
+
+            {openCalendar && (
+                <div ref={calendarRef} className="absolute left-0 z-50 bg-white shadow-lg rounded-xl mt-2">
+                    <DateRange
+                        editableDateInputs={true}
+                        onChange={handleDateChange}
+                        moveRangeOnFirstSelection={false}
+                        ranges={[{
+                            startDate: dates.startDate,
+                            endDate: dates.endDate,
+                            key: 'selection'
+                        }]}
+                        minDate={new Date()}
+                        rangeColors={['#FF5A5F']}
+                        showDateDisplay={false}
+                        showPreview={false}
+                        showSelectionPreview={true}
+                        months={2}
+                        direction="horizontal"
                     />
-                    {showSuggestions && filteredLocations.length > 0 && (
-                        <div className="absolute z-50 bg-white border rounded shadow-md mt-2 w-full overflow-y-auto max-h-48">
-                            {filteredLocations.map((loc, index) => (
-                                <div
-                                    key={index}
-                                    className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
-                                    onClick={() => {
-                                        setFormData(prev => ({
-                                            ...prev,
-                                            destination: loc
-                                        }));
-                                        setShowSuggestions(false);
-                                    }}
+                </div>
+            )}
+
+            {/* GUEST SELECTOR */}
+            <div
+                onClick={() => setOpenGuests(true)}
+                className="border rounded-xl p-3 cursor-pointer flex justify-between items-center"
+            >
+                <div>
+                    <p className="text-sm text-gray-500">Guests</p>
+                    <p className="font-semibold">{formatGuestLabel()}</p>
+                </div>
+            </div>
+
+            {/* UPDATED POPUP SECTION */}
+            {openGuests && (
+                <div
+                    ref={guestMenuRef}
+                    className="absolute left-1/2 -translate-x-1/2 bg-white z-50 rounded-xl shadow-xl border p-4 overflow-y-auto"
+                    style={{
+                        width: "90%",          // Increased Width
+                        maxHeight: "200px",    // Reduced Height
+                        top: "260px",
+                    }}
+                >
+                    <div className="mb-4">
+                        <div className="flex justify-between items-center mb-2">
+                            <div>
+                                <p className="font-medium">Adults</p>
+                                <p className="text-sm text-gray-500">Age 14 or above</p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <button
+                                    onClick={() => modifyGuest("adults", false)}
+                                    className="w-8 h-8 rounded-full border flex items-center justify-center"
                                 >
-                                    {loc}
-                                </div>
-                            ))}
+                                    -
+                                </button>
+                                <span>{guests.adults}</span>
+                                <button
+                                    onClick={() => modifyGuest("adults", true)}
+                                    className="w-8 h-8 rounded-full border flex items-center justify-center"
+                                >
+                                    +
+                                </button>
+                            </div>
                         </div>
-                    )}
-                </div>
+                    </div>
 
-                {/* Check-in */}
-                <div className="relative">
-                    <label className="text-sm text-gray-500 mb-1 block">Check-in</label>
-                    <div className="flex items-center justify-between border-b pb-1">
-                        <input
-                            type="date"
-                            id="checkIn"
-                            name="checkIn"
-                            value={formData.checkIn}
-                            onChange={handleInputChange}
-                            className="absolute inset-0 opacity-0 cursor-pointer"
-                        />
-                        <span className="text-gray-800">{formatDate(formData.checkIn)}</span>
-                        <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                        </svg>
+                    <div className="mb-4">
+                        <div className="flex justify-between items-center mb-2">
+                            <div>
+                                <p className="font-medium">Children</p>
+                                <p className="text-sm text-gray-500">Ages 5-12</p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <button
+                                    onClick={() => {
+                                        if (guests.children > 0) {
+                                            setGuests(prev => ({
+                                                ...prev,
+                                                children: prev.children - 1,
+                                                childrenAges: prev.childrenAges.slice(0, -1)
+                                            }));
+                                        }
+                                    }}
+                                    className="w-8 h-8 rounded-full border flex items-center justify-center"
+                                >
+                                    -
+                                </button>
+                                <span>{guests.children}</span>
+                                <button
+                                    onClick={() => {
+                                        setGuests(prev => ({
+                                            ...prev,
+                                            children: prev.children + 1,
+                                            childrenAges: [...prev.childrenAges, 5] // Default age 5
+                                        }));
+                                    }}
+                                    className="w-8 h-8 rounded-full border flex items-center justify-center"
+                                >
+                                    +
+                                </button>
+                            </div>
+                        </div>
+                        {guests.childrenAges.length > 0 && (
+                            <div className="grid grid-cols-2 gap-2 mt-2">
+                                {guests.childrenAges.map((age, index) => (
+                                    <div key={index} className="flex items-center gap-2">
+                                        <span className="text-sm">Child {index + 1}:</span>
+                                        <select
+                                            value={age}
+                                            onChange={(e) => updateChildAge(index, parseInt(e.target.value))}
+                                            className="border rounded p-1 text-sm w-20"
+                                        >
+                                            {[5, 6, 7, 8, 9, 10, 11, 12].map(num => (
+                                                <option key={num} value={num}>{num} years</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="mb-4">
+                        <div className="flex justify-between items-center">
+                            <div>
+                                <p className="font-medium">Infants</p>
+                                <p className="text-sm text-gray-500">Under 5 years</p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <button
+                                    onClick={() => {
+                                        if (guests.infants > 0) {
+                                            setGuests(prev => ({
+                                                ...prev,
+                                                infants: prev.infants - 1
+                                            }));
+                                        }
+                                    }}
+                                    className="w-8 h-8 rounded-full border flex items-center justify-center"
+                                >
+                                    -
+                                </button>
+                                <span>{guests.infants}</span>
+                                <button
+                                    onClick={() => {
+                                        if (guests.infants < 2) { // Limit to 2 infants
+                                            setGuests(prev => ({
+                                                ...prev,
+                                                infants: prev.infants + 1
+                                            }));
+                                        }
+                                    }}
+                                    className="w-8 h-8 rounded-full border flex items-center justify-center"
+                                >
+                                    +
+                                </button>
+                            </div>
+                        </div>
+                        {guests.infants > 0 && (
+                            <p className="text-xs text-gray-500 mt-1">
+                                Maximum 2 infants allowed (0-4 years)
+                            </p>
+                        )}
+                    </div>
+
+                    <div className="mb-4">
+                        <div className="flex justify-between items-center mb-2">
+                            <div>
+                                <p className="font-medium">Pets</p>
+                                <p className="text-sm text-gray-500"></p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <button
+                                    onClick={() => modifyGuest("pets", false)}
+                                    className="w-8 h-8 rounded-full border flex items-center justify-center"
+                                >
+                                    -
+                                </button>
+                                <span>{guests.pets}</span>
+                                <button
+                                    onClick={() => modifyGuest("pets", true)}
+                                    className="w-8 h-8 rounded-full border flex items-center justify-center"
+                                >
+                                    +
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
+            )}
 
-                {/* Check-out */}
-                <div className="relative">
-                    <label className="text-sm text-gray-500 mb-1 block">Check-out</label>
-                    <div className="flex items-center justify-between border-b pb-1">
-                        <input
-                            type="date"
-                            id="checkOut"
-                            name="checkOut"
-                            value={formData.checkOut}
-                            onChange={handleInputChange}
-                            min={formData.checkIn}
-                            className="absolute inset-0 opacity-0 cursor-pointer"
-                        />
-                        <span className="text-gray-800">{formatDate(formData.checkOut)}</span>
-                        <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                        </svg>
-                    </div>
-                </div>
+            <button className="bg-[#e24627] text-white w-full rounded-full py-4 mt-6 text-lg font-semibold">
+                Reserve
+            </button>
 
-                {/* Guests */}
-                <div className="relative">
-                    <label className="text-sm text-gray-500 mb-1 block">Guests and rooms</label>
-                    <div className="flex items-center justify-between border-b pb-1">
-                        <select
-                            name="guests"
-                            value={formData.guests}
-                            onChange={handleInputChange}
-                            className="absolute inset-0 opacity-0 cursor-pointer"
-                        >
-                            {guestOptions.map((option, index) => (
-                                <option key={index} value={option}>
-                                    {option}
-                                </option>
-                            ))}
-                        </select>
-                        <span className="text-gray-800">{formData.guests}</span>
-                        <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
-                        </svg>
-                    </div>
-                </div>
+            <div className="flex justify-between mt-5 border-t pt-4">
+                <p className="text-lg font-semibold">Total Price : </p>
+                <p className="text-lg font-bold">
+                    ₹{pricePerNight.toLocaleString()}
+                </p>
+            </div>
 
-                {/* Submit Button */}
-                <div className="pt-4">
-                    <button
-                        type="submit"
-                        className="bg-primary hover:bg-[#e38a1f] text-white font-semibold py-3 px-6 rounded-lg w-full flex items-center justify-center transition duration-300 shadow-md"
-                    >
-                        <span>Search Hotels</span>
-                        <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"></path>
-                        </svg>
-                    </button>
-                </div>
-            </form>
         </div>
     );
 };
 
-export default HotelBooking_Form;
+export default BookingCard;

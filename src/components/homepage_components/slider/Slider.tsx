@@ -9,7 +9,7 @@ import { navbarData } from '../../../data';
 
 const Slider = () => {
     const images = [
-        { id: 5, src: resolveOptimizedAsset('banner4.jpg'), alt: 'Image 5' },
+        { id: 5, src: 'https://atlashomestorage.blob.core.windows.net/listing-images/fallback.jpeg', alt: 'Atlas Homes Banner' },
     ];
 
     return (
@@ -19,7 +19,7 @@ const Slider = () => {
                 <Link to='/'>
                     <img
                         className='w-20 h-20 md:w-44 md:h-20 object-cover rounded-md'
-                        src={navbarData.logo[0].image}
+                        src='https://atlashomestorage.blob.core.windows.net/listing-images/logo-removebg-preview (3).be48d403.webp'
                         alt='Logo'
                     />
                 </Link>

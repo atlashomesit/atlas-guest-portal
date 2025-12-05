@@ -18,6 +18,9 @@ Optional tooling:
 - Cloudflare Pages build vars → `NODE_VERSION=20.18.1`, `NPM_FLAGS=--no-audit --no-fund`
 - Enforced override → `@jridgewell/sourcemap-codec@1.5.5`
 
+### Image optimization manifest
+- `npm run optimize-images` normalizes JPEG/PNG assets to WebP, cleans outdated variants, and writes a manifest to `src/assets/optimized-manifest.json` (creating the directory if missing) so the app can reference the optimized filenames consistently across local, CI, and Cloudflare Pages builds.
+
 ### Lockfile maintenance
 - Use Node 20.x (see `.nvmrc`) and run `npm install` to refresh dependencies.
 - Always commit the resulting `package-lock.json` so `npm ci` stays in sync locally, in CI, and during Cloudflare builds.
