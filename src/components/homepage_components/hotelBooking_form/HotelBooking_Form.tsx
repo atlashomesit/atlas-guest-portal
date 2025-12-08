@@ -2,6 +2,13 @@ import { useState, useRef, useEffect } from 'react';
 import { DateRange } from 'react-date-range';
 import { format } from 'date-fns';
 import { propertyData } from '../../../data';
+import Razorpay from 'razorpay';
+
+declare global {
+  interface Window {
+    Razorpay: any;
+  }
+}
 
 import 'react-date-range/dist/styles.css';
 import 'react-date-range/dist/theme/default.css';
@@ -79,13 +86,40 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
         pricePerNight = basePrice + (additionalPeople * 400);
     }
     
-    const originalPrice = Math.round(pricePerNight * 1.1); // 10% higher than the current price
+    // Calculate number of nights (minimum 1 night)
+    const oneDay = 24 * 60 * 60 * 1000; // hours*minutes*seconds*milliseconds
+    const nights = Math.max(1, Math.round(Math.abs((dates.endDate.getTime() - dates.startDate.getTime()) / oneDay)));
+    
+    // Calculate total price based on number of nights
+    const totalPrice = pricePerNight * nights;
+    const originalPrice = Math.round(pricePerNight * nights * 1.1); // 10% higher than the current price
     
     // Log for debugging
     console.log('Property ID:', propertyId, 'Adults:', guests.adults, 'Children:', guests.children, 'Total people:', totalPeople, 'Price per night:', pricePerNight);
 
     const guestMenuRef = useRef<HTMLDivElement | null>(null);
     const calendarRef = useRef<HTMLDivElement | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
+
+    // Removed loadRazorpay function as it's no longer needed with direct link redirection
+
+    const initiatePayment = () => {
+  try {
+    setIsLoading(true);
+
+    const url = new URL('https://pages.razorpay.com/atlashomestays');
+    url.searchParams.append('amount', totalPrice.toString());
+    url.searchParams.append('currency', 'INR');
+
+    window.location.href = url.toString();
+
+  } catch (error) {
+    console.error('Payment error:', error);
+    alert('Error processing payment. Please try again.');
+    setIsLoading(false);
+  }
+};
+
 
     const formatGuestLabel = () => {
         const { adults, children, infants, pets } = guests;
@@ -173,7 +207,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
             </div>
 
             {openCalendar && (
-                <div ref={calendarRef} className="absolute left-0 z-50 bg-white shadow-lg rounded-xl mt-2">
+                <div ref={calendarRef} className="absolute right-0 z-50 bg-white shadow-lg rounded-xl mt-2 overflow-hidden border border-gray-200">
                     <DateRange
                         editableDateInputs={true}
                         onChange={handleDateChange}
@@ -184,12 +218,16 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
                             key: 'selection'
                         }]}
                         minDate={new Date()}
-                        rangeColors={['#FF5A5F']}
+                        rangeColors={['#B99359']}
                         showDateDisplay={false}
                         showPreview={false}
                         showSelectionPreview={true}
-                        months={2}
+                        months={1}
                         direction="horizontal"
+                        className="text-sm"
+                        monthDisplayFormat="MMMM yyyy"
+                        weekdayDisplayFormat="EEEE"
+                        dayDisplayFormat="d"
                     />
                 </div>
             )}
@@ -365,14 +403,55 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
                 </div>
             )}
 
-            <button className="bg-[#e24627] text-white w-full rounded-full py-4 mt-6 text-lg font-semibold">
-                Reserve
-            </button>
+            <div className="space-y-4 mt-6">
+              {/* Payment Method Selection */}
+              <div className="p-4 border rounded-xl">
+                <label className="flex items-center space-x-3 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="payment-method"
+                    className="h-5 w-5 text-[#B99359] focus:ring-[#B99359]"
+                    defaultChecked
+                    disabled={isLoading}
+                  />
+                  <div className="flex items-center">
+                    <img 
+                      src="https://cdn.razorpay.com/logo.svg" 
+                      alt="Razorpay" 
+                      className="h-6 mr-2"
+                    />
+                    <span className="text-gray-700">Pay with Razorpay</span>
+                  </div>
+                </label>
+              </div>
+              
+              {/* Reserve Button */}
+              <button 
+                onClick={initiatePayment}
+                disabled={isLoading}
+                className="bg-[#B99359] hover:bg-[#A0804D] text-white w-full rounded-full py-4 text-lg font-semibold transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center"
+              >
+                {isLoading ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Processing...
+                  </>
+                ) : (
+                  'Reserve Now'
+                )}
+              </button>
+            </div>
 
             <div className="flex justify-between mt-5 border-t pt-4">
-                <p className="text-lg font-semibold">Total Price : </p>
+                <div>
+                    <p className="text-lg font-semibold">Total Amount</p>
+                    <p className="text-sm text-gray-500">Inclusive of all taxes and fees</p>
+                </div>
                 <p className="text-lg font-bold">
-                    ₹{pricePerNight.toLocaleString()}
+                    ₹{totalPrice.toLocaleString('en-IN')}
                 </p>
             </div>
 
