@@ -1,8 +1,8 @@
 import { Link, useParams } from "react-router-dom";
 import SEO from "../../components/SEO";
-import { blogPosts, BlogCategory } from "../../data/blogPosts";
+import { blogPosts, BlogCategory as BlogCategoryType } from "../../data/blogPosts";
 
-const categoryMeta: Record<BlogCategory, { title: string; description: string; label: string }> = {
+const categoryMeta: Record<BlogCategoryType, { title: string; description: string; label: string }> = {
   "guest-guides": {
     title: "Guest Guides | Atlas Homestays",
     description: "Destination tips and stay guidance for Atlas Homestays guests.",
@@ -15,9 +15,13 @@ const categoryMeta: Record<BlogCategory, { title: string; description: string; l
   },
 };
 
+const isValidCategory = (value: string | undefined): value is BlogCategoryType => {
+  return Boolean(value && value in categoryMeta);
+};
+
 const BlogCategory = () => {
   const { category } = useParams();
-  const safeCategory = (category as BlogCategory) || "guest-guides";
+  const safeCategory: BlogCategoryType = isValidCategory(category) ? category : "guest-guides";
   const meta = categoryMeta[safeCategory];
   const filtered = blogPosts.filter((post) => post.category === safeCategory);
 
