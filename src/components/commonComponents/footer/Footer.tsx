@@ -1,4 +1,4 @@
-import { resolveOptimizedAsset } from '../../../utils/resolveOptimizedAsset';
+import logo from '../../../assets/logo.svg';
 import { FaFacebook, FaTwitter, FaYoutube, FaInstagram } from 'react-icons/fa';
 import { ImGithub } from 'react-icons/im';
 import { IoIosMail, IoIosCall, IoIosArrowForward } from "react-icons/io";
@@ -17,13 +17,17 @@ const iconMap = {
 };
 
 const Footer = () => {
+    const socialLinks = Array.isArray(footerData?.socialLinks) ? footerData.socialLinks : [];
+    const contactInfo = Array.isArray(footerData?.contactInfo) ? footerData.contactInfo : [];
+    const logoSrc = logo;
+
     return (
         <div className='py-10 md:py-10 px-4 lg:px-8 bg-black text-[#949494]'>
             <div className='max-w-screen-2xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8'>
                 <div className='flex flex-col gap-7 items-center lg:items-start'>
-                    <img className='w-32 md:w-20 rounded-md' src={resolveOptimizedAsset('logo.jpeg')} alt="paymentlogo" />
+                    <img className='w-32 md:w-20 rounded-md' src={logoSrc} alt="paymentlogo" />
                     <div className='flex text-lg gap-6'>
-                        {footerData.socialLinks.map(({ icon, link }, index) => {
+                        {socialLinks.map(({ icon, link }, index) => {
                             const IconComponent = iconMap[icon];
                             return (
                                 <a key={index} href={link} target="_blank" rel="noopener noreferrer">
@@ -61,7 +65,7 @@ const Footer = () => {
                 <div className="text-center lg:text-left">
                     <h2 className="text-2xl text-primary font-semibold mb-4">Locate Us</h2>
                     <div className="text-base flex flex-col gap-3">
-                        {footerData.contactInfo.map(({ icon, text }, index) => {
+                        {contactInfo.map(({ icon, text }, index) => {
                             const IconComponent = iconMap[icon];
 
                             return (
