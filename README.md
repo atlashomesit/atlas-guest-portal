@@ -84,3 +84,8 @@ Optional tooling:
 
 ## Listings
 - Featured listing: mark `featured: true` in [`src/data/listings.ts`](src/data/listings.ts). Images are auto-loaded from `src/assets/<unit>/`.
+
+## Blog and Policies updates
+- **Add a blog post:** edit `src/data/blogPosts.ts` and append a new object with `title`, `slug`, `category` (`guest-guides` or `hospitality-tech`), `excerpt`, `content`, and optional `featuredImage`, `metaTitle`, and `metaDescription`. The routes `/blog`, `/blog/:category`, and `/blog/:slug` automatically surface new entries.
+- **Edit policies:** update the content blocks in `src/pages/policies/Policies.tsx` while keeping the existing anchors to preserve deep links from navigation and the footer.
+- **Sitemap URL:** a static sitemap is served from `public/sitemap.xml` and referenced in `public/robots.txt` for Cloudflare Pages deployments.
