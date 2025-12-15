@@ -127,9 +127,6 @@ const propertyImages: Record<string, string[]> = Object.fromEntries(
     ])
 );
 
-// Debug log
-console.log('propertyImages:', propertyImages);
-
 // Export the propertyImages object
 export { propertyImages };
 

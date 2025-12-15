@@ -79,6 +79,8 @@ Optional tooling:
 - **Node version errors:** Verify `node -v` meets the prerequisite range. Use `nvm` or `fnm` to align versions.
 - **Port 5173 already in use:** Override with `npm run dev -- --port 5174` or free the port before starting Vite.
 - **Blank property pages:** Ensure navigation via the homepage so React Router receives the `location.state` payload required by [`Homepage_LocationDetails`](src/components/homepage_components/homepage_locationsdetails/Homepage_LocationDetails.tsx).
+- **Runtime blank screens:** The app is wrapped in an error boundary. If a page fails, the boundary renders a fallback and the console shows the captured error; use the Reload button to recover.
+- **Asset resolution rules:** Place shared images (e.g., the brand logo) in `src/assets/` to leverage `resolveOptimizedAsset`, or reference files in `public/` with absolute paths like `/logo.svg` so Vite serves them without import errors. Prefer SVGs or other text-based assets when possible to avoid binary diffs.
 - **Email delivery fails:** Confirm the EmailJS service, template, and public keys are filled in `.env` and referenced in [`BookingFrom.tsx`](src/components/homepage_components/homepage_Propertydetails/BookingFrom.tsx) and [`ContactUs.tsx`](src/pages/contactus/ContactUs.tsx).
 - **Cloudflare deployment issues:** Ensure the Pages build command (`npm run build`) succeeds locally; failed builds prevent deploys.
 

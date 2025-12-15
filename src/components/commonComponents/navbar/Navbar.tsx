@@ -7,7 +7,8 @@ import { FaFacebook, FaTwitter, FaYoutube, FaInstagram } from 'react-icons/fa';
 import { ImGithub } from 'react-icons/im';
 import { IoIosArrowForward } from "react-icons/io";
 import { footerData, propertyData } from '../../../data';
-import { resolveOptimizedAsset } from '../../../utils/resolveOptimizedAsset';
+import logo from '../../../assets/logo.svg';
+import { getItemKey, sanitizeItems } from '../../../utils/sanitizeItems';
 
 const iconMap = {
     ImGithub,
@@ -24,6 +25,7 @@ const Navbar = () => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isApartmentsOpen, setIsApartmentsOpen] = useState(false);
     const [isBlogOpen, setIsBlogOpen] = useState(false);
+    const apartments = sanitizeItems(propertyData);
 
     useEffect(() => {
         const onLoadfunction = () => {
@@ -122,7 +124,7 @@ const Navbar = () => {
             {/* Main Nav */}
             <div id='navbar_container' className='bg-white transition-all duration-300 w-full flex items-center justify-between px-4 py-3 md:py-4 md:px-12'>
                 <Link to='/' className='flex items-center gap-3'>
-                    <img className='w-20 h-16 object-contain rounded-md' src={resolveOptimizedAsset('logo.jpeg')} alt='Logo' />
+                    <img className='w-20 h-16 object-contain rounded-md' src={logo} alt='Atlas Homestays logo' />
                     <span className='font-bold text-lg text-slate-900 hidden sm:block'>Atlas Homestays</span>
                 </Link>
 
@@ -139,9 +141,13 @@ const Navbar = () => {
                         </button>
                         <div className='absolute invisible group-hover:visible opacity-0 group-hover:opacity-100 transition bg-white border border-slate-200 rounded-xl shadow-lg min-w-[220px] py-2'>
                             <NavLink to='/apartments' className='block px-4 py-2 text-sm text-slate-800 hover:bg-slate-50'>Apartments Overview</NavLink>
-                            {propertyData.flatMap((property) => property.properties).map((apt) => (
-                                <NavLink key={apt.id} to={`/property_details/${apt.id}`} className='block px-4 py-2 text-sm text-slate-800 hover:bg-slate-50'>
-                                    {apt.property_name}
+                            {apartments.map((apt, index) => (
+                                <NavLink
+                                    key={getItemKey(apt, index)}
+                                    to={`/property_details/${apt.id ?? apt.listingId ?? getItemKey(apt, index)}`}
+                                    className='block px-4 py-2 text-sm text-slate-800 hover:bg-slate-50'
+                                >
+                                    {apt.property_name || apt.title || `Property ${apt.id ?? apt.listingId}`}
                                 </NavLink>
                             ))}
                         </div>
@@ -179,9 +185,14 @@ const Navbar = () => {
                     {isApartmentsOpen && (
                         <div className='pl-4 space-y-1'>
                             <NavLink onClick={closeMobile} to='/apartments' className='block py-1 text-sm text-slate-700'>Apartments Overview</NavLink>
-                            {propertyData.flatMap((property) => property.properties).map((apt) => (
-                                <NavLink key={apt.id} onClick={closeMobile} to={`/property_details/${apt.id}`} className='block py-1 text-sm text-slate-700'>
-                                    {apt.property_name}
+                            {apartments.map((apt, index) => (
+                                <NavLink
+                                    key={getItemKey(apt, index)}
+                                    onClick={closeMobile}
+                                    to={`/property_details/${apt.id ?? apt.listingId ?? getItemKey(apt, index)}`}
+                                    className='block py-1 text-sm text-slate-700'
+                                >
+                                    {apt.property_name || apt.title || `Property ${apt.id ?? apt.listingId}`}
                                 </NavLink>
                             ))}
                         </div>
