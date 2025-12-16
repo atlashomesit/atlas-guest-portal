@@ -76,6 +76,31 @@ Optional tooling:
 | Preview built assets locally | `npm run preview` |
 | Trigger Cloudflare Pages deployment | Push to `main` (Pages builds with `npm run build`) |
 
+## Short-link redirects
+- Short-link redirects live in [`public/_redirects`](public/_redirects) so Vite copies them verbatim into the Pages build output.
+- Targets must stay **relative** (e.g., `/property_details/atlas-homes-room-101`) to automatically preserve the current host on dev and production; hardcoding `https://www.atlashomestays.com` would break dev URLs.
+- Ordering matters: the short-link rules should stay at the top of `_redirects`, and the SPA fallback of `/* /index.html 200` must remain last to avoid swallowing redirects.
+
+### Verification commands
+Use `curl -I` to confirm redirects keep the current domain and point at the right slug:
+
+```bash
+curl -I https://dev.atlashomestays.com/101
+curl -I https://dev.atlashomestays.com/102
+curl -I https://dev.atlashomestays.com/201
+curl -I https://dev.atlashomestays.com/202
+curl -I https://dev.atlashomestays.com/301
+curl -I https://dev.atlashomestays.com/302
+curl -I https://dev.atlashomestays.com/501
+```
+
+Each command should return a 301/302 with a `Location` header set to `/property_details/<slug>` (no `www.atlashomestays.com` host).
+
+**Acceptance criteria**
+- Dev short links (e.g., `https://dev.atlashomestays.com/101`) never redirect to `www.atlashomestays.com`.
+- All listed short links return a redirect to the matching `/property_details/<slug>` path on both dev and production.
+- `_redirects` contains only relative targets for short links, with the SPA fallback left last.
+
 ## Troubleshooting
 - **Node version errors:** Verify `node -v` meets the prerequisite range. Use `nvm` or `fnm` to align versions.
 - **Port 5173 already in use:** Override with `npm run dev -- --port 5174` or free the port before starting Vite.

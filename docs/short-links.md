@@ -6,14 +6,14 @@ This project supports branded short URLs that send guests directly to Atlas prop
 
 | Short path | Target URL |
 | --- | --- |
-| `/101` | https://www.atlashomestays.com/property_details/atlas-homes-room-101 |
-| `/102` | https://www.atlashomestays.com/property_details/atlas-homes-room-102 |
-| `/201` | https://www.atlashomestays.com/property_details/atlas-homes-room-201 |
-| `/202` | https://www.atlashomestays.com/property_details/atlas-homes-room-202 |
-| `/301` | https://www.atlashomestays.com/property_details/atlas-homes-room-301 |
-| `/302` | https://www.atlashomestays.com/property_details/atlas-homes-room-302 |
-| `/penthouse` | https://www.atlashomestays.com/property_details/atlas-penthouse-501 |
-| `/501` | https://www.atlashomestays.com/property_details/atlas-penthouse-501 |
+| `/101` | /property_details/atlas-homes-room-101 |
+| `/102` | /property_details/atlas-homes-room-102 |
+| `/201` | /property_details/atlas-homes-room-201 |
+| `/202` | /property_details/atlas-homes-room-202 |
+| `/301` | /property_details/atlas-homes-room-301 |
+| `/302` | /property_details/atlas-homes-room-302 |
+| `/penthouse` | /property_details/atlas-penthouse-501 |
+| `/501` | /property_details/atlas-homes-room-501 |
 
 ## How it works
 
@@ -23,7 +23,7 @@ Direct navigation is supported on Cloudflare Pages via [`public/_redirects`](../
 
 ## Adding or updating a short link
 
-1. Edit `src/config/shortLinks.ts` and update the `shortLinkMap` object with the new path → target URL mapping. Keep keys lowercase and use full URLs pointing at `/property_details/<slug>` routes.
+1. Edit `src/config/shortLinks.ts` and update the `shortLinkMap` object with the new path → target URL mapping. Keep keys lowercase and use relative paths pointing at `/property_details/<slug>` routes so they work on any environment.
 2. No router changes are required; the dynamic `/:shortCode` route will pick up new entries automatically.
 3. Commit the change.
 
