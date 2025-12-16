@@ -7,17 +7,17 @@ import { faqItems } from "../content/legal/faqs";
 import { policySections } from "../content/legal/policies";
 import { termsSections } from "../content/legal/terms";
 import { useScrollToHash } from "../hooks/useScrollToHash";
+import { CONTACT } from "../config/contact";
 import { buildWaLink, defaultPrefill } from "../utils/whatsapp";
 
 const FaqPage = () => {
   useScrollToHash();
   const [search, setSearch] = useState("");
-  const whatsappPhone = import.meta.env.VITE_WHATSAPP_PHONE_E164 || "+917032493290";
   const whatsappLink = useMemo(() => {
     const href = typeof window !== "undefined" ? window.location.href : "";
     const prefill = defaultPrefill({ href, context: "FAQs" });
-    return buildWaLink({ phoneE164: whatsappPhone, text: prefill });
-  }, [whatsappPhone]);
+    return buildWaLink({ phoneE164: CONTACT.business.whatsapp, text: prefill });
+  }, []);
 
   const grouped = useMemo(() => {
     const query = search.trim().toLowerCase();

@@ -44,11 +44,8 @@ Optional tooling:
    ```bash
    cp .env.example .env
    ```
-   Populate the EmailJS identifiers before attempting to send booking/contact forms. Add the WhatsApp
-   contact number for chat CTAs:
-   ```bash
-   VITE_WHATSAPP_PHONE_E164=919999999999
-   ```
+   Populate the EmailJS identifiers before attempting to send booking/contact forms. Phone/WhatsApp
+   numbers are centralized in [`src/config/contact.ts`](src/config/contact.ts) and default to the business line.
 3. **Run the development server**
    ```bash
    npm run dev

@@ -5,18 +5,18 @@ import SectionNav from "../components/legal/SectionNav";
 import SEO from "../components/SEO";
 import { policyMetadata, policySections } from "../content/legal/policies";
 import { termsSections } from "../content/legal/terms";
+import { CONTACT } from "../config/contact";
 import { buildWaLink, defaultPrefill } from "../utils/whatsapp";
 
 const Policies = () => {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState<Set<string>>(new Set());
 
-  const whatsappPhone = import.meta.env.VITE_WHATSAPP_PHONE_E164 || "+917032493290";
   const whatsappLink = useMemo(() => {
     const href = typeof window !== "undefined" ? window.location.href : "";
     const prefill = defaultPrefill({ href, context: "Policies" });
-    return buildWaLink({ phoneE164: whatsappPhone, text: prefill });
-  }, [whatsappPhone]);
+    return buildWaLink({ phoneE164: CONTACT.business.whatsapp, text: prefill });
+  }, []);
 
   const filteredPolicies = useMemo(() => {
     const term = search.trim().toLowerCase();

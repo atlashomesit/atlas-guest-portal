@@ -12,6 +12,7 @@ import { buildWaLink } from '../../../utils/whatsapp';
 import { primaryNav, moreNav, ctaNav, helpNav } from '../../../config/navigation';
 import MoreMenu from '../../Nav/MoreMenu';
 import { LOGO_URL } from '../../../config/branding';
+import { CONTACT, formatDisplayNumber } from '../../../config/contact';
 
 const iconMap = {
     ImGithub,
@@ -30,9 +31,8 @@ const Navbar = () => {
     const [isMoreOpen, setIsMoreOpen] = useState(false);
     const [isHelpOpen, setIsHelpOpen] = useState(false);
     const apartments = sanitizeItems(propertyData);
-    const whatsappPhone = import.meta.env.VITE_WHATSAPP_PHONE_E164 || '+917032493290';
     const whatsappLink = buildWaLink({
-        phoneE164: whatsappPhone,
+        phoneE164: CONTACT.business.whatsapp,
         text: "Hi Atlas Homestays 👋 I'd like to learn more about booking a stay.",
     });
 
@@ -98,7 +98,7 @@ const Navbar = () => {
                 <div className="flex flex-row justify-center items-center gap-4 w-full md:w-auto">
                     <div className="flex items-center gap-2 font-semibold md:font-medium">
                         <IoIosCall className="text-lg md:text-xl" />
-                        <span className="text-sm md:text-base">+91-7032493290</span>
+                        <span className="text-sm md:text-base">{formatDisplayNumber()}</span>
                     </div>
                     <span className="text-slate-400 hidden md:block">|</span>
                     <a
