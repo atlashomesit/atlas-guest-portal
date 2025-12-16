@@ -58,6 +58,7 @@ Optional tooling:
 | --- | --- |
 | `src/main.tsx` | Entry point bootstrapping React with router context and Tailwind global styles. |
 | `src/App.tsx` | Declares `BrowserRouter` routes for the home page, property detail views, location collections, and 404 handling while wrapping shared layout pieces. |
+| `src/pages/Policies.tsx` | Single-column policies page with anchored sections, SEO metadata (title/description/canonical), and deep-linkable table of contents. |
 | `src/pages/home/Home.tsx` | Home hero, location scroller, parallax CTA, and marketing sections composing homepage modules. |
 | `src/components/homepage_components/homepage_locations/HomePage_Locations.tsx` | Grid of property cards sourced from `LISTINGS`, featuring the Penthouse layout and linking to slugged property detail views when data exists. |
 | `src/components/homepage_components/homepage_Propertydetails/Homepage_PropertyDetails.tsx` | Property detail page rendering gallery, amenities, booking widget, and policies from `propertyData`. |
@@ -89,5 +90,7 @@ Optional tooling:
 
 ## Blog and Policies updates
 - **Add a blog post:** edit `src/data/blogPosts.ts` and append a new object with `title`, `slug`, `category` (`guest-guides` or `hospitality-tech`), `excerpt`, `content`, and optional `featuredImage`, `metaTitle`, and `metaDescription`. The routes `/blog`, `/blog/:category`, and `/blog/:slug` automatically surface new entries.
-- **Edit policies:** update the content blocks in `src/pages/policies/Policies.tsx` while keeping the existing anchors to preserve deep links from navigation and the footer.
+- **Policies route:** `/policies` renders a single-column page with a table of contents and anchored sections (e.g., `#cancellation-refund-policy`, `#house-rules`). The header and footer link to these anchors, so keep the IDs stable.
+- **Edit policies:** update the content blocks in `src/pages/Policies.tsx` to change wording or add new clauses while keeping the existing anchors to preserve deep links from navigation and the footer.
+- **Booking confirmations:** the booking confirmation alerts and EmailJS payloads reference the policy URL and cancellation/reschedule anchors (see `BookingFrom.tsx`). Update the shared `policyMessage` string there if the canonical URL ever changes.
 - **Sitemap URL:** a static sitemap is served from `public/sitemap.xml` and referenced in `public/robots.txt` for Cloudflare Pages deployments.
