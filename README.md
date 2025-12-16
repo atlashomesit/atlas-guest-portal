@@ -138,3 +138,9 @@ Each command should return a 301/302 with a `Location` header set to `/property_
 - **Edit policies:** update the content blocks in `src/pages/Policies.tsx` to change wording or add new clauses while keeping the existing anchors to preserve deep links from navigation and the footer.
 - **Booking confirmations:** the booking confirmation alerts and EmailJS payloads reference the policy URL and cancellation/reschedule anchors (see `BookingFrom.tsx`). Update the shared `policyMessage` string there if the canonical URL ever changes.
 - **Sitemap URL:** a static sitemap is served from `public/sitemap.xml` and referenced in `public/robots.txt` for Cloudflare Pages deployments.
+
+### Terms & Conditions and stay policies
+- **Content source:** `src/content/terms.ts` holds the numbered Terms & Conditions sections, inline policy snippets, and the Razorpay consent note used across the booking flow.
+- **Route:** `/terms` (aliased at `/terms-and-conditions`) renders the structured terms page defined in `src/pages/Terms.tsx` with anchor links and last-updated metadata.
+- **Unit timings & fees:** `src/config/policyConfig.ts` centralizes per-unit check-in/out windows and extra-guest fee ranges (`baseGuestAllowance`, `unitPolicies`).
+- **UI reuse:** booking widgets (`BookingFrom.tsx`, `hotelBooking_form/HotelBooking_Form.tsx`) and property details (`Homepage_PropertyDetails.tsx`) pull inline snippets and timing data from those sources to avoid hardcoded strings.

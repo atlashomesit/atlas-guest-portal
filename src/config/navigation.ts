@@ -10,6 +10,7 @@ export const primaryNav: NavItem[] = [
     { label: 'Location', to: '/location' },
     { label: 'FAQ', to: '/faq' },
     { label: 'Policies', to: '/policies' },
+    { label: 'Terms', to: '/terms' },
     { label: 'Contact', to: '/contact' },
 ];
 
