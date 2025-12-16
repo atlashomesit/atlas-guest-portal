@@ -3,7 +3,7 @@ import { ImGithub } from 'react-icons/im';
 import { IoIosMail, IoIosCall, IoIosArrowForward } from "react-icons/io";
 import { footerData } from '../../../data';
 import { Link } from 'react-router-dom';
-import { moreNav, primaryNav } from '../../../config/navigation';
+import { helpNav, moreNav, primaryNav } from '../../../config/navigation';
 import { LOGO_URL } from '../../../config/branding';
 
 const iconMap = {
@@ -69,14 +69,13 @@ const Footer = () => {
                 </div>
 
                 <div className="text-center lg:text-left">
-                    <h2 className="text-2xl text-primary font-semibold mb-4">Policies</h2>
+                    <h2 className="text-2xl text-primary font-semibold mb-4">Help</h2>
                     <div className="text-base flex flex-col gap-2">
-                        <Link to="/policies" className="hover:text-white">Policies</Link>
-                        <Link to="/terms" className="hover:text-white">Terms &amp; Conditions</Link>
-                        <Link to="/policies#cancellation-refund-policy" className="hover:text-white">Cancellation Policy</Link>
-                        <Link to="/policies#house-rules" className="hover:text-white">House Rules</Link>
-                        <Link to="/policies#amenity-usage-policy-jacuzzi-home-theater-lift-parking" className="hover:text-white">Amenities</Link>
-                        <Link to="/policies#payment-terms" className="hover:text-white">Payment</Link>
+                        {helpNav.map((item) => (
+                            <Link key={item.label} to={item.to} className="hover:text-white">
+                                {item.label}
+                            </Link>
+                        ))}
                     </div>
                 </div>
 

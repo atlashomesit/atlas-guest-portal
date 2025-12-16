@@ -2,19 +2,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { fireEvent, render, screen } from '@testing-library/react';
 import Policies from './Policies';
 import Footer from '../components/commonComponents/footer/Footer';
-
-const sectionTitles = [
-  'Cancellation & Refund Policy',
-  'Reschedule / Date Change Policy',
-  'Check-In & Check-Out Policy',
-  'Extra Guests & Visitors Policy',
-  'House Rules',
-  'Damage, Penalties & Security Deposit',
-  'Amenity Usage Policy (Jacuzzi / Home Theater / Lift / Parking)',
-  'Payment Terms',
-  'ID Verification & Local Law Compliance',
-  'Liability & Disclaimer',
-];
+import { policySections } from '../content/legal/policies';
 
 describe('Policies page', () => {
   const renderPage = () => render(
@@ -25,21 +13,41 @@ describe('Policies page', () => {
 
   it('renders the page title for policies', () => {
     renderPage();
-    expect(screen.getByRole('heading', { name: /ATLAS HOMESTAYS – POLICIES/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Guest Policies \| Atlas Guest Portal/i })).toBeInTheDocument();
   });
 
-  it('shows all sections in the table of contents', () => {
+  it('shows all sections in the section nav', () => {
     renderPage();
-    sectionTitles.forEach((title) => {
-      expect(screen.getByRole('link', { name: title })).toBeInTheDocument();
+    policySections.forEach((section) => {
+      expect(screen.getByRole('link', { name: section.title })).toBeInTheDocument();
     });
   });
 
   it('provides anchors for each section target', () => {
     const { container } = renderPage();
-    const firstLink = screen.getByRole('link', { name: sectionTitles[0] });
+    const firstLink = screen.getByRole('link', { name: policySections[0].title });
     fireEvent.click(firstLink);
-    expect(container.querySelector('#cancellation-refund-policy')).not.toBeNull();
+    expect(container.querySelector(`#${policySections[0].id}`)).not.toBeNull();
+  });
+
+  it('renders a stable anchor list snapshot', () => {
+    const { container } = renderPage();
+    const anchors = Array.from(
+      container.querySelectorAll('nav[aria-label="Section navigation"] a')
+    ).map((link) => link.textContent);
+
+    expect(anchors).toMatchInlineSnapshot(`
+      [
+        "Cancellation & Refunds",
+        "Reschedules & Date Changes",
+        "Check-in & Check-out",
+        "Guests, Extra Guests & Visitors",
+        "House Rules & Community Etiquette",
+        "Amenity Usage (Jacuzzi, Lift, Parking, Home Theatre)",
+        "Damages, Deposits & Incidentals",
+        "Compliance, Safety & Liability",
+      ]
+    `);
   });
 });
 
@@ -52,10 +60,7 @@ describe('Policies links in footer', () => {
     );
 
     expect(screen.getByText('Policies').closest('a')).toHaveAttribute('href', '/policies');
-    expect(screen.getByText('Cancellation Policy').closest('a')).toHaveAttribute(
-      'href',
-      '/policies#cancellation-refund-policy'
-    );
-    expect(screen.getByText('House Rules').closest('a')).toHaveAttribute('href', '/policies#house-rules');
+    expect(screen.getByText('FAQs').closest('a')).toHaveAttribute('href', '/faq');
+    expect(screen.getByText('Terms').closest('a')).toHaveAttribute('href', '/terms');
   });
 });

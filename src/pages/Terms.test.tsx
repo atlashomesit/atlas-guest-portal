@@ -13,9 +13,9 @@ describe("Terms", () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByRole("heading", { name: /Terms & Conditions – Atlas Homestays/i })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /Quick navigation/i })).toBeInTheDocument();
-    expect(screen.getByText(/Booking & Payment/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Terms of Service \| Atlas Guest Portal/i })).toBeInTheDocument();
+    expect(screen.getByText(/Print-friendly view/i)).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { level: 2 }).length).toBeGreaterThan(1);
     expect(screen.getByText(/Payment data sharing/i)).toBeInTheDocument();
   });
 });

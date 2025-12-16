@@ -9,7 +9,7 @@ import { IoIosArrowForward } from "react-icons/io";
 import { footerData, propertyData } from '../../../data';
 import { getItemKey, sanitizeItems } from '../../../utils/sanitizeItems';
 import { buildWaLink } from '../../../utils/whatsapp';
-import { primaryNav, moreNav, ctaNav } from '../../../config/navigation';
+import { primaryNav, moreNav, ctaNav, helpNav } from '../../../config/navigation';
 import MoreMenu from '../../Nav/MoreMenu';
 import { LOGO_URL } from '../../../config/branding';
 
@@ -28,6 +28,7 @@ const Navbar = () => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isApartmentsOpen, setIsApartmentsOpen] = useState(false);
     const [isMoreOpen, setIsMoreOpen] = useState(false);
+    const [isHelpOpen, setIsHelpOpen] = useState(false);
     const apartments = sanitizeItems(propertyData);
     const whatsappPhone = import.meta.env.VITE_WHATSAPP_PHONE_E164 || '+917032493290';
     const whatsappLink = buildWaLink({
@@ -62,6 +63,7 @@ const Navbar = () => {
         setIsMenuOpen(false);
         setIsApartmentsOpen(false);
         setIsMoreOpen(false);
+        setIsHelpOpen(false);
     };
 
     return (
@@ -160,6 +162,23 @@ const Navbar = () => {
                                     ))}
                                 </div>
                             </div>
+                        ) : item.label === 'Help' ? (
+                            <div key={item.label} className='relative group'>
+                                <button className='px-3 py-2 text-sm font-semibold text-slate-800 hover:text-primary flex items-center gap-1'>
+                                    {item.label}
+                                </button>
+                                <div className='absolute invisible group-hover:visible opacity-0 group-hover:opacity-100 transition bg-white border border-slate-200 rounded-xl shadow-lg min-w-[200px] py-2'>
+                                    {helpNav.map((helpItem) => (
+                                        <NavLink
+                                            key={helpItem.label}
+                                            to={helpItem.to}
+                                            className='block px-4 py-2 text-sm text-slate-800 hover:bg-slate-50'
+                                        >
+                                            {helpItem.label}
+                                        </NavLink>
+                                    ))}
+                                </div>
+                            </div>
                         ) : (
                             <NavLink key={item.label} to={item.to} className={navLinkClass}>
                                 {item.label}
@@ -238,6 +257,24 @@ const Navbar = () => {
                                         {item.label}
                                     </NavLink>
                                 )
+                            ))}
+                        </div>
+                    )}
+
+                    <button onClick={() => setIsHelpOpen(!isHelpOpen)} className='w-full text-left py-2 font-semibold text-slate-800'>
+                        Help
+                    </button>
+                    {isHelpOpen && (
+                        <div className='pl-4 space-y-1'>
+                            {helpNav.map((item) => (
+                                <NavLink
+                                    key={item.label}
+                                    onClick={closeMobile}
+                                    to={item.to}
+                                    className='block py-1 text-sm text-slate-700'
+                                >
+                                    {item.label}
+                                </NavLink>
                             ))}
                         </div>
                     )}
