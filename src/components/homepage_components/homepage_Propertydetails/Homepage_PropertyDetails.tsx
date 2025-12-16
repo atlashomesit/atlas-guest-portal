@@ -183,54 +183,63 @@ const PropertyDetails = () => {
                 </div>
 
                 {/* Image Gallery */}
-                <div className="flex gap-2 h-64 md:h-96 lg:h-[450px] overflow-hidden ">
-                    {/* Main image */}
-                    <div className="flex-1 relative h-full">
-                        <a href={propertyImages[data.id]?.[0] || data.property_img[0]} data-fancybox="property-gallery">
-                            <img
-                                src={propertyImages[String(data.id)]?.[0] || data.property_img[0]}
-                                alt="Main property"
-                                className="w-full h-full object-cover rounded-md"
-                                onError={(e) => {
-                                    const target = e.target as HTMLImageElement;
-                                    target.onerror = null;
-                                    target.src = data.property_img[0] || '';
-                                }}
-                            />
-                        </a>
+              {/* Image Gallery */}
+<div className="flex gap-2 h-64 md:h-96 lg:h-[450px] overflow-hidden ">
+  {/* Main image */}
+  <div className="flex-1 relative h-full">
+    <a href={propertyImages[data.id]?.[0] || data.property_img[0]} data-fancybox="property-gallery">
+      <img
+        src={propertyImages[String(data.id)]?.[0] || data.property_img[0]}
+        alt="Main property"
+        className="w-full h-full object-cover rounded-md"
+        onError={(e) => {
+          const target = e.target as HTMLImageElement;
+          target.onerror = null;
+          target.src = data.property_img[0] || '';
+        }}
+      />
+    </a>
+  </div>
 
-                        <button
-                            onClick={() => {
-                                const images = propertyImages[String(data.id)] || data.property_img;
-                                Fancybox.show(images.map((img: string) => ({
-                                    src: img,
-                                    type: "image"
-                                })));
-                            }}
-                            className="absolute bottom-4 right-4 bg-black/60 text-white text-xs md:text-sm px-4 py-2 rounded-full flex items-center gap-2 hover:bg-black/80 transition"
-                        >
-                            View photos
-                        </button>
-                    </div>
+  {/* Thumbnails */}
+  <div className="flex-1 grid grid-cols-2 grid-rows-2 gap-2 h-full">
+    {(propertyImages[data.id]?.slice(1, 5) || data.property_img.slice(1, 5)).map((img: string, index: number) => (
+      <div key={index} className="relative w-full h-full">
+        <a href={img} data-fancybox="property-gallery">
+          <img
+            src={img}
+            alt={`Thumbnail ${index + 1}`}
+            className="w-full h-full object-cover rounded-md hover:opacity-80 transition"
+            onError={(e) => {
+              const target = e.target as HTMLImageElement;
+              target.onerror = null;
+              target.src = data.property_img[index + 1] || '';
+            }}
+          />
+        </a>
 
-                    {/* Thumbnails */}
-                    <div className="flex-1 grid grid-cols-2 grid-rows-2 gap-2 h-full">
-                        {(propertyImages[data.id]?.slice(1, 5) || data.property_img.slice(1, 5)).map((img: string, index: number) => (
-                            <a key={index} href={img} data-fancybox="property-gallery">
-                                <img
-                                    src={img}
-                                    alt={`Thumbnail ${index + 1}`}
-                                    className="w-full h-full object-cover rounded-md hover:opacity-80 transition"
-                                    onError={(e) => {
-                                        const target = e.target as HTMLImageElement;
-                                        target.onerror = null;
-                                        target.src = data.property_img[index + 1] || '';
-                                    }}
-                                />
-                            </a>
-                        ))}
-                    </div>
-                </div>
+        {/* Show "View photos" button only on the 4th thumbnail */}
+        {index === 3 && (
+          <button
+            onClick={() => {
+              const images = propertyImages[String(data.id)] || data.property_img;
+              Fancybox.show(
+                images.map((img: string) => ({
+                  src: img,
+                  type: "image",
+                }))
+              );
+            }}
+            className="absolute bottom-2 right-2 bg-black/60 text-white text-xs md:text-sm px-3 py-1 rounded-full flex items-center gap-2 hover:bg-black/80 transition"
+          >
+            All photos
+          </button>
+        )}
+      </div>
+    ))}
+  </div>
+</div>
+
 
 
                 <div className='flex flex-col gap-4 sm:flex-row '>
