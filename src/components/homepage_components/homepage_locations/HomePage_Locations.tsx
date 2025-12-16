@@ -4,7 +4,7 @@ import { propertyData, propertyImages } from "../../../data.ts";
 import { LISTINGS, type Listing } from "../../../data/listings";
 import "./homepage_location.css";
 import { getItemKey, sanitizeItems } from "../../../utils/sanitizeItems";
-import logo from "../../../assets/logo.svg";
+import { LOGO_URL } from "../../../config/branding";
 
 type HomePageLocationsProps = {
   listings?: unknown;
@@ -14,7 +14,7 @@ const HomePage_Locations = ({ listings = LISTINGS }: HomePageLocationsProps) => 
   const navigate = useNavigate();
   const safeListings = React.useMemo(() => sanitizeItems<Listing>(listings), [listings]);
   const safePropertyData = React.useMemo(() => sanitizeItems(propertyData), []);
-  const fallbackCover = logo;
+  const fallbackCover = LOGO_URL;
 
   // Sort items to have featured (penthouse) first
   const items = React.useMemo(

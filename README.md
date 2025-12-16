@@ -27,6 +27,10 @@ Optional tooling:
 ### Image optimization manifest
 - `npm run optimize-images` normalizes JPEG/PNG assets to WebP, cleans outdated variants, and writes a manifest to `src/assets/optimized-manifest.json` (creating the directory if missing) so the app can reference the optimized filenames consistently across local, CI, and Cloudflare Pages builds.
 
+### Branding assets
+- The canonical Atlas Homestays logo lives at `https://atlashomestorage.blob.core.windows.net/listing-images/logo-removebg-preview%20(3).be48d403.webp` and is exported as `LOGO_URL` from [`src/config/branding.ts`](src/config/branding.ts) so all layouts (header, footer, hero, property cards) reuse the same source.
+- When updating brand imagery, change `LOGO_URL` to keep every consumer in sync instead of hardcoding URLs inside components.
+
 ### Lockfile maintenance
 - Use Node 20.x (see `.nvmrc`) and run `npm install` to refresh dependencies.
 - Always commit the resulting `package-lock.json` so `npm ci` stays in sync locally, in CI, and during Cloudflare builds.

@@ -1,6 +1,6 @@
-import { resolveOptimizedAsset, resolveOptimizedGallery } from "./utils/resolveOptimizedAsset";
+import { LOGO_URL } from "./config/branding";
 
-const logo = resolveOptimizedAsset("logo-removebg-preview (3).png");
+const logo = LOGO_URL;
 
 const propertyImagePaths: Record<string, string[]> = {
     "101": [
