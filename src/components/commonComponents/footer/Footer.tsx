@@ -72,6 +72,7 @@ const Footer = () => {
                     <h2 className="text-2xl text-primary font-semibold mb-4">Policies</h2>
                     <div className="text-base flex flex-col gap-2">
                         <Link to="/policies" className="hover:text-white">Policies</Link>
+                        <Link to="/terms" className="hover:text-white">Terms &amp; Conditions</Link>
                         <Link to="/policies#cancellation-refund-policy" className="hover:text-white">Cancellation Policy</Link>
                         <Link to="/policies#house-rules" className="hover:text-white">House Rules</Link>
                         <Link to="/policies#amenity-usage-policy-jacuzzi-home-theater-lift-parking" className="hover:text-white">Amenities</Link>
@@ -111,7 +112,7 @@ const Footer = () => {
             </div>
 
             <div className='text-base text-slate-300 text-center mt-10'>
-                © 2025 The Atlas Homes All rights reserved | <Link to="/policies" className='hover:text-white'>Policies</Link> | <Link to="/contact" className='hover:text-white'>Contact</Link>
+                © 2025 The Atlas Homes All rights reserved | <Link to="/policies" className='hover:text-white'>Policies</Link> | <Link to="/terms" className='hover:text-white'>Terms</Link> | <Link to="/contact" className='hover:text-white'>Contact</Link>
             </div>
 
         </div>

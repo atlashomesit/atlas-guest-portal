@@ -9,6 +9,7 @@ import Homepage_PropertyDetails from "./components/homepage_components/homepage_
 import ScrollToTop from "./ScrollTop"
 import Homepage_LocationDetails from "./components/homepage_components/homepage_locationsdetails/Homepage_LocationDetails"
 import Policies from "./pages/Policies"
+import Terms from "./pages/Terms"
 import Apartments from "./pages/Apartments"
 import Amenities from "./pages/Amenities"
 import LocationPage from "./pages/LocationPage"
@@ -49,6 +50,8 @@ function AppWrapper() {
         <Route path="/blog/:category/:slug" element={<BlogPostPage />} />
         <Route path="/blog/:slug" element={<BlogPostPage />} />
         <Route path="/policies" element={<Policies />} />
+        <Route path="/terms" element={<Terms />} />
+        <Route path="/terms-and-conditions" element={<Terms />} />
         <Route path="/property_details/:id" element={<Homepage_PropertyDetails />} />
         <Route path="/property_LocationDetails/:id" element={<Homepage_LocationDetails />} />
         <Route path="/:shortCode" element={<ShortLinkRedirect />} />
