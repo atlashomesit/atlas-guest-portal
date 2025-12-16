@@ -1,3 +1,11 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+.btn-chip {
+  @apply inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-slate-200 text-slate-800 font-semibold shadow-sm hover:border-primary hover:text-primary transition;
+}
+
+.btn-chip--active {
+  @apply border-primary text-primary;
+}

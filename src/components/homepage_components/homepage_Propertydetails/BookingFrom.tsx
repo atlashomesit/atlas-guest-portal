@@ -3,6 +3,7 @@ import emailjs from '@emailjs/browser';
 import { Plus, Minus } from 'lucide-react';
 import { FaAngleDown, FaAngleUp } from "react-icons/fa6";
 import { emailJsConfig, getMissingEmailJsEnvKeys, isEmailJsConfigured } from '../../../utils/emailjsConfig';
+import { inlinePolicySnippets } from '../../../content/terms';
 interface Property {
   property_name: string;
 }
@@ -39,6 +40,8 @@ const BookingForm = ({ propertyData }: { propertyData: Property }) => {
   const [pets, setPets] = useState(0);
   const [isServiceAnimal, setIsServiceAnimal] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [termsAcceptedAt, setTermsAcceptedAt] = useState<string | null>(null);
 
   // Calculate number of nights
   const calculateNights = () => {
@@ -78,6 +81,10 @@ const BookingForm = ({ propertyData }: { propertyData: Property }) => {
       alert('Please enter a valid email address.');
       return;
     }
+    if (!termsAccepted) {
+      alert('Please review and accept the Terms & Conditions before reserving.');
+      return;
+    }
     if (!isEmailJsConfigured()) {
       const missingKeys = getMissingEmailJsEnvKeys().join(', ');
       console.error('EmailJS environment variables are not fully configured.', missingKeys);
@@ -86,6 +93,10 @@ const BookingForm = ({ propertyData }: { propertyData: Property }) => {
     }
 
     setIsLoading(true);
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const policyMessage =
+      `Policies: ${origin}/policies | Cancel: ${origin}/policies#cancellation-refund-policy | Reschedule: ${origin}/policies#reschedule-date-change-policy | Terms: ${origin}/terms`;
+
     const templateParams = {
       to_email: emailJsConfig.ownerEmail,
       to_name: 'Property Owner',
@@ -101,11 +112,14 @@ const BookingForm = ({ propertyData }: { propertyData: Property }) => {
       pets,
       service_animal: isServiceAnimal ? 'Yes' : 'No',
       total_guests: totalGuests,
+      termsAccepted,
+      termsAcceptedAt: termsAcceptedAt || new Date().toISOString(),
       // total_price: `₹${totalPrice.toLocaleString()}`,
       property_name: propertyData?.property_name || 'Property',
       message: `New booking request for ${nights} nights from ${checkIn} to ${checkOut}.
 Guests: ${adults} adults, ${children} children, ${infants} infants, ${pets} pets.
-Total Price: ₹${totalPrice.toLocaleString()}`
+Total Price: ₹${totalPrice.toLocaleString()}
+${policyMessage}`
     };
     try {
       await emailjs.send(
@@ -115,7 +129,7 @@ Total Price: ₹${totalPrice.toLocaleString()}`
         emailJsConfig.publicKey!
       );
 
-      alert('Booking request sent successfully!');
+      alert(`Booking request sent successfully!\nPolicies (Cancellation, House Rules, Refunds): ${origin}/policies\nTerms & Conditions: ${origin}/terms`);
       // Optionally clear the form or keep data as is
       setName('');
       setContactNumber('');
@@ -130,6 +144,8 @@ Total Price: ₹${totalPrice.toLocaleString()}`
       setPets(0);
       setIsServiceAnimal(false);
       setShowGuestDetails(false);
+      setTermsAccepted(false);
+      setTermsAcceptedAt(null);
       setIsLoading(false);
       // Resetting the form fields after successful submission
     } catch (error) {
@@ -142,6 +158,12 @@ Total Price: ₹${totalPrice.toLocaleString()}`
   return (
     <div className="w-full bg-white rounded-lg border border-gray-200 shadow-sm">
       <div className="p-4 space-y-4">
+        <div className="rounded-lg bg-gray-50 border border-gray-200 p-3 text-sm text-gray-700 space-y-1">
+          <div className="font-semibold text-gray-900">Booking essentials</div>
+          <p>{inlinePolicySnippets.guestId} <a className="underline" href="/terms#guests">Read more</a></p>
+          <p>{inlinePolicySnippets.extraGuests} <a className="underline" href="/terms#guests">Details</a></p>
+          <p>{inlinePolicySnippets.cancellation} <a className="underline" href="/terms#cancellations">Cancellation terms</a></p>
+        </div>
         {/* Input Fields for Name, Contact Number, and Email */}
         <input
           type="text"
@@ -366,18 +388,38 @@ Total Price: ₹${totalPrice.toLocaleString()}`
           )}
         </div>
 
+        <div className="rounded-lg bg-gray-50 border border-gray-200 p-3 text-sm text-gray-700 space-y-2">
+          <div className="font-semibold text-gray-900">House rules &amp; damages</div>
+          <p>{inlinePolicySnippets.houseRules} <a className="underline" href="/terms#house-rules">Rules</a></p>
+          <p>{inlinePolicySnippets.damages} <a className="underline" href="/terms#damages">Damages</a></p>
+        </div>
+
         {/* Reserve Button */}
         <button
           onClick={handleSubmit}
-          disabled={isLoading}
+          disabled={isLoading || !termsAccepted}
           className="w-full bg-gradient-to-r from-pink-500 to-red-500 hover:from-pink-600 hover:to-red-600 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isLoading ? 'Sending...' : 'Reserve'}
         </button>
 
-        {/* Footer Note */}
-        <div className="text-center text-sm text-gray-600">
-          You won't be charged yet
+        <div className="space-y-2 text-sm text-gray-700">
+          <label className="flex items-start gap-2">
+            <input
+              type="checkbox"
+              className="mt-1 h-4 w-4"
+              checked={termsAccepted}
+              onChange={(event) => {
+                setTermsAccepted(event.target.checked);
+                setTermsAcceptedAt(event.target.checked ? new Date().toISOString() : null);
+              }}
+            />
+            <span>
+              I have read and agree to the <a className="underline" href="/terms">Terms &amp; Conditions</a> and understand the booking policies above.
+            </span>
+          </label>
+          <p className="text-gray-600">{inlinePolicySnippets.paymentConsent}</p>
+          <p className="text-center text-gray-600">You won't be charged yet</p>
         </div>
       </div>
     </div>

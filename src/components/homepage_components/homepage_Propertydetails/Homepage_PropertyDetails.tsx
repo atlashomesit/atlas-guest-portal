@@ -10,6 +10,8 @@ import { FaCcMastercard, FaLocationDot } from "react-icons/fa6";
 import { X, ChevronRight } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { propertyData, propertyImages } from '../../../data.ts';
+import { getUnitPolicy } from '../../../config/policyConfig';
+import { inlinePolicySnippets } from '../../../content/terms';
 import Subheading from '../../commonComponents/subheading/Subheading';
 import HotelBooking_Form from '../hotelBooking_form/HotelBooking_Form';
 
@@ -162,6 +164,8 @@ const PropertyDetails = () => {
     }
     if (!data) return <p className='mt-40 mb-20 text-center text-3xl'>Loading...</p>;
 
+    const unitPolicy = getUnitPolicy(data?.id);
+
     return (
         <section className="w-full pt-28 md:pt-0 tracking-wide">
             <div className='pt-10 pl-32'>
@@ -313,6 +317,18 @@ const PropertyDetails = () => {
                             <div className=" border rounded-lg overflow-hidden shadow-sm">
                                 <div className="bg-white p-6">
                                     <h2 className="text-xl sm:text-2xl font-semibold mb-6">Things to know</h2>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                                        <div className="p-4 border rounded-lg bg-gray-50">
+                                            <p className="text-gray-600 text-sm mb-1">Check-in / Check-out</p>
+                                            <p className="font-medium text-gray-900">Check-in {unitPolicy.checkIn} · Check-out {unitPolicy.checkOut}</p>
+                                            <a className="text-sm text-indigo-700 underline" href="/terms#check-in-check-out">View terms</a>
+                                        </div>
+                                        <div className="p-4 border rounded-lg bg-gray-50">
+                                            <p className="text-gray-600 text-sm mb-1">Key policies</p>
+                                            <p className="font-medium text-gray-900">{inlinePolicySnippets.cancellation}</p>
+                                            <p className="text-gray-800 mt-2 text-sm">{inlinePolicySnippets.houseRules}</p>
+                                        </div>
+                                    </div>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                                         {data.property_policy_details
                                             .filter(policy => !policy.type.includes('Policy') && !policy.type.includes('Detailed'))

@@ -3,6 +3,8 @@ import { DateRange } from 'react-date-range';
 import { format } from 'date-fns';
 import { propertyData } from '../../../data';
 import Razorpay from 'razorpay';
+import { inlinePolicySnippets } from '../../../content/terms';
+import { baseGuestAllowance, getUnitPolicy } from '../../../config/policyConfig';
 
 declare global {
   interface Window {
@@ -100,12 +102,26 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
     const guestMenuRef = useRef<HTMLDivElement | null>(null);
     const calendarRef = useRef<HTMLDivElement | null>(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [termsAccepted, setTermsAccepted] = useState(false);
+    const [termsAcceptedAt, setTermsAcceptedAt] = useState<string | null>(null);
 
     // Removed loadRazorpay function as it's no longer needed with direct link redirection
 
     const initiatePayment = () => {
+  if (!termsAccepted) {
+    alert('Please confirm the Terms & Conditions before reserving.');
+    return;
+  }
   try {
     setIsLoading(true);
+    const acceptedAt = termsAcceptedAt || new Date().toISOString();
+    setTermsAcceptedAt(acceptedAt);
+    // TODO: Persist termsAccepted + acceptedAt to booking payload or analytics when backend wiring is added.
+    try {
+      localStorage.setItem('atlas_terms_accepted_at', acceptedAt);
+    } catch (error) {
+      console.warn('Unable to persist terms acceptance locally', error);
+    }
 
     const url = new URL('https://pages.razorpay.com/atlashomestays');
     url.searchParams.append('amount', totalPrice.toString());
@@ -119,6 +135,8 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
     setIsLoading(false);
   }
 };
+
+    const unitPolicy = getUnitPolicy(propertyId);
 
 
     const formatGuestLabel = () => {
@@ -176,11 +194,21 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
             {/* PRICE SECTION */}
             <p className="text-[30px] font-bold">
                 ₹{pricePerNight.toLocaleString()}
-                
+
                 <span className="text-base ml-1">/night</span>
             </p>
 
             <p className="text-yellow-500 text-sm mb-4">★ 4.78 (21 reviews)</p>
+
+            <div className="mb-4 space-y-1 text-sm text-gray-700">
+                <p>
+                    Base price includes {baseGuestAllowance} guests; additional guests incur {unitPolicy.extraGuestFeeRange} per night (unit dependent).
+                    <a className="underline ml-1" href="/terms#guests">See terms</a>
+                </p>
+                <p>
+                    Check-in {unitPolicy.checkIn} · Check-out {unitPolicy.checkOut}.<a className="underline ml-1" href="/terms#check-in-check-out">Timings</a>
+                </p>
+            </div>
 
 
             <div className="grid grid-cols-2 gap-3 mb-4">
@@ -403,6 +431,22 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
                 </div>
             )}
 
+            <div className="mt-4 space-y-3 text-sm text-gray-700 border rounded-xl p-4 bg-gray-50">
+                <div>
+                    <p className="font-semibold text-gray-900">Guest details</p>
+                    <p>{inlinePolicySnippets.guestId} <a className="underline" href="/terms#guests">Read more</a></p>
+                </div>
+                <div>
+                    <p className="font-semibold text-gray-900">Cancellations</p>
+                    <p>{inlinePolicySnippets.cancellation} <a className="underline" href="/terms#cancellations">Policy</a></p>
+                </div>
+                <div>
+                    <p className="font-semibold text-gray-900">House rules &amp; damages</p>
+                    <p>{inlinePolicySnippets.houseRules}</p>
+                    <p className="mt-1">{inlinePolicySnippets.damages} <a className="underline" href="/terms#damages">Damages</a></p>
+                </div>
+            </div>
+
             <div className="space-y-4 mt-6">
               {/* Payment Method Selection */}
               <div className="p-4 border rounded-xl">
@@ -415,20 +459,37 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
                     disabled={isLoading}
                   />
                   <div className="flex items-center">
-                    <img 
-                      src="https://cdn.razorpay.com/logo.svg" 
-                      alt="Razorpay" 
+                    <img
+                      src="https://cdn.razorpay.com/logo.svg"
+                      alt="Razorpay"
                       className="h-6 mr-2"
                     />
                     <span className="text-gray-700">Pay with Razorpay</span>
                   </div>
                 </label>
+                <p className="text-sm text-gray-600 mt-2">{inlinePolicySnippets.paymentConsent}</p>
               </div>
+
+              <label className="flex items-start gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  className="mt-1 h-4 w-4"
+                  checked={termsAccepted}
+                  onChange={(event) => {
+                    setTermsAccepted(event.target.checked);
+                    setTermsAcceptedAt(event.target.checked ? new Date().toISOString() : null);
+                  }}
+                />
+                <span>
+                  I agree to the <a className="underline" href="/terms">Terms &amp; Conditions</a> and the policies above.
+                  {termsAcceptedAt && <span className="block text-gray-500">Accepted at {new Date(termsAcceptedAt).toLocaleString()}</span>}
+                </span>
+              </label>
               
               {/* Reserve Button */}
-              <button 
+              <button
                 onClick={initiatePayment}
-                disabled={isLoading}
+                disabled={isLoading || !termsAccepted}
                 className="bg-[#B99359] hover:bg-[#A0804D] text-white w-full rounded-full py-4 text-lg font-semibold transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center"
               >
                 {isLoading ? (

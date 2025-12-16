@@ -1,0 +1,143 @@
+import { useMemo, useState } from "react";
+import LegalLayout from "../components/legal/LegalLayout";
+import LegalSearch from "../components/legal/LegalSearch";
+import SectionNav from "../components/legal/SectionNav";
+import SEO from "../components/SEO";
+import { faqItems } from "../content/legal/faqs";
+import { policySections } from "../content/legal/policies";
+import { termsSections } from "../content/legal/terms";
+import { useScrollToHash } from "../hooks/useScrollToHash";
+import { CONTACT } from "../config/contact";
+import { buildWaLink, defaultPrefill } from "../utils/whatsapp";
+
+const FaqPage = () => {
+  useScrollToHash();
+  const [search, setSearch] = useState("");
+  const whatsappLink = useMemo(() => {
+    const href = typeof window !== "undefined" ? window.location.href : "";
+    const prefill = defaultPrefill({ href, context: "FAQs" });
+    return buildWaLink({ phoneE164: CONTACT.business.whatsapp, text: prefill });
+  }, []);
+
+  const grouped = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    const filtered = query
+      ? faqItems.filter((item) =>
+          `${item.question} ${item.answer} ${(item.tags || []).join(" ")}`
+            .toLowerCase()
+            .includes(query)
+        )
+      : faqItems;
+
+    const byCategory = filtered.reduce<Record<string, typeof filtered>>((acc, item) => {
+      acc[item.category] = acc[item.category] ? [...acc[item.category], item] : [item];
+      return acc;
+    }, {});
+
+    return Object.entries(byCategory).map(([category, items]) => ({ category, items }));
+  }, [search]);
+
+  const sectionNav = grouped.map(({ category }) => ({ id: category.toLowerCase().replace(/\s+/g, "-"), label: category }));
+
+  const resolveTitle = (link: { type: "policy" | "terms"; id: string }) => {
+    if (link.type === "policy") {
+      return policySections.find((p) => p.id === link.id)?.title ?? link.id;
+    }
+    return termsSections.find((t) => t.id === link.id)?.title ?? link.id;
+  };
+
+  return (
+    <LegalLayout
+      current="faq"
+      title="FAQs | Atlas Guest Portal"
+      description="Quick answers that link directly to the underlying policy and terms sections."
+    >
+      <SEO
+        title="FAQs | Atlas Guest Portal"
+        description="Common questions about bookings, payments, check-in, guests, amenities, and deposits."
+        url="/faq"
+      />
+
+      <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6">
+        <SectionNav sections={sectionNav} />
+
+        <div className="space-y-6">
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <LegalSearch value={search} onChange={setSearch} placeholder="Search FAQs" />
+              <div className="bg-amber-50 text-amber-800 border border-amber-200 rounded-xl p-4 text-sm">
+                <p className="font-semibold">If anything here conflicts with Terms, the Terms apply.</p>
+                <p>Each answer links to the source policy or terms section.</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            {grouped.map(({ category, items }) => (
+              <section
+                key={category}
+                id={category.toLowerCase().replace(/\s+/g, "-")}
+                className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4"
+              >
+                <div className="space-y-1">
+                  <h2 className="text-2xl font-bold text-slate-900">{category}</h2>
+                  <p className="text-sm text-slate-600">Search within this category or expand answers below.</p>
+                </div>
+
+                <div className="divide-y divide-slate-200">
+                  {items.map((item) => (
+                    <details key={item.id} className="py-3 group" id={item.id} open>
+                      <summary className="flex items-center justify-between cursor-pointer">
+                        <h3 className="text-lg font-semibold text-slate-900">{item.question}</h3>
+                        <span className="text-primary text-sm">Toggle</span>
+                      </summary>
+                      <div className="mt-2 space-y-2 text-slate-800">
+                        <p>{item.answer}</p>
+                        <div className="flex flex-wrap gap-2">
+                          {item.linksTo.map((link) => (
+                            <a
+                              key={`${item.id}-${link.id}`}
+                              className="text-xs uppercase tracking-[0.2em] px-3 py-1 rounded-full bg-slate-100 text-primary font-semibold"
+                              href={`/${link.type === "policy" ? "policies" : "terms"}#${link.id}`}
+                            >
+                              Related: {link.type === "policy" ? "Policy" : "Terms"} – {resolveTitle(link)}
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    </details>
+                  ))}
+                </div>
+              </section>
+            ))}
+
+            {grouped.length === 0 && (
+              <div className="bg-white border border-slate-200 rounded-2xl p-6 text-slate-700 shadow-sm">
+                No FAQs match your search yet. Try a different keyword.
+              </div>
+            )}
+          </div>
+
+          <div className="bg-gradient-to-r from-primary/90 to-primary text-white rounded-2xl p-6 shadow-lg">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <h3 className="text-xl font-bold">Need help?</h3>
+                <p className="text-white/90">Message us with your question and we will direct you to the right section.</p>
+              </div>
+              <a
+                href={whatsappLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-white text-primary font-semibold rounded-xl shadow-md hover:shadow-lg"
+              >
+                Message on WhatsApp
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </LegalLayout>
+  );
+};
+
+export default FaqPage;

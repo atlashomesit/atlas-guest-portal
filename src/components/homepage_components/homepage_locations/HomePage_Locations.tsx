@@ -1,36 +1,31 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { propertyData, propertyImages } from "../../../data.ts";
-import Heading from "../../commonComponents/heading/Heading";
-import { LISTINGS } from "../../../data/listings";
+import { LISTINGS, type Listing } from "../../../data/listings";
 import "./homepage_location.css";
+import { getItemKey, sanitizeItems } from "../../../utils/sanitizeItems";
+import { LOGO_URL } from "../../../config/branding";
 
-const HomePage_Locations = () => {
+type HomePageLocationsProps = {
+  listings?: unknown;
+};
+
+const HomePage_Locations = ({ listings = LISTINGS }: HomePageLocationsProps) => {
   const navigate = useNavigate();
-  
-  // Debug log
-  console.log('propertyImages:', propertyImages);
-  console.log('propertyData:', propertyData);
-
-  // Debug log to check the data
-  console.log('HomePage_Locations - propertyData:', propertyData);
-  console.log('HomePage_Locations - LISTINGS:', LISTINGS);
-  console.log('HomePage_Locations - propertyImages:', propertyImages);
+  const safeListings = React.useMemo(() => sanitizeItems<Listing>(listings), [listings]);
+  const safePropertyData = React.useMemo(() => sanitizeItems(propertyData), []);
+  const fallbackCover = LOGO_URL;
 
   // Sort items to have featured (penthouse) first
   const items = React.useMemo(
-    () => [...LISTINGS].sort((a, b) => Number(!!b.featured) - Number(!!a.featured)),
-    []
+    () => [...safeListings].sort((a, b) => Number(!!b.featured) - Number(!!a.featured)),
+    [safeListings]
   );
 
   // Get the penthouse and other properties
   const penthouse = items.find(item => item.featured);
   const otherProperties = items.filter(item => !item.featured);
-  
-  // Debug log
-  console.log('Penthouse:', penthouse);
-  console.log('Other properties:', otherProperties);
-  
+
   // Split other properties into chunks for different rows
   // First row will have 3 cards, second row will have remaining cards
   const firstRow = otherProperties.slice(0, 3);
@@ -52,35 +47,13 @@ const HomePage_Locations = () => {
     }
   };
 
-  const PropertyCard = ({ property: propertyItem, isPenthouse = false }: { property: any, isPenthouse?: boolean }) => {
+  const PropertyCard = ({ property: propertyItem, isPenthouse = false }: { property: Listing, isPenthouse?: boolean }) => {
     const listing = propertyItem;
-    
-    // Debug log the listing data
-    console.log('PropertyCard - listing:', listing);
-    
-    // Get the property data from propertyData array using the id
-    const propertyDataItem = propertyData.find(p => String(p.id) === String(listing.id));
-    
-    // Debug log the found property data
-    console.log('PropertyCard - propertyDataItem:', propertyDataItem);
-    
-    // Get images for the property
+
+    const propertyDataItem = safePropertyData.find((p) => String(p.id) === String(listing.id));
     const imgs = propertyImages[String(listing.id)] || [];
-    const cover = imgs[0] || '';
-    
-    // Debug log the images
-    console.log('PropertyCard - images:', { imgs, cover });
-    
-    // Get the display name - use property_name from propertyDataItem if available, otherwise fall back to listing.title or id
+    const cover = imgs[0] || fallbackCover;
     const displayName = propertyDataItem?.property_name || listing.title || `Property ${listing.id}`;
-    
-    // Debug log
-    console.log('Rendering property card:', {
-      listingId: listing.id,
-      propertyData,
-      imgs,
-      cover
-    });
 
     const interactiveProps: React.HTMLAttributes<HTMLElement> = propertyDataItem
       ? {
@@ -102,9 +75,9 @@ const HomePage_Locations = () => {
         {...interactiveProps}
       >
         <div className="relative">
-          <img 
+          <img
             src={cover}
-            alt={`${listing.property_name} cover`}
+            alt={`${displayName} cover`}
             className="w-full h-64 object-cover rounded-b-3xl"
             onError={(e) => {
               const target = e.target as HTMLImageElement;
@@ -156,16 +129,16 @@ const HomePage_Locations = () => {
         
         {/* First Row - 3 cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-          {firstRow.map((property) => (
-            <PropertyCard key={property.id} property={property} />
+          {firstRow.map((property, index) => (
+            <PropertyCard key={getItemKey(property, index)} property={property} />
           ))}
         </div>
         
         {/* Second Row - Remaining cards */}
         {secondRow.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {secondRow.map((property) => (
-              <PropertyCard key={property.id} property={property} />
+            {secondRow.map((property, index) => (
+              <PropertyCard key={getItemKey(property, index)} property={property} />
             ))}
           </div>
         )}

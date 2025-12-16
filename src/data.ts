@@ -1,6 +1,7 @@
-import { resolveOptimizedAsset, resolveOptimizedGallery } from "./utils/resolveOptimizedAsset";
+import { LOGO_URL } from "./config/branding";
+import { CONTACT } from "./config/contact";
 
-const logo = resolveOptimizedAsset("logo-removebg-preview (3).png");
+const logo = LOGO_URL;
 
 const propertyImagePaths: Record<string, string[]> = {
     "101": [
@@ -126,9 +127,6 @@ const propertyImages: Record<string, string[]> = Object.fromEntries(
         })
     ])
 );
-
-// Debug log
-console.log('propertyImages:', propertyImages);
 
 // Export the propertyImages object
 export { propertyImages };
@@ -573,7 +571,7 @@ export const navbarData = {
         {
             id: 2,
             icon: 'IoIosCall',
-            data: '+91-7032493290'
+            data: `+91-${CONTACT.business.phone}`
         },
     ],
     logo: [
@@ -698,7 +696,7 @@ export const footerData: FooterDataInterface = {
     ],
     contactInfo: [
         { icon: 'IoIosMail', text: 'atlashomeskphb@gmail.com' },
-        { icon: 'IoIosCall', text: ['+91-7032493290'] },
+        { icon: 'IoIosCall', text: [`+91-${CONTACT.business.phone}`] },
     ],
     villaLinks: [
         { icon: 'IoIosArrowForward', text: 'Vrindavan', link: '/' },
