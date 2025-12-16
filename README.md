@@ -34,7 +34,11 @@ Optional tooling:
    ```bash
    cp .env.example .env
    ```
-   Populate the EmailJS identifiers before attempting to send booking/contact forms.
+   Populate the EmailJS identifiers before attempting to send booking/contact forms. Add the WhatsApp
+   contact number for chat CTAs:
+   ```bash
+   VITE_WHATSAPP_PHONE_E164=919999999999
+   ```
 3. **Run the development server**
    ```bash
    npm run dev
@@ -66,6 +70,11 @@ Optional tooling:
 | `src/data.ts` | Source of property metadata, navigation content, and footer links consumed across the UI. |
 | `src/components/commonComponents/navbar/Navbar.tsx` / `footer/Footer.tsx` | Global navigation/header ribbon and footer contact blocks. |
 | `docs/` | Working notes covering the API guide and first PR starter; see `ONBOARDING.md`, `ARCHITECTURE.md`, `RUNBOOK.md`, and `SECURITY.md` for the comprehensive onboarding, architecture, operations, and security docs. |
+
+## Routes & deep links
+- `/faq` → FAQ hub with accordion sections and WhatsApp CTA
+- `/faq#cancellation-refunds` → scrolls to the Cancellation & Refunds section
+- `/faq#refund-timeline` → opens the refund timeline question
 
 ## Common Tasks
 | Goal | Command |

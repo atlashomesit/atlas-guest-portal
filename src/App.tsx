@@ -15,6 +15,7 @@ import LocationPage from "./pages/LocationPage"
 import GalleryPage from "./pages/GalleryPage"
 import OffersPage from "./pages/OffersPage"
 import AboutPage from "./pages/AboutPage"
+import FaqPage from "./pages/FaqPage"
 import BlogHome from "./pages/blog/BlogHome"
 import BlogCategory from "./pages/blog/BlogCategory"
 import BlogPostPage from "./pages/blog/BlogPostPage"
@@ -42,6 +43,7 @@ function AppWrapper() {
         <Route path="/gallery" element={<GalleryPage />} />
         <Route path="/offers" element={<OffersPage />} />
         <Route path="/about" element={<AboutPage />} />
+        <Route path="/faq" element={<FaqPage />} />
         <Route path="/blog" element={<BlogHome />} />
         <Route path="/blog/:category" element={<BlogCategory />} />
         <Route path="/blog/:category/:slug" element={<BlogPostPage />} />
