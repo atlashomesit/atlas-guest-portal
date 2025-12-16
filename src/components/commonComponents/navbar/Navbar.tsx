@@ -9,6 +9,7 @@ import { IoIosArrowForward } from "react-icons/io";
 import { footerData, propertyData } from '../../../data';
 import logo from '../../../assets/logo.svg';
 import { getItemKey, sanitizeItems } from '../../../utils/sanitizeItems';
+import { buildWaLink } from '../../../utils/whatsapp';
 
 const iconMap = {
     ImGithub,
@@ -26,6 +27,11 @@ const Navbar = () => {
     const [isApartmentsOpen, setIsApartmentsOpen] = useState(false);
     const [isBlogOpen, setIsBlogOpen] = useState(false);
     const apartments = sanitizeItems(propertyData);
+    const whatsappPhone = import.meta.env.VITE_WHATSAPP_PHONE_E164 || '+917032493290';
+    const whatsappLink = buildWaLink({
+        phoneE164: whatsappPhone,
+        text: "Hi Atlas Homestays 👋 I'd like to learn more about booking a stay.",
+    });
 
     useEffect(() => {
         const onLoadfunction = () => {
@@ -92,7 +98,7 @@ const Navbar = () => {
                     </div>
                     <span className="text-slate-400 hidden md:block">|</span>
                     <a
-                        href="https://wa.me/+917032493290"
+                        href={whatsappLink}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-green-500 text-2xl"
@@ -155,6 +161,7 @@ const Navbar = () => {
 
                     <NavLink to='/amenities' className={navLinkClass}>Amenities</NavLink>
                     <NavLink to='/location' className={navLinkClass}>Location</NavLink>
+                    <NavLink to='/faq' className={navLinkClass}>FAQ</NavLink>
                     <NavLink to='/gallery' className={navLinkClass}>Gallery</NavLink>
                     <NavLink to='/offers' className={navLinkClass}>Offers</NavLink>
 
@@ -172,7 +179,7 @@ const Navbar = () => {
                     <NavLink to='/about' className={navLinkClass}>About Us</NavLink>
                     <NavLink to='/policies' className={navLinkClass}>Policies</NavLink>
                     <NavLink to='/contact' className={navLinkClass}>Contact Us</NavLink>
-                    <a href='https://wa.me/+917032493290' className='px-4 py-2 bg-primary text-white font-semibold rounded-full shadow-md hover:shadow-lg transition'>Book Now</a>
+                    <a href={whatsappLink} className='px-4 py-2 bg-primary text-white font-semibold rounded-full shadow-md hover:shadow-lg transition'>Book Now</a>
                 </div>
             </div>
 
@@ -201,6 +208,7 @@ const Navbar = () => {
 
                     <NavLink onClick={closeMobile} to='/amenities' className='block py-2 text-slate-800 font-semibold'>Amenities</NavLink>
                     <NavLink onClick={closeMobile} to='/location' className='block py-2 text-slate-800 font-semibold'>Location</NavLink>
+                    <NavLink onClick={closeMobile} to='/faq' className='block py-2 text-slate-800 font-semibold'>FAQ</NavLink>
                     <NavLink onClick={closeMobile} to='/gallery' className='block py-2 text-slate-800 font-semibold'>Gallery</NavLink>
                     <NavLink onClick={closeMobile} to='/offers' className='block py-2 text-slate-800 font-semibold'>Offers</NavLink>
 
@@ -218,7 +226,7 @@ const Navbar = () => {
                     <NavLink onClick={closeMobile} to='/about' className='block py-2 text-slate-800 font-semibold'>About Us</NavLink>
                     <NavLink onClick={closeMobile} to='/policies' className='block py-2 text-slate-800 font-semibold'>Policies</NavLink>
                     <NavLink onClick={closeMobile} to='/contact' className='block py-2 text-slate-800 font-semibold'>Contact Us</NavLink>
-                    <a href='https://wa.me/+917032493290' className='block py-2 text-primary font-bold'>Book Now</a>
+                    <a href={whatsappLink} className='block py-2 text-primary font-bold'>Book Now</a>
                 </div>
             )}
         </section>
