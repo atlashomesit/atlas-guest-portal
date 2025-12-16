@@ -10,6 +10,8 @@ import { footerData, propertyData } from '../../../data';
 import logo from '../../../assets/logo.svg';
 import { getItemKey, sanitizeItems } from '../../../utils/sanitizeItems';
 import { buildWaLink } from '../../../utils/whatsapp';
+import { primaryNav, moreNav, ctaNav } from '../../../config/navigation';
+import MoreMenu from '../../Nav/MoreMenu';
 
 const iconMap = {
     ImGithub,
@@ -25,7 +27,7 @@ const iconMap = {
 const Navbar = () => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isApartmentsOpen, setIsApartmentsOpen] = useState(false);
-    const [isBlogOpen, setIsBlogOpen] = useState(false);
+    const [isMoreOpen, setIsMoreOpen] = useState(false);
     const apartments = sanitizeItems(propertyData);
     const whatsappPhone = import.meta.env.VITE_WHATSAPP_PHONE_E164 || '+917032493290';
     const whatsappLink = buildWaLink({
@@ -59,7 +61,7 @@ const Navbar = () => {
     const closeMobile = () => {
         setIsMenuOpen(false);
         setIsApartmentsOpen(false);
-        setIsBlogOpen(false);
+        setIsMoreOpen(false);
     };
 
     return (
@@ -139,54 +141,45 @@ const Navbar = () => {
                 </button>
 
                 <div className='hidden md:flex items-center gap-4'>
-                    <NavLink to='/' className={navLinkClass}>Home</NavLink>
-
-                    <div className='relative group'>
-                        <button className='px-3 py-2 text-sm font-semibold text-slate-800 hover:text-primary flex items-center gap-1'>
-                            Apartments
-                        </button>
-                        <div className='absolute invisible group-hover:visible opacity-0 group-hover:opacity-100 transition bg-white border border-slate-200 rounded-xl shadow-lg min-w-[220px] py-2'>
-                            <NavLink to='/apartments' className='block px-4 py-2 text-sm text-slate-800 hover:bg-slate-50'>Apartments Overview</NavLink>
-                            {apartments.map((apt, index) => (
-                                <NavLink
-                                    key={getItemKey(apt, index)}
-                                    to={`/property_details/${apt.id ?? apt.listingId ?? getItemKey(apt, index)}`}
-                                    className='block px-4 py-2 text-sm text-slate-800 hover:bg-slate-50'
-                                >
-                                    {apt.property_name || apt.title || `Property ${apt.id ?? apt.listingId}`}
-                                </NavLink>
-                            ))}
-                        </div>
-                    </div>
-
-                    <NavLink to='/amenities' className={navLinkClass}>Amenities</NavLink>
-                    <NavLink to='/location' className={navLinkClass}>Location</NavLink>
-                    <NavLink to='/faq' className={navLinkClass}>FAQ</NavLink>
-                    <NavLink to='/gallery' className={navLinkClass}>Gallery</NavLink>
-                    <NavLink to='/offers' className={navLinkClass}>Offers</NavLink>
-
-                    <div className='relative group'>
-                        <button className='px-3 py-2 text-sm font-semibold text-slate-800 hover:text-primary flex items-center gap-1'>
-                            Blog
-                        </button>
-                        <div className='absolute invisible group-hover:visible opacity-0 group-hover:opacity-100 transition bg-white border border-slate-200 rounded-xl shadow-lg min-w-[200px] py-2'>
-                            <NavLink to='/blog' className='block px-4 py-2 text-sm text-slate-800 hover:bg-slate-50'>Blog Home</NavLink>
-                            <NavLink to='/blog/guest-guides' className='block px-4 py-2 text-sm text-slate-800 hover:bg-slate-50'>Guest Guides</NavLink>
-                            <NavLink to='/blog/hospitality-tech' className='block px-4 py-2 text-sm text-slate-800 hover:bg-slate-50'>Hospitality Tech & AI</NavLink>
-                        </div>
-                    </div>
-
-                    <NavLink to='/about' className={navLinkClass}>About Us</NavLink>
-                    <NavLink to='/policies' className={navLinkClass}>Policies</NavLink>
-                    <NavLink to='/contact' className={navLinkClass}>Contact Us</NavLink>
-                    <a href={whatsappLink} className='px-4 py-2 bg-primary text-white font-semibold rounded-full shadow-md hover:shadow-lg transition'>Book Now</a>
+                    {primaryNav.filter((item) => !item.hidden).map((item) => (
+                        item.label === 'Apartments' ? (
+                            <div key={item.label} className='relative group'>
+                                <button className='px-3 py-2 text-sm font-semibold text-slate-800 hover:text-primary flex items-center gap-1'>
+                                    {item.label}
+                                </button>
+                                <div className='absolute invisible group-hover:visible opacity-0 group-hover:opacity-100 transition bg-white border border-slate-200 rounded-xl shadow-lg min-w-[220px] py-2'>
+                                    <NavLink to={item.to} className='block px-4 py-2 text-sm text-slate-800 hover:bg-slate-50'>Apartments Overview</NavLink>
+                                    {apartments.map((apt, index) => (
+                                        <NavLink
+                                            key={getItemKey(apt, index)}
+                                            to={`/property_details/${apt.id ?? apt.listingId ?? getItemKey(apt, index)}`}
+                                            className='block px-4 py-2 text-sm text-slate-800 hover:bg-slate-50'
+                                        >
+                                            {apt.property_name || apt.title || `Property ${apt.id ?? apt.listingId}`}
+                                        </NavLink>
+                                    ))}
+                                </div>
+                            </div>
+                        ) : (
+                            <NavLink key={item.label} to={item.to} className={navLinkClass}>
+                                {item.label}
+                            </NavLink>
+                        )
+                    ))}
+                    <MoreMenu items={moreNav} />
+                    <a
+                        href={whatsappLink}
+                        className='px-4 py-2 bg-primary text-white font-semibold rounded-full shadow-md hover:shadow-lg transition'
+                        target='_blank'
+                        rel='noopener noreferrer'
+                    >
+                        {ctaNav.label}
+                    </a>
                 </div>
             </div>
 
             {isMenuOpen && (
                 <div className='md:hidden bg-white border-t border-slate-200 shadow-lg px-4 py-3 space-y-2'>
-                    <NavLink onClick={closeMobile} to='/' className='block py-2 text-slate-800 font-semibold'>Home</NavLink>
-
                     <button onClick={() => setIsApartmentsOpen(!isApartmentsOpen)} className='w-full text-left py-2 font-semibold text-slate-800'>
                         Apartments
                     </button>
@@ -205,28 +198,58 @@ const Navbar = () => {
                             ))}
                         </div>
                     )}
+                    {primaryNav
+                        .filter((item) => !item.hidden && item.label !== 'Apartments')
+                        .map((item) => (
+                            <NavLink
+                                key={item.label}
+                                onClick={closeMobile}
+                                to={item.to}
+                                className='block py-2 text-slate-800 font-semibold'
+                            >
+                                {item.label}
+                            </NavLink>
+                        ))}
 
-                    <NavLink onClick={closeMobile} to='/amenities' className='block py-2 text-slate-800 font-semibold'>Amenities</NavLink>
-                    <NavLink onClick={closeMobile} to='/location' className='block py-2 text-slate-800 font-semibold'>Location</NavLink>
-                    <NavLink onClick={closeMobile} to='/faq' className='block py-2 text-slate-800 font-semibold'>FAQ</NavLink>
-                    <NavLink onClick={closeMobile} to='/gallery' className='block py-2 text-slate-800 font-semibold'>Gallery</NavLink>
-                    <NavLink onClick={closeMobile} to='/offers' className='block py-2 text-slate-800 font-semibold'>Offers</NavLink>
-
-                    <button onClick={() => setIsBlogOpen(!isBlogOpen)} className='w-full text-left py-2 font-semibold text-slate-800'>
-                        Blog
+                    <button onClick={() => setIsMoreOpen(!isMoreOpen)} className='w-full text-left py-2 font-semibold text-slate-800'>
+                        More
                     </button>
-                    {isBlogOpen && (
+                    {isMoreOpen && (
                         <div className='pl-4 space-y-1'>
-                            <NavLink onClick={closeMobile} to='/blog' className='block py-1 text-sm text-slate-700'>Blog Home</NavLink>
-                            <NavLink onClick={closeMobile} to='/blog/guest-guides' className='block py-1 text-sm text-slate-700'>Guest Guides</NavLink>
-                            <NavLink onClick={closeMobile} to='/blog/hospitality-tech' className='block py-1 text-sm text-slate-700'>Hospitality Tech & AI</NavLink>
+                            {moreNav.filter((item) => !item.hidden).map((item) => (
+                                item.external ? (
+                                    <a
+                                        key={item.label}
+                                        href={item.to}
+                                        onClick={closeMobile}
+                                        className='block py-1 text-sm text-slate-700'
+                                        target='_blank'
+                                        rel='noopener noreferrer'
+                                    >
+                                        {item.label}
+                                    </a>
+                                ) : (
+                                    <NavLink
+                                        key={item.label}
+                                        onClick={closeMobile}
+                                        to={item.to}
+                                        className='block py-1 text-sm text-slate-700'
+                                    >
+                                        {item.label}
+                                    </NavLink>
+                                )
+                            ))}
                         </div>
                     )}
 
-                    <NavLink onClick={closeMobile} to='/about' className='block py-2 text-slate-800 font-semibold'>About Us</NavLink>
-                    <NavLink onClick={closeMobile} to='/policies' className='block py-2 text-slate-800 font-semibold'>Policies</NavLink>
-                    <NavLink onClick={closeMobile} to='/contact' className='block py-2 text-slate-800 font-semibold'>Contact Us</NavLink>
-                    <a href={whatsappLink} className='block py-2 text-primary font-bold'>Book Now</a>
+                    <a
+                        href={whatsappLink}
+                        className='block py-2 text-primary font-bold'
+                        target='_blank'
+                        rel='noopener noreferrer'
+                    >
+                        {ctaNav.label}
+                    </a>
                 </div>
             )}
         </section>
