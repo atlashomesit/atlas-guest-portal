@@ -5,12 +5,16 @@ export type NavItem = {
     hidden?: boolean;
 };
 
+export const helpNav: NavItem[] = [
+    { label: 'Policies', to: '/policies' },
+    { label: 'FAQs', to: '/faq' },
+    { label: 'Terms', to: '/terms' },
+];
+
 export const primaryNav: NavItem[] = [
     { label: 'Apartments', to: '/apartments' },
     { label: 'Location', to: '/location' },
-    { label: 'FAQ', to: '/faq' },
-    { label: 'Policies', to: '/policies' },
-    { label: 'Terms', to: '/terms' },
+    { label: 'Help', to: '/policies' },
     { label: 'Contact', to: '/contact' },
 ];
 

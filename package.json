@@ -5,12 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host",
-    "prebuild": "node tools/optimize-images.mjs",
+    "prebuild": "npm run validate:legal && node tools/optimize-images.mjs",
     "build": "vite build",
     "test": "vitest run",
+    "pretest": "npm run validate:legal",
     "lint": "eslint .",
     "format": "prettier -w .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "validate:legal": "node ./node_modules/vitest/vitest.mjs run src/content/legal/validateLegalContent.test.ts"
   },
   "engines": {
     "node": ">=20.18.1",
