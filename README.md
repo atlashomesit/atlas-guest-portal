@@ -10,8 +10,8 @@ Atlas Homes Frontend is a Vite-powered React + TypeScript single-page applicatio
 - Mobile: primary links plus a collapsible "More" group; tapping any item closes the menu
 
 ## Prerequisites
-- Node.js **18.18+** or **20.0+** (required by Vite 5)
-- npm **9+** (ships with the recommended Node releases)
+- Node.js **22.12.0+** (required by Vite 7 and enforced in `.nvmrc`/`.node-version`)
+- npm **10.9.2+** (ships with the recommended Node releases)
 - Modern browser for previewing the development server
 
 Optional tooling:
@@ -19,10 +19,15 @@ Optional tooling:
 - ESLint-compatible editor integration for real-time lint feedback
 
 ## Build Environment
-- Node **20.18.1** (LTS)
-- npm **10+**
-- Cloudflare Pages build vars → `NODE_VERSION=20.18.1`, `NPM_FLAGS=--no-audit --no-fund`
+- Node **22.12.0** (LTS)
+- npm **10.9.2**
+- Cloudflare Pages build vars → `NODE_VERSION=22.12.0`, `NPM_FLAGS=--no-audit --no-fund`
 - Enforced override → `@jridgewell/sourcemap-codec@1.5.5`
+
+### Cloudflare Pages settings
+- In the Pages project dashboard, set the environment variable `NODE_VERSION=22.12.0` so builds align with Vite 7's engine requirement (\`^20.19.0 || >=22.12.0\`).
+- The repo includes `.nvmrc` and `.node-version` set to **22.12.0**; use them locally (e.g., `nvm use`) to match the Pages runtime and avoid EBADENGINE warnings.
+- `npm run validate:legal` uses Vitest with the **jsdom** environment; keep `jsdom` installed and available during builds so the validator can parse the DOM-like structures it asserts against.
 
 ### Image optimization manifest
 - `npm run optimize-images` normalizes JPEG/PNG assets to WebP, cleans outdated variants, and writes a manifest to `src/assets/optimized-manifest.json` (creating the directory if missing) so the app can reference the optimized filenames consistently across local, CI, and Cloudflare Pages builds.
