@@ -40,6 +40,14 @@ const SEO = ({ title, description, image, url, type = "website" }: SEOProps) => 
     if (url) {
       const ogUrl = ensureMeta("og:url", "property");
       ogUrl.content = url;
+
+      let canonical = document.querySelector("link[rel='canonical']") as HTMLLinkElement | null;
+      if (!canonical) {
+        canonical = document.createElement("link");
+        canonical.rel = "canonical";
+        document.head.appendChild(canonical);
+      }
+      canonical.href = url;
     }
 
     if (image) {

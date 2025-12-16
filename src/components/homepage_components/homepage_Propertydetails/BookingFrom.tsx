@@ -86,6 +86,9 @@ const BookingForm = ({ propertyData }: { propertyData: Property }) => {
     }
 
     setIsLoading(true);
+    const policyMessage =
+      "Policies (Cancellation, House Rules, Refunds): https://atlashomestays.com/policies | Cancel: https://atlashomestays.com/policies#cancellation-refund-policy | Reschedule: https://atlashomestays.com/policies#reschedule-date-change-policy";
+
     const templateParams = {
       to_email: emailJsConfig.ownerEmail,
       to_name: 'Property Owner',
@@ -105,7 +108,8 @@ const BookingForm = ({ propertyData }: { propertyData: Property }) => {
       property_name: propertyData?.property_name || 'Property',
       message: `New booking request for ${nights} nights from ${checkIn} to ${checkOut}.
 Guests: ${adults} adults, ${children} children, ${infants} infants, ${pets} pets.
-Total Price: ₹${totalPrice.toLocaleString()}`
+Total Price: ₹${totalPrice.toLocaleString()}
+${policyMessage}`
     };
     try {
       await emailjs.send(
@@ -115,7 +119,7 @@ Total Price: ₹${totalPrice.toLocaleString()}`
         emailJsConfig.publicKey!
       );
 
-      alert('Booking request sent successfully!');
+      alert(`Booking request sent successfully!\nPolicies (Cancellation, House Rules, Refunds): https://atlashomestays.com/policies`);
       // Optionally clear the form or keep data as is
       setName('');
       setContactNumber('');

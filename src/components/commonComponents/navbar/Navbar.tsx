@@ -170,6 +170,7 @@ const Navbar = () => {
                     </div>
 
                     <NavLink to='/about' className={navLinkClass}>About Us</NavLink>
+                    <NavLink to='/policies' className={navLinkClass}>Policies</NavLink>
                     <NavLink to='/contact' className={navLinkClass}>Contact Us</NavLink>
                     <a href='https://wa.me/+917032493290' className='px-4 py-2 bg-primary text-white font-semibold rounded-full shadow-md hover:shadow-lg transition'>Book Now</a>
                 </div>
@@ -215,6 +216,7 @@ const Navbar = () => {
                     )}
 
                     <NavLink onClick={closeMobile} to='/about' className='block py-2 text-slate-800 font-semibold'>About Us</NavLink>
+                    <NavLink onClick={closeMobile} to='/policies' className='block py-2 text-slate-800 font-semibold'>Policies</NavLink>
                     <NavLink onClick={closeMobile} to='/contact' className='block py-2 text-slate-800 font-semibold'>Contact Us</NavLink>
                     <a href='https://wa.me/+917032493290' className='block py-2 text-primary font-bold'>Book Now</a>
                 </div>
