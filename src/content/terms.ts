@@ -91,7 +91,7 @@ export const termsSections: TermsSection[] = [
     title: "Contacts",
     paragraphs: [
       "Property Manager: +91-7032493290.",
-      "Owner Aruna: +91-9502244053.",
+      "Owner (escalation): +91-9177773290.",
     ],
   },
 ];

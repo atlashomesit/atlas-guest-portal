@@ -1,4 +1,5 @@
 import { LOGO_URL } from "./config/branding";
+import { CONTACT } from "./config/contact";
 
 const logo = LOGO_URL;
 
@@ -570,7 +571,7 @@ export const navbarData = {
         {
             id: 2,
             icon: 'IoIosCall',
-            data: '+91-7032493290'
+            data: `+91-${CONTACT.business.phone}`
         },
     ],
     logo: [
@@ -695,7 +696,7 @@ export const footerData: FooterDataInterface = {
     ],
     contactInfo: [
         { icon: 'IoIosMail', text: 'atlashomeskphb@gmail.com' },
-        { icon: 'IoIosCall', text: ['+91-7032493290'] },
+        { icon: 'IoIosCall', text: [`+91-${CONTACT.business.phone}`] },
     ],
     villaLinks: [
         { icon: 'IoIosArrowForward', text: 'Vrindavan', link: '/' },
