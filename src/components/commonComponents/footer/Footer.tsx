@@ -1,10 +1,10 @@
-import logo from '../../../assets/logo.svg';
 import { FaFacebook, FaTwitter, FaYoutube, FaInstagram } from 'react-icons/fa';
 import { ImGithub } from 'react-icons/im';
 import { IoIosMail, IoIosCall, IoIosArrowForward } from "react-icons/io";
 import { footerData } from '../../../data';
 import { Link } from 'react-router-dom';
 import { moreNav, primaryNav } from '../../../config/navigation';
+import { LOGO_URL } from '../../../config/branding';
 
 const iconMap = {
     ImGithub,
@@ -20,7 +20,7 @@ const iconMap = {
 const Footer = () => {
     const socialLinks = Array.isArray(footerData?.socialLinks) ? footerData.socialLinks : [];
     const contactInfo = Array.isArray(footerData?.contactInfo) ? footerData.contactInfo : [];
-    const logoSrc = logo;
+    const logoSrc = LOGO_URL;
 
     return (
         <div className='py-10 md:py-10 px-4 lg:px-8 bg-black text-[#949494]'>

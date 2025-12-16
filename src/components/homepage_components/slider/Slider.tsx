@@ -6,6 +6,7 @@ import { resolveOptimizedAsset } from '../../../utils/resolveOptimizedAsset';
 // import Homepage_form from '../homepage_form/Homepage_form';
 import { Link } from 'react-router-dom';
 import { navbarData } from '../../../data';
+import { LOGO_URL } from '../../../config/branding';
 
 const Slider = () => {
     const images = [
@@ -19,7 +20,7 @@ const Slider = () => {
                 <Link to='/'>
                     <img
                         className='w-20 h-20 md:w-44 md:h-20 object-cover rounded-md'
-                        src='https://atlashomestorage.blob.core.windows.net/listing-images/logo-removebg-preview (3).be48d403.webp'
+                        src={LOGO_URL}
                         alt='Logo'
                     />
                 </Link>

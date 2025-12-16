@@ -7,11 +7,11 @@ import { FaFacebook, FaTwitter, FaYoutube, FaInstagram } from 'react-icons/fa';
 import { ImGithub } from 'react-icons/im';
 import { IoIosArrowForward } from "react-icons/io";
 import { footerData, propertyData } from '../../../data';
-import logo from '../../../assets/logo.svg';
 import { getItemKey, sanitizeItems } from '../../../utils/sanitizeItems';
 import { buildWaLink } from '../../../utils/whatsapp';
 import { primaryNav, moreNav, ctaNav } from '../../../config/navigation';
 import MoreMenu from '../../Nav/MoreMenu';
+import { LOGO_URL } from '../../../config/branding';
 
 const iconMap = {
     ImGithub,
@@ -132,7 +132,7 @@ const Navbar = () => {
             {/* Main Nav */}
             <div id='navbar_container' className='bg-white transition-all duration-300 w-full flex items-center justify-between px-4 py-3 md:py-4 md:px-12'>
                 <Link to='/' className='flex items-center gap-3'>
-                    <img className='w-20 h-16 object-contain rounded-md' src={logo} alt='Atlas Homestays logo' />
+                    <img className='w-20 h-16 object-contain rounded-md' src={LOGO_URL} alt='Atlas Homestays logo' />
                     <span className='font-bold text-lg text-slate-900 hidden sm:block'>Atlas Homestays</span>
                 </Link>
 
