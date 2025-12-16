@@ -4,6 +4,7 @@ import { ImGithub } from 'react-icons/im';
 import { IoIosMail, IoIosCall, IoIosArrowForward } from "react-icons/io";
 import { footerData } from '../../../data';
 import { Link } from 'react-router-dom';
+import { moreNav, primaryNav } from '../../../config/navigation';
 
 const iconMap = {
     ImGithub,
@@ -23,7 +24,7 @@ const Footer = () => {
 
     return (
         <div className='py-10 md:py-10 px-4 lg:px-8 bg-black text-[#949494]'>
-            <div className='max-w-screen-2xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8'>
+            <div className='max-w-screen-2xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-8'>
                 <div className='flex flex-col gap-7 items-center lg:items-start'>
                     <img className='w-32 md:w-20 rounded-md' src={logoSrc} alt="paymentlogo" />
                     <div className='flex text-lg gap-6'>
@@ -39,15 +40,31 @@ const Footer = () => {
                 </div>
 
                 <div className='text-center lg:text-left'>
-                    <h2 className='text-2xl text-primary font-semibold mb-4'>Navigate</h2>
+                    <h2 className='text-2xl text-primary font-semibold mb-4'>Quick Links</h2>
                     <div className='flex flex-col gap-2 text-base'>
-                        <Link to='/apartments' className='hover:text-white'>Apartments</Link>
-                        <Link to='/blog' className='hover:text-white'>Blog</Link>
-                        <Link to='/blog/guest-guides' className='hover:text-white'>Guest Guides</Link>
-                        <Link to='/blog/hospitality-tech' className='hover:text-white'>Hospitality Tech & AI</Link>
-                        <Link to='/policies' className='hover:text-white'>Policies</Link>
-                        <Link to='/contact' className='hover:text-white'>Contact</Link>
+                        {primaryNav.filter((item) => !item.hidden).map((item) => (
+                            <Link key={item.label} to={item.to} className='hover:text-white'>
+                                {item.label}
+                            </Link>
+                        ))}
                         <a href='/sitemap.xml' className='hover:text-white'>Sitemap</a>
+                    </div>
+                </div>
+
+                <div className='text-center lg:text-left'>
+                    <h2 className='text-2xl text-primary font-semibold mb-4'>More</h2>
+                    <div className='flex flex-col gap-2 text-base'>
+                        {moreNav.filter((item) => !item.hidden).map((item) => (
+                            item.external ? (
+                                <a key={item.label} href={item.to} target="_blank" rel="noopener noreferrer" className='hover:text-white'>
+                                    {item.label}
+                                </a>
+                            ) : (
+                                <Link key={item.label} to={item.to} className='hover:text-white'>
+                                    {item.label}
+                                </Link>
+                            )
+                        ))}
                     </div>
                 </div>
 
