@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from 'react';
 import { DateRange } from 'react-date-range';
 import { format } from 'date-fns';
 import { propertyData } from '../../../data';
-import Razorpay from 'razorpay';
 import { inlinePolicySnippets } from '../../../content/terms';
 import { baseGuestAllowance, getUnitPolicy } from '../../../config/policyConfig';
 
@@ -76,28 +75,22 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
     // Calculate total number of people (adults + children)
     const totalPeople = guests.adults + guests.children;
     
-    // Calculate price based on property ID
-    let pricePerNight;
-    if (Number(propertyId) === 501) {
-        // For property 501: Base price for 2 people, ₹700 per additional person (adult or child)
-        const additionalPeople = Math.max(0, totalPeople - 2);
-        pricePerNight = basePrice + (additionalPeople * 700);
-    } else {
-        // For other properties: Base price for 2 people, ₹400 per additional person (adult or child)
-        const additionalPeople = Math.max(0, totalPeople - 2);
-        pricePerNight = basePrice + (additionalPeople * 400);
-    }
+    const additionalPeople = Math.max(0, totalPeople - baseGuestAllowance);
+    const extraGuestRate = Number(propertyId) === 501 ? 700 : 400;
+    const extraGuestChargePerNight = additionalPeople * extraGuestRate;
+    const nightlyRateWithGuests = basePrice + extraGuestChargePerNight;
     
     // Calculate number of nights (minimum 1 night)
     const oneDay = 24 * 60 * 60 * 1000; // hours*minutes*seconds*milliseconds
     const nights = Math.max(1, Math.round(Math.abs((dates.endDate.getTime() - dates.startDate.getTime()) / oneDay)));
     
     // Calculate total price based on number of nights
-    const totalPrice = pricePerNight * nights;
-    const originalPrice = Math.round(pricePerNight * nights * 1.1); // 10% higher than the current price
+    const staySubtotal = nightlyRateWithGuests * nights;
+    const feesAndTaxes = Math.round(staySubtotal * 0.12);
+    const totalPrice = staySubtotal + feesAndTaxes;
     
     // Log for debugging
-    console.log('Property ID:', propertyId, 'Adults:', guests.adults, 'Children:', guests.children, 'Total people:', totalPeople, 'Price per night:', pricePerNight);
+    console.log('Property ID:', propertyId, 'Adults:', guests.adults, 'Children:', guests.children, 'Total people:', totalPeople, 'Nightly rate with guests:', nightlyRateWithGuests);
 
     const guestMenuRef = useRef<HTMLDivElement | null>(null);
     const calendarRef = useRef<HTMLDivElement | null>(null);
@@ -188,17 +181,26 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
         }));
     };
 
+    const hasSelection = Boolean(dates.startDate && dates.endDate && guests.adults);
+
     return (
-        <div className="max-w-md mx-auto p-6 bg-white shadow-xl rounded-2xl relative">
+        <div id="booking-form" className="max-w-md mx-auto p-6 bg-white shadow-xl rounded-2xl relative pb-24 lg:pb-0">
 
             {/* PRICE SECTION */}
             <p className="text-[30px] font-bold">
-                ₹{pricePerNight.toLocaleString()}
+                ₹{nightlyRateWithGuests.toLocaleString()}
 
                 <span className="text-base ml-1">/night</span>
             </p>
 
-            <p className="text-yellow-500 text-sm mb-4">★ 4.78 (21 reviews)</p>
+            {property && (
+                <div className="mb-4 space-y-1">
+                    <p className="text-amber-600 text-sm font-semibold">★ {property.property_rating.toFixed(2)} ({property.property_reviews} reviews)</p>
+                    {property.property_review_snippets?.[0] && (
+                        <p className="text-sm text-gray-700 italic">“{property.property_review_snippets[0]}”</p>
+                    )}
+                </div>
+            )}
 
             <div className="mb-4 space-y-1 text-sm text-gray-700">
                 <p>
@@ -431,6 +433,30 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
                 </div>
             )}
 
+            {hasSelection && (
+                <div className="mt-6 space-y-3 border rounded-xl p-4 bg-white shadow-sm">
+                    <div className="flex justify-between text-sm">
+                        <span>{nights} night{nights > 1 ? 's' : ''} × ₹{(nightlyRateWithGuests - extraGuestChargePerNight).toLocaleString('en-IN')}</span>
+                        <span>₹{((nightlyRateWithGuests - extraGuestChargePerNight) * nights).toLocaleString('en-IN')}</span>
+                    </div>
+                    {additionalPeople > 0 && (
+                        <div className="flex justify-between text-sm text-gray-700">
+                            <span>Extra guests ({additionalPeople} × ₹{extraGuestRate})</span>
+                            <span>₹{(extraGuestChargePerNight * nights).toLocaleString('en-IN')}</span>
+                        </div>
+                    )}
+                    <div className="flex justify-between text-sm text-gray-700">
+                        <span>Fees &amp; taxes (est.)</span>
+                        <span>₹{feesAndTaxes.toLocaleString('en-IN')}</span>
+                    </div>
+                    <div className="flex justify-between text-base font-semibold text-gray-900 border-t pt-3">
+                        <span>Total</span>
+                        <span>₹{totalPrice.toLocaleString('en-IN')}</span>
+                    </div>
+                    <p className="text-xs text-gray-500">No hidden charges — everything is shown upfront for your dates and guest count.</p>
+                </div>
+            )}
+
             <div className="mt-4 space-y-3 text-sm text-gray-700 border rounded-xl p-4 bg-gray-50">
                 <div>
                     <p className="font-semibold text-gray-900">Guest details</p>
@@ -509,11 +535,26 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
             <div className="flex justify-between mt-5 border-t pt-4">
                 <div>
                     <p className="text-lg font-semibold">Total Amount</p>
-                    <p className="text-sm text-gray-500">Inclusive of all taxes and fees</p>
+                    <p className="text-sm text-gray-500">Inclusive of estimated taxes and fees</p>
                 </div>
                 <p className="text-lg font-bold">
                     ₹{totalPrice.toLocaleString('en-IN')}
                 </p>
+            </div>
+
+            <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t shadow-2xl px-4 py-3 flex items-center justify-between z-40">
+                <div>
+                    <p className="text-xs text-gray-600">Total for your stay</p>
+                    <p className="text-lg font-semibold">₹{totalPrice.toLocaleString('en-IN')}</p>
+                    <p className="text-[11px] text-gray-500">No hidden charges</p>
+                </div>
+                <button
+                    onClick={initiatePayment}
+                    disabled={isLoading || !termsAccepted}
+                    className="bg-[#B99359] hover:bg-[#A0804D] text-white rounded-full px-4 py-3 text-sm font-semibold transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed"
+                >
+                    Reserve Now
+                </button>
             </div>
 
         </div>

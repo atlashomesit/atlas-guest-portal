@@ -160,6 +160,10 @@ private bar setup, wine chiller, Nespresso machine, washer-dryer, ironing statio
         property_location: "Hyderabad, Telangana",
         property_reviews: 128,
         property_rating: 4.95,
+        property_review_snippets: [
+            "Guests love the rooftop plunge pool and skyline views.",
+            "Concierge support and housekeeping were prompt and thoughtful."
+        ],
         property_price: 4999,
         property_img: propertyImages["501"],
         property_nearplaces: [
@@ -222,6 +226,10 @@ High-speed Wi-Fi (150 Mbps, multiple ISPs), air-conditioning in the bedroom, a f
         property_location: "Hyderabad, Telangana",
         property_reviews: 59,
         property_rating: 4.9,
+        property_review_snippets: [
+            "Check-in was smooth and the apartment was spotless.",
+            "Proximity to Cyber Towers made daily commuting simple."
+        ],
         property_price: 2999,
         property_img: propertyImages["201"],
         property_nearplaces: [
@@ -280,6 +288,10 @@ Complimentary Wi-Fi, air-conditioning, inverter backup, daily housekeeping, and 
         property_location: "Hyderabad, Telangana",
         property_reviews: 64,
         property_rating: 4.8,
+        property_review_snippets: [
+            "Families appreciated the quiet lane and airy balconies.",
+            "Hosts responded quickly to every small request."
+        ],
         property_price: 2999,
         property_img: propertyImages["202"],
         property_nearplaces: [
@@ -341,6 +353,10 @@ Complimentary Wi-Fi (150 Mbps), fully equipped kitchen (gas stove, microwave, re
         property_location: "Hyderabad, Telangana",
         property_reviews: 72,
         property_rating: 4.7,
+        property_review_snippets: [
+            "Guests mention spotless rooms and reliable Wi-Fi for work.",
+            "Walking distance to markets and eateries was a big plus."
+        ],
         property_price: 2999,
         property_img: propertyImages["301"],
         property_nearplaces: [
@@ -398,6 +414,10 @@ High-speed Wi-Fi (150 Mbps, multiple ISPs), air-conditioning in the bedroom, a f
         property_location: "Hyderabad, Telangana",
         property_reviews: 85,
         property_rating: 4.9,
+        property_review_snippets: [
+            "Hosts were proactive with check-in guidance and local tips.",
+            "Guests highlight the pristine linens and airy bedrooms."
+        ],
         property_price: 2999,
         property_img: propertyImages["101"],
         property_nearplaces: [
@@ -456,6 +476,10 @@ Enjoy uninterrupted high-speed Wi-Fi, AC, and a fully equipped kitchen with gas 
         property_location: "Hyderabad, Telangana",
         property_reviews: 91,
         property_rating: 4.8,
+        property_review_snippets: [
+            "Travelers noted fast Wi-Fi and comfy beds for longer stays.",
+            "Neighborhood felt safe and everything was within a short drive."
+        ],
         property_price: 2999,
         property_img: propertyImages["102"],
         property_nearplaces: [
@@ -516,6 +540,10 @@ Fully equipped kitchen with microwave, refrigerator, RO water, toaster, and gas 
         property_location: "Hyderabad, Telangana",
         property_reviews: 77,
         property_rating: 4.85,
+        property_review_snippets: [
+            "Guests praised the sunlit living area and thoughtful kitchen setup.",
+            "Host communication was quick, making arrivals stress-free."
+        ],
         property_price: 2999,
         property_img: propertyImages["302"],
         property_nearplaces: [
