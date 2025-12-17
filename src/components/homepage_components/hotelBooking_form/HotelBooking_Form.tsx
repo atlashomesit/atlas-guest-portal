@@ -4,6 +4,8 @@ import { format } from 'date-fns';
 import { propertyData } from '../../../data';
 import { inlinePolicySnippets } from '../../../content/terms';
 import { baseGuestAllowance, getUnitPolicy } from '../../../config/policyConfig';
+import { FaCcMastercard, FaCcVisa, FaCreditCard, FaUserFriends } from 'react-icons/fa';
+import { SiGooglepay, SiRazorpay } from 'react-icons/si';
 
 declare global {
   interface Window {
@@ -21,6 +23,7 @@ interface BookingCardProps {
 const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
     const [openCalendar, setOpenCalendar] = useState(false);
     const [openGuests, setOpenGuests] = useState(false);
+    const [isRazorpayReady, setIsRazorpayReady] = useState(false);
 
     const [dates, setDates] = useState({
         startDate: new Date(),
@@ -30,6 +33,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
     
     const handleDateChange = (ranges: any) => {
         const { startDate, endDate } = ranges.selection;
+        setHasInteractedWithDates(true);
         
         // Always update the dates when a selection is made
         if (startDate && endDate) {
@@ -97,37 +101,112 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
     const [isLoading, setIsLoading] = useState(false);
     const [termsAccepted, setTermsAccepted] = useState(false);
     const [termsAcceptedAt, setTermsAcceptedAt] = useState<string | null>(null);
+    const [hasInteractedWithDates, setHasInteractedWithDates] = useState(false);
 
-    // Removed loadRazorpay function as it's no longer needed with direct link redirection
+    const preloadRazorpay = () => {
+        const existingPreload = document.querySelector("link[rel='preload'][href='https://checkout.razorpay.com/v1/checkout.js']");
+        if (!existingPreload) {
+            const preloadLink = document.createElement('link');
+            preloadLink.rel = 'preload';
+            preloadLink.as = 'script';
+            preloadLink.href = 'https://checkout.razorpay.com/v1/checkout.js';
+            document.head.appendChild(preloadLink);
+        }
+    };
 
-    const initiatePayment = () => {
-  if (!termsAccepted) {
-    alert('Please confirm the Terms & Conditions before reserving.');
-    return;
-  }
-  try {
-    setIsLoading(true);
-    const acceptedAt = termsAcceptedAt || new Date().toISOString();
-    setTermsAcceptedAt(acceptedAt);
-    // TODO: Persist termsAccepted + acceptedAt to booking payload or analytics when backend wiring is added.
-    try {
-      localStorage.setItem('atlas_terms_accepted_at', acceptedAt);
-    } catch (error) {
-      console.warn('Unable to persist terms acceptance locally', error);
-    }
+    const loadRazorpay = (): Promise<boolean> => {
+        return new Promise((resolve) => {
+            if (window.Razorpay) {
+                setIsRazorpayReady(true);
+                resolve(true);
+                return;
+            }
 
-    const url = new URL('https://pages.razorpay.com/atlashomestays');
-    url.searchParams.append('amount', totalPrice.toString());
-    url.searchParams.append('currency', 'INR');
+            const existingScript = document.querySelector("script[src='https://checkout.razorpay.com/v1/checkout.js']") as HTMLScriptElement | null;
+            if (existingScript) {
+                existingScript.addEventListener('load', () => {
+                    setIsRazorpayReady(true);
+                    resolve(true);
+                });
+                existingScript.addEventListener('error', () => resolve(false));
+                return;
+            }
 
-    window.location.href = url.toString();
+            const script = document.createElement('script');
+            script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+            script.async = true;
+            script.onload = () => {
+                setIsRazorpayReady(true);
+                resolve(true);
+            };
+            script.onerror = () => resolve(false);
+            document.body.appendChild(script);
+        });
+    };
 
-  } catch (error) {
-    console.error('Payment error:', error);
-    alert('Error processing payment. Please try again.');
-    setIsLoading(false);
-  }
-};
+    useEffect(() => {
+        preloadRazorpay();
+        loadRazorpay();
+    }, []);
+
+    const initiatePayment = async () => {
+        if (!termsAccepted) {
+            alert('Please confirm the Terms & Conditions before reserving.');
+            return;
+        }
+
+        setIsLoading(true);
+
+        const scriptReady = await loadRazorpay();
+        if (!scriptReady) {
+            setIsLoading(false);
+            alert('Payment gateway could not be initialized. Please check your connection and try again.');
+            return;
+        }
+
+        const acceptedAt = termsAcceptedAt || new Date().toISOString();
+        setTermsAcceptedAt(acceptedAt);
+        try {
+            localStorage.setItem('atlas_terms_accepted_at', acceptedAt);
+        } catch (error) {
+            console.warn('Unable to persist terms acceptance locally', error);
+        }
+
+        const razorpayOptions = {
+            key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_placeholder',
+            amount: totalPrice * 100,
+            currency: 'INR',
+            name: property?.property_name || 'Atlas Homestays',
+            description: 'Secure checkout powered by Razorpay',
+            notes: {
+                termsAcceptedAt: acceptedAt,
+                propertyId: propertyId,
+                nights,
+            },
+            prefill: {
+                name: 'Atlas Guest',
+            },
+            theme: {
+                color: '#B99359',
+            },
+            handler: () => {
+                alert('Payment initiated successfully. Our team will confirm your booking shortly.');
+                setIsLoading(false);
+            },
+            modal: {
+                ondismiss: () => {
+                    setIsLoading(false);
+                },
+            },
+        };
+
+        const razorpay = new window.Razorpay(razorpayOptions);
+        razorpay.open();
+        razorpay.on('payment.failed', () => {
+            alert('Payment could not be completed. Please try again or use a different method.');
+            setIsLoading(false);
+        });
+    };
 
     const unitPolicy = getUnitPolicy(propertyId);
 
@@ -182,9 +261,10 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
     };
 
     const hasSelection = Boolean(dates.startDate && dates.endDate && guests.adults);
+    const primaryCtaLabel = hasSelection && termsAccepted ? 'Book now' : 'Check availability';
 
     return (
-        <div id="booking-form" className="max-w-md mx-auto p-6 bg-white shadow-xl rounded-2xl relative pb-24 lg:pb-0">
+        <div id="booking-form" className="max-w-md mx-auto p-6 bg-white shadow-xl rounded-2xl relative pb-28 lg:pb-0 lg:sticky lg:top-20">
 
             {/* PRICE SECTION */}
             <p className="text-[30px] font-bold">
@@ -433,7 +513,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
                 </div>
             )}
 
-            {hasSelection && (
+            {hasSelection && hasInteractedWithDates && (
                 <div className="mt-6 space-y-3 border rounded-xl p-4 bg-white shadow-sm">
                     <div className="flex justify-between text-sm">
                         <span>{nights} night{nights > 1 ? 's' : ''} × ₹{(nightlyRateWithGuests - extraGuestChargePerNight).toLocaleString('en-IN')}</span>
@@ -494,6 +574,22 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
                   </div>
                 </label>
                 <p className="text-sm text-gray-600 mt-2">{inlinePolicySnippets.paymentConsent}</p>
+                <p className="text-xs text-gray-500 mt-1">{isRazorpayReady ? 'Inline Razorpay checkout is ready.' : 'Preloading secure Razorpay checkout...'}</p>
+                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-gray-600">
+                  <span className="inline-flex items-center gap-1 bg-green-50 text-green-800 px-2 py-1 rounded-full">
+                    <SiRazorpay className="text-green-600" /> Razorpay secured
+                  </span>
+                  <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-700 px-2 py-1 rounded-full">
+                    <FaCreditCard /> Cards
+                  </span>
+                  <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-700 px-2 py-1 rounded-full">
+                    <SiGooglepay /> UPI
+                  </span>
+                  <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-700 px-2 py-1 rounded-full">
+                    <FaCcVisa />
+                    <FaCcMastercard />
+                  </span>
+                </div>
               </div>
 
               <label className="flex items-start gap-2 text-sm text-gray-700">
@@ -527,7 +623,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
                     Processing...
                   </>
                 ) : (
-                  'Reserve Now'
+                  primaryCtaLabel
                 )}
               </button>
             </div>
@@ -542,19 +638,26 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
                 </p>
             </div>
 
-            <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t shadow-2xl px-4 py-3 flex items-center justify-between z-40">
-                <div>
-                    <p className="text-xs text-gray-600">Total for your stay</p>
-                    <p className="text-lg font-semibold">₹{totalPrice.toLocaleString('en-IN')}</p>
+            <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t shadow-2xl px-4 py-3 flex items-center justify-between gap-3 z-40">
+                <div className="flex flex-col text-xs text-gray-600">
+                    <div className="font-semibold text-gray-900 text-sm">{format(dates.startDate, 'dd MMM')} - {format(dates.endDate, 'dd MMM')}</div>
+                    <div className="flex items-center gap-1 text-gray-700 text-sm">
+                        <FaUserFriends className="h-4 w-4" />
+                        <span>{formatGuestLabel()}</span>
+                    </div>
                     <p className="text-[11px] text-gray-500">No hidden charges</p>
                 </div>
-                <button
-                    onClick={initiatePayment}
-                    disabled={isLoading || !termsAccepted}
-                    className="bg-[#B99359] hover:bg-[#A0804D] text-white rounded-full px-4 py-3 text-sm font-semibold transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed"
-                >
-                    Reserve Now
-                </button>
+                <div className="text-right">
+                    <p className="text-xs text-gray-600">Total</p>
+                    <p className="text-lg font-semibold">₹{totalPrice.toLocaleString('en-IN')}</p>
+                    <button
+                        onClick={initiatePayment}
+                        disabled={isLoading || !termsAccepted}
+                        className="mt-1 bg-[#B99359] hover:bg-[#A0804D] text-white rounded-full px-4 py-2 text-sm font-semibold transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed"
+                    >
+                        {primaryCtaLabel}
+                    </button>
+                </div>
             </div>
 
         </div>
