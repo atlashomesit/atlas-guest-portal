@@ -43,3 +43,45 @@
 #text{
     font-size: 20px;
 }
+.slider-wrapper {
+  position: relative; /* already added */
+}
+
+.slider-wrapper .slick-list {
+  overflow: visible !important; /* allow dots to show above */
+}
+
+.slider-wrapper .slick-slide img {
+  position: relative;
+  z-index: 10; /* below dots */
+  border-radius: 0 0 1rem 1rem; /* optional */
+}
+
+.slick-dots-above {
+  position: absolute;
+  top: 8px; /* distance from top of slider */
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50; /* above the image */
+}
+
+.slick-dots-custom {
+  display: flex !important;
+  gap: 8px;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.slick-dots-custom li button {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.8);
+  border: none;
+}
+
+.slick-dots-custom li.slick-active button {
+  background: #fff;
+}
