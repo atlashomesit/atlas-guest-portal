@@ -7,6 +7,7 @@ import { TfiBrushAlt } from "react-icons/tfi";
 import { LiaNewspaper } from "react-icons/lia";
 import { MdOutlineEmojiFoodBeverage, MdOutlineLocalLaundryService, MdOutlineDone } from "react-icons/md";
 import { FaCcMastercard, FaLocationDot } from "react-icons/fa6";
+import { FaStar } from "react-icons/fa";
 import { X, ChevronRight } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { propertyData, propertyImages } from '../../../data.ts';
@@ -38,6 +39,10 @@ interface Property {
     property_nearplaces: string[];
     property_mapSrc: string;
     property_policy_details: PropertyDetail[];
+    property_rating: number;
+    property_reviews: number;
+    property_review_snippets: string[];
+    property_price: number;
 }
 
 const PropertyDetails = () => {
@@ -179,6 +184,18 @@ const PropertyDetails = () => {
                     <div className="flex items-center text-gray-600">
                         <FaLocationDot className="mr-2 text-sm" />
                         <span className="text-sm sm:text-base">{data.property_location}</span>
+                    </div>
+                    <div className="mt-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3 text-sm text-gray-700">
+                        <div className="flex items-center gap-2 font-semibold text-gray-900">
+                            <FaStar className="text-amber-500" />
+                            <span>{data.property_rating.toFixed(2)}</span>
+                            <span className="text-gray-600">• {data.property_reviews} reviews</span>
+                        </div>
+                        {data.property_review_snippets?.[0] && (
+                            <p className="sm:pl-3 sm:border-l sm:border-gray-200 sm:ml-3 text-gray-600 italic">
+                                “{data.property_review_snippets[0]}”
+                            </p>
+                        )}
                     </div>
                 </div>
 
@@ -354,7 +371,10 @@ const PropertyDetails = () => {
                     </div>
                     {/* right div  */}
                     <div className="w-full sm:w-1/3">
-                        <div className='sticky top-16'>
+                        <div className='hidden lg:block sticky top-16'>
+                            <HotelBooking_Form propertyId={data.id} />
+                        </div>
+                        <div className="lg:hidden">
                             <HotelBooking_Form propertyId={data.id} />
                         </div>
                     </div>
