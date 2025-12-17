@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { DateRange } from 'react-date-range';
 import { format } from 'date-fns';
 import { propertyData } from '../../../data';
@@ -24,6 +24,18 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
     const [openCalendar, setOpenCalendar] = useState(false);
     const [openGuests, setOpenGuests] = useState(false);
     const [isRazorpayReady, setIsRazorpayReady] = useState(false);
+    const [paymentStatus, setPaymentStatus] = useState<
+        | { state: 'idle' }
+        | {
+            state: 'success';
+            paymentId: string;
+            bookingId: string;
+        }
+        | {
+            state: 'failure';
+            reason: string;
+        }
+    >({ state: 'idle' });
 
     const [dates, setDates] = useState({
         startDate: new Date(),
@@ -92,9 +104,22 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
     const staySubtotal = nightlyRateWithGuests * nights;
     const feesAndTaxes = Math.round(staySubtotal * 0.12);
     const totalPrice = staySubtotal + feesAndTaxes;
-    
+
     // Log for debugging
     console.log('Property ID:', propertyId, 'Adults:', guests.adults, 'Children:', guests.children, 'Total people:', totalPeople, 'Nightly rate with guests:', nightlyRateWithGuests);
+
+    const formatGuestLabel = () => {
+        const { adults, children, infants, pets } = guests;
+        const guestCount = adults + children + infants;
+        const guestText = guestCount === 1 ? 'guest' : 'guests';
+        const petText = pets === 1 ? 'pet' : 'pets';
+
+        let label = `${guestCount} ${guestText}`;
+        if (pets > 0) {
+            label += `, ${pets} ${petText}`;
+        }
+        return label;
+    };
 
     const guestMenuRef = useRef<HTMLDivElement | null>(null);
     const calendarRef = useRef<HTMLDivElement | null>(null);
@@ -111,6 +136,14 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
             preloadLink.as = 'script';
             preloadLink.href = 'https://checkout.razorpay.com/v1/checkout.js';
             document.head.appendChild(preloadLink);
+        }
+
+        const existingPreconnect = document.querySelector("link[rel='preconnect'][href='https://checkout.razorpay.com']");
+        if (!existingPreconnect) {
+            const preconnectLink = document.createElement('link');
+            preconnectLink.rel = 'preconnect';
+            preconnectLink.href = 'https://checkout.razorpay.com';
+            document.head.appendChild(preconnectLink);
         }
     };
 
@@ -149,6 +182,21 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
         loadRazorpay();
     }, []);
 
+    const userPrefill = useMemo(() => ({
+        name: 'Atlas Guest',
+        email: 'guest@example.com',
+        contact: '+919999999999',
+    }), []);
+
+    const bookingSummary = useMemo(() => ({
+        propertyName: property?.property_name || 'Atlas Homestays',
+        checkIn: format(dates.startDate, 'dd MMM yyyy'),
+        checkOut: format(dates.endDate, 'dd MMM yyyy'),
+        guests: formatGuestLabel(),
+        nights,
+        total: totalPrice,
+    }), [property?.property_name, dates.startDate, dates.endDate, nights, totalPrice, guests]);
+
     const initiatePayment = async () => {
         if (!termsAccepted) {
             alert('Please confirm the Terms & Conditions before reserving.');
@@ -156,6 +204,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
         }
 
         setIsLoading(true);
+        setPaymentStatus({ state: 'idle' });
 
         const scriptReady = await loadRazorpay();
         if (!scriptReady) {
@@ -172,6 +221,8 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
             console.warn('Unable to persist terms acceptance locally', error);
         }
 
+        const bookingId = `ATLAS-${propertyId}-${Date.now()}`;
+
         const razorpayOptions = {
             key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_placeholder',
             amount: totalPrice * 100,
@@ -182,15 +233,23 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
                 termsAcceptedAt: acceptedAt,
                 propertyId: propertyId,
                 nights,
+                bookingId,
+                checkIn: bookingSummary.checkIn,
+                checkOut: bookingSummary.checkOut,
+                guests: bookingSummary.guests,
             },
             prefill: {
-                name: 'Atlas Guest',
+                ...userPrefill,
             },
             theme: {
                 color: '#B99359',
             },
-            handler: () => {
-                alert('Payment initiated successfully. Our team will confirm your booking shortly.');
+            handler: (response: any) => {
+                setPaymentStatus({
+                    state: 'success',
+                    paymentId: response.razorpay_payment_id,
+                    bookingId,
+                });
                 setIsLoading(false);
             },
             modal: {
@@ -202,27 +261,18 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
 
         const razorpay = new window.Razorpay(razorpayOptions);
         razorpay.open();
-        razorpay.on('payment.failed', () => {
-            alert('Payment could not be completed. Please try again or use a different method.');
+        razorpay.on('payment.failed', (response: any) => {
+            const failureReason = response.error?.description || 'Payment could not be completed.';
+            setPaymentStatus({
+                state: 'failure',
+                reason: `${failureReason} Please try again or choose a different method.`,
+            });
             setIsLoading(false);
         });
     };
 
     const unitPolicy = getUnitPolicy(propertyId);
 
-
-    const formatGuestLabel = () => {
-        const { adults, children, infants, pets } = guests;
-        const guestCount = adults + children + infants;
-        const guestText = guestCount === 1 ? 'guest' : 'guests';
-        const petText = pets === 1 ? 'pet' : 'pets';
-        
-        let label = `${guestCount} ${guestText}`;
-        if (pets > 0) {
-            label += `, ${pets} ${petText}`;
-        }
-        return label;
-    };
 
     const updateChildAge = (index: number, age: number) => {
         const newAges = [...guests.childrenAges];
@@ -626,6 +676,45 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
                   primaryCtaLabel
                 )}
               </button>
+
+              {paymentStatus.state === 'success' && (
+                <div className="border border-green-200 bg-green-50 rounded-xl p-4 space-y-2">
+                  <p className="text-green-800 font-semibold">Payment received!</p>
+                  <p className="text-sm text-gray-800">Booking ID: <span className="font-mono font-semibold">{paymentStatus.bookingId}</span></p>
+                  <p className="text-sm text-gray-800">Payment reference: <span className="font-mono">{paymentStatus.paymentId}</span></p>
+                  <p className="text-sm text-gray-700">We’ll confirm your stay shortly. In the meantime, you can save this booking ID and reach out for any changes.</p>
+                  <div className="flex flex-wrap gap-3 text-sm">
+                    <a className="px-3 py-2 rounded-full bg-white border text-amber-700" href="tel:+919833899938">Call concierge</a>
+                    <a className="px-3 py-2 rounded-full bg-white border text-amber-700" href="mailto:stay@atlashomestays.com?subject=Booking%20Support&body=Booking%20ID%3A%20">Email support</a>
+                    <button
+                      type="button"
+                      className="px-3 py-2 rounded-full bg-amber-600 text-white"
+                      onClick={() => setPaymentStatus({ state: 'idle' })}
+                    >
+                      Hide message
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {paymentStatus.state === 'failure' && (
+                <div className="border border-red-200 bg-red-50 rounded-xl p-4 space-y-2">
+                  <p className="text-red-800 font-semibold">Payment was not completed</p>
+                  <p className="text-sm text-gray-800">{paymentStatus.reason}</p>
+                  <div className="flex flex-wrap gap-3 text-sm">
+                    <button
+                      type="button"
+                      onClick={initiatePayment}
+                      className="px-3 py-2 rounded-full bg-amber-600 text-white"
+                      disabled={isLoading}
+                    >
+                      Try again
+                    </button>
+                    <a className="px-3 py-2 rounded-full bg-white border text-amber-700" href="tel:+919833899938">Call to pay</a>
+                    <a className="px-3 py-2 rounded-full bg-white border text-amber-700" href="mailto:stay@atlashomestays.com?subject=Payment%20Assistance&body=Please%20help%20me%20complete%20my%20booking.">Get help via email</a>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex justify-between mt-5 border-t pt-4">
