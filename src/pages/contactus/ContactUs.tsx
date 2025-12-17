@@ -6,6 +6,10 @@ import { Link } from "react-router-dom";
 import { formatDisplayNumber, getTelLink, getWhatsAppLink } from "../../config/contact";
 import { ctaNav } from "../../config/navigation";
 import { emailJsConfig, getMissingEmailJsEnvKeys, isEmailJsConfigured } from "../../utils/emailjsConfig";
+import { Card } from "../../components/ui/Card";
+import { Typography } from "../../components/ui/Typography";
+import { Input } from "../../components/ui/Input";
+import { Button } from "../../components/ui/Button";
 
 const ContactUs = () => {
 
@@ -67,10 +71,10 @@ const ContactUs = () => {
                     {/* Left Section */}
                     <div className="w-full text-gray-600 text-lg leading-relaxed space-y-4">
                         <div className="space-y-2">
-                            <h2 className="text-3xl font-semibold text-gray-900">We are ready to help</h2>
-                            <p>
+                            <Typography variant="h2">We are ready to help</Typography>
+                            <Typography variant="subtitle">
                                 Questions about reservations, special requests, or the best unit for your stay? Our guest team will respond quickly on our primary contact lines.
-                            </p>
+                            </Typography>
                         </div>
                         <div className="flex flex-wrap gap-3">
                             <a
@@ -88,101 +92,91 @@ const ContactUs = () => {
                                 Call {formatDisplayNumber()}
                             </a>
                         </div>
-                        <p className="text-sm text-slate-700">
+                        <Typography variant="muted">
                             Prefer email? Reach us at <a className="text-primary font-semibold" href="mailto:atlashomeskphb@gmail.com">atlashomeskphb@gmail.com</a>.
-                        </p>
+                        </Typography>
                     </div>
 
                     {/* Contact Details */}
-                    <div className="w-full md:w-5/12 bg-white border border-slate-200 rounded-2xl shadow-sm p-6 space-y-4">
+                    <Card className="w-full md:w-5/12 space-y-4">
                         <div className="space-y-1">
-                            <p className="text-xs uppercase tracking-[0.25em] text-primary">Direct lines</p>
-                            <p className="text-xl font-semibold text-slate-900">Business desk</p>
+                            <Typography variant="muted" className="tracking-[0.25em] uppercase">Direct lines</Typography>
+                            <Typography variant="h3">Business desk</Typography>
                         </div>
                         <div className="space-y-3 text-slate-800">
                             <div>
-                                <p className="text-sm text-slate-600">Call</p>
+                                <Typography variant="muted">Call</Typography>
                                 <a className="font-semibold text-lg text-primary" href={getTelLink()}>{formatDisplayNumber()}</a>
                             </div>
                             <div>
-                                <p className="text-sm text-slate-600">WhatsApp</p>
+                                <Typography variant="muted">WhatsApp</Typography>
                                 <a className="font-semibold text-lg text-primary" href={getWhatsAppLink()} target="_blank" rel="noopener noreferrer">{formatDisplayNumber()}</a>
                             </div>
                             <div>
-                                <p className="text-sm text-slate-600">Email</p>
+                                <Typography variant="muted">Email</Typography>
                                 <a className="font-semibold text-lg text-primary" href="mailto:atlashomeskphb@gmail.com">atlashomeskphb@gmail.com</a>
                             </div>
                         </div>
-                        <p className="text-sm text-slate-600">Owner contact is reserved for escalations; reach out on the business line first for the fastest help.</p>
-                    </div>
+                        <Typography variant="muted">Owner contact is reserved for escalations; reach out on the business line first for the fastest help.</Typography>
+                    </Card>
                 </div>
             </div>
 
             {/* Contact Us form  */}
             <div className="max-w-5xl my-12 mx-auto px-4 grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-8">
-                <div className="bg-white p-6 lg:p-8 border border-slate-200 rounded-2xl shadow-sm">
-                    <h2 className="text-2xl font-semibold text-center text-slate-900">Send us a note</h2>
-                    <p className="text-center text-slate-600 mt-2">Share your trip details and we will reply with tailored options.</p>
-                    <form onSubmit={handleSubmit} className="space-y-4 mt-6">
-                        <input
+                <Card className="space-y-2">
+                    <Typography variant="h2" className="text-center">Send us a note</Typography>
+                    <Typography variant="muted" className="text-center">Share your trip details and we will reply with tailored options.</Typography>
+                    <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+                        <Input
                             type="text"
                             name="name"
                             placeholder="Your Name"
                             value={formData.name}
                             onChange={handleChange}
                             required
-                            className="w-full p-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
                         />
-                        <input
+                        <Input
                             type="email"
                             name="email"
                             placeholder="Your Email"
                             value={formData.email}
                             onChange={handleChange}
                             required
-                            className="w-full p-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
                         />
-                        <input
+                        <Input
                             type="tel"
                             name="contactnumber"
                             placeholder="Your Contact Number"
                             value={formData.contactnumber}
                             onChange={handleChange}
                             required
-                            className="w-full p-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
                         />
-                        <select
-                            name="destination"
-                            value={formData.destination}
-                            onChange={handleChange}
-                            className="w-full p-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
-                        >
+                        <Input as="select" name="destination" value={formData.destination} onChange={handleChange}>
                             <option value="">Select Destination</option>
                             <option value="Lonavala">Lonavala</option>
                             <option value="Dapoli">Dapoli</option>
-                        </select>
-                        <textarea
+                        </Input>
+                        <Input
+                            as="textarea"
                             name="description"
                             placeholder="Tell us about your stay"
                             value={formData.description}
                             onChange={handleChange}
                             required
-                            className="w-full p-3 border rounded-md h-28 focus:outline-none focus:ring-2 focus:ring-primary/50"
-                        ></textarea>
-                        <button
-                            type="submit"
-                            className="w-full bg-primary text-white p-3 rounded-md font-semibold hover:bg-primary/90 transition"
-                        >
+                            rows={5}
+                        />
+                        <Button type="submit" fullWidth>
                             Send message
-                        </button>
+                        </Button>
                     </form>
-                </div>
+                </Card>
 
-                <div className="bg-gradient-to-br from-primary/5 via-white to-white border border-slate-200 rounded-2xl shadow-sm p-6 lg:p-8 space-y-6">
+                <Card className="space-y-6" muted>
                     <div className="space-y-2">
-                        <p className="text-xs uppercase tracking-[0.25em] text-primary">Quick links</p>
-                        <h3 className="text-xl font-semibold text-slate-900">Find answers faster</h3>
-                        <p className="text-slate-700">Jump to the most requested pages before you reach out.</p>
+                        <Typography variant="muted" className="tracking-[0.25em] uppercase">Quick links</Typography>
+                        <Typography variant="h3">Find answers faster</Typography>
+                        <Typography variant="subtitle">Jump to the most requested pages before you reach out.</Typography>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <Link to="/policies" className="px-4 py-3 rounded-xl border border-slate-200 bg-white hover:border-primary font-semibold text-slate-900 transition">Policies</Link>
@@ -193,7 +187,7 @@ const ContactUs = () => {
                     <div className="bg-white border border-dashed border-primary/30 rounded-xl p-4 text-sm text-slate-700">
                         Prefer a quick response? WhatsApp us on {formatDisplayNumber()} for booking confirmations.
                     </div>
-                </div>
+                </Card>
             </div>
 
             {/* Homepage Property section */}

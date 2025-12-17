@@ -1,10 +1,11 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { DateRange } from 'react-date-range';
 import { format } from 'date-fns';
 import { propertyData } from '../../../data';
-import Razorpay from 'razorpay';
 import { inlinePolicySnippets } from '../../../content/terms';
 import { baseGuestAllowance, getUnitPolicy } from '../../../config/policyConfig';
+import { FaCcMastercard, FaCcVisa, FaCreditCard, FaUserFriends } from 'react-icons/fa';
+import { SiGooglepay, SiRazorpay } from 'react-icons/si';
 
 declare global {
   interface Window {
@@ -22,6 +23,19 @@ interface BookingCardProps {
 const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
     const [openCalendar, setOpenCalendar] = useState(false);
     const [openGuests, setOpenGuests] = useState(false);
+    const [isRazorpayReady, setIsRazorpayReady] = useState(false);
+    const [paymentStatus, setPaymentStatus] = useState<
+        | { state: 'idle' }
+        | {
+            state: 'success';
+            paymentId: string;
+            bookingId: string;
+        }
+        | {
+            state: 'failure';
+            reason: string;
+        }
+    >({ state: 'idle' });
 
     const [dates, setDates] = useState({
         startDate: new Date(),
@@ -31,6 +45,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
     
     const handleDateChange = (ranges: any) => {
         const { startDate, endDate } = ranges.selection;
+        setHasInteractedWithDates(true);
         
         // Always update the dates when a selection is made
         if (startDate && endDate) {
@@ -76,81 +91,188 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
     // Calculate total number of people (adults + children)
     const totalPeople = guests.adults + guests.children;
     
-    // Calculate price based on property ID
-    let pricePerNight;
-    if (Number(propertyId) === 501) {
-        // For property 501: Base price for 2 people, ₹700 per additional person (adult or child)
-        const additionalPeople = Math.max(0, totalPeople - 2);
-        pricePerNight = basePrice + (additionalPeople * 700);
-    } else {
-        // For other properties: Base price for 2 people, ₹400 per additional person (adult or child)
-        const additionalPeople = Math.max(0, totalPeople - 2);
-        pricePerNight = basePrice + (additionalPeople * 400);
-    }
+    const additionalPeople = Math.max(0, totalPeople - baseGuestAllowance);
+    const extraGuestRate = Number(propertyId) === 501 ? 700 : 400;
+    const extraGuestChargePerNight = additionalPeople * extraGuestRate;
+    const nightlyRateWithGuests = basePrice + extraGuestChargePerNight;
     
     // Calculate number of nights (minimum 1 night)
     const oneDay = 24 * 60 * 60 * 1000; // hours*minutes*seconds*milliseconds
     const nights = Math.max(1, Math.round(Math.abs((dates.endDate.getTime() - dates.startDate.getTime()) / oneDay)));
     
     // Calculate total price based on number of nights
-    const totalPrice = pricePerNight * nights;
-    const originalPrice = Math.round(pricePerNight * nights * 1.1); // 10% higher than the current price
-    
+    const staySubtotal = nightlyRateWithGuests * nights;
+    const feesAndTaxes = Math.round(staySubtotal * 0.12);
+    const totalPrice = staySubtotal + feesAndTaxes;
+
     // Log for debugging
-    console.log('Property ID:', propertyId, 'Adults:', guests.adults, 'Children:', guests.children, 'Total people:', totalPeople, 'Price per night:', pricePerNight);
-
-    const guestMenuRef = useRef<HTMLDivElement | null>(null);
-    const calendarRef = useRef<HTMLDivElement | null>(null);
-    const [isLoading, setIsLoading] = useState(false);
-    const [termsAccepted, setTermsAccepted] = useState(false);
-    const [termsAcceptedAt, setTermsAcceptedAt] = useState<string | null>(null);
-
-    // Removed loadRazorpay function as it's no longer needed with direct link redirection
-
-    const initiatePayment = () => {
-  if (!termsAccepted) {
-    alert('Please confirm the Terms & Conditions before reserving.');
-    return;
-  }
-  try {
-    setIsLoading(true);
-    const acceptedAt = termsAcceptedAt || new Date().toISOString();
-    setTermsAcceptedAt(acceptedAt);
-    // TODO: Persist termsAccepted + acceptedAt to booking payload or analytics when backend wiring is added.
-    try {
-      localStorage.setItem('atlas_terms_accepted_at', acceptedAt);
-    } catch (error) {
-      console.warn('Unable to persist terms acceptance locally', error);
-    }
-
-    const url = new URL('https://pages.razorpay.com/atlashomestays');
-    url.searchParams.append('amount', totalPrice.toString());
-    url.searchParams.append('currency', 'INR');
-
-    window.location.href = url.toString();
-
-  } catch (error) {
-    console.error('Payment error:', error);
-    alert('Error processing payment. Please try again.');
-    setIsLoading(false);
-  }
-};
-
-    const unitPolicy = getUnitPolicy(propertyId);
-
+    console.log('Property ID:', propertyId, 'Adults:', guests.adults, 'Children:', guests.children, 'Total people:', totalPeople, 'Nightly rate with guests:', nightlyRateWithGuests);
 
     const formatGuestLabel = () => {
         const { adults, children, infants, pets } = guests;
         const guestCount = adults + children + infants;
         const guestText = guestCount === 1 ? 'guest' : 'guests';
         const petText = pets === 1 ? 'pet' : 'pets';
-        
+
         let label = `${guestCount} ${guestText}`;
         if (pets > 0) {
             label += `, ${pets} ${petText}`;
         }
         return label;
     };
+
+    const guestMenuRef = useRef<HTMLDivElement | null>(null);
+    const calendarRef = useRef<HTMLDivElement | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
+    const [termsAccepted, setTermsAccepted] = useState(false);
+    const [termsAcceptedAt, setTermsAcceptedAt] = useState<string | null>(null);
+    const [hasInteractedWithDates, setHasInteractedWithDates] = useState(false);
+
+    const preloadRazorpay = () => {
+        const existingPreload = document.querySelector("link[rel='preload'][href='https://checkout.razorpay.com/v1/checkout.js']");
+        if (!existingPreload) {
+            const preloadLink = document.createElement('link');
+            preloadLink.rel = 'preload';
+            preloadLink.as = 'script';
+            preloadLink.href = 'https://checkout.razorpay.com/v1/checkout.js';
+            document.head.appendChild(preloadLink);
+        }
+
+        const existingPreconnect = document.querySelector("link[rel='preconnect'][href='https://checkout.razorpay.com']");
+        if (!existingPreconnect) {
+            const preconnectLink = document.createElement('link');
+            preconnectLink.rel = 'preconnect';
+            preconnectLink.href = 'https://checkout.razorpay.com';
+            document.head.appendChild(preconnectLink);
+        }
+    };
+
+    const loadRazorpay = (): Promise<boolean> => {
+        return new Promise((resolve) => {
+            if (window.Razorpay) {
+                setIsRazorpayReady(true);
+                resolve(true);
+                return;
+            }
+
+            const existingScript = document.querySelector("script[src='https://checkout.razorpay.com/v1/checkout.js']") as HTMLScriptElement | null;
+            if (existingScript) {
+                existingScript.addEventListener('load', () => {
+                    setIsRazorpayReady(true);
+                    resolve(true);
+                });
+                existingScript.addEventListener('error', () => resolve(false));
+                return;
+            }
+
+            const script = document.createElement('script');
+            script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+            script.async = true;
+            script.onload = () => {
+                setIsRazorpayReady(true);
+                resolve(true);
+            };
+            script.onerror = () => resolve(false);
+            document.body.appendChild(script);
+        });
+    };
+
+    useEffect(() => {
+        preloadRazorpay();
+        loadRazorpay();
+    }, []);
+
+    const userPrefill = useMemo(() => ({
+        name: 'Atlas Guest',
+        email: 'guest@example.com',
+        contact: '+919999999999',
+    }), []);
+
+    const bookingSummary = useMemo(() => ({
+        propertyName: property?.property_name || 'Atlas Homestays',
+        checkIn: format(dates.startDate, 'dd MMM yyyy'),
+        checkOut: format(dates.endDate, 'dd MMM yyyy'),
+        guests: formatGuestLabel(),
+        nights,
+        total: totalPrice,
+    }), [property?.property_name, dates.startDate, dates.endDate, nights, totalPrice, guests]);
+
+    const initiatePayment = async () => {
+        if (!termsAccepted) {
+            alert('Please confirm the Terms & Conditions before reserving.');
+            return;
+        }
+
+        setIsLoading(true);
+        setPaymentStatus({ state: 'idle' });
+
+        const scriptReady = await loadRazorpay();
+        if (!scriptReady) {
+            setIsLoading(false);
+            alert('Payment gateway could not be initialized. Please check your connection and try again.');
+            return;
+        }
+
+        const acceptedAt = termsAcceptedAt || new Date().toISOString();
+        setTermsAcceptedAt(acceptedAt);
+        try {
+            localStorage.setItem('atlas_terms_accepted_at', acceptedAt);
+        } catch (error) {
+            console.warn('Unable to persist terms acceptance locally', error);
+        }
+
+        const bookingId = `ATLAS-${propertyId}-${Date.now()}`;
+
+        const razorpayOptions = {
+            key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_placeholder',
+            amount: totalPrice * 100,
+            currency: 'INR',
+            name: property?.property_name || 'Atlas Homestays',
+            description: 'Secure checkout powered by Razorpay',
+            notes: {
+                termsAcceptedAt: acceptedAt,
+                propertyId: propertyId,
+                nights,
+                bookingId,
+                checkIn: bookingSummary.checkIn,
+                checkOut: bookingSummary.checkOut,
+                guests: bookingSummary.guests,
+            },
+            prefill: {
+                ...userPrefill,
+            },
+            theme: {
+                color: '#B99359',
+            },
+            handler: (response: any) => {
+                setPaymentStatus({
+                    state: 'success',
+                    paymentId: response.razorpay_payment_id,
+                    bookingId,
+                });
+                setIsLoading(false);
+            },
+            modal: {
+                ondismiss: () => {
+                    setIsLoading(false);
+                },
+            },
+        };
+
+        const razorpay = new window.Razorpay(razorpayOptions);
+        razorpay.open();
+        razorpay.on('payment.failed', (response: any) => {
+            const failureReason = response.error?.description || 'Payment could not be completed.';
+            setPaymentStatus({
+                state: 'failure',
+                reason: `${failureReason} Please try again or choose a different method.`,
+            });
+            setIsLoading(false);
+        });
+    };
+
+    const unitPolicy = getUnitPolicy(propertyId);
+
 
     const updateChildAge = (index: number, age: number) => {
         const newAges = [...guests.childrenAges];
@@ -188,17 +310,27 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
         }));
     };
 
+    const hasSelection = Boolean(dates.startDate && dates.endDate && guests.adults);
+    const primaryCtaLabel = hasSelection && termsAccepted ? 'Book now' : 'Check availability';
+
     return (
-        <div className="max-w-md mx-auto p-6 bg-white shadow-xl rounded-2xl relative">
+        <div id="booking-form" className="max-w-md mx-auto p-6 bg-white shadow-xl rounded-2xl relative pb-28 lg:pb-0 lg:sticky lg:top-20">
 
             {/* PRICE SECTION */}
             <p className="text-[30px] font-bold">
-                ₹{pricePerNight.toLocaleString()}
+                ₹{nightlyRateWithGuests.toLocaleString()}
 
                 <span className="text-base ml-1">/night</span>
             </p>
 
-            <p className="text-yellow-500 text-sm mb-4">★ 4.78 (21 reviews)</p>
+            {property && (
+                <div className="mb-4 space-y-1">
+                    <p className="text-amber-600 text-sm font-semibold">★ {property.property_rating.toFixed(2)} ({property.property_reviews} reviews)</p>
+                    {property.property_review_snippets?.[0] && (
+                        <p className="text-sm text-gray-700 italic">“{property.property_review_snippets[0]}”</p>
+                    )}
+                </div>
+            )}
 
             <div className="mb-4 space-y-1 text-sm text-gray-700">
                 <p>
@@ -431,6 +563,30 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
                 </div>
             )}
 
+            {hasSelection && hasInteractedWithDates && (
+                <div className="mt-6 space-y-3 border rounded-xl p-4 bg-white shadow-sm">
+                    <div className="flex justify-between text-sm">
+                        <span>{nights} night{nights > 1 ? 's' : ''} × ₹{(nightlyRateWithGuests - extraGuestChargePerNight).toLocaleString('en-IN')}</span>
+                        <span>₹{((nightlyRateWithGuests - extraGuestChargePerNight) * nights).toLocaleString('en-IN')}</span>
+                    </div>
+                    {additionalPeople > 0 && (
+                        <div className="flex justify-between text-sm text-gray-700">
+                            <span>Extra guests ({additionalPeople} × ₹{extraGuestRate})</span>
+                            <span>₹{(extraGuestChargePerNight * nights).toLocaleString('en-IN')}</span>
+                        </div>
+                    )}
+                    <div className="flex justify-between text-sm text-gray-700">
+                        <span>Fees &amp; taxes (est.)</span>
+                        <span>₹{feesAndTaxes.toLocaleString('en-IN')}</span>
+                    </div>
+                    <div className="flex justify-between text-base font-semibold text-gray-900 border-t pt-3">
+                        <span>Total</span>
+                        <span>₹{totalPrice.toLocaleString('en-IN')}</span>
+                    </div>
+                    <p className="text-xs text-gray-500">No hidden charges — everything is shown upfront for your dates and guest count.</p>
+                </div>
+            )}
+
             <div className="mt-4 space-y-3 text-sm text-gray-700 border rounded-xl p-4 bg-gray-50">
                 <div>
                     <p className="font-semibold text-gray-900">Guest details</p>
@@ -468,6 +624,22 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
                   </div>
                 </label>
                 <p className="text-sm text-gray-600 mt-2">{inlinePolicySnippets.paymentConsent}</p>
+                <p className="text-xs text-gray-500 mt-1">{isRazorpayReady ? 'Inline Razorpay checkout is ready.' : 'Preloading secure Razorpay checkout...'}</p>
+                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-gray-600">
+                  <span className="inline-flex items-center gap-1 bg-green-50 text-green-800 px-2 py-1 rounded-full">
+                    <SiRazorpay className="text-green-600" /> Razorpay secured
+                  </span>
+                  <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-700 px-2 py-1 rounded-full">
+                    <FaCreditCard /> Cards
+                  </span>
+                  <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-700 px-2 py-1 rounded-full">
+                    <SiGooglepay /> UPI
+                  </span>
+                  <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-700 px-2 py-1 rounded-full">
+                    <FaCcVisa />
+                    <FaCcMastercard />
+                  </span>
+                </div>
               </div>
 
               <label className="flex items-start gap-2 text-sm text-gray-700">
@@ -501,19 +673,80 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
                     Processing...
                   </>
                 ) : (
-                  'Reserve Now'
+                  primaryCtaLabel
                 )}
               </button>
+
+              {paymentStatus.state === 'success' && (
+                <div className="border border-green-200 bg-green-50 rounded-xl p-4 space-y-2">
+                  <p className="text-green-800 font-semibold">Payment received!</p>
+                  <p className="text-sm text-gray-800">Booking ID: <span className="font-mono font-semibold">{paymentStatus.bookingId}</span></p>
+                  <p className="text-sm text-gray-800">Payment reference: <span className="font-mono">{paymentStatus.paymentId}</span></p>
+                  <p className="text-sm text-gray-700">We’ll confirm your stay shortly. In the meantime, you can save this booking ID and reach out for any changes.</p>
+                  <div className="flex flex-wrap gap-3 text-sm">
+                    <a className="px-3 py-2 rounded-full bg-white border text-amber-700" href="tel:+919833899938">Call concierge</a>
+                    <a className="px-3 py-2 rounded-full bg-white border text-amber-700" href="mailto:stay@atlashomestays.com?subject=Booking%20Support&body=Booking%20ID%3A%20">Email support</a>
+                    <button
+                      type="button"
+                      className="px-3 py-2 rounded-full bg-amber-600 text-white"
+                      onClick={() => setPaymentStatus({ state: 'idle' })}
+                    >
+                      Hide message
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {paymentStatus.state === 'failure' && (
+                <div className="border border-red-200 bg-red-50 rounded-xl p-4 space-y-2">
+                  <p className="text-red-800 font-semibold">Payment was not completed</p>
+                  <p className="text-sm text-gray-800">{paymentStatus.reason}</p>
+                  <div className="flex flex-wrap gap-3 text-sm">
+                    <button
+                      type="button"
+                      onClick={initiatePayment}
+                      className="px-3 py-2 rounded-full bg-amber-600 text-white"
+                      disabled={isLoading}
+                    >
+                      Try again
+                    </button>
+                    <a className="px-3 py-2 rounded-full bg-white border text-amber-700" href="tel:+919833899938">Call to pay</a>
+                    <a className="px-3 py-2 rounded-full bg-white border text-amber-700" href="mailto:stay@atlashomestays.com?subject=Payment%20Assistance&body=Please%20help%20me%20complete%20my%20booking.">Get help via email</a>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex justify-between mt-5 border-t pt-4">
                 <div>
                     <p className="text-lg font-semibold">Total Amount</p>
-                    <p className="text-sm text-gray-500">Inclusive of all taxes and fees</p>
+                    <p className="text-sm text-gray-500">Inclusive of estimated taxes and fees</p>
                 </div>
                 <p className="text-lg font-bold">
                     ₹{totalPrice.toLocaleString('en-IN')}
                 </p>
+            </div>
+
+            <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t shadow-2xl px-4 py-3 flex items-center justify-between gap-3 z-40">
+                <div className="flex flex-col text-xs text-gray-600">
+                    <div className="font-semibold text-gray-900 text-sm">{format(dates.startDate, 'dd MMM')} - {format(dates.endDate, 'dd MMM')}</div>
+                    <div className="flex items-center gap-1 text-gray-700 text-sm">
+                        <FaUserFriends className="h-4 w-4" />
+                        <span>{formatGuestLabel()}</span>
+                    </div>
+                    <p className="text-[11px] text-gray-500">No hidden charges</p>
+                </div>
+                <div className="text-right">
+                    <p className="text-xs text-gray-600">Total</p>
+                    <p className="text-lg font-semibold">₹{totalPrice.toLocaleString('en-IN')}</p>
+                    <button
+                        onClick={initiatePayment}
+                        disabled={isLoading || !termsAccepted}
+                        className="mt-1 bg-[#B99359] hover:bg-[#A0804D] text-white rounded-full px-4 py-2 text-sm font-semibold transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed"
+                    >
+                        {primaryCtaLabel}
+                    </button>
+                </div>
             </div>
 
         </div>
