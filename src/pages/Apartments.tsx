@@ -27,6 +27,7 @@ type CombinedListing = {
   price: number;
   rating: number;
   reviews: number;
+  featured: boolean;
   propertyType: string;
   guests: number;
   petFriendly: boolean;
@@ -109,6 +110,7 @@ const Apartments = () => {
         price: property.property_price || 0,
         rating: property.property_rating || 0,
         reviews: property.property_reviews || 0,
+        featured: Boolean(listing.featured),
         propertyType: derivePropertyType(name),
         guests: deriveGuests(property),
         petFriendly: derivePetFriendly(property),
@@ -134,6 +136,10 @@ const Apartments = () => {
       result = [...result].sort((a, b) => a.price - b.price);
     } else if (sortBy === "rating") {
       result = [...result].sort((a, b) => b.rating - a.rating);
+    } else {
+      result = [...result].sort(
+        (a, b) => Number(b.featured) - Number(a.featured) || b.rating - a.rating
+      );
     }
 
     return result;

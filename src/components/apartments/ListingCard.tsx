@@ -14,6 +14,13 @@ type ListingCardProps = {
   onClick?: () => void;
 };
 
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  }).format(value);
+
 const ListingCard: React.FC<ListingCardProps> = ({
   name,
   location,
@@ -56,11 +63,11 @@ const ListingCard: React.FC<ListingCardProps> = ({
           <h3 className="text-lg font-semibold text-gray-900">{name}</h3>
           <p className="text-sm text-gray-600">{location}</p>
         </div>
-        <div className="flex items-center gap-1 text-sm font-semibold text-gray-900">
-          <span aria-hidden>★</span>
-          <span>{rating.toFixed(2)}</span>
-          <span className="text-gray-500">({reviews})</span>
-        </div>
+      <div className="flex items-center gap-1 text-sm font-semibold text-gray-900">
+        <span aria-hidden>★</span>
+        <span>{rating > 0 ? rating.toFixed(2) : "New"}</span>
+        <span className="text-gray-500">({reviews.toLocaleString()})</span>
+      </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600">
@@ -75,11 +82,11 @@ const ListingCard: React.FC<ListingCardProps> = ({
         )}
       </div>
 
-      <div className="mt-auto flex items-baseline justify-between pt-2">
-        <div className="text-xl font-bold text-gray-900">
-          ₹{price.toLocaleString()} <span className="text-sm font-normal text-gray-600">/ night</span>
+      <div className="mt-auto pt-2 text-sm text-gray-700">
+        <div className="text-lg font-semibold text-gray-900">
+          {formatCurrency(price)}/night
+          <span className="ml-2 text-xs font-semibold text-gray-600">– all fees included</span>
         </div>
-        <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">All fees included</span>
       </div>
     </div>
   </article>
