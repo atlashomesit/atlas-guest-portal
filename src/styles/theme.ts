@@ -1,17 +1,30 @@
+export const DEFAULT_THEME = "default" as const;
+
 export const designTokens = {
-  color: {
-    background: "var(--color-background)",
-    surface: "var(--color-surface)",
-    mutedSurface: "var(--color-surface-muted)",
-    primary: "var(--color-primary)",
-    primaryStrong: "var(--color-primary-strong)",
-    accent: "var(--color-accent)",
-    ink: "var(--color-ink)",
-    inkSubtle: "var(--color-ink-subtle)",
-    border: "var(--color-border)",
-    borderStrong: "var(--color-border-strong)",
-    success: "var(--color-success)",
-    danger: "var(--color-danger)",
+  bg: {
+    primary: "var(--bg-primary)",
+    surface: "var(--bg-surface)",
+    muted: "var(--bg-muted)",
+  },
+  text: {
+    primary: "var(--text-primary)",
+    muted: "var(--text-muted)",
+  },
+  accent: {
+    primary: "var(--accent-primary)",
+    soft: "var(--accent-soft)",
+  },
+  cta: {
+    primary: "var(--cta-primary)",
+    secondary: "var(--cta-secondary)",
+  },
+  border: {
+    subtle: "var(--border-subtle)",
+    strong: "var(--border-strong)",
+  },
+  state: {
+    success: "var(--support-success)",
+    danger: "var(--support-danger)",
   },
   typography: {
     base: "var(--font-family-base)",
@@ -47,9 +60,17 @@ export const designTokens = {
     pill: "var(--radius-pill)",
   },
   shadow: {
-    soft: "var(--shadow-soft)",
-    strong: "var(--shadow-strong)",
+    level1: "var(--shadow-level-1)",
+    level2: "var(--shadow-level-2)",
   },
 } as const;
 
 export type DesignTokens = typeof designTokens;
+
+export type ThemeName = typeof DEFAULT_THEME;
+
+export const applyTheme = (theme: ThemeName = DEFAULT_THEME) => {
+  if (typeof document === "undefined") return;
+
+  document.documentElement.dataset.theme = theme;
+};

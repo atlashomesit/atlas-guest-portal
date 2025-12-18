@@ -46,7 +46,7 @@ const Amenities = () => {
     ]
 
     return (
-        <section className="py-14 lg:py-28  bg-Bg_Primary">
+        <section className="py-14 lg:py-28  bg-bg-primary">
             <div className="w-full h-fit  flex flex-col lg:flex-row justify-center items-center gap-5">
                 {/* content  */}
                 <div className="image w-full h-full flex-1 flex justify-center items-center gap-6">

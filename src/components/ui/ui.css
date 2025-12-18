@@ -10,15 +10,15 @@
   font-size: var(--font-size-md);
   border: 1px solid transparent;
   color: #ffffff;
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-strong) 100%);
-  box-shadow: var(--shadow-soft);
+  background: linear-gradient(135deg, var(--cta-primary) 0%, var(--cta-secondary) 100%);
+  box-shadow: var(--shadow-level-1);
   transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease;
 }
 
 .rb-button:hover {
   transform: translateY(-1px);
-  box-shadow: var(--shadow-strong);
-  background: linear-gradient(135deg, var(--color-primary-strong) 0%, var(--color-primary) 100%);
+  box-shadow: var(--shadow-level-2);
+  background: linear-gradient(135deg, var(--cta-secondary) 0%, var(--cta-primary) 100%);
 }
 
 .rb-button:active {
@@ -26,26 +26,26 @@
 }
 
 .rb-button--secondary {
-  background: var(--color-surface);
-  color: var(--color-ink);
-  border-color: var(--color-border-strong);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
   box-shadow: none;
 }
 
 .rb-button--secondary:hover {
-  background: var(--color-surface-muted);
-  box-shadow: var(--shadow-soft);
+  background: var(--bg-muted);
+  box-shadow: var(--shadow-level-1);
 }
 
 .rb-button--ghost {
   background: transparent;
-  color: var(--color-ink);
+  color: var(--text-primary);
   border-color: transparent;
   box-shadow: none;
 }
 
 .rb-button--ghost:hover {
-  background: var(--color-surface-muted);
+  background: var(--bg-muted);
 }
 
 .rb-button--block {
@@ -66,38 +66,38 @@
   width: 100%;
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-md);
-  border: 1px solid var(--color-border);
-  background-color: var(--color-surface);
-  color: var(--color-ink);
+  border: 1px solid var(--border-subtle);
+  background-color: var(--bg-surface);
+  color: var(--text-primary);
   font-family: var(--font-family-base);
   font-size: var(--font-size-md);
   transition: border-color 150ms ease, box-shadow 150ms ease;
 }
 
 .rb-input::placeholder {
-  color: var(--color-ink-subtle);
+  color: var(--text-muted);
 }
 
 .rb-input:focus-visible {
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 20%, transparent);
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary) 20%, transparent);
 }
 
 .rb-card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   padding: var(--space-6);
-  box-shadow: var(--shadow-soft);
-  color: var(--color-ink);
+  box-shadow: var(--shadow-level-1);
+  color: var(--text-primary);
 }
 
 .rb-card--muted {
-  background: linear-gradient(180deg, var(--color-surface-muted) 0%, var(--color-surface) 100%);
+  background: linear-gradient(180deg, var(--bg-muted) 0%, var(--bg-surface) 100%);
 }
 
 .rb-typography {
-  color: var(--color-ink);
+  color: var(--text-primary);
   font-family: var(--font-family-display);
   margin: 0;
 }
@@ -122,7 +122,7 @@
 .rb-typography--subtitle {
   font-size: var(--font-size-lg);
   line-height: var(--line-height-relaxed);
-  color: var(--color-ink-subtle);
+  color: var(--text-muted);
 }
 
 .rb-typography--body {
@@ -133,5 +133,5 @@
 .rb-typography--muted {
   font-size: var(--font-size-sm);
   line-height: var(--line-height-relaxed);
-  color: var(--color-ink-subtle);
+  color: var(--text-muted);
 }
