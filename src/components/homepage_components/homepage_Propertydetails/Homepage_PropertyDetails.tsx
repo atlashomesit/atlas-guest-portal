@@ -372,10 +372,10 @@ const PropertyDetails = () => {
                     {/* right div  */}
                     <div className="w-full sm:w-1/3">
                         <div className='hidden lg:block sticky top-16'>
-                            <HotelBooking_Form propertyId={data.id} />
+                            <HotelBooking_Form propertyId={data.id} supportPadding />
                         </div>
                         <div className="lg:hidden">
-                            <HotelBooking_Form propertyId={data.id} />
+                            <HotelBooking_Form propertyId={data.id} supportPadding />
                         </div>
                     </div>
                 </div>
