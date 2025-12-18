@@ -7,6 +7,7 @@ import { LISTINGS, type Listing } from "../data/listings";
 import ListingCard from "../components/apartments/ListingCard";
 import ListingFilters from "../components/apartments/ListingFilters";
 import { sanitizeItems } from "../utils/sanitizeItems";
+import { trackEvent } from "../utils/analytics";
 
 type PropertyRecord = {
   id: number | string;
@@ -151,10 +152,32 @@ const Apartments = () => {
 
     const slug = String(propertyName).toLowerCase().replace(/\s+/g, "-");
 
+    trackEvent(
+      "listing_selected",
+      { source: "apartments", listingName: propertyName },
+      { listingId: property.id, unitCode: property.id, route: `/property_details/${slug}` },
+    );
+
     navigate(`/property_details/${slug}`, {
       state: { property },
     });
   };
+
+  React.useEffect(() => {
+    trackEvent(
+      "listings_browse",
+      {
+        total: filteredListings.length,
+        sortBy,
+        guests,
+        minPrice,
+        maxPrice,
+        propertyType,
+        petFriendlyOnly,
+      },
+      { route: "/apartments" },
+    );
+  }, [filteredListings.length, sortBy, guests, minPrice, maxPrice, propertyType, petFriendlyOnly]);
 
   return (
     <main className="bg-gray-50 py-10">

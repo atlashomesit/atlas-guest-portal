@@ -5,6 +5,7 @@ import { useLocation, useMatch } from "react-router-dom";
 
 import { CONTACT } from "../../config/contact";
 import { buildWaLink } from "../../utils/whatsapp";
+import { trackEvent } from "../../utils/analytics";
 
 const VISIBLE_MODAL_SELECTORS = [
   "dialog[open]",
@@ -98,6 +99,13 @@ const SupportStickyBar = () => {
             href={whatsappLink}
             target="_blank"
             rel="noreferrer"
+            onClick={() =>
+              trackEvent(
+                "support_whatsapp",
+                { surface: "sticky_bar" },
+                { route: location.pathname, unitCode: matchPropertyDetails?.params?.id },
+              )
+            }
             className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#25D366] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#1DA851] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#128C7E] sm:w-auto"
           >
             <FaWhatsapp aria-hidden="true" className="text-lg" />
@@ -105,6 +113,13 @@ const SupportStickyBar = () => {
           </a>
           <a
             href={`tel:+91${CONTACT.business.phone}`}
+            onClick={() =>
+              trackEvent(
+                "support_call",
+                { surface: "sticky_bar" },
+                { route: location.pathname, unitCode: matchPropertyDetails?.params?.id },
+              )
+            }
             className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-900 shadow-sm transition hover:border-gray-300 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black sm:w-auto"
           >
             <FiPhone aria-hidden="true" className="text-lg" />

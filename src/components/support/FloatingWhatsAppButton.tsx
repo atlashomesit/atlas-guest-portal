@@ -4,6 +4,7 @@ import { FaWhatsapp } from "react-icons/fa";
 
 import { CONTACT } from "../../config/contact";
 import { buildWaLink } from "../../utils/whatsapp";
+import { trackEvent } from "../../utils/analytics";
 
 const getHelpPanelElement = () =>
   document.querySelector<HTMLElement>("[data-help-panel], .help-panel, #help-panel");
@@ -86,6 +87,13 @@ const FloatingWhatsAppButton = () => {
         href={whatsappLink}
         target="_blank"
         rel="noreferrer"
+        onClick={() =>
+          trackEvent(
+            "support_whatsapp",
+            { surface: "floating_button" },
+            { route: location.pathname, unitCode: unitSlug ?? undefined },
+          )
+        }
         className="group inline-flex items-center gap-3 rounded-full bg-[#25D366] px-4 py-3 text-white shadow-2xl transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_20px_45px_-10px_rgba(37,211,102,0.55)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#128C7E] sm:px-5 sm:py-3.5"
       >
         <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-2xl sm:h-11 sm:w-11">
