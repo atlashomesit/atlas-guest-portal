@@ -4,6 +4,7 @@ import { FaPhoneAlt, FaQuestionCircle, FaWhatsapp } from "react-icons/fa";
 
 import { CONTACT, getTelLink } from "../../config/contact";
 import { buildWaLink, defaultPrefill } from "../../utils/whatsapp";
+import { trackEvent } from "../../utils/analytics";
 
 const PANEL_ID = "help-launcher-panel";
 
@@ -70,6 +71,7 @@ const HelpLauncher = () => {
   const handleFaqNavigation = () => {
     navigate("/faq");
     setIsOpen(false);
+    trackEvent("support_faq", { surface: "help_launcher" }, { route: location.pathname });
   };
 
   const links = [
@@ -123,6 +125,13 @@ const HelpLauncher = () => {
                     href={link.href}
                     target={link.external ? "_blank" : undefined}
                     rel={link.external ? "noreferrer" : undefined}
+                    onClick={() =>
+                      trackEvent(
+                        link.label.toLowerCase().includes("whatsapp") ? "support_whatsapp" : "support_call",
+                        { surface: "help_launcher" },
+                        { route: location.pathname },
+                      )
+                    }
                     className="group flex items-start gap-3 rounded-xl px-3 py-2 transition-colors duration-150 hover:bg-gray-50 focus-visible:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b48530]"
                   >
                     <span className="mt-0.5 text-lg text-[#b48530]">{link.icon}</span>

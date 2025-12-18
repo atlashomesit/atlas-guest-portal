@@ -6,6 +6,7 @@ import { inlinePolicySnippets } from '../../../content/terms';
 import { baseGuestAllowance, getUnitPolicy } from '../../../config/policyConfig';
 import { FaCcMastercard, FaCcVisa, FaCreditCard, FaUserFriends } from 'react-icons/fa';
 import { SiGooglepay, SiRazorpay } from 'react-icons/si';
+import { trackEvent } from '../../../utils/analytics';
 
 declare global {
   interface Window {
@@ -66,6 +67,18 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
                     key: 'selection'
                 });
             }
+
+            const selectedNights = Math.max(1, Math.round(Math.abs((endDate.getTime() - startDate.getTime()) / oneDay)));
+            trackEvent(
+                'dates_selected',
+                {
+                    startDate: startDate.toISOString(),
+                    endDate: endDate.toISOString(),
+                    nights: selectedNights,
+                    guests: totalPeople,
+                },
+                { propertyId, listingId: propertyId, unitCode: propertyId },
+            );
         }
     };
 
@@ -199,6 +212,17 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     }), [property?.property_name, dates.startDate, dates.endDate, nights, totalPrice, guests]);
 
     const initiatePayment = async () => {
+        trackEvent(
+            'reserve_click',
+            {
+                termsAccepted,
+                hasSelection,
+                guests: totalPeople,
+                nights,
+            },
+            { propertyId, listingId: propertyId, unitCode: propertyId },
+        );
+
         if (!termsAccepted) {
             alert('Please confirm the Terms & Conditions before reserving.');
             return;
@@ -223,6 +247,17 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         }
 
         const bookingId = `ATLAS-${propertyId}-${Date.now()}`;
+
+        trackEvent(
+            'checkout_start',
+            {
+                bookingId,
+                total: totalPrice,
+                nights,
+                guests: totalPeople,
+            },
+            { propertyId, listingId: propertyId, unitCode: propertyId },
+        );
 
         const razorpayOptions = {
             key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_placeholder',
@@ -252,6 +287,15 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
                     bookingId,
                 });
                 setIsLoading(false);
+                trackEvent(
+                    'payment_success',
+                    {
+                        bookingId,
+                        paymentId: response.razorpay_payment_id,
+                        total: totalPrice,
+                    },
+                    { propertyId, listingId: propertyId, unitCode: propertyId },
+                );
             },
             modal: {
                 ondismiss: () => {
@@ -269,6 +313,11 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
                 reason: `${failureReason} Please try again or choose a different method.`,
             });
             setIsLoading(false);
+            trackEvent(
+                'payment_failure',
+                { bookingId, reason: failureReason },
+                { propertyId, listingId: propertyId, unitCode: propertyId },
+            );
         });
     };
 

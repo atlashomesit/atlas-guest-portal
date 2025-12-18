@@ -15,6 +15,7 @@ import { getUnitPolicy } from '../../../config/policyConfig';
 import { inlinePolicySnippets } from '../../../content/terms';
 import Subheading from '../../commonComponents/subheading/Subheading';
 import HotelBooking_Form from '../hotelBooking_form/HotelBooking_Form';
+import { trackEvent } from '../../../utils/analytics';
 
 import { Fancybox } from "@fancyapps/ui";
 import "@fancyapps/ui/dist/fancybox/fancybox.css";
@@ -126,6 +127,19 @@ const PropertyDetails = () => {
             Fancybox.destroy();
         };
     }, [data]);
+
+    useEffect(() => {
+        if (!data) return;
+
+        trackEvent(
+            'listing_view',
+            {
+                propertyName: data.property_name,
+                price: data.property_price,
+            },
+            { listingId: data.id, unitCode: data.id, route: location.pathname },
+        );
+    }, [data, location.pathname]);
 
     const renderIcon = (iconName: string) => {
         const name = iconName.toLowerCase();

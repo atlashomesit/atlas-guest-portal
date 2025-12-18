@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Slider, { Settings } from "react-slick";
 
@@ -6,6 +6,7 @@ import { propertyData, propertyImages } from "../../../data.ts";
 import { LISTINGS, type Listing } from "../../../data/listings";
 import { sanitizeItems, getItemKey } from "../../../utils/sanitizeItems";
 import { LOGO_URL } from "../../../config/branding";
+import { trackEvent } from "../../../utils/analytics";
 
 import "./homepage_location.css";
 import "slick-carousel/slick/slick.css";
@@ -40,12 +41,33 @@ const HomePage_Locations = ({ listings = LISTINGS }: HomePageLocationsProps) => 
   const firstRow = otherProperties.slice(0, 3);
   const secondRow = otherProperties.slice(3);
 
+  useEffect(() => {
+    trackEvent(
+      "listings_browse",
+      {
+        total: items.length,
+        featured: Number(Boolean(penthouse)),
+        surface: "home_locations",
+      },
+      { route: "/" },
+    );
+  }, [items.length, penthouse]);
+
   const handleNavigate = (property: any) => {
     try {
       const propertyName = property.property_name || property.title || property.id;
       if (!propertyName) return;
 
       const slug = String(propertyName).toLowerCase().replace(/\s+/g, "-");
+
+      trackEvent(
+        "listing_selected",
+        {
+          surface: "home_locations",
+          listingName: propertyName,
+        },
+        { listingId: property?.id, unitCode: property?.id, route: `/property_details/${slug}` },
+      );
 
       navigate(`/property_details/${slug}`, {
         state: { property },
