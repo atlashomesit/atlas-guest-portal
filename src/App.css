@@ -38,10 +38,28 @@ body::-webkit-scrollbar {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
+.help-launcher {
+  right: 1rem;
+  bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
+  z-index: 48;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+@media (max-width: 767px) {
+  .help-launcher-open .floating-whatsapp {
+    display: none;
+  }
+}
+
 @media (min-width: 640px) {
   .floating-whatsapp {
     left: 1.5rem;
     bottom: calc(2.25rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .help-launcher {
+    right: 1.5rem;
+    bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
   }
 }
 
@@ -49,5 +67,10 @@ body::-webkit-scrollbar {
   .floating-whatsapp {
     left: 2rem;
     bottom: calc(2.75rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .help-launcher {
+    right: 2rem;
+    bottom: calc(3.75rem + env(safe-area-inset-bottom, 0px));
   }
 }
