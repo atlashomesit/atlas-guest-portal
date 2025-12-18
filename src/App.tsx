@@ -21,6 +21,7 @@ import BlogHome from "./pages/blog/BlogHome"
 import BlogCategory from "./pages/blog/BlogCategory"
 import BlogPostPage from "./pages/blog/BlogPostPage"
 import ShortLinkRedirect from "./components/ShortLinkRedirect"
+import FloatingWhatsAppButton from "./components/support/FloatingWhatsAppButton"
 
 function AppWrapper() {
   const location = useLocation();
@@ -57,6 +58,7 @@ function AppWrapper() {
         <Route path="/:shortCode" element={<ShortLinkRedirect />} />
         <Route path="/*" element={<PageNotFound />} />
       </Routes>
+      <FloatingWhatsAppButton />
       <Footer />
     </>
   );

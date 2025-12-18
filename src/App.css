@@ -31,3 +31,23 @@ body::-webkit-scrollbar {
   /* --primary-color: #fc9d2c; */
   --primary-color: #b48530;
 }
+.floating-whatsapp {
+  left: 1rem;
+  bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
+  z-index: 45;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+@media (min-width: 640px) {
+  .floating-whatsapp {
+    left: 1.5rem;
+    bottom: calc(2.25rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media (min-width: 1024px) {
+  .floating-whatsapp {
+    left: 2rem;
+    bottom: calc(2.75rem + env(safe-area-inset-bottom, 0px));
+  }
+}
