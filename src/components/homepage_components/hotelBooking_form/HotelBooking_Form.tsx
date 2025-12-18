@@ -18,9 +18,10 @@ import 'react-date-range/dist/theme/default.css';
 
 interface BookingCardProps {
     propertyId: number;
+    supportPadding?: boolean;
 }
 
-const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
+const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = false }) => {
     const [openCalendar, setOpenCalendar] = useState(false);
     const [openGuests, setOpenGuests] = useState(false);
     const [isRazorpayReady, setIsRazorpayReady] = useState(false);
@@ -313,8 +314,10 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
     const hasSelection = Boolean(dates.startDate && dates.endDate && guests.adults);
     const primaryCtaLabel = hasSelection && termsAccepted ? 'Book now' : 'Check availability';
 
+    const containerPaddingBottom = supportPadding ? 'pb-40' : 'pb-28';
+
     return (
-        <div id="booking-form" className="max-w-md mx-auto p-6 bg-white shadow-xl rounded-2xl relative pb-28 lg:pb-0 lg:sticky lg:top-20">
+        <div id="booking-form" className={`max-w-md mx-auto p-6 bg-white shadow-xl rounded-2xl relative ${containerPaddingBottom} lg:pb-0 lg:sticky lg:top-20`}>
 
             {/* PRICE SECTION */}
             <p className="text-[30px] font-bold">
