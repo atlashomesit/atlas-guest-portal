@@ -94,14 +94,14 @@ const FloatingWhatsAppButton = () => {
             { route: location.pathname, unitCode: unitSlug ?? undefined },
           )
         }
-        className="group inline-flex items-center gap-3 rounded-full bg-success px-4 py-3 text-[var(--text-contrast)] shadow-level2 transition-all duration-200 hover:-translate-y-1 hover:shadow-level2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-success sm:px-5 sm:py-3.5"
+        className="group inline-flex items-center gap-3 rounded-pill border border-border-subtle bg-bg-surface px-4 py-3 text-text-primary shadow-level2 transition-all duration-200 hover:-translate-y-1 hover:border-accent-primary hover:bg-[var(--cta-primary-hover)] hover:text-[var(--text-contrast)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-primary sm:px-5 sm:py-3.5"
       >
-        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--text-contrast)_20%,transparent)] text-2xl sm:h-11 sm:w-11">
+        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--support-success)_15%,transparent)] text-2xl text-success sm:h-11 sm:w-11">
           <FaWhatsapp aria-hidden="true" />
         </span>
         <span className="flex flex-col">
-          <span className="text-sm font-semibold leading-tight sm:text-base">WhatsApp us</span>
-          <span className="text-[11px] leading-tight text-[color-mix(in_srgb,var(--text-contrast)_90%,transparent)] sm:text-xs">Quickest way to reach the team</span>
+          <span className="text-sm font-semibold leading-tight text-accent-primary transition-colors duration-200 group-hover:text-[var(--text-contrast)] sm:text-base">WhatsApp us</span>
+          <span className="text-[11px] leading-tight text-text-muted transition-colors duration-200 group-hover:text-[color-mix(in_srgb,var(--text-contrast)_90%,transparent)] sm:text-xs">Quickest way to reach the team</span>
         </span>
       </a>
     </div>
