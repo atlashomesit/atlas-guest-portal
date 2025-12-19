@@ -18,6 +18,7 @@ export const designTokens = {
   text: {
     primary: "var(--text-primary)",
     muted: "var(--text-muted)",
+    onHero: "var(--text-on-hero)",
   },
   accent: {
     primary: "var(--accent-primary)",
