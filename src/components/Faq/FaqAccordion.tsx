@@ -33,7 +33,7 @@ const FaqAccordion = ({ items, activeItemId }: FaqAccordionProps) => {
           <div
             key={item.id}
             id={item.id}
-            className="border border-slate-200 rounded-xl bg-white shadow-sm hover:shadow-md transition-shadow"
+            className="border border-border-subtle rounded-xl bg-bg-surface shadow-level1 hover:shadow-level2 transition-shadow"
           >
             <button
               type="button"
@@ -41,7 +41,7 @@ const FaqAccordion = ({ items, activeItemId }: FaqAccordionProps) => {
               aria-expanded={isOpen}
               aria-controls={`${item.id}-panel`}
               id={triggerId}
-              className="w-full flex items-center justify-between gap-4 px-4 py-3 text-left text-slate-900 font-semibold"
+              className="w-full flex items-center justify-between gap-4 px-4 py-3 text-left text-text-primary font-semibold"
             >
               <span>{item.question}</span>
               <span aria-hidden className="text-primary text-xl">
@@ -57,7 +57,7 @@ const FaqAccordion = ({ items, activeItemId }: FaqAccordionProps) => {
               }`}
             >
               <div className="overflow-hidden">
-                <div className="px-4 pb-4 text-slate-700 leading-relaxed">{item.answer}</div>
+                <div className="px-4 pb-4 text-text-muted leading-relaxed">{item.answer}</div>
               </div>
             </div>
           </div>

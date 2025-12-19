@@ -12,7 +12,7 @@ const CommonBanner: React.FC<CommonBannerProps> = ({ image, PageName }) => {
                 <img className='h-full w-full object-cover' src={image} alt="Banner_Image" />
             </div>
             <div className='px-4 lg:px-20 py-8'>
-                <span className='text-3xl text-slate-600 font-semibold tracking-wide'>{PageName}</span>
+                <span className='text-3xl text-text-primary font-semibold tracking-wide'>{PageName}</span>
             </div>
         </section>
     )

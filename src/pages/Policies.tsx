@@ -59,10 +59,10 @@ const Policies = () => {
         <SectionNav sections={sectionNav} />
 
         <div className="space-y-6">
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+          <div className="bg-bg-surface border border-border-subtle rounded-2xl p-6 shadow-level1 space-y-4">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <LegalSearch value={search} onChange={setSearch} placeholder="Search policies" />
-              <div className="bg-amber-50 text-amber-800 border border-amber-200 rounded-xl p-4 text-sm">
+              <div className="bg-[color:color-mix(in_srgb,var(--accent-soft)_65%,var(--bg-surface))] text-text-primary border border-border-subtle rounded-xl p-4 text-sm">
                 <p className="font-semibold">If anything here conflicts with Terms, the Terms apply.</p>
                 <p>Policies summarise how we operationalise the Terms for guests.</p>
               </div>
@@ -74,13 +74,13 @@ const Policies = () => {
               <article
                 key={section.id}
                 id={section.id}
-                className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm"
+                className="bg-bg-surface border border-border-subtle rounded-2xl p-6 shadow-level1"
               >
                 <header className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                   <div>
                     <p className="text-xs uppercase tracking-[0.2em] text-primary">Policy</p>
-                    <h2 className="text-2xl font-bold text-slate-900">{section.title}</h2>
-                    <p className="text-slate-700 mt-1">{section.summary}</p>
+                    <h2 className="text-2xl font-bold text-text-primary">{section.title}</h2>
+                    <p className="text-text-muted mt-1">{section.summary}</p>
                   </div>
                   <div className="flex flex-wrap gap-2 items-center">
                     {section.termsRefs.map((ref) => {
@@ -88,7 +88,7 @@ const Policies = () => {
                       return (
                         <a
                           key={ref}
-                          className="text-sm px-3 py-1 rounded-full bg-slate-100 text-primary font-semibold hover:bg-primary/10"
+                          className="text-sm px-3 py-1 rounded-full bg-bg-muted text-primary font-semibold hover:bg-primary/10"
                           href={`/terms#${ref}`}
                         >
                           Terms: {term?.title || ref}
@@ -98,7 +98,7 @@ const Policies = () => {
                     <button
                       type="button"
                       onClick={() => toggle(section.id)}
-                      className="text-sm font-semibold px-3 py-2 rounded-full border border-slate-200 hover:border-primary text-primary"
+                      className="text-sm font-semibold px-3 py-2 rounded-full border border-border-subtle hover:border-cta-primary text-primary"
                       aria-expanded={open.has(section.id)}
                       aria-controls={`${section.id}-details`}
                     >
@@ -108,7 +108,7 @@ const Policies = () => {
                 </header>
 
                 {open.has(section.id) && (
-                  <div id={`${section.id}-details`} className="mt-4 space-y-3 text-slate-800">
+                  <div id={`${section.id}-details`} className="mt-4 space-y-3 text-text-primary">
                     <ul className="list-disc pl-5 space-y-2">
                       {section.details.map((detail, idx) => (
                         <li key={idx}>{detail}</li>
@@ -120,23 +120,23 @@ const Policies = () => {
             ))}
 
             {filteredPolicies.length === 0 && (
-              <div className="bg-white border border-slate-200 rounded-2xl p-6 text-slate-700 shadow-sm">
+              <div className="bg-bg-surface border border-border-subtle rounded-2xl p-6 text-text-muted shadow-level1">
                 No policies match your search yet. Try a different keyword.
               </div>
             )}
           </div>
 
-          <div className="bg-gradient-to-r from-primary/90 to-primary text-white rounded-2xl p-6 shadow-lg">
+          <div className="bg-gradient-to-r from-primary/90 to-primary text-[var(--text-contrast)] rounded-2xl p-6 shadow-level2">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div>
                 <h3 className="text-xl font-bold">Need help?</h3>
-                <p className="text-white/90">Chat with us for clarifications before you book.</p>
+                <p className="text-[color-mix(in_srgb,var(--text-contrast)_90%,transparent)]">Chat with us for clarifications before you book.</p>
               </div>
               <a
                 href={whatsappLink}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-white text-primary font-semibold rounded-xl shadow-md hover:shadow-lg"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-bg-surface text-primary font-semibold rounded-xl shadow-level1 hover:shadow-level2"
               >
                 Message on WhatsApp
               </a>

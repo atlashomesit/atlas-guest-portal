@@ -153,7 +153,7 @@ const HomePage_Locations = ({ listings = LISTINGS }: HomePageLocationsProps) => 
 
     return (
       <div
-        className={`bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 cursor-pointer ${
+        className={`bg-bg-surface rounded-2xl overflow-hidden shadow-level1 hover:shadow-level2 transition-shadow duration-300 cursor-pointer border border-border-subtle ${
           isPenthouse ? "lg:col-span-3" : ""
         }`}
         onClick={() => handleNavigate(propertyDataItem)}
@@ -181,7 +181,7 @@ const HomePage_Locations = ({ listings = LISTINGS }: HomePageLocationsProps) => 
               <button
                 key={idx}
                 className={`w-3 h-3 rounded-full transition-colors duration-300 ${
-                  current === idx ? "bg-white" : "bg-white/50"
+                  current === idx ? "bg-[color:var(--text-contrast)]" : "bg-[color:color-mix(in_srgb,var(--text-contrast)_50%,transparent)]"
                 }`}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -194,14 +194,14 @@ const HomePage_Locations = ({ listings = LISTINGS }: HomePageLocationsProps) => 
 
         {/* DETAILS */}
         <div className="p-4">
-          <h2 className="text-xl font-bold text-gray-800 truncate">{displayName}</h2>
-          <div className="text-gray-600 text-sm mt-1">Hyderabad, Telangana</div>
+          <h2 className="text-xl font-bold text-text-primary truncate">{displayName}</h2>
+          <div className="text-text-muted text-sm mt-1">Hyderabad, Telangana</div>
           <div className="flex items-center mt-2">
-            <span className="text-yellow-400 text-lg">⭐</span>
+            <span className="text-accent-primary text-lg">⭐</span>
             <span className="font-semibold ml-1">
               {propertyDataItem?.property_rating?.toFixed(1) || "4.8"}
             </span>
-            <span className="text-gray-500 text-sm ml-1">
+            <span className="text-text-muted text-sm ml-1">
               ({propertyDataItem?.property_reviews || "0"} reviews)
             </span>
           </div>
@@ -209,7 +209,7 @@ const HomePage_Locations = ({ listings = LISTINGS }: HomePageLocationsProps) => 
             <span className="text-xl font-bold">
               ₹{propertyDataItem?.property_price?.toLocaleString() || "4,999"}
             </span>
-            <span className="text-gray-600 text-sm ml-1">for 1 night</span>
+            <span className="text-text-muted text-sm ml-1">for 1 night</span>
           </div>
         </div>
       </div>

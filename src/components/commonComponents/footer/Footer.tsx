@@ -24,8 +24,7 @@ const Footer = () => {
 
     return (
         <div
-            className='py-10 md:py-10 px-4 lg:px-8'
-            style={{ backgroundColor: 'var(--text-primary)', color: 'color-mix(in srgb, var(--text-contrast) 72%, transparent)' }}
+            className='py-10 md:py-10 px-4 lg:px-8 bg-[color:var(--text-primary)] text-[color:color-mix(in_srgb,var(--text-contrast)_72%,transparent)]'
         >
             <div className='max-w-screen-2xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-8'>
                 <div className='flex flex-col gap-7 items-center lg:items-start'>
@@ -113,7 +112,7 @@ const Footer = () => {
                 </div>
             </div>
 
-            <div className='text-base text-center mt-10' style={{ color: 'color-mix(in srgb, var(--text-contrast) 70%, transparent)' }}>
+            <div className='text-base text-center mt-10 text-[color:color-mix(in_srgb,var(--text-contrast)_70%,transparent)]'>
                 © 2025 The Atlas Homes All rights reserved | <Link to="/policies" className='hover:text-[var(--text-contrast)]'>Policies</Link> | <Link to="/terms" className='hover:text-[var(--text-contrast)]'>Terms</Link> | <Link to="/contact" className='hover:text-[var(--text-contrast)]'>Contact</Link>
             </div>
 

@@ -50,15 +50,15 @@ const NearByPlaces = () => {
                 </div>
                 <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 px-6 lg:px-9'>
                     {data?.map((item) => (
-                        <div key={item.title} className='relative h-[50vh] md:h-[70vh] w-full mb-3 border border-gray-300 rounded-lg overflow-hidden'>
+                        <div key={item.title} className='relative h-[50vh] md:h-[70vh] w-full mb-3 border border-border-subtle rounded-lg overflow-hidden'>
                             {/* Image with Overlay */}
                             <div className="relative h-5/6 w-full">
                                 <img className='object-cover h-full w-full' src={item.thumbnail} alt={item.title} />
-                                <div className="absolute inset-0 bg-black bg-opacity-10"></div> {/* Dark overlay */}
+                                <div className="absolute inset-0 bg-[color:color-mix(in_srgb,var(--text-primary)_10%,transparent)]"></div> {/* Dark overlay */}
                             </div>
 
                             {/* Text Content */}
-                            <div className='absolute h-1/6 bottom-0 left-0 w-full  px-6 bg-gradient-to-t from-black via-black/100 to-transparent text-white'>
+                            <div className='absolute h-1/6 bottom-0 left-0 w-full  px-6 bg-gradient-to-t from-[color:color-mix(in_srgb,var(--text-primary)_90%,transparent)] via-[color:color-mix(in_srgb,var(--text-primary)_80%,transparent)] to-transparent text-[var(--text-contrast)]'>
                                 <p className='text-lg md:text-xl font-semibold'>{item.title}</p>
                                 <p className='text-xs md:text-sm mt-1'>{item.description}</p>
                             </div>

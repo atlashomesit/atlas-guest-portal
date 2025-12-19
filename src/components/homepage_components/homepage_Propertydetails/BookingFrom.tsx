@@ -4,6 +4,9 @@ import { Plus, Minus } from 'lucide-react';
 import { FaAngleDown, FaAngleUp } from "react-icons/fa6";
 import { emailJsConfig, getMissingEmailJsEnvKeys, isEmailJsConfigured } from '../../../utils/emailjsConfig';
 import { inlinePolicySnippets } from '../../../content/terms';
+import { Card } from '../../ui/Card';
+import { Input } from '../../ui/Input';
+import { Button } from '../../ui/Button';
 interface Property {
   property_name: string;
 }
@@ -156,68 +159,65 @@ ${policyMessage}`
     }
   };
   return (
-    <div className="w-full bg-white rounded-lg border border-gray-200 shadow-sm">
-      <div className="p-4 space-y-4">
-        <div className="rounded-lg bg-gray-50 border border-gray-200 p-3 text-sm text-gray-700 space-y-1">
-          <div className="font-semibold text-gray-900">Booking essentials</div>
+    <Card className="w-full">
+      <div className="space-y-4">
+        <div className="rounded-lg bg-bg-muted border border-border-subtle p-3 text-sm text-text-muted space-y-1">
+          <div className="font-semibold text-text-primary">Booking essentials</div>
           <p>{inlinePolicySnippets.guestId} <a className="underline" href="/terms#guests">Read more</a></p>
           <p>{inlinePolicySnippets.extraGuests} <a className="underline" href="/terms#guests">Details</a></p>
           <p>{inlinePolicySnippets.cancellation} <a className="underline" href="/terms#cancellations">Cancellation terms</a></p>
         </div>
         {/* Input Fields for Name, Contact Number, and Email */}
-        <input
+        <Input
           type="text"
           placeholder="Name"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="w-full p-2 border border-gray-300 rounded"
         />
-        <input
+        <Input
           type="text"
           placeholder="Contact Number"
           value={contactNumber}
           onChange={(e) => setContactNumber(e.target.value)}
-          className="w-full p-2 border border-gray-300 rounded"
         />
-        <input
+        <Input
           type="email"
           placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="w-full p-2 border border-gray-300 rounded"
         />
 
         {/* Price Display */}
-        {/* <div className="text-2xl font-semibold text-gray-900">
-                    ₹{totalPrice.toLocaleString()} <span className="text-base font-normal text-gray-600">for {nights} nights</span>
+        {/* <div className="text-2xl font-semibold text-text-primary">
+                    ₹{totalPrice.toLocaleString()} <span className="text-base font-normal text-text-muted">for {nights} nights</span>
                 </div> */}
 
         {/* Check-in/Check-out */}
-        <div className="border border-gray-300 rounded-lg overflow-hidden">
+        <div className="border border-border-subtle rounded-lg overflow-hidden">
           <div className="flex">
-            <div className="flex-1 p-3 border-r border-gray-300">
-              <div className="text-xs font-semibold text-gray-900 uppercase tracking-wide mb-1">CHECK-IN</div>
-              <input
+            <div className="flex-1 p-3 border-r border-border-subtle">
+              <div className="text-xs font-semibold text-text-primary uppercase tracking-wide mb-1">CHECK-IN</div>
+              <Input
                 type="date"
                 value={checkIn}
                 onChange={(e) => setCheckIn(e.target.value)}
-                className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full"
                 min={formatDateForInput(new Date())}
               />
-              <div className="text-xs text-gray-500 mt-1">
+              <div className="text-xs text-text-muted mt-1">
                 {formatDateForDisplay(checkIn)}
               </div>
             </div>
             <div className="flex-1 p-3">
-              <div className="text-xs font-semibold text-gray-900 uppercase tracking-wide mb-1">CHECKOUT</div>
-              <input
+              <div className="text-xs font-semibold text-text-primary uppercase tracking-wide mb-1">CHECKOUT</div>
+              <Input
                 type="date"
                 value={checkOut}
                 onChange={(e) => setCheckOut(e.target.value)}
-                className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full"
                 min={checkIn}
               />
-              <div className="text-xs text-gray-500 mt-1">
+              <div className="text-xs text-text-muted mt-1">
                 {formatDateForDisplay(checkOut)}
               </div>
             </div>
@@ -225,16 +225,16 @@ ${policyMessage}`
         </div>
 
         {/* Guests Selector */}
-        <div className="border border-gray-300 rounded-lg">
+        <div className="border border-border-subtle rounded-lg">
           <button
             type="button"
             onClick={() => setShowGuestDetails(!showGuestDetails)}
-            className="w-full p-3 flex justify-between items-center text-left"
+            className="w-full p-3 flex justify-between items-center text-left text-text-primary"
           >
             <div className='flex items-center justify-between w-full'>
               <div>
-                <div className="text-xs font-semibold text-gray-900 uppercase tracking-wide mb-1">GUESTS</div>
-                <div className="text-sm font-medium text-gray-900">
+                <div className="text-xs font-semibold text-text-primary uppercase tracking-wide mb-1">GUESTS</div>
+                <div className="text-sm font-medium text-text-primary">
                   {totalGuests === 0 
                     ? 'Guests' 
                     : (
@@ -259,29 +259,29 @@ ${policyMessage}`
                   }
                 </div>
               </div>
-              <div className='transition duration-150 ease-in-out transform active:scale-95  text-white px-4 py-2 rounded '>
+              <div className='transition duration-150 ease-in-out transform active:scale-95 text-text-muted px-4 py-2 rounded '>
                 {showGuestDetails ? (
-                  <FaAngleUp size={20} className="text-gray-600" />
+                  <FaAngleUp size={20} className="text-text-muted" />
                 ) : (
-                  <FaAngleDown size={20} className="text-gray-600" />
+                  <FaAngleDown size={20} className="text-text-muted" />
                 )}
               </div>
             </div>
           </button>
 
           {showGuestDetails && (
-            <div className="border-t border-gray-200 p-4 space-y-4">
+            <div className="border-t border-border-subtle p-4 space-y-4">
               {/* Adults */}
               <div className="flex justify-between items-center">
                 <div>
-                  <div className="font-medium text-gray-900">Adults</div>
-                  <div className="text-sm text-gray-500">Age 13+</div>
+                  <div className="font-medium text-text-primary">Adults</div>
+                  <div className="text-sm text-text-muted">Age 13+</div>
                 </div>
                 <div className="flex items-center space-x-3">
                   <button
                     type="button"
                     onClick={() => setAdults(Math.max(1, adults - 1))}
-                    className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:border-gray-400 disabled:opacity-50"
+                    className="w-8 h-8 rounded-full border border-border-subtle flex items-center justify-center text-text-muted hover:border-border-strong disabled:opacity-50"
                     disabled={adults <= 1}
                   >
                     <Minus size={16} />
@@ -290,7 +290,7 @@ ${policyMessage}`
                   <button
                     type="button"
                     onClick={() => setAdults(adults + 1)}
-                    className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:border-gray-400"
+                    className="w-8 h-8 rounded-full border border-border-subtle flex items-center justify-center text-text-muted hover:border-border-strong"
                   >
                     <Plus size={16} />
                   </button>
@@ -300,14 +300,14 @@ ${policyMessage}`
               {/* Children */}
               <div className="flex justify-between items-center">
                 <div>
-                  <div className="font-medium text-gray-900">Children</div>
-                  <div className="text-sm text-gray-500">Ages 2-12</div>
+                  <div className="font-medium text-text-primary">Children</div>
+                  <div className="text-sm text-text-muted">Ages 2-12</div>
                 </div>
                 <div className="flex items-center space-x-3">
                   <button
                     type="button"
                     onClick={() => setChildren(Math.max(0, children - 1))}
-                    className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:border-gray-400 disabled:opacity-50"
+                    className="w-8 h-8 rounded-full border border-border-subtle flex items-center justify-center text-text-muted hover:border-border-strong disabled:opacity-50"
                     disabled={children <= 0}
                   >
                     <Minus size={16} />
@@ -316,7 +316,7 @@ ${policyMessage}`
                   <button
                     type="button"
                     onClick={() => setChildren(children + 1)}
-                    className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:border-gray-400"
+                    className="w-8 h-8 rounded-full border border-border-subtle flex items-center justify-center text-text-muted hover:border-border-strong"
                   >
                     <Plus size={16} />
                   </button>
@@ -326,14 +326,14 @@ ${policyMessage}`
               {/* Infants */}
               <div className="flex justify-between items-center">
                 <div>
-                  <div className="font-medium text-gray-900">Infants</div>
-                  <div className="text-sm text-gray-500">Under 2</div>
+                  <div className="font-medium text-text-primary">Infants</div>
+                  <div className="text-sm text-text-muted">Under 2</div>
                 </div>
                 <div className="flex items-center space-x-3">
                   <button
                     type="button"
                     onClick={() => setInfants(Math.max(0, infants - 1))}
-                    className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:border-gray-400 disabled:opacity-50"
+                    className="w-8 h-8 rounded-full border border-border-subtle flex items-center justify-center text-text-muted hover:border-border-strong disabled:opacity-50"
                     disabled={infants <= 0}
                   >
                     <Minus size={16} />
@@ -342,7 +342,7 @@ ${policyMessage}`
                   <button
                     type="button"
                     onClick={() => setInfants(infants + 1)}
-                    className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:border-gray-400"
+                    className="w-8 h-8 rounded-full border border-border-subtle flex items-center justify-center text-text-muted hover:border-border-strong"
                   >
                     <Plus size={16} />
                   </button>
@@ -352,11 +352,11 @@ ${policyMessage}`
               {/* Pets */}
               <div className="flex justify-between items-center">
                 <div>
-                  <div className="font-medium text-gray-900">Pets</div>
+                  <div className="font-medium text-text-primary">Pets</div>
                   <button
                     type="button"
                     onClick={() => setIsServiceAnimal(!isServiceAnimal)}
-                    className="text-sm text-gray-600 underline hover:text-gray-800"
+                    className="text-sm text-text-muted underline hover:text-text-primary"
                   >
                     Bringing a service animal?
                   </button>
@@ -365,7 +365,7 @@ ${policyMessage}`
                   <button
                     type="button"
                     onClick={() => setPets(Math.max(0, pets - 1))}
-                    className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:border-gray-400 disabled:opacity-50"
+                    className="w-8 h-8 rounded-full border border-border-subtle flex items-center justify-center text-text-muted hover:border-border-strong disabled:opacity-50"
                     disabled={pets <= 0}
                   >
                     <Minus size={16} />
@@ -374,40 +374,41 @@ ${policyMessage}`
                   <button
                     type="button"
                     onClick={() => setPets(pets + 1)}
-                    className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:border-gray-400"
+                    className="w-8 h-8 rounded-full border border-border-subtle flex items-center justify-center text-text-muted hover:border-border-strong"
                   >
                     <Plus size={16} />
                   </button>
                 </div>
               </div>
 
-              <div className="text-sm text-gray-600 pt-2 border-t border-gray-200">
+              <div className="text-sm text-text-muted pt-2 border-t border-border-subtle">
                 This place has a maximum of 2 guests, not including infants. If you're bringing more than 2 pets, please let your Host know.
               </div>
             </div>
           )}
         </div>
 
-        <div className="rounded-lg bg-gray-50 border border-gray-200 p-3 text-sm text-gray-700 space-y-2">
-          <div className="font-semibold text-gray-900">House rules &amp; damages</div>
+        <div className="rounded-lg bg-bg-muted border border-border-subtle p-3 text-sm text-text-muted space-y-2">
+          <div className="font-semibold text-text-primary">House rules &amp; damages</div>
           <p>{inlinePolicySnippets.houseRules} <a className="underline" href="/terms#house-rules">Rules</a></p>
           <p>{inlinePolicySnippets.damages} <a className="underline" href="/terms#damages">Damages</a></p>
         </div>
 
         {/* Reserve Button */}
-        <button
+        <Button
+          type="button"
           onClick={handleSubmit}
           disabled={isLoading || !termsAccepted}
-          className="w-full bg-gradient-to-r from-pink-500 to-red-500 hover:from-pink-600 hover:to-red-600 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          fullWidth
         >
           {isLoading ? 'Sending...' : 'Reserve'}
-        </button>
+        </Button>
 
-        <div className="space-y-2 text-sm text-gray-700">
+        <div className="space-y-2 text-sm text-text-muted">
           <label className="flex items-start gap-2">
             <input
               type="checkbox"
-              className="mt-1 h-4 w-4"
+              className="mt-1 h-4 w-4 accent-accent-primary"
               checked={termsAccepted}
               onChange={(event) => {
                 setTermsAccepted(event.target.checked);
@@ -418,11 +419,11 @@ ${policyMessage}`
               I have read and agree to the <a className="underline" href="/terms">Terms &amp; Conditions</a> and understand the booking policies above.
             </span>
           </label>
-          <p className="text-gray-600">{inlinePolicySnippets.paymentConsent}</p>
-          <p className="text-center text-gray-600">You won't be charged yet</p>
+          <p>{inlinePolicySnippets.paymentConsent}</p>
+          <p className="text-center">You won't be charged yet</p>
         </div>
       </div>
-    </div>
+    </Card>
   );
 };
 

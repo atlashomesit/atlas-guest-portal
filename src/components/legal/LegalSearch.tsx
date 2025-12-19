@@ -7,7 +7,7 @@ interface LegalSearchProps {
 const LegalSearch = ({ value, onChange, placeholder }: LegalSearchProps) => {
   return (
     <div className="space-y-2">
-      <label className="block text-sm font-semibold text-slate-800" htmlFor="legal-search">
+      <label className="block text-sm font-semibold text-text-primary" htmlFor="legal-search">
         Search
       </label>
       <input
@@ -16,7 +16,7 @@ const LegalSearch = ({ value, onChange, placeholder }: LegalSearchProps) => {
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder || "Search policies or FAQs"}
-        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm focus:border-primary focus:outline-none"
+        className="w-full rounded-xl border border-border-subtle bg-bg-surface px-4 py-3 shadow-level1 focus:border-cta-primary focus:outline-none text-text-primary"
       />
     </div>
   );
