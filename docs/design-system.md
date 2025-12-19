@@ -1,6 +1,6 @@
 # Design system foundation
 
-Our design system keeps the UI calm and premium while staying accessible. Tokens live in CSS variables within `src/styles/theme.css` and are mirrored as TypeScript references in `src/styles/theme.ts`. The active theme is applied via a `data-theme` attribute on the document root, so seasonal palettes can override variables without touching component code.
+Our design system keeps the UI calm and premium while staying accessible. Tokens live in CSS variables within `src/styles/themes/*.css` and are mirrored as TypeScript references in `src/styles/theme.ts`. The active theme is applied via a `data-theme` attribute on the document root, so seasonal palettes can override variables without touching component code.
 
 ## Tokens
 
@@ -15,6 +15,13 @@ Our design system keeps the UI calm and premium while staying accessible. Tokens
 - **Shadows:** `--shadow-level-1`, `--shadow-level-2`.
 
 Use the `designTokens` export from `src/styles/theme.ts` when you need the token name in code, and rely on CSS variables directly in styles.
+
+### Theming and registration
+
+- Base tokens that are shared across themes live in `src/styles/themes/base.css`.
+- Theme palettes live in `src/styles/themes/<theme>.css` and are selected via `data-theme="<theme>"` on `<html>`.
+- Register new themes in `themeRegistry` inside `src/styles/theme.ts`; `applyTheme` will validate the key and fall back to the default theme if an unknown value is provided.
+- `src/styles/themes/index.css` imports every registered theme so CSS bundles include their tokens.
 
 ## Shared components
 

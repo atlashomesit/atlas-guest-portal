@@ -1,0 +1,32 @@
+:root[data-theme="christmas"] {
+  /* Surfaces */
+  --bg-primary: #f1f8f3;
+  --bg-surface: #ffffff;
+  --bg-muted: #e4f1e7;
+
+  /* Text */
+  --text-primary: #0f1f12;
+  --text-muted: #3f4f44;
+
+  /* Accent + CTA */
+  --accent-primary: #0f7a4b;
+  --accent-soft: #e5f4ec;
+  --accent-primary-rgb: 15 122 75;
+  --accent-soft-rgb: 229 244 236;
+  --cta-primary: #c0392b;
+  --cta-secondary: #8c1d1d;
+  --cta-primary-rgb: 192 57 43;
+  --cta-secondary-rgb: 140 29 29;
+
+  /* Borders */
+  --border-subtle: #d3e2d7;
+  --border-strong: #9fb5a5;
+
+  /* Status */
+  --support-success: #2d8a5d;
+  --support-danger: #b5473d;
+
+  /* Shadows */
+  --shadow-level-1: 0 10px 30px rgba(15, 31, 18, 0.08);
+  --shadow-level-2: 0 20px 40px rgba(15, 31, 18, 0.12);
+}

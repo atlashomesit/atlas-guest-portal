@@ -1,4 +1,13 @@
-export const DEFAULT_THEME = "default" as const;
+export const themeRegistry = {
+  default: { label: "Default" },
+  valentine: { label: "Valentine" },
+  christmas: { label: "Christmas" },
+  newYear: { label: "New Year" },
+} as const;
+
+export type ThemeName = keyof typeof themeRegistry;
+
+export const DEFAULT_THEME: ThemeName = "default";
 
 export const designTokens = {
   bg: {
@@ -82,10 +91,15 @@ export const designTokens = {
 
 export type DesignTokens = typeof designTokens;
 
-export type ThemeName = typeof DEFAULT_THEME;
+const isRegisteredTheme = (theme: string): theme is ThemeName => {
+  return theme in themeRegistry;
+};
 
-export const applyTheme = (theme: ThemeName = DEFAULT_THEME) => {
+export const availableThemes = Object.keys(themeRegistry) as ThemeName[];
+
+export const applyTheme = (theme: string = DEFAULT_THEME) => {
   if (typeof document === "undefined") return;
 
-  document.documentElement.dataset.theme = theme;
+  const resolvedTheme: ThemeName = isRegisteredTheme(theme) ? theme : DEFAULT_THEME;
+  document.documentElement.dataset.theme = resolvedTheme;
 };
