@@ -44,9 +44,14 @@ Every event includes an `env` field so downstream services can segment traffic a
 | `checkout_start` | Razorpay checkout initialization | `bookingId`, `total`, `nights`, `guests`, identifiers |
 | `payment_success` | Payment success handler | `bookingId`, `paymentId`, `total`, identifiers |
 | `payment_failure` | Payment failure handler | `bookingId`, `reason`, identifiers |
-| `support_whatsapp` | WhatsApp links (floating button, sticky bar, help launcher) | `surface`, identifiers |
-| `support_call` | Phone links (sticky bar, help launcher) | `surface`, identifiers |
-| `support_faq` | FAQ navigation from Help Launcher | `surface`, identifiers |
+| `support_whatsapp` | WhatsApp links (launcher, sticky bar) | `surface`, identifiers |
+| `support_call` | Phone links (launcher, sticky bar) | `surface`, identifiers |
+| `support_faq` | FAQ navigation from Support Launcher | `surface`, identifiers |
+| `chat_opened` | Support launcher expanded | `surface`, identifiers |
+| `chat_message_sent` | User sends a chatbot message | `surface`, `source`, `intent`, `wordCount`, identifiers |
+| `chat_quick_action_clicked` | Quick action chip clicked | `id`, `label`, `surface`, identifiers |
+| `chat_escalated_whatsapp` | Escalation keywords/actions detected | `surface`, `source`, identifiers |
+| `chat_callback_cta_clicked` | Callback CTA opened | `surface`, identifiers |
 
 All events automatically attach:
 
@@ -63,7 +68,7 @@ All events automatically attach:
 - Apartments browse & filter changes (`src/pages/Apartments.tsx`)
 - Property details view (`src/components/homepage_components/homepage_Propertydetails/Homepage_PropertyDetails.tsx`)
 - Booking form interactions (`src/components/homepage_components/hotelBooking_form/HotelBooking_Form.tsx`)
-- Support surfaces (`src/components/support/FloatingWhatsAppButton.tsx`, `SupportStickyBar.tsx`, `HelpLauncher.tsx`)
+- Support surfaces (`src/components/support/SupportLauncher.tsx`, `SupportStickyBar.tsx`)
 
 ### Adding a backend transport
 
