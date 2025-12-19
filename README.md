@@ -69,6 +69,11 @@ Optional tooling:
    npm run preview
    ```
 
+## Theming
+- CSS variables for the active palette are defined per theme in `src/styles/themes/*.css` and loaded globally via `src/styles/themes/index.css`.
+- `applyTheme(themeKey)` in [`src/styles/theme.ts`](src/styles/theme.ts) applies the `data-theme` attribute on `<html>` while falling back to the default when an unknown key is provided.
+- To add a seasonal palette: duplicate `src/styles/themes/default.css` into a new file (for example, `valentine.css`), adjust the variable values, import it in `src/styles/themes/index.css`, and register the key in `themeRegistry` inside `src/styles/theme.ts`. Components do not need refactors because they already consume semantic tokens.
+
 ## Project Map
 | Path | Description |
 | --- | --- |

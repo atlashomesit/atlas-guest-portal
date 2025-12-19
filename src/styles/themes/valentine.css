@@ -1,0 +1,32 @@
+:root[data-theme="valentine"] {
+  /* Surfaces */
+  --bg-primary: #fff1f4;
+  --bg-surface: #ffffff;
+  --bg-muted: #ffe6ed;
+
+  /* Text */
+  --text-primary: #291520;
+  --text-muted: #6b4a5c;
+
+  /* Accent + CTA */
+  --accent-primary: #e05686;
+  --accent-soft: #ffe2ec;
+  --accent-primary-rgb: 224 86 134;
+  --accent-soft-rgb: 255 226 236;
+  --cta-primary: #c2185b;
+  --cta-secondary: #8e2b5c;
+  --cta-primary-rgb: 194 24 91;
+  --cta-secondary-rgb: 142 43 92;
+
+  /* Borders */
+  --border-subtle: #f4cfdc;
+  --border-strong: #e39ab9;
+
+  /* Status */
+  --support-success: #2d8a5d;
+  --support-danger: #b5473d;
+
+  /* Shadows */
+  --shadow-level-1: 0 10px 30px rgba(41, 21, 32, 0.08);
+  --shadow-level-2: 0 20px 40px rgba(41, 21, 32, 0.12);
+}
