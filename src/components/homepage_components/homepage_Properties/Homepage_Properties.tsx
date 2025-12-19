@@ -107,7 +107,7 @@ const Homepage_Properties = () => {
                                     <p className="text-sm text-gray-500">{data.property_location}</p>
                                 </div>
                                 Batch
-                                <span className="absolute z-40 top-5 left-0 bg-[#dc3535] text-white px-3 py-2">
+                                <span className="absolute z-40 top-5 left-0 bg-danger text-[var(--text-contrast)] px-3 py-2">
                                     <h2 className="text-sm tracking-wider font-normal ">{data.property_deal}</h2>
                                 </span>
                             </div>

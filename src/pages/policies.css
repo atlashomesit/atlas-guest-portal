@@ -1,13 +1,13 @@
 .policies-shell {
-  background: #f8fafc;
-  color: #0f172a;
+  background: var(--bg-primary);
+  color: var(--text-primary);
   min-height: 100vh;
 }
 
 .policies-hero {
   padding: 7rem 1.25rem 3rem;
-  background: linear-gradient(135deg, #0f172a 0%, #1f2937 100%);
-  color: #fff;
+  background: linear-gradient(135deg, var(--cta-primary) 0%, var(--cta-secondary) 100%);
+  color: var(--text-contrast);
 }
 
 .policies-hero__content {
@@ -24,7 +24,7 @@
 }
 
 .policies-hero .lead {
-  color: #e2e8f0;
+  color: color-mix(in srgb, var(--text-contrast) 85%, var(--bg-primary) 15%);
   line-height: 1.6;
 }
 
@@ -37,15 +37,15 @@
 .eyebrow {
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #cbd5e1;
+  color: color-mix(in srgb, var(--text-contrast) 70%, transparent);
   font-weight: 700;
   font-size: 0.8rem;
 }
 
 .pill {
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
+  border: 1px solid color-mix(in srgb, var(--text-contrast) 35%, transparent);
+  background: color-mix(in srgb, var(--text-contrast) 15%, transparent);
+  color: var(--text-contrast);
   padding: 0.55rem 1rem;
   border-radius: 999px;
   font-weight: 700;
@@ -55,8 +55,8 @@
 
 .pill:hover,
 .pill:focus-visible {
-  background: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.6);
+  background: color-mix(in srgb, var(--text-contrast) 25%, transparent);
+  border-color: color-mix(in srgb, var(--text-contrast) 55%, transparent);
   outline: none;
 }
 
@@ -74,7 +74,7 @@
 }
 
 .section-heading .muted {
-  color: #475569;
+  color: var(--text-muted);
 }
 
 .toc-grid {
@@ -84,20 +84,20 @@
 }
 
 .toc-card {
-  background: #fff;
-  border: 1px solid #e2e8f0;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
   padding: 1rem 1.1rem;
   border-radius: 14px;
-  color: #0f172a;
+  color: var(--text-primary);
   font-weight: 700;
   text-decoration: none;
   transition: all 0.2s ease;
-  box-shadow: 0 10px 35px rgba(15, 23, 42, 0.05);
+  box-shadow: var(--shadow-level-1);
 }
 
 .toc-card:hover,
 .toc-card:focus-visible {
-  border-color: #0f172a;
+  border-color: var(--border-strong);
   transform: translateY(-2px);
   outline: none;
 }
@@ -111,14 +111,14 @@
 }
 
 .policy-section {
-  background: #fff;
-  border: 1px solid #e2e8f0;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
   border-radius: 16px;
   padding: 1.5rem;
   display: grid;
   gap: 1rem;
   scroll-margin-top: 120px;
-  box-shadow: 0 14px 45px rgba(15, 23, 42, 0.06);
+  box-shadow: var(--shadow-level-2);
 }
 
 .policy-header {
@@ -134,7 +134,7 @@
 }
 
 .policy-copy {
-  color: #334155;
+  color: var(--text-muted);
   line-height: 1.7;
   display: grid;
   gap: 0.75rem;
@@ -148,11 +148,11 @@
 }
 
 .policy-body li strong {
-  color: #0f172a;
+  color: var(--text-primary);
 }
 
 .back-to-top {
-  color: #0f172a;
+  color: var(--text-primary);
   font-weight: 700;
   text-decoration: none;
   width: fit-content;
@@ -174,9 +174,9 @@
   }
 
   .pill {
-    color: #0f172a;
-    background: #e2e8f0;
-    border-color: #cbd5e1;
+    color: var(--text-primary);
+    background: var(--bg-muted);
+    border-color: var(--border-subtle);
   }
 }
 

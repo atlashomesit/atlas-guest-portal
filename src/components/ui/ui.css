@@ -9,7 +9,7 @@
   font-weight: 600;
   font-size: var(--font-size-md);
   border: 1px solid transparent;
-  color: #ffffff;
+  color: var(--text-contrast);
   background: linear-gradient(135deg, var(--cta-primary) 0%, var(--cta-secondary) 100%);
   box-shadow: var(--shadow-level-1);
   transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease;
@@ -23,6 +23,18 @@
 
 .rb-button:active {
   transform: translateY(0);
+  box-shadow: var(--shadow-level-1);
+}
+
+.rb-button:disabled {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--cta-primary) 60%, transparent) 0%,
+    color-mix(in srgb, var(--cta-secondary) 60%, transparent) 100%
+  );
+  color: color-mix(in srgb, var(--text-contrast) 65%, transparent);
+  cursor: not-allowed;
+  box-shadow: none;
 }
 
 .rb-button--secondary {
@@ -46,6 +58,13 @@
 
 .rb-button--ghost:hover {
   background: var(--bg-muted);
+}
+
+.rb-button--secondary:disabled,
+.rb-button--ghost:disabled {
+  background: var(--bg-muted);
+  color: var(--text-muted);
+  border-color: var(--border-subtle);
 }
 
 .rb-button--block {
@@ -81,6 +100,13 @@
 .rb-input:focus-visible {
   border-color: var(--accent-primary);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary) 20%, transparent);
+}
+
+.rb-input:disabled {
+  background-color: var(--bg-muted);
+  color: var(--text-muted);
+  border-color: var(--border-subtle);
+  cursor: not-allowed;
 }
 
 .rb-card {

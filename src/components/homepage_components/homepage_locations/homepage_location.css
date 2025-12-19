@@ -1,16 +1,11 @@
 .custom-swiper .swiper-scrollbar {
-    background: rgba(255, 255, 255, 0.3);
-    /* Track color */
+    background: color-mix(in srgb, var(--text-contrast) 30%, transparent);
     height: 4px;
-    /* Thickness */
     border-radius: 4px;
-    /* Rounded edges */
 }
 
 .custom-swiper .swiper-scrollbar-drag {
-    background: #ffffff;
-    /* Draggable bar color */
-    /* border-radius: 4px; */
+    background: var(--text-contrast);
 }
 
 
@@ -78,10 +73,10 @@
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.8);
+  background: color-mix(in srgb, var(--text-contrast) 80%, transparent);
   border: none;
 }
 
 .slick-dots-custom li.slick-active button {
-  background: #fff;
+  background: var(--text-contrast);
 }
