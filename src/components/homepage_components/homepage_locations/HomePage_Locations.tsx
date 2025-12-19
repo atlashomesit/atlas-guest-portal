@@ -159,9 +159,9 @@ const HomePage_Locations = ({ listings = LISTINGS }: HomePageLocationsProps) => 
     const visibleDots = 4;
 
     const getVisibleDots = () => {
-      let start = Math.max(current - Math.floor(visibleDots / 2), 0);
-      if (start + visibleDots > totalDots) start = totalDots - visibleDots;
-      return Array.from({ length: visibleDots }, (_, i) => start + i);
+      let start = Math.max(current - Math.floor(visibleDots - 1) / 2, 0);
+      if (start + (visibleDots-1) > totalDots) start = totalDots - (visibleDots-1);
+      return Array.from({ length: visibleDots - 1 }, (_, i) => start + i);
     };
 
     return (
@@ -189,7 +189,7 @@ const HomePage_Locations = ({ listings = LISTINGS }: HomePageLocationsProps) => 
           <NextArrow className="absolute right-2 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-300" onClick={() => sliderRef.current?.slickNext()} />
 
           {/* Custom dots overlay */}
-          <div className="absolute bottom-3 left-1/2 transform -translate-x-1/2 z-[var(--z-overlay)] flex gap-2">
+          <div className="absolute bottom-3 left-1/2 transform -translate-x-1/2 z-[var(--z-overlay)] flex gap-2 items-center">
             {getVisibleDots().map((idx) => (
               <button
                 key={idx}
@@ -202,6 +202,16 @@ const HomePage_Locations = ({ listings = LISTINGS }: HomePageLocationsProps) => 
                 }}
               ></button>
             ))}
+            <button
+  className="w-6 h-6 flex items-center justify-center text-white"
+  onClick={(e) => {
+    e.stopPropagation();
+    sliderRef.current?.slickPlay();
+  }}
+>
+  ▶
+</button>
+
           </div>
         </div>
 
