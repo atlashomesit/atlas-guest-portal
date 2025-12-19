@@ -1,8 +1,8 @@
 /* Custom Swiper Arrows */
 .swiper-button-next,
 .swiper-button-prev {
-    color: #ffffff !important;  /* White color */
-    background: rgba(0, 0, 0, 0.5); /* Semi-transparent black background */
+    color: var(--text-contrast) !important;
+    background: color-mix(in srgb, var(--text-primary) 50%, transparent);
     padding: 10px;
     border-radius: 50%;
     width: 40px;

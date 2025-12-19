@@ -90,8 +90,8 @@ const SupportStickyBar = () => {
       className="fixed inset-x-4 md:inset-x-auto md:right-6 md:left-auto z-30"
       style={{ bottom: bottomSpacing }}
     >
-      <div className="flex flex-col items-stretch gap-3 rounded-2xl bg-white px-4 py-3 shadow-2xl ring-1 ring-black/5 md:flex-row md:items-center md:gap-4">
-        <div className="text-center text-sm font-semibold text-gray-900 md:text-left md:text-base">
+      <div className="flex flex-col items-stretch gap-3 rounded-2xl bg-bg-surface px-4 py-3 shadow-level2 ring-1 ring-border-subtle md:flex-row md:items-center md:gap-4">
+        <div className="text-center text-sm font-semibold text-text-primary md:text-left md:text-base">
           Need help booking?
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3 md:ml-auto md:flex-row">
@@ -106,7 +106,7 @@ const SupportStickyBar = () => {
                 { route: location.pathname, unitCode: matchPropertyDetails?.params?.id },
               )
             }
-            className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#25D366] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#1DA851] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#128C7E] sm:w-auto"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-success px-4 py-2 text-sm font-semibold text-[var(--text-contrast)] transition hover:bg-[color-mix(in_srgb,var(--support-success)_85%,transparent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-success shadow-level1 sm:w-auto"
           >
             <FaWhatsapp aria-hidden="true" className="text-lg" />
             WhatsApp
@@ -120,7 +120,7 @@ const SupportStickyBar = () => {
                 { route: location.pathname, unitCode: matchPropertyDetails?.params?.id },
               )
             }
-            className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-900 shadow-sm transition hover:border-gray-300 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black sm:w-auto"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-border-subtle bg-bg-surface px-4 py-2 text-sm font-semibold text-text-primary shadow-level1 transition hover:border-border-strong hover:bg-bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-strong sm:w-auto"
           >
             <FiPhone aria-hidden="true" className="text-lg" />
             Call us

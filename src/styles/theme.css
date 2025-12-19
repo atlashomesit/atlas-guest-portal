@@ -12,6 +12,7 @@
   --line-height-tight: 1.2;
   --line-height-snug: 1.35;
   --line-height-relaxed: 1.6;
+  --text-contrast: #ffffff;
 
   /* Spacing */
   --space-1: 0.25rem;

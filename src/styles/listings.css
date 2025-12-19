@@ -7,9 +7,9 @@
 .card {
   position: relative;
   overflow: hidden;
-  border-radius: 12px;
-  box-shadow: 0 2px 10px rgba(0,0,0,.08);
-  background: #fff;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-level-1);
+  background: var(--bg-surface);
   display: flex;
   flex-direction: column;
 }

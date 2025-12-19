@@ -112,7 +112,7 @@ const Navbar = () => {
           {/* More dropdown */}
           <div className={`dropdown relative ${isMoreOpen ? 'open' : ''}`}>
             <button
-              className="dropdown-button hover:text-white"
+              className="dropdown-button hover:text-[var(--text-contrast)]"
               onClick={() => setIsMoreOpen(!isMoreOpen)}
             >
               More
@@ -122,7 +122,7 @@ const Navbar = () => {
                 <NavLink
                   key={item.label}
                   to={item.to}
-                  className="block px-4 pt-2 pb-0 text-sm text-[#1f2937] hover:bg-slate-50 hover:text-white transition-colors"
+                  className="block px-4 pt-2 pb-0 text-sm text-text-primary hover:bg-bg-muted hover:text-[var(--text-primary)] transition-colors"
                 >
                   {item.label}
                 </NavLink>
@@ -152,7 +152,7 @@ const Navbar = () => {
           {/* Apartments */}
           <button
             onClick={() => setIsApartmentsOpen(!isApartmentsOpen)}
-            className="block py-2 font-semibold text-[#1f2937] hover:text-white transition-colors"
+            className="block py-2 font-semibold text-text-primary hover:text-[var(--text-contrast)] transition-colors"
           >
             Apartments
           </button>
@@ -175,7 +175,7 @@ const Navbar = () => {
           {/* More */}
           <button
             onClick={() => setIsMoreOpen(!isMoreOpen)}
-            className="block py-2 font-semibold text-[#1f2937] hover:text-white transition-colors"
+            className="block py-2 font-semibold text-text-primary hover:text-[var(--text-contrast)] transition-colors"
           >
             More
           </button>
@@ -186,7 +186,7 @@ const Navbar = () => {
                   key={item.label}
                   to={item.to}
                   onClick={closeMobile}
-                  className="block py-1 text-[#1f2937] hover:text-white transition-colors"
+                  className="block py-1 text-text-primary hover:text-[var(--text-contrast)] transition-colors"
                 >
                   {item.label}
                 </NavLink>
@@ -198,7 +198,7 @@ const Navbar = () => {
           <div className="mt-2 flex flex-col gap-2">
             <a
               href={telLink}
-              className="phone flex items-center gap-2 font-semibold text-[#1f2937] hover:text-white transition-colors"
+              className="phone flex items-center gap-2 font-semibold text-text-primary hover:text-[var(--text-contrast)] transition-colors"
             >
               <IoIosCall className="text-lg" />
               <span>{formatDisplayNumber()}</span>

@@ -25,12 +25,6 @@ body::-webkit-scrollbar {
   /* Hides the scrollbar */
 }
 
-:root {
-  --primary-background-color: #fff;
-  --secondary-background-color: #f8f8f8;
-  /* --primary-color: #fc9d2c; */
-  --primary-color: #b48530;
-}
 .floating-whatsapp {
   left: 1rem;
   bottom: calc(5rem + env(safe-area-inset-bottom, 0px));

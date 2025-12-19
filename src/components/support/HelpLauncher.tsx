@@ -132,24 +132,24 @@ const HelpLauncher = () => {
                         { route: location.pathname },
                       )
                     }
-                    className="group flex items-start gap-3 rounded-xl px-3 py-2 transition-colors duration-150 hover:bg-gray-50 focus-visible:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b48530]"
+                    className="group flex items-start gap-3 rounded-xl px-3 py-2 transition-colors duration-150 hover:bg-bg-muted focus-visible:bg-bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary"
                   >
-                    <span className="mt-0.5 text-lg text-[#b48530]">{link.icon}</span>
+                    <span className="mt-0.5 text-lg text-primary">{link.icon}</span>
                     <span className="flex flex-col leading-tight">
                       <span className="font-semibold">{link.label}</span>
-                      <span className="text-xs text-gray-600">{link.description}</span>
+                      <span className="text-xs text-text-muted">{link.description}</span>
                     </span>
                   </a>
                 ) : (
                   <button
                     type="button"
                     onClick={link.onClick}
-                    className="group flex w-full items-start gap-3 rounded-xl px-3 py-2 transition-colors duration-150 hover:bg-gray-50 focus-visible:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b48530]"
+                    className="group flex w-full items-start gap-3 rounded-xl px-3 py-2 transition-colors duration-150 hover:bg-bg-muted focus-visible:bg-bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary"
                   >
-                    <span className="mt-0.5 text-lg text-[#b48530]">{link.icon}</span>
+                    <span className="mt-0.5 text-lg text-primary">{link.icon}</span>
                     <span className="flex flex-col items-start leading-tight">
                       <span className="font-semibold">{link.label}</span>
-                      <span className="text-xs text-gray-600">{link.description}</span>
+                      <span className="text-xs text-text-muted">{link.description}</span>
                     </span>
                   </button>
                 )}
@@ -160,18 +160,18 @@ const HelpLauncher = () => {
 
         <button
           type="button"
-          className="flex items-center gap-3 rounded-full bg-[#b48530] px-4 py-3 text-white shadow-2xl transition-transform duration-200 hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a5a1f]"
+          className="flex items-center gap-3 rounded-full bg-cta-primary px-4 py-3 text-[var(--text-contrast)] shadow-level2 transition-transform duration-200 hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
           aria-expanded={isOpen}
           aria-controls={PANEL_ID}
           aria-label={isOpen ? "Hide help options" : "Show help options"}
           onClick={() => setIsOpen((prev) => !prev)}
         >
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-lg">
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--text-contrast)_20%,transparent)] text-lg">
             <FaQuestionCircle aria-hidden="true" />
           </span>
           <span className="flex flex-col text-left leading-tight">
             <span className="text-sm font-semibold">Need help?</span>
-            <span className="text-[11px] text-white/90">Chat, call, or browse FAQs</span>
+            <span className="text-[11px] text-[color-mix(in_srgb,var(--text-contrast)_90%,transparent)]">Chat, call, or browse FAQs</span>
           </span>
           <span className="text-sm" aria-hidden="true">
             {isOpen ? "−" : "+"}
