@@ -76,9 +76,9 @@
 
 /* Logo text */
 .navbar-logo-text {
-  font-weight: bold;
+  font-weight: 700;
   font-size: 1.125rem;
-  color: var(--text-contrast);
+  color: var(--brand-ink);
   display: none;
 }
 
