@@ -15,6 +15,8 @@ import { getUnitPolicy } from '../../../config/policyConfig';
 import { inlinePolicySnippets } from '../../../content/terms';
 import Subheading from '../../commonComponents/subheading/Subheading';
 import HotelBooking_Form from '../hotelBooking_form/HotelBooking_Form';
+import { trackEvent } from '../../../utils/analytics';
+import { Button } from '../../ui/Button';
 
 import { Fancybox } from "@fancyapps/ui";
 import "@fancyapps/ui/dist/fancybox/fancybox.css";
@@ -127,6 +129,20 @@ const PropertyDetails = () => {
         };
     }, [data]);
 
+    useEffect(() => {
+        if (!data) return;
+
+        trackEvent(
+            'listing_view',
+            {
+                surface: 'property_details',
+                propertyName: data.property_name,
+                price: data.property_price,
+            },
+            { listingId: data.id, unitCode: data.id, route: location.pathname },
+        );
+    }, [data, location.pathname]);
+
     const renderIcon = (iconName: string) => {
         const name = iconName.toLowerCase();
         if (name.includes('bed')) return <FaBed />;
@@ -155,14 +171,14 @@ const PropertyDetails = () => {
         return (
             <div className="min-h-screen flex items-center justify-center">
                 <div className="text-center">
-                    <div className="text-2xl font-semibold text-gray-700 mb-4">Loading property details...</div>
-                    <div className="text-gray-500">If this takes too long, the property may not exist or there might be a connection issue.</div>
-                    <button 
+                    <div className="text-2xl font-semibold text-text-primary mb-4">Loading property details...</div>
+                    <div className="text-text-muted">If this takes too long, the property may not exist or there might be a connection issue.</div>
+                    <Button 
                         onClick={() => window.history.back()}
-                        className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                        className="mt-4"
                     >
                         Go Back
-                    </button>
+                    </Button>
                 </div>
             </div>
         );
@@ -180,19 +196,19 @@ const PropertyDetails = () => {
             <div className="max-w-[85rem] flex flex-col gap-10 mx-auto px-4 sm:px-8 lg:px-16 py-8">
                 {/* Property Header */}
                 <div className="">
-                    <h1 className="text-2xl sm:text-3xl font-semibold mb-2 capitalize">{data.property_name}</h1>
-                    <div className="flex items-center text-gray-600">
+                    <h1 className="text-2xl sm:text-3xl font-semibold mb-2 capitalize text-text-primary">{data.property_name}</h1>
+                    <div className="flex items-center text-text-muted">
                         <FaLocationDot className="mr-2 text-sm" />
                         <span className="text-sm sm:text-base">{data.property_location}</span>
                     </div>
-                    <div className="mt-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3 text-sm text-gray-700">
-                        <div className="flex items-center gap-2 font-semibold text-gray-900">
-                            <FaStar className="text-amber-500" />
+                    <div className="mt-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3 text-sm text-text-muted">
+                        <div className="flex items-center gap-2 font-semibold text-text-primary">
+                            <FaStar className="text-accent-primary" />
                             <span>{data.property_rating.toFixed(2)}</span>
-                            <span className="text-gray-600">• {data.property_reviews} reviews</span>
+                            <span className="text-text-muted">• {data.property_reviews} reviews</span>
                         </div>
                         {data.property_review_snippets?.[0] && (
-                            <p className="sm:pl-3 sm:border-l sm:border-gray-200 sm:ml-3 text-gray-600 italic">
+                            <p className="sm:pl-3 sm:border-l sm:border-border-subtle sm:ml-3 text-text-muted italic">
                                 “{data.property_review_snippets[0]}”
                             </p>
                         )}
@@ -247,7 +263,7 @@ const PropertyDetails = () => {
                 }))
               );
             }}
-            className="absolute bottom-2 right-2 bg-black/60 text-white text-xs md:text-sm px-3 py-1 rounded-full flex items-center gap-2 hover:bg-black/80 transition"
+            className="absolute bottom-2 right-2 bg-[color:color-mix(in_srgb,var(--text-primary)_65%,transparent)] text-[var(--text-contrast)] text-xs md:text-sm px-3 py-1 rounded-full flex items-center gap-2 hover:bg-[color:color-mix(in_srgb,var(--text-primary)_80%,transparent)] transition"
           >
             All photos
           </button>
@@ -263,16 +279,16 @@ const PropertyDetails = () => {
                     {/* Left div  */}
                     <div className="w-full sm:w-2/3">
                         {/* About this place */}
-                        <div className=" pb-8 border-b">
-                            <h2 className="text-xl sm:text-2xl font-semibold mb-4">About this place</h2>
-                            <p className="text-gray-700 leading-relaxed text-justify">
+                        <div className="pb-8 border-b border-border-subtle">
+                            <h2 className="text-xl sm:text-2xl font-semibold mb-4 text-text-primary">About this place</h2>
+                            <p className="text-text-muted leading-relaxed text-justify">
                                 {showAboutMore
                                     ? data.property_description
                                     : `${data.property_description.slice(0, 200)}...`}
                             </p>
                             <button
                                 onClick={() => setShowAboutMore(!showAboutMore)}
-                                className="flex items-center mt-3 font-semibold underline hover:text-gray-700 transition"
+                                className="flex items-center mt-3 font-semibold underline hover:text-text-primary transition"
                             >
                                 Show {showAboutMore ? 'Less' : 'More'}
                                 <ChevronRight className={`ml-1 w-4 h-4 transition-transform ${showAboutMore ? 'rotate-90' : ''}`} />
@@ -280,14 +296,14 @@ const PropertyDetails = () => {
                         </div>
 
                         {/* About neighborhood */}
-                        <div className=" pb-8 border-b">
-                            <h2 className="text-xl sm:text-2xl font-semibold mb-4">About neighborhood</h2>
-                            <p className="text-gray-700 leading-relaxed mb-2">
+                        <div className="pb-8 border-b border-border-subtle">
+                            <h2 className="text-xl sm:text-2xl font-semibold mb-4 text-text-primary">About neighborhood</h2>
+                            <p className="text-text-muted leading-relaxed mb-2">
                                 Location & Neighborhood Located in {data.property_location}, this property offers easy access to major attractions and landmarks in the area.
                             </p>
                             {showNeighborhoodMore && (
-                                <div className="text-gray-700 leading-relaxed mt-3">
-                                    <p className="mb-2 font-medium">Nearby places include:</p>
+                                <div className="text-text-muted leading-relaxed mt-3">
+                                    <p className="mb-2 font-medium text-text-primary">Nearby places include:</p>
                                     <ul className="list-disc list-inside space-y-1 ml-2">
                                         {data.property_nearplaces.slice(0, 10).map((place, idx) => (
                                             <li key={idx}>{place}</li>
@@ -297,7 +313,7 @@ const PropertyDetails = () => {
                             )}
                             <button
                                 onClick={() => setShowNeighborhoodMore(!showNeighborhoodMore)}
-                                className="flex items-center mt-3 font-semibold underline hover:text-gray-700 transition"
+                                className="flex items-center mt-3 font-semibold underline hover:text-text-primary transition"
                             >
                                 Show {showNeighborhoodMore ? 'Less' : 'More'}
                                 <ChevronRight className={`ml-1 w-4 h-4 transition-transform ${showNeighborhoodMore ? 'rotate-90' : ''}`} />
@@ -305,28 +321,29 @@ const PropertyDetails = () => {
                         </div>
 
                         {/* What this place offers */}
-                        <div className=" pb-8 border-b">
-                            <h2 className="text-xl sm:text-2xl font-semibold mb-6">What this place offers</h2>
+                        <div className="pb-8 border-b border-border-subtle">
+                            <h2 className="text-xl sm:text-2xl font-semibold mb-6 text-text-primary">What this place offers</h2>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                                 {data.property_amenities.slice(0, 6).map((amenity, idx) => (
                                     <div key={idx} className="flex items-center gap-3 sm:gap-4">
-                                        <span className="text-xl sm:text-2xl text-gray-700">{renderIcon(amenity.amenities_icon)}</span>
-                                        <span className="text-gray-800 text-sm sm:text-base">{formatAmenityName(amenity.amenities_icon)}</span>
+                                        <span className="text-xl sm:text-2xl text-text-primary">{renderIcon(amenity.amenities_icon)}</span>
+                                        <span className="text-text-primary text-sm sm:text-base">{formatAmenityName(amenity.amenities_icon)}</span>
                                     </div>
                                 ))}
                             </div>
-                            <button
+                            <Button
+                                variant="secondary"
                                 onClick={() => setShowAmenitiesModal(true)}
-                                className="mt-6 px-6 py-3 border-2 border-black rounded-lg font-semibold hover:bg-gray-50 transition text-sm sm:text-base"
+                                className="mt-6"
                             >
                                 Show All Amenities
-                            </button>
+                            </Button>
                         </div>
 
                         {/* Location Map */}
                         <div className="">
-                            <h2 className="text-xl sm:text-2xl font-semibold mb-4">Where you'll be</h2>
-                            <div className="rounded-lg overflow-hidden border">
+                            <h2 className="text-xl sm:text-2xl font-semibold mb-4 text-text-primary">Where you'll be</h2>
+                            <div className="rounded-lg overflow-hidden border border-border-subtle">
                                 <iframe
                                     src={data.property_mapSrc}
                                     className="w-full h-64 sm:h-96"
@@ -335,24 +352,24 @@ const PropertyDetails = () => {
                                     referrerPolicy="no-referrer-when-downgrade"
                                 ></iframe>
                             </div>
-                            <p className="mt-4 text-gray-700 text-sm sm:text-base">{data.property_location}</p>
+                            <p className="mt-4 text-text-muted text-sm sm:text-base">{data.property_location}</p>
                         </div>
 
                         {/* Policies Section */}
                         {data.property_policy_details && (
-                            <div className=" border rounded-lg overflow-hidden shadow-sm">
-                                <div className="bg-white p-6">
-                                    <h2 className="text-xl sm:text-2xl font-semibold mb-6">Things to know</h2>
+                            <div className="border border-border-subtle rounded-lg overflow-hidden shadow-level1 bg-bg-surface">
+                                <div className="bg-bg-surface p-6">
+                                    <h2 className="text-xl sm:text-2xl font-semibold mb-6 text-text-primary">Things to know</h2>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-                                        <div className="p-4 border rounded-lg bg-gray-50">
-                                            <p className="text-gray-600 text-sm mb-1">Check-in / Check-out</p>
-                                            <p className="font-medium text-gray-900">Check-in {unitPolicy.checkIn} · Check-out {unitPolicy.checkOut}</p>
-                                            <a className="text-sm text-indigo-700 underline" href="/terms#check-in-check-out">View terms</a>
+                                        <div className="p-4 border border-border-subtle rounded-lg bg-bg-muted">
+                                            <p className="text-text-muted text-sm mb-1">Check-in / Check-out</p>
+                                            <p className="font-medium text-text-primary">Check-in {unitPolicy.checkIn} · Check-out {unitPolicy.checkOut}</p>
+                                            <a className="text-sm text-accent-primary underline" href="/terms#check-in-check-out">View terms</a>
                                         </div>
-                                        <div className="p-4 border rounded-lg bg-gray-50">
-                                            <p className="text-gray-600 text-sm mb-1">Key policies</p>
-                                            <p className="font-medium text-gray-900">{inlinePolicySnippets.cancellation}</p>
-                                            <p className="text-gray-800 mt-2 text-sm">{inlinePolicySnippets.houseRules}</p>
+                                        <div className="p-4 border border-border-subtle rounded-lg bg-bg-muted">
+                                            <p className="text-text-muted text-sm mb-1">Key policies</p>
+                                            <p className="font-medium text-text-primary">{inlinePolicySnippets.cancellation}</p>
+                                            <p className="text-text-primary mt-2 text-sm">{inlinePolicySnippets.houseRules}</p>
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -360,8 +377,8 @@ const PropertyDetails = () => {
                                             .filter(policy => !policy.type.includes('Policy') && !policy.type.includes('Detailed'))
                                             .map((policy, idx) => (
                                                 <div key={idx}>
-                                                    <p className="text-gray-600 text-sm mb-1">{policy.type}</p>
-                                                    <p className="font-medium text-gray-900">{policy.value}</p>
+                                                    <p className="text-text-muted text-sm mb-1">{policy.type}</p>
+                                                    <p className="font-medium text-text-primary">{policy.value}</p>
                                                 </div>
                                             ))}
                                     </div>
@@ -372,23 +389,23 @@ const PropertyDetails = () => {
                     {/* right div  */}
                     <div className="w-full sm:w-1/3">
                         <div className='hidden lg:block sticky top-16'>
-                            <HotelBooking_Form propertyId={data.id} />
+                            <HotelBooking_Form propertyId={data.id} supportPadding />
                         </div>
                         <div className="lg:hidden">
-                            <HotelBooking_Form propertyId={data.id} />
+                            <HotelBooking_Form propertyId={data.id} supportPadding />
                         </div>
                     </div>
                 </div>
 
                 {/* Amenities Modal */}
                 {showAmenitiesModal && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-                        <div className="bg-white rounded-lg max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-                            <div className="flex items-center justify-between p-6 border-b">
-                                <h3 className="text-xl sm:text-2xl font-semibold">All Amenities</h3>
+                    <div className="fixed inset-0 bg-[color:color-mix(in_srgb,var(--text-primary)_70%,transparent)] z-[var(--z-modal)] flex items-center justify-center p-4">
+                        <div className="bg-bg-surface rounded-lg max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-border-subtle shadow-level2">
+                            <div className="flex items-center justify-between p-6 border-b border-border-subtle">
+                                <h3 className="text-xl sm:text-2xl font-semibold text-text-primary">All Amenities</h3>
                                 <button
                                     onClick={() => setShowAmenitiesModal(false)}
-                                    className="p-2 hover:bg-gray-100 rounded-full transition"
+                                    className="p-2 hover:bg-bg-muted rounded-full transition"
                                 >
                                     <X className="w-5 h-5 sm:w-6 sm:h-6" />
                                 </button>
@@ -398,20 +415,21 @@ const PropertyDetails = () => {
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                                     {data.property_amenities.map((amenity, idx) => (
                                         <div key={idx} className="flex items-center gap-3 sm:gap-4">
-                                            <span className="text-xl sm:text-2xl text-gray-700">{renderIcon(amenity.amenities_icon)}</span>
-                                            <span className="text-gray-800 text-sm sm:text-base">{formatAmenityName(amenity.amenities_icon)}</span>
+                                            <span className="text-xl sm:text-2xl text-text-primary">{renderIcon(amenity.amenities_icon)}</span>
+                                            <span className="text-text-primary text-sm sm:text-base">{formatAmenityName(amenity.amenities_icon)}</span>
                                         </div>
                                     ))}
                                 </div>
                             </div>
 
-                            <div className="p-6 border-t">
-                                <button
+                            <div className="p-6 border-t border-border-subtle">
+                                <Button
                                     onClick={() => setShowAmenitiesModal(false)}
-                                    className="w-full px-6 py-3 bg-black text-white rounded-lg font-semibold hover:bg-gray-800 transition"
+                                    fullWidth
+                                    variant="secondary"
                                 >
                                     Close
-                                </button>
+                                </Button>
                             </div>
                         </div>
                     </div>

@@ -45,15 +45,15 @@ const ShortLinkRedirect = () => {
 
     if (!normalizedCode || !targetUrl) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-slate-50 px-6">
-                <div className="max-w-md w-full bg-white shadow-lg rounded-lg p-8 text-center">
-                    <h1 className="text-2xl font-semibold text-slate-900 mb-4">Link not found</h1>
-                    <p className="text-slate-600 mb-6">
+            <div className="min-h-screen flex items-center justify-center bg-bg-muted px-6">
+                <div className="max-w-md w-full bg-bg-surface shadow-level2 rounded-lg p-8 text-center">
+                    <h1 className="text-2xl font-semibold text-text-primary mb-4">Link not found</h1>
+                    <p className="text-text-muted mb-6">
                         We couldn't find the short link you're looking for. Please return to the homepage and try again.
                     </p>
                     <Link
                         to="/"
-                        className="inline-flex items-center justify-center px-4 py-2 rounded-md bg-slate-900 text-white hover:bg-slate-800 transition-colors"
+                        className="inline-flex items-center justify-center px-4 py-2 rounded-md bg-cta-primary text-[var(--text-contrast)] hover:bg-cta-secondary transition-colors shadow-level1"
                     >
                         Go to Home
                     </Link>
@@ -65,17 +65,17 @@ const ShortLinkRedirect = () => {
     const label = normalizedCode === "penthouse" ? "Penthouse 501" : `Room ${normalizedCode.toUpperCase()}`;
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-slate-50 px-6">
-            <div className="max-w-md w-full bg-white shadow-lg rounded-lg p-8 text-center space-y-4">
+        <div className="min-h-screen flex items-center justify-center bg-bg-muted px-6">
+            <div className="max-w-md w-full bg-bg-surface shadow-level2 rounded-lg p-8 text-center space-y-4">
                 <div className="flex justify-center">
-                    <div className="h-12 w-12 rounded-full border-4 border-slate-200 border-t-slate-900 animate-spin" aria-hidden="true" />
+                    <div className="h-12 w-12 rounded-full border-4 border-border-subtle border-t-primary animate-spin" aria-hidden="true" />
                 </div>
-                <h1 className="text-2xl font-semibold text-slate-900">Taking you to Atlas Homes {label}…</h1>
-                <p className="text-slate-600 break-words">{targetUrl}</p>
+                <h1 className="text-2xl font-semibold text-text-primary">Taking you to Atlas Homes {label}…</h1>
+                <p className="text-text-muted break-words">{targetUrl}</p>
                 <button
                     type="button"
                     onClick={() => window.location.replace(targetUrl)}
-                    className="w-full inline-flex items-center justify-center px-4 py-2 rounded-md bg-slate-900 text-white hover:bg-slate-800 transition-colors"
+                    className="w-full inline-flex items-center justify-center px-4 py-2 rounded-md bg-cta-primary text-[var(--text-contrast)] hover:bg-cta-secondary transition-colors shadow-level1"
                 >
                     Continue
                 </button>

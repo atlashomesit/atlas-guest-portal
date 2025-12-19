@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import './navbar.css';
 import { IoIosCall } from 'react-icons/io';
+import { FaWhatsapp } from 'react-icons/fa';
 import { buildWaLink } from '../../../utils/whatsapp';
 import { sanitizeItems, getItemKey } from '../../../utils/sanitizeItems';
 import { primaryNav, moreNav, ctaNav } from '../../../config/navigation';
 import { LOGO_URL } from '../../../config/branding';
-import { CONTACT, formatDisplayNumber } from '../../../config/contact';
+import { CONTACT, formatDisplayNumber, getTelLink } from '../../../config/contact';
 import { propertyData } from '../../../data';
 
 const Navbar = () => {
@@ -20,6 +21,7 @@ const Navbar = () => {
     phoneE164: CONTACT.business.whatsapp,
     text: "Hi Atlas Homestays 👋 I'd like to learn more about booking a stay.",
   });
+  const telLink = getTelLink();
 
   useEffect(() => {
     const onLoadfunction = () => {
@@ -48,79 +50,97 @@ const Navbar = () => {
 
   return (
     <section className="navbar-container" id="navbar_container">
-
-      {/* LEFT: Logo + Name */}
-      <div className="navbar-left flex items-center justify-between w-full md:w-auto">
-        <Link to="/" className="flex items-center gap-2">
-          <img className="navbar-logo" src={LOGO_URL} alt="Atlas Homestays logo" />
-          <span className="navbar-logo-text">Atlas Homestays</span>
-        </Link>
-
-        {/* Mobile hamburger */}
-        <button
-          className="mobile-menu-button md:hidden"
-          onClick={() => setIsMenuOpen(!isMenuOpen)}
+      <div className="navbar-top-strip">
+        <a className="top-strip-link" href={telLink}>
+          <IoIosCall aria-hidden="true" />
+          <span>Call us: {formatDisplayNumber()}</span>
+        </a>
+        <a
+          className="top-strip-link"
+          href={whatsappLink}
+          target="_blank"
+          rel="noopener noreferrer"
         >
-          ☰
-        </button>
+          <FaWhatsapp aria-hidden="true" />
+          <span>WhatsApp</span>
+        </a>
       </div>
 
-      {/* CENTER: Desktop Menu */}
-      <div className="navbar-center hidden md:flex gap-2">
-        <NavLink to="/" className={navLinkClass}>Home</NavLink>
+      <div className="navbar-main">
+        {/* LEFT: Logo + Name */}
+        <div className="navbar-left flex items-center justify-between w-full md:w-auto">
+          <Link to="/" className="flex items-center gap-2">
+            <img className="navbar-logo" src={LOGO_URL} alt="Atlas Homestays logo" />
+            <span className="navbar-logo-text">Atlas Homestays</span>
+          </Link>
 
-        {primaryNav.filter(i => !i.hidden).map(item =>
-          item.label === 'Apartments' ? (
-            <div key={item.label} className="dropdown relative">
-              <button className="dropdown-button">{item.label}</button>
-              <div className="dropdown-menu">
-                <NavLink to={item.to}>Apartments Overview</NavLink>
-                {apartments.map((apt, index) => (
-                  <NavLink
-                    key={getItemKey(apt, index)}
-                    to={`/property_details/${apt.id ?? apt.listingId ?? getItemKey(apt, index)}`}
-                  >
-                    {apt.property_name || apt.title || `Property ${index + 1}`}
-                  </NavLink>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <NavLink key={item.label} to={item.to} className={navLinkClass}>{item.label}</NavLink>
-          )
-        )}
-
-        {/* More dropdown */}
-        <div className={`dropdown relative ${isMoreOpen ? 'open' : ''}`}>
+          {/* Mobile hamburger */}
           <button
-            className="dropdown-button hover:text-white"
-            onClick={() => setIsMoreOpen(!isMoreOpen)}
+            className="mobile-menu-button md:hidden"
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
+            aria-label={`${isMenuOpen ? 'Close' : 'Open'} navigation menu`}
           >
-            More
+            ☰
           </button>
-          <div className="dropdown-menu">
-            {moreNav.map((item) => (
-              <NavLink
-                key={item.label}
-                to={item.to}
-                className="block px-4 pt-2 pb-0 text-sm text-[#1f2937] hover:bg-slate-50 hover:text-white transition-colors"
-              >
-                {item.label}
-              </NavLink>
-            ))}
+        </div>
+
+        {/* CENTER: Desktop Menu */}
+        <div className="navbar-center hidden md:flex gap-2">
+          <NavLink to="/" className={navLinkClass}>Home</NavLink>
+
+          {primaryNav.filter(i => !i.hidden).map(item =>
+            item.label === 'Apartments' ? (
+              <div key={item.label} className="dropdown relative">
+                <button className="dropdown-button">{item.label}</button>
+                <div className="dropdown-menu">
+                  <NavLink to={item.to}>Apartments Overview</NavLink>
+                  {apartments.map((apt, index) => (
+                    <NavLink
+                      key={getItemKey(apt, index)}
+                      to={`/property_details/${apt.id ?? apt.listingId ?? getItemKey(apt, index)}`}
+                    >
+                      {apt.property_name || apt.title || `Property ${index + 1}`}
+                    </NavLink>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <NavLink key={item.label} to={item.to} className={navLinkClass}>{item.label}</NavLink>
+            )
+          )}
+
+          {/* More dropdown */}
+          <div className={`dropdown relative ${isMoreOpen ? 'open' : ''}`}>
+            <button
+              className="dropdown-button hover:text-[var(--text-contrast)]"
+              onClick={() => setIsMoreOpen(!isMoreOpen)}
+            >
+              More
+            </button>
+            <div className="dropdown-menu">
+              {moreNav.map((item) => (
+                <NavLink
+                  key={item.label}
+                  to={item.to}
+                  className="block px-4 pt-2 pb-0 text-sm text-text-primary hover:bg-bg-muted hover:text-[var(--text-primary)] transition-colors"
+                >
+                  {item.label}
+                </NavLink>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* RIGHT: Desktop Phone + Book Now */}
-      <div className="navbar-right hidden md:flex gap-2">
-        <div className="phone">
-          <IoIosCall className="text-lg md:text-xl" />
-          <span>{formatDisplayNumber()}</span>
+        {/* RIGHT: Desktop Phone + Book Now */}
+        <div className="navbar-right hidden md:flex gap-2">
+          <a href={telLink} className="phone">
+            <IoIosCall className="text-lg md:text-xl" />
+            <span>{formatDisplayNumber()}</span>
+          </a>
+          <a href={whatsappLink} target="_blank" rel="noopener noreferrer" className="book-now">
+            {ctaNav.label}
+          </a>
         </div>
-        <a href={whatsappLink} target="_blank" rel="noopener noreferrer" className="book-now">
-          {ctaNav.label}
-        </a>
       </div>
 
       {/* MOBILE MENU (Slide Down) */}
@@ -132,7 +152,7 @@ const Navbar = () => {
           {/* Apartments */}
           <button
             onClick={() => setIsApartmentsOpen(!isApartmentsOpen)}
-            className="block py-2 font-semibold text-[#1f2937] hover:text-white transition-colors"
+            className="block py-2 font-semibold text-text-primary hover:text-[var(--text-contrast)] transition-colors"
           >
             Apartments
           </button>
@@ -155,7 +175,7 @@ const Navbar = () => {
           {/* More */}
           <button
             onClick={() => setIsMoreOpen(!isMoreOpen)}
-            className="block py-2 font-semibold text-[#1f2937] hover:text-white transition-colors"
+            className="block py-2 font-semibold text-text-primary hover:text-[var(--text-contrast)] transition-colors"
           >
             More
           </button>
@@ -166,7 +186,7 @@ const Navbar = () => {
                   key={item.label}
                   to={item.to}
                   onClick={closeMobile}
-                  className="block py-1 text-[#1f2937] hover:text-white transition-colors"
+                  className="block py-1 text-text-primary hover:text-[var(--text-contrast)] transition-colors"
                 >
                   {item.label}
                 </NavLink>
@@ -176,10 +196,13 @@ const Navbar = () => {
 
           {/* Mobile Phone + Book Now */}
           <div className="mt-2 flex flex-col gap-2">
-            <div className="phone flex items-center gap-2 font-semibold text-[#1f2937] hover:text-white transition-colors">
+            <a
+              href={telLink}
+              className="phone flex items-center gap-2 font-semibold text-text-primary hover:text-[var(--text-contrast)] transition-colors"
+            >
               <IoIosCall className="text-lg" />
               <span>{formatDisplayNumber()}</span>
-            </div>
+            </a>
             <a
               href={whatsappLink}
               target="_blank"

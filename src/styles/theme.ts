@@ -1,17 +1,44 @@
+export const themeRegistry = {
+  default: { label: "Default" },
+  valentine: { label: "Valentine" },
+  christmas: { label: "Christmas" },
+  newYear: { label: "New Year" },
+} as const;
+
+export type ThemeName = keyof typeof themeRegistry;
+
+export const DEFAULT_THEME: ThemeName = "default";
+
 export const designTokens = {
-  color: {
-    background: "var(--color-background)",
-    surface: "var(--color-surface)",
-    mutedSurface: "var(--color-surface-muted)",
-    primary: "var(--color-primary)",
-    primaryStrong: "var(--color-primary-strong)",
-    accent: "var(--color-accent)",
-    ink: "var(--color-ink)",
-    inkSubtle: "var(--color-ink-subtle)",
-    border: "var(--color-border)",
-    borderStrong: "var(--color-border-strong)",
-    success: "var(--color-success)",
-    danger: "var(--color-danger)",
+  bg: {
+    primary: "var(--bg-primary)",
+    surface: "var(--bg-surface)",
+    muted: "var(--bg-muted)",
+  },
+  text: {
+    primary: "var(--text-primary)",
+    muted: "var(--text-muted)",
+    onHero: "var(--text-on-hero)",
+  },
+  accent: {
+    primary: "var(--accent-primary)",
+    soft: "var(--accent-soft)",
+  },
+  cta: {
+    primary: "var(--cta-primary)",
+    primaryHover: "var(--cta-primary-hover)",
+    secondary: "var(--cta-secondary)",
+  },
+  border: {
+    subtle: "var(--border-subtle)",
+    strong: "var(--border-strong)",
+  },
+  state: {
+    success: "var(--support-success)",
+    danger: "var(--support-danger)",
+  },
+  footer: {
+    background: "var(--footer-bg)",
   },
   typography: {
     base: "var(--font-family-base)",
@@ -47,9 +74,37 @@ export const designTokens = {
     pill: "var(--radius-pill)",
   },
   shadow: {
-    soft: "var(--shadow-soft)",
-    strong: "var(--shadow-strong)",
+    level1: "var(--shadow-level-1)",
+    level2: "var(--shadow-level-2)",
+  },
+  zIndex: {
+    base: "var(--z-base)",
+    dropdown: "var(--z-dropdown)",
+    sticky: "var(--z-sticky)",
+    floating: "var(--z-floating)",
+    overlay: "var(--z-overlay)",
+    modal: "var(--z-modal)",
+    toast: "var(--z-toast)",
+  },
+  safeArea: {
+    top: "var(--safe-area-top)",
+    right: "var(--safe-area-right)",
+    bottom: "var(--safe-area-bottom)",
+    left: "var(--safe-area-left)",
   },
 } as const;
 
 export type DesignTokens = typeof designTokens;
+
+const isRegisteredTheme = (theme: string): theme is ThemeName => {
+  return theme in themeRegistry;
+};
+
+export const availableThemes = Object.keys(themeRegistry) as ThemeName[];
+
+export const applyTheme = (theme: string = DEFAULT_THEME) => {
+  if (typeof document === "undefined") return;
+
+  const resolvedTheme: ThemeName = isRegisteredTheme(theme) ? theme : DEFAULT_THEME;
+  document.documentElement.dataset.theme = resolvedTheme;
+};

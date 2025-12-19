@@ -1,5 +1,6 @@
 import { FaBed, FaShower, FaSwimmingPool, FaCar } from "react-icons/fa";
 import { IoMdClose } from "react-icons/io";
+import { Button } from "../../ui/Button";
 // Define the types for the property amenities
 interface Amenity {
     amenities_type: string;
@@ -44,8 +45,8 @@ const PropertyModal: React.FC<PropertyModalProps> = ({ property, onClose, handle
     console.log(property.id);
 
     return (
-        <section className="fixed inset-0 flex items-center justify-center w-full bg-black bg-opacity-50 z-50">
-            <div className="relative bg-white flex flex-col md:flex-row gap-5 rounded-lg shadow-lg p-6 h-[70vh] md:h-[70vh] w-[80%] overflow-y-auto overflow-x-hidden">
+        <section className="fixed inset-0 flex items-center justify-center w-full bg-[color:color-mix(in_srgb,var(--text-primary)_70%,transparent)] z-[var(--z-modal)]">
+            <div className="relative bg-bg-surface flex flex-col md:flex-row gap-5 rounded-lg shadow-level2 p-6 h-[70vh] md:h-[70vh] w-[80%] overflow-y-auto overflow-x-hidden text-text-primary">
                 {/* property image  */}
                 <div className="flex-1 h-full">
                     <img src={property.property_img[0]} alt={property.property_name} className="w-full  md:h-full object-cover rounded-lg" />
@@ -53,7 +54,7 @@ const PropertyModal: React.FC<PropertyModalProps> = ({ property, onClose, handle
                 {/* property details  */}
                 <div className="flex-1 flex flex-col gap-4">
                     {/* modal close button  */}
-                    <span onClick={onClose} className=" fixed right-2 top-2 cursor-pointer z-10 text-2xl text-white h-8 w-8 bg-[rgba(0,0,0,0.4)] hover:bg-[rgba(0,0,0,0.6)] flex justify-center items-center"><IoMdClose /></span>
+                    <span onClick={onClose} className=" fixed right-2 top-2 cursor-pointer z-[var(--z-dropdown)] text-2xl text-[var(--text-contrast)] h-8 w-8 bg-[color:color-mix(in_srgb,var(--text-primary)_40%,transparent)] hover:bg-[color:color-mix(in_srgb,var(--text-primary)_60%,transparent)] flex justify-center items-center"><IoMdClose /></span>
                     {/* title  */}
                     <div className="flex justify-between items-start">
                         <h2 className="text-xl font-bold ">{property.property_name}</h2>
@@ -61,11 +62,11 @@ const PropertyModal: React.FC<PropertyModalProps> = ({ property, onClose, handle
                     <hr />
                     {/* description  */}
                     <div className="flex flex-col gap-4">
-                        <p className="text-gray-700 mb-4 text-justify text-sm md:text-base tracking-wide">{property.property_description} </p>
+                        <p className="text-text-muted mb-4 text-justify text-sm md:text-base tracking-wide">{property.property_description} </p>
                         <hr />
                         <div className="flex flex-row gap-1 md:gap-3">
                             <h3 className="font-semibold">Location </h3>
-                            <p className="text-gray-600">: {property.property_location}</p>
+                            <p className="text-text-muted">: {property.property_location}</p>
                         </div>
                         <hr />
                         {/* amenities  */}
@@ -81,7 +82,9 @@ const PropertyModal: React.FC<PropertyModalProps> = ({ property, onClose, handle
                             </ul>
                         </div>
                         {/* redirecting button (redirecting to the property  detail page ) */}
-                        <button onClick={() => handleNavigate(property)} className="bg-primary text-white rounded-md px-4 py-2 mt-4">View Details</button>
+                        <Button onClick={() => handleNavigate(property)} className="mt-4">
+                            View Details
+                        </Button>
                     </div>
 
                 </div>

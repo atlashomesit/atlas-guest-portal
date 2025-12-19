@@ -23,16 +23,18 @@ const Footer = () => {
     const logoSrc = LOGO_URL;
 
     return (
-        <div className='py-10 md:py-10 px-4 lg:px-8 bg-black text-[#949494]'>
+        <div
+            className='py-10 md:py-10 px-4 lg:px-8 bg-[color:var(--footer-bg)] text-[color:var(--footer-text)]'
+        >
             <div className='max-w-screen-2xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-8'>
                 <div className='flex flex-col gap-7 items-center lg:items-start'>
                     <img className='w-32 md:w-20 rounded-md' src={logoSrc} alt="paymentlogo" />
-                    <div className='flex text-lg gap-6'>
+                    <div className='flex text-lg gap-6 text-[color:var(--footer-link)]'>
                         {socialLinks.map(({ icon, link }, index) => {
                             const IconComponent = iconMap[icon];
                             return (
                                 <a key={index} href={link} target="_blank" rel="noopener noreferrer">
-                                    <IconComponent className='hover:text-primary duration-300 cursor-pointer' />
+                                    <IconComponent className='hover:text-[color:var(--footer-link-hover)] duration-300 cursor-pointer' />
                                 </a>
                             );
                         })}
@@ -40,27 +42,27 @@ const Footer = () => {
                 </div>
 
                 <div className='text-center lg:text-left'>
-                    <h2 className='text-2xl text-primary font-semibold mb-4'>Quick Links</h2>
+                    <h2 className='text-2xl font-semibold mb-4 text-[color:var(--footer-heading)]'>Quick Links</h2>
                     <div className='flex flex-col gap-2 text-base'>
                         {primaryNav.filter((item) => !item.hidden).map((item) => (
-                            <Link key={item.label} to={item.to} className='hover:text-white'>
+                            <Link key={item.label} to={item.to} className='text-[color:var(--footer-link)] hover:text-[color:var(--footer-link-hover)] transition-colors'>
                                 {item.label}
                             </Link>
                         ))}
-                        <a href='/sitemap.xml' className='hover:text-white'>Sitemap</a>
+                        <a href='/sitemap.xml' className='text-[color:var(--footer-link)] hover:text-[color:var(--footer-link-hover)] transition-colors'>Sitemap</a>
                     </div>
                 </div>
 
                 <div className='text-center lg:text-left'>
-                    <h2 className='text-2xl text-primary font-semibold mb-4'>More</h2>
+                    <h2 className='text-2xl font-semibold mb-4 text-[color:var(--footer-heading)]'>More</h2>
                     <div className='flex flex-col gap-2 text-base'>
                         {moreNav.filter((item) => !item.hidden).map((item) => (
                             item.external ? (
-                                <a key={item.label} href={item.to} target="_blank" rel="noopener noreferrer" className='hover:text-white'>
+                                <a key={item.label} href={item.to} target="_blank" rel="noopener noreferrer" className='text-[color:var(--footer-link)] hover:text-[color:var(--footer-link-hover)] transition-colors'>
                                     {item.label}
                                 </a>
                             ) : (
-                                <Link key={item.label} to={item.to} className='hover:text-white'>
+                                <Link key={item.label} to={item.to} className='text-[color:var(--footer-link)] hover:text-[color:var(--footer-link-hover)] transition-colors'>
                                     {item.label}
                                 </Link>
                             )
@@ -69,10 +71,10 @@ const Footer = () => {
                 </div>
 
                 <div className="text-center lg:text-left">
-                    <h2 className="text-2xl text-primary font-semibold mb-4">Help</h2>
+                    <h2 className="text-2xl font-semibold mb-4 text-[color:var(--footer-heading)]">Help</h2>
                     <div className="text-base flex flex-col gap-2">
                         {helpNav.map((item) => (
-                            <Link key={item.label} to={item.to} className="hover:text-white">
+                            <Link key={item.label} to={item.to} className="text-[color:var(--footer-link)] hover:text-[color:var(--footer-link-hover)] transition-colors">
                                 {item.label}
                             </Link>
                         ))}
@@ -80,13 +82,13 @@ const Footer = () => {
                 </div>
 
                 <div className="text-center lg:text-left">
-                    <h2 className="text-2xl text-primary font-semibold mb-4">Locate Us</h2>
+                    <h2 className="text-2xl font-semibold mb-4 text-[color:var(--footer-heading)]">Locate Us</h2>
                     <div className="text-base flex flex-col gap-3">
                         {contactInfo.map(({ icon, text }, index) => {
                             const IconComponent = iconMap[icon];
 
                             return (
-                                <div key={index} className="hover:text-white flex flex-col gap-2 cursor-pointer">
+                                <div key={index} className="hover:text-[color:var(--footer-link-hover)] text-[color:var(--footer-link)] flex flex-col gap-2 cursor-pointer transition-colors">
                                     {Array.isArray(text) ? (
                                         text.map((line, idx) => (
                                             <p
@@ -110,8 +112,8 @@ const Footer = () => {
                 </div>
             </div>
 
-            <div className='text-base text-slate-300 text-center mt-10'>
-                © 2025 The Atlas Homes All rights reserved | <Link to="/policies" className='hover:text-white'>Policies</Link> | <Link to="/terms" className='hover:text-white'>Terms</Link> | <Link to="/contact" className='hover:text-white'>Contact</Link>
+            <div className='text-base text-center mt-10 text-[color:var(--footer-link)]'>
+                © 2025 The Atlas Homes All rights reserved | <Link to="/policies" className='hover:text-[color:var(--footer-link-hover)] transition-colors'>Policies</Link> | <Link to="/terms" className='hover:text-[color:var(--footer-link-hover)] transition-colors'>Terms</Link> | <Link to="/contact" className='hover:text-[color:var(--footer-link-hover)] transition-colors'>Contact</Link>
             </div>
 
         </div>

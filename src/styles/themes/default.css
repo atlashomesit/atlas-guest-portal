@@ -1,0 +1,50 @@
+:root,
+:root[data-theme="default"] {
+  /* Surfaces */
+  --bg-primary: #ede7c7;
+  --bg-surface: #fdfbf6;
+  --bg-muted: #e7dfc4;
+
+  /* Text */
+  --text-primary: #1b2533;
+  --text-muted: #3f4a5a;
+  --text-body: #243041;
+
+  /* Accent + CTA */
+  --accent-primary: #a2bffe;
+  --accent-soft: #f6e7de;
+  --romance-soft: #f6e7de;
+  --accent-primary-rgb: 162 191 254;
+  --accent-soft-rgb: 246 231 222;
+  --cta-primary: #4f6f9f;
+  --cta-primary-hover: #3f5d88;
+  --cta-secondary: #6f8bbd;
+  --cta-primary-rgb: 79 111 159;
+  --cta-primary-hover-rgb: 63 93 136;
+  --cta-secondary-rgb: 111 139 189;
+  --brand: #2f4b86;
+  --brand-ink: #1f2f52;
+  --brand-contrast: #eef3ff;
+  --brand-soft: #e2e9fb;
+
+  /* Borders */
+  --border-subtle: #dcd3b3;
+  --border-strong: #c3b693;
+
+  /* Status */
+  --support-success: #2d8a5d;
+  --support-danger: #b5473d;
+
+  /* Footer */
+  --footer-bg: #162030;
+  --footer-text: #d8e1ed;
+  --footer-heading: #f3f6fb;
+  --footer-link: #c8d2de;
+  --footer-link-hover: #ffffff;
+
+  /* Shadows */
+  --shadow-level-1: 0 12px 32px rgba(30, 39, 51, 0.1);
+  --shadow-level-2: 0 20px 48px rgba(30, 39, 51, 0.16);
+  --shadow-1: var(--shadow-level-1);
+  --shadow-2: var(--shadow-level-2);
+}

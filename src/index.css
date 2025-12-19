@@ -1,13 +1,20 @@
-@import "./styles/theme.css";
+@import "./styles/themes/index.css";
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 .btn-chip {
-  @apply inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-slate-200 text-slate-800 font-semibold shadow-sm hover:border-primary hover:text-primary transition;
+  @apply inline-flex items-center gap-2 px-4 py-2 rounded-full bg-bg-surface border border-border-subtle text-text-primary font-semibold shadow-level1 transition;
+  box-shadow: var(--shadow-level-1);
+}
+
+.btn-chip:hover {
+  border-color: var(--cta-primary);
+  color: var(--cta-primary);
+  box-shadow: var(--shadow-level-2);
 }
 
 .btn-chip--active {
-  @apply border-primary text-primary;
+  @apply border-cta-primary text-cta-primary;
 }

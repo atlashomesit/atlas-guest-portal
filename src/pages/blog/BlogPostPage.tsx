@@ -9,7 +9,7 @@ const BlogPostPage = () => {
   if (!post) {
     return (
       <div className="px-4 md:px-10 lg:px-20 py-28">
-        <h1 className="text-3xl font-bold text-slate-900">Post not found</h1>
+        <h1 className="text-3xl font-bold text-text-primary">Post not found</h1>
         <Link to="/blog" className="text-primary font-semibold mt-4 inline-block">
           Back to Blog
         </Link>
@@ -18,7 +18,7 @@ const BlogPostPage = () => {
   }
 
   return (
-    <div className="px-4 md:px-10 lg:px-20 py-24 bg-gray-50 min-h-screen">
+    <div className="px-4 md:px-10 lg:px-20 py-24 bg-bg-muted min-h-screen">
       <SEO
         title={post.metaTitle || post.title}
         description={post.metaDescription || post.excerpt}
@@ -26,7 +26,7 @@ const BlogPostPage = () => {
         url={`https://atlashomestays.com/blog/${post.slug}`}
         type="article"
       />
-      <div className="max-w-4xl mx-auto space-y-6 bg-white p-6 md:p-10 rounded-2xl border border-slate-200 shadow-sm">
+      <div className="max-w-4xl mx-auto space-y-6 bg-bg-surface p-6 md:p-10 rounded-2xl border border-border-subtle shadow-level1">
         <div className="space-y-2">
           <Link to="/blog" className="text-primary font-semibold">
             Back to Blog
@@ -34,7 +34,7 @@ const BlogPostPage = () => {
           <p className="text-sm uppercase tracking-[0.18em] text-primary font-semibold">
             {post.category === "guest-guides" ? "Guest Guides" : "Hospitality Tech & AI"}
           </p>
-          <h1 className="text-3xl md:text-4xl font-bold text-slate-900">{post.title}</h1>
+          <h1 className="text-3xl md:text-4xl font-bold text-text-primary">{post.title}</h1>
         </div>
         {post.featuredImage && (
           <img
@@ -44,9 +44,9 @@ const BlogPostPage = () => {
             loading="lazy"
           />
         )}
-        <p className="text-slate-700 leading-relaxed text-lg">{post.content}</p>
-        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
-          <p className="text-sm text-slate-600">
+        <p className="text-text-muted leading-relaxed text-lg">{post.content}</p>
+        <div className="bg-bg-muted border border-border-subtle rounded-xl p-4">
+          <p className="text-sm text-text-muted">
             For booking offers and property policies, explore our Apartments, Offers, and Policies pages.
           </p>
           <div className="flex gap-3 mt-3 flex-wrap">

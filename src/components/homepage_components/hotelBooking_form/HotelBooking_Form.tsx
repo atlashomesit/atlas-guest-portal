@@ -6,6 +6,7 @@ import { inlinePolicySnippets } from '../../../content/terms';
 import { baseGuestAllowance, getUnitPolicy } from '../../../config/policyConfig';
 import { FaCcMastercard, FaCcVisa, FaCreditCard, FaUserFriends } from 'react-icons/fa';
 import { SiGooglepay, SiRazorpay } from 'react-icons/si';
+import { trackEvent } from '../../../utils/analytics';
 
 declare global {
   interface Window {
@@ -18,9 +19,10 @@ import 'react-date-range/dist/theme/default.css';
 
 interface BookingCardProps {
     propertyId: number;
+    supportPadding?: boolean;
 }
 
-const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
+const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = false }) => {
     const [openCalendar, setOpenCalendar] = useState(false);
     const [openGuests, setOpenGuests] = useState(false);
     const [isRazorpayReady, setIsRazorpayReady] = useState(false);
@@ -36,6 +38,12 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
             reason: string;
         }
     >({ state: 'idle' });
+
+    const ctaPrimaryColor = useMemo(() => {
+        if (typeof window === 'undefined') return 'var(--cta-primary)';
+        const value = getComputedStyle(document.documentElement).getPropertyValue('--cta-primary').trim();
+        return value || 'var(--cta-primary)';
+    }, []);
 
     const [dates, setDates] = useState({
         startDate: new Date(),
@@ -65,6 +73,19 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
                     key: 'selection'
                 });
             }
+
+            const selectedNights = Math.max(1, Math.round(Math.abs((endDate.getTime() - startDate.getTime()) / oneDay)));
+            trackEvent(
+                'dates_selected',
+                {
+                    surface: 'booking_form',
+                    startDate: startDate.toISOString(),
+                    endDate: endDate.toISOString(),
+                    nights: selectedNights,
+                    guests: totalPeople,
+                },
+                { propertyId, listingId: propertyId, unitCode: propertyId },
+            );
         }
     };
 
@@ -198,6 +219,29 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
     }), [property?.property_name, dates.startDate, dates.endDate, nights, totalPrice, guests]);
 
     const initiatePayment = async () => {
+        trackEvent(
+            'reserve_click',
+            {
+                surface: 'booking_form',
+                termsAccepted,
+                hasSelection,
+                guests: totalPeople,
+                nights,
+            },
+            { propertyId, listingId: propertyId, unitCode: propertyId },
+        );
+
+        trackEvent(
+            'availability_search',
+            {
+                surface: 'booking_form',
+                startDate: dates.startDate.toISOString(),
+                endDate: dates.endDate.toISOString(),
+                guests: totalPeople,
+            },
+            { propertyId, listingId: propertyId, unitCode: propertyId },
+        );
+
         if (!termsAccepted) {
             alert('Please confirm the Terms & Conditions before reserving.');
             return;
@@ -223,6 +267,18 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
 
         const bookingId = `ATLAS-${propertyId}-${Date.now()}`;
 
+        trackEvent(
+            'checkout_started',
+            {
+                surface: 'booking_form',
+                bookingId,
+                total: totalPrice,
+                nights,
+                guests: totalPeople,
+            },
+            { propertyId, listingId: propertyId, unitCode: propertyId },
+        );
+
         const razorpayOptions = {
             key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_placeholder',
             amount: totalPrice * 100,
@@ -242,7 +298,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
                 ...userPrefill,
             },
             theme: {
-                color: '#B99359',
+                color: ctaPrimaryColor,
             },
             handler: (response: any) => {
                 setPaymentStatus({
@@ -251,6 +307,16 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
                     bookingId,
                 });
                 setIsLoading(false);
+                trackEvent(
+                    'payment_success',
+                    {
+                        surface: 'booking_form',
+                        bookingId,
+                        paymentId: response.razorpay_payment_id,
+                        total: totalPrice,
+                    },
+                    { propertyId, listingId: propertyId, unitCode: propertyId },
+                );
             },
             modal: {
                 ondismiss: () => {
@@ -268,6 +334,11 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
                 reason: `${failureReason} Please try again or choose a different method.`,
             });
             setIsLoading(false);
+                trackEvent(
+                    'payment_failed',
+                    { surface: 'booking_form', bookingId, reason: failureReason },
+                    { propertyId, listingId: propertyId, unitCode: propertyId },
+                );
         });
     };
 
@@ -313,8 +384,10 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
     const hasSelection = Boolean(dates.startDate && dates.endDate && guests.adults);
     const primaryCtaLabel = hasSelection && termsAccepted ? 'Book now' : 'Check availability';
 
+    const containerPaddingBottom = supportPadding ? 'pb-40' : 'pb-28';
+
     return (
-        <div id="booking-form" className="max-w-md mx-auto p-6 bg-white shadow-xl rounded-2xl relative pb-28 lg:pb-0 lg:sticky lg:top-20">
+        <div id="booking-form" className={`max-w-md mx-auto p-6 bg-bg-surface shadow-level2 rounded-2xl relative ${containerPaddingBottom} lg:pb-0 lg:sticky lg:top-20`}>
 
             {/* PRICE SECTION */}
             <p className="text-[30px] font-bold">
@@ -325,14 +398,14 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
 
             {property && (
                 <div className="mb-4 space-y-1">
-                    <p className="text-amber-600 text-sm font-semibold">★ {property.property_rating.toFixed(2)} ({property.property_reviews} reviews)</p>
+                    <p className="text-cta-primary text-sm font-semibold">★ {property.property_rating.toFixed(2)} ({property.property_reviews} reviews)</p>
                     {property.property_review_snippets?.[0] && (
-                        <p className="text-sm text-gray-700 italic">“{property.property_review_snippets[0]}”</p>
+                        <p className="text-sm text-text-primary italic">“{property.property_review_snippets[0]}”</p>
                     )}
                 </div>
             )}
 
-            <div className="mb-4 space-y-1 text-sm text-gray-700">
+            <div className="mb-4 space-y-1 text-sm text-text-primary">
                 <p>
                     Base price includes {baseGuestAllowance} guests; additional guests incur {unitPolicy.extraGuestFeeRange} per night (unit dependent).
                     <a className="underline ml-1" href="/terms#guests">See terms</a>
@@ -348,7 +421,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
                     onClick={() => setOpenCalendar(true)}
                     className="border rounded-xl p-3 cursor-pointer"
                 >
-                    <p className="text-sm text-gray-500">Check-In Date</p>
+                    <p className="text-sm text-text-muted">Check-In Date</p>
                     <p className="font-semibold">
                         {format(dates.startDate, "dd-MM-yyyy")}
                     </p>
@@ -356,10 +429,10 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
 
                 <div
                     onClick={() => setOpenCalendar(true)}
-                    className="border rounded-xl p-3 cursor-pointer"
+                    className="border border-border-subtle bg-bg-surface rounded-xl p-3 cursor-pointer"
                     title={dates.startDate.getTime() === dates.endDate.getTime() ? "Check-out date must be after check-in date" : ""}
                 >
-                    <p className="text-sm text-gray-500">Check-Out Date</p>
+                    <p className="text-sm text-text-muted">Check-Out Date</p>
                     <p className="font-semibold">
                         {format(dates.endDate, "dd-MM-yyyy")}
                     </p>
@@ -367,7 +440,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
             </div>
 
             {openCalendar && (
-                <div ref={calendarRef} className="absolute right-0 z-50 bg-white shadow-lg rounded-xl mt-2 overflow-hidden border border-gray-200">
+                <div ref={calendarRef} className="absolute right-0 z-[var(--z-overlay)] bg-bg-surface shadow-level2 rounded-xl mt-2 overflow-hidden border border-border-subtle">
                     <DateRange
                         editableDateInputs={true}
                         onChange={handleDateChange}
@@ -378,7 +451,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
                             key: 'selection'
                         }]}
                         minDate={new Date()}
-                        rangeColors={['#B99359']}
+                        rangeColors={[ctaPrimaryColor]}
                         showDateDisplay={false}
                         showPreview={false}
                         showSelectionPreview={true}
@@ -395,10 +468,10 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
             {/* GUEST SELECTOR */}
             <div
                 onClick={() => setOpenGuests(true)}
-                className="border rounded-xl p-3 cursor-pointer flex justify-between items-center"
+                className="border border-border-subtle bg-bg-surface rounded-xl p-3 cursor-pointer flex justify-between items-center"
             >
                 <div>
-                    <p className="text-sm text-gray-500">Guests</p>
+                    <p className="text-sm text-text-muted">Guests</p>
                     <p className="font-semibold">{formatGuestLabel()}</p>
                 </div>
             </div>
@@ -407,30 +480,30 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
             {openGuests && (
                 <div
                     ref={guestMenuRef}
-                    className="absolute left-1/2 -translate-x-1/2 bg-white z-50 rounded-xl shadow-xl border p-4 overflow-y-auto"
+                    className="absolute left-1/2 -translate-x-1/2 bg-bg-surface z-[var(--z-overlay)] rounded-xl shadow-level2 border border-border-subtle p-4 overflow-y-auto"
                     style={{
-                        width: "90%",          // Increased Width
-                        maxHeight: "200px",    // Reduced Height
-                        top: "260px",
+                        width: '90%',          // Increased Width
+                        maxHeight: '200px',    // Reduced Height
+                        top: '260px',
                     }}
                 >
                     <div className="mb-4">
                         <div className="flex justify-between items-center mb-2">
                             <div>
                                 <p className="font-medium">Adults</p>
-                                <p className="text-sm text-gray-500">Age 14 or above</p>
+                                <p className="text-sm text-text-muted">Age 14 or above</p>
                             </div>
                             <div className="flex items-center gap-3">
                                 <button
                                     onClick={() => modifyGuest("adults", false)}
-                                    className="w-8 h-8 rounded-full border flex items-center justify-center"
+                                    className="w-8 h-8 rounded-full border border-border-subtle flex items-center justify-center"
                                 >
                                     -
                                 </button>
                                 <span>{guests.adults}</span>
                                 <button
                                     onClick={() => modifyGuest("adults", true)}
-                                    className="w-8 h-8 rounded-full border flex items-center justify-center"
+                                    className="w-8 h-8 rounded-full border border-border-subtle flex items-center justify-center"
                                 >
                                     +
                                 </button>
@@ -442,7 +515,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
                         <div className="flex justify-between items-center mb-2">
                             <div>
                                 <p className="font-medium">Children</p>
-                                <p className="text-sm text-gray-500">Ages 5-12</p>
+                                <p className="text-sm text-text-muted">Ages 5-12</p>
                             </div>
                             <div className="flex items-center gap-3">
                                 <button
@@ -455,7 +528,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
                                             }));
                                         }
                                     }}
-                                    className="w-8 h-8 rounded-full border flex items-center justify-center"
+                                    className="w-8 h-8 rounded-full border border-border-subtle flex items-center justify-center"
                                 >
                                     -
                                 </button>
@@ -468,7 +541,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
                                             childrenAges: [...prev.childrenAges, 5] // Default age 5
                                         }));
                                     }}
-                                    className="w-8 h-8 rounded-full border flex items-center justify-center"
+                                    className="w-8 h-8 rounded-full border border-border-subtle flex items-center justify-center"
                                 >
                                     +
                                 </button>
@@ -498,7 +571,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
                         <div className="flex justify-between items-center">
                             <div>
                                 <p className="font-medium">Infants</p>
-                                <p className="text-sm text-gray-500">Under 5 years</p>
+                                <p className="text-sm text-text-muted">Under 5 years</p>
                             </div>
                             <div className="flex items-center gap-3">
                                 <button
@@ -510,7 +583,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
                                             }));
                                         }
                                     }}
-                                    className="w-8 h-8 rounded-full border flex items-center justify-center"
+                                    className="w-8 h-8 rounded-full border border-border-subtle flex items-center justify-center"
                                 >
                                     -
                                 </button>
@@ -524,14 +597,14 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
                                             }));
                                         }
                                     }}
-                                    className="w-8 h-8 rounded-full border flex items-center justify-center"
+                                    className="w-8 h-8 rounded-full border border-border-subtle flex items-center justify-center"
                                 >
                                     +
                                 </button>
                             </div>
                         </div>
                         {guests.infants > 0 && (
-                            <p className="text-xs text-gray-500 mt-1">
+                            <p className="text-xs text-text-muted mt-1">
                                 Maximum 2 infants allowed (0-4 years)
                             </p>
                         )}
@@ -541,19 +614,19 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
                         <div className="flex justify-between items-center mb-2">
                             <div>
                                 <p className="font-medium">Pets</p>
-                                <p className="text-sm text-gray-500"></p>
+                                <p className="text-sm text-text-muted"></p>
                             </div>
                             <div className="flex items-center gap-3">
                                 <button
                                     onClick={() => modifyGuest("pets", false)}
-                                    className="w-8 h-8 rounded-full border flex items-center justify-center"
+                                    className="w-8 h-8 rounded-full border border-border-subtle flex items-center justify-center"
                                 >
                                     -
                                 </button>
                                 <span>{guests.pets}</span>
                                 <button
                                     onClick={() => modifyGuest("pets", true)}
-                                    className="w-8 h-8 rounded-full border flex items-center justify-center"
+                                    className="w-8 h-8 rounded-full border border-border-subtle flex items-center justify-center"
                                 >
                                     +
                                 </button>
@@ -564,40 +637,40 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
             )}
 
             {hasSelection && hasInteractedWithDates && (
-                <div className="mt-6 space-y-3 border rounded-xl p-4 bg-white shadow-sm">
+                <div className="mt-6 space-y-3 border border-border-subtle rounded-xl p-4 bg-bg-surface shadow-level1">
                     <div className="flex justify-between text-sm">
                         <span>{nights} night{nights > 1 ? 's' : ''} × ₹{(nightlyRateWithGuests - extraGuestChargePerNight).toLocaleString('en-IN')}</span>
                         <span>₹{((nightlyRateWithGuests - extraGuestChargePerNight) * nights).toLocaleString('en-IN')}</span>
                     </div>
                     {additionalPeople > 0 && (
-                        <div className="flex justify-between text-sm text-gray-700">
+                        <div className="flex justify-between text-sm text-text-primary">
                             <span>Extra guests ({additionalPeople} × ₹{extraGuestRate})</span>
                             <span>₹{(extraGuestChargePerNight * nights).toLocaleString('en-IN')}</span>
                         </div>
                     )}
-                    <div className="flex justify-between text-sm text-gray-700">
+                    <div className="flex justify-between text-sm text-text-primary">
                         <span>Fees &amp; taxes (est.)</span>
                         <span>₹{feesAndTaxes.toLocaleString('en-IN')}</span>
                     </div>
-                    <div className="flex justify-between text-base font-semibold text-gray-900 border-t pt-3">
+                    <div className="flex justify-between text-base font-semibold text-text-primary border-t pt-3">
                         <span>Total</span>
                         <span>₹{totalPrice.toLocaleString('en-IN')}</span>
                     </div>
-                    <p className="text-xs text-gray-500">No hidden charges — everything is shown upfront for your dates and guest count.</p>
+                    <p className="text-xs text-text-muted">No hidden charges — everything is shown upfront for your dates and guest count.</p>
                 </div>
             )}
 
-            <div className="mt-4 space-y-3 text-sm text-gray-700 border rounded-xl p-4 bg-gray-50">
+            <div className="mt-4 space-y-3 text-sm text-text-primary border border-border-subtle rounded-xl p-4 bg-bg-muted">
                 <div>
-                    <p className="font-semibold text-gray-900">Guest details</p>
+                    <p className="font-semibold text-text-primary">Guest details</p>
                     <p>{inlinePolicySnippets.guestId} <a className="underline" href="/terms#guests">Read more</a></p>
                 </div>
                 <div>
-                    <p className="font-semibold text-gray-900">Cancellations</p>
+                    <p className="font-semibold text-text-primary">Cancellations</p>
                     <p>{inlinePolicySnippets.cancellation} <a className="underline" href="/terms#cancellations">Policy</a></p>
                 </div>
                 <div>
-                    <p className="font-semibold text-gray-900">House rules &amp; damages</p>
+                    <p className="font-semibold text-text-primary">House rules &amp; damages</p>
                     <p>{inlinePolicySnippets.houseRules}</p>
                     <p className="mt-1">{inlinePolicySnippets.damages} <a className="underline" href="/terms#damages">Damages</a></p>
                 </div>
@@ -605,12 +678,12 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
 
             <div className="space-y-4 mt-6">
               {/* Payment Method Selection */}
-              <div className="p-4 border rounded-xl">
+              <div className="p-4 border border-border-subtle rounded-xl bg-bg-surface shadow-level1">
                 <label className="flex items-center space-x-3 cursor-pointer">
                   <input
                     type="radio"
                     name="payment-method"
-                    className="h-5 w-5 text-[#B99359] focus:ring-[#B99359]"
+                    className="h-5 w-5 text-cta-primary focus:ring-cta-primary"
                     defaultChecked
                     disabled={isLoading}
                   />
@@ -620,29 +693,35 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
                       alt="Razorpay"
                       className="h-6 mr-2"
                     />
-                    <span className="text-gray-700">Pay with Razorpay</span>
+                    <span className="text-text-primary">Pay with Razorpay</span>
                   </div>
                 </label>
-                <p className="text-sm text-gray-600 mt-2">{inlinePolicySnippets.paymentConsent}</p>
-                <p className="text-xs text-gray-500 mt-1">{isRazorpayReady ? 'Inline Razorpay checkout is ready.' : 'Preloading secure Razorpay checkout...'}</p>
-                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-gray-600">
-                  <span className="inline-flex items-center gap-1 bg-green-50 text-green-800 px-2 py-1 rounded-full">
-                    <SiRazorpay className="text-green-600" /> Razorpay secured
+                <p className="text-sm text-text-muted mt-2">{inlinePolicySnippets.paymentConsent}</p>
+                <p className="text-xs text-text-muted mt-1">{isRazorpayReady ? 'Inline Razorpay checkout is ready.' : 'Preloading secure Razorpay checkout...'}</p>
+                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-text-muted">
+                  <span
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-full"
+                    style={{
+                      backgroundColor: 'color-mix(in srgb, var(--support-success) 12%, var(--bg-surface))',
+                      color: 'var(--support-success)',
+                    }}
+                  >
+                    <SiRazorpay className="text-success" /> Razorpay secured
                   </span>
-                  <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-700 px-2 py-1 rounded-full">
+                  <span className="inline-flex items-center gap-1 bg-bg-muted text-text-primary px-2 py-1 rounded-full">
                     <FaCreditCard /> Cards
                   </span>
-                  <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-700 px-2 py-1 rounded-full">
+                  <span className="inline-flex items-center gap-1 bg-bg-muted text-text-primary px-2 py-1 rounded-full">
                     <SiGooglepay /> UPI
                   </span>
-                  <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-700 px-2 py-1 rounded-full">
+                  <span className="inline-flex items-center gap-1 bg-bg-muted text-text-primary px-2 py-1 rounded-full">
                     <FaCcVisa />
                     <FaCcMastercard />
                   </span>
                 </div>
               </div>
 
-              <label className="flex items-start gap-2 text-sm text-gray-700">
+              <label className="flex items-start gap-2 text-sm text-text-primary">
                 <input
                   type="checkbox"
                   className="mt-1 h-4 w-4"
@@ -654,7 +733,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
                 />
                 <span>
                   I agree to the <a className="underline" href="/terms">Terms &amp; Conditions</a> and the policies above.
-                  {termsAcceptedAt && <span className="block text-gray-500">Accepted at {new Date(termsAcceptedAt).toLocaleString()}</span>}
+                  {termsAcceptedAt && <span className="block text-text-muted">Accepted at {new Date(termsAcceptedAt).toLocaleString()}</span>}
                 </span>
               </label>
               
@@ -662,11 +741,11 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
               <button
                 onClick={initiatePayment}
                 disabled={isLoading || !termsAccepted}
-                className="bg-[#B99359] hover:bg-[#A0804D] text-white w-full rounded-full py-4 text-lg font-semibold transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center"
+                className="bg-cta-primary hover:bg-cta-secondary text-[var(--text-contrast)] w-full rounded-full py-4 text-lg font-semibold transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center shadow-level1"
               >
                 {isLoading ? (
                   <>
-                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-[var(--text-contrast)]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
@@ -678,17 +757,23 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
               </button>
 
               {paymentStatus.state === 'success' && (
-                <div className="border border-green-200 bg-green-50 rounded-xl p-4 space-y-2">
-                  <p className="text-green-800 font-semibold">Payment received!</p>
-                  <p className="text-sm text-gray-800">Booking ID: <span className="font-mono font-semibold">{paymentStatus.bookingId}</span></p>
-                  <p className="text-sm text-gray-800">Payment reference: <span className="font-mono">{paymentStatus.paymentId}</span></p>
-                  <p className="text-sm text-gray-700">We’ll confirm your stay shortly. In the meantime, you can save this booking ID and reach out for any changes.</p>
+                <div
+                  className="rounded-xl p-4 space-y-2 border"
+                  style={{
+                    borderColor: 'color-mix(in srgb, var(--support-success) 35%, transparent)',
+                    backgroundColor: 'color-mix(in srgb, var(--support-success) 12%, var(--bg-surface))',
+                  }}
+                >
+                  <p className="text-success font-semibold">Payment received!</p>
+                  <p className="text-sm text-text-primary">Booking ID: <span className="font-mono font-semibold">{paymentStatus.bookingId}</span></p>
+                  <p className="text-sm text-text-primary">Payment reference: <span className="font-mono">{paymentStatus.paymentId}</span></p>
+                  <p className="text-sm text-text-muted">We’ll confirm your stay shortly. In the meantime, you can save this booking ID and reach out for any changes.</p>
                   <div className="flex flex-wrap gap-3 text-sm">
-                    <a className="px-3 py-2 rounded-full bg-white border text-amber-700" href="tel:+919833899938">Call concierge</a>
-                    <a className="px-3 py-2 rounded-full bg-white border text-amber-700" href="mailto:stay@atlashomestays.com?subject=Booking%20Support&body=Booking%20ID%3A%20">Email support</a>
+                    <a className="px-3 py-2 rounded-full bg-bg-surface border border-border-subtle text-cta-primary" href="tel:+919833899938">Call concierge</a>
+                    <a className="px-3 py-2 rounded-full bg-bg-surface border border-border-subtle text-cta-primary" href="mailto:stay@atlashomestays.com?subject=Booking%20Support&body=Booking%20ID%3A%20">Email support</a>
                     <button
                       type="button"
-                      className="px-3 py-2 rounded-full bg-amber-600 text-white"
+                      className="px-3 py-2 rounded-full bg-cta-secondary text-[var(--text-contrast)]"
                       onClick={() => setPaymentStatus({ state: 'idle' })}
                     >
                       Hide message
@@ -698,20 +783,26 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
               )}
 
               {paymentStatus.state === 'failure' && (
-                <div className="border border-red-200 bg-red-50 rounded-xl p-4 space-y-2">
-                  <p className="text-red-800 font-semibold">Payment was not completed</p>
-                  <p className="text-sm text-gray-800">{paymentStatus.reason}</p>
+                <div
+                  className="rounded-xl p-4 space-y-2 border"
+                  style={{
+                    borderColor: 'color-mix(in srgb, var(--support-danger) 35%, transparent)',
+                    backgroundColor: 'color-mix(in srgb, var(--support-danger) 12%, var(--bg-surface))',
+                  }}
+                >
+                  <p className="text-danger font-semibold">Payment was not completed</p>
+                  <p className="text-sm text-text-primary">{paymentStatus.reason}</p>
                   <div className="flex flex-wrap gap-3 text-sm">
                     <button
                       type="button"
                       onClick={initiatePayment}
-                      className="px-3 py-2 rounded-full bg-amber-600 text-white"
+                      className="px-3 py-2 rounded-full bg-cta-secondary text-[var(--text-contrast)]"
                       disabled={isLoading}
                     >
                       Try again
                     </button>
-                    <a className="px-3 py-2 rounded-full bg-white border text-amber-700" href="tel:+919833899938">Call to pay</a>
-                    <a className="px-3 py-2 rounded-full bg-white border text-amber-700" href="mailto:stay@atlashomestays.com?subject=Payment%20Assistance&body=Please%20help%20me%20complete%20my%20booking.">Get help via email</a>
+                    <a className="px-3 py-2 rounded-full bg-bg-surface border border-border-subtle text-cta-primary" href="tel:+919833899938">Call to pay</a>
+                    <a className="px-3 py-2 rounded-full bg-bg-surface border border-border-subtle text-cta-primary" href="mailto:stay@atlashomestays.com?subject=Payment%20Assistance&body=Please%20help%20me%20complete%20my%20booking.">Get help via email</a>
                   </div>
                 </div>
               )}
@@ -720,29 +811,32 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId }) => {
             <div className="flex justify-between mt-5 border-t pt-4">
                 <div>
                     <p className="text-lg font-semibold">Total Amount</p>
-                    <p className="text-sm text-gray-500">Inclusive of estimated taxes and fees</p>
+                    <p className="text-sm text-text-muted">Inclusive of estimated taxes and fees</p>
                 </div>
                 <p className="text-lg font-bold">
                     ₹{totalPrice.toLocaleString('en-IN')}
                 </p>
             </div>
 
-            <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t shadow-2xl px-4 py-3 flex items-center justify-between gap-3 z-40">
-                <div className="flex flex-col text-xs text-gray-600">
-                    <div className="font-semibold text-gray-900 text-sm">{format(dates.startDate, 'dd MMM')} - {format(dates.endDate, 'dd MMM')}</div>
-                    <div className="flex items-center gap-1 text-gray-700 text-sm">
+            <div
+                className="lg:hidden fixed bottom-0 left-0 right-0 bg-bg-surface border-t border-border-subtle shadow-level2 px-4 py-3 flex items-center justify-between gap-3 z-[var(--z-sticky)]"
+                style={{ paddingBottom: 'calc(var(--safe-area-bottom, env(safe-area-inset-bottom, 0px)) + 0.75rem)' }}
+            >
+                <div className="flex flex-col text-xs text-text-muted">
+                    <div className="font-semibold text-text-primary text-sm">{format(dates.startDate, 'dd MMM')} - {format(dates.endDate, 'dd MMM')}</div>
+                    <div className="flex items-center gap-1 text-text-primary text-sm">
                         <FaUserFriends className="h-4 w-4" />
                         <span>{formatGuestLabel()}</span>
                     </div>
-                    <p className="text-[11px] text-gray-500">No hidden charges</p>
+                    <p className="text-[11px] text-text-muted">No hidden charges</p>
                 </div>
                 <div className="text-right">
-                    <p className="text-xs text-gray-600">Total</p>
+                    <p className="text-xs text-text-muted">Total</p>
                     <p className="text-lg font-semibold">₹{totalPrice.toLocaleString('en-IN')}</p>
                     <button
                         onClick={initiatePayment}
                         disabled={isLoading || !termsAccepted}
-                        className="mt-1 bg-[#B99359] hover:bg-[#A0804D] text-white rounded-full px-4 py-2 text-sm font-semibold transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed"
+                        className="mt-1 bg-cta-primary hover:bg-cta-secondary text-[var(--text-contrast)] rounded-full px-4 py-2 text-sm font-semibold transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed shadow-level1"
                     >
                         {primaryCtaLabel}
                     </button>

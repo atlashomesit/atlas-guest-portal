@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Slider, { Settings } from "react-slick";
 
@@ -6,6 +6,8 @@ import { propertyData, propertyImages } from "../../../data.ts";
 import { LISTINGS, type Listing } from "../../../data/listings";
 import { sanitizeItems, getItemKey } from "../../../utils/sanitizeItems";
 import { LOGO_URL } from "../../../config/branding";
+import { trackEvent } from "../../../utils/analytics";
+import Heading from "../../commonComponents/heading/Heading";
 
 import "./homepage_location.css";
 import "slick-carousel/slick/slick.css";
@@ -40,12 +42,33 @@ const HomePage_Locations = ({ listings = LISTINGS }: HomePageLocationsProps) => 
   const firstRow = otherProperties.slice(0, 3);
   const secondRow = otherProperties.slice(3);
 
+  useEffect(() => {
+    trackEvent(
+      "listings_browse",
+      {
+        total: items.length,
+        featured: Number(Boolean(penthouse)),
+        surface: "home_locations",
+      },
+      { route: "/" },
+    );
+  }, [items.length, penthouse]);
+
   const handleNavigate = (property: any) => {
     try {
       const propertyName = property.property_name || property.title || property.id;
       if (!propertyName) return;
 
       const slug = String(propertyName).toLowerCase().replace(/\s+/g, "-");
+
+      trackEvent(
+        "listing_selected",
+        {
+          surface: "home_locations",
+          listingName: propertyName,
+        },
+        { listingId: property?.id, unitCode: property?.id, route: `/property_details/${slug}` },
+      );
 
       navigate(`/property_details/${slug}`, {
         state: { property },
@@ -61,7 +84,13 @@ const HomePage_Locations = ({ listings = LISTINGS }: HomePageLocationsProps) => 
 
   const NextArrow = ({ onClick, className }: any) => (
     <div
-      className={`w-8 h-8 bg-black/60 text-white rounded-full flex items-center justify-center cursor-pointer ${className}`}
+      className={`w-8 h-8 text-[color:var(--text-contrast)] rounded-full flex items-center justify-center cursor-pointer ${className}`}
+      style={{
+        background:
+          "color-mix(in srgb, var(--text-primary) 62%, transparent)",
+        boxShadow: "0 8px 18px color-mix(in srgb, var(--text-primary) 28%, transparent)",
+        backdropFilter: "blur(2px)",
+      }}
       onClick={(e) => {
         e.stopPropagation();
         onClick?.();
@@ -73,7 +102,13 @@ const HomePage_Locations = ({ listings = LISTINGS }: HomePageLocationsProps) => 
 
   const PrevArrow = ({ onClick, className }: any) => (
     <div
-      className={`w-8 h-8 bg-black/60 text-white rounded-full flex items-center justify-center cursor-pointer ${className}`}
+      className={`w-8 h-8 text-[color:var(--text-contrast)] rounded-full flex items-center justify-center cursor-pointer ${className}`}
+      style={{
+        background:
+          "color-mix(in srgb, var(--text-primary) 62%, transparent)",
+        boxShadow: "0 8px 18px color-mix(in srgb, var(--text-primary) 28%, transparent)",
+        backdropFilter: "blur(2px)",
+      }}
       onClick={(e) => {
         e.stopPropagation();
         onClick?.();
@@ -131,7 +166,7 @@ const HomePage_Locations = ({ listings = LISTINGS }: HomePageLocationsProps) => 
 
     return (
       <div
-        className={`bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 cursor-pointer ${
+        className={`bg-bg-surface rounded-2xl overflow-hidden shadow-level1 hover:shadow-level2 transition-shadow duration-300 cursor-pointer border border-border-subtle ${
           isPenthouse ? "lg:col-span-3" : ""
         }`}
         onClick={() => handleNavigate(propertyDataItem)}
@@ -154,12 +189,12 @@ const HomePage_Locations = ({ listings = LISTINGS }: HomePageLocationsProps) => 
           <NextArrow className="absolute right-2 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-300" onClick={() => sliderRef.current?.slickNext()} />
 
           {/* Custom dots overlay */}
-          <div className="absolute bottom-3 left-1/2 transform -translate-x-1/2 z-50 flex gap-2">
+          <div className="absolute bottom-3 left-1/2 transform -translate-x-1/2 z-[var(--z-overlay)] flex gap-2">
             {getVisibleDots().map((idx) => (
               <button
                 key={idx}
                 className={`w-3 h-3 rounded-full transition-colors duration-300 ${
-                  current === idx ? "bg-white" : "bg-white/50"
+                  current === idx ? "bg-[color:var(--text-contrast)]" : "bg-[color:color-mix(in_srgb,var(--text-contrast)_50%,transparent)]"
                 }`}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -172,14 +207,14 @@ const HomePage_Locations = ({ listings = LISTINGS }: HomePageLocationsProps) => 
 
         {/* DETAILS */}
         <div className="p-4">
-          <h2 className="text-xl font-bold text-gray-800 truncate">{displayName}</h2>
-          <div className="text-gray-600 text-sm mt-1">Hyderabad, Telangana</div>
+          <h2 className="text-xl font-bold text-text-primary truncate">{displayName}</h2>
+          <div className="text-text-muted text-sm mt-1">Hyderabad, Telangana</div>
           <div className="flex items-center mt-2">
-            <span className="text-yellow-400 text-lg">⭐</span>
+            <span className="text-accent-primary text-lg">⭐</span>
             <span className="font-semibold ml-1">
               {propertyDataItem?.property_rating?.toFixed(1) || "4.8"}
             </span>
-            <span className="text-gray-500 text-sm ml-1">
+            <span className="text-text-muted text-sm ml-1">
               ({propertyDataItem?.property_reviews || "0"} reviews)
             </span>
           </div>
@@ -187,7 +222,7 @@ const HomePage_Locations = ({ listings = LISTINGS }: HomePageLocationsProps) => 
             <span className="text-xl font-bold">
               ₹{propertyDataItem?.property_price?.toLocaleString() || "4,999"}
             </span>
-            <span className="text-gray-600 text-sm ml-1">for 1 night</span>
+            <span className="text-text-muted text-sm ml-1">for 1 night</span>
           </div>
         </div>
       </div>
@@ -199,18 +234,9 @@ const HomePage_Locations = ({ listings = LISTINGS }: HomePageLocationsProps) => 
   ============================ */
 
   return (
-    <section className="py-12 px-4 sm:px-6 lg:px-8 bg-white">
+    <section className="py-12 px-4 sm:px-6 lg:px-8 bg-bg-surface">
       <div className="max-w-7xl mx-auto">
-        <div className="py-16 text-[#fff] md:pb-6 md:pt-8 tracking-wide flex justify-center items-center text-xl md:text-2xl lg:text-5xl font-medium relative">
-          <p
-            className="relative after:content-[''] bg-primary px-6 py-1 font-semibold rounded-lg 
-            after:absolute after:left-0 after:-bottom-2 after:w-full after:h-[3px] 
-            after:bg-primary after:rounded-full after:transition-all after:duration-500 
-            after:ease-in-out hover:after:w-0 cursor-pointer"
-          >
-            Our Homes
-          </p>
-        </div>
+        <Heading title="Our Homes" />
 
         {penthouse && (
           <div className="mb-6 w-full">

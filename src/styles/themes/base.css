@@ -1,0 +1,80 @@
+:root {
+  /* Typography */
+  --font-family-base: "Plus Jakarta Sans", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-family-display: "Plus Jakarta Sans", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-md: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.375rem;
+  --font-size-2xl: 1.75rem;
+  --font-size-3xl: 2.25rem;
+  --line-height-tight: 1.2;
+  --line-height-snug: 1.35;
+  --line-height-relaxed: 1.6;
+  --text-contrast: #ffffff;
+  --text-on-hero: #ffffff;
+
+  /* Spacing */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+
+  /* Radius */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-pill: 999px;
+
+  /* Design tokens */
+  --color-bg: var(--bg-primary);
+  --color-surface: var(--bg-surface);
+  --color-surface-muted: var(--bg-muted);
+  --text-strong: var(--text-primary);
+  --text-body: var(--text-primary);
+  --text-secondary: var(--text-muted);
+  --text-inverse: var(--text-contrast);
+  --brand: var(--cta-primary);
+  --brand-ink: #1f2c45;
+  --brand-contrast: #f4f7ff;
+  --border-default: var(--border-subtle);
+  --shadow-soft: var(--shadow-level-1);
+  --shadow-strong: var(--shadow-level-2);
+  --footer-text: color-mix(in srgb, var(--text-contrast) 82%, transparent);
+  --footer-heading: var(--text-contrast);
+  --footer-link: color-mix(in srgb, var(--text-contrast) 70%, transparent);
+  --footer-link-hover: #ffffff;
+
+  /* Safe area insets */
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-right: env(safe-area-inset-right, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
+
+  /* Layering / z-index scale */
+  --z-base: 0;
+  --z-dropdown: 10;
+  --z-sticky: 20;
+  --z-floating: 30;
+  --z-overlay: 40;
+  --z-modal: 50;
+  --z-toast: 60;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-body);
+  font-family: var(--font-family-base);
+  line-height: var(--line-height-relaxed);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 3px;
+}
