@@ -83,11 +83,11 @@ const SupportStickyBar = () => {
 
   const hasMobileCheckoutElements = Boolean(matchPropertyDetails || isCheckoutContext);
   const bottomOffset = hasMobileCheckoutElements ? 96 : 20;
-  const bottomSpacing = `calc(env(safe-area-inset-bottom, 0px) + ${bottomOffset}px)`;
+  const bottomSpacing = `calc(var(--safe-area-bottom, env(safe-area-inset-bottom, 0px)) + ${bottomOffset}px)`;
 
   return (
     <div
-      className="fixed inset-x-4 md:inset-x-auto md:right-6 md:left-auto z-30"
+      className="fixed inset-x-4 md:inset-x-auto md:right-6 md:left-auto z-[var(--z-sticky)]"
       style={{ bottom: bottomSpacing }}
     >
       <div className="flex flex-col items-stretch gap-3 rounded-2xl bg-bg-surface px-4 py-3 shadow-level2 ring-1 ring-border-subtle md:flex-row md:items-center md:gap-4">

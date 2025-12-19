@@ -398,7 +398,7 @@ const PropertyDetails = () => {
 
                 {/* Amenities Modal */}
                 {showAmenitiesModal && (
-                    <div className="fixed inset-0 bg-[color:color-mix(in_srgb,var(--text-primary)_70%,transparent)] z-50 flex items-center justify-center p-4">
+                    <div className="fixed inset-0 bg-[color:color-mix(in_srgb,var(--text-primary)_70%,transparent)] z-[var(--z-modal)] flex items-center justify-center p-4">
                         <div className="bg-bg-surface rounded-lg max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-border-subtle shadow-level2">
                             <div className="flex items-center justify-between p-6 border-b border-border-subtle">
                                 <h3 className="text-xl sm:text-2xl font-semibold text-text-primary">All Amenities</h3>

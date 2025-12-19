@@ -425,7 +425,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
             </div>
 
             {openCalendar && (
-                <div ref={calendarRef} className="absolute right-0 z-50 bg-bg-surface shadow-level2 rounded-xl mt-2 overflow-hidden border border-border-subtle">
+                <div ref={calendarRef} className="absolute right-0 z-[var(--z-overlay)] bg-bg-surface shadow-level2 rounded-xl mt-2 overflow-hidden border border-border-subtle">
                     <DateRange
                         editableDateInputs={true}
                         onChange={handleDateChange}
@@ -465,7 +465,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
             {openGuests && (
                 <div
                     ref={guestMenuRef}
-                    className="absolute left-1/2 -translate-x-1/2 bg-bg-surface z-50 rounded-xl shadow-level2 border border-border-subtle p-4 overflow-y-auto"
+                    className="absolute left-1/2 -translate-x-1/2 bg-bg-surface z-[var(--z-overlay)] rounded-xl shadow-level2 border border-border-subtle p-4 overflow-y-auto"
                     style={{
                         width: '90%',          // Increased Width
                         maxHeight: '200px',    // Reduced Height
@@ -803,7 +803,10 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
                 </p>
             </div>
 
-            <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-bg-surface border-t border-border-subtle shadow-level2 px-4 py-3 flex items-center justify-between gap-3 z-40">
+            <div
+                className="lg:hidden fixed bottom-0 left-0 right-0 bg-bg-surface border-t border-border-subtle shadow-level2 px-4 py-3 flex items-center justify-between gap-3 z-[var(--z-sticky)]"
+                style={{ paddingBottom: 'calc(var(--safe-area-bottom, env(safe-area-inset-bottom, 0px)) + 0.75rem)' }}
+            >
                 <div className="flex flex-col text-xs text-text-muted">
                     <div className="font-semibold text-text-primary text-sm">{format(dates.startDate, 'dd MMM')} - {format(dates.endDate, 'dd MMM')}</div>
                     <div className="flex items-center gap-1 text-text-primary text-sm">

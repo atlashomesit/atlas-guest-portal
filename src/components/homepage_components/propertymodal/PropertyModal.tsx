@@ -45,7 +45,7 @@ const PropertyModal: React.FC<PropertyModalProps> = ({ property, onClose, handle
     console.log(property.id);
 
     return (
-        <section className="fixed inset-0 flex items-center justify-center w-full bg-[color:color-mix(in_srgb,var(--text-primary)_70%,transparent)] z-50">
+        <section className="fixed inset-0 flex items-center justify-center w-full bg-[color:color-mix(in_srgb,var(--text-primary)_70%,transparent)] z-[var(--z-modal)]">
             <div className="relative bg-bg-surface flex flex-col md:flex-row gap-5 rounded-lg shadow-level2 p-6 h-[70vh] md:h-[70vh] w-[80%] overflow-y-auto overflow-x-hidden text-text-primary">
                 {/* property image  */}
                 <div className="flex-1 h-full">
@@ -54,7 +54,7 @@ const PropertyModal: React.FC<PropertyModalProps> = ({ property, onClose, handle
                 {/* property details  */}
                 <div className="flex-1 flex flex-col gap-4">
                     {/* modal close button  */}
-                    <span onClick={onClose} className=" fixed right-2 top-2 cursor-pointer z-10 text-2xl text-[var(--text-contrast)] h-8 w-8 bg-[color:color-mix(in_srgb,var(--text-primary)_40%,transparent)] hover:bg-[color:color-mix(in_srgb,var(--text-primary)_60%,transparent)] flex justify-center items-center"><IoMdClose /></span>
+                    <span onClick={onClose} className=" fixed right-2 top-2 cursor-pointer z-[var(--z-dropdown)] text-2xl text-[var(--text-contrast)] h-8 w-8 bg-[color:color-mix(in_srgb,var(--text-primary)_40%,transparent)] hover:bg-[color:color-mix(in_srgb,var(--text-primary)_60%,transparent)] flex justify-center items-center"><IoMdClose /></span>
                     {/* title  */}
                     <div className="flex justify-between items-start">
                         <h2 className="text-xl font-bold ">{property.property_name}</h2>
