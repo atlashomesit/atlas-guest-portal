@@ -6,8 +6,9 @@
   --bg-muted: #e7dfc4;
 
   /* Text */
-  --text-primary: #1e2733;
-  --text-muted: #5d6674;
+  --text-primary: #1b2533;
+  --text-muted: #3f4a5a;
+  --text-body: #243041;
 
   /* Accent + CTA */
   --accent-primary: #a2bffe;
@@ -21,6 +22,10 @@
   --cta-primary-rgb: 79 111 159;
   --cta-primary-hover-rgb: 63 93 136;
   --cta-secondary-rgb: 111 139 189;
+  --brand: #2f4b86;
+  --brand-ink: #1f2f52;
+  --brand-contrast: #eef3ff;
+  --brand-soft: #e2e9fb;
 
   /* Borders */
   --border-subtle: #dcd3b3;
@@ -32,6 +37,10 @@
 
   /* Footer */
   --footer-bg: #162030;
+  --footer-text: #d8e1ed;
+  --footer-heading: #f3f6fb;
+  --footer-link: #c8d2de;
+  --footer-link-hover: #ffffff;
 
   /* Shadows */
   --shadow-level-1: 0 12px 32px rgba(30, 39, 51, 0.1);

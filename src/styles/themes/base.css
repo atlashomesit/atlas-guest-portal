@@ -29,6 +29,25 @@
   --radius-lg: 1rem;
   --radius-pill: 999px;
 
+  /* Design tokens */
+  --color-bg: var(--bg-primary);
+  --color-surface: var(--bg-surface);
+  --color-surface-muted: var(--bg-muted);
+  --text-strong: var(--text-primary);
+  --text-body: var(--text-primary);
+  --text-secondary: var(--text-muted);
+  --text-inverse: var(--text-contrast);
+  --brand: var(--cta-primary);
+  --brand-ink: #1f2c45;
+  --brand-contrast: #f4f7ff;
+  --border-default: var(--border-subtle);
+  --shadow-soft: var(--shadow-level-1);
+  --shadow-strong: var(--shadow-level-2);
+  --footer-text: color-mix(in srgb, var(--text-contrast) 82%, transparent);
+  --footer-heading: var(--text-contrast);
+  --footer-link: color-mix(in srgb, var(--text-contrast) 70%, transparent);
+  --footer-link-hover: #ffffff;
+
   /* Safe area insets */
   --safe-area-top: env(safe-area-inset-top, 0px);
   --safe-area-right: env(safe-area-inset-right, 0px);
@@ -47,7 +66,7 @@
 
 body {
   background-color: var(--bg-primary);
-  color: var(--text-primary);
+  color: var(--text-body);
   font-family: var(--font-family-base);
   line-height: var(--line-height-relaxed);
   text-rendering: optimizeLegibility;

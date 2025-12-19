@@ -7,6 +7,7 @@ import { LISTINGS, type Listing } from "../../../data/listings";
 import { sanitizeItems, getItemKey } from "../../../utils/sanitizeItems";
 import { LOGO_URL } from "../../../config/branding";
 import { trackEvent } from "../../../utils/analytics";
+import Heading from "../../commonComponents/heading/Heading";
 
 import "./homepage_location.css";
 import "slick-carousel/slick/slick.css";
@@ -235,16 +236,7 @@ const HomePage_Locations = ({ listings = LISTINGS }: HomePageLocationsProps) => 
   return (
     <section className="py-12 px-4 sm:px-6 lg:px-8 bg-bg-surface">
       <div className="max-w-7xl mx-auto">
-        <div className="py-16 text-[var(--text-contrast)] md:pb-6 md:pt-8 tracking-wide flex justify-center items-center text-xl md:text-2xl lg:text-5xl font-medium relative">
-          <p
-            className="relative after:content-[''] bg-accent-primary px-6 py-1 font-semibold rounded-lg 
-            after:absolute after:left-0 after:-bottom-2 after:w-full after:h-[3px] 
-            after:bg-accent-primary after:rounded-full after:transition-all after:duration-500 
-            after:ease-in-out hover:after:w-0 cursor-pointer"
-          >
-            Our Homes
-          </p>
-        </div>
+        <Heading title="Our Homes" />
 
         {penthouse && (
           <div className="mb-6 w-full">
