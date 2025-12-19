@@ -8,14 +8,18 @@ import { trackEvent } from "../../utils/analytics";
 import { hasVisibleModal } from "../../utils/modals";
 import { buildWaLink } from "../../utils/whatsapp";
 
-const SupportStickyBar = () => {
+interface SupportStickyBarProps {
+  hidden?: boolean;
+}
+
+const SupportStickyBar = ({ hidden = false }: SupportStickyBarProps) => {
   const location = useLocation();
   const matchPropertyDetails = useMatch("/property_details/:id");
   const isCheckoutContext = /checkout|reserve/i.test(location.pathname);
   const [pageUrl, setPageUrl] = useState("");
   const [isHiddenForModal, setIsHiddenForModal] = useState(false);
 
-  const shouldShow = (matchPropertyDetails || isCheckoutContext) && !isHiddenForModal;
+  const shouldShow = (matchPropertyDetails || isCheckoutContext) && !isHiddenForModal && !hidden;
 
   useEffect(() => {
     if (typeof window === "undefined") return;

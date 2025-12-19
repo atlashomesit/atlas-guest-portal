@@ -58,11 +58,14 @@ Add a `surface` string for every UI trigger to simplify downstream filtering. Pa
 | `support_whatsapp` | WhatsApp links (launcher, sticky bar) | `surface`, identifiers |
 | `support_call` | Phone links (launcher, sticky bar) | `surface`, identifiers |
 | `support_faq` | FAQ navigation from Support Launcher | `surface`, identifiers |
-| `chat_opened` | Support launcher expanded | `surface`, identifiers |
-| `chat_message_sent` | User sends a chatbot message | `surface`, `source`, `intent`, `wordCount`, identifiers |
+| `chat_pill_viewed` | Chat pill becomes visible | `surface`, identifiers |
+| `chat_opened` | Chat widget expanded | `surface`, identifiers, `entryPoint` (launcher/button) |
+| `chat_minimized` | Chat widget minimized | `surface`, identifiers |
+| `chat_message_sent` | User sends a chatbot message | `surface`, `messageType` (`text`/`quick_action`), `intent`, `charCount`, identifiers |
 | `chat_quick_action_clicked` | Quick action chip clicked | `id`, `label`, `surface`, identifiers |
-| `chat_escalated_whatsapp` | Escalation keywords/actions detected | `surface`, `source`, identifiers |
-| `chat_callback_cta_clicked` | Callback CTA opened | `surface`, identifiers |
+| `chat_escalated_whatsapp` | Escalation keywords/actions detected or CTA clicked | `surface`, `source`, identifiers |
+| `chat_callback_started` | Callback mini-flow opened inside chat | `surface`, identifiers |
+| `chat_callback_submitted` | Callback form submitted from chat | `surface`, identifiers |
 
 ### Callback and chat events
 
@@ -71,11 +74,14 @@ Add a `surface` string for every UI trigger to simplify downstream filtering. Pa
 | `callback_bar_viewed` | Callback bar, banner, or CTA loads | `surface`, identifiers (`listingId`, `unitCode`, `route`) |
 | `callback_submitted` | Callback lead submitted successfully | `surface`, identifiers, `submissionId` (generated client id), `attempt` (ordinal). Do **not** include phone/email. |
 | `callback_submit_failed` | Callback submission request errors | `surface`, identifiers, `error` (non-PII message or code), `attempt` |
+| `chat_pill_viewed` | Chat pill is rendered | `surface`, identifiers |
 | `chat_opened` | Chat UI opened or expanded | `surface`, identifiers, `entryPoint` (launcher button, inline prompt, hotkey) |
-| `chat_message_sent` | User sends a chat message | `surface`, identifiers, `messageType` (`text`/`quick_action`), `charCount` (omit message body) |
+| `chat_minimized` | Chat minimized back to the pill | `surface`, identifiers |
+| `chat_message_sent` | User sends a chat message | `surface`, identifiers, `messageType` (`text`/`quick_action`), `intent`, `charCount` (omit message body) |
 | `chat_quick_action_clicked` | Quick action/pill tapped in chat | `surface`, identifiers, `actionId`, `actionLabel` (ui copy) |
 | `chat_escalated_whatsapp` | Chat handoff to WhatsApp is initiated | `surface`, identifiers |
-| `chat_callback_cta_clicked` | Chat inline callback CTA clicked | `surface`, identifiers |
+| `chat_callback_started` | Callback form opened from chat | `surface`, identifiers |
+| `chat_callback_submitted` | Chat inline callback submitted | `surface`, identifiers |
 
 ### Integration points (existing)
 
