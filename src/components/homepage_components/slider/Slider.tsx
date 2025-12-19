@@ -1,14 +1,16 @@
 import { Link } from 'react-router-dom';
+import { CalendarClock, CheckCircle2, Receipt, ShieldCheck } from 'lucide-react';
 import { LOGO_URL } from '../../../config/branding';
 import { trackEvent } from '../../../utils/analytics';
+import { FeatureBadge } from '../../ui/FeatureBadge';
 
 const HERO_IMAGE = 'https://atlashomestorage.blob.core.windows.net/listing-images/fallback.jpeg';
 
 const uspItems = [
-  'Verified homes',
-  'Secure Razorpay payments',
-  'No hidden fees',
-  'Flexible cancellation',
+  { label: 'Verified homes', icon: CheckCircle2 },
+  { label: 'Secure Razorpay payments', icon: ShieldCheck },
+  { label: 'No hidden fees', icon: Receipt },
+  { label: 'Flexible cancellation', icon: CalendarClock },
 ];
 
 const Slider = () => {
@@ -61,14 +63,15 @@ const Slider = () => {
       </div>
 
       <div className="bg-bg-surface">
-        <div className="mx-auto grid max-w-5xl grid-cols-1 gap-3 px-6 py-6 sm:grid-cols-2 lg:grid-cols-4">
-          {uspItems.map((usp) => (
-            <div
-              key={usp}
-              className="rounded-2xl border border-border-subtle bg-bg-muted px-4 py-4 text-center shadow-level1"
-            >
-              <p className="text-sm font-semibold text-text-primary">{usp}</p>
-            </div>
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-3 px-6 py-6">
+          {uspItems.map(({ label, icon }) => (
+            <FeatureBadge
+              key={label}
+              icon={icon}
+              label={label}
+              tone="linen"
+              className="min-w-[240px] justify-center sm:min-w-[0]"
+            />
           ))}
         </div>
       </div>
