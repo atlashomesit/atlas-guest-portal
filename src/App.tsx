@@ -24,6 +24,7 @@ import ShortLinkRedirect from "./components/ShortLinkRedirect"
 import SupportLauncher from "./components/support/SupportLauncher"
 import FloatingWhatsAppButton from "./components/support/FloatingWhatsAppButton"
 import HelpLauncher from "./components/support/HelpLauncher"
+import SupportStickyBar from "./components/support/SupportStickyBar"
 
 function AppWrapper() {
   const location = useLocation();
@@ -63,6 +64,7 @@ function AppWrapper() {
       <SupportLauncher />
       <HelpLauncher />
       <FloatingWhatsAppButton />
+      <SupportStickyBar />
       <Footer />
     </>
   );
