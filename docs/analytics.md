@@ -1,6 +1,6 @@
 ## Analytics overview
 
-This project includes a lightweight analytics helper that standardizes event payloads and keeps them network-safe by default. Events are enriched with the current environment (`dev` or `prod`), route context, timestamps, and relevant identifiers (listing/unit/property codes) so future backends can ingest consistent telemetry.
+This project includes a lightweight analytics helper that standardizes event payloads and keeps them network-safe by default. Events are enriched with the current environment (`dev` or `prod`), route context, timestamps, and relevant identifiers (listing/unit/property codes) so future backends can ingest consistent telemetry. Always pass a `surface` string so downstream consumers can filter by UI origin, and never include PII (phone numbers, email addresses, raw chat text, etc.).
 
 ### Helper usage
 
@@ -31,11 +31,22 @@ The helper maps `import.meta.env.MODE` to:
 
 Every event includes an `env` field so downstream services can segment traffic automatically.
 
+### Payload hygiene
+
+All events automatically attach:
+
+- `env`: `dev` or `prod`
+- `route`: current pathname or the provided override
+- `timestamp`: ISO string
+- Identifiers: `listingId`, `unitCode`, and/or `propertyId` when provided
+
+Add a `surface` string for every UI trigger to simplify downstream filtering. Payloads must stay PII-free: capture metadata (counts, states, action identifiers), not phone numbers, email addresses, or free-form chat text.
+
 ### Current events and payloads
 
 | Event | When it fires | Key payload fields |
 | --- | --- | --- |
-| `home_view` | Home page mount | `listings` (available homes) |
+| `home_view` | Home page mount | `surface`, `listings` (available homes) |
 | `listings_browse` | Home locations grid render, Apartments page filter changes, hero CTA | `surface`, `total`, `featured`, `sortBy`, `guests`, `minPrice`, `maxPrice`, `propertyType`, `petFriendlyOnly` |
 | `listing_selected` | Selecting a listing card | `surface`, `listingName`, identifiers (`listingId`, `unitCode`, `route`) |
 | `listing_view` | Property details page loads | `propertyName`, `price`, identifiers |
@@ -53,12 +64,18 @@ Every event includes an `env` field so downstream services can segment traffic a
 | `chat_escalated_whatsapp` | Escalation keywords/actions detected | `surface`, `source`, identifiers |
 | `chat_callback_cta_clicked` | Callback CTA opened | `surface`, identifiers |
 
-All events automatically attach:
+### Callback and chat events
 
-- `env`: `dev` or `prod`
-- `route`: current pathname or the provided override
-- `timestamp`: ISO string
-- Identifiers: `listingId`, `unitCode`, and/or `propertyId` when provided
+| Event | When it fires | Expected payload fields |
+| --- | --- | --- |
+| `callback_bar_viewed` | Callback bar, banner, or CTA loads | `surface`, identifiers (`listingId`, `unitCode`, `route`) |
+| `callback_submitted` | Callback lead submitted successfully | `surface`, identifiers, `submissionId` (generated client id), `attempt` (ordinal). Do **not** include phone/email. |
+| `callback_submit_failed` | Callback submission request errors | `surface`, identifiers, `error` (non-PII message or code), `attempt` |
+| `chat_opened` | Chat UI opened or expanded | `surface`, identifiers, `entryPoint` (launcher button, inline prompt, hotkey) |
+| `chat_message_sent` | User sends a chat message | `surface`, identifiers, `messageType` (`text`/`quick_action`), `charCount` (omit message body) |
+| `chat_quick_action_clicked` | Quick action/pill tapped in chat | `surface`, identifiers, `actionId`, `actionLabel` (ui copy) |
+| `chat_escalated_whatsapp` | Chat handoff to WhatsApp is initiated | `surface`, identifiers |
+| `chat_callback_cta_clicked` | Chat inline callback CTA clicked | `surface`, identifiers |
 
 ### Integration points (existing)
 

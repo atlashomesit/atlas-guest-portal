@@ -135,6 +135,7 @@ const PropertyDetails = () => {
         trackEvent(
             'listing_view',
             {
+                surface: 'property_details',
                 propertyName: data.property_name,
                 price: data.property_price,
             },

@@ -20,7 +20,7 @@ const Home = () => {
         console.log('Home component mounted');
         console.log('propertyData:', propertyData);
         console.log('propertyImages:', propertyImages);
-        trackEvent('home_view', { listings: propertyData.length });
+        trackEvent('home_view', { surface: 'home', listings: propertyData.length });
     }, []);
     
     return (
