@@ -83,7 +83,13 @@ const HomePage_Locations = ({ listings = LISTINGS }: HomePageLocationsProps) => 
 
   const NextArrow = ({ onClick, className }: any) => (
     <div
-      className={`w-8 h-8 bg-black/60 text-white rounded-full flex items-center justify-center cursor-pointer ${className}`}
+      className={`w-8 h-8 text-[color:var(--text-contrast)] rounded-full flex items-center justify-center cursor-pointer ${className}`}
+      style={{
+        background:
+          "color-mix(in srgb, var(--text-primary) 62%, transparent)",
+        boxShadow: "0 8px 18px color-mix(in srgb, var(--text-primary) 28%, transparent)",
+        backdropFilter: "blur(2px)",
+      }}
       onClick={(e) => {
         e.stopPropagation();
         onClick?.();
@@ -95,7 +101,13 @@ const HomePage_Locations = ({ listings = LISTINGS }: HomePageLocationsProps) => 
 
   const PrevArrow = ({ onClick, className }: any) => (
     <div
-      className={`w-8 h-8 bg-black/60 text-white rounded-full flex items-center justify-center cursor-pointer ${className}`}
+      className={`w-8 h-8 text-[color:var(--text-contrast)] rounded-full flex items-center justify-center cursor-pointer ${className}`}
+      style={{
+        background:
+          "color-mix(in srgb, var(--text-primary) 62%, transparent)",
+        boxShadow: "0 8px 18px color-mix(in srgb, var(--text-primary) 28%, transparent)",
+        backdropFilter: "blur(2px)",
+      }}
       onClick={(e) => {
         e.stopPropagation();
         onClick?.();

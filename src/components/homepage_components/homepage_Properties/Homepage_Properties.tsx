@@ -81,7 +81,12 @@ const Homepage_Properties = () => {
                                     Modal View Button
                                     <span
                                         onClick={handleModal(data)}
-                                        className="absolute right-3 bottom-3 cursor-pointer z-[var(--z-dropdown)] text-2xl text-white h-8 w-8 bg-black/50 flex justify-center items-center rounded-full"
+                                        className="absolute right-3 bottom-3 cursor-pointer z-[var(--z-dropdown)] text-2xl text-[color:var(--text-contrast)] h-8 w-8 flex justify-center items-center rounded-full shadow-lg"
+                                        style={{
+                                            background:
+                                                "color-mix(in srgb, var(--text-primary) 60%, transparent)",
+                                            backdropFilter: "blur(2px)",
+                                        }}
                                     >
                                         <RxOpenInNewWindow />
                                     </span>
