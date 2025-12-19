@@ -72,7 +72,7 @@ const Homepage_Testimonial = () => {
                         slidesPerView={1}
                         pagination={{
                             clickable: true,
-                            bulletClass: 'swiper-pagination-bullet bg-primary w-2 h-2 inline-block rounded-full mx-1 opacity-60 cursor-pointer transition-opacity',
+                            bulletClass: 'swiper-pagination-bullet bg-accent-primary w-2 h-2 inline-block rounded-full mx-1 opacity-60 cursor-pointer transition-opacity',
                             bulletActiveClass: 'swiper-pagination-bullet-active opacity-100',
                         }}
                         navigation={{

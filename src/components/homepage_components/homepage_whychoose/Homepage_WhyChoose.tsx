@@ -59,7 +59,7 @@ const Homepage_WhyChoose = () => {
                     <div className="flex-1 relative">
                         <div className="relative z-10 rounded-xl overflow-hidden shadow-2xl transform transition duration-500 hover:-translate-y-2">
                             <img src={featureData.images[0]} alt="Luxury accommodation" className="w-full h-80 lg:h-96 object-cover" />
-                            <div className="absolute inset-0 bg-primary/10 mix-blend-multiply"></div>
+                            <div className="absolute inset-0 bg-accent-primary/10 mix-blend-multiply"></div>
                         </div>
                         <img
                             src={featureData.images[1]}
@@ -72,7 +72,7 @@ const Homepage_WhyChoose = () => {
                     <div className="flex-1">
                         <h2 className="text-3xl lg:text-4xl font-bold text-text-primary relative mb-4">
                             {featureData.title}
-                            <span className="absolute -bottom-2 left-0 w-1/4 h-1 bg-primary rounded-full"></span>
+                            <span className="absolute -bottom-2 left-0 w-1/4 h-1 bg-accent-primary rounded-full"></span>
                         </h2>
                         <p className="text-text-muted leading-relaxed mb-6">{featureData.description}</p>
 
@@ -83,12 +83,12 @@ const Homepage_WhyChoose = () => {
                                     key={index}
                                     onClick={() => setActiveFeature(index)}
                                     className={`p-4 rounded-lg transition-all duration-300 cursor-pointer flex items-start gap-4 border-l-4 ${activeFeature === index
-                                        ? 'bg-bg-surface shadow-level1 border-primary'
+                                        ? 'bg-bg-surface shadow-level1 border-accent-primary'
                                         : 'border-transparent hover:bg-bg-surface'
                                         }`}
                                 >
                                     <div
-                                        className={`p-2 rounded-full ${activeFeature === index ? 'bg-primary text-[var(--text-contrast)]' : 'bg-primary/10 text-primary'
+                                        className={`p-2 rounded-full ${activeFeature === index ? 'bg-accent-primary text-[var(--text-contrast)]' : 'bg-accent-primary/10 text-accent-primary'
                                             }`}
                                     >
                                         <MdOutlineDone className="text-xl" />
