@@ -30,3 +30,9 @@ Use the shared design tokens to keep contrast and hierarchy consistent across At
 - **Footer.** Always use `--footer-bg` with `--footer-text` for body copy and `--footer-link` plus `--footer-link-hover` for links.
 
 Follow these tokens before adding new colors; update this guide when introducing additional theme values.
+
+## Listing cards
+
+- Show a single-line **quick facts row** of small icon chips (guests, bedrooms when available, Wi-Fi, parking/pet flags). Chips should wrap on small screens and hide gracefully when data is missing.
+- Keep price and CTAs in one grouped block: price on the left with `/night` and fee note, primary “View details” button on the right. Secondary CTAs are optional; match button styles to brand tokens.
+- Preserve existing rating and property-type badges; do not reduce current information density or responsiveness.
