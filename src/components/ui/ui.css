@@ -161,3 +161,46 @@
   line-height: var(--line-height-relaxed);
   color: var(--text-muted);
 }
+
+.rb-feature-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-level-1);
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  letter-spacing: -0.01em;
+  transition:
+    transform 150ms ease,
+    box-shadow 150ms ease,
+    border-color 150ms ease,
+    background-color 150ms ease;
+}
+
+.rb-feature-badge--linen {
+  background: color-mix(in srgb, var(--bg-muted) 80%, var(--bg-surface) 20%);
+}
+
+.rb-feature-badge__icon svg {
+  width: 1rem;
+  height: 1rem;
+  color: var(--accent-primary);
+}
+
+.rb-feature-badge:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-level-2);
+  border-color: color-mix(in srgb, var(--border-subtle) 55%, var(--accent-primary) 45%);
+  background: color-mix(in srgb, var(--bg-surface) 85%, var(--bg-muted) 15%);
+}
+
+.rb-feature-badge:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent-primary) 80%, transparent);
+  outline-offset: 2px;
+  box-shadow: var(--shadow-level-2);
+}
