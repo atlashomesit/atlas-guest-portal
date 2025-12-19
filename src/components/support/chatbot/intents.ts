@@ -99,18 +99,43 @@ export const intents: IntentDefinition[] = [
   },
 ];
 
-export const escalationKeywords = ["agent", "human", "call", "callback", "phone", "someone", "team"];
+export const escalationKeywords = ["agent", "human", "call", "callback", "phone", "someone", "team", "help", "support", "whatsapp"];
 
 export const quickActions: QuickAction[] = [
   {
-    id: "pricing",
-    label: "Pricing & availability",
-    prompt: "Can you help me check pricing and availability for this stay?",
+    id: "checkin",
+    label: "Check-in / Check-out",
+    prompt: "What are the check-in and check-out timings?",
   },
   {
-    id: "rules",
-    label: "Check-in rules",
-    prompt: "What are the check-in and check-out rules?",
+    id: "early_checkin",
+    label: "Early check-in?",
+    prompt: "Can I get an early check-in or late check-out?",
+  },
+  {
+    id: "cancellation",
+    label: "Cancellation policy",
+    prompt: "What is your cancellation policy?",
+  },
+  {
+    id: "extra_guest",
+    label: "Extra guests & charges",
+    prompt: "Are extra guests allowed and are there any charges?",
+  },
+  {
+    id: "id_required",
+    label: "ID required?",
+    prompt: "Do you need government ID for all guests?",
+  },
+  {
+    id: "parking",
+    label: "Parking",
+    prompt: "Is parking available at the property?",
+  },
+  {
+    id: "location",
+    label: "Location / Maps",
+    prompt: "Can you share the location or Google Maps pin?",
   },
   {
     id: "talk_human",
