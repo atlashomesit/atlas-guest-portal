@@ -136,9 +136,10 @@ const SupportWidget = () => {
 
       {isOpen ? (
         <div
-          className="fixed right-3 z-[var(--z-floating)] w-[min(92vw,420px)] overflow-hidden rounded-3xl border border-[color-mix(in_srgb,var(--border-subtle)_80%,transparent)] bg-[color-mix(in_srgb,var(--bg-surface)_97%,#f7f4ed_8%)] text-text-primary shadow-level4 ring-1 ring-border-subtle backdrop-blur md:right-5"
-          style={{ bottom: bottomSpacing }}
-        >
+  className="fixed right-3 z-[var(--z-floating)] w-[min(92vw,420px)] overflow-hidden rounded-3xl border border-[color-mix(in_srgb,var(--border-subtle)_80%,transparent)] bg-[color-mix(in_srgb,var(--bg-surface)_97%,#f7f4ed_8%)] text-text-primary shadow-level4 ring-1 ring-border-subtle backdrop-blur md:right-5"
+  style={{ bottom: bottomSpacing, top: '5px' }}
+>
+
           <div className="flex items-start justify-between gap-3 bg-[color-mix(in_srgb,var(--bg-surface)_96%,#f2efe8_18%)] px-4 py-3">
             <div className="flex flex-col gap-0.5">
               <p className="text-sm font-semibold text-text-primary">Need a hand?</p>
@@ -287,16 +288,6 @@ const SupportWidget = () => {
                   className="w-full resize-none rounded-xl border border-border-subtle bg-bg-muted p-3 text-sm text-text-muted outline-none"
                   placeholder="Messaging coming soon"
                 />
-                <div className="flex items-center justify-between text-[11px] text-text-muted">
-                  <span>We&apos;ll keep this minimized so it never blocks your CTAs.</span>
-                  <button
-                    type="button"
-                    onClick={handleClose}
-                    className="rounded-full px-3 py-1 text-xs font-semibold text-cta-primary underline underline-offset-2"
-                  >
-                    Collapse
-                  </button>
-                </div>
               </div>
             </div>
           </div>

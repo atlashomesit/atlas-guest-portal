@@ -158,7 +158,8 @@ const Slider = () => {
         className="relative isolate overflow-hidden min-h-[75vh] md:min-h-[70vh] flex items-center justify-center bg-cover bg-center bg-no-repeat"
         style={{ backgroundImage: `${HERO_OVERLAY}, url(${HERO_IMAGE})` }}
       >
-        <div className="relative z-10 flex flex-col items-center gap-7 px-6 py-12 text-center max-w-4xl">
+        <div className="relative top-[40px] z-10 flex flex-col items-center gap-7 px-6 py-12 text-center max-w-4xl">
+
           <Link to="/" className="flex items-center gap-3">
             <img src={LOGO_URL} alt="Atlas Homestays" className="h-14 w-auto rounded-md bg-[color:color-mix(in_srgb,var(--bg-surface)_80%,transparent)] p-2 shadow-level1" />
             <span className="text-xl font-semibold text-[var(--text-contrast)] tracking-wide">Atlas Homestays</span>
