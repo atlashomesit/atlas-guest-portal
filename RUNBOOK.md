@@ -10,6 +10,7 @@ This runbook captures the day-to-day operational tasks for the Atlas Homes Front
    npm run build
    ```
 3. Confirm `dist/` is generated without TypeScript or ESLint errors.
+4. When adding or adjusting themes, follow the [Design system and theming guide](docs/design-system.md) for token usage, z-index scale, and safe-area requirements.
 
 ## Deployment (Cloudflare Pages)
 1. Merge or push the desired commit to the `main` branch; Cloudflare Pages automatically runs `npm run build` and publishes the static bundle.
