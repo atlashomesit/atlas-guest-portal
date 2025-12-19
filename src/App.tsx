@@ -21,6 +21,7 @@ import BlogHome from "./pages/blog/BlogHome"
 import BlogCategory from "./pages/blog/BlogCategory"
 import BlogPostPage from "./pages/blog/BlogPostPage"
 import ShortLinkRedirect from "./components/ShortLinkRedirect"
+import CallbackRequestBar from "./components/support/CallbackRequestBar"
 import FloatingWhatsAppButton from "./components/support/FloatingWhatsAppButton"
 import HelpLauncher from "./components/support/HelpLauncher"
 import SupportStickyBar from "./components/support/SupportStickyBar"
@@ -60,6 +61,7 @@ function AppWrapper() {
         <Route path="/:shortCode" element={<ShortLinkRedirect />} />
         <Route path="/*" element={<PageNotFound />} />
       </Routes>
+      <CallbackRequestBar />
       <HelpLauncher />
       <FloatingWhatsAppButton />
       <SupportStickyBar />
