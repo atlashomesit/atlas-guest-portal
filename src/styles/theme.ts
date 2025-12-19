@@ -63,6 +63,21 @@ export const designTokens = {
     level1: "var(--shadow-level-1)",
     level2: "var(--shadow-level-2)",
   },
+  zIndex: {
+    base: "var(--z-base)",
+    dropdown: "var(--z-dropdown)",
+    sticky: "var(--z-sticky)",
+    floating: "var(--z-floating)",
+    overlay: "var(--z-overlay)",
+    modal: "var(--z-modal)",
+    toast: "var(--z-toast)",
+  },
+  safeArea: {
+    top: "var(--safe-area-top)",
+    right: "var(--safe-area-right)",
+    bottom: "var(--safe-area-bottom)",
+    left: "var(--safe-area-left)",
+  },
 } as const;
 
 export type DesignTokens = typeof designTokens;

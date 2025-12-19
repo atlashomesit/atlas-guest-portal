@@ -242,7 +242,7 @@ const Homepage_LocationDetails = () => {
                                     </div>
                                     <span
                                         onClick={handleModal(data)}
-                                        className="absolute right-2 top-2 cursor-pointer z-10 bg-[color:color-mix(in_srgb,var(--bg-surface)_60%,transparent)] hover:bg-bg-surface p-1 rounded-full"
+                                        className="absolute right-2 top-2 cursor-pointer z-[var(--z-dropdown)] bg-[color:color-mix(in_srgb,var(--bg-surface)_60%,transparent)] hover:bg-bg-surface p-1 rounded-full"
                                     >
                                         <RxOpenInNewWindow size={18} />
                                     </span>

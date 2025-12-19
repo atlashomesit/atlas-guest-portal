@@ -68,7 +68,7 @@ const MoreMenu = ({ items, onNavigate }: MoreMenuProps) => {
                     id="more-menu"
                     ref={menuRef}
                     role="menu"
-                    className="absolute right-0 mt-2 bg-bg-surface border border-border-subtle rounded-xl shadow-level2 min-w-[180px] py-2 z-10"
+                    className="absolute right-0 mt-2 bg-bg-surface border border-border-subtle rounded-xl shadow-level2 min-w-[180px] py-2 z-[var(--z-dropdown)]"
                 >
                     {visibleItems.map((item, index) => (
                         item.external ? (

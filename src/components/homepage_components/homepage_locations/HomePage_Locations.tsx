@@ -176,7 +176,7 @@ const HomePage_Locations = ({ listings = LISTINGS }: HomePageLocationsProps) => 
           <NextArrow className="absolute right-2 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-300" onClick={() => sliderRef.current?.slickNext()} />
 
           {/* Custom dots overlay */}
-          <div className="absolute bottom-3 left-1/2 transform -translate-x-1/2 z-50 flex gap-2">
+          <div className="absolute bottom-3 left-1/2 transform -translate-x-1/2 z-[var(--z-overlay)] flex gap-2">
             {getVisibleDots().map((idx) => (
               <button
                 key={idx}

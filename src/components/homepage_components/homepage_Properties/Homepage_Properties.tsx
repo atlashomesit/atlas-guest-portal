@@ -81,7 +81,7 @@ const Homepage_Properties = () => {
                                     Modal View Button
                                     <span
                                         onClick={handleModal(data)}
-                                        className="absolute right-3 bottom-3 cursor-pointer z-10 text-2xl text-white h-8 w-8 bg-black/50 flex justify-center items-center rounded-full"
+                                        className="absolute right-3 bottom-3 cursor-pointer z-[var(--z-dropdown)] text-2xl text-white h-8 w-8 bg-black/50 flex justify-center items-center rounded-full"
                                     >
                                         <RxOpenInNewWindow />
                                     </span>
@@ -107,7 +107,7 @@ const Homepage_Properties = () => {
                                     <p className="text-sm text-text-muted">{data.property_location}</p>
                                 </div>
                                 Batch
-                                <span className="absolute z-40 top-5 left-0 bg-danger text-[var(--text-contrast)] px-3 py-2">
+                                <span className="absolute z-[var(--z-overlay)] top-5 left-0 bg-danger text-[var(--text-contrast)] px-3 py-2">
                                     <h2 className="text-sm tracking-wider font-normal ">{data.property_deal}</h2>
                                 </span>
                             </div>
