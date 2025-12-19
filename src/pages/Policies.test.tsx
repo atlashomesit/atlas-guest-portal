@@ -59,8 +59,13 @@ describe('Policies links in footer', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByText('Policies').closest('a')).toHaveAttribute('href', '/policies');
-    expect(screen.getByText('FAQs').closest('a')).toHaveAttribute('href', '/faq');
-    expect(screen.getByText('Terms').closest('a')).toHaveAttribute('href', '/terms');
+    const policyLinks = screen.getAllByText('Policies').map((node) => node.closest('a'));
+    expect(policyLinks.some((link) => link?.getAttribute('href') === '/policies')).toBe(true);
+
+    const faqLinks = screen.getAllByText('FAQs').map((node) => node.closest('a'));
+    expect(faqLinks.some((link) => link?.getAttribute('href') === '/faq')).toBe(true);
+
+    const termsLinks = screen.getAllByText('Terms').map((node) => node.closest('a'));
+    expect(termsLinks.some((link) => link?.getAttribute('href') === '/terms')).toBe(true);
   });
 });

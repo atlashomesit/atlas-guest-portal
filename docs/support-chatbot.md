@@ -3,9 +3,9 @@
 This doc captures the lightweight intent engine, triggers, and escalation rules for the floating support launcher.
 
 ## Surface overview
-- **SupportLauncher** (`src/components/support/SupportLauncher.tsx`): single floating trigger that opens a panel with WhatsApp, FAQ, call, and callback shortcuts plus a chatbot area.
-- **CallbackRequestBar** (`src/components/support/CallbackRequestBar.tsx`): safe-area-aware bar for collecting a phone number and optional note; invoked from the launcher or callback-related intents.
-- **Intent engine** (`src/components/support/chatbot/intents.ts`): keyword-based matcher returning canned responses and quick-action chips.
+- **SupportWidget** (`src/components/support/SupportWidget.tsx`): single floating trigger that opens a panel with WhatsApp, FAQ, call, and callback shortcuts plus a chat placeholder. It handles offsets near the footer so it does not block CTAs or banners.
+- **CallbackRequestBar** (`src/components/support/CallbackRequestBar.tsx`): legacy safe-area-aware bar for collecting a phone number and optional note; keep for reference when wiring future flows.
+- **Intent engine** (`src/components/support/chatbot/intents.ts`): keyword-based matcher returning canned responses and quick-action chips (kept for future richer chat UI).
 
 ## Intents
 The intent file defines keyword maps and responses. Current intents include:
@@ -52,5 +52,5 @@ Add new events in `src/utils/analytics.ts` and document them in `docs/analytics.
 ## Content updates
 1) Edit responses/keywords in `src/components/support/chatbot/intents.ts`.
 2) Adjust quick actions there; match prompts to the UX copy.
-3) If adding new escalation paths, update `escalationKeywords` and the handling logic in `SupportLauncher.tsx`.
+3) If adding new escalation paths, update `escalationKeywords` and the handling logic in `SupportWidget.tsx` (or the chat shell you introduce).
 4) Keep analytics payloads in sync with `docs/analytics.md` so dashboards remain accurate.

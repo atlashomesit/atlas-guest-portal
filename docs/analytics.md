@@ -51,10 +51,11 @@ Add a `surface` string for every UI trigger to simplify downstream filtering. Pa
 | `listing_selected` | Selecting a listing card | `surface`, `listingName`, identifiers (`listingId`, `unitCode`, `route`) |
 | `listing_view` | Property details page loads | `propertyName`, `price`, identifiers |
 | `dates_selected` | Date picker selection in booking form | `startDate`, `endDate`, `nights`, `guests`, identifiers |
+| `availability_search` | Users submit a date/guest search (hero form, booking form) | `surface`, `startDate`, `endDate`, `guests`, identifiers |
 | `reserve_click` | Reserve/Book CTA click | `termsAccepted`, `hasSelection`, `guests`, `nights`, identifiers |
-| `checkout_start` | Razorpay checkout initialization | `bookingId`, `total`, `nights`, `guests`, identifiers |
+| `checkout_started` | Razorpay checkout initialization | `bookingId`, `total`, `nights`, `guests`, identifiers |
 | `payment_success` | Payment success handler | `bookingId`, `paymentId`, `total`, identifiers |
-| `payment_failure` | Payment failure handler | `bookingId`, `reason`, identifiers |
+| `payment_failed` | Payment failure handler | `bookingId`, `reason`, identifiers |
 | `support_whatsapp` | WhatsApp links (launcher, sticky bar) | `surface`, identifiers |
 | `support_call` | Phone links (launcher, sticky bar) | `surface`, identifiers |
 | `support_faq` | FAQ navigation from Support Launcher | `surface`, identifiers |
@@ -91,7 +92,7 @@ Add a `surface` string for every UI trigger to simplify downstream filtering. Pa
 - Apartments browse & filter changes (`src/pages/Apartments.tsx`)
 - Property details view (`src/components/homepage_components/homepage_Propertydetails/Homepage_PropertyDetails.tsx`)
 - Booking form interactions (`src/components/homepage_components/hotelBooking_form/HotelBooking_Form.tsx`)
-- Support surfaces (`src/components/support/SupportLauncher.tsx`, `SupportStickyBar.tsx`)
+- Support surfaces (`src/components/support/SupportWidget.tsx`)
 
 ### Adding a backend transport
 

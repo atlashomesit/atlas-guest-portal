@@ -231,6 +231,17 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
             { propertyId, listingId: propertyId, unitCode: propertyId },
         );
 
+        trackEvent(
+            'availability_search',
+            {
+                surface: 'booking_form',
+                startDate: dates.startDate.toISOString(),
+                endDate: dates.endDate.toISOString(),
+                guests: totalPeople,
+            },
+            { propertyId, listingId: propertyId, unitCode: propertyId },
+        );
+
         if (!termsAccepted) {
             alert('Please confirm the Terms & Conditions before reserving.');
             return;
@@ -257,7 +268,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         const bookingId = `ATLAS-${propertyId}-${Date.now()}`;
 
         trackEvent(
-            'checkout_start',
+            'checkout_started',
             {
                 surface: 'booking_form',
                 bookingId,
@@ -323,11 +334,11 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
                 reason: `${failureReason} Please try again or choose a different method.`,
             });
             setIsLoading(false);
-            trackEvent(
-                'payment_failure',
-                { surface: 'booking_form', bookingId, reason: failureReason },
-                { propertyId, listingId: propertyId, unitCode: propertyId },
-            );
+                trackEvent(
+                    'payment_failed',
+                    { surface: 'booking_form', bookingId, reason: failureReason },
+                    { propertyId, listingId: propertyId, unitCode: propertyId },
+                );
         });
     };
 

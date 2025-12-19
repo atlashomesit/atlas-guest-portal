@@ -133,6 +133,17 @@ const Slider = () => {
     });
 
     trackEvent(
+      'availability_search',
+      {
+        surface: 'hero_form',
+        checkIn: checkInDate.toISOString(),
+        checkOut: checkOutDate.toISOString(),
+        guests,
+      },
+      { route: `/apartments?${searchParams.toString()}` },
+    );
+
+    trackEvent(
       'listings_browse',
       { surface: 'hero_form', checkIn: checkInDate.toISOString(), checkOut: checkOutDate.toISOString(), guests },
       { route: `/apartments?${searchParams.toString()}` },
