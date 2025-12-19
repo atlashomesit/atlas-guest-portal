@@ -1,4 +1,5 @@
 import { Component, ReactNode } from 'react';
+import { Button } from './ui/Button';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -32,23 +33,19 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 text-center p-6 gap-4">
-          <h1 className="text-2xl font-semibold text-gray-900">Something went wrong</h1>
-          <p className="text-gray-600 max-w-xl">
+        <div className="min-h-screen flex flex-col items-center justify-center bg-bg-muted text-center p-6 gap-4">
+          <h1 className="text-2xl font-semibold text-text-primary">Something went wrong</h1>
+          <p className="text-text-muted max-w-xl">
             Please try reloading the page. If the problem persists, contact support or return to the home page to continue
             browsing.
           </p>
           <div className="flex gap-3 flex-wrap justify-center">
-            <button
-              type="button"
-              onClick={this.handleReload}
-              className="px-5 py-2 bg-primary text-white rounded-lg shadow-sm hover:shadow-md transition"
-            >
+            <Button type="button" onClick={this.handleReload}>
               Reload
-            </button>
+            </Button>
             <a
               href="/"
-              className="px-5 py-2 border border-gray-300 text-gray-800 rounded-lg shadow-sm hover:bg-gray-100 transition"
+              className="px-5 py-2 border border-border-subtle text-text-primary rounded-lg shadow-level1 hover:bg-bg-muted transition"
             >
               Back to Home
             </a>

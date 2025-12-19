@@ -180,12 +180,12 @@ const Apartments = () => {
   }, [filteredListings.length, sortBy, guests, minPrice, maxPrice, propertyType, petFriendlyOnly]);
 
   return (
-    <main className="bg-gray-50 py-10">
+    <main className="bg-bg-muted py-10">
       <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 md:px-8">
         <header className="space-y-2">
           <p className="text-sm font-semibold uppercase tracking-wide text-primary">Atlas Homestays</p>
-          <h1 className="text-3xl font-bold text-gray-900 sm:text-4xl">Hyderabad serviced apartments</h1>
-          <p className="max-w-3xl text-base text-gray-600">
+          <h1 className="text-3xl font-bold text-text-primary sm:text-4xl">Hyderabad serviced apartments</h1>
+          <p className="max-w-3xl text-base text-text-muted">
             Discover beautifully furnished homes tailored for extended stays, business travel, and weekend getaways.
             Browse our curated apartments and penthouses, complete with clear pricing and trusted ratings.
           </p>
@@ -233,9 +233,9 @@ const Apartments = () => {
         </section>
 
         {filteredListings.length === 0 && (
-          <div className="rounded-2xl bg-white p-6 text-center shadow-sm">
-            <h2 className="text-xl font-semibold text-gray-900">No homes match these filters</h2>
-            <p className="mt-2 text-gray-600">Try adjusting your price range or guest count to see more options.</p>
+          <div className="rounded-2xl bg-bg-surface p-6 text-center shadow-sm border border-border-subtle">
+            <h2 className="text-xl font-semibold text-text-primary">No homes match these filters</h2>
+            <p className="mt-2 text-text-muted">Try adjusting your price range or guest count to see more options.</p>
           </div>
         )}
       </div>

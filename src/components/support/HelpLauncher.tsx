@@ -111,9 +111,9 @@ const HelpLauncher = () => {
           role="region"
           aria-label="Help quick links"
           aria-hidden={!isOpen}
-          className={`w-64 overflow-hidden rounded-2xl bg-white/95 p-3 text-gray-900 shadow-xl ring-1 ring-black/5 backdrop-blur transition-[opacity,transform] duration-200 ease-out sm:w-72 ${
+          className={`w-64 overflow-hidden rounded-2xl bg-[color:color-mix(in_srgb,var(--bg-surface)_95%,transparent)] p-3 text-text-primary shadow-level2 ring-1 ring-border-subtle backdrop-blur transition-[opacity,transform] duration-200 ease-out sm:w-72 ${
             isOpen
-              ? "pointer-events-auto opacity-100 focus-within:shadow-2xl focus-within:ring-black/10"
+              ? "pointer-events-auto opacity-100 focus-within:shadow-level2 focus-within:ring-border-strong"
               : "pointer-events-none opacity-0 translate-y-1"
           }`}
     >
@@ -134,7 +134,7 @@ const HelpLauncher = () => {
                     }
                     className="group flex items-start gap-3 rounded-xl px-3 py-2 transition-colors duration-150 hover:bg-bg-muted focus-visible:bg-bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary"
                   >
-                    <span className="mt-0.5 text-lg text-primary">{link.icon}</span>
+                    <span className="mt-0.5 text-lg text-accent-primary">{link.icon}</span>
                     <span className="flex flex-col leading-tight">
                       <span className="font-semibold">{link.label}</span>
                       <span className="text-xs text-text-muted">{link.description}</span>
@@ -146,7 +146,7 @@ const HelpLauncher = () => {
                     onClick={link.onClick}
                     className="group flex w-full items-start gap-3 rounded-xl px-3 py-2 transition-colors duration-150 hover:bg-bg-muted focus-visible:bg-bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary"
                   >
-                    <span className="mt-0.5 text-lg text-primary">{link.icon}</span>
+                    <span className="mt-0.5 text-lg text-accent-primary">{link.icon}</span>
                     <span className="flex flex-col items-start leading-tight">
                       <span className="font-semibold">{link.label}</span>
                       <span className="text-xs text-text-muted">{link.description}</span>

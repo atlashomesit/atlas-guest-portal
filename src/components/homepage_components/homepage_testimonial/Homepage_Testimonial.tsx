@@ -46,7 +46,7 @@ const Homepage_Testimonial = () => {
                 {[...Array(5)].map((_, i) => (
                     <svg
                         key={i}
-                        className={`w-4 h-4 ${i < rating ? "text-yellow-400" : "text-gray-300"}`}
+                        className={`w-4 h-4 ${i < rating ? "text-accent-primary" : "text-border-subtle"}`}
                         xmlns="http://www.w3.org/2000/svg"
                         viewBox="0 0 24 24"
                         fill="currentColor"
@@ -59,7 +59,7 @@ const Homepage_Testimonial = () => {
     };
 
     return (
-        <div className="py-12 bg-gray-50">
+        <div className="py-12 bg-bg-muted">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <span className="block text-center mb-12">
                     <Heading title="Hear What Our Happy Guests Are Saying" />
@@ -97,15 +97,15 @@ const Homepage_Testimonial = () => {
                     >
                         {data?.map((item, index) => (
                             <SwiperSlide key={index}>
-                                <div className="h-auto min-h-64 bg-white border border-gray-200 shadow-lg rounded-lg overflow-hidden transition-all duration-300 hover:shadow-xl hover:border-primary">
+                                <div className="h-auto min-h-64 bg-bg-surface border border-border-subtle shadow-level1 rounded-lg overflow-hidden transition-all duration-300 hover:shadow-level2 hover:border-cta-primary">
                                     <div className="p-6 h-full flex flex-col">
                                         <div className="mb-4">
-                                            <FaQuoteLeft className="text-primary text-3xl opacity-50" />
+                                            <FaQuoteLeft className="text-accent-primary text-3xl opacity-50" />
                                         </div>
-                                        <p className="text-gray-700 flex-grow mb-4">{item.review}</p>
+                                        <p className="text-text-muted flex-grow mb-4">{item.review}</p>
                                         <div className="mt-auto">
                                             {renderStars(item.rating)}
-                                            <p className="font-medium text-gray-900 mt-3">{item.clientName}</p>
+                                            <p className="font-medium text-text-primary mt-3">{item.clientName}</p>
                                         </div>
                                     </div>
                                 </div>
@@ -114,10 +114,10 @@ const Homepage_Testimonial = () => {
                     </Swiper>
 
                     <div className="absolute top-1/2 left-0 right-0 z-20 flex justify-between items-center px-2 transform -translate-y-1/2">
-                        <button className="PrevElement flex justify-center items-center bg-white shadow-md hover:bg-primary hover:text-white transition-colors duration-300 cursor-pointer h-10 w-10 md:h-12 md:w-12 rounded-full text-gray-800 border border-gray-200">
+                        <button className="PrevElement flex justify-center items-center bg-bg-surface shadow-level1 hover:bg-cta-primary hover:text-[var(--text-contrast)] transition-colors duration-300 cursor-pointer h-10 w-10 md:h-12 md:w-12 rounded-full text-text-primary border border-border-subtle">
                             <GrFormPrevious className="text-xl md:text-2xl" />
                         </button>
-                        <button className="NextElement flex justify-center items-center bg-white shadow-md hover:bg-primary hover:text-white transition-colors duration-300 cursor-pointer h-10 w-10 md:h-12 md:w-12 rounded-full text-gray-800 border border-gray-200">
+                        <button className="NextElement flex justify-center items-center bg-bg-surface shadow-level1 hover:bg-cta-primary hover:text-[var(--text-contrast)] transition-colors duration-300 cursor-pointer h-10 w-10 md:h-12 md:w-12 rounded-full text-text-primary border border-border-subtle">
                             <MdOutlineNavigateNext className="text-xl md:text-2xl" />
                         </button>
                     </div>

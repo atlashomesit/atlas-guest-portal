@@ -66,10 +66,10 @@ const ContactUs = () => {
             </div>
 
             {/* Contact Info Section */}
-            <div className="bg-slate-50 border-y border-slate-200">
+            <div className="bg-bg-muted border-y border-border-subtle">
                 <div className="flex flex-col md:flex-row gap-8 px-4 lg:px-20 py-10 max-w-6xl mx-auto">
                     {/* Left Section */}
-                    <div className="w-full text-gray-600 text-lg leading-relaxed space-y-4">
+                    <div className="w-full text-text-muted text-lg leading-relaxed space-y-4">
                         <div className="space-y-2">
                             <Typography variant="h2">We are ready to help</Typography>
                             <Typography variant="subtitle">
@@ -79,7 +79,7 @@ const ContactUs = () => {
                         <div className="flex flex-wrap gap-3">
                             <a
                                 href={getWhatsAppLink()}
-                                className="inline-flex items-center justify-center gap-2 rounded-full bg-green-600 text-white px-4 py-2 font-semibold shadow-md hover:shadow-lg transition"
+                                className="inline-flex items-center justify-center gap-2 rounded-full bg-cta-secondary text-[var(--text-contrast)] px-4 py-2 font-semibold shadow-level1 hover:shadow-level2 transition"
                                 target="_blank"
                                 rel="noopener noreferrer"
                             >
@@ -87,13 +87,13 @@ const ContactUs = () => {
                             </a>
                             <a
                                 href={getTelLink()}
-                                className="inline-flex items-center justify-center gap-2 rounded-full bg-primary text-white px-4 py-2 font-semibold shadow-md hover:shadow-lg transition"
+                                className="inline-flex items-center justify-center gap-2 rounded-full bg-cta-primary text-[var(--text-contrast)] px-4 py-2 font-semibold shadow-level1 hover:shadow-level2 transition"
                             >
                                 Call {formatDisplayNumber()}
                             </a>
                         </div>
                         <Typography variant="muted">
-                            Prefer email? Reach us at <a className="text-primary font-semibold" href="mailto:atlashomeskphb@gmail.com">atlashomeskphb@gmail.com</a>.
+                            Prefer email? Reach us at <a className="text-accent-primary font-semibold" href="mailto:atlashomeskphb@gmail.com">atlashomeskphb@gmail.com</a>.
                         </Typography>
                     </div>
 
@@ -103,7 +103,7 @@ const ContactUs = () => {
                             <Typography variant="muted" className="tracking-[0.25em] uppercase">Direct lines</Typography>
                             <Typography variant="h3">Business desk</Typography>
                         </div>
-                        <div className="space-y-3 text-slate-800">
+                        <div className="space-y-3 text-text-primary">
                             <div>
                                 <Typography variant="muted">Call</Typography>
                                 <a className="font-semibold text-lg text-primary" href={getTelLink()}>{formatDisplayNumber()}</a>
@@ -179,12 +179,12 @@ const ContactUs = () => {
                         <Typography variant="subtitle">Jump to the most requested pages before you reach out.</Typography>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <Link to="/policies" className="px-4 py-3 rounded-xl border border-slate-200 bg-white hover:border-primary font-semibold text-slate-900 transition">Policies</Link>
-                        <Link to="/faq" className="px-4 py-3 rounded-xl border border-slate-200 bg-white hover:border-primary font-semibold text-slate-900 transition">FAQs</Link>
-                        <Link to="/terms" className="px-4 py-3 rounded-xl border border-slate-200 bg-white hover:border-primary font-semibold text-slate-900 transition">Terms</Link>
-                        <Link to={ctaNav.to} className="px-4 py-3 rounded-xl border border-slate-200 bg-white hover:border-primary font-semibold text-slate-900 transition">Book now</Link>
+                        <Link to="/policies" className="px-4 py-3 rounded-xl border border-border-subtle bg-bg-surface hover:border-cta-primary font-semibold text-text-primary transition">Policies</Link>
+                        <Link to="/faq" className="px-4 py-3 rounded-xl border border-border-subtle bg-bg-surface hover:border-cta-primary font-semibold text-text-primary transition">FAQs</Link>
+                        <Link to="/terms" className="px-4 py-3 rounded-xl border border-border-subtle bg-bg-surface hover:border-cta-primary font-semibold text-text-primary transition">Terms</Link>
+                        <Link to={ctaNav.to} className="px-4 py-3 rounded-xl border border-border-subtle bg-bg-surface hover:border-cta-primary font-semibold text-text-primary transition">Book now</Link>
                     </div>
-                    <div className="bg-white border border-dashed border-primary/30 rounded-xl p-4 text-sm text-slate-700">
+                    <div className="bg-bg-surface border border-dashed border-cta-primary/30 rounded-xl p-4 text-sm text-text-muted">
                         Prefer a quick response? WhatsApp us on {formatDisplayNumber()} for booking confirmations.
                     </div>
                 </Card>

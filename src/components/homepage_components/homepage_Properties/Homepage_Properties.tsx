@@ -51,7 +51,7 @@ const Homepage_Properties = () => {
                 <div className=" grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {propertyData?.map((property) => (
                         property.properties?.map((data) => (
-                            <div key={data.id} className="relative bg-white shadow-lg rounded-lg overflow-hidden transform transition-all duration-300 ">
+                            <div key={data.id} className="relative bg-bg-surface shadow-level2 rounded-lg overflow-hidden transform transition-all duration-300 ">
                                 Image Container
                                 <div className="relative h-64 md:h-80">
                                     <Swiper
@@ -89,12 +89,12 @@ const Homepage_Properties = () => {
 
                                 Content
                                 <div className="p-4 flex flex-col gap-3">
-                                    <h2 className="text-lg font-semibold text-gray-800">{data.property_name}</h2>
+                                    <h2 className="text-lg font-semibold text-text-primary">{data.property_name}</h2>
 
                                     Amenities
                                     <div className="flex flex-wrap items-center gap-3">
                                         {data?.property_amenities.slice(0, 3).map((amenity, index) => (
-                                            <div key={index} className="flex items-center gap-2 text-gray-600">
+                                            <div key={index} className="flex items-center gap-2 text-text-muted">
                                                 <span className="text-lg">{renderIcon(amenity.amenities_icon)}</span>
                                                 <span className="text-sm">
                                                     {amenity.amenities_count ? ` ${amenity.amenities_count}` : ` ${amenity.amenities_availablity}`}
@@ -104,7 +104,7 @@ const Homepage_Properties = () => {
                                     </div>
 
                                     Location
-                                    <p className="text-sm text-gray-500">{data.property_location}</p>
+                                    <p className="text-sm text-text-muted">{data.property_location}</p>
                                 </div>
                                 Batch
                                 <span className="absolute z-40 top-5 left-0 bg-danger text-[var(--text-contrast)] px-3 py-2">

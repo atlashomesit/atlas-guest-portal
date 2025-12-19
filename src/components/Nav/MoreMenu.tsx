@@ -54,7 +54,7 @@ const MoreMenu = ({ items, onNavigate }: MoreMenuProps) => {
             <button
                 type="button"
                 ref={buttonRef}
-                className="px-3 py-2 text-sm font-semibold text-slate-800 hover:text-primary flex items-center gap-1"
+                className="px-3 py-2 text-sm font-semibold text-text-primary hover:text-primary flex items-center gap-1"
                 aria-haspopup="menu"
                 aria-expanded={isOpen}
                 aria-controls="more-menu"
@@ -68,7 +68,7 @@ const MoreMenu = ({ items, onNavigate }: MoreMenuProps) => {
                     id="more-menu"
                     ref={menuRef}
                     role="menu"
-                    className="absolute right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-lg min-w-[180px] py-2 z-10"
+                    className="absolute right-0 mt-2 bg-bg-surface border border-border-subtle rounded-xl shadow-level2 min-w-[180px] py-2 z-10"
                 >
                     {visibleItems.map((item, index) => (
                         item.external ? (
@@ -82,7 +82,7 @@ const MoreMenu = ({ items, onNavigate }: MoreMenuProps) => {
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 role="menuitem"
-                                className="block px-4 py-2 text-sm text-slate-800 hover:bg-slate-50 focus:bg-slate-100 focus:outline-none"
+                                className="block px-4 py-2 text-sm text-text-primary hover:bg-bg-muted focus:bg-bg-muted focus:outline-none"
                                 ref={index === 0 ? firstItemRef : undefined}
                             >
                                 {item.label}
@@ -97,7 +97,7 @@ const MoreMenu = ({ items, onNavigate }: MoreMenuProps) => {
                                 }}
                                 role="menuitem"
                                 className={({ isActive }) =>
-                                    `block px-4 py-2 text-sm hover:bg-slate-50 focus:bg-slate-100 focus:outline-none ${isActive ? 'text-primary' : 'text-slate-800'}`
+                                    `block px-4 py-2 text-sm hover:bg-bg-muted focus:bg-bg-muted focus:outline-none ${isActive ? 'text-primary' : 'text-text-primary'}`
                                 }
                                 ref={index === 0 ? firstItemRef : undefined}
                                 tabIndex={-1}
