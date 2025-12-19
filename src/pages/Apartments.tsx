@@ -1,5 +1,5 @@
 import React from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import { LOGO_URL } from "../config/branding";
 import { propertyData, propertyImages } from "../data";
@@ -62,6 +62,7 @@ const derivePetFriendly = (property: PropertyRecord): boolean =>
 
 const Apartments = () => {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const safeListings = React.useMemo(
     () => sanitizeItems<Listing>(LISTINGS),
@@ -90,6 +91,8 @@ const Apartments = () => {
   const [minPrice, setMinPrice] = React.useState(priceBounds.min);
   const [maxPrice, setMaxPrice] = React.useState(priceBounds.max);
   const [guests, setGuests] = React.useState(2);
+  const [checkIn, setCheckIn] = React.useState<string | null>(null);
+  const [checkOut, setCheckOut] = React.useState<string | null>(null);
   const [propertyType, setPropertyType] = React.useState("all");
   const [petFriendlyOnly, setPetFriendlyOnly] = React.useState(false);
   const [sortBy, setSortBy] = React.useState("featured");
@@ -164,6 +167,34 @@ const Apartments = () => {
   };
 
   React.useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const guestsParam = Number(params.get("guests"));
+    const parsedCheckIn = params.get("checkIn");
+    const parsedCheckOut = params.get("checkOut");
+
+    const isValidDate = (value: string | null) => {
+      if (!value) return false;
+      const parsed = new Date(value);
+      return !Number.isNaN(parsed.getTime());
+    };
+
+    const nextCheckIn = isValidDate(parsedCheckIn) ? parsedCheckIn : null;
+    const nextCheckOut =
+      isValidDate(parsedCheckOut) && nextCheckIn && new Date(parsedCheckOut) > new Date(nextCheckIn)
+        ? parsedCheckOut
+        : isValidDate(parsedCheckOut) && !nextCheckIn
+          ? parsedCheckOut
+          : null;
+
+    if (guestsParam && guestsParam > 0) {
+      setGuests((current) => (current === guestsParam ? current : guestsParam));
+    }
+
+    setCheckIn((current) => (nextCheckIn !== current ? nextCheckIn : current));
+    setCheckOut((current) => (nextCheckOut !== current ? nextCheckOut : current));
+  }, [location.search]);
+
+  React.useEffect(() => {
     trackEvent(
       "listings_browse",
       {
@@ -171,6 +202,8 @@ const Apartments = () => {
         total: filteredListings.length,
         sortBy,
         guests,
+        checkIn,
+        checkOut,
         minPrice,
         maxPrice,
         propertyType,
@@ -178,7 +211,19 @@ const Apartments = () => {
       },
       { route: "/apartments" },
     );
-  }, [filteredListings.length, sortBy, guests, minPrice, maxPrice, propertyType, petFriendlyOnly]);
+  }, [filteredListings.length, sortBy, guests, minPrice, maxPrice, propertyType, petFriendlyOnly, checkIn, checkOut]);
+
+  const formattedDates = React.useMemo(() => {
+    const formatter = new Intl.DateTimeFormat("en-GB", {
+      month: "short",
+      day: "numeric",
+    });
+
+    const displayCheckIn = checkIn ? formatter.format(new Date(checkIn)) : null;
+    const displayCheckOut = checkOut ? formatter.format(new Date(checkOut)) : null;
+
+    return { displayCheckIn, displayCheckOut };
+  }, [checkIn, checkOut]);
 
   return (
     <main className="bg-bg-muted py-10">
@@ -191,6 +236,28 @@ const Apartments = () => {
             Browse our curated apartments and penthouses, complete with clear pricing and trusted ratings.
           </p>
         </header>
+
+        <div className="rounded-2xl bg-bg-surface p-4 shadow-level1 border border-border-subtle text-sm text-text-muted">
+          <p className="text-base font-semibold text-text-primary">Trip details</p>
+          <p className="mt-1 flex flex-wrap gap-2">
+            <span className="rounded-full bg-bg-muted px-3 py-1 text-xs font-semibold uppercase tracking-wide text-text-primary">
+              Guests: {guests}
+            </span>
+            {formattedDates.displayCheckIn && (
+              <span className="rounded-full bg-bg-muted px-3 py-1 text-xs font-semibold uppercase tracking-wide text-text-primary">
+                Check-in: {formattedDates.displayCheckIn}
+              </span>
+            )}
+            {formattedDates.displayCheckOut && (
+              <span className="rounded-full bg-bg-muted px-3 py-1 text-xs font-semibold uppercase tracking-wide text-text-primary">
+                Check-out: {formattedDates.displayCheckOut}
+              </span>
+            )}
+            {!formattedDates.displayCheckIn && !formattedDates.displayCheckOut && (
+              <span>Adjust dates anytime to refine the availability you see.</span>
+            )}
+          </p>
+        </div>
 
         <ListingFilters
           priceMin={priceBounds.min}
