@@ -227,10 +227,12 @@ const Slider = () => {
             )}
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex flex-col text-left text-sm text-[color-mix(in_srgb,var(--text-on-hero)_85%,transparent)]">
-                <span className="font-semibold text-[var(--text-on-hero)]">Plan your stay</span>
-                <span>Instantly view options for your dates and group size.</span>
-              </div>
+              <div className="flex flex-col text-left text-sm bg-gray-200 text-black rounded-md p-3">
+  <span className="font-semibold text-black">Plan your stay</span>
+  <span className="text-black">
+    Instantly view options for your dates and group size.
+  </span>
+</div>
 
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
                 <button
@@ -240,14 +242,19 @@ const Slider = () => {
                   Check availability
                 </button>
                 <Link
-                  to="/apartments"
-                  onClick={() =>
-                    trackEvent('listings_browse', { surface: 'hero_secondary' }, { route: '/apartments' })
-                  }
-                  className="inline-flex items-center justify-center rounded-full border border-[color:color-mix(in_srgb,var(--cta-primary)_65%,transparent)] bg-[color:color-mix(in_srgb,var(--bg-surface)_80%,transparent)] px-6 py-3 text-base font-semibold text-[var(--text-on-hero)] shadow-level1 transition hover:bg-[color:color-mix(in_srgb,var(--bg-surface)_60%,transparent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary"
-                >
-                  Browse listings
-                </Link>
+  to="/apartments"
+  onClick={() =>
+    trackEvent(
+      'listings_browse',
+      { surface: 'hero_secondary' },
+      { route: '/apartments' }
+    )
+  }
+  className="inline-flex items-center justify-center rounded-full border border-black bg-black px-6 py-3 text-base font-semibold text-white shadow-level1 transition hover:bg-gray-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black"
+>
+  Browse listings
+</Link>
+
               </div>
             </div>
           </form>
