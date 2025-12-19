@@ -22,6 +22,9 @@ import BlogCategory from "./pages/blog/BlogCategory"
 import BlogPostPage from "./pages/blog/BlogPostPage"
 import ShortLinkRedirect from "./components/ShortLinkRedirect"
 import SupportLauncher from "./components/support/SupportLauncher"
+import CallbackRequestBar from "./components/support/CallbackRequestBar"
+import FloatingWhatsAppButton from "./components/support/FloatingWhatsAppButton"
+import HelpLauncher from "./components/support/HelpLauncher"
 import SupportStickyBar from "./components/support/SupportStickyBar"
 
 function AppWrapper() {
@@ -60,6 +63,9 @@ function AppWrapper() {
         <Route path="/*" element={<PageNotFound />} />
       </Routes>
       <SupportLauncher />
+      <CallbackRequestBar />
+      <HelpLauncher />
+      <FloatingWhatsAppButton />
       <SupportStickyBar />
       <Footer />
     </>
