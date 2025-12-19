@@ -78,6 +78,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
             trackEvent(
                 'dates_selected',
                 {
+                    surface: 'booking_form',
                     startDate: startDate.toISOString(),
                     endDate: endDate.toISOString(),
                     nights: selectedNights,
@@ -221,6 +222,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         trackEvent(
             'reserve_click',
             {
+                surface: 'booking_form',
                 termsAccepted,
                 hasSelection,
                 guests: totalPeople,
@@ -257,6 +259,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         trackEvent(
             'checkout_start',
             {
+                surface: 'booking_form',
                 bookingId,
                 total: totalPrice,
                 nights,
@@ -296,6 +299,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
                 trackEvent(
                     'payment_success',
                     {
+                        surface: 'booking_form',
                         bookingId,
                         paymentId: response.razorpay_payment_id,
                         total: totalPrice,
@@ -321,7 +325,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
             setIsLoading(false);
             trackEvent(
                 'payment_failure',
-                { bookingId, reason: failureReason },
+                { surface: 'booking_form', bookingId, reason: failureReason },
                 { propertyId, listingId: propertyId, unitCode: propertyId },
             );
         });

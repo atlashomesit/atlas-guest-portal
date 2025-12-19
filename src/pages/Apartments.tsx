@@ -154,7 +154,7 @@ const Apartments = () => {
 
     trackEvent(
       "listing_selected",
-      { source: "apartments", listingName: propertyName },
+      { surface: "apartments", listingName: propertyName },
       { listingId: property.id, unitCode: property.id, route: `/property_details/${slug}` },
     );
 
@@ -167,6 +167,7 @@ const Apartments = () => {
     trackEvent(
       "listings_browse",
       {
+        surface: "apartments",
         total: filteredListings.length,
         sortBy,
         guests,

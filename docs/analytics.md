@@ -1,6 +1,6 @@
 ## Analytics overview
 
-This project includes a lightweight analytics helper that standardizes event payloads and keeps them network-safe by default. Events are enriched with the current environment (`dev` or `prod`), route context, timestamps, and relevant identifiers (listing/unit/property codes) so future backends can ingest consistent telemetry.
+This project includes a lightweight analytics helper that standardizes event payloads and keeps them network-safe by default. Events are enriched with the current environment (`dev` or `prod`), route context, timestamps, and relevant identifiers (listing/unit/property codes) so future backends can ingest consistent telemetry. Always pass a `surface` string so downstream consumers can filter by UI origin, and never include PII (phone numbers, email addresses, raw chat text, etc.).
 
 ### Helper usage
 
@@ -31,22 +31,7 @@ The helper maps `import.meta.env.MODE` to:
 
 Every event includes an `env` field so downstream services can segment traffic automatically.
 
-### Current events and payloads
-
-| Event | When it fires | Key payload fields |
-| --- | --- | --- |
-| `home_view` | Home page mount | `listings` (available homes) |
-| `listings_browse` | Home locations grid render, Apartments page filter changes, hero CTA | `surface`, `total`, `featured`, `sortBy`, `guests`, `minPrice`, `maxPrice`, `propertyType`, `petFriendlyOnly` |
-| `listing_selected` | Selecting a listing card | `surface`, `listingName`, identifiers (`listingId`, `unitCode`, `route`) |
-| `listing_view` | Property details page loads | `propertyName`, `price`, identifiers |
-| `dates_selected` | Date picker selection in booking form | `startDate`, `endDate`, `nights`, `guests`, identifiers |
-| `reserve_click` | Reserve/Book CTA click | `termsAccepted`, `hasSelection`, `guests`, `nights`, identifiers |
-| `checkout_start` | Razorpay checkout initialization | `bookingId`, `total`, `nights`, `guests`, identifiers |
-| `payment_success` | Payment success handler | `bookingId`, `paymentId`, `total`, identifiers |
-| `payment_failure` | Payment failure handler | `bookingId`, `reason`, identifiers |
-| `support_whatsapp` | WhatsApp links (floating button, sticky bar, help launcher) | `surface`, identifiers |
-| `support_call` | Phone links (sticky bar, help launcher) | `surface`, identifiers |
-| `support_faq` | FAQ navigation from Help Launcher | `surface`, identifiers |
+### Payload hygiene
 
 All events automatically attach:
 
@@ -54,6 +39,38 @@ All events automatically attach:
 - `route`: current pathname or the provided override
 - `timestamp`: ISO string
 - Identifiers: `listingId`, `unitCode`, and/or `propertyId` when provided
+
+Add a `surface` string for every UI trigger to simplify downstream filtering. Payloads must stay PII-free: capture metadata (counts, states, action identifiers), not phone numbers, email addresses, or free-form chat text.
+
+### Current events and payloads
+
+| Event | When it fires | Key payload fields |
+| --- | --- | --- |
+| `home_view` | Home page mount | `surface`, `listings` (available homes) |
+| `listings_browse` | Home locations grid render, Apartments page filter changes, hero CTA | `surface`, `total`, `featured`, `sortBy`, `guests`, `minPrice`, `maxPrice`, `propertyType`, `petFriendlyOnly` |
+| `listing_selected` | Selecting a listing card | `surface`, `listingName`, identifiers (`listingId`, `unitCode`, `route`) |
+| `listing_view` | Property details page loads | `surface`, `propertyName`, `price`, identifiers |
+| `dates_selected` | Date picker selection in booking form | `surface`, `startDate`, `endDate`, `nights`, `guests`, identifiers |
+| `reserve_click` | Reserve/Book CTA click | `surface`, `termsAccepted`, `hasSelection`, `guests`, `nights`, identifiers |
+| `checkout_start` | Razorpay checkout initialization | `surface`, `bookingId`, `total`, `nights`, `guests`, identifiers |
+| `payment_success` | Payment success handler | `surface`, `bookingId`, `paymentId`, `total`, identifiers |
+| `payment_failure` | Payment failure handler | `surface`, `bookingId`, `reason`, identifiers |
+| `support_whatsapp` | WhatsApp links (floating button, sticky bar, help launcher) | `surface`, identifiers |
+| `support_call` | Phone links (sticky bar, help launcher) | `surface`, identifiers |
+| `support_faq` | FAQ navigation from Help Launcher | `surface`, identifiers |
+
+### Callback and chat events
+
+| Event | When it fires | Expected payload fields |
+| --- | --- | --- |
+| `callback_bar_viewed` | Callback bar, banner, or CTA loads | `surface`, identifiers (`listingId`, `unitCode`, `route`) |
+| `callback_submitted` | Callback lead submitted successfully | `surface`, identifiers, `submissionId` (generated client id), `attempt` (ordinal). Do **not** include phone/email. |
+| `callback_submit_failed` | Callback submission request errors | `surface`, identifiers, `error` (non-PII message or code), `attempt` |
+| `chat_opened` | Chat UI opened or expanded | `surface`, identifiers, `entryPoint` (launcher button, inline prompt, hotkey) |
+| `chat_message_sent` | User sends a chat message | `surface`, identifiers, `messageType` (`text`/`quick_action`), `charCount` (omit message body) |
+| `chat_quick_action_clicked` | Quick action/pill tapped in chat | `surface`, identifiers, `actionId`, `actionLabel` (ui copy) |
+| `chat_escalated_whatsapp` | Chat handoff to WhatsApp is initiated | `surface`, identifiers |
+| `chat_callback_cta_clicked` | Chat inline callback CTA clicked | `surface`, identifiers |
 
 ### Integration points (existing)
 
