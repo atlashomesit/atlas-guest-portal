@@ -25,6 +25,7 @@ export const designTokens = {
   },
   cta: {
     primary: "var(--cta-primary)",
+    primaryHover: "var(--cta-primary-hover)",
     secondary: "var(--cta-secondary)",
   },
   border: {
@@ -34,6 +35,9 @@ export const designTokens = {
   state: {
     success: "var(--support-success)",
     danger: "var(--support-danger)",
+  },
+  footer: {
+    background: "var(--footer-bg)",
   },
   typography: {
     base: "var(--font-family-base)",

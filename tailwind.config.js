@@ -36,6 +36,7 @@ export default {
         },
         cta: {
           primary: withOpacity('--cta-primary-rgb'),
+          primaryHover: withOpacity('--cta-primary-hover-rgb'),
           secondary: withOpacity('--cta-secondary-rgb'),
         },
         border: {

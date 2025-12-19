@@ -1,33 +1,41 @@
 :root,
 :root[data-theme="default"] {
   /* Surfaces */
-  --bg-primary: #f6f1e8;
-  --bg-surface: #ffffff;
-  --bg-muted: #efe7dc;
+  --bg-primary: #ede7c7;
+  --bg-surface: #fdfbf6;
+  --bg-muted: #e7dfc4;
 
   /* Text */
-  --text-primary: #0f172a;
-  --text-muted: #4b5563;
+  --text-primary: #1e2733;
+  --text-muted: #5d6674;
 
   /* Accent + CTA */
-  --accent-primary: #7da2c4;
-  --accent-soft: #f3d7d0;
-  --accent-primary-rgb: 125 162 196;
-  --accent-soft-rgb: 243 215 208;
-  --cta-primary: #2f7c85;
-  --cta-secondary: #3f6b89;
-  --cta-primary-rgb: 47 124 133;
-  --cta-secondary-rgb: 63 107 137;
+  --accent-primary: #a2bffe;
+  --accent-soft: #f6e7de;
+  --romance-soft: #f6e7de;
+  --accent-primary-rgb: 162 191 254;
+  --accent-soft-rgb: 246 231 222;
+  --cta-primary: #4f6f9f;
+  --cta-primary-hover: #3f5d88;
+  --cta-secondary: #6f8bbd;
+  --cta-primary-rgb: 79 111 159;
+  --cta-primary-hover-rgb: 63 93 136;
+  --cta-secondary-rgb: 111 139 189;
 
   /* Borders */
-  --border-subtle: #e3dbcf;
-  --border-strong: #cbbda7;
+  --border-subtle: #dcd3b3;
+  --border-strong: #c3b693;
 
   /* Status */
   --support-success: #2d8a5d;
   --support-danger: #b5473d;
 
+  /* Footer */
+  --footer-bg: #162030;
+
   /* Shadows */
-  --shadow-level-1: 0 10px 30px rgba(15, 23, 42, 0.08);
-  --shadow-level-2: 0 20px 40px rgba(15, 23, 42, 0.12);
+  --shadow-level-1: 0 12px 32px rgba(30, 39, 51, 0.1);
+  --shadow-level-2: 0 20px 48px rgba(30, 39, 51, 0.16);
+  --shadow-1: var(--shadow-level-1);
+  --shadow-2: var(--shadow-level-2);
 }
