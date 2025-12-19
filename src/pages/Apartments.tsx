@@ -19,6 +19,7 @@ type PropertyRecord = {
   property_img?: string[];
   property_amenities?: { amenities_icon?: string }[];
   property_policy_details?: { type?: string; value?: string }[];
+  property_description?: string;
 };
 
 type CombinedListing = {
@@ -31,6 +32,9 @@ type CombinedListing = {
   featured: boolean;
   propertyType: string;
   guests: number;
+  bedrooms: number | null;
+  hasWifi: boolean;
+  hasParking: boolean;
   petFriendly: boolean;
   image: string;
   property: PropertyRecord;
@@ -57,6 +61,24 @@ const derivePetFriendly = (property: PropertyRecord): boolean =>
   Boolean(
     property.property_amenities?.some((amenity) =>
       amenity.amenities_icon?.toLowerCase().includes("pet")
+    )
+  );
+
+const deriveBedrooms = (property: PropertyRecord): number | null => {
+  const description = property.property_description ?? "";
+  const bhkMatch = description.match(/(\d+)\s*bhk/i);
+  if (bhkMatch?.[1]) return Number(bhkMatch[1]);
+
+  const bedroomMatch = description.match(/(\d+)\s*(?:bedroom|bedrooms|br)\b/i);
+  if (bedroomMatch?.[1]) return Number(bedroomMatch[1]);
+
+  return null;
+};
+
+const deriveAmenityFlag = (property: PropertyRecord, keyword: string): boolean =>
+  Boolean(
+    property.property_amenities?.some((amenity) =>
+      amenity.amenities_icon?.toLowerCase().includes(keyword)
     )
   );
 
@@ -117,6 +139,9 @@ const Apartments = () => {
         featured: Boolean(listing.featured),
         propertyType: derivePropertyType(name),
         guests: deriveGuests(property),
+        bedrooms: deriveBedrooms(property),
+        hasWifi: deriveAmenityFlag(property, "wifi"),
+        hasParking: deriveAmenityFlag(property, "park"),
         petFriendly: derivePetFriendly(property),
         image: images?.[0] || LOGO_URL,
         property,
@@ -294,6 +319,9 @@ const Apartments = () => {
               reviews={listing.reviews}
               propertyType={listing.propertyType}
               guests={listing.guests}
+              bedrooms={listing.bedrooms}
+              hasWifi={listing.hasWifi}
+              hasParking={listing.hasParking}
               petFriendly={listing.petFriendly}
               onClick={() => handleNavigate(listing.property)}
             />
