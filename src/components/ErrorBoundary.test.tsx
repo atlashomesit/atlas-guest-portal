@@ -9,9 +9,11 @@ describe('ErrorBoundary', () => {
     };
 
     const reloadSpy = vi.fn();
-    const originalReload = window.location.reload;
-    // @ts-expect-error override for test
-    window.location.reload = reloadSpy;
+    const originalLocation = window.location;
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { ...originalLocation, reload: reloadSpy },
+    });
 
     render(
       <ErrorBoundary>
@@ -23,6 +25,9 @@ describe('ErrorBoundary', () => {
     fireEvent.click(screen.getByRole('button', { name: /reload/i }));
     expect(reloadSpy).toHaveBeenCalled();
 
-    window.location.reload = originalReload;
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: originalLocation,
+    });
   });
 });

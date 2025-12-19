@@ -21,10 +21,7 @@ import BlogHome from "./pages/blog/BlogHome"
 import BlogCategory from "./pages/blog/BlogCategory"
 import BlogPostPage from "./pages/blog/BlogPostPage"
 import ShortLinkRedirect from "./components/ShortLinkRedirect"
-import SupportLauncher from "./components/support/SupportLauncher"
-import FloatingWhatsAppButton from "./components/support/FloatingWhatsAppButton"
-import HelpLauncher from "./components/support/HelpLauncher"
-import SupportStickyBar from "./components/support/SupportStickyBar"
+import SupportWidget from "./components/support/SupportWidget"
 
 function AppWrapper() {
   const location = useLocation();
@@ -61,10 +58,7 @@ function AppWrapper() {
         <Route path="/:shortCode" element={<ShortLinkRedirect />} />
         <Route path="/*" element={<PageNotFound />} />
       </Routes>
-      <SupportLauncher />
-      <HelpLauncher />
-      <FloatingWhatsAppButton />
-      <SupportStickyBar />
+      <SupportWidget />
       <Footer />
     </>
   );
