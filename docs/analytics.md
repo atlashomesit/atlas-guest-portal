@@ -49,15 +49,20 @@ Add a `surface` string for every UI trigger to simplify downstream filtering. Pa
 | `home_view` | Home page mount | `surface`, `listings` (available homes) |
 | `listings_browse` | Home locations grid render, Apartments page filter changes, hero CTA | `surface`, `total`, `featured`, `sortBy`, `guests`, `minPrice`, `maxPrice`, `propertyType`, `petFriendlyOnly` |
 | `listing_selected` | Selecting a listing card | `surface`, `listingName`, identifiers (`listingId`, `unitCode`, `route`) |
-| `listing_view` | Property details page loads | `surface`, `propertyName`, `price`, identifiers |
-| `dates_selected` | Date picker selection in booking form | `surface`, `startDate`, `endDate`, `nights`, `guests`, identifiers |
-| `reserve_click` | Reserve/Book CTA click | `surface`, `termsAccepted`, `hasSelection`, `guests`, `nights`, identifiers |
-| `checkout_start` | Razorpay checkout initialization | `surface`, `bookingId`, `total`, `nights`, `guests`, identifiers |
-| `payment_success` | Payment success handler | `surface`, `bookingId`, `paymentId`, `total`, identifiers |
-| `payment_failure` | Payment failure handler | `surface`, `bookingId`, `reason`, identifiers |
-| `support_whatsapp` | WhatsApp links (floating button, sticky bar, help launcher) | `surface`, identifiers |
-| `support_call` | Phone links (sticky bar, help launcher) | `surface`, identifiers |
-| `support_faq` | FAQ navigation from Help Launcher | `surface`, identifiers |
+| `listing_view` | Property details page loads | `propertyName`, `price`, identifiers |
+| `dates_selected` | Date picker selection in booking form | `startDate`, `endDate`, `nights`, `guests`, identifiers |
+| `reserve_click` | Reserve/Book CTA click | `termsAccepted`, `hasSelection`, `guests`, `nights`, identifiers |
+| `checkout_start` | Razorpay checkout initialization | `bookingId`, `total`, `nights`, `guests`, identifiers |
+| `payment_success` | Payment success handler | `bookingId`, `paymentId`, `total`, identifiers |
+| `payment_failure` | Payment failure handler | `bookingId`, `reason`, identifiers |
+| `support_whatsapp` | WhatsApp links (launcher, sticky bar) | `surface`, identifiers |
+| `support_call` | Phone links (launcher, sticky bar) | `surface`, identifiers |
+| `support_faq` | FAQ navigation from Support Launcher | `surface`, identifiers |
+| `chat_opened` | Support launcher expanded | `surface`, identifiers |
+| `chat_message_sent` | User sends a chatbot message | `surface`, `source`, `intent`, `wordCount`, identifiers |
+| `chat_quick_action_clicked` | Quick action chip clicked | `id`, `label`, `surface`, identifiers |
+| `chat_escalated_whatsapp` | Escalation keywords/actions detected | `surface`, `source`, identifiers |
+| `chat_callback_cta_clicked` | Callback CTA opened | `surface`, identifiers |
 
 ### Callback and chat events
 
@@ -80,7 +85,7 @@ Add a `surface` string for every UI trigger to simplify downstream filtering. Pa
 - Apartments browse & filter changes (`src/pages/Apartments.tsx`)
 - Property details view (`src/components/homepage_components/homepage_Propertydetails/Homepage_PropertyDetails.tsx`)
 - Booking form interactions (`src/components/homepage_components/hotelBooking_form/HotelBooking_Form.tsx`)
-- Support surfaces (`src/components/support/FloatingWhatsAppButton.tsx`, `SupportStickyBar.tsx`, `HelpLauncher.tsx`)
+- Support surfaces (`src/components/support/SupportLauncher.tsx`, `SupportStickyBar.tsx`)
 
 ### Adding a backend transport
 
