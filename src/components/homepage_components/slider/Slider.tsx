@@ -5,6 +5,7 @@ import { trackEvent } from '../../../utils/analytics';
 import { FeatureBadge } from '../../ui/FeatureBadge';
 
 const HERO_IMAGE = 'https://atlashomestorage.blob.core.windows.net/listing-images/fallback.jpeg';
+const HERO_OVERLAY = 'linear-gradient(120deg, rgba(21, 30, 44, 0.82) 0%, rgba(21, 30, 44, 0.68) 45%, rgba(21, 30, 44, 0.8) 100%)';
 
 const uspItems = [
   { label: 'Verified homes', icon: CheckCircle2 },
@@ -16,30 +17,32 @@ const uspItems = [
 const Slider = () => {
   return (
     <section className="w-full bg-bg-muted text-text-primary">
-      <div className="relative isolate overflow-hidden min-h-[75vh] md:min-h-[70vh] flex items-center justify-center">
-        <img
-          src={HERO_IMAGE}
-          alt="Modern living room with warm lighting"
-          className="absolute inset-0 h-full w-full object-cover"
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-[color:color-mix(in_srgb,var(--text-primary)_90%,transparent)] via-[color:color-mix(in_srgb,var(--text-primary)_72%,transparent)] to-[color:color-mix(in_srgb,var(--text-primary)_60%,transparent)]" />
-
-        <div className="relative z-10 flex flex-col items-center gap-6 px-6 py-12 text-center max-w-4xl">
+      <div
+        className="relative isolate overflow-hidden min-h-[75vh] md:min-h-[70vh] flex items-center justify-center bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: `${HERO_OVERLAY}, url(${HERO_IMAGE})` }}
+      >
+        <div className="relative z-10 flex flex-col items-center gap-7 px-6 py-12 text-center max-w-4xl">
           <Link to="/" className="flex items-center gap-3">
             <img src={LOGO_URL} alt="Atlas Homestays" className="h-14 w-auto rounded-md bg-[color:color-mix(in_srgb,var(--bg-surface)_80%,transparent)] p-2 shadow-level1" />
             <span className="text-xl font-semibold text-[var(--text-contrast)] tracking-wide">Atlas Homestays</span>
           </Link>
 
-          <div className="space-y-3">
-            <p className="text-3xl md:text-5xl font-semibold text-[var(--text-contrast)] drop-shadow-lg">
+          <div className="space-y-4 max-w-3xl">
+            <p
+              className="text-3xl md:text-5xl font-semibold text-[var(--text-on-hero)] drop-shadow-lg text-pretty"
+              style={{ textWrap: 'balance' }}
+            >
               Thoughtfully curated stays in Hyderabad
             </p>
-            <p className="text-base md:text-lg text-[color-mix(in_srgb,var(--text-contrast)_90%,transparent)]">
+            <p
+              className="text-base md:text-lg text-[color-mix(in_srgb,var(--text-on-hero)_88%,transparent)] text-pretty"
+              style={{ textWrap: 'balance' }}
+            >
               Discover verified apartments with flexible bookings, transparent pricing, and secure payments.
             </p>
           </div>
 
-          <div className="w-full max-w-3xl rounded-full bg-[color:color-mix(in_srgb,var(--bg-surface)_95%,transparent)] shadow-level2 backdrop-blur border border-[color:color-mix(in_srgb,var(--bg-surface)_60%,transparent)] p-3 sm:p-4 flex flex-col sm:flex-row items-stretch gap-3 sm:gap-4">
+          <div className="w-full max-w-3xl rounded-full bg-[color:color-mix(in_srgb,var(--bg-surface)_92%,transparent)] shadow-level2 backdrop-blur border border-[color:color-mix(in_srgb,var(--bg-surface)_55%,transparent)] p-3 sm:p-4 flex flex-col sm:flex-row items-stretch gap-3 sm:gap-4">
             <div className="flex flex-1 items-center gap-3 rounded-full bg-bg-muted px-4 py-3 shadow-inner">
               <span className="text-xs font-semibold uppercase tracking-wide text-text-muted">City</span>
               <input

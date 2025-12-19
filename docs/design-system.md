@@ -6,6 +6,7 @@ Our design system keeps the UI calm, premium, and accessible. Tokens live as CSS
 
 - **Surfaces:** `--bg-primary` (linen canvas page background), `--bg-surface` (linen-to-ivory cards and panels), `--bg-muted` (soft linen bands/stripes).
 - **Text:** `--text-primary` (body + headings), `--text-muted` (supporting copy and labels).
+- **Hero text:** `--text-on-hero` (high-contrast white for overlays on photography).
 - **Accent:** `--accent-primary` (pastel-blue accent for links, focus rings, highlights), `--accent-soft` (blush micro-highlights/halos for chips, subtle dividers). Keep accents visually distinct from booking CTAs.
 - **CTA:** `--cta-primary` (muted-blue CTAs for book/submit actions), `--cta-secondary` (quiet alternatives such as “Save for later”). CTAs intentionally differ from accent to keep booking intent obvious.
 - **Borders:** `--border-subtle` (card outlines/dividers), `--border-strong` (inputs, alerts, emphasized frames).
