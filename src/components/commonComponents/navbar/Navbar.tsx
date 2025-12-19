@@ -50,22 +50,6 @@ const Navbar = () => {
 
   return (
     <section className="navbar-container" id="navbar_container">
-      <div className="navbar-top-strip">
-        <a className="top-strip-link" href={telLink}>
-          <IoIosCall aria-hidden="true" />
-          <span>Call us: {formatDisplayNumber()}</span>
-        </a>
-        <a
-          className="top-strip-link"
-          href={whatsappLink}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <FaWhatsapp aria-hidden="true" />
-          <span>WhatsApp</span>
-        </a>
-      </div>
-
       <div className="navbar-main">
         {/* LEFT: Logo + Name */}
         <div className="navbar-left flex items-center justify-between w-full md:w-auto">
