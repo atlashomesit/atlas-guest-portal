@@ -72,15 +72,14 @@ describe("Slider hero search", () => {
     );
   });
 
-  it("shows experiential trust badges without payment or fee language", () => {
+  it("shows exactly three high-signal trust badges", () => {
     renderSlider();
     const trustBadges = screen.getByTestId("trust-badges");
     expect(trustBadges).toBeInTheDocument();
     expect(screen.getByText(/verified homes/i)).toBeInTheDocument();
-    expect(screen.getByText(/prime hyderabad locations/i)).toBeInTheDocument();
-    expect(screen.getByText(/flexible cancellation/i)).toBeInTheDocument();
-    expect(trustBadges).not.toHaveTextContent(/razorpay/i);
-    expect(trustBadges).not.toHaveTextContent(/secure payments/i);
-    expect(trustBadges).not.toHaveTextContent(/hidden fees/i);
+    expect(screen.getByText(/secure razorpay payments/i)).toBeInTheDocument();
+    expect(screen.getByText(/no hidden fees/i)).toBeInTheDocument();
+    expect(trustBadges).not.toHaveTextContent(/flexible cancellation/i);
+    expect(trustBadges.querySelectorAll(".rb-trust-badge").length).toBe(3);
   });
 });

@@ -4,6 +4,7 @@
 Atlas Homes Frontend is a Vite-powered React + TypeScript single-page application that markets Atlas Homestays inventory and captures booking intent. Routing is centralized in [`src/App.tsx`](src/App.tsx), which mounts global UI elements (navbar, scroll restoration, footer) around page-level routes. The landing experience rendered by [`src/pages/home/Home.tsx`](src/pages/home/Home.tsx) weaves together carousel hero content, featured locations, marketing callouts, and testimonials composed from modular components and the structured property inventory exported by [`src/data.ts`](src/data.ts).
 
 **Trust placement principle:** transactional trust (payments, fees, confirmation) is shown only at decision points such as the search widget or checkout. Brand/experiential trust (e.g., verified homes, locations, flexibility) is shown elsewhere to avoid repetition.
+The hero trust row is intentionally limited to three high-signal badges—**Verified homes**, **Secure Razorpay payments**, and **No hidden fees**—to keep scannability high; flexible cancellation is handled in Policies/FAQs/booking flows instead of the badge row.
 
 ### Navigation structure
 - Primary (desktop & mobile): Home, Apartments, Location, FAQs, Contact
