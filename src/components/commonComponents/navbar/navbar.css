@@ -43,7 +43,8 @@
 }
 
 .navbar-main {
-  width: 100%;
+  width: min(1200px, calc(100% - 2rem));
+  margin: 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
