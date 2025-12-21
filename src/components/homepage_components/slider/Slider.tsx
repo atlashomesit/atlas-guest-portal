@@ -1,19 +1,19 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { CalendarClock, CheckCircle2, MapPin, ShieldCheck } from 'lucide-react';
+import { BadgePercent, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { LOGO_URL } from '../../../config/branding';
 import { HERO_IMAGE_URL } from '../../../config/hero';
 import { trackEvent } from '../../../utils/analytics';
-import { FeatureBadge } from '../../ui/FeatureBadge';
+import { TrustBadge } from '../../ui/TrustBadge';
 
 const HERO_OVERLAY_GRADIENT =
   'linear-gradient(90deg, rgba(0, 0, 0, 0.62) 0%, rgba(0, 0, 0, 0.45) 45%, rgba(0, 0, 0, 0.24) 100%)';
 const STORAGE_KEY = 'atlasHeroSearch';
 
-const uspItems = [
+const TRUST_BADGES = [
   { label: 'Verified homes', icon: CheckCircle2 },
-  { label: 'Prime Hyderabad locations', icon: MapPin },
-  { label: 'Flexible cancellation', icon: CalendarClock },
+  { label: 'Secure Razorpay payments', icon: ShieldCheck },
+  { label: 'No hidden fees', icon: BadgePercent },
 ];
 
 const Slider = () => {
@@ -275,14 +275,13 @@ const Slider = () => {
       </div>
 
       <div className="bg-bg-surface" data-testid="trust-badges">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-3 px-6 py-6">
-          {uspItems.map(({ label, icon }) => (
-            <FeatureBadge
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-4 px-6 py-8 md:gap-5">
+          {TRUST_BADGES.map(({ label, icon }) => (
+            <TrustBadge
               key={label}
               icon={icon}
               label={label}
-              tone="linen"
-              className="min-w-[240px] justify-center sm:min-w-[0]"
+              className="min-w-[220px] justify-center sm:min-w-[0]"
             />
           ))}
         </div>
