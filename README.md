@@ -95,6 +95,12 @@ Optional tooling:
 | `src/components/commonComponents/navbar/Navbar.tsx` / `footer/Footer.tsx` | Global navigation/header ribbon and footer contact blocks. |
 | `docs/` | Working notes covering the API guide and first PR starter; see `ONBOARDING.md`, `ARCHITECTURE.md`, `RUNBOOK.md`, and `SECURITY.md` for the comprehensive onboarding, architecture, operations, and security docs. |
 
+### “Our Homes” card conversion updates
+- **Explicit CTAs:** Each listing card now renders a primary “View room” button (plus an optional “Check dates” deep link when hero search dates exist) so the next action is obvious on desktop and mobile.
+- **Cleaner imagery:** Carousel dots are lighter and only surface on hover/focus for desktop while staying subtle on mobile; the legacy play icon is removed unless a video source exists in the future.
+- **Price hierarchy:** Pricing compresses to a concise stack—strike-through MRP (when discounted), bold nightly rate, and a single savings line—removing redundant copy while keeping `/ night` visible.
+- **Trust cues:** Discount badges use meaningful labels (defaulting to “Best price on our website” when a discount is present), and a compact amenities row surfaces Wi‑Fi/AC (with icons) per unit for faster trust-building.
+
 ## Routes & deep links
 - `/faq` → FAQ hub with accordion sections and WhatsApp CTA
 - `/faq#cancellation-refunds` → scrolls to the Cancellation & Refunds section

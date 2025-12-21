@@ -80,3 +80,8 @@
 .slick-dots-custom li.slick-active button {
   background: var(--text-contrast);
 }
+
+.slider-wrapper .slick-dots button,
+.slider-wrapper .slick-dots li {
+  display: none;
+}
