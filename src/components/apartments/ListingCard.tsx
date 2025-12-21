@@ -1,5 +1,6 @@
 import React from "react";
 import { BedDouble, Car, PawPrint, Users, Wifi } from "lucide-react";
+import pricingConfig from "../../config/pricing.config";
 
 type ListingCardProps = {
   id: string;
@@ -127,7 +128,9 @@ const ListingCard: React.FC<ListingCardProps> = ({
                 {formatCurrency(price)}
                 <span className="ml-1 text-base font-medium text-text-muted">/night</span>
               </div>
-              <span className="text-xs font-semibold text-text-muted">All fees included</span>
+              <span className="text-xs font-semibold text-text-muted">
+                Discount ({pricingConfig.globalDiscountPercent}%) applied
+              </span>
             </div>
             <div className="flex flex-wrap gap-2">
               <button

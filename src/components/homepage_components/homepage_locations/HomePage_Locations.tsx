@@ -7,6 +7,7 @@ import { LISTINGS, type Listing } from "../../../data/listings";
 import { sanitizeItems, getItemKey } from "../../../utils/sanitizeItems";
 import { LOGO_URL } from "../../../config/branding";
 import { trackEvent } from "../../../utils/analytics";
+import { calculateNightlyPrice, inferUnitType } from "../../../utils/pricing";
 import Heading from "../../commonComponents/heading/Heading";
 
 import "./homepage_location.css";
@@ -164,6 +165,24 @@ const HomePage_Locations = ({ listings = LISTINGS }: HomePageLocationsProps) => 
       return Array.from({ length: visibleDots - 1 }, (_, i) => start + i);
     };
 
+    const nightlyPrice = React.useMemo(() => {
+      try {
+        const unitType = inferUnitType({
+          id: propertyDataItem?.id ?? listing.id,
+          property_name: propertyDataItem?.property_name ?? displayName,
+        });
+
+        return calculateNightlyPrice({
+          unitType,
+          checkInDate: new Date(),
+          guests: 2,
+        });
+      } catch (error) {
+        console.warn("Unable to derive nightly price for property", listing.id, error);
+        return null;
+      }
+    }, [displayName, listing.id, propertyDataItem?.id, propertyDataItem?.property_name]);
+
     return (
       <div
         className={`bg-bg-surface rounded-2xl overflow-hidden shadow-level1 hover:shadow-level2 transition-shadow duration-300 cursor-pointer border border-border-subtle ${
@@ -228,11 +247,21 @@ const HomePage_Locations = ({ listings = LISTINGS }: HomePageLocationsProps) => 
               ({propertyDataItem?.property_reviews || "0"} reviews)
             </span>
           </div>
-          <div className="mt-2">
-            <span className="text-xl font-bold">
-              ₹{propertyDataItem?.property_price?.toLocaleString() || "4,999"}
-            </span>
-            <span className="text-text-muted text-sm ml-1">for 1 night</span>
+          <div className="mt-2 space-y-1">
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold">
+                ₹{nightlyPrice?.finalNightlyPrice?.toLocaleString("en-IN") || "4,999"}
+              </span>
+              <span className="text-text-muted text-sm">per night</span>
+            </div>
+            <p className="text-xs text-text-muted">
+              Base ₹{nightlyPrice?.baseNightlyPrice?.toLocaleString("en-IN") || "3,500"} · Discount ({nightlyPrice?.appliedDiscountPercent ?? 0}%)
+            </p>
+            {nightlyPrice?.isNewYearsEve && (
+              <span className="inline-flex items-center rounded-full bg-[color:var(--bg-muted)] px-2 py-1 text-[11px] font-semibold text-cta-primary">
+                New Year’s Eve pricing (2×)
+              </span>
+            )}
           </div>
         </div>
       </div>
