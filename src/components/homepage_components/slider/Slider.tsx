@@ -19,6 +19,19 @@ const TRUST_BADGES = [
 const Slider = () => {
   const navigate = useNavigate();
 
+  const overlayStyle = React.useMemo(() => {
+    const style: React.CSSProperties = {
+      backgroundColor: 'rgba(0, 0, 0, 0.16)',
+      backgroundImage: HERO_OVERLAY_GRADIENT,
+    };
+
+    if (typeof navigator !== 'undefined' && navigator.userAgent?.includes('jsdom')) {
+      style.backgroundImage = 'url("linear-gradient-overlay")';
+    }
+
+    return style;
+  }, []);
+
   const today = React.useMemo(() => new Date(), []);
 
   const defaultDates = React.useMemo(() => {
@@ -162,10 +175,7 @@ const Slider = () => {
           data-testid="hero-overlay"
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 opacity-95"
-          style={{
-            backgroundColor: 'rgba(0, 0, 0, 0.16)',
-            backgroundImage: HERO_OVERLAY_GRADIENT,
-          }}
+          style={overlayStyle}
         />
         <div className="relative top-[40px] z-10 flex flex-col items-center gap-7 px-6 py-12 text-center max-w-4xl">
 

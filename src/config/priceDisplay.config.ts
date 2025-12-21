@@ -11,10 +11,10 @@ export interface PriceDisplayConfig {
 
 export const priceDisplayConfig: PriceDisplayConfig = {
   discount: {
-    primaryBadgeLabel: "Smart Saver Price",
-    secondaryBadgeLabel: "🔥 Hot Deal",
-    reasonLabel: "Limited-time Atlas member deal",
-    savingsPrefix: "You save",
+    primaryBadgeLabel: "Best price on our website",
+    secondaryBadgeLabel: "Limited-time deal",
+    reasonLabel: "Direct booking savings",
+    savingsPrefix: "Save",
   },
   defaultSpecialLabel: "Special day pricing",
   specialPricingLabels: {
