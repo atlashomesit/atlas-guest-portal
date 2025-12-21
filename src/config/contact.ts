@@ -16,7 +16,7 @@ export const CONTACT = {
 export const DEFAULT_CONTACT_CHANNEL: ContactChannel = "business";
 
 export function getTelLink(channel: ContactChannel = DEFAULT_CONTACT_CHANNEL) {
-  return `tel:${CONTACT[channel].phone}`;
+  return `tel:+91${CONTACT[channel].phone}`;
 }
 
 export function getWhatsAppLink(channel: ContactChannel = DEFAULT_CONTACT_CHANNEL) {
