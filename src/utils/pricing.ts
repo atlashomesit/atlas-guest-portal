@@ -16,6 +16,8 @@ export type NightlyPriceBreakdown = {
   currency: string;
   appliedDiscountPercent: number;
   includedGuests: number;
+  dateKey: string;
+  hasSpecialDateMultiplier: boolean;
   isNewYearsEve: boolean;
 };
 
@@ -142,6 +144,7 @@ export const calculateNightlyPrice = ({
     subtotalBeforeMultiplier * dateMultiplier,
     pricingConfig.rounding,
   );
+  const hasSpecialDateMultiplier = dateMultiplier > 1;
 
   return {
     baseNightlyPrice,
@@ -153,6 +156,8 @@ export const calculateNightlyPrice = ({
     currency: pricingConfig.currency,
     appliedDiscountPercent: discountPercent,
     includedGuests,
-    isNewYearsEve: dateKey === "12-31" && dateMultiplier > 1,
+    dateKey,
+    hasSpecialDateMultiplier,
+    isNewYearsEve: dateKey === "12-31" && hasSpecialDateMultiplier,
   };
 };

@@ -8,6 +8,7 @@ import { FaCcMastercard, FaCcVisa, FaCreditCard, FaUserFriends } from 'react-ico
 import { SiGooglepay, SiRazorpay } from 'react-icons/si';
 import { trackEvent } from '../../../utils/analytics';
 import { calculateNightlyPrice, inferUnitType } from '../../../utils/pricing';
+import { priceDisplayConfig } from '../../../config/priceDisplay.config';
 
 declare global {
   interface Window {
@@ -148,7 +149,18 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     const averageNightlyRate = nights > 0 ? Math.round(staySubtotal / nights) : 0;
     const baseNightlyRate = nightlyBreakdown[0]?.breakdown.baseNightlyPrice ?? 0;
     const discountPercentApplied = nightlyBreakdown[0]?.breakdown.appliedDiscountPercent ?? 0;
-    const newYearsApplies = nightlyBreakdown.some((night) => night.breakdown.dateMultiplier > 1);
+    const specialPricingNight = nightlyBreakdown.find((night) => night.breakdown.hasSpecialDateMultiplier);
+    const hasSpecialPricing = Boolean(specialPricingNight);
+    const specialPricingLabel = specialPricingNight?.breakdown.dateKey
+        ? priceDisplayConfig.specialPricingLabels[specialPricingNight.breakdown.dateKey] ?? priceDisplayConfig.defaultSpecialLabel
+        : hasSpecialPricing
+            ? priceDisplayConfig.defaultSpecialLabel
+            : null;
+    const nightlySavings = nightlyBreakdown[0]?.breakdown.discountAmount ?? 0;
+    const hasDiscountToShow = discountPercentApplied > 0 && !hasSpecialPricing;
+    const priceBadgeClass = hasSpecialPricing
+        ? "inline-flex items-center rounded-full bg-[color:var(--bg-muted)] px-3 py-1 text-xs font-semibold text-cta-primary text-center"
+        : "inline-flex items-center rounded-full bg-[color:color-mix(in_srgb,var(--cta-primary)_12%,transparent)] px-3 py-1 text-xs font-semibold text-cta-primary text-center";
     const extraGuestsCount = Math.max(0, totalPeople - baseGuestAllowance);
     const totalExtraGuestCharges = nightlyBreakdown.reduce((sum, night) => sum + night.breakdown.extraGuestFee, 0);
 
@@ -413,20 +425,38 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         <div id="booking-form" className={`max-w-md mx-auto p-6 bg-bg-surface shadow-level2 rounded-2xl relative ${containerPaddingBottom} lg:pb-0 lg:sticky lg:top-20`}>
 
             {/* PRICE SECTION */}
-            <div className="mb-2 flex items-start justify-between gap-3">
-                <div>
-                    <p className="text-[30px] font-bold text-text-primary leading-none">
-                        ₹{averageNightlyRate.toLocaleString("en-IN")}
-                        <span className="text-base font-semibold ml-1 text-text-muted">/night</span>
+            <div className="mb-2 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="space-y-1">
+                    <div className="flex flex-wrap items-baseline gap-2">
+                        {hasDiscountToShow && (
+                            <span className="text-sm font-medium text-text-muted line-through">
+                                ₹{baseNightlyRate.toLocaleString("en-IN")}
+                            </span>
+                        )}
+                        <p className="text-[30px] font-bold text-cta-primary leading-none">
+                            ₹{averageNightlyRate.toLocaleString("en-IN")}
+                            <span className="text-base font-semibold ml-1 text-text-muted">/night</span>
+                        </p>
+                    </div>
+                    <p className="text-sm text-text-muted">
+                        {hasSpecialPricing ? "Average nightly with special-day pricing" : "Average nightly after discount"}
                     </p>
-                    <p className="text-sm text-text-muted">Average nightly after discount</p>
-                    <p className="text-xs text-text-muted">
-                        Base price: ₹{baseNightlyRate.toLocaleString("en-IN")} · Discount ({discountPercentApplied}%)
-                    </p>
+                    {hasDiscountToShow && nightlySavings > 0 && (
+                        <p className="text-xs font-semibold text-cta-primary">
+                            {priceDisplayConfig.discount.savingsPrefix} ₹{nightlySavings.toLocaleString("en-IN")} nightly
+                        </p>
+                    )}
+                    {hasDiscountToShow && (
+                        <p className="text-xs text-text-muted">
+                            {priceDisplayConfig.discount.reasonLabel} · Discount ({discountPercentApplied}%)
+                        </p>
+                    )}
                 </div>
-                {newYearsApplies && (
-                    <span className="mt-1 inline-flex items-center rounded-full bg-[color:var(--bg-muted)] px-3 py-1 text-xs font-semibold text-cta-primary">
-                        New Year’s Eve pricing (2×)
+                {(hasSpecialPricing || hasDiscountToShow) && (
+                    <span className={`mt-1 ${priceBadgeClass}`}>
+                        {hasSpecialPricing
+                            ? specialPricingLabel || "Special day pricing"
+                            : priceDisplayConfig.discount.primaryBadgeLabel || priceDisplayConfig.discount.secondaryBadgeLabel}
                     </span>
                 )}
             </div>

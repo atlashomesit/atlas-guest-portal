@@ -164,6 +164,7 @@ Each command should return a 301/302 with a `Location` header set to `/property_
   - 1BHK on Dec 31: discounted ₹2,905 → 2× multiplier → **₹5,810** per night.
   - Penthouse on normal dates: base ₹6,000 → 17% discount → **₹4,980** per night (₹9,960 on Dec 31 with the 2× multiplier).
 - To change prices safely, edit the config for permanent defaults or set env vars for temporary promos; keep the currency/timezone aligned with INR/Asia-Kolkata to avoid date-key drift for `"MM-DD"` multipliers.
+- Discount and special-day badge copy for UI surfaces is centralized in [`src/config/priceDisplay.config.ts`](src/config/priceDisplay.config.ts) to keep strike-through labels and special pricing tags API-ready.
 
 ## Legal content model and validation
 

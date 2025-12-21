@@ -8,7 +8,7 @@ import ListingCard from "../components/apartments/ListingCard";
 import ListingFilters from "../components/apartments/ListingFilters";
 import { sanitizeItems } from "../utils/sanitizeItems";
 import { trackEvent } from "../utils/analytics";
-import { calculateNightlyPrice, inferUnitType } from "../utils/pricing";
+import { calculateNightlyPrice, inferUnitType, type NightlyPriceBreakdown } from "../utils/pricing";
 
 type PropertyRecord = {
   id: number | string;
@@ -28,6 +28,7 @@ type CombinedListing = {
   name: string;
   location: string;
   price: number;
+  pricingBreakdown: NightlyPriceBreakdown | null;
   rating: number;
   reviews: number;
   featured: boolean;
@@ -105,21 +106,20 @@ const Apartments = () => {
   const [sortBy, setSortBy] = React.useState("featured");
 
   const computeNightlyPrice = React.useCallback(
-    (property: PropertyRecord) => {
+    (property: PropertyRecord): NightlyPriceBreakdown | null => {
       const unitType = inferUnitType({ id: property.id, property_name: property.property_name });
       const referenceDate = checkIn ? new Date(checkIn) : new Date();
       const checkInDate = Number.isNaN(referenceDate.getTime()) ? new Date() : referenceDate;
 
       try {
-        const pricing = calculateNightlyPrice({
+        return calculateNightlyPrice({
           unitType,
           checkInDate,
           guests,
         });
-        return pricing.finalNightlyPrice;
       } catch (error) {
         console.warn("Unable to calculate price for listing", property.id, error);
-        return 0;
+        return null;
       }
     },
     [checkIn, guests],
@@ -127,7 +127,7 @@ const Apartments = () => {
 
   const priceBounds = React.useMemo(() => {
     const prices = safeProperties
-      .map((property) => computeNightlyPrice(property))
+      .map((property) => computeNightlyPrice(property)?.finalNightlyPrice)
       .filter((price): price is number => typeof price === "number" && price > 0);
 
     const min = Math.min(...prices);
@@ -156,13 +156,15 @@ const Apartments = () => {
       const images = property.property_img || propertyImages[String(listing.id)];
       const name = property.property_name || listing.title || `Property ${listing.id}`;
       const location = property.property_location || listing.subtitle || "Hyderabad";
-      const price = computeNightlyPrice(property);
+      const pricing = computeNightlyPrice(property);
+      const price = pricing?.finalNightlyPrice ?? 0;
 
       return {
         id: String(listing.id),
         name,
         location,
         price,
+        pricingBreakdown: pricing,
         rating: property.property_rating || 0,
         reviews: property.property_reviews || 0,
         featured: Boolean(listing.featured),
@@ -344,6 +346,7 @@ const Apartments = () => {
               location={listing.location}
               image={listing.image}
               price={listing.price}
+              pricingBreakdown={listing.pricingBreakdown}
               rating={listing.rating}
               reviews={listing.reviews}
               propertyType={listing.propertyType}

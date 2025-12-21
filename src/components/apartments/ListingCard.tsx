@@ -1,6 +1,7 @@
 import React from "react";
 import { BedDouble, Car, PawPrint, Users, Wifi } from "lucide-react";
-import pricingConfig from "../../config/pricing.config";
+import { priceDisplayConfig } from "../../config/priceDisplay.config";
+import { type NightlyPriceBreakdown } from "../../utils/pricing";
 
 type ListingCardProps = {
   id: string;
@@ -8,6 +9,7 @@ type ListingCardProps = {
   location: string;
   image: string;
   price: number;
+  pricingBreakdown?: NightlyPriceBreakdown | null;
   rating: number;
   reviews: number;
   propertyType: string;
@@ -31,6 +33,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
   location,
   image,
   price,
+  pricingBreakdown,
   rating,
   reviews,
   propertyType,
@@ -41,6 +44,27 @@ const ListingCard: React.FC<ListingCardProps> = ({
   petFriendly,
   onClick,
 }) => {
+  const finalPrice = pricingBreakdown?.finalNightlyPrice ?? price;
+  const originalPrice = pricingBreakdown?.baseNightlyPrice ?? price;
+  const hasSpecialPricing = Boolean(pricingBreakdown?.hasSpecialDateMultiplier);
+  const specialPricingLabel =
+    hasSpecialPricing && pricingBreakdown?.dateKey
+      ? priceDisplayConfig.specialPricingLabels[pricingBreakdown.dateKey] ??
+        priceDisplayConfig.defaultSpecialLabel
+      : hasSpecialPricing
+        ? priceDisplayConfig.defaultSpecialLabel
+        : null;
+  const showDiscount = Boolean(
+    pricingBreakdown &&
+      pricingBreakdown.discountAmount > 0 &&
+      !pricingBreakdown.hasSpecialDateMultiplier,
+  );
+  const savingsAmount = showDiscount ? pricingBreakdown?.discountAmount ?? 0 : 0;
+  const badgeLabel =
+    specialPricingLabel ||
+    priceDisplayConfig.discount.primaryBadgeLabel ||
+    priceDisplayConfig.discount.secondaryBadgeLabel;
+
   const quickFacts = [
     {
       label: `${guests} guest${guests === 1 ? "" : "s"}`,
@@ -123,14 +147,39 @@ const ListingCard: React.FC<ListingCardProps> = ({
 
         <div className="mt-auto flex flex-col gap-3 pt-2 text-sm text-text-muted">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <div className="text-xl font-semibold text-text-primary leading-tight">
-                {formatCurrency(price)}
-                <span className="ml-1 text-base font-medium text-text-muted">/night</span>
+            <div className="flex flex-col gap-1">
+              <div className="flex flex-wrap items-baseline gap-2">
+                {showDiscount && (
+                  <span className="text-sm font-medium text-text-muted line-through">
+                    {formatCurrency(originalPrice)}
+                  </span>
+                )}
+                <div className="text-xl font-bold text-cta-primary leading-tight">
+                  {formatCurrency(finalPrice)}
+                  <span className="ml-1 text-base font-medium text-text-muted">/night</span>
+                </div>
               </div>
-              <span className="text-xs font-semibold text-text-muted">
-                Discount ({pricingConfig.globalDiscountPercent}%) applied
-              </span>
+              {showDiscount && savingsAmount > 0 && (
+                <span className="text-xs font-semibold text-cta-primary">
+                  {priceDisplayConfig.discount.savingsPrefix} {formatCurrency(savingsAmount)}
+                </span>
+              )}
+              {specialPricingLabel ? (
+                <span className="inline-flex w-fit items-center rounded-full bg-[color:var(--bg-muted)] px-3 py-1 text-xs font-semibold text-cta-primary">
+                  {specialPricingLabel}
+                </span>
+              ) : (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center rounded-full bg-[color:color-mix(in_srgb,var(--cta-primary)_12%,transparent)] px-3 py-1 text-xs font-semibold text-cta-primary">
+                    {badgeLabel}
+                  </span>
+                  {showDiscount && (
+                    <span className="text-xs font-semibold text-text-muted">
+                      {priceDisplayConfig.discount.reasonLabel}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
             <div className="flex flex-wrap gap-2">
               <button

@@ -8,6 +8,7 @@ import { sanitizeItems, getItemKey } from "../../../utils/sanitizeItems";
 import { LOGO_URL } from "../../../config/branding";
 import { trackEvent } from "../../../utils/analytics";
 import { calculateNightlyPrice, inferUnitType } from "../../../utils/pricing";
+import { priceDisplayConfig } from "../../../config/priceDisplay.config";
 import Heading from "../../commonComponents/heading/Heading";
 
 import "./homepage_location.css";
@@ -183,6 +184,23 @@ const HomePage_Locations = ({ listings = LISTINGS }: HomePageLocationsProps) => 
       }
     }, [displayName, listing.id, propertyDataItem?.id, propertyDataItem?.property_name]);
 
+    const hasSpecialPricing = Boolean(nightlyPrice?.hasSpecialDateMultiplier);
+    const specialPricingLabel =
+      hasSpecialPricing && nightlyPrice?.dateKey
+        ? priceDisplayConfig.specialPricingLabels[nightlyPrice.dateKey] ?? priceDisplayConfig.defaultSpecialLabel
+        : hasSpecialPricing
+          ? priceDisplayConfig.defaultSpecialLabel
+          : null;
+    const showDiscount =
+      Boolean(nightlyPrice?.discountAmount) &&
+      !hasSpecialPricing &&
+      (nightlyPrice?.discountAmount ?? 0) > 0;
+    const savingsAmount = showDiscount ? nightlyPrice?.discountAmount ?? 0 : 0;
+    const badgeLabel =
+      specialPricingLabel ||
+      priceDisplayConfig.discount.primaryBadgeLabel ||
+      priceDisplayConfig.discount.secondaryBadgeLabel;
+
     return (
       <div
         className={`bg-bg-surface rounded-2xl overflow-hidden shadow-level1 hover:shadow-level2 transition-shadow duration-300 cursor-pointer border border-border-subtle ${
@@ -248,19 +266,35 @@ const HomePage_Locations = ({ listings = LISTINGS }: HomePageLocationsProps) => 
             </span>
           </div>
           <div className="mt-2 space-y-1">
-            <div className="flex items-baseline gap-2">
-              <span className="text-xl font-bold">
+            <div className="flex flex-wrap items-baseline gap-2">
+              {showDiscount && (
+                <span className="text-sm text-text-muted line-through">
+                  ₹{nightlyPrice?.baseNightlyPrice?.toLocaleString("en-IN") || "3,500"}
+                </span>
+              )}
+              <span className="text-xl font-bold text-cta-primary">
                 ₹{nightlyPrice?.finalNightlyPrice?.toLocaleString("en-IN") || "4,999"}
               </span>
               <span className="text-text-muted text-sm">per night</span>
             </div>
-            <p className="text-xs text-text-muted">
-              Base ₹{nightlyPrice?.baseNightlyPrice?.toLocaleString("en-IN") || "3,500"} · Discount ({nightlyPrice?.appliedDiscountPercent ?? 0}%)
-            </p>
-            {nightlyPrice?.isNewYearsEve && (
+            {showDiscount && savingsAmount > 0 && (
+              <p className="text-xs font-semibold text-cta-primary">
+                {priceDisplayConfig.discount.savingsPrefix} ₹{savingsAmount.toLocaleString("en-IN")}
+              </p>
+            )}
+            {specialPricingLabel ? (
               <span className="inline-flex items-center rounded-full bg-[color:var(--bg-muted)] px-2 py-1 text-[11px] font-semibold text-cta-primary">
-                New Year’s Eve pricing (2×)
+                {specialPricingLabel}
               </span>
+            ) : (
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="inline-flex items-center rounded-full bg-[color:color-mix(in_srgb,var(--cta-primary)_12%,transparent)] px-2 py-1 font-semibold text-cta-primary">
+                  {badgeLabel}
+                </span>
+                <p className="text-text-muted">
+                  {priceDisplayConfig.discount.reasonLabel} · Discount ({nightlyPrice?.appliedDiscountPercent ?? 0}%)
+                </p>
+              </div>
             )}
           </div>
         </div>
