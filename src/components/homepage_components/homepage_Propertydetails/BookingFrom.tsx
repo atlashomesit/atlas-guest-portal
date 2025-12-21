@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import emailjs from '@emailjs/browser';
 import { Plus, Minus } from 'lucide-react';
 import { FaAngleDown, FaAngleUp } from "react-icons/fa6";
@@ -7,6 +7,7 @@ import { inlinePolicySnippets } from '../../../content/terms';
 import { Card } from '../../ui/Card';
 import { Input } from '../../ui/Input';
 import { Button } from '../../ui/Button';
+import { calculateNightlyPrice, inferUnitType } from '../../../utils/pricing';
 interface Property {
   property_name: string;
 }
@@ -45,26 +46,42 @@ const BookingForm = ({ propertyData }: { propertyData: Property }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [termsAcceptedAt, setTermsAcceptedAt] = useState<string | null>(null);
+  const unitType = inferUnitType({ property_name: propertyData?.property_name });
+  const totalGuests = adults + children + infants;
 
-  // Calculate number of nights
-  const calculateNights = () => {
+  const stayDates = useMemo(() => {
     const start = new Date(checkIn);
     const end = new Date(checkOut);
-    const diffTime = Math.abs(end.getTime() - start.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
-  };
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return [];
 
-  // Calculate total price (mock calculation)
-  const calculatePrice = () => {
-    const nights = calculateNights();
-    const basePrice = 3321; // Base price per night in rupees
-    return basePrice * nights;
-  };
+    const nights: Date[] = [];
+    const cursor = new Date(start);
+    while (cursor < end) {
+      nights.push(new Date(cursor));
+      cursor.setDate(cursor.getDate() + 1);
+    }
 
-  const totalGuests = adults + children + infants;
-  const nights = calculateNights();
-  const totalPrice = calculatePrice();
+    if (nights.length === 0) {
+      nights.push(start);
+    }
+
+    return nights;
+  }, [checkIn, checkOut]);
+
+  const nightlyBreakdown = useMemo(
+    () =>
+      stayDates.map((date) =>
+        calculateNightlyPrice({
+          unitType,
+          checkInDate: date,
+          guests: totalGuests || 1,
+        }),
+      ),
+    [stayDates, totalGuests, unitType],
+  );
+
+  const nights = nightlyBreakdown.length;
+  const totalPrice = nightlyBreakdown.reduce((sum, breakdown) => sum + breakdown.finalNightlyPrice, 0);
 
   const validateEmail = (email: string) => {
     // Simple email regex validation

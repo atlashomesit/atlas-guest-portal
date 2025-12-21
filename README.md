@@ -153,6 +153,18 @@ Each command should return a 301/302 with a `Location` header set to `/property_
 - **Unit timings & fees:** `src/config/policyConfig.ts` centralizes per-unit check-in/out windows and extra-guest fee ranges (`baseGuestAllowance`, `unitPolicies`).
 - **UI reuse:** booking widgets (`BookingFrom.tsx`, `hotelBooking_form/HotelBooking_Form.tsx`) and property details (`Homepage_PropertyDetails.tsx`) pull inline snippets and timing data from those sources to avoid hardcoded strings.
 
+## Pricing configuration
+- Centralized in [`src/config/pricing.config.ts`](src/config/pricing.config.ts) with helpers in [`src/utils/pricing.ts`](src/utils/pricing.ts). The config tracks per-unit base rates (`1bhk: ₹3,500`, `penthouse: ₹6,000`), included guests (2 by default), a global discount (`17%`), a New Year’s Eve multiplier (`"12-31": 2`), currency/timezone, rounding rules, and optional extras (extra guest fees, max guests, cleaning fees).
+- Env overrides (ideal for Cloudflare Pages) let you adjust pricing without rebuilding:
+  - `VITE_GLOBAL_DISCOUNT_PERCENT` → overrides the discount (e.g., `15` for 15% off).
+  - `VITE_DATE_MULTIPLIERS_JSON` → JSON map of `"MM-DD": multiplier` (e.g., `{"12-31":2,"01-01":1.25}`).
+- `calculateNightlyPrice` applies the config + overrides in this order: base rate → discount → date multiplier (per night) → extra-guest fees (if configured) → rounding. For multi-night stays, the Dec 31 multiplier is applied **only** to that night.
+- Example outcomes (before fees/taxes):
+  - 1BHK on Dec 30: base ₹3,500 → 17% discount → **₹2,905** per night.
+  - 1BHK on Dec 31: discounted ₹2,905 → 2× multiplier → **₹5,810** per night.
+  - Penthouse on normal dates: base ₹6,000 → 17% discount → **₹4,980** per night (₹9,960 on Dec 31 with the 2× multiplier).
+- To change prices safely, edit the config for permanent defaults or set env vars for temporary promos; keep the currency/timezone aligned with INR/Asia-Kolkata to avoid date-key drift for `"MM-DD"` multipliers.
+
 ## Legal content model and validation
 
 The Help area (Policies, FAQs, Terms) uses a single source of truth located in `src/content/legal/`. Edit `terms.ts` first, then reference those IDs from `policies.ts` (summaries) and `faqs.ts` (answers). Every policy must include `termsRefs` pointing to valid Terms IDs, and every FAQ needs at least one `linksTo` entry pointing to a policy or terms section. A build/test-time validator (`npm run validate:legal`) blocks builds if IDs are missing, unknown, or if risky promises in Policies/FAQs are not tied back to the Terms.
