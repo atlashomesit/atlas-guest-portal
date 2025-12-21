@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { CalendarClock, CheckCircle2, Receipt, ShieldCheck } from 'lucide-react';
+import { CalendarClock, CheckCircle2, MapPin, ShieldCheck } from 'lucide-react';
 import { LOGO_URL } from '../../../config/branding';
 import { HERO_IMAGE_URL } from '../../../config/hero';
 import { trackEvent } from '../../../utils/analytics';
@@ -12,8 +12,7 @@ const STORAGE_KEY = 'atlasHeroSearch';
 
 const uspItems = [
   { label: 'Verified homes', icon: CheckCircle2 },
-  { label: 'Secure Razorpay payments', icon: ShieldCheck },
-  { label: 'No hidden fees', icon: Receipt },
+  { label: 'Prime Hyderabad locations', icon: MapPin },
   { label: 'Flexible cancellation', icon: CalendarClock },
 ];
 
@@ -244,7 +243,7 @@ const Slider = () => {
                   <span>Book with confidence</span>
                 </div>
                 <p className="text-sm text-text-secondary sm:border-l sm:border-[color:color-mix(in_srgb,var(--text-muted)_60%,transparent)] sm:pl-3">
-                  Instant confirmation • Razorpay secure • No hidden charges
+                  Instant confirmation • Secure payments • No hidden charges
                 </p>
               </div>
 
@@ -275,7 +274,7 @@ const Slider = () => {
         </div>
       </div>
 
-      <div className="bg-bg-surface">
+      <div className="bg-bg-surface" data-testid="trust-badges">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-3 px-6 py-6">
           {uspItems.map(({ label, icon }) => (
             <FeatureBadge

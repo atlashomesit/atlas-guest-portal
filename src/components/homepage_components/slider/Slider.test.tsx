@@ -39,7 +39,7 @@ describe("Slider hero search", () => {
     expect(overlay).toBeInTheDocument();
     expect(overlay.style.backgroundImage).toMatch(/linear-gradient/i);
     expect(screen.getByText(/book with confidence/i)).toBeInTheDocument();
-    expect(screen.getByText(/instant confirmation • razorpay secure • no hidden charges/i)).toBeInTheDocument();
+    expect(screen.getByText(/instant confirmation • secure payments • no hidden charges/i)).toBeInTheDocument();
   });
 
   it("shows CTA hierarchy with primary button and secondary link", () => {
@@ -70,5 +70,17 @@ describe("Slider hero search", () => {
       expect.anything(),
       expect.anything(),
     );
+  });
+
+  it("shows experiential trust badges without payment or fee language", () => {
+    renderSlider();
+    const trustBadges = screen.getByTestId("trust-badges");
+    expect(trustBadges).toBeInTheDocument();
+    expect(screen.getByText(/verified homes/i)).toBeInTheDocument();
+    expect(screen.getByText(/prime hyderabad locations/i)).toBeInTheDocument();
+    expect(screen.getByText(/flexible cancellation/i)).toBeInTheDocument();
+    expect(trustBadges).not.toHaveTextContent(/razorpay/i);
+    expect(trustBadges).not.toHaveTextContent(/secure payments/i);
+    expect(trustBadges).not.toHaveTextContent(/hidden fees/i);
   });
 });

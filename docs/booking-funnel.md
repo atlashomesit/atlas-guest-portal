@@ -21,7 +21,7 @@ The homepage hero search now aligns with booking intent. It captures dates, gues
 ### Hero visual system
 - Background photography is sourced from `HERO_IMAGE_URL` in `src/config/hero.ts` so swaps are a single-line change.
 - A left-to-right dark overlay gradient sits above the image to keep hero headlines readable on bright backgrounds.
-- Trust copy beside the form uses “Book with confidence” followed by “Instant confirmation • Razorpay secure • No hidden charges” to reinforce safety without adding extra UI weight.
+- Trust copy beside the form uses “Book with confidence” followed by “Instant confirmation • Secure payments • No hidden charges” to reinforce safety without adding extra UI weight.
 - CTA hierarchy favors a single filled primary button (“Check availability”) with a lighter-weight text link for browsing listings.
 
 ### Query parameters
