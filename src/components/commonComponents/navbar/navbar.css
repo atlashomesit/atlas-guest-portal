@@ -60,6 +60,12 @@
   gap: 0.5rem;
 }
 
+.navbar-right {
+  margin-left: auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 @media(min-width: 768px) {
   .navbar-main {
     flex-wrap: nowrap;
@@ -169,7 +175,7 @@
   display: flex;
   align-items: center;
   gap: 0.25rem;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--text-primary);
   transition: color 0.3s;
   text-decoration: none;
@@ -180,20 +186,31 @@
 }
 
 .navbar-right .book-now {
-  padding: 0.5rem 0.5rem;
+  padding: 0.45rem 0.65rem;
   font-size: 0.75rem;
   font-weight: 600;
-  background-color: var(--cta-secondary);
-  color: var(--text-contrast);
+  background-color: transparent;
+  color: var(--cta-primary);
+  border: 1px solid color-mix(in srgb, var(--cta-primary) 70%, var(--text-primary));
   border-radius: 9999px;
-  box-shadow: var(--shadow-level-1);
-  transition: all 0.3s;
+  box-shadow: none;
+  transition: all 0.2s;
   text-decoration: none;
 }
 
 .navbar-right .book-now:hover {
-  background-color: var(--cta-primary);
-  color: var(--text-contrast);
+  background-color: color-mix(in srgb, var(--cta-primary) 10%, transparent);
+  color: var(--cta-primary);
+}
+
+@media(max-width: 767px) {
+  .navbar-right .phone span {
+    font-size: 0.9rem;
+  }
+
+  .navbar-right .book-now {
+    font-size: 0.75rem;
+  }
 }
 
 /* Mobile menu button */

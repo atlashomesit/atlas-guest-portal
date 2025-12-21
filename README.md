@@ -4,10 +4,13 @@
 Atlas Homes Frontend is a Vite-powered React + TypeScript single-page application that markets Atlas Homestays inventory and captures booking intent. Routing is centralized in [`src/App.tsx`](src/App.tsx), which mounts global UI elements (navbar, scroll restoration, footer) around page-level routes. The landing experience rendered by [`src/pages/home/Home.tsx`](src/pages/home/Home.tsx) weaves together carousel hero content, featured locations, marketing callouts, and testimonials composed from modular components and the structured property inventory exported by [`src/data.ts`](src/data.ts).
 
 ### Navigation structure
-- Primary (desktop): Apartments, Location, FAQ, Policies, Contact
-- "More" dropdown: Gallery, About Us, Articles (routes to `/blog`), Offers
+- Primary (desktop & mobile): Home, Apartments, Location, FAQs, Contact
+- Header keeps the business phone visible (tel link) alongside a softer-outline Book Now CTA
+- Footer carries the destinations that were previously grouped under “More” (Gallery, About Us, Articles, Offers) plus Sitemap/Policies/Terms
 - CTA: Book Now button remains a WhatsApp booking handoff
-- Mobile: primary links plus a collapsible "More" group; tapping any item closes the menu
+- Mobile: ordered primary links with collapsible Apartments children; tapping any item closes the menu
+
+Rationale: simplify the header for faster wayfinding, surface FAQs in-place of the former Help label without changing content, and keep the full phone number prominent (especially for India users who prefer to call and negotiate) while retaining but softening the Book Now emphasis.
 
 ## Prerequisites
 - Node.js **22.12.0+** (required by Vite 7 and enforced in `.nvmrc`/`.node-version`)

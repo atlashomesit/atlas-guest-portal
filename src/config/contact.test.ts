@@ -12,12 +12,12 @@ const FORBIDDEN_NUMBER = ["95022", "44053"].join("");
 describe("contact config", () => {
   it("uses business details by default", () => {
     expect(DEFAULT_CONTACT_CHANNEL).toBe("business");
-    expect(getTelLink()).toBe(`tel:${CONTACT.business.phone}`);
+    expect(getTelLink()).toBe(`tel:+91${CONTACT.business.phone}`);
     expect(getWhatsAppLink()).toBe(`https://wa.me/${CONTACT.business.whatsapp}`);
   });
 
   it("exposes owner channel only when explicitly requested", () => {
-    expect(getTelLink("owner")).toBe(`tel:${CONTACT.owner.phone}`);
+    expect(getTelLink("owner")).toBe(`tel:+91${CONTACT.owner.phone}`);
     expect(getWhatsAppLink("owner")).toBe(`https://wa.me/${CONTACT.owner.whatsapp}`);
   });
 
