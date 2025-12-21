@@ -47,10 +47,11 @@
   margin: 0 auto;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   padding: 0.25rem 0.5rem;
   gap: 0.5rem;
   flex-wrap: wrap;
+  position: relative;
 }
 
 .navbar-left,
@@ -61,10 +62,20 @@
   gap: 0.5rem;
 }
 
+.navbar-left {
+  flex-shrink: 0;
+}
+
+.navbar-center {
+  flex: 1;
+  justify-content: center;
+}
+
 .navbar-right {
-  margin-left: auto;
+  margin-left: 1rem;
   flex-wrap: wrap;
   justify-content: flex-end;
+  flex-shrink: 0;
 }
 
 @media(min-width: 768px) {
