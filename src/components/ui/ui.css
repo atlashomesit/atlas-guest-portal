@@ -169,11 +169,11 @@
   padding: var(--space-2) var(--space-4);
   border-radius: var(--radius-pill);
   border: 1px solid var(--border-subtle);
-  background: var(--bg-surface);
-  box-shadow: var(--shadow-level-1);
+  background: color-mix(in srgb, var(--bg-muted) 70%, var(--bg-surface) 30%);
+  box-shadow: none;
   color: var(--text-primary);
   font-weight: 600;
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-xs);
   letter-spacing: -0.01em;
   transition:
     transform 150ms ease,
@@ -183,7 +183,7 @@
 }
 
 .rb-feature-badge--linen {
-  background: color-mix(in srgb, var(--bg-muted) 80%, var(--bg-surface) 20%);
+  background: color-mix(in srgb, var(--bg-muted) 85%, var(--bg-surface) 15%);
 }
 
 .rb-feature-badge__icon svg {

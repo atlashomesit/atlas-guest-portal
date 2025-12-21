@@ -18,7 +18,7 @@ export function FeatureBadge({ icon: Icon, label, tone = "surface", className, .
   return (
     <div className={classes} tabIndex={0} {...rest}>
       <span className="rb-feature-badge__icon" aria-hidden="true">
-        <Icon size={18} strokeWidth={2.25} />
+        <Icon size={16} strokeWidth={2.1} />
       </span>
       <span className="rb-feature-badge__label">{label}</span>
     </div>
