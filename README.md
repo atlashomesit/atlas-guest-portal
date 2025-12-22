@@ -32,10 +32,11 @@ Optional tooling:
 
 ## Environment Variables
 - Vite only surfaces variables prefixed with `VITE_`; CRA-style `REACT_APP_*` keys are ignored at runtime. Make sure API hosts use `VITE_API_BASE_URL` rather than the legacy `REACT_APP_API_BASE_URL` name.
-- `VITE_API_BASE_URL` (required) → Base URL for all API calls (omit trailing slash). The value is read centrally in [`src/config/api.ts`](src/config/api.ts); if it is missing, the app logs an error and renders a friendly fallback screen instead of a blank page.
+- `VITE_API_BASE_URL` (required) → Base URL for all API calls (omit trailing slash). The value is resolved at runtime via [`/config.js`](functions/config.js) and [`src/config/getApiBaseUrl.ts`](src/config/getApiBaseUrl.ts); if it is missing, the app logs an error and renders a friendly fallback screen instead of a blank page.
 - Cloudflare Pages setup:
   - **Production:** Project → Settings → Environment variables → set `VITE_API_BASE_URL` to the production API host. Save for “Production” scope.
   - **Preview:** In the same screen, add `VITE_API_BASE_URL` for the “Preview” scope to point at staging/QA APIs so preview builds load data correctly.
+  - Runtime config: Pages Functions serve `/config.js` that injects `window.__ATLAS_RUNTIME_CONFIG__ = { apiBaseUrl: "..." }`. Changes to the env var apply immediately (no rebuild needed after this change ships); visiting `/config.js` should return the runtime value or an empty string with a comment if missing.
 
 ### Cloudflare Pages settings
 - In the Pages project dashboard, set the environment variable `NODE_VERSION=22.12.0` so builds align with Vite 7's engine requirement (\`^20.19.0 || >=22.12.0\`).
