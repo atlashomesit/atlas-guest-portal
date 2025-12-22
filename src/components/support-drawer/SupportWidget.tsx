@@ -31,6 +31,8 @@ const SupportWidgetContent = () => {
   const [callbackError, setCallbackError] = useState<string | null>(null);
   const {
     enableClickOutsideToClose,
+    enableSupportCtaHierarchy,
+    enableSupportLayoutVariants,
     enableHideUnfinishedChatbot,
     enableRevealCallbackOnClickOnly,
     enableRecommendedWhatsAppPrimary,
@@ -185,6 +187,7 @@ const SupportWidgetContent = () => {
       <>
         <SupportActionGrid
           contactPhone={CONTACT.business.phone}
+          enableCtaHierarchy={enableSupportCtaHierarchy}
           enableRecommendedWhatsAppPrimary={enableRecommendedWhatsAppPrimary}
           onCallClick={() => trackEvent("support_call", { surface: "support_widget" }, analyticsMetadata)}
           onFaqClick={handleFaqClick}
@@ -233,8 +236,17 @@ const SupportWidgetContent = () => {
               onClick={handleClose}
             />
           ) : null}
+          {/* Enable layoutVariants + ctaHierarchy (e.g., ?ff=layoutVariants,compactDrawer,ctaHierarchy)
+              to trial the compact drawer and CTA priority without changing the default experience. */}
           <SupportDrawer
             bottomSpacing={bottomSpacing}
+            layoutVariant={
+              enableSupportLayoutVariants
+                ? enableCompactDrawer
+                  ? "compactDrawer"
+                  : "fullHeightDrawer"
+                : "legacy"
+            }
             onClose={handleClose}
             trustMicrocopy={enableTrustMicrocopy ? TRUST_MICROCOPY : undefined}
           >
