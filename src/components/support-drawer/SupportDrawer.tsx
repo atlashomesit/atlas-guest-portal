@@ -28,27 +28,42 @@ const SupportDrawerViewContext = createContext<SupportDrawerViewContextValue | n
 interface SupportDrawerProps {
   bottomSpacing: string;
   children: ReactNode;
+  layoutVariant?: SupportDrawerLayoutVariant;
   onClose: () => void;
   trustMicrocopy?: ReactNode;
 }
 
-const SupportDrawer = ({ bottomSpacing, children, onClose, trustMicrocopy }: SupportDrawerProps) => {
+type SupportDrawerLayoutVariant = "legacy" | "fullHeightDrawer" | "compactDrawer";
+
+const SupportDrawer = ({ bottomSpacing, children, layoutVariant, onClose, trustMicrocopy }: SupportDrawerProps) => {
   const drawerRef = useRef<HTMLDivElement>(null);
-  const { enableClickOutsideToClose, enableCompactDrawer, enableTrustMicrocopy } = useSupportDrawerFlags();
+  const {
+    enableClickOutsideToClose,
+    enableCompactDrawer,
+    enableSupportLayoutVariants,
+    enableTrustMicrocopy,
+  } = useSupportDrawerFlags();
   const [view, setView] = useState<SupportDrawerView>("home");
 
+  const resolvedLayoutVariant: SupportDrawerLayoutVariant = useMemo(() => {
+    if (enableSupportLayoutVariants) {
+      return layoutVariant ?? (enableCompactDrawer ? "compactDrawer" : "fullHeightDrawer");
+    }
+    return enableCompactDrawer ? "compactDrawer" : "legacy";
+  }, [enableCompactDrawer, enableSupportLayoutVariants, layoutVariant]);
+
   const widthClass = useMemo(
-    () => (enableCompactDrawer ? "w-[min(92vw,380px)]" : "w-[min(92vw,420px)]"),
-    [enableCompactDrawer],
+    () => (resolvedLayoutVariant === "compactDrawer" ? "w-[min(92vw,380px)]" : "w-[min(92vw,420px)]"),
+    [resolvedLayoutVariant],
   );
 
   const containerStyle = useMemo<CSSProperties>(() => {
-    if (enableCompactDrawer) {
+    if (resolvedLayoutVariant === "compactDrawer") {
       return { bottom: bottomSpacing, maxHeight: "65vh" };
     }
 
     return { bottom: bottomSpacing, top: "5px" };
-  }, [bottomSpacing, enableCompactDrawer]);
+  }, [bottomSpacing, resolvedLayoutVariant]);
 
   const goToHome = useCallback(() => setView("home"), []);
   const goToCallback = useCallback(() => setView("callback"), []);
@@ -84,7 +99,9 @@ const SupportDrawer = ({ bottomSpacing, children, onClose, trustMicrocopy }: Sup
     <SupportDrawerViewContext.Provider value={viewContextValue}>
       <div
         ref={drawerRef}
-        className={`fixed right-3 z-[var(--z-floating)] ${widthClass} flex flex-col overflow-hidden rounded-3xl border border-[color-mix(in_srgb,var(--border-subtle)_80%,transparent)] bg-[color-mix(in_srgb,var(--bg-surface)_97%,#f7f4ed_8%)] text-text-primary shadow-level4 ring-1 ring-border-subtle backdrop-blur md:right-5 ${enableCompactDrawer ? "max-h-[65vh]" : ""}`}
+        className={`fixed right-3 z-[var(--z-floating)] ${widthClass} flex flex-col overflow-hidden rounded-3xl border border-[color-mix(in_srgb,var(--border-subtle)_80%,transparent)] bg-[color-mix(in_srgb,var(--bg-surface)_97%,#f7f4ed_8%)] text-text-primary shadow-level4 ring-1 ring-border-subtle backdrop-blur md:right-5 ${
+          resolvedLayoutVariant === "compactDrawer" ? "max-h-[65vh]" : ""
+        }`}
         style={containerStyle}
       >
         <div className="flex items-start justify-between gap-3 bg-[color-mix(in_srgb,var(--bg-surface)_96%,#f2efe8_18%)] px-4 py-3">
@@ -106,7 +123,9 @@ const SupportDrawer = ({ bottomSpacing, children, onClose, trustMicrocopy }: Sup
           <p className="px-4 pb-2 text-[11px] font-medium uppercase tracking-wide text-text-muted">{trustMicrocopy}</p>
         ) : null}
 
-        <div className={`min-h-0 flex-1 ${enableCompactDrawer ? "overflow-y-auto" : "overflow-visible"}`}>{children}</div>
+        <div className={`min-h-0 flex-1 ${resolvedLayoutVariant === "compactDrawer" ? "overflow-y-auto" : "overflow-visible"}`}>
+          {children}
+        </div>
       </div>
     </SupportDrawerViewContext.Provider>
   );

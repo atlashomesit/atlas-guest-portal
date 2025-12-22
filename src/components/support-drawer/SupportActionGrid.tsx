@@ -9,6 +9,7 @@ export const RECOMMENDED_ACTION_ID: SupportActionId = "whatsapp";
 
 interface SupportActionGridProps {
   contactPhone: string;
+  enableCtaHierarchy?: boolean;
   enableRecommendedWhatsAppPrimary?: boolean;
   onCallClick: () => void;
   onFaqClick: () => void;
@@ -16,6 +17,7 @@ interface SupportActionGridProps {
   onWhatsappClick: () => void;
   primaryActionIds?: SupportActionId[];
   secondaryActionIds?: SupportActionId[];
+  tertiaryActionIds?: SupportActionId[];
   whatsappLink: string;
 }
 
@@ -24,6 +26,7 @@ const ACTION_STYLES =
 
 const SupportActionGrid = ({
   contactPhone,
+  enableCtaHierarchy,
   enableRecommendedWhatsAppPrimary,
   onCallClick,
   onCallbackClick,
@@ -31,6 +34,7 @@ const SupportActionGrid = ({
   onWhatsappClick,
   primaryActionIds,
   secondaryActionIds,
+  tertiaryActionIds,
   whatsappLink,
 }: SupportActionGridProps) => {
   const allActions: Record<SupportActionId, JSX.Element> = {
@@ -96,22 +100,43 @@ const SupportActionGrid = ({
     ),
   };
 
-  const configuredPrimary = primaryActionIds ?? (enableRecommendedWhatsAppPrimary ? [RECOMMENDED_ACTION_ID] : undefined);
+  const shouldApplyHierarchy = Boolean(enableCtaHierarchy);
+  const configuredPrimary =
+    primaryActionIds ??
+    (shouldApplyHierarchy
+      ? ([RECOMMENDED_ACTION_ID] as SupportActionId[])
+      : enableRecommendedWhatsAppPrimary
+        ? [RECOMMENDED_ACTION_ID]
+        : undefined);
   const primaryIds = configuredPrimary ?? (Object.keys(allActions) as SupportActionId[]);
   const primarySet = new Set(primaryIds);
 
-  const secondaryIds =
+  const configuredSecondary =
     secondaryActionIds ??
-    (enableRecommendedWhatsAppPrimary
-      ? (Object.keys(allActions).filter((id) => !primarySet.has(id as SupportActionId)) as SupportActionId[])
-      : []);
+    (shouldApplyHierarchy
+      ? (["call", "callback"].filter((id) => allActions[id as SupportActionId]) as SupportActionId[])
+      : enableRecommendedWhatsAppPrimary
+        ? (Object.keys(allActions).filter((id) => !primarySet.has(id as SupportActionId)) as SupportActionId[])
+        : []);
+  const secondaryIds = configuredSecondary.filter((id) => !primarySet.has(id));
+  const secondarySet = new Set(secondaryIds);
 
-  const renderSecondary = enableRecommendedWhatsAppPrimary && secondaryIds.length > 0;
+  const tertiaryIds =
+    (shouldApplyHierarchy
+      ? tertiaryActionIds ?? (["faq"].filter((id) => allActions[id as SupportActionId]) as SupportActionId[])
+      : tertiaryActionIds) ?? [];
+
+  const renderSecondary = (enableRecommendedWhatsAppPrimary || shouldApplyHierarchy) && secondaryIds.length > 0;
+  const renderTertiary = shouldApplyHierarchy && tertiaryIds.length > 0;
 
   const renderAction = (id: SupportActionId) => cloneElement(allActions[id], { key: id });
 
   if (!enableRecommendedWhatsAppPrimary) {
-    return <div className="grid grid-cols-2 gap-3 px-4 py-3">{primaryIds.map(renderAction)}</div>;
+    const prioritizedIds = shouldApplyHierarchy
+      ? [...primaryIds, ...secondaryIds, ...tertiaryIds.filter((id) => !secondarySet.has(id) && !primarySet.has(id))]
+      : primaryIds;
+
+    return <div className="grid grid-cols-2 gap-3 px-4 py-3">{prioritizedIds.map(renderAction)}</div>;
   }
 
   return (
@@ -120,8 +145,19 @@ const SupportActionGrid = ({
 
       {renderSecondary ? (
         <div className="rounded-2xl border border-border-subtle bg-bg-muted/60 p-2">
-          <p className="px-1 pb-1 text-[13px] font-medium text-text-muted">Other ways to reach us</p>
+          <p className="px-1 pb-1 text-[13px] font-medium text-text-muted">
+            {shouldApplyHierarchy ? "Next best options" : "Other ways to reach us"}
+          </p>
           <div className="flex flex-col gap-2">{secondaryIds.map(renderAction)}</div>
+        </div>
+      ) : null}
+
+      {renderTertiary ? (
+        <div className="rounded-2xl border border-border-subtle bg-[color-mix(in_srgb,var(--bg-muted)_50%,transparent)] p-2">
+          <p className="px-1 pb-1 text-[13px] font-medium text-text-muted">Self-serve</p>
+          <div className="flex flex-col gap-2">
+            {tertiaryIds.filter((id) => !primarySet.has(id) && !secondarySet.has(id)).map((id) => renderAction(id))}
+          </div>
         </div>
       ) : null}
     </div>

@@ -1,10 +1,12 @@
 type FeatureFlagKey =
   | "enableCompactDrawer"
+  | "enableSupportLayoutVariants"
   | "enableRecommendedWhatsAppPrimary"
   | "enableSecondaryActionsCollapsed"
   | "enableRevealCallbackOnClickOnly"
   | "enableHideUnfinishedChatbot"
   | "enableClickOutsideToClose"
+  | "enableSupportCtaHierarchy"
   | "enableSessionDismissRemember"
   | "enableTrustMicrocopy";
 
@@ -12,23 +14,30 @@ export type FeatureFlags = Record<FeatureFlagKey, boolean>;
 
 const DEFAULT_FLAGS: FeatureFlags = {
   enableCompactDrawer: false,
+  enableSupportLayoutVariants: false,
   enableRecommendedWhatsAppPrimary: false,
   enableSecondaryActionsCollapsed: false,
   enableRevealCallbackOnClickOnly: false,
   enableHideUnfinishedChatbot: false,
   enableClickOutsideToClose: false,
+  enableSupportCtaHierarchy: false,
   enableSessionDismissRemember: false,
   enableTrustMicrocopy: false,
 };
 
 const FLAG_TOKEN_MAP: Record<string, FeatureFlagKey> = {
   compactDrawer: "enableCompactDrawer",
+  layoutVariants: "enableSupportLayoutVariants",
   whatsappPrimary: "enableRecommendedWhatsAppPrimary",
   collapseSecondary: "enableSecondaryActionsCollapsed",
   revealCallback: "enableRevealCallbackOnClickOnly",
   hideChatbot: "enableHideUnfinishedChatbot",
+  ctaHierarchy: "enableSupportCtaHierarchy",
   trustMicrocopy: "enableTrustMicrocopy",
 };
+// To trial compact drawer + CTA hierarchy safely, prefer enabling with URL/localStorage tokens like:
+//   ?ff=layoutVariants,compactDrawer,ctaHierarchy
+// Keeping layoutVariants off will retain the legacy sizing and action ordering.
 
 const parseTokens = (raw: string | null) =>
   raw
