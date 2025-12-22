@@ -2,19 +2,21 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation, useMatch } from "react-router-dom";
 
 import { CONTACT } from "../../config/contact";
+import { supportDrawerFlags } from "../../config/supportDrawerFlags";
 import { trackEvent } from "../../utils/analytics";
 import { buildWaLink, defaultPrefill } from "../../utils/whatsapp";
 import { submitCallbackRequest } from "../support/callbackService";
 import CallbackRequestForm from "./CallbackRequestForm";
 import ChatbotPlaceholder from "./ChatbotPlaceholder";
 import SupportActionGrid from "./SupportActionGrid";
+import { SupportDrawerFlagsProvider, useSupportDrawerFlags } from "./SupportDrawerFlagsContext";
 import SupportDrawer from "./SupportDrawer";
 import SupportWidgetTrigger from "./SupportWidgetTrigger";
 import { CallbackStatus, SupportAnalyticsMetadata } from "./supportDrawer.types";
 
 const SCROLL_BUFFER_PX = 200;
 
-const SupportWidget = () => {
+const SupportWidgetContent = () => {
   const location = useLocation();
   const matchPropertyDetails = useMatch("/property_details/:id");
   const listingId = matchPropertyDetails?.params?.id ?? null;
@@ -25,6 +27,8 @@ const SupportWidget = () => {
   const [callbackPhone, setCallbackPhone] = useState("");
   const [callbackStatus, setCallbackStatus] = useState<CallbackStatus>("idle");
   const [callbackError, setCallbackError] = useState<string | null>(null);
+  const { enableHideUnfinishedChatbot, enableRevealCallbackOnClickOnly } = useSupportDrawerFlags();
+  const [isCallbackExpanded, setIsCallbackExpanded] = useState(() => !enableRevealCallbackOnClickOnly);
 
   const analyticsMetadata: SupportAnalyticsMetadata = {
     route: location.pathname,
@@ -69,6 +73,12 @@ const SupportWidget = () => {
     };
   }, []);
 
+  useEffect(() => {
+    if (!isOpen) {
+      setIsCallbackExpanded(!enableRevealCallbackOnClickOnly);
+    }
+  }, [enableRevealCallbackOnClickOnly, isOpen]);
+
   const handleOpen = () => {
     setIsOpen(true);
     trackEvent("chat_opened", { surface: "support_widget", entryPoint: "floating_pill" }, analyticsMetadata);
@@ -111,6 +121,10 @@ const SupportWidget = () => {
     }
   };
 
+  const handleRevealCallback = () => {
+    setIsCallbackExpanded(true);
+  };
+
   if (location.pathname.includes("payment") || location.pathname.includes("checkout")) {
     return null;
   }
@@ -125,6 +139,7 @@ const SupportWidget = () => {
             contactPhone={CONTACT.business.phone}
             onCallClick={() => trackEvent("support_call", { surface: "support_widget" }, analyticsMetadata)}
             onFaqClick={() => trackEvent("support_faq", { surface: "support_widget" }, analyticsMetadata)}
+            onCallbackClick={enableRevealCallbackOnClickOnly ? handleRevealCallback : undefined}
             onWhatsappClick={() =>
               trackEvent("support_whatsapp", { surface: "support_widget" }, analyticsMetadata)
             }
@@ -132,21 +147,29 @@ const SupportWidget = () => {
           />
 
           <div className="flex flex-col gap-3 px-4 pb-4">
-            <CallbackRequestForm
-              callbackError={callbackError}
-              callbackPhone={callbackPhone}
-              callbackStatus={callbackStatus}
-              onClose={handleClose}
-              onPhoneChange={handlePhoneChange}
-              onSubmit={handleCallbackSubmit}
-            />
+            {isCallbackExpanded ? (
+              <CallbackRequestForm
+                callbackError={callbackError}
+                callbackPhone={callbackPhone}
+                callbackStatus={callbackStatus}
+                onClose={handleClose}
+                onPhoneChange={handlePhoneChange}
+                onSubmit={handleCallbackSubmit}
+              />
+            ) : null}
 
-            <ChatbotPlaceholder />
+            {enableHideUnfinishedChatbot ? null : <ChatbotPlaceholder />}
           </div>
         </SupportDrawer>
       ) : null}
     </>
   );
 };
+
+const SupportWidget = () => (
+  <SupportDrawerFlagsProvider flags={supportDrawerFlags}>
+    <SupportWidgetContent />
+  </SupportDrawerFlagsProvider>
+);
 
 export default SupportWidget;
