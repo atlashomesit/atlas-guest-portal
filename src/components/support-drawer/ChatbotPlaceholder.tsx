@@ -21,6 +21,8 @@ const ChatbotPlaceholder = ({ enableHideUnfinishedChatbot = false }: ChatbotPlac
     );
   }
 
+  // Recommended replacement copy when live chat goes live:
+  // "Chat live with our team for instant support."
   return (
     <div className="rounded-2xl border border-[color-mix(in_srgb,var(--border-subtle)_80%,transparent)] bg-[color-mix(in_srgb,var(--bg-muted)_92%,#f9f6f1_12%)] p-3 shadow-inner">
       <div className="mb-2 flex items-center justify-between gap-2">
