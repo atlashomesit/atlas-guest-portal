@@ -24,7 +24,7 @@ const CallbackRequestForm = ({
   const resolvedExpectationText = expectationText ?? copy.expectationText;
 
   return (
-    <div className="rounded-2xl border border-border-subtle bg-bg-surface p-[var(--drawer-card-padding-block)] shadow-inner">
+    <div className="rounded-2xl border border-border-subtle bg-bg-surface p-[var(--drawer-card-padding-block,0.75rem)] shadow-inner">
       <p className="text-sm font-semibold text-text-primary">{copy.title}</p>
       <p className="text-xs text-text-muted">{copy.subtitle}</p>
       {resolvedExpectationText ? (

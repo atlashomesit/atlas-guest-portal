@@ -198,7 +198,7 @@ const SupportWidgetContent = () => {
           whatsappLink={whatsappLink}
         />
 
-        <div className="flex flex-col gap-[var(--drawer-section-gap)] px-[var(--drawer-card-padding-inline)] pb-[calc(var(--drawer-card-padding-block)_+_0.25rem)]">
+        <div className="flex flex-col gap-[var(--drawer-section-gap,0.75rem)] px-[var(--drawer-card-padding-inline,1rem)] pb-[calc(var(--drawer-card-padding-block,0.75rem)+0.25rem)]">
           {isCallbackExpanded ? (
             <CallbackRequestForm
               callbackError={callbackError}

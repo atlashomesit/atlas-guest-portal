@@ -55,6 +55,7 @@ const SupportDrawer = ({
   const {
     enableClickOutsideToClose,
     enableCompactDrawer,
+    enableDrawerStructureTokens,
     enableSupportLayoutVariants,
     enableTrustMicrocopy,
   } = useSupportDrawerFlags();
@@ -81,12 +82,15 @@ const SupportDrawer = ({
   }, [bottomSpacing, resolvedLayoutVariant]);
 
   const spacingTokens = useMemo<CSSProperties>(
-    () => ({
-      "--drawer-card-padding-block": SUPPORT_DRAWER_SPACING.cardPaddingBlock,
-      "--drawer-card-padding-inline": SUPPORT_DRAWER_SPACING.cardPaddingInline,
-      "--drawer-section-gap": SUPPORT_DRAWER_SPACING.sectionGap,
-    }),
-    [],
+    () =>
+      enableDrawerStructureTokens
+        ? {
+            "--drawer-card-padding-block": SUPPORT_DRAWER_SPACING.cardPaddingBlock,
+            "--drawer-card-padding-inline": SUPPORT_DRAWER_SPACING.cardPaddingInline,
+            "--drawer-section-gap": SUPPORT_DRAWER_SPACING.sectionGap,
+          }
+        : {},
+    [enableDrawerStructureTokens],
   );
 
   const goToHome = useCallback(() => setView("home"), []);
@@ -128,7 +132,7 @@ const SupportDrawer = ({
         }`}
         style={{ ...containerStyle, ...spacingTokens }}
       >
-        <div className="flex items-start justify-between gap-[var(--drawer-section-gap)] bg-[color-mix(in_srgb,var(--bg-surface)_96%,#f2efe8_18%)] px-[var(--drawer-card-padding-inline)] py-[var(--drawer-card-padding-block)]">
+        <div className="flex items-start justify-between gap-[var(--drawer-section-gap,0.75rem)] bg-[color-mix(in_srgb,var(--bg-surface)_96%,#f2efe8_18%)] px-[var(--drawer-card-padding-inline,1rem)] py-[var(--drawer-card-padding-block,0.75rem)]">
           <div className="flex flex-col gap-0.5">
             <p className="text-sm font-semibold text-text-primary">{SUPPORT_DRAWER_COPY.header.title}</p>
             <p className="text-xs text-text-muted">{SUPPORT_DRAWER_COPY.header.subtitle}</p>
@@ -151,7 +155,9 @@ const SupportDrawer = ({
         </div>
 
         {enableTrustMicrocopy && trustMicrocopy ? (
-          <p className="px-[var(--drawer-card-padding-inline)] pb-2 text-[11px] font-medium uppercase tracking-wide text-text-muted">{trustMicrocopy}</p>
+          <p className="px-[var(--drawer-card-padding-inline,1rem)] pb-2 text-[11px] font-medium uppercase tracking-wide text-text-muted">
+            {trustMicrocopy}
+          </p>
         ) : null}
 
         <div
