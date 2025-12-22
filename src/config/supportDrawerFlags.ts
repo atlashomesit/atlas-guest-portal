@@ -1,22 +1,6 @@
-// Support drawer UX feature flags. All flags default to false to preserve current behavior.
-export const enableCompactDrawer = false;
-export const enableRecommendedWhatsAppPrimary = false;
-export const enableSecondaryActionsCollapsed = false;
-export const enableRevealCallbackOnClickOnly = false;
-export const enableHideUnfinishedChatbot = false;
-export const enableClickOutsideToClose = false;
-export const enableSessionDismissRemember = false;
-export const enableTrustMicrocopy = false;
+import { defaultFeatureFlags, getFeatureFlags } from "./featureFlags";
 
-export const supportDrawerFlags = {
-  enableCompactDrawer,
-  enableRecommendedWhatsAppPrimary,
-  enableSecondaryActionsCollapsed,
-  enableRevealCallbackOnClickOnly,
-  enableHideUnfinishedChatbot,
-  enableClickOutsideToClose,
-  enableSessionDismissRemember,
-  enableTrustMicrocopy,
-};
+// Deprecated: prefer importing getFeatureFlags directly from featureFlags.ts.
+export const supportDrawerFlags = getFeatureFlags();
 
-export type SupportDrawerFlags = typeof supportDrawerFlags;
+export type SupportDrawerFlags = typeof defaultFeatureFlags;
