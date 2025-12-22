@@ -11,6 +11,7 @@ import {
 } from "react";
 import { FiX } from "react-icons/fi";
 
+import { SUPPORT_DRAWER_COPY } from "../../config/supportDrawerCopy";
 import { useSupportDrawerFlags } from "./SupportDrawerFlagsContext";
 
 type SupportDrawerView = "home" | "callback" | "faq" | "chat";
@@ -106,14 +107,14 @@ const SupportDrawer = ({ bottomSpacing, children, layoutVariant, onClose, trustM
       >
         <div className="flex items-start justify-between gap-3 bg-[color-mix(in_srgb,var(--bg-surface)_96%,#f2efe8_18%)] px-4 py-3">
           <div className="flex flex-col gap-0.5">
-            <p className="text-sm font-semibold text-text-primary">Need a hand?</p>
-            <p className="text-xs text-text-muted">Chat with Atlas or jump to WhatsApp/callback without losing your place.</p>
+            <p className="text-sm font-semibold text-text-primary">{SUPPORT_DRAWER_COPY.header.title}</p>
+            <p className="text-xs text-text-muted">{SUPPORT_DRAWER_COPY.header.subtitle}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
             className="rounded-full p-2 text-text-muted transition hover:bg-bg-muted hover:text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-strong"
-            aria-label="Close support widget"
+            aria-label={SUPPORT_DRAWER_COPY.controls.closeAriaLabel}
           >
             <FiX aria-hidden="true" />
           </button>

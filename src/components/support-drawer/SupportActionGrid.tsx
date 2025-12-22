@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { FaWhatsapp } from "react-icons/fa";
 import { FiHelpCircle, FiPhone, FiPhoneCall } from "react-icons/fi";
 
+import { SUPPORT_DRAWER_COPY } from "../../config/supportDrawerCopy";
+
 type SupportActionId = "whatsapp" | "call" | "faq" | "callback";
 
 export const RECOMMENDED_ACTION_ID: SupportActionId = "whatsapp";
@@ -50,8 +52,10 @@ const SupportActionGrid = ({
           <FaWhatsapp aria-hidden="true" />
         </span>
         <span>
-          WhatsApp
-          <span className="block text-[11px] font-normal text-text-muted">Fastest response</span>
+          {SUPPORT_DRAWER_COPY.actions.whatsapp.label}
+          <span className="block text-[11px] font-normal text-text-muted">
+            {SUPPORT_DRAWER_COPY.actions.whatsapp.description}
+          </span>
         </span>
       </a>
     ),
@@ -61,8 +65,10 @@ const SupportActionGrid = ({
           <FiPhone aria-hidden="true" />
         </span>
         <span>
-          Call
-          <span className="block text-[11px] font-normal text-text-muted">Speak with the team</span>
+          {SUPPORT_DRAWER_COPY.actions.call.label}
+          <span className="block text-[11px] font-normal text-text-muted">
+            {SUPPORT_DRAWER_COPY.actions.call.description}
+          </span>
         </span>
       </a>
     ),
@@ -72,8 +78,10 @@ const SupportActionGrid = ({
           <FiHelpCircle aria-hidden="true" />
         </span>
         <span>
-          FAQs
-          <span className="block text-[11px] font-normal text-text-muted">Instant answers</span>
+          {SUPPORT_DRAWER_COPY.actions.faq.label}
+          <span className="block text-[11px] font-normal text-text-muted">
+            {SUPPORT_DRAWER_COPY.actions.faq.description}
+          </span>
         </span>
       </Link>
     ),
@@ -83,8 +91,10 @@ const SupportActionGrid = ({
           <FiPhoneCall aria-hidden="true" />
         </span>
         <div className="flex-1">
-          <span className="block">Request callback</span>
-          <span className="block text-[11px] font-normal text-text-muted">We&apos;ll ring you back</span>
+          <span className="block">{SUPPORT_DRAWER_COPY.actions.callback.label}</span>
+          <span className="block text-[11px] font-normal text-text-muted">
+            {SUPPORT_DRAWER_COPY.actions.callback.description}
+          </span>
         </div>
       </button>
     ) : (
@@ -93,8 +103,10 @@ const SupportActionGrid = ({
           <FiPhoneCall aria-hidden="true" />
         </span>
         <div className="flex-1">
-          <span className="block">Request callback</span>
-          <span className="block text-[11px] font-normal text-text-muted">We&apos;ll ring you back</span>
+          <span className="block">{SUPPORT_DRAWER_COPY.actions.callback.label}</span>
+          <span className="block text-[11px] font-normal text-text-muted">
+            {SUPPORT_DRAWER_COPY.actions.callback.description}
+          </span>
         </div>
       </div>
     ),
@@ -146,7 +158,9 @@ const SupportActionGrid = ({
       {renderSecondary ? (
         <div className="rounded-2xl border border-border-subtle bg-bg-muted/60 p-2">
           <p className="px-1 pb-1 text-[13px] font-medium text-text-muted">
-            {shouldApplyHierarchy ? "Next best options" : "Other ways to reach us"}
+            {shouldApplyHierarchy
+              ? SUPPORT_DRAWER_COPY.actions.secondaryHeader.hierarchy
+              : SUPPORT_DRAWER_COPY.actions.secondaryHeader.flat}
           </p>
           <div className="flex flex-col gap-2">{secondaryIds.map(renderAction)}</div>
         </div>
@@ -154,7 +168,9 @@ const SupportActionGrid = ({
 
       {renderTertiary ? (
         <div className="rounded-2xl border border-border-subtle bg-[color-mix(in_srgb,var(--bg-muted)_50%,transparent)] p-2">
-          <p className="px-1 pb-1 text-[13px] font-medium text-text-muted">Self-serve</p>
+          <p className="px-1 pb-1 text-[13px] font-medium text-text-muted">
+            {SUPPORT_DRAWER_COPY.actions.tertiaryHeader}
+          </p>
           <div className="flex flex-col gap-2">
             {tertiaryIds.filter((id) => !primarySet.has(id) && !secondarySet.has(id)).map((id) => renderAction(id))}
           </div>
