@@ -7,12 +7,12 @@
     "dev": "vite --host",
     "prebuild": "npm run validate:legal && node tools/optimize-images.mjs",
     "build": "vite build",
-    "test": "vitest run",
+    "test": "node node_modules/vitest/vitest.mjs run",
     "pretest": "npm run validate:legal",
     "lint": "eslint .",
     "format": "prettier -w .",
     "preview": "vite preview",
-    "validate:legal": "CI=1 vitest run --config vitest.config.ts src/content/legal/validateLegalContent.test.ts --bail=1"
+    "validate:legal": "CI=1 node node_modules/vitest/vitest.mjs run --config vitest.config.ts src/content/legal/validateLegalContent.test.ts --bail=1"
   },
   "engines": {
     "node": ">=22.12.0",

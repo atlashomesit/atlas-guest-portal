@@ -215,6 +215,20 @@
   color: var(--cta-primary);
 }
 
+.navbar-right .help-link {
+  padding: 0.45rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  border-radius: 9999px;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.navbar-right .help-link:hover {
+  color: var(--cta-primary);
+}
+
 @media(max-width: 767px) {
   .navbar-right .phone span {
     font-size: 0.9rem;

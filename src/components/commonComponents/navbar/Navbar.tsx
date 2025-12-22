@@ -8,6 +8,7 @@ import { primaryNav, ctaNav } from '../../../config/navigation';
 import { LOGO_URL } from '../../../config/branding';
 import { CONTACT, formatDisplayNumber, getTelLink } from '../../../config/contact';
 import { propertyData } from '../../../data';
+import { trackEvent } from '../../../utils/analytics';
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -20,6 +21,7 @@ const Navbar = () => {
     text: "Hi Atlas Homestays 👋 I'd like to learn more about booking a stay.",
   });
   const telLink = getTelLink();
+  const bookNowTarget = ctaNav.to;
 
   useEffect(() => {
     const onLoadfunction = () => {
@@ -96,8 +98,24 @@ const Navbar = () => {
             <IoIosCall className="text-lg md:text-xl" />
             <span>{formatDisplayNumber()}</span>
           </a>
-          <a href={whatsappLink} target="_blank" rel="noopener noreferrer" className="book-now" aria-label="Book now">
+          <Link
+            to={bookNowTarget}
+            className="book-now"
+            aria-label="Book now"
+            onClick={() => {
+              trackEvent('cta_book_now_clicked', { source: 'header' }, { route: bookNowTarget });
+            }}
+          >
             {ctaNav.label}
+          </Link>
+          <a
+            href={whatsappLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="help-link"
+            aria-label="Need help on WhatsApp"
+          >
+            Need help?
           </a>
         </div>
       </div>
@@ -147,14 +165,26 @@ const Navbar = () => {
               <IoIosCall className="text-lg" />
               <span>{formatDisplayNumber()}</span>
             </a>
+            <Link
+              to={bookNowTarget}
+              className="book-now text-center"
+              aria-label="Book now"
+              onClick={() => {
+                trackEvent('cta_book_now_clicked', { source: 'header' }, { route: bookNowTarget });
+                closeMobile();
+              }}
+            >
+              {ctaNav.label}
+            </Link>
             <a
               href={whatsappLink}
               target="_blank"
               rel="noopener noreferrer"
-              className="book-now text-center"
-              aria-label="Book now"
+              className="help-link text-center"
+              aria-label="Need help on WhatsApp"
+              onClick={closeMobile}
             >
-              {ctaNav.label}
+              Need help?
             </a>
           </div>
         </div>

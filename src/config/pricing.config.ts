@@ -28,7 +28,7 @@ export const pricingConfig: PricingConfig = {
     "1bhk": 2,
     penthouse: 2,
   },
-  globalDiscountPercent: 5,
+  globalDiscountPercent: 17,
   dateMultipliers: {
     "12-31": 2,
   },

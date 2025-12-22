@@ -1,4 +1,5 @@
 import React from "react";
+import { addDays, format } from "date-fns";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { vi } from "vitest";
@@ -7,12 +8,6 @@ vi.mock("react-router-dom", async () => {
   const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
   return {
     ...actual,
-    MemoryRouter: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-    Link: ({ children, to, ...props }: React.PropsWithChildren<{ to: string }>) => (
-      <a href={to} {...props}>
-        {children}
-      </a>
-    ),
     useNavigate: () => vi.fn(),
   };
 });
@@ -49,25 +44,29 @@ describe("Slider hero search", () => {
     expect(browseLink.tagName.toLowerCase()).toBe("a");
   });
 
-  it("shows validation when check-out is not after check-in", async () => {
+  it("updates summary and tracks search when a date range is selected", () => {
     renderSlider();
 
-    const checkInInput = screen.getByLabelText(/check-in/i);
-    const checkOutInput = screen.getByLabelText(/check-out/i);
+    const startDate = addDays(new Date(), 5);
+    const endDate = addDays(startDate, 2);
 
-    fireEvent.change(checkInInput, { target: { value: "2025-01-10" } });
-    fireEvent.change(checkOutInput, { target: { value: "2025-01-09" } });
+    const startTestId = `hero-date-${format(startDate, "yyyy-MM-dd")}`;
+    const endTestId = `hero-date-${format(endDate, "yyyy-MM-dd")}`;
 
-    const form = checkInInput.closest("form");
-    form?.setAttribute("novalidate", "true");
+    fireEvent.click(screen.getByTestId("hero-date-toggle"));
+    fireEvent.click(screen.getByTestId(startTestId));
+    fireEvent.click(screen.getByTestId(endTestId));
 
-    if (!form) throw new Error("Form not found");
+    expect(screen.getByText(new RegExp(format(startDate, "dd MMM yyyy")))).toBeInTheDocument();
+    expect(screen.getByText(/guests/i)).toBeInTheDocument();
+
     const trackSpy = vi.spyOn(analytics, "trackEvent");
-    fireEvent.submit(form);
+    const submitButton = screen.getByRole("button", { name: /check availability/i });
+    fireEvent.click(submitButton);
 
-    expect(trackSpy).not.toHaveBeenCalledWith(
+    expect(trackSpy).toHaveBeenCalledWith(
       "availability_search",
-      expect.anything(),
+      expect.objectContaining({ surface: "hero_form" }),
       expect.anything(),
     );
   });
