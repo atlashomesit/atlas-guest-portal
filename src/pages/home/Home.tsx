@@ -1,19 +1,16 @@
-import Parallax from "../../components/commonComponents/parallax/Parallax";
-// import Amenities from "../../components/homepage_components/amenities/Amenities";
-import Homepage_ExclusiveService from "../../components/homepage_components/homepage_exclusiveservice/Homepage_ExclusiveService";
-// import Homepage_LetUsGuide from "../../components/homepage_components/homepage_letusguide/Homepage_LetUsGuide";
-// import Homepage_Properties from "../../components/homepage_components/homepage_Properties/Homepage_Properties";
-import Homepage_Testimonial from "../../components/homepage_components/homepage_testimonial/Homepage_Testimonial";
-import Homepage_WhyChoose from "../../components/homepage_components/homepage_whychoose/Homepage_WhyChoose";
 import Slider from "../../components/homepage_components/slider/Slider";
-import { resolveOptimizedAsset } from "../../utils/resolveOptimizedAsset";
 import HomePage_Locations from "../../components/homepage_components/homepage_locations/HomePage_Locations";
-
-const parallaxImage = 'https://atlashomestorage.blob.core.windows.net/listing-images/301/img_1.jpg';
-
 import { useEffect } from 'react';
 import { propertyData, propertyImages } from '../../data';
 import { trackEvent } from '../../utils/analytics';
+import BannerSecondary from "../../components/home/BannerSecondary";
+import ServicesSection from "../../components/home/ServicesSection";
+import WhyChooseSection from "../../components/home/WhyChooseSection";
+import TestimonialsSection from "../../components/home/TestimonialsSection";
+import FooterCtaStrip from "../../components/home/FooterCtaStrip";
+import {
+    enableFooterMiniCtaAboveFooter,
+} from "../../config/homepageUxFlags";
 
 const Home = () => {
     useEffect(() => {
@@ -34,13 +31,7 @@ const Home = () => {
             <div>
                 <HomePage_Locations />
             </div>
-            <div className="m-8">
-                <Parallax
-                    image={parallaxImage}
-                    title={'Atlas Homes – Where Every Stay Feels Like Home'}
-                    description={'At Atlas Homes, every detail is designed for your comfort. Relax in beautifully appointed spaces, enjoy modern amenities, and make every moment unforgettable.'}
-                />
-            </div>
+            <BannerSecondary />
 
             {/* <div className=" px-4 lg:px-20 ">
                 <Amenities />
@@ -52,14 +43,17 @@ const Home = () => {
                 <Homepage_LetUsGuide />
             </div> */}
             <div className="">
-                <Homepage_ExclusiveService />
+                <ServicesSection />
             </div>
             <div className="">
-                <Homepage_WhyChoose />
+                <WhyChooseSection />
             </div>
             <div className="">
-                <Homepage_Testimonial />
+                <TestimonialsSection />
             </div>
+            {enableFooterMiniCtaAboveFooter && (
+                <FooterCtaStrip />
+            )}
         </section>
     );
 };

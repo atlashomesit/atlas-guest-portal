@@ -9,7 +9,7 @@ All guest-facing contact numbers are centralized in `src/config/contact.ts`.
 UI components should default to the business channel. Only use the owner channel for explicit escalation/legal flows.
 
 ## Helpers
-- `getTelLink(channel?)` returns a `tel:` link for the selected channel (business by default).
+- `getTelLink(channel?)` returns a `tel:` link prefixed with `+91` for the selected channel (business by default).
 - `getWhatsAppLink(channel?)` returns a `wa.me` link using digits only.
 - `formatDisplayNumber(channel?)` renders the `+91-` formatted number for display.
 

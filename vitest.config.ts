@@ -9,11 +9,16 @@ export default defineConfig({
     alias: {
       react: path.resolve(__dirname, 'node_modules/react'),
       'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
+      'react-router-dom/node_modules/react': path.resolve(__dirname, 'node_modules/react'),
+      'react-router-dom/node_modules/react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
     },
   },
   test: {
     environment: 'jsdom',
     setupFiles: './src/setupTests.ts',
     globals: true,
+    deps: {
+      inline: ['react-router-dom', 'react-router'],
+    },
   },
 });

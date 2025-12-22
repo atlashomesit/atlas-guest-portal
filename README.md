@@ -3,11 +3,17 @@
 ## Overview
 Atlas Homes Frontend is a Vite-powered React + TypeScript single-page application that markets Atlas Homestays inventory and captures booking intent. Routing is centralized in [`src/App.tsx`](src/App.tsx), which mounts global UI elements (navbar, scroll restoration, footer) around page-level routes. The landing experience rendered by [`src/pages/home/Home.tsx`](src/pages/home/Home.tsx) weaves together carousel hero content, featured locations, marketing callouts, and testimonials composed from modular components and the structured property inventory exported by [`src/data.ts`](src/data.ts).
 
+**Trust placement principle:** transactional trust (payments, fees, confirmation) is shown only at decision points such as the search widget or checkout. Brand/experiential trust (e.g., verified homes, locations, flexibility) is shown elsewhere to avoid repetition.
+The hero trust row is intentionally limited to three high-signal badges—**Verified homes**, **Secure Razorpay payments**, and **No hidden fees**—to keep scannability high; flexible cancellation is handled in Policies/FAQs/booking flows instead of the badge row.
+
 ### Navigation structure
-- Primary (desktop): Apartments, Location, FAQ, Policies, Contact
-- "More" dropdown: Gallery, About Us, Articles (routes to `/blog`), Offers
+- Primary (desktop & mobile): Home, Apartments, Location, FAQs, Contact
+- Header keeps the business phone visible (tel link) alongside a softer-outline Book Now CTA
+- Footer carries the destinations that were previously grouped under “More” (Gallery, About Us, Articles, Offers) plus Sitemap/Policies/Terms
 - CTA: Book Now button remains a WhatsApp booking handoff
-- Mobile: primary links plus a collapsible "More" group; tapping any item closes the menu
+- Mobile: ordered primary links with collapsible Apartments children; tapping any item closes the menu
+
+Rationale: simplify the header for faster wayfinding, surface FAQs in-place of the former Help label without changing content, and keep the full phone number prominent (especially for India users who prefer to call and negotiate) while retaining but softening the Book Now emphasis.
 
 ## Prerequisites
 - Node.js **22.12.0+** (required by Vite 7 and enforced in `.nvmrc`/`.node-version`)
@@ -89,6 +95,12 @@ Optional tooling:
 | `src/components/commonComponents/navbar/Navbar.tsx` / `footer/Footer.tsx` | Global navigation/header ribbon and footer contact blocks. |
 | `docs/` | Working notes covering the API guide and first PR starter; see `ONBOARDING.md`, `ARCHITECTURE.md`, `RUNBOOK.md`, and `SECURITY.md` for the comprehensive onboarding, architecture, operations, and security docs. |
 
+### “Our Homes” card conversion updates
+- **Explicit CTAs:** Each listing card now renders a primary “View room” button (plus an optional “Check dates” deep link when hero search dates exist) so the next action is obvious on desktop and mobile.
+- **Cleaner imagery:** Carousel dots are lighter and only surface on hover/focus for desktop while staying subtle on mobile; the legacy play icon is removed unless a video source exists in the future.
+- **Price hierarchy:** Pricing compresses to a concise stack—strike-through MRP (when discounted), bold nightly rate, and a single savings line—removing redundant copy while keeping `/ night` visible.
+- **Trust cues:** Discount badges use meaningful labels (defaulting to “Best price on our website” when a discount is present), and a compact amenities row surfaces Wi‑Fi/AC (with icons) per unit for faster trust-building.
+
 ## Routes & deep links
 - `/faq` → FAQ hub with accordion sections and WhatsApp CTA
 - `/faq#cancellation-refunds` → scrolls to the Cancellation & Refunds section
@@ -152,6 +164,19 @@ Each command should return a 301/302 with a `Location` header set to `/property_
 - **Route:** `/terms` (aliased at `/terms-and-conditions`) renders the structured terms page defined in `src/pages/Terms.tsx` with anchor links and last-updated metadata.
 - **Unit timings & fees:** `src/config/policyConfig.ts` centralizes per-unit check-in/out windows and extra-guest fee ranges (`baseGuestAllowance`, `unitPolicies`).
 - **UI reuse:** booking widgets (`BookingFrom.tsx`, `hotelBooking_form/HotelBooking_Form.tsx`) and property details (`Homepage_PropertyDetails.tsx`) pull inline snippets and timing data from those sources to avoid hardcoded strings.
+
+## Pricing configuration
+- Centralized in [`src/config/pricing.config.ts`](src/config/pricing.config.ts) with helpers in [`src/utils/pricing.ts`](src/utils/pricing.ts). The config tracks per-unit base rates (`1bhk: ₹3,500`, `penthouse: ₹6,000`), included guests (2 by default), a global discount (`17%`), a New Year’s Eve multiplier (`"12-31": 2`), currency/timezone, rounding rules, and optional extras (extra guest fees, max guests, cleaning fees).
+- Env overrides (ideal for Cloudflare Pages) let you adjust pricing without rebuilding:
+  - `VITE_GLOBAL_DISCOUNT_PERCENT` → overrides the discount (e.g., `15` for 15% off).
+  - `VITE_DATE_MULTIPLIERS_JSON` → JSON map of `"MM-DD": multiplier` (e.g., `{"12-31":2,"01-01":1.25}`).
+- `calculateNightlyPrice` applies the config + overrides in this order: base rate → discount → date multiplier (per night) → extra-guest fees (if configured) → rounding. For multi-night stays, the Dec 31 multiplier is applied **only** to that night.
+- Example outcomes (before fees/taxes):
+  - 1BHK on Dec 30: base ₹3,500 → 17% discount → **₹2,905** per night.
+  - 1BHK on Dec 31: discounted ₹2,905 → 2× multiplier → **₹5,810** per night.
+  - Penthouse on normal dates: base ₹6,000 → 17% discount → **₹4,980** per night (₹9,960 on Dec 31 with the 2× multiplier).
+- To change prices safely, edit the config for permanent defaults or set env vars for temporary promos; keep the currency/timezone aligned with INR/Asia-Kolkata to avoid date-key drift for `"MM-DD"` multipliers.
+- Discount and special-day badge copy for UI surfaces is centralized in [`src/config/priceDisplay.config.ts`](src/config/priceDisplay.config.ts) to keep strike-through labels and special pricing tags API-ready.
 
 ## Legal content model and validation
 

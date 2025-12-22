@@ -2,10 +2,9 @@ import { useEffect, useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import './navbar.css';
 import { IoIosCall } from 'react-icons/io';
-import { FaWhatsapp } from 'react-icons/fa';
 import { buildWaLink } from '../../../utils/whatsapp';
 import { sanitizeItems, getItemKey } from '../../../utils/sanitizeItems';
-import { primaryNav, moreNav, ctaNav } from '../../../config/navigation';
+import { primaryNav, ctaNav } from '../../../config/navigation';
 import { LOGO_URL } from '../../../config/branding';
 import { CONTACT, formatDisplayNumber, getTelLink } from '../../../config/contact';
 import { propertyData } from '../../../data';
@@ -13,7 +12,6 @@ import { propertyData } from '../../../data';
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isApartmentsOpen, setIsApartmentsOpen] = useState(false);
-  const [isMoreOpen, setIsMoreOpen] = useState(false);
 
   const apartments = sanitizeItems(propertyData);
 
@@ -45,7 +43,6 @@ const Navbar = () => {
   const closeMobile = () => {
     setIsMenuOpen(false);
     setIsApartmentsOpen(false);
-    setIsMoreOpen(false);
   };
 
   return (
@@ -70,8 +67,6 @@ const Navbar = () => {
 
         {/* CENTER: Desktop Menu */}
         <div className="navbar-center hidden md:flex gap-2">
-          <NavLink to="/" className={navLinkClass}>Home</NavLink>
-
           {primaryNav.filter(i => !i.hidden).map(item =>
             item.label === 'Apartments' ? (
               <div key={item.label} className="dropdown relative">
@@ -93,35 +88,15 @@ const Navbar = () => {
             )
           )}
 
-          {/* More dropdown */}
-          <div className={`dropdown relative ${isMoreOpen ? 'open' : ''}`}>
-            <button
-              className="dropdown-button hover:text-[var(--text-contrast)]"
-              onClick={() => setIsMoreOpen(!isMoreOpen)}
-            >
-              More
-            </button>
-            <div className="dropdown-menu">
-              {moreNav.map((item) => (
-                <NavLink
-                  key={item.label}
-                  to={item.to}
-                  className="block px-4 pt-2 pb-0 text-sm text-text-primary hover:bg-bg-muted hover:text-[var(--text-primary)] transition-colors"
-                >
-                  {item.label}
-                </NavLink>
-              ))}
-            </div>
-          </div>
         </div>
 
-        {/* RIGHT: Desktop Phone + Book Now */}
-        <div className="navbar-right hidden md:flex gap-2">
-          <a href={telLink} className="phone">
+        {/* RIGHT: Phone + Book Now */}
+        <div className="navbar-right flex gap-2">
+          <a href={telLink} className="phone" aria-label="Call Atlas Homestays">
             <IoIosCall className="text-lg md:text-xl" />
             <span>{formatDisplayNumber()}</span>
           </a>
-          <a href={whatsappLink} target="_blank" rel="noopener noreferrer" className="book-now">
+          <a href={whatsappLink} target="_blank" rel="noopener noreferrer" className="book-now" aria-label="Book now">
             {ctaNav.label}
           </a>
         </div>
@@ -130,59 +105,44 @@ const Navbar = () => {
       {/* MOBILE MENU (Slide Down) */}
       {isMenuOpen && (
         <div className="mobile-menu md:hidden">
-          {/* Nav Links */}
-          <NavLink onClick={closeMobile} to="/" className="block py-2">Home</NavLink>
-
-          {/* Apartments */}
-          <button
-            onClick={() => setIsApartmentsOpen(!isApartmentsOpen)}
-            className="block py-2 font-semibold text-text-primary hover:text-[var(--text-contrast)] transition-colors"
-          >
-            Apartments
-          </button>
-          {isApartmentsOpen && (
-            <div className="pl-2">
-              <NavLink onClick={closeMobile} to="/apartments">Apartments Overview</NavLink>
-              {apartments.map((apt, idx) => (
-                <NavLink
-                  key={getItemKey(apt, idx)}
-                  onClick={closeMobile}
-                  to={`/property_details/${apt.id ?? apt.listingId ?? getItemKey(apt, idx)}`}
-                  className="block py-1"
-                >
-                  {apt.property_name || apt.title}
-                </NavLink>
-              ))}
-            </div>
-          )}
-
-          {/* More */}
-          <button
-            onClick={() => setIsMoreOpen(!isMoreOpen)}
-            className="block py-2 font-semibold text-text-primary hover:text-[var(--text-contrast)] transition-colors"
-          >
-            More
-          </button>
-          {isMoreOpen && (
-            <div className="pl-2">
-              {moreNav.map((item) => (
-                <NavLink
-                  key={item.label}
-                  to={item.to}
-                  onClick={closeMobile}
-                  className="block py-1 text-text-primary hover:text-[var(--text-contrast)] transition-colors"
+          {primaryNav.filter((item) => !item.hidden).map((item) => (
+            item.label === 'Apartments' ? (
+              <div key={item.label}>
+                <button
+                  onClick={() => setIsApartmentsOpen(!isApartmentsOpen)}
+                  className="block py-2 font-semibold text-text-primary hover:text-[var(--text-contrast)] transition-colors w-full text-left"
                 >
                   {item.label}
-                </NavLink>
-              ))}
-            </div>
-          )}
+                </button>
+                {isApartmentsOpen && (
+                  <div className="pl-2">
+                    <NavLink onClick={closeMobile} to={item.to}>Apartments Overview</NavLink>
+                    {apartments.map((apt, idx) => (
+                      <NavLink
+                        key={getItemKey(apt, idx)}
+                        onClick={closeMobile}
+                        to={`/property_details/${apt.id ?? apt.listingId ?? getItemKey(apt, idx)}`}
+                        className="block py-1"
+                      >
+                        {apt.property_name || apt.title}
+                      </NavLink>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <NavLink key={item.label} onClick={closeMobile} to={item.to} className="block py-2">
+                {item.label}
+              </NavLink>
+            )
+          ))}
 
           {/* Mobile Phone + Book Now */}
           <div className="mt-2 flex flex-col gap-2">
             <a
               href={telLink}
               className="phone flex items-center gap-2 font-semibold text-text-primary hover:text-[var(--text-contrast)] transition-colors"
+              aria-label="Call Atlas Homestays"
             >
               <IoIosCall className="text-lg" />
               <span>{formatDisplayNumber()}</span>
@@ -192,6 +152,7 @@ const Navbar = () => {
               target="_blank"
               rel="noopener noreferrer"
               className="book-now text-center"
+              aria-label="Book now"
             >
               {ctaNav.label}
             </a>

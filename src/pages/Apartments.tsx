@@ -8,6 +8,7 @@ import ListingCard from "../components/apartments/ListingCard";
 import ListingFilters from "../components/apartments/ListingFilters";
 import { sanitizeItems } from "../utils/sanitizeItems";
 import { trackEvent } from "../utils/analytics";
+import { calculateNightlyPrice, inferUnitType, type NightlyPriceBreakdown } from "../utils/pricing";
 
 type PropertyRecord = {
   id: number | string;
@@ -27,6 +28,7 @@ type CombinedListing = {
   name: string;
   location: string;
   price: number;
+  pricingBreakdown: NightlyPriceBreakdown | null;
   rating: number;
   reviews: number;
   featured: boolean;
@@ -96,10 +98,37 @@ const Apartments = () => {
     []
   );
 
+  const [guests, setGuests] = React.useState(2);
+  const [checkIn, setCheckIn] = React.useState<string | null>(null);
+  const [checkOut, setCheckOut] = React.useState<string | null>(null);
+  const [propertyType, setPropertyType] = React.useState("all");
+  const [petFriendlyOnly, setPetFriendlyOnly] = React.useState(false);
+  const [sortBy, setSortBy] = React.useState("featured");
+
+  const computeNightlyPrice = React.useCallback(
+    (property: PropertyRecord): NightlyPriceBreakdown | null => {
+      const unitType = inferUnitType({ id: property.id, property_name: property.property_name });
+      const referenceDate = checkIn ? new Date(checkIn) : new Date();
+      const checkInDate = Number.isNaN(referenceDate.getTime()) ? new Date() : referenceDate;
+
+      try {
+        return calculateNightlyPrice({
+          unitType,
+          checkInDate,
+          guests,
+        });
+      } catch (error) {
+        console.warn("Unable to calculate price for listing", property.id, error);
+        return null;
+      }
+    },
+    [checkIn, guests],
+  );
+
   const priceBounds = React.useMemo(() => {
     const prices = safeProperties
-      .map((property) => property.property_price)
-      .filter((price): price is number => typeof price === "number");
+      .map((property) => computeNightlyPrice(property)?.finalNightlyPrice)
+      .filter((price): price is number => typeof price === "number" && price > 0);
 
     const min = Math.min(...prices);
     const max = Math.max(...prices);
@@ -108,16 +137,15 @@ const Apartments = () => {
       min: Number.isFinite(min) ? min : 0,
       max: Number.isFinite(max) ? max : 10000,
     };
-  }, [safeProperties]);
+  }, [computeNightlyPrice, safeProperties]);
 
   const [minPrice, setMinPrice] = React.useState(priceBounds.min);
   const [maxPrice, setMaxPrice] = React.useState(priceBounds.max);
-  const [guests, setGuests] = React.useState(2);
-  const [checkIn, setCheckIn] = React.useState<string | null>(null);
-  const [checkOut, setCheckOut] = React.useState<string | null>(null);
-  const [propertyType, setPropertyType] = React.useState("all");
-  const [petFriendlyOnly, setPetFriendlyOnly] = React.useState(false);
-  const [sortBy, setSortBy] = React.useState("featured");
+
+  React.useEffect(() => {
+    setMinPrice((current) => Math.max(priceBounds.min, Math.min(current, priceBounds.max)));
+    setMaxPrice((current) => Math.min(priceBounds.max, Math.max(current, priceBounds.min)));
+  }, [priceBounds.max, priceBounds.min]);
 
   const listings = React.useMemo<CombinedListing[]>(() => {
     const merged = safeListings.map((listing) => {
@@ -128,12 +156,15 @@ const Apartments = () => {
       const images = property.property_img || propertyImages[String(listing.id)];
       const name = property.property_name || listing.title || `Property ${listing.id}`;
       const location = property.property_location || listing.subtitle || "Hyderabad";
+      const pricing = computeNightlyPrice(property);
+      const price = pricing?.finalNightlyPrice ?? 0;
 
       return {
         id: String(listing.id),
         name,
         location,
-        price: property.property_price || 0,
+        price,
+        pricingBreakdown: pricing,
         rating: property.property_rating || 0,
         reviews: property.property_reviews || 0,
         featured: Boolean(listing.featured),
@@ -149,7 +180,7 @@ const Apartments = () => {
     });
 
     return merged.filter((item) => item.price > 0 && item.image);
-  }, [safeListings, safeProperties]);
+  }, [computeNightlyPrice, safeListings, safeProperties]);
 
   const filteredListings = React.useMemo(() => {
     let result = listings.filter(
@@ -315,6 +346,7 @@ const Apartments = () => {
               location={listing.location}
               image={listing.image}
               price={listing.price}
+              pricingBreakdown={listing.pricingBreakdown}
               rating={listing.rating}
               reviews={listing.reviews}
               propertyType={listing.propertyType}

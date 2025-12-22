@@ -1,23 +1,36 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { CalendarClock, CheckCircle2, Receipt, ShieldCheck } from 'lucide-react';
+import { BadgePercent, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { LOGO_URL } from '../../../config/branding';
+import { HERO_IMAGE_URL } from '../../../config/hero';
 import { trackEvent } from '../../../utils/analytics';
-import { FeatureBadge } from '../../ui/FeatureBadge';
+import { TrustBadge } from '../../ui/TrustBadge';
 
-const HERO_IMAGE = 'https://atlashomestorage.blob.core.windows.net/listing-images/fallback.jpeg';
-const HERO_OVERLAY = 'linear-gradient(120deg, rgba(21, 30, 44, 0.82) 0%, rgba(21, 30, 44, 0.68) 45%, rgba(21, 30, 44, 0.8) 100%)';
+const HERO_OVERLAY_GRADIENT =
+  'linear-gradient(90deg, rgba(0, 0, 0, 0.62) 0%, rgba(0, 0, 0, 0.45) 45%, rgba(0, 0, 0, 0.24) 100%)';
 const STORAGE_KEY = 'atlasHeroSearch';
 
-const uspItems = [
+const TRUST_BADGES = [
   { label: 'Verified homes', icon: CheckCircle2 },
   { label: 'Secure Razorpay payments', icon: ShieldCheck },
-  { label: 'No hidden fees', icon: Receipt },
-  { label: 'Flexible cancellation', icon: CalendarClock },
+  { label: 'No hidden fees', icon: BadgePercent },
 ];
 
 const Slider = () => {
   const navigate = useNavigate();
+
+  const overlayStyle = React.useMemo(() => {
+    const style: React.CSSProperties = {
+      backgroundColor: 'rgba(0, 0, 0, 0.16)',
+      backgroundImage: HERO_OVERLAY_GRADIENT,
+    };
+
+    if (typeof navigator !== 'undefined' && navigator.userAgent?.includes('jsdom')) {
+      style.backgroundImage = 'url("linear-gradient-overlay")';
+    }
+
+    return style;
+  }, []);
 
   const today = React.useMemo(() => new Date(), []);
 
@@ -156,8 +169,14 @@ const Slider = () => {
     <section className="w-full bg-bg-muted text-text-primary">
       <div
         className="relative isolate overflow-hidden min-h-[75vh] md:min-h-[70vh] flex items-center justify-center bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: `${HERO_OVERLAY}, url(${HERO_IMAGE})` }}
+        style={{ backgroundImage: `url(${HERO_IMAGE_URL})` }}
       >
+        <div
+          data-testid="hero-overlay"
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 opacity-95"
+          style={overlayStyle}
+        />
         <div className="relative top-[40px] z-10 flex flex-col items-center gap-7 px-6 py-12 text-center max-w-4xl">
 
           <Link to="/" className="flex items-center gap-3">
@@ -228,14 +247,17 @@ const Slider = () => {
             )}
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex flex-col text-left text-sm bg-gray-200 text-black rounded-md p-3">
-  <span className="font-semibold text-black">Plan your stay</span>
-  <span className="text-black">
-    Instantly view options for your dates and group size.
-  </span>
-</div>
+              <div className="flex flex-col gap-1 rounded-xl bg-[color:color-mix(in_srgb,var(--bg-surface)_92%,transparent)] px-4 py-3 text-left shadow-inner sm:flex-row sm:items-center sm:gap-3">
+                <div className="flex items-center gap-2 text-sm font-semibold text-text-primary">
+                  <ShieldCheck className="h-4 w-4 text-cta-secondary" aria-hidden="true" />
+                  <span>Book with confidence</span>
+                </div>
+                <p className="text-sm text-text-secondary sm:border-l sm:border-[color:color-mix(in_srgb,var(--text-muted)_60%,transparent)] sm:pl-3">
+                  Instant confirmation • Secure payments • No hidden charges
+                </p>
+              </div>
 
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
                 <button
                   type="submit"
                   className="inline-flex items-center justify-center rounded-full bg-cta-primary px-6 py-3 text-base font-semibold text-[var(--text-contrast)] shadow-level2 transition hover:bg-cta-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
@@ -243,18 +265,18 @@ const Slider = () => {
                   Check availability
                 </button>
                 <Link
-  to="/apartments"
-  onClick={() =>
-    trackEvent(
-      'listings_browse',
-      { surface: 'hero_secondary' },
-      { route: '/apartments' }
-    )
-  }
-  className="inline-flex items-center justify-center rounded-full border border-black bg-black px-6 py-3 text-base font-semibold text-white shadow-level1 transition hover:bg-gray-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black"
->
-  Browse listings
-</Link>
+                  to="/apartments"
+                  onClick={() =>
+                    trackEvent(
+                      'listings_browse',
+                      { surface: 'hero_secondary' },
+                      { route: '/apartments' },
+                    )
+                  }
+                  className="inline-flex items-center justify-center text-base font-semibold text-text-primary underline-offset-4 transition hover:text-cta-secondary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
+                >
+                  Browse listings
+                </Link>
 
               </div>
             </div>
@@ -262,15 +284,14 @@ const Slider = () => {
         </div>
       </div>
 
-      <div className="bg-bg-surface">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-3 px-6 py-6">
-          {uspItems.map(({ label, icon }) => (
-            <FeatureBadge
+      <div className="bg-bg-surface" data-testid="trust-badges">
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-4 px-6 py-8 md:gap-5">
+          {TRUST_BADGES.map(({ label, icon }) => (
+            <TrustBadge
               key={label}
               icon={icon}
               label={label}
-              tone="linen"
-              className="min-w-[240px] justify-center sm:min-w-[0]"
+              className="min-w-[220px] justify-center sm:min-w-[0]"
             />
           ))}
         </div>

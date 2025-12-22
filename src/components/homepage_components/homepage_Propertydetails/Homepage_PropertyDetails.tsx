@@ -9,7 +9,7 @@ import { MdOutlineEmojiFoodBeverage, MdOutlineLocalLaundryService, MdOutlineDone
 import { FaCcMastercard, FaLocationDot } from "react-icons/fa6";
 import { FaStar } from "react-icons/fa";
 import { X, ChevronRight } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { propertyData, propertyImages } from '../../../data.ts';
 import { getUnitPolicy } from '../../../config/policyConfig';
 import { inlinePolicySnippets } from '../../../content/terms';
@@ -17,6 +17,7 @@ import Subheading from '../../commonComponents/subheading/Subheading';
 import HotelBooking_Form from '../hotelBooking_form/HotelBooking_Form';
 import { trackEvent } from '../../../utils/analytics';
 import { Button } from '../../ui/Button';
+import { calculateNightlyPrice, inferUnitType } from '../../../utils/pricing';
 
 import { Fancybox } from "@fancyapps/ui";
 import "@fancyapps/ui/dist/fancybox/fancybox.css";
@@ -54,15 +55,22 @@ const PropertyDetails = () => {
     const [showAmenitiesModal, setShowAmenitiesModal] = useState(false);
     const [showAboutMore, setShowAboutMore] = useState(false);
     const [showNeighborhoodMore, setShowNeighborhoodMore] = useState(false);
-
-    // Debug log
-    console.log('PropertyDetails - propertyImages:', propertyImages);
-    console.log('PropertyDetails - propertyData:', propertyData);
-    console.log('PropertyDetails - slug:', slug);
+    const unitType = inferUnitType({ id: data?.id, property_name: data?.property_name });
+    const nightlyPrice = useMemo(() => {
+        if (!data) return null;
+        try {
+            return calculateNightlyPrice({
+                unitType,
+                checkInDate: new Date(),
+                guests: 2,
+            });
+        } catch (error) {
+            console.warn("Unable to calculate nightly price for property", data.id, error);
+            return null;
+        }
+    }, [data, unitType]);
 
     useEffect(() => {
-        console.log('Searching for property with slug:', slug);
-        
         // First try to find by slug match
         const foundBySlug = propertyData.find((item: any) => {
             const propertySlug = item.property_name.toLowerCase().replace(/\s+/g, '-');
@@ -70,9 +78,7 @@ const PropertyDetails = () => {
         });
 
         if (foundBySlug) {
-            console.log('Found property by slug match:', foundBySlug);
             const images = propertyImages[String(foundBySlug.id)] || [];
-            console.log('Setting property data with images:', { foundBySlug, images });
             setData({
                 ...foundBySlug,
                 property_img: Array.isArray(images) ? images : []
@@ -85,9 +91,7 @@ const PropertyDetails = () => {
         if (propertyId) {
             const foundById = propertyData.find((item: any) => String(item.id) === String(propertyId));
             if (foundById) {
-                console.log('Found property by ID match:', foundById);
                 const images = propertyImages[String(foundById.id)] || [];
-                console.log('Setting property data with images:', { foundById, images });
                 setData({
                     ...foundById,
                     property_img: Array.isArray(images) ? images : []
@@ -98,7 +102,6 @@ const PropertyDetails = () => {
 
         // If still not found, try to get from location state
         if (location.state?.property) {
-            console.log('Using property from location state:', location.state.property);
             const prop = location.state.property;
             const images = propertyImages[String(prop.id)] || [];
             setData({
@@ -137,11 +140,11 @@ const PropertyDetails = () => {
             {
                 surface: 'property_details',
                 propertyName: data.property_name,
-                price: data.property_price,
+                price: nightlyPrice?.finalNightlyPrice ?? data.property_price,
             },
             { listingId: data.id, unitCode: data.id, route: location.pathname },
         );
-    }, [data, location.pathname]);
+    }, [data, location.pathname, nightlyPrice?.finalNightlyPrice]);
 
     const renderIcon = (iconName: string) => {
         const name = iconName.toLowerCase();
