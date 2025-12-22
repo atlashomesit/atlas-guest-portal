@@ -8,6 +8,8 @@ import { baseGuestAllowance, getUnitPolicy } from '../../../config/policyConfig'
 import { FaCcMastercard, FaCcVisa, FaCreditCard, FaUserFriends } from 'react-icons/fa';
 import { SiGooglepay, SiRazorpay } from 'react-icons/si';
 import { trackEvent } from '../../../utils/analytics';
+import { calculateNightlyPrice, inferUnitType } from '../../../utils/pricing';
+import { priceDisplayConfig } from '../../../config/priceDisplay.config';
 
 declare global {
   interface Window {
@@ -109,27 +111,60 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
 
     // Convert propertyId to number if it's passed as a string
     const property = propertyData.find(p => p.id === Number(propertyId));
-    const basePrice = property?.property_price || 0;
+    const unitType = inferUnitType({ id: property?.id, property_name: property?.property_name });
     
     // Calculate total number of people (adults + children)
     const totalPeople = guests.adults + guests.children;
     
-    const additionalPeople = Math.max(0, totalPeople - baseGuestAllowance);
-    const extraGuestRate = Number(propertyId) === 501 ? 700 : 400;
-    const extraGuestChargePerNight = additionalPeople * extraGuestRate;
-    const nightlyRateWithGuests = basePrice + extraGuestChargePerNight;
-    
     // Calculate number of nights (minimum 1 night)
     const oneDay = 24 * 60 * 60 * 1000; // hours*minutes*seconds*milliseconds
-    const nights = Math.max(1, Math.round(Math.abs((dates.endDate.getTime() - dates.startDate.getTime()) / oneDay)));
-    
-    // Calculate total price based on number of nights
-    const staySubtotal = nightlyRateWithGuests * nights;
+
+    const nightlyBreakdown = useMemo(() => {
+        const start = new Date(dates.startDate);
+        const end = new Date(dates.endDate);
+        const perNightDates: Date[] = [];
+        const cursor = new Date(start);
+
+        while (cursor < end) {
+            perNightDates.push(new Date(cursor));
+            cursor.setDate(cursor.getDate() + 1);
+        }
+
+        if (perNightDates.length === 0) {
+            perNightDates.push(new Date(start));
+        }
+
+        return perNightDates.map((nightDate) => ({
+            date: nightDate,
+            breakdown: calculateNightlyPrice({
+                unitType,
+                checkInDate: nightDate,
+                guests: totalPeople,
+            }),
+        }));
+    }, [dates.endDate, dates.startDate, totalPeople, unitType]);
+
+    const nights = nightlyBreakdown.length;
+    const staySubtotal = nightlyBreakdown.reduce((sum, night) => sum + night.breakdown.finalNightlyPrice, 0);
     const feesAndTaxes = Math.round(staySubtotal * 0.12);
     const totalPrice = staySubtotal + feesAndTaxes;
-
-    // Log for debugging
-    console.log('Property ID:', propertyId, 'Adults:', guests.adults, 'Children:', guests.children, 'Total people:', totalPeople, 'Nightly rate with guests:', nightlyRateWithGuests);
+    const averageNightlyRate = nights > 0 ? Math.round(staySubtotal / nights) : 0;
+    const baseNightlyRate = nightlyBreakdown[0]?.breakdown.baseNightlyPrice ?? 0;
+    const discountPercentApplied = nightlyBreakdown[0]?.breakdown.appliedDiscountPercent ?? 0;
+    const specialPricingNight = nightlyBreakdown.find((night) => night.breakdown.hasSpecialDateMultiplier);
+    const hasSpecialPricing = Boolean(specialPricingNight);
+    const specialPricingLabel = specialPricingNight?.breakdown.dateKey
+        ? priceDisplayConfig.specialPricingLabels[specialPricingNight.breakdown.dateKey] ?? priceDisplayConfig.defaultSpecialLabel
+        : hasSpecialPricing
+            ? priceDisplayConfig.defaultSpecialLabel
+            : null;
+    const nightlySavings = nightlyBreakdown[0]?.breakdown.discountAmount ?? 0;
+    const hasDiscountToShow = discountPercentApplied > 0 && !hasSpecialPricing;
+    const priceBadgeClass = hasSpecialPricing
+        ? "inline-flex items-center rounded-full bg-[color:var(--bg-muted)] px-3 py-1 text-xs font-semibold text-cta-primary text-center"
+        : "inline-flex items-center rounded-full bg-[color:color-mix(in_srgb,var(--cta-primary)_12%,transparent)] px-3 py-1 text-xs font-semibold text-cta-primary text-center";
+    const extraGuestsCount = Math.max(0, totalPeople - baseGuestAllowance);
+    const totalExtraGuestCharges = nightlyBreakdown.reduce((sum, night) => sum + night.breakdown.extraGuestFee, 0);
 
     const formatGuestLabel = () => {
         const { adults, children, infants, pets } = guests;
@@ -425,11 +460,41 @@ useEffect(() => {
         <div id="booking-form" className={`max-w-md mx-auto p-6 bg-bg-surface shadow-level2 rounded-2xl relative ${containerPaddingBottom} lg:pb-0 lg:sticky lg:top-20`}>
 
             {/* PRICE SECTION */}
-            <p className="text-[30px] font-bold">
-                ₹{nightlyRateWithGuests.toLocaleString()}
-
-                <span className="text-base ml-1">/night</span>
-            </p>
+            <div className="mb-2 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="space-y-1">
+                    <div className="flex flex-wrap items-baseline gap-2">
+                        {hasDiscountToShow && (
+                            <span className="text-sm font-medium text-text-muted line-through">
+                                ₹{baseNightlyRate.toLocaleString("en-IN")}
+                            </span>
+                        )}
+                        <p className="text-[30px] font-bold text-cta-primary leading-none">
+                            ₹{averageNightlyRate.toLocaleString("en-IN")}
+                            <span className="text-base font-semibold ml-1 text-text-muted">/night</span>
+                        </p>
+                    </div>
+                    <p className="text-sm text-text-muted">
+                        {hasSpecialPricing ? "Average nightly with special-day pricing" : "Average nightly after discount"}
+                    </p>
+                    {hasDiscountToShow && nightlySavings > 0 && (
+                        <p className="text-xs font-semibold text-cta-primary">
+                            {priceDisplayConfig.discount.savingsPrefix} ₹{nightlySavings.toLocaleString("en-IN")} nightly
+                        </p>
+                    )}
+                    {hasDiscountToShow && (
+                        <p className="text-xs text-text-muted">
+                            {priceDisplayConfig.discount.reasonLabel} · Discount ({discountPercentApplied}%)
+                        </p>
+                    )}
+                </div>
+                {(hasSpecialPricing || hasDiscountToShow) && (
+                    <span className={`mt-1 ${priceBadgeClass}`}>
+                        {hasSpecialPricing
+                            ? specialPricingLabel || "Special day pricing"
+                            : priceDisplayConfig.discount.primaryBadgeLabel || priceDisplayConfig.discount.secondaryBadgeLabel}
+                    </span>
+                )}
+            </div>
 
             {property && (
                 <div className="mb-4 space-y-1">
@@ -674,14 +739,34 @@ useEffect(() => {
 
             {hasSelection && hasInteractedWithDates && (
                 <div className="mt-6 space-y-3 border border-border-subtle rounded-xl p-4 bg-bg-surface shadow-level1">
-                    <div className="flex justify-between text-sm">
-                        <span>{nights} night{nights > 1 ? 's' : ''} × ₹{(nightlyRateWithGuests - extraGuestChargePerNight).toLocaleString('en-IN')}</span>
-                        <span>₹{((nightlyRateWithGuests - extraGuestChargePerNight) * nights).toLocaleString('en-IN')}</span>
+                    <div className="space-y-2">
+                        {nightlyBreakdown.map((night) => (
+                            <div className="flex justify-between text-sm" key={night.date.toISOString()}>
+                                <span className="flex items-center gap-2">
+                                    {format(night.date, "dd MMM")} 
+                                    {night.breakdown.isNewYearsEve && (
+                                        <span className="rounded-full bg-[color:var(--bg-muted)] px-2 py-0.5 text-[11px] font-semibold text-cta-primary">
+                                            New Year’s Eve pricing (2×)
+                                        </span>
+                                    )}
+                                </span>
+                                <span>₹{night.breakdown.finalNightlyPrice.toLocaleString("en-IN")}</span>
+                            </div>
+                        ))}
                     </div>
-                    {additionalPeople > 0 && (
+
+                    <div className="flex justify-between text-sm text-text-muted">
+                        <span>Base price</span>
+                        <span>₹{baseNightlyRate.toLocaleString("en-IN")}</span>
+                    </div>
+                    <div className="flex justify-between text-sm text-cta-primary">
+                        <span>Discount ({discountPercentApplied}%) applied</span>
+                        <span>Included</span>
+                    </div>
+                    {extraGuestsCount > 0 && (
                         <div className="flex justify-between text-sm text-text-primary">
-                            <span>Extra guests ({additionalPeople} × ₹{extraGuestRate})</span>
-                            <span>₹{(extraGuestChargePerNight * nights).toLocaleString('en-IN')}</span>
+                            <span>Extra guests ({extraGuestsCount})</span>
+                            <span>₹{totalExtraGuestCharges.toLocaleString("en-IN")}</span>
                         </div>
                     )}
                     <div className="flex justify-between text-sm text-text-primary">
