@@ -30,6 +30,13 @@ Optional tooling:
 - Cloudflare Pages build vars → `NODE_VERSION=22.12.0`, `NPM_FLAGS=--no-audit --no-fund`
 - Enforced override → `@jridgewell/sourcemap-codec@1.5.5`
 
+## Environment Variables
+- Vite only surfaces variables prefixed with `VITE_`; CRA-style `REACT_APP_*` keys are ignored at runtime. Make sure API hosts use `VITE_API_BASE_URL` rather than the legacy `REACT_APP_API_BASE_URL` name.
+- `VITE_API_BASE_URL` (required) → Base URL for all API calls (omit trailing slash). The value is read centrally in [`src/config/api.ts`](src/config/api.ts); if it is missing, the app logs an error and renders a friendly fallback screen instead of a blank page.
+- Cloudflare Pages setup:
+  - **Production:** Project → Settings → Environment variables → set `VITE_API_BASE_URL` to the production API host. Save for “Production” scope.
+  - **Preview:** In the same screen, add `VITE_API_BASE_URL` for the “Preview” scope to point at staging/QA APIs so preview builds load data correctly.
+
 ### Cloudflare Pages settings
 - In the Pages project dashboard, set the environment variable `NODE_VERSION=22.12.0` so builds align with Vite 7's engine requirement (\`^20.19.0 || >=22.12.0\`).
 - The repo includes `.nvmrc` and `.node-version` set to **22.12.0**; use them locally (e.g., `nvm use`) to match the Pages runtime and avoid EBADENGINE warnings.

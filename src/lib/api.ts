@@ -1,14 +1,8 @@
 import axios from "axios";
-import { getApiBase } from "../utils/env";
-
-const apiBase = getApiBase();
-if (import.meta.env.PROD && !apiBase) {
-  // eslint-disable-next-line no-console
-  console.error("CONFIG: Missing VITE_API_BASE in production build.");
-}
+import { API_BASE_URL } from "@/config/api";
 
 export const api = axios.create({
-  baseURL: apiBase,
+  baseURL: API_BASE_URL || undefined,
   headers: { Accept: "application/json" },
 });
 
@@ -31,4 +25,3 @@ export function asArray<T>(val: unknown, label: string): T[] {
   console.error(`${label} expected array, got:`, val);
   return [];
 }
-
