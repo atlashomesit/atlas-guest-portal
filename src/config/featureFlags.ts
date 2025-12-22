@@ -5,6 +5,7 @@ type FeatureFlagKey =
   | "enableSecondaryActionsCollapsed"
   | "enableRevealCallbackOnClickOnly"
   | "enableHideUnfinishedChatbot"
+  | "enableChatbotPlaceholder"
   | "enableClickOutsideToClose"
   | "enableSupportCtaHierarchy"
   | "enableSessionDismissRemember"
@@ -19,6 +20,7 @@ const DEFAULT_FLAGS: FeatureFlags = {
   enableSecondaryActionsCollapsed: false,
   enableRevealCallbackOnClickOnly: false,
   enableHideUnfinishedChatbot: false,
+  enableChatbotPlaceholder: false,
   enableClickOutsideToClose: false,
   enableSupportCtaHierarchy: false,
   enableSessionDismissRemember: false,
@@ -32,6 +34,7 @@ const FLAG_TOKEN_MAP: Record<string, FeatureFlagKey> = {
   collapseSecondary: "enableSecondaryActionsCollapsed",
   revealCallback: "enableRevealCallbackOnClickOnly",
   hideChatbot: "enableHideUnfinishedChatbot",
+  chatPlaceholder: "enableChatbotPlaceholder",
   ctaHierarchy: "enableSupportCtaHierarchy",
   trustMicrocopy: "enableTrustMicrocopy",
 };

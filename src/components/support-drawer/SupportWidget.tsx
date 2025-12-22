@@ -33,6 +33,7 @@ const SupportWidgetContent = () => {
     enableClickOutsideToClose,
     enableSupportCtaHierarchy,
     enableSupportLayoutVariants,
+    enableChatbotPlaceholder,
     enableHideUnfinishedChatbot,
     enableRevealCallbackOnClickOnly,
     enableRecommendedWhatsAppPrimary,
@@ -208,7 +209,9 @@ const SupportWidgetContent = () => {
             />
           ) : null}
 
-          <ChatbotPlaceholder enableHideUnfinishedChatbot={enableHideUnfinishedChatbot} />
+          {enableChatbotPlaceholder ? (
+            <ChatbotPlaceholder enableHideUnfinishedChatbot={enableHideUnfinishedChatbot} />
+          ) : null}
         </div>
       </>
     );
