@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { DateRange } from 'react-date-range';
 import { format } from 'date-fns';
+import { api, asArray } from '@/lib/api';
 import { propertyData } from '../../../data';
 import { inlinePolicySnippets } from '../../../content/terms';
 import { baseGuestAllowance, getUnitPolicy } from '../../../config/policyConfig';
@@ -25,6 +26,7 @@ interface BookingCardProps {
 const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = false }) => {
     const [openCalendar, setOpenCalendar] = useState(false);
     const [openGuests, setOpenGuests] = useState(false);
+    const [bookedDates, setBookedDates] = useState<Date[]>([]);
     const [isRazorpayReady, setIsRazorpayReady] = useState(false);
     const [paymentStatus, setPaymentStatus] = useState<
         | { state: 'idle' }
@@ -369,11 +371,44 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
                 setOpenCalendar(false);
             }
         };
-
-        document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
+     
 
+useEffect(() => {
+    const fetchBookedDates = async () => {
+        try {
+            // Replace `{id}` with your propertyId
+            const response = await api.get(`/bookings/${propertyId}`);
+            // Assuming your API returns an array of bookings with startDate and endDate
+            const bookings = asArray(response.data);
+
+            const dates: Date[] = [];
+            bookings.forEach((booking: any) => {
+                const start = new Date(booking.startDate);
+                const end = new Date(booking.endDate);
+
+                // Fill all dates in the range
+                for (
+                    let d = new Date(start);
+                    d <= end;
+                    d.setDate(d.getDate() + 1)
+                ) {
+                    dates.push(new Date(d));
+                }
+            });
+
+            setBookedDates(dates);
+        } catch (error) {
+            console.error("Failed to fetch booked dates:", error);
+        }
+    };
+
+    fetchBookedDates();
+}, [propertyId]);
+
+   
     const modifyGuest = (type: keyof typeof guests, increment: boolean) => {
         setGuests(prev => ({
             ...prev,
@@ -461,6 +496,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
                         monthDisplayFormat="MMMM yyyy"
                         weekdayDisplayFormat="EEEE"
                         dayDisplayFormat="d"
+                        disabledDates={bookedDates}
                     />
                 </div>
             )}
