@@ -184,7 +184,7 @@ const SupportWidgetContent = () => {
             />
           ) : null}
 
-          {enableHideUnfinishedChatbot ? null : <ChatbotPlaceholder />}
+          <ChatbotPlaceholder enableHideUnfinishedChatbot={enableHideUnfinishedChatbot} />
         </div>
       </>
     );
