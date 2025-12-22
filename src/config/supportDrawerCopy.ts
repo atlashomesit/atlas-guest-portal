@@ -14,6 +14,7 @@ export const SUPPORT_DRAWER_COPY = {
   },
   controls: {
     closeAriaLabel: "Close support widget",
+    closeReassurance: "You can reopen any time if you still need us.",
   },
   actions: {
     whatsapp: {
