@@ -10,7 +10,7 @@ import CallbackRequestForm from "./CallbackRequestForm";
 import ChatbotPlaceholder from "./ChatbotPlaceholder";
 import SupportActionGrid from "./SupportActionGrid";
 import { SupportDrawerFlagsProvider, useSupportDrawerFlags } from "./SupportDrawerFlagsContext";
-import SupportDrawer from "./SupportDrawer";
+import SupportDrawer, { useSupportDrawerView } from "./SupportDrawer";
 import SupportWidgetTrigger from "./SupportWidgetTrigger";
 import { CallbackStatus, SupportAnalyticsMetadata } from "./supportDrawer.types";
 
@@ -27,7 +27,8 @@ const SupportWidgetContent = () => {
   const [callbackPhone, setCallbackPhone] = useState("");
   const [callbackStatus, setCallbackStatus] = useState<CallbackStatus>("idle");
   const [callbackError, setCallbackError] = useState<string | null>(null);
-  const { enableHideUnfinishedChatbot, enableRevealCallbackOnClickOnly } = useSupportDrawerFlags();
+  const { enableHideUnfinishedChatbot, enableRevealCallbackOnClickOnly, enableRecommendedWhatsAppPrimary } =
+    useSupportDrawerFlags();
   const [isCallbackExpanded, setIsCallbackExpanded] = useState(() => !enableRevealCallbackOnClickOnly);
 
   const analyticsMetadata: SupportAnalyticsMetadata = {
@@ -125,6 +126,70 @@ const SupportWidgetContent = () => {
     setIsCallbackExpanded(true);
   };
 
+  const DrawerContent = () => {
+    const { view, goToCallback, goToFaq, goToChat } = useSupportDrawerView();
+
+    useEffect(() => {
+      if (!enableRevealCallbackOnClickOnly) return;
+      if (view === "callback") {
+        setIsCallbackExpanded(true);
+      }
+    }, [enableRevealCallbackOnClickOnly, view]);
+
+    const handleCallbackCardClick = () => {
+      if (enableRevealCallbackOnClickOnly) {
+        goToCallback();
+        handleRevealCallback();
+        return;
+      }
+
+      handleRevealCallback();
+    };
+
+    const handleFaqClick = () => {
+      trackEvent("support_faq", { surface: "support_widget" }, analyticsMetadata);
+      if (enableRevealCallbackOnClickOnly) {
+        goToFaq();
+      }
+    };
+
+    const handleWhatsappClick = () => {
+      trackEvent("support_whatsapp", { surface: "support_widget" }, analyticsMetadata);
+      if (enableRevealCallbackOnClickOnly) {
+        goToChat();
+      }
+    };
+
+    return (
+      <>
+        <SupportActionGrid
+          contactPhone={CONTACT.business.phone}
+          enableRecommendedWhatsAppPrimary={enableRecommendedWhatsAppPrimary}
+          onCallClick={() => trackEvent("support_call", { surface: "support_widget" }, analyticsMetadata)}
+          onFaqClick={handleFaqClick}
+          onCallbackClick={enableRevealCallbackOnClickOnly ? handleCallbackCardClick : undefined}
+          onWhatsappClick={handleWhatsappClick}
+          whatsappLink={whatsappLink}
+        />
+
+        <div className="flex flex-col gap-3 px-4 pb-4">
+          {isCallbackExpanded ? (
+            <CallbackRequestForm
+              callbackError={callbackError}
+              callbackPhone={callbackPhone}
+              callbackStatus={callbackStatus}
+              onClose={handleClose}
+              onPhoneChange={handlePhoneChange}
+              onSubmit={handleCallbackSubmit}
+            />
+          ) : null}
+
+          {enableHideUnfinishedChatbot ? null : <ChatbotPlaceholder />}
+        </div>
+      </>
+    );
+  };
+
   if (location.pathname.includes("payment") || location.pathname.includes("checkout")) {
     return null;
   }
@@ -135,31 +200,7 @@ const SupportWidgetContent = () => {
 
       {isOpen ? (
         <SupportDrawer bottomSpacing={bottomSpacing} onClose={handleClose}>
-          <SupportActionGrid
-            contactPhone={CONTACT.business.phone}
-            onCallClick={() => trackEvent("support_call", { surface: "support_widget" }, analyticsMetadata)}
-            onFaqClick={() => trackEvent("support_faq", { surface: "support_widget" }, analyticsMetadata)}
-            onCallbackClick={enableRevealCallbackOnClickOnly ? handleRevealCallback : undefined}
-            onWhatsappClick={() =>
-              trackEvent("support_whatsapp", { surface: "support_widget" }, analyticsMetadata)
-            }
-            whatsappLink={whatsappLink}
-          />
-
-          <div className="flex flex-col gap-3 px-4 pb-4">
-            {isCallbackExpanded ? (
-              <CallbackRequestForm
-                callbackError={callbackError}
-                callbackPhone={callbackPhone}
-                callbackStatus={callbackStatus}
-                onClose={handleClose}
-                onPhoneChange={handlePhoneChange}
-                onSubmit={handleCallbackSubmit}
-              />
-            ) : null}
-
-            {enableHideUnfinishedChatbot ? null : <ChatbotPlaceholder />}
-          </div>
+          <DrawerContent />
         </SupportDrawer>
       ) : null}
     </>
