@@ -15,15 +15,15 @@ type FeatureFlagKey =
 export type FeatureFlags = Record<FeatureFlagKey, boolean>;
 
 const DEFAULT_FLAGS: FeatureFlags = {
-  enableCompactDrawer: false,
+  enableCompactDrawer: true,
   enableSupportLayoutVariants: false,
   enableRecommendedWhatsAppPrimary: false,
-  enableSecondaryActionsCollapsed: false,
-  enableRevealCallbackOnClickOnly: false,
-  enableHideUnfinishedChatbot: false,
-  enableChatbotPlaceholder: false,
-  enableClickOutsideToClose: false,
-  enableSupportCtaHierarchy: false,
+  enableSecondaryActionsCollapsed: true,
+  enableRevealCallbackOnClickOnly: true,
+  enableHideUnfinishedChatbot: true,
+  enableChatbotPlaceholder: true,
+  enableClickOutsideToClose: true,
+  enableSupportCtaHierarchy: true,
   enableSessionDismissRemember: false,
   enableTrustMicrocopy: false,
   enableCloseReassurance: false,
