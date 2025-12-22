@@ -1,5 +1,7 @@
 import { FiMessageCircle } from "react-icons/fi";
 
+import { SUPPORT_DRAWER_COPY } from "../../config/supportDrawerCopy";
+
 type ChatbotPlaceholderProps = {
   enableHideUnfinishedChatbot?: boolean;
 };
@@ -13,8 +15,8 @@ const ChatbotPlaceholder = ({ enableHideUnfinishedChatbot = false }: ChatbotPlac
             <FiMessageCircle aria-hidden="true" />
           </span>
           <div>
-            <p className="text-sm font-semibold text-text-primary">Chat support</p>
-            <p className="text-[11px] text-text-muted">Prefer chat? Message us on WhatsApp for instant support.</p>
+            <p className="text-sm font-semibold text-text-primary">{SUPPORT_DRAWER_COPY.chatbot.hidden.title}</p>
+            <p className="text-[11px] text-text-muted">{SUPPORT_DRAWER_COPY.chatbot.hidden.description}</p>
           </div>
         </div>
       </div>
@@ -31,20 +33,20 @@ const ChatbotPlaceholder = ({ enableHideUnfinishedChatbot = false }: ChatbotPlac
             <FiMessageCircle aria-hidden="true" />
           </span>
           <div>
-            <p className="text-sm font-semibold text-text-primary">Chat interface</p>
-            <p className="text-[11px] text-text-muted">Placeholder while backend wiring is in progress.</p>
+            <p className="text-sm font-semibold text-text-primary">{SUPPORT_DRAWER_COPY.chatbot.placeholder.title}</p>
+            <p className="text-[11px] text-text-muted">{SUPPORT_DRAWER_COPY.chatbot.placeholder.description}</p>
           </div>
         </div>
       </div>
       <div className="flex flex-col gap-2">
         <div className="rounded-xl bg-bg-surface p-3 text-sm text-text-muted shadow-level1">
-          Hi there! Ask about check-in rules, cancellations, parking, or anything else about your stay.
+          {SUPPORT_DRAWER_COPY.chatbot.placeholder.openingLine}
         </div>
         <textarea
           rows={2}
           disabled
           className="w-full resize-none rounded-xl border border-border-subtle bg-bg-muted p-3 text-sm text-text-muted outline-none"
-          placeholder="Messaging coming soon"
+          placeholder={SUPPORT_DRAWER_COPY.chatbot.placeholder.inputPlaceholder}
         />
       </div>
     </div>

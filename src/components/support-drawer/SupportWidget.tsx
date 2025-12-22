@@ -3,6 +3,7 @@ import { useLocation, useMatch } from "react-router-dom";
 
 import { CONTACT } from "../../config/contact";
 import { getFeatureFlags } from "../../config/featureFlags";
+import { SUPPORT_DRAWER_COPY } from "../../config/supportDrawerCopy";
 import { trackEvent } from "../../utils/analytics";
 import { buildWaLink, defaultPrefill } from "../../utils/whatsapp";
 import { submitCallbackRequest } from "../support/callbackService";
@@ -16,7 +17,6 @@ import { CallbackStatus, SupportAnalyticsMetadata } from "./supportDrawer.types"
 
 const SCROLL_BUFFER_PX = 200;
 const DISMISS_KEY = "supportDrawer:dismissed";
-const TRUST_MICROCOPY = "Fast support on WhatsApp";
 
 const SupportWidgetContent = () => {
   const location = useLocation();
@@ -122,7 +122,7 @@ const SupportWidgetContent = () => {
     setCallbackError(null);
     const sanitized = callbackPhone.replace(/\D/g, "");
     if (sanitized.length !== 10) {
-      setCallbackError("Enter a valid 10-digit number.");
+      setCallbackError(SUPPORT_DRAWER_COPY.callbackForm.invalidPhoneError);
       setCallbackStatus("error");
       return;
     }
@@ -142,7 +142,7 @@ const SupportWidgetContent = () => {
     } catch (error) {
       console.error("[support-widget] callback request failed", error);
       setCallbackStatus("error");
-      setCallbackError("Could not send request. Try WhatsApp or call us.");
+      setCallbackError(SUPPORT_DRAWER_COPY.callbackForm.submissionError);
     }
   };
 
@@ -203,6 +203,7 @@ const SupportWidgetContent = () => {
               callbackError={callbackError}
               callbackPhone={callbackPhone}
               callbackStatus={callbackStatus}
+              expectationText={SUPPORT_DRAWER_COPY.callbackForm.expectationText}
               onClose={handleClose}
               onPhoneChange={handlePhoneChange}
               onSubmit={handleCallbackSubmit}
@@ -251,7 +252,7 @@ const SupportWidgetContent = () => {
                 : "legacy"
             }
             onClose={handleClose}
-            trustMicrocopy={enableTrustMicrocopy ? TRUST_MICROCOPY : undefined}
+            trustMicrocopy={enableTrustMicrocopy ? SUPPORT_DRAWER_COPY.trustMicrocopy : undefined}
           >
             <DrawerContent />
           </SupportDrawer>
