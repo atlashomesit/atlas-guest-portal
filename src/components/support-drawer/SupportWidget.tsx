@@ -15,6 +15,8 @@ import SupportWidgetTrigger from "./SupportWidgetTrigger";
 import { CallbackStatus, SupportAnalyticsMetadata } from "./supportDrawer.types";
 
 const SCROLL_BUFFER_PX = 200;
+const DISMISS_KEY = "supportDrawer:dismissed";
+const TRUST_MICROCOPY = "Fast support on WhatsApp";
 
 const SupportWidgetContent = () => {
   const location = useLocation();
@@ -27,8 +29,15 @@ const SupportWidgetContent = () => {
   const [callbackPhone, setCallbackPhone] = useState("");
   const [callbackStatus, setCallbackStatus] = useState<CallbackStatus>("idle");
   const [callbackError, setCallbackError] = useState<string | null>(null);
-  const { enableHideUnfinishedChatbot, enableRevealCallbackOnClickOnly, enableRecommendedWhatsAppPrimary } =
-    useSupportDrawerFlags();
+  const {
+    enableClickOutsideToClose,
+    enableHideUnfinishedChatbot,
+    enableRevealCallbackOnClickOnly,
+    enableRecommendedWhatsAppPrimary,
+    enableSessionDismissRemember,
+    enableTrustMicrocopy,
+  } = useSupportDrawerFlags();
+  const [isDismissed, setIsDismissed] = useState(false);
   const [isCallbackExpanded, setIsCallbackExpanded] = useState(() => !enableRevealCallbackOnClickOnly);
 
   const analyticsMetadata: SupportAnalyticsMetadata = {
@@ -56,6 +65,11 @@ const SupportWidgetContent = () => {
   }, [location.key]);
 
   useEffect(() => {
+    if (!enableSessionDismissRemember || typeof window === "undefined") return;
+    setIsDismissed(sessionStorage.getItem(DISMISS_KEY) === "true");
+  }, [enableSessionDismissRemember]);
+
+  useEffect(() => {
     if (typeof window === "undefined") return undefined;
 
     const updateOffset = () => {
@@ -80,6 +94,12 @@ const SupportWidgetContent = () => {
     }
   }, [enableRevealCallbackOnClickOnly, isOpen]);
 
+  const rememberDismissal = () => {
+    if (!enableSessionDismissRemember || typeof window === "undefined") return;
+    sessionStorage.setItem(DISMISS_KEY, "true");
+    setIsDismissed(true);
+  };
+
   const handleOpen = () => {
     setIsOpen(true);
     trackEvent("chat_opened", { surface: "support_widget", entryPoint: "floating_pill" }, analyticsMetadata);
@@ -87,6 +107,7 @@ const SupportWidgetContent = () => {
 
   const handleClose = () => {
     setIsOpen(false);
+    rememberDismissal();
     trackEvent("chat_minimized", { surface: "support_widget" }, analyticsMetadata);
   };
 
@@ -194,14 +215,32 @@ const SupportWidgetContent = () => {
     return null;
   }
 
+  if (enableSessionDismissRemember && isDismissed) {
+    return null;
+  }
+
   return (
     <>
       {!isOpen ? <SupportWidgetTrigger bottomSpacing={bottomSpacing} onOpen={handleOpen} /> : null}
 
       {isOpen ? (
-        <SupportDrawer bottomSpacing={bottomSpacing} onClose={handleClose}>
-          <DrawerContent />
-        </SupportDrawer>
+        <>
+          {enableClickOutsideToClose ? (
+            <div
+              role="presentation"
+              className="fixed inset-0 bg-transparent"
+              style={{ zIndex: "calc(var(--z-floating) - 1)" }}
+              onClick={handleClose}
+            />
+          ) : null}
+          <SupportDrawer
+            bottomSpacing={bottomSpacing}
+            onClose={handleClose}
+            trustMicrocopy={enableTrustMicrocopy ? TRUST_MICROCOPY : undefined}
+          >
+            <DrawerContent />
+          </SupportDrawer>
+        </>
       ) : null}
     </>
   );

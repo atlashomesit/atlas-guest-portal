@@ -1,4 +1,14 @@
-import { ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import {
+  CSSProperties,
+  ReactNode,
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { FiX } from "react-icons/fi";
 
 import { useSupportDrawerFlags } from "./SupportDrawerFlagsContext";
@@ -19,17 +29,26 @@ interface SupportDrawerProps {
   bottomSpacing: string;
   children: ReactNode;
   onClose: () => void;
+  trustMicrocopy?: ReactNode;
 }
 
-const SupportDrawer = ({ bottomSpacing, children, onClose }: SupportDrawerProps) => {
+const SupportDrawer = ({ bottomSpacing, children, onClose, trustMicrocopy }: SupportDrawerProps) => {
   const drawerRef = useRef<HTMLDivElement>(null);
-  const { enableClickOutsideToClose, enableCompactDrawer } = useSupportDrawerFlags();
+  const { enableClickOutsideToClose, enableCompactDrawer, enableTrustMicrocopy } = useSupportDrawerFlags();
   const [view, setView] = useState<SupportDrawerView>("home");
 
   const widthClass = useMemo(
     () => (enableCompactDrawer ? "w-[min(92vw,380px)]" : "w-[min(92vw,420px)]"),
     [enableCompactDrawer],
   );
+
+  const containerStyle = useMemo<CSSProperties>(() => {
+    if (enableCompactDrawer) {
+      return { bottom: bottomSpacing, maxHeight: "65vh" };
+    }
+
+    return { bottom: bottomSpacing, top: "5px" };
+  }, [bottomSpacing, enableCompactDrawer]);
 
   const goToHome = useCallback(() => setView("home"), []);
   const goToCallback = useCallback(() => setView("callback"), []);
@@ -65,8 +84,8 @@ const SupportDrawer = ({ bottomSpacing, children, onClose }: SupportDrawerProps)
     <SupportDrawerViewContext.Provider value={viewContextValue}>
       <div
         ref={drawerRef}
-        className={`fixed right-3 z-[var(--z-floating)] ${widthClass} overflow-hidden rounded-3xl border border-[color-mix(in_srgb,var(--border-subtle)_80%,transparent)] bg-[color-mix(in_srgb,var(--bg-surface)_97%,#f7f4ed_8%)] text-text-primary shadow-level4 ring-1 ring-border-subtle backdrop-blur md:right-5`}
-        style={{ bottom: bottomSpacing, top: "5px" }}
+        className={`fixed right-3 z-[var(--z-floating)] ${widthClass} flex flex-col overflow-hidden rounded-3xl border border-[color-mix(in_srgb,var(--border-subtle)_80%,transparent)] bg-[color-mix(in_srgb,var(--bg-surface)_97%,#f7f4ed_8%)] text-text-primary shadow-level4 ring-1 ring-border-subtle backdrop-blur md:right-5 ${enableCompactDrawer ? "max-h-[65vh]" : ""}`}
+        style={containerStyle}
       >
         <div className="flex items-start justify-between gap-3 bg-[color-mix(in_srgb,var(--bg-surface)_96%,#f2efe8_18%)] px-4 py-3">
           <div className="flex flex-col gap-0.5">
@@ -83,7 +102,11 @@ const SupportDrawer = ({ bottomSpacing, children, onClose }: SupportDrawerProps)
           </button>
         </div>
 
-        {children}
+        {enableTrustMicrocopy && trustMicrocopy ? (
+          <p className="px-4 pb-2 text-[11px] font-medium uppercase tracking-wide text-text-muted">{trustMicrocopy}</p>
+        ) : null}
+
+        <div className={`min-h-0 flex-1 ${enableCompactDrawer ? "overflow-y-auto" : "overflow-visible"}`}>{children}</div>
       </div>
     </SupportDrawerViewContext.Provider>
   );
