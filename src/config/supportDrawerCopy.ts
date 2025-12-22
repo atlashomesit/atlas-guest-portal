@@ -45,6 +45,7 @@ export const SUPPORT_DRAWER_COPY = {
     phonePrefixLabel: "+91",
     phoneInputAriaLabel: "Callback phone",
     expectationText: undefined as string | undefined,
+    // Example: "We usually call back within 10 minutes (9am–9pm IST)."
     phonePlaceholder: "10-digit phone number",
     invalidPhoneError: "Enter a valid 10-digit number.",
     submissionError: "Could not send request. Try WhatsApp or call us.",
