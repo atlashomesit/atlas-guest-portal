@@ -1,13 +1,13 @@
 import { ReactNode, createContext, useContext, useMemo } from "react";
 
-import type { SupportDrawerFlags } from "../../config/supportDrawerFlags";
+import type { FeatureFlags } from "../../config/featureFlags";
 
 interface SupportDrawerFlagsProviderProps {
   children: ReactNode;
-  flags: SupportDrawerFlags;
+  flags: FeatureFlags;
 }
 
-const SupportDrawerFlagsContext = createContext<SupportDrawerFlags | null>(null);
+const SupportDrawerFlagsContext = createContext<FeatureFlags | null>(null);
 
 export const SupportDrawerFlagsProvider = ({ children, flags }: SupportDrawerFlagsProviderProps) => {
   const memoizedFlags = useMemo(() => flags, [flags]);

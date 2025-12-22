@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation, useMatch } from "react-router-dom";
 
 import { CONTACT } from "../../config/contact";
-import { supportDrawerFlags } from "../../config/supportDrawerFlags";
+import { getFeatureFlags } from "../../config/featureFlags";
 import { trackEvent } from "../../utils/analytics";
 import { buildWaLink, defaultPrefill } from "../../utils/whatsapp";
 import { submitCallbackRequest } from "../support/callbackService";
@@ -246,10 +246,15 @@ const SupportWidgetContent = () => {
   );
 };
 
-const SupportWidget = () => (
-  <SupportDrawerFlagsProvider flags={supportDrawerFlags}>
-    <SupportWidgetContent />
-  </SupportDrawerFlagsProvider>
-);
+const SupportWidget = () => {
+  const location = useLocation();
+  const featureFlags = useMemo(() => getFeatureFlags(), [location.search]);
+
+  return (
+    <SupportDrawerFlagsProvider flags={featureFlags}>
+      <SupportWidgetContent />
+    </SupportDrawerFlagsProvider>
+  );
+};
 
 export default SupportWidget;
