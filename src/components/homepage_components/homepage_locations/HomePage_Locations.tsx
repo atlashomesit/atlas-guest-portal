@@ -382,7 +382,7 @@ const HomePage_Locations = ({ listings = LISTINGS }: HomePageLocationsProps) => 
   ============================ */
 
   return (
-    <section className="py-12 px-4 sm:px-6 lg:px-8 bg-bg-surface">
+    <section className="py-12 px-4 sm:px-6 lg:px-8 bg-bg-surface scroll-mt-28" id="our-homes">
       <div className="max-w-7xl mx-auto">
         <Heading title="Our Homes" />
 

@@ -49,20 +49,10 @@ const BookingForm = ({ propertyData }: { propertyData: Property }) => {
   const unitType = inferUnitType({ property_name: propertyData?.property_name });
   const totalGuests = adults + children + infants;
 
-<<<<<<< HEAD
-  // Calculate number of nights
-  const calculateNights = () => {
-    
-    const diffTime = Math.abs(end.getTime() - start.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
-  };
-=======
   const stayDates = useMemo(() => {
     const start = new Date(checkIn);
     const end = new Date(checkOut);
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return [];
->>>>>>> 22ede2cc4af757674e7c0448cb6895dcb3b43cf1
 
     const nights: Date[] = [];
     const cursor = new Date(start);
