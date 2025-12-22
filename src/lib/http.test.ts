@@ -7,7 +7,7 @@ afterEach(() => {
 
 describe('apiFetch', () => {
   it('prefixes base for relative paths in prod', async () => {
-    vi.stubEnv('VITE_API_BASE', 'https://api.test');
+    vi.stubEnv('VITE_API_BASE_URL', 'https://api.test');
     vi.resetModules();
     const { apiFetch } = await import('./http');
     const mock = vi.fn(() => Promise.resolve(new Response('{}', { status: 200 })));
@@ -17,7 +17,7 @@ describe('apiFetch', () => {
   });
 
   it('blocks localhost on non-local host', async () => {
-    vi.stubEnv('VITE_API_BASE', 'https://api.test');
+    vi.stubEnv('VITE_API_BASE_URL', 'https://api.test');
     vi.stubEnv('DEV', 'false');
     vi.resetModules();
     const { apiFetch } = await import('./http');

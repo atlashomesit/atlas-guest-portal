@@ -1,13 +1,14 @@
+import { API_BASE_URL } from '@/config/api';
 import { IS_LOCALHOST } from '@/config/env';
-import { getApiBase } from '@/utils/env';
-
-const API_BASE = getApiBase();
 
 export async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
   const hasProtocol = /^https?:\/\//i.test(path);
   let url = path;
   if (!hasProtocol) {
-    url = IS_LOCALHOST ? path : `${API_BASE}${path}`;
+    if (!API_BASE_URL) {
+      throw new Error("API base URL is not configured");
+    }
+    url = IS_LOCALHOST ? path : `${API_BASE_URL}${path}`;
   }
   if (!IS_LOCALHOST && url.includes('localhost')) {
     throw new Error('Refusing localhost request from non-localhost host');

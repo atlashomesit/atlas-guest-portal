@@ -1,2 +1,2 @@
 export { ENV, getAuthConfig, getAllowedEmails, IS_LOCALHOST } from '@/config/env';
-export { getApiBase } from '@/utils/env';
+export { API_BASE_URL, IS_API_BASE_CONFIGURED } from '@/config/api';

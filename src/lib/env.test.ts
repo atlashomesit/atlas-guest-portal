@@ -1,7 +1,9 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.unstubAllEnvs();
+  vi.resetModules();
 });
 
 describe("getAllowedEmails", () => {
@@ -20,12 +22,20 @@ describe("getAllowedEmails", () => {
   });
 });
 
-describe('getApiBase', () => {
-  it('blocks localhost in prod', async () => {
-    vi.stubEnv('PROD', 'true');
-    vi.stubEnv('VITE_API_BASE', 'http://localhost:3000');
-    vi.resetModules();
-    const { getApiBase } = await import('../utils/env');
-    expect(() => getApiBase()).toThrow();
+describe("API_BASE_URL", () => {
+  it("trims trailing slashes", async () => {
+    vi.stubEnv("VITE_API_BASE_URL", "https://api.test/");
+    const { API_BASE_URL } = await import("../config/api");
+    expect(API_BASE_URL).toBe("https://api.test");
+  });
+
+  it("logs and clears localhost config in production", async () => {
+    vi.stubEnv("PROD", "true");
+    vi.stubEnv("VITE_API_BASE_URL", "http://localhost:3000/");
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const { API_BASE_URL } = await import("../config/api");
+    expect(API_BASE_URL).toBe("");
+    expect(errorSpy).toHaveBeenCalledWith("VITE_API_BASE_URL cannot point to localhost in production environments");
   });
 });
