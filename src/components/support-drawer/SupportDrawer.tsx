@@ -29,6 +29,7 @@ const SupportDrawerViewContext = createContext<SupportDrawerViewContextValue | n
 interface SupportDrawerProps {
   bottomSpacing: string;
   children: ReactNode;
+  enableCloseReassurance?: boolean;
   layoutVariant?: SupportDrawerLayoutVariant;
   onClose: () => void;
   trustMicrocopy?: ReactNode;
@@ -36,7 +37,20 @@ interface SupportDrawerProps {
 
 type SupportDrawerLayoutVariant = "legacy" | "fullHeightDrawer" | "compactDrawer";
 
-const SupportDrawer = ({ bottomSpacing, children, layoutVariant, onClose, trustMicrocopy }: SupportDrawerProps) => {
+const SUPPORT_DRAWER_SPACING = {
+  cardPaddingBlock: "0.75rem",
+  cardPaddingInline: "1rem",
+  sectionGap: "0.75rem",
+} as const;
+
+const SupportDrawer = ({
+  bottomSpacing,
+  children,
+  enableCloseReassurance,
+  layoutVariant,
+  onClose,
+  trustMicrocopy,
+}: SupportDrawerProps) => {
   const drawerRef = useRef<HTMLDivElement>(null);
   const {
     enableClickOutsideToClose,
@@ -65,6 +79,15 @@ const SupportDrawer = ({ bottomSpacing, children, layoutVariant, onClose, trustM
 
     return { bottom: bottomSpacing, top: "5px" };
   }, [bottomSpacing, resolvedLayoutVariant]);
+
+  const spacingTokens = useMemo<CSSProperties>(
+    () => ({
+      "--drawer-card-padding-block": SUPPORT_DRAWER_SPACING.cardPaddingBlock,
+      "--drawer-card-padding-inline": SUPPORT_DRAWER_SPACING.cardPaddingInline,
+      "--drawer-section-gap": SUPPORT_DRAWER_SPACING.sectionGap,
+    }),
+    [],
+  );
 
   const goToHome = useCallback(() => setView("home"), []);
   const goToCallback = useCallback(() => setView("callback"), []);
@@ -103,28 +126,37 @@ const SupportDrawer = ({ bottomSpacing, children, layoutVariant, onClose, trustM
         className={`fixed right-3 z-[var(--z-floating)] ${widthClass} flex flex-col overflow-hidden rounded-3xl border border-[color-mix(in_srgb,var(--border-subtle)_80%,transparent)] bg-[color-mix(in_srgb,var(--bg-surface)_97%,#f7f4ed_8%)] text-text-primary shadow-level4 ring-1 ring-border-subtle backdrop-blur md:right-5 ${
           resolvedLayoutVariant === "compactDrawer" ? "max-h-[65vh]" : ""
         }`}
-        style={containerStyle}
+        style={{ ...containerStyle, ...spacingTokens }}
       >
-        <div className="flex items-start justify-between gap-3 bg-[color-mix(in_srgb,var(--bg-surface)_96%,#f2efe8_18%)] px-4 py-3">
+        <div className="flex items-start justify-between gap-[var(--drawer-section-gap)] bg-[color-mix(in_srgb,var(--bg-surface)_96%,#f2efe8_18%)] px-[var(--drawer-card-padding-inline)] py-[var(--drawer-card-padding-block)]">
           <div className="flex flex-col gap-0.5">
             <p className="text-sm font-semibold text-text-primary">{SUPPORT_DRAWER_COPY.header.title}</p>
             <p className="text-xs text-text-muted">{SUPPORT_DRAWER_COPY.header.subtitle}</p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full p-2 text-text-muted transition hover:bg-bg-muted hover:text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-strong"
-            aria-label={SUPPORT_DRAWER_COPY.controls.closeAriaLabel}
-          >
-            <FiX aria-hidden="true" />
-          </button>
+          <div className="flex flex-col items-end gap-1">
+            <button
+              type="button"
+              onClick={onClose}
+              className={`rounded-full ${enableCloseReassurance ? "p-2.5" : "p-2"} text-text-muted transition hover:bg-bg-muted hover:text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-strong`}
+              aria-label={SUPPORT_DRAWER_COPY.controls.closeAriaLabel}
+            >
+              <FiX aria-hidden="true" size={enableCloseReassurance ? 26 : 24} />
+            </button>
+            {enableCloseReassurance ? (
+              <span className="max-w-[180px] text-right text-[11px] font-medium leading-4 text-text-muted">
+                {SUPPORT_DRAWER_COPY.controls.closeReassurance}
+              </span>
+            ) : null}
+          </div>
         </div>
 
         {enableTrustMicrocopy && trustMicrocopy ? (
-          <p className="px-4 pb-2 text-[11px] font-medium uppercase tracking-wide text-text-muted">{trustMicrocopy}</p>
+          <p className="px-[var(--drawer-card-padding-inline)] pb-2 text-[11px] font-medium uppercase tracking-wide text-text-muted">{trustMicrocopy}</p>
         ) : null}
 
-        <div className={`min-h-0 flex-1 ${resolvedLayoutVariant === "compactDrawer" ? "overflow-y-auto" : "overflow-visible"}`}>
+        <div
+          className={`min-h-0 flex-1 ${resolvedLayoutVariant === "compactDrawer" ? "overflow-y-auto" : "overflow-visible"}`}
+        >
           {children}
         </div>
       </div>

@@ -37,6 +37,7 @@ const SupportWidgetContent = () => {
     enableHideUnfinishedChatbot,
     enableRevealCallbackOnClickOnly,
     enableRecommendedWhatsAppPrimary,
+    enableCloseReassurance,
     enableSessionDismissRemember,
     enableTrustMicrocopy,
   } = useSupportDrawerFlags();
@@ -197,7 +198,7 @@ const SupportWidgetContent = () => {
           whatsappLink={whatsappLink}
         />
 
-        <div className="flex flex-col gap-3 px-4 pb-4">
+        <div className="flex flex-col gap-[var(--drawer-section-gap)] px-[var(--drawer-card-padding-inline)] pb-[calc(var(--drawer-card-padding-block)_+_0.25rem)]">
           {isCallbackExpanded ? (
             <CallbackRequestForm
               callbackError={callbackError}
@@ -252,6 +253,7 @@ const SupportWidgetContent = () => {
                 : "legacy"
             }
             onClose={handleClose}
+            enableCloseReassurance={enableCloseReassurance}
             trustMicrocopy={enableTrustMicrocopy ? SUPPORT_DRAWER_COPY.trustMicrocopy : undefined}
           >
             <DrawerContent />

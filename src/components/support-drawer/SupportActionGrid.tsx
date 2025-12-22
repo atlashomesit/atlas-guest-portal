@@ -24,7 +24,7 @@ interface SupportActionGridProps {
 }
 
 const ACTION_STYLES =
-  "flex items-center gap-3 rounded-2xl border border-border-subtle bg-bg-surface px-3 py-2 text-left text-sm font-semibold shadow-level1 transition hover:-translate-y-0.5 hover:border-accent-primary hover:bg-[color-mix(in_srgb,var(--cta-primary)_10%,transparent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary";
+  "flex items-center gap-[var(--drawer-section-gap)] rounded-2xl border border-border-subtle bg-bg-surface px-3 py-2 text-left text-sm font-semibold shadow-level1 transition hover:-translate-y-0.5 hover:border-accent-primary hover:bg-[color-mix(in_srgb,var(--cta-primary)_10%,transparent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary";
 
 const SupportActionGrid = ({
   contactPhone,
@@ -148,11 +148,15 @@ const SupportActionGrid = ({
       ? [...primaryIds, ...secondaryIds, ...tertiaryIds.filter((id) => !secondarySet.has(id) && !primarySet.has(id))]
       : primaryIds;
 
-    return <div className="grid grid-cols-2 gap-3 px-4 py-3">{prioritizedIds.map(renderAction)}</div>;
+    return (
+      <div className="grid grid-cols-2 gap-[var(--drawer-section-gap)] px-[var(--drawer-card-padding-inline)] py-[var(--drawer-card-padding-block)]">
+        {prioritizedIds.map(renderAction)}
+      </div>
+    );
   }
 
   return (
-    <div className="flex flex-col gap-3 px-4 py-3">
+    <div className="flex flex-col gap-[var(--drawer-section-gap)] px-[var(--drawer-card-padding-inline)] py-[var(--drawer-card-padding-block)]">
       <div className="flex flex-col gap-2">{primaryIds.map(renderAction)}</div>
 
       {renderSecondary ? (

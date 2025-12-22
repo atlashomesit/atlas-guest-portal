@@ -9,7 +9,8 @@ type FeatureFlagKey =
   | "enableClickOutsideToClose"
   | "enableSupportCtaHierarchy"
   | "enableSessionDismissRemember"
-  | "enableTrustMicrocopy";
+  | "enableTrustMicrocopy"
+  | "enableCloseReassurance";
 
 export type FeatureFlags = Record<FeatureFlagKey, boolean>;
 
@@ -25,6 +26,7 @@ const DEFAULT_FLAGS: FeatureFlags = {
   enableSupportCtaHierarchy: false,
   enableSessionDismissRemember: false,
   enableTrustMicrocopy: false,
+  enableCloseReassurance: false,
 };
 
 const FLAG_TOKEN_MAP: Record<string, FeatureFlagKey> = {
@@ -37,6 +39,7 @@ const FLAG_TOKEN_MAP: Record<string, FeatureFlagKey> = {
   chatPlaceholder: "enableChatbotPlaceholder",
   ctaHierarchy: "enableSupportCtaHierarchy",
   trustMicrocopy: "enableTrustMicrocopy",
+  closeReassurance: "enableCloseReassurance",
 };
 // To trial compact drawer + CTA hierarchy safely, prefer enabling with URL/localStorage tokens like:
 //   ?ff=layoutVariants,compactDrawer,ctaHierarchy

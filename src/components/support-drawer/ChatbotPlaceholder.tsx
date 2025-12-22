@@ -9,7 +9,7 @@ type ChatbotPlaceholderProps = {
 const ChatbotPlaceholder = ({ enableHideUnfinishedChatbot = false }: ChatbotPlaceholderProps) => {
   if (enableHideUnfinishedChatbot) {
     return (
-      <div className="rounded-2xl border border-[color-mix(in_srgb,var(--border-subtle)_80%,transparent)] bg-[color-mix(in_srgb,var(--bg-muted)_92%,#f9f6f1_12%)] p-3 shadow-inner">
+      <div className="rounded-2xl border border-[color-mix(in_srgb,var(--border-subtle)_80%,transparent)] bg-[color-mix(in_srgb,var(--bg-muted)_92%,#f9f6f1_12%)] p-[var(--drawer-card-padding-block)] shadow-inner">
         <div className="flex items-center gap-2">
           <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--cta-primary)_12%,transparent)] text-cta-primary">
             <FiMessageCircle aria-hidden="true" />
@@ -26,7 +26,7 @@ const ChatbotPlaceholder = ({ enableHideUnfinishedChatbot = false }: ChatbotPlac
   // Recommended replacement copy when live chat goes live:
   // "Chat live with our team for instant support."
   return (
-    <div className="rounded-2xl border border-[color-mix(in_srgb,var(--border-subtle)_80%,transparent)] bg-[color-mix(in_srgb,var(--bg-muted)_92%,#f9f6f1_12%)] p-3 shadow-inner">
+    <div className="rounded-2xl border border-[color-mix(in_srgb,var(--border-subtle)_80%,transparent)] bg-[color-mix(in_srgb,var(--bg-muted)_92%,#f9f6f1_12%)] p-[var(--drawer-card-padding-block)] shadow-inner">
       <div className="mb-2 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--cta-primary)_12%,transparent)] text-cta-primary">
@@ -39,13 +39,13 @@ const ChatbotPlaceholder = ({ enableHideUnfinishedChatbot = false }: ChatbotPlac
         </div>
       </div>
       <div className="flex flex-col gap-2">
-        <div className="rounded-xl bg-bg-surface p-3 text-sm text-text-muted shadow-level1">
+        <div className="rounded-xl bg-bg-surface p-[var(--drawer-card-padding-block)] text-sm text-text-muted shadow-level1">
           {SUPPORT_DRAWER_COPY.chatbot.placeholder.openingLine}
         </div>
         <textarea
           rows={2}
           disabled
-          className="w-full resize-none rounded-xl border border-border-subtle bg-bg-muted p-3 text-sm text-text-muted outline-none"
+          className="w-full resize-none rounded-xl border border-border-subtle bg-bg-muted p-[var(--drawer-card-padding-block)] text-sm text-text-muted outline-none"
           placeholder={SUPPORT_DRAWER_COPY.chatbot.placeholder.inputPlaceholder}
         />
       </div>
