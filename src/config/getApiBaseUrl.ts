@@ -31,7 +31,7 @@ const getRuntimeApiBaseUrl = (): string | undefined => {
 };
 
 const missingConfigMessage =
-  "API base URL is not configured. Expected Cloudflare Pages env var VITE_API_BASE_URL (available via /config.js). If you just added it in Cloudflare, redeploy once or confirm the correct environment (Preview vs Production).";
+  "API base URL is not configured. Expected Cloudflare Pages env var VITE_API_BASE_URL (available via /config). If you just added it in Cloudflare, redeploy once or confirm the correct environment (Preview vs Production).";
 
 export const getApiBaseUrl = (): string => {
   const runtimeValue = normalizeApiBaseUrl(getRuntimeApiBaseUrl());
