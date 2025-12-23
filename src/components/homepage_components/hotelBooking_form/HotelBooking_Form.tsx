@@ -218,8 +218,10 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     const [isInlineChecking, setIsInlineChecking] = useState(false);
     const bookingEngagementRef = useRef(false);
     const bookingDropoffTrackedRef = useRef(false);
-    const latestBookingStateRef = useRef({ guests: totalPeople, hasSelection });
     const latestPaymentStateRef = useRef(paymentStatus.state);
+    
+    const hasSelection = Boolean(dates.startDate && dates.endDate && guests.adults);
+    const latestBookingStateRef = useRef({ guests: totalPeople, hasSelection });
 
     const preloadRazorpay = () => {
         const existingPreload = document.querySelector("link[rel='preload'][href='https://checkout.razorpay.com/v1/checkout.js']");
@@ -549,8 +551,7 @@ useEffect(() => {
     const isAtMax = (type: GuestCountKey) =>
         typeof guestLimits[type].max === 'number' && guests[type] >= (guestLimits[type].max ?? Number.MAX_SAFE_INTEGER);
 
-    const hasSelection = Boolean(dates.startDate && dates.endDate && guests.adults);
-    const primaryCtaLabel = hasSelection && termsAccepted ? 'Book now' : 'Check availability';
+     const primaryCtaLabel = hasSelection && termsAccepted ? 'Book now' : 'Check availability';
     const inlineCtaLabel = hasSelection ? 'Check availability' : 'Select dates';
     const isCheckoutInvalid = dates.endDate <= dates.startDate;
     const guestNeedsAdult = guests.adults < 1;

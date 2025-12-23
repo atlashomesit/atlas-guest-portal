@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Link, NavLink } from 'react-router-dom';
+import { Link, NavLink, useNavigate } from 'react-router-dom';
 import './navbar.css';
+
 import { IoIosCall } from 'react-icons/io';
 import { buildWaLink } from '../../../utils/whatsapp';
 import { sanitizeItems, getItemKey } from '../../../utils/sanitizeItems';
@@ -14,29 +15,35 @@ const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isApartmentsOpen, setIsApartmentsOpen] = useState(false);
 
+  const navigate = useNavigate();
+
   const apartments = sanitizeItems(propertyData);
 
   const whatsappLink = buildWaLink({
     phoneE164: CONTACT.business.whatsapp,
     text: "Hi Atlas Homestays 👋 I'd like to learn more about booking a stay.",
   });
-  const telLink = getTelLink();
-  const bookNowTarget = ctaNav.to;
 
+  const telLink = getTelLink();
+
+  /* =========================
+     NAVBAR SCROLL EFFECT
+  ========================= */
   useEffect(() => {
-    const onLoadfunction = () => {
+    const onScroll = () => {
       const navbar = document.getElementById('navbar_container');
-      if (navbar) {
-        if (window.scrollY > 20) {
-          navbar.classList.add('backdrop-blur');
-        } else {
-          navbar.classList.remove('backdrop-blur');
-        }
+      if (!navbar) return;
+
+      if (window.scrollY > 20) {
+        navbar.classList.add('backdrop-blur');
+      } else {
+        navbar.classList.remove('backdrop-blur');
       }
     };
-    window.addEventListener('scroll', onLoadfunction);
-    onLoadfunction();
-    return () => window.removeEventListener('scroll', onLoadfunction);
+
+    window.addEventListener('scroll', onScroll);
+    onScroll();
+    return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
@@ -47,27 +54,42 @@ const Navbar = () => {
     setIsApartmentsOpen(false);
   };
 
+  /* =========================
+     BOOK NOW HANDLER
+  ========================= */
+  const handleBookNow = () => {
+    trackEvent(
+      'cta_book_now_clicked',
+      { source: 'header' },
+      { route: '/' }
+    );
+
+    navigate('/', {
+      state: { scrollTo: 'our-homes' }
+    });
+
+    closeMobile();
+  };
+
   return (
     <section className="navbar-container" id="navbar_container">
       <div className="navbar-main">
-        {/* LEFT: Logo + Name */}
+        {/* LEFT */}
         <div className="navbar-left flex items-center justify-between w-full lg:w-auto">
           <Link to="/" className="flex items-center gap-2">
             <img className="navbar-logo" src={LOGO_URL} alt="Atlas Homestays logo" />
             <span className="navbar-logo-text">Atlas Homestays</span>
           </Link>
 
-          {/* Mobile hamburger */}
           <button
             className="mobile-menu-button lg:hidden"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            aria-label={`${isMenuOpen ? 'Close' : 'Open'} navigation menu`}
           >
             ☰
           </button>
         </div>
 
-        {/* CENTER: Desktop Menu */}
+        {/* CENTER */}
         <div className="navbar-center hidden lg:flex gap-2">
           {primaryNav.filter(i => !i.hidden).map(item =>
             item.label === 'Apartments' ? (
@@ -86,55 +108,59 @@ const Navbar = () => {
                 </div>
               </div>
             ) : (
-              <NavLink key={item.label} to={item.to} className={navLinkClass}>{item.label}</NavLink>
+              <NavLink key={item.label} to={item.to} className={navLinkClass}>
+                {item.label}
+              </NavLink>
             )
           )}
-
         </div>
 
-        {/* RIGHT: Phone + Book Now */}
+        {/* RIGHT */}
         <div className="navbar-right flex gap-2">
-          <a href={telLink} className="phone" aria-label="Call Atlas Homestays">
-            <IoIosCall className="text-lg md:text-xl" />
+          <a href={telLink} className="phone">
+            <IoIosCall />
             <span>{formatDisplayNumber()}</span>
           </a>
-          <Link
-            to={bookNowTarget}
+
+          {/* BOOK NOW */}
+          <button
+            type="button"
             className="book-now"
-            aria-label="Book now"
-            onClick={() => {
-              trackEvent('cta_book_now_clicked', { source: 'header' }, { route: bookNowTarget });
-            }}
+            onClick={handleBookNow}
           >
             {ctaNav.label}
-          </Link>
+          </button>
+
           <a
             href={whatsappLink}
             target="_blank"
             rel="noopener noreferrer"
             className="help-link"
-            aria-label="Need help on WhatsApp"
           >
             Need help?
           </a>
         </div>
       </div>
 
-      {/* MOBILE MENU (Slide Down) */}
+      {/* MOBILE MENU */}
       {isMenuOpen && (
         <div className="mobile-menu lg:hidden">
-          {primaryNav.filter((item) => !item.hidden).map((item) => (
+          {primaryNav.filter(i => !i.hidden).map(item =>
             item.label === 'Apartments' ? (
               <div key={item.label}>
                 <button
                   onClick={() => setIsApartmentsOpen(!isApartmentsOpen)}
-                  className="block py-2 font-semibold text-text-primary hover:text-[var(--text-contrast)] transition-colors w-full text-left"
+                  className="block py-2 font-semibold w-full text-left"
                 >
                   {item.label}
                 </button>
+
                 {isApartmentsOpen && (
                   <div className="pl-2">
-                    <NavLink onClick={closeMobile} to={item.to}>Apartments Overview</NavLink>
+                    <NavLink onClick={closeMobile} to={item.to}>
+                      Apartments Overview
+                    </NavLink>
+
                     {apartments.map((apt, idx) => (
                       <NavLink
                         key={getItemKey(apt, idx)}
@@ -149,39 +175,37 @@ const Navbar = () => {
                 )}
               </div>
             ) : (
-              <NavLink key={item.label} onClick={closeMobile} to={item.to} className="block py-2">
+              <NavLink
+                key={item.label}
+                onClick={closeMobile}
+                to={item.to}
+                className="block py-2"
+              >
                 {item.label}
               </NavLink>
             )
-          ))}
+          )}
 
-          {/* Mobile Phone + Book Now */}
+          {/* MOBILE ACTIONS */}
           <div className="mt-2 flex flex-col gap-2">
-            <a
-              href={telLink}
-              className="phone flex items-center gap-2 font-semibold text-text-primary hover:text-[var(--text-contrast)] transition-colors"
-              aria-label="Call Atlas Homestays"
-            >
-              <IoIosCall className="text-lg" />
+            <a href={telLink} className="phone flex items-center gap-2">
+              <IoIosCall />
               <span>{formatDisplayNumber()}</span>
             </a>
-            <Link
-              to={bookNowTarget}
+
+            <button
+              type="button"
               className="book-now text-center"
-              aria-label="Book now"
-              onClick={() => {
-                trackEvent('cta_book_now_clicked', { source: 'header' }, { route: bookNowTarget });
-                closeMobile();
-              }}
+              onClick={handleBookNow}
             >
               {ctaNav.label}
-            </Link>
+            </button>
+
             <a
               href={whatsappLink}
               target="_blank"
               rel="noopener noreferrer"
               className="help-link text-center"
-              aria-label="Need help on WhatsApp"
               onClick={closeMobile}
             >
               Need help?
