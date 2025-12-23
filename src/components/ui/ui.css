@@ -205,12 +205,12 @@
   gap: var(--space-2);
   padding: var(--space-3) var(--space-5);
   min-height: 48px;
-  border-radius: var(--radius-pill);
-  border: 1px solid color-mix(in srgb, var(--border-strong) 80%, transparent);
-  background: color-mix(in srgb, var(--bg-surface) 90%, var(--bg-muted) 10%);
+  border-radius: var(--radius-lg);
+  border: 1px solid color-mix(in srgb, var(--border-strong) 70%, transparent);
+  background: color-mix(in srgb, var(--bg-surface) 88%, var(--bg-muted) 12%);
   box-shadow: 0 4px 12px color-mix(in srgb, var(--shadow-base) 10%, transparent);
   color: var(--text-primary);
-  font-weight: 700;
+  font-weight: 600;
   font-size: var(--font-size-sm);
   letter-spacing: -0.01em;
   transition:
@@ -229,8 +229,8 @@
 .rb-trust-badge:hover {
   transform: translateY(-1px);
   box-shadow: var(--shadow-level-2);
-  border-color: color-mix(in srgb, var(--accent-primary) 45%, var(--border-strong) 55%);
-  background: color-mix(in srgb, var(--bg-surface) 82%, var(--bg-muted) 18%);
+  border-color: color-mix(in srgb, var(--accent-primary) 42%, var(--border-strong) 58%);
+  background: color-mix(in srgb, var(--bg-surface) 85%, var(--bg-muted) 15%);
 }
 
 .rb-trust-badge:focus-visible {
