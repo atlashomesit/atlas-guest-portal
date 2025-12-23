@@ -2,7 +2,7 @@ import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { LOGO_URL } from "../config/branding";
-import { propertyData, propertyImages } from "../data";
+import { propertyData, propertyImages } from "../data/propertyData";
 import { LISTINGS, type Listing } from "../data/listings";
 import ListingCard from "../components/apartments/ListingCard";
 import ListingFilters from "../components/apartments/ListingFilters";
@@ -84,19 +84,97 @@ const deriveAmenityFlag = (property: PropertyRecord, keyword: string): boolean =
     )
   );
 
+// Simple error boundary for the component
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('Error in Apartments component:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-8 text-center">
+          <h2 className="text-xl font-semibold text-red-600 mb-2">Something went wrong</h2>
+          <p className="text-gray-600">We're having trouble loading the apartments. Please try again later.</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          >
+            Reload Page
+          </button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 const Apartments = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const safeListings = React.useMemo(
-    () => sanitizeItems<Listing>(LISTINGS),
-    []
-  );
+  const safeListings = React.useMemo(() => {
+    try {
+      if (!Array.isArray(LISTINGS)) {
+        console.error('LISTINGS is not an array:', LISTINGS);
+        return [];
+      }
+      return LISTINGS.map(listing => ({
+        ...listing,
+        id: String(listing?.id || '') // Ensure ID is a string
+      }));
+    } catch (error) {
+      console.error('Error processing LISTINGS:', error);
+      return [];
+    }
+  }, []);
 
-  const safeProperties = React.useMemo(
-    () => sanitizeItems<PropertyRecord>(propertyData),
-    []
-  );
+  const safeProperties = React.useMemo(() => {
+    try {
+      if (!Array.isArray(propertyData)) {
+        console.error('propertyData is not an array:', propertyData);
+        return [];
+      }
+      
+      return propertyData.map(property => {
+        // Ensure property has required fields
+        const safeProperty = {
+          id: String(property?.id || ''),
+          property_name: property?.property_name || `Property ${property?.id || ''}`,
+          property_location: property?.property_location || 'Hyderabad',
+          property_description: property?.property_description || 'A comfortable place to stay',
+          property_price: typeof property?.property_price === 'number' ? property.property_price : 0,
+          property_rating: typeof property?.property_rating === 'number' ? property.property_rating : 0,
+          property_reviews: typeof property?.property_reviews === 'number' ? property.property_reviews : 0,
+          property_img: Array.isArray(property?.property_img) ? property.property_img : [],
+          property_amenities: Array.isArray(property?.property_amenities) ? property.property_amenities : [],
+          property_policy_details: Array.isArray(property?.property_policy_details) ? property.property_policy_details : [],
+          // Include any other properties with proper defaults
+          ...property
+        };
+        
+        // Ensure property_img has at least one image
+        if (!safeProperty.property_img || safeProperty.property_img.length === 0) {
+          safeProperty.property_img = [LOGO_URL];
+        }
+        
+        return safeProperty;
+      });
+    } catch (error) {
+      console.error('Error processing propertyData:', error);
+      return [];
+    }
+  }, [propertyData]);
 
   const [guests, setGuests] = React.useState(2);
   const [checkIn, setCheckIn] = React.useState<string | null>(null);
@@ -151,9 +229,19 @@ const Apartments = () => {
     const merged = safeListings.map((listing) => {
       const property = safeProperties.find(
         (item) => String(item.id) === String(listing.id)
-      ) || { id: listing.id };
+      ) || { 
+        id: listing.id,
+        property_name: listing.title,
+        property_location: 'Hyderabad',
+        property_price: 0,
+        property_rating: 0,
+        property_reviews: 0,
+        property_amenities: [],
+        property_policy_details: []
+      };
 
-      const images = property.property_img || propertyImages[String(listing.id)];
+      // Ensure we have a valid image URL
+      const images = property.property_img || propertyImages[String(listing.id)] || [LOGO_URL];
       const name = property.property_name || listing.title || `Property ${listing.id}`;
       const location = property.property_location || listing.subtitle || "Hyderabad";
       const pricing = computeNightlyPrice(property);
@@ -371,4 +459,11 @@ const Apartments = () => {
   );
 };
 
-export default Apartments;
+// Wrap the component with the error boundary
+export default function ApartmentsWithErrorBoundary() {
+  return (
+    <ErrorBoundary>
+      <Apartments />
+    </ErrorBoundary>
+  );
+}
