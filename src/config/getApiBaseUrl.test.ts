@@ -30,6 +30,7 @@ describe("getApiBaseUrl", () => {
   });
 
   it("throws when missing", async () => {
+    vi.stubEnv("VITE_API_BASE_URL", "");
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const { getApiBaseUrl } = await import("./getApiBaseUrl");
     expect(() => getApiBaseUrl()).toThrow(/API base URL is not configured/);

@@ -219,7 +219,7 @@ const Slider = () => {
           className="pointer-events-none absolute inset-0 opacity-95"
           style={overlayStyle}
         />
-        <div className="relative top-[40px] z-10 flex flex-col items-center gap-9 px-6 py-12 text-center max-w-4xl">
+        <div className="relative z-10 flex max-w-4xl flex-col items-center gap-8 px-6 py-14 text-center">
 
           <Link to="/" className="flex items-center gap-3">
             <img src={LOGO_URL} alt="Atlas Homestays" className="h-14 w-auto rounded-md bg-[color:color-mix(in_srgb,var(--bg-surface)_80%,transparent)] p-2 shadow-level1" />
@@ -243,27 +243,27 @@ const Slider = () => {
 
           <form
             onSubmit={handleSubmit}
-            className="w-full max-w-5xl rounded-3xl bg-[color:color-mix(in_srgb,var(--bg-surface)_92%,transparent)] shadow-level3 backdrop-blur border border-[color:color-mix(in_srgb,var(--bg-surface)_55%,transparent)] p-4 md:p-6 flex flex-col gap-4"
+            className="w-full max-w-5xl rounded-3xl bg-[color:color-mix(in_srgb,var(--bg-surface)_92%,transparent)] shadow-level3 backdrop-blur border border-[color:color-mix(in_srgb,var(--bg-surface)_55%,transparent)] p-5 md:p-7 flex flex-col gap-5"
           >
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-[1.1fr_1.1fr_0.95fr_auto]" ref={calendarWrapperRef}>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-[1.1fr_1.1fr_0.95fr_auto]" ref={calendarWrapperRef}>
               <div className="relative">
                 <button
                   type="button"
-                  className="flex h-full w-full flex-col justify-center rounded-2xl bg-bg-muted px-4 py-3 text-left shadow-inner transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
+                  className="flex h-full w-full flex-col justify-center rounded-2xl bg-bg-muted px-5 py-4 text-left shadow-inner transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
                   aria-label="Select check-in date"
                   aria-expanded={isCalendarOpen}
                   onClick={() => setIsCalendarOpen((open) => !open)}
                   data-testid="hero-date-toggle"
                 >
-                  <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-text-muted">
+                  <span className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-[color-mix(in_srgb,var(--text-primary)_82%,transparent)]">
                     <CalendarRange className="h-4 w-4" aria-hidden="true" />
                     Check-in
                   </span>
-                  <span className="mt-1 flex items-center justify-between gap-2 text-lg font-semibold text-text-primary">
+                  <span className="mt-2 flex items-center justify-between gap-2 text-lg font-semibold text-text-primary">
                     {checkInLabel}
                     <ChevronDown className={`h-4 w-4 text-text-muted transition ${isCalendarOpen ? 'rotate-180' : ''}`} aria-hidden />
                   </span>
-                  <span className="mt-1 text-xs font-medium text-text-secondary">Earliest available date shown.</span>
+                  <span className="mt-2 text-sm font-medium text-[color-mix(in_srgb,var(--text-primary)_78%,transparent)]">Earliest available date shown.</span>
                 </button>
 
                 {isCalendarOpen && (
@@ -292,31 +292,31 @@ const Slider = () => {
 
               <button
                 type="button"
-                className="flex h-full w-full flex-col justify-center rounded-2xl bg-bg-muted px-4 py-3 text-left shadow-inner transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary md:-ml-[1px]"
+                className="flex h-full w-full flex-col justify-center rounded-2xl bg-bg-muted px-5 py-4 text-left shadow-inner transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary md:-ml-[1px]"
                 aria-label="Select check-out date"
                 aria-expanded={isCalendarOpen}
                 onClick={() => setIsCalendarOpen((open) => !open)}
               >
-                <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-text-muted">
+                <span className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-[color-mix(in_srgb,var(--text-primary)_82%,transparent)]">
                   <CalendarRange className="h-4 w-4" aria-hidden="true" />
                   Check-out
                 </span>
-                <span className="mt-1 flex items-center justify-between gap-2 text-lg font-semibold text-text-primary">
+                <span className="mt-2 flex items-center justify-between gap-2 text-lg font-semibold text-text-primary">
                   {checkOutLabel}
                   <ChevronDown className={`h-4 w-4 text-text-muted transition ${isCalendarOpen ? 'rotate-180' : ''}`} aria-hidden />
                 </span>
-                <span className="mt-1 text-xs font-medium text-text-secondary">Ensure your stay ends after check-in.</span>
+                <span className="mt-2 text-sm font-medium text-[color-mix(in_srgb,var(--text-primary)_78%,transparent)]">Ensure your stay ends after check-in.</span>
               </button>
 
-              <div className="flex flex-col rounded-2xl bg-bg-muted px-4 py-3 shadow-inner text-left md:-ml-[1px]">
-                <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-text-muted">
+              <div className="flex flex-col rounded-2xl bg-bg-muted px-5 py-4 shadow-inner text-left md:-ml-[1px]">
+                <span className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-[color-mix(in_srgb,var(--text-primary)_82%,transparent)]">
                   <Users className="h-4 w-4" aria-hidden />
                   Guests
                 </span>
                 <div className="mt-2 flex items-center justify-between gap-3">
                   <button
                     type="button"
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border-subtle text-lg font-semibold text-text-primary transition hover:border-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary disabled:opacity-40"
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border-subtle text-lg font-semibold text-text-primary transition hover:border-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary disabled:opacity-40"
                     onClick={() => setGuests((prev) => Math.max(1, prev - 1))}
                     disabled={guests <= 1}
                     aria-label="Decrease guests"
@@ -329,17 +329,17 @@ const Slider = () => {
                   </div>
                   <button
                     type="button"
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border-subtle text-lg font-semibold text-text-primary transition hover:border-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border-subtle text-lg font-semibold text-text-primary transition hover:border-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
                     onClick={() => setGuests((prev) => Math.min(16, prev + 1))}
                     aria-label="Increase guests"
                   >
                     +
                   </button>
                 </div>
-                <span className="mt-2 text-xs font-medium text-text-secondary">Defaulting to 2 guests; adjust anytime.</span>
+                <span className="mt-2 text-sm font-medium text-[color-mix(in_srgb,var(--text-primary)_78%,transparent)]">Defaulting to 2 guests; adjust anytime.</span>
               </div>
 
-              <div className="flex flex-col justify-center gap-3 rounded-2xl bg-bg-muted px-4 py-3 shadow-inner md:-ml-[1px]">
+              <div className="flex flex-col justify-center gap-3 rounded-2xl bg-bg-muted px-5 py-4 shadow-inner md:-ml-[1px]">
                 <button
                   type="submit"
                   className="inline-flex w-full items-center justify-center rounded-full bg-cta-primary px-6 py-3 text-base font-semibold text-[var(--text-contrast)] shadow-level3 transition hover:bg-cta-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
@@ -368,12 +368,12 @@ const Slider = () => {
               </p>
             )}
 
-            <div className="flex flex-col gap-1 rounded-2xl bg-[color:color-mix(in_srgb,var(--bg-surface)_92%,transparent)] px-4 py-3 text-left shadow-inner md:flex-row md:items-center md:gap-3">
+            <div className="flex flex-col gap-2 rounded-2xl bg-[color:color-mix(in_srgb,var(--bg-surface)_92%,transparent)] px-5 py-4 text-left shadow-inner md:flex-row md:items-center md:gap-4">
               <div className="flex items-center gap-2 text-sm font-semibold text-text-primary">
                 <ShieldCheck className="h-4 w-4 text-cta-secondary" aria-hidden="true" />
                 <span>Book with confidence</span>
               </div>
-              <p className="text-sm text-text-secondary md:border-l md:border-[color:color-mix(in_srgb,var(--text-muted)_60%,transparent)] md:pl-3">
+              <p className="text-sm text-[color-mix(in_srgb,var(--text-primary)_78%,transparent)] md:border-l md:border-[color:color-mix(in_srgb,var(--text-muted)_60%,transparent)] md:pl-4">
                 Instant confirmation • Secure payments • No hidden charges
               </p>
             </div>
@@ -382,7 +382,7 @@ const Slider = () => {
       </div>
 
       <div className="bg-bg-surface" data-testid="trust-badges">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-4 px-6 py-8 md:gap-5">
+        <div className="mx-auto -mt-2 flex max-w-5xl flex-wrap items-center justify-center gap-4 px-6 py-6 md:gap-5 md:py-7">
           {TRUST_BADGES.map(({ label, icon }) => (
             <TrustBadge
               key={label}
