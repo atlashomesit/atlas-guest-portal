@@ -11,7 +11,7 @@ import { trackEvent } from '../../../utils/analytics';
 import { TrustBadge } from '../../ui/TrustBadge';
 
 const HERO_OVERLAY_GRADIENT =
-  'linear-gradient(90deg, rgba(0, 0, 0, 0.62) 0%, rgba(0, 0, 0, 0.45) 45%, rgba(0, 0, 0, 0.24) 100%)';
+  'linear-gradient(115deg, rgba(7, 10, 18, 0.82) 0%, rgba(7, 10, 18, 0.64) 45%, rgba(7, 10, 18, 0.38) 100%)';
 const STORAGE_KEY = 'atlasHeroSearch';
 
 const TRUST_BADGES = [
@@ -25,7 +25,7 @@ const Slider = () => {
 
   const overlayStyle = React.useMemo(() => {
     const style: React.CSSProperties = {
-      backgroundColor: 'rgba(0, 0, 0, 0.16)',
+      backgroundColor: 'rgba(0, 0, 0, 0.35)',
       backgroundImage: HERO_OVERLAY_GRADIENT,
     };
 
@@ -204,12 +204,8 @@ const Slider = () => {
     }
   };
 
-  const formattedDateSummary =
-    dateRange.startDate && dateRange.endDate
-      ? `${format(dateRange.startDate, 'dd MMM yyyy')} – ${format(dateRange.endDate, 'dd MMM yyyy')}`
-      : 'Select dates';
-
-  const summaryLine = `${formattedDateSummary} · ${guests} guest${guests === 1 ? '' : 's'}`;
+  const checkInLabel = dateRange.startDate ? format(dateRange.startDate, 'dd MMM yyyy') : 'Check-in';
+  const checkOutLabel = dateRange.endDate ? format(dateRange.endDate, 'dd MMM yyyy') : 'Check-out';
 
   return (
     <section className="w-full bg-bg-muted text-text-primary">
@@ -223,7 +219,7 @@ const Slider = () => {
           className="pointer-events-none absolute inset-0 opacity-95"
           style={overlayStyle}
         />
-        <div className="relative top-[40px] z-10 flex flex-col items-center gap-7 px-6 py-12 text-center max-w-4xl">
+        <div className="relative top-[40px] z-10 flex flex-col items-center gap-9 px-6 py-12 text-center max-w-4xl">
 
           <Link to="/" className="flex items-center gap-3">
             <img src={LOGO_URL} alt="Atlas Homestays" className="h-14 w-auto rounded-md bg-[color:color-mix(in_srgb,var(--bg-surface)_80%,transparent)] p-2 shadow-level1" />
@@ -231,43 +227,43 @@ const Slider = () => {
           </Link>
 
           <div className="space-y-4 max-w-3xl">
-            <p
-              className="text-3xl md:text-5xl font-semibold text-[var(--text-on-hero)] drop-shadow-lg text-pretty"
+            <h1
+              className="text-4xl md:text-6xl font-bold leading-tight text-[var(--text-on-hero)] drop-shadow-lg text-pretty"
               style={{ textWrap: 'balance' }}
             >
               Thoughtfully curated stays in Hyderabad
-            </p>
-            <p
-              className="text-base md:text-lg text-[color-mix(in_srgb,var(--text-on-hero)_88%,transparent)] text-pretty"
+            </h1>
+            <h2
+              className="text-lg md:text-xl font-medium text-[color-mix(in_srgb,var(--text-on-hero)_88%,transparent)] text-pretty"
               style={{ textWrap: 'balance' }}
             >
               Discover verified apartments with flexible bookings, transparent pricing, and secure payments.
-            </p>
+            </h2>
           </div>
 
           <form
             onSubmit={handleSubmit}
-            className="w-full max-w-4xl rounded-2xl bg-[color:color-mix(in_srgb,var(--bg-surface)_92%,transparent)] shadow-level2 backdrop-blur border border-[color:color-mix(in_srgb,var(--bg-surface)_55%,transparent)] p-4 md:p-5 flex flex-col gap-3"
+            className="w-full max-w-5xl rounded-3xl bg-[color:color-mix(in_srgb,var(--bg-surface)_92%,transparent)] shadow-level3 backdrop-blur border border-[color:color-mix(in_srgb,var(--bg-surface)_55%,transparent)] p-4 md:p-6 flex flex-col gap-4"
           >
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-[1.6fr_0.9fr]">
-              <div className="relative" ref={calendarWrapperRef}>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-[1.1fr_1.1fr_0.95fr_auto]" ref={calendarWrapperRef}>
+              <div className="relative">
                 <button
                   type="button"
-                  className="flex w-full flex-col rounded-xl bg-bg-muted px-4 py-3 text-left shadow-inner transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
-                  aria-label="Choose your stay dates"
+                  className="flex h-full w-full flex-col justify-center rounded-2xl bg-bg-muted px-4 py-3 text-left shadow-inner transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
+                  aria-label="Select check-in date"
                   aria-expanded={isCalendarOpen}
                   onClick={() => setIsCalendarOpen((open) => !open)}
                   data-testid="hero-date-toggle"
                 >
                   <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-text-muted">
                     <CalendarRange className="h-4 w-4" aria-hidden="true" />
-                    Dates
+                    Check-in
                   </span>
                   <span className="mt-1 flex items-center justify-between gap-2 text-lg font-semibold text-text-primary">
-                    {summaryLine}
+                    {checkInLabel}
                     <ChevronDown className={`h-4 w-4 text-text-muted transition ${isCalendarOpen ? 'rotate-180' : ''}`} aria-hidden />
                   </span>
-                  <span className="mt-1 text-xs font-medium text-text-secondary">Check-out must be after check-in.</span>
+                  <span className="mt-1 text-xs font-medium text-text-secondary">Earliest available date shown.</span>
                 </button>
 
                 {isCalendarOpen && (
@@ -294,7 +290,25 @@ const Slider = () => {
                 )}
               </div>
 
-              <div className="flex flex-col rounded-xl bg-bg-muted px-4 py-3 shadow-inner text-left">
+              <button
+                type="button"
+                className="flex h-full w-full flex-col justify-center rounded-2xl bg-bg-muted px-4 py-3 text-left shadow-inner transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary md:-ml-[1px]"
+                aria-label="Select check-out date"
+                aria-expanded={isCalendarOpen}
+                onClick={() => setIsCalendarOpen((open) => !open)}
+              >
+                <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-text-muted">
+                  <CalendarRange className="h-4 w-4" aria-hidden="true" />
+                  Check-out
+                </span>
+                <span className="mt-1 flex items-center justify-between gap-2 text-lg font-semibold text-text-primary">
+                  {checkOutLabel}
+                  <ChevronDown className={`h-4 w-4 text-text-muted transition ${isCalendarOpen ? 'rotate-180' : ''}`} aria-hidden />
+                </span>
+                <span className="mt-1 text-xs font-medium text-text-secondary">Ensure your stay ends after check-in.</span>
+              </button>
+
+              <div className="flex flex-col rounded-2xl bg-bg-muted px-4 py-3 shadow-inner text-left md:-ml-[1px]">
                 <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-text-muted">
                   <Users className="h-4 w-4" aria-hidden />
                   Guests
@@ -324,29 +338,11 @@ const Slider = () => {
                 </div>
                 <span className="mt-2 text-xs font-medium text-text-secondary">Defaulting to 2 guests; adjust anytime.</span>
               </div>
-            </div>
 
-            {error && (
-              <p className="text-left text-sm font-semibold text-[color-mix(in_srgb,var(--cta-secondary)_90%,transparent)]">
-                {error}
-              </p>
-            )}
-
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex flex-col gap-1 rounded-xl bg-[color:color-mix(in_srgb,var(--bg-surface)_92%,transparent)] px-4 py-3 text-left shadow-inner sm:flex-row sm:items-center sm:gap-3">
-                <div className="flex items-center gap-2 text-sm font-semibold text-text-primary">
-                  <ShieldCheck className="h-4 w-4 text-cta-secondary" aria-hidden="true" />
-                  <span>Book with confidence</span>
-                </div>
-                <p className="text-sm text-text-secondary sm:border-l sm:border-[color:color-mix(in_srgb,var(--text-muted)_60%,transparent)] sm:pl-3">
-                  Instant confirmation • Secure payments • No hidden charges
-                </p>
-              </div>
-
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+              <div className="flex flex-col justify-center gap-3 rounded-2xl bg-bg-muted px-4 py-3 shadow-inner md:-ml-[1px]">
                 <button
                   type="submit"
-                  className="inline-flex items-center justify-center rounded-full bg-cta-primary px-6 py-3 text-base font-semibold text-[var(--text-contrast)] shadow-level2 transition hover:bg-cta-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
+                  className="inline-flex w-full items-center justify-center rounded-full bg-cta-primary px-6 py-3 text-base font-semibold text-[var(--text-contrast)] shadow-level3 transition hover:bg-cta-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
                 >
                   Check availability
                 </button>
@@ -363,8 +359,23 @@ const Slider = () => {
                 >
                   Browse listings
                 </Link>
-
               </div>
+            </div>
+
+            {error && (
+              <p className="text-left text-sm font-semibold text-[color-mix(in_srgb,var(--cta-secondary)_90%,transparent)]">
+                {error}
+              </p>
+            )}
+
+            <div className="flex flex-col gap-1 rounded-2xl bg-[color:color-mix(in_srgb,var(--bg-surface)_92%,transparent)] px-4 py-3 text-left shadow-inner md:flex-row md:items-center md:gap-3">
+              <div className="flex items-center gap-2 text-sm font-semibold text-text-primary">
+                <ShieldCheck className="h-4 w-4 text-cta-secondary" aria-hidden="true" />
+                <span>Book with confidence</span>
+              </div>
+              <p className="text-sm text-text-secondary md:border-l md:border-[color:color-mix(in_srgb,var(--text-muted)_60%,transparent)] md:pl-3">
+                Instant confirmation • Secure payments • No hidden charges
+              </p>
             </div>
           </form>
         </div>
