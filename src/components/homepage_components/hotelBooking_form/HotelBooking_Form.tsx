@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, useId } from 'react';
 import { DateRange } from 'react-date-range';
-import { format } from 'date-fns';
+import { addDays, format, startOfDay } from 'date-fns';
 import { api, asArray } from '@/lib/api';
 import { propertyData } from '../../../data';
 import { inlinePolicySnippets } from '../../../content/terms';
@@ -35,6 +35,10 @@ const guestLimits: Record<GuestCountKey, { min: number; max?: number }> = {
 };
 
 const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = false }) => {
+    const today = startOfDay(new Date());
+    const defaultStartDate = addDays(today, 1);
+    const defaultEndDate = addDays(today, 2);
+
     const [openCalendar, setOpenCalendar] = useState(false);
     const [openGuests, setOpenGuests] = useState(false);
     const [bookedDates, setBookedDates] = useState<Date[]>([]);
@@ -59,41 +63,39 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     }, []);
 
     const [dates, setDates] = useState({
-        startDate: new Date(),
-        endDate: new Date(Date.now() + 86400000), // Next day by default
+        startDate: defaultStartDate,
+        endDate: defaultEndDate,
         key: "selection",
     });
     
     const handleDateChange = (ranges: any) => {
         const { startDate, endDate } = ranges.selection;
         setHasInteractedWithDates(true);
+        const normalizedStart = startDate ? startOfDay(startDate) : defaultStartDate;
+        const normalizedEnd = endDate ? startOfDay(endDate) : defaultEndDate;
+        const effectiveStartDate = normalizedStart < today ? defaultStartDate : normalizedStart;
+        let resolvedEndDate = normalizedEnd <= effectiveStartDate ? addDays(effectiveStartDate, 1) : normalizedEnd;
         
         // Always update the dates when a selection is made
         if (startDate && endDate) {
             // If the same date is selected for both start and end, set end to next day
-            if (startDate.getTime() === endDate.getTime()) {
-                const nextDay = new Date(startDate);
-                nextDay.setDate(nextDay.getDate() + 1);
-                setDates({
-                    startDate: startDate,
-                    endDate: nextDay,
-                    key: 'selection'
-                });
-            } else {
-                setDates({
-                    startDate: startDate,
-                    endDate: endDate,
-                    key: 'selection'
-                });
+            if (effectiveStartDate.getTime() === normalizedEnd.getTime()) {
+                resolvedEndDate = addDays(effectiveStartDate, 1);
             }
 
-            const selectedNights = Math.max(1, Math.round(Math.abs((endDate.getTime() - startDate.getTime()) / oneDay)));
+            setDates({
+                startDate: effectiveStartDate,
+                endDate: resolvedEndDate,
+                key: 'selection'
+            });
+
+            const selectedNights = Math.max(1, Math.round(Math.abs((resolvedEndDate.getTime() - effectiveStartDate.getTime()) / oneDay)));
             trackEvent(
                 'dates_selected',
                 {
                     surface: 'booking_form',
-                    startDate: startDate.toISOString(),
-                    endDate: endDate.toISOString(),
+                    startDate: effectiveStartDate.toISOString(),
+                    endDate: resolvedEndDate.toISOString(),
                     nights: selectedNights,
                     guests: totalPeople,
                 },
@@ -478,6 +480,14 @@ useEffect(() => {
     const isCheckoutInvalid = dates.endDate <= dates.startDate;
     const guestNeedsAdult = guests.adults < 1;
     const containerPaddingBottom = supportPadding ? 'pb-40' : 'pb-28';
+    const validationMessageId = useId();
+    const checkOutErrorId = useId();
+    const guestErrorId = useId();
+    const validationMessage = useMemo(() => {
+        if (isCheckoutInvalid) return 'Check-out must be after check-in.';
+        if (guestNeedsAdult) return 'Add at least one adult.';
+        return '';
+    }, [guestNeedsAdult, isCheckoutInvalid]);
 
     const handleInlineCta = () => {
         setHasInteractedWithDates(true);
@@ -490,6 +500,10 @@ useEffect(() => {
 
     return (
         <div id="booking-form" className={`max-w-md mx-auto p-6 bg-bg-surface shadow-level2 rounded-2xl relative ${containerPaddingBottom} lg:pb-0 lg:sticky lg:top-20`}>
+
+            <div className="sr-only" role="status" aria-live="polite">
+                <span id={validationMessageId}>{validationMessage || ' '}</span>
+            </div>
 
             {/* PRICE SECTION */}
             <div className="mb-2 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -557,6 +571,8 @@ useEffect(() => {
                             setOpenGuests(false);
                         }}
                         className="group flex h-full min-h-[4.5rem] flex-col justify-center rounded-xl border border-border-subtle bg-bg-surface/70 px-4 text-left text-text-primary shadow-inner transition hover:border-border-strong hover:bg-bg-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary"
+                        aria-label={`Select check-in date, currently ${format(dates.startDate, "dd MMM yyyy")}`}
+                        aria-describedby={validationMessage ? validationMessageId : undefined}
                     >
                         <span className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">Check-in</span>
                         <span className="mt-1 text-base font-semibold text-text-primary">
@@ -572,6 +588,9 @@ useEffect(() => {
                             setHasInteractedWithDates(true);
                         }}
                         className="group flex h-full min-h-[4.5rem] flex-col justify-center rounded-xl border border-border-subtle bg-bg-surface/70 px-4 text-left text-text-primary shadow-inner transition hover:border-border-strong hover:bg-bg-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary"
+                        aria-label={`Select check-out date, currently ${format(dates.endDate, "dd MMM yyyy")}`}
+                        aria-describedby={isCheckoutInvalid ? checkOutErrorId : validationMessage ? validationMessageId : undefined}
+                        aria-invalid={isCheckoutInvalid}
                     >
                         <span className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">Check-out</span>
                         <span className="mt-1 text-base font-semibold text-text-primary">
@@ -591,6 +610,9 @@ useEffect(() => {
                             setOpenCalendar(false);
                         }}
                         className="group flex h-full min-h-[4.5rem] flex-col justify-center rounded-xl border border-border-subtle bg-bg-surface/70 px-4 text-left text-text-primary shadow-inner transition hover:border-border-strong hover:bg-bg-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary"
+                        aria-label={`Select guests, currently ${formatGuestLabel()}`}
+                        aria-describedby={guestNeedsAdult ? guestErrorId : undefined}
+                        aria-invalid={guestNeedsAdult}
                     >
                         <span className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">Guests</span>
                         <span className="mt-1 text-base font-semibold text-text-primary">{formatGuestLabel()}</span>
@@ -623,7 +645,7 @@ useEffect(() => {
                             endDate: dates.endDate,
                             key: 'selection'
                         }]}
-                        minDate={new Date()}
+                        minDate={defaultStartDate}
                         rangeColors={[ctaPrimaryColor]}
                         showDateDisplay={false}
                         showPreview={false}
@@ -660,7 +682,7 @@ useEffect(() => {
                                 <button
                                     onClick={() => modifyGuest("adults", false)}
                                     disabled={isAtMin("adults")}
-                                    className="w-10 h-10 rounded-full border border-border-subtle flex items-center justify-center text-text-primary hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-strong disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="w-10 h-10 rounded-full border border-border-subtle flex items-center justify-center text-text-primary hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     -
                                 </button>
@@ -668,7 +690,7 @@ useEffect(() => {
                                 <button
                                     onClick={() => modifyGuest("adults", true)}
                                     disabled={isAtMax("adults")}
-                                    className="w-10 h-10 rounded-full border border-border-subtle flex items-center justify-center text-text-primary hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-strong disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="w-10 h-10 rounded-full border border-border-subtle flex items-center justify-center text-text-primary hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     +
                                 </button>
@@ -693,7 +715,7 @@ useEffect(() => {
                                         }));
                                     }}
                                     disabled={isAtMin("children")}
-                                    className="w-10 h-10 rounded-full border border-border-subtle flex items-center justify-center text-text-primary hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-strong disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="w-10 h-10 rounded-full border border-border-subtle flex items-center justify-center text-text-primary hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     -
                                 </button>
@@ -715,7 +737,7 @@ useEffect(() => {
                                         });
                                     }}
                                     disabled={isAtMax("children")}
-                                    className="w-10 h-10 rounded-full border border-border-subtle flex items-center justify-center text-text-primary hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-strong disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="w-10 h-10 rounded-full border border-border-subtle flex items-center justify-center text-text-primary hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     +
                                 </button>
@@ -751,7 +773,7 @@ useEffect(() => {
                                 <button
                                     onClick={() => modifyGuest("infants", false)}
                                     disabled={isAtMin("infants")}
-                                    className="w-10 h-10 rounded-full border border-border-subtle flex items-center justify-center text-text-primary hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-strong disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="w-10 h-10 rounded-full border border-border-subtle flex items-center justify-center text-text-primary hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     -
                                 </button>
@@ -759,7 +781,7 @@ useEffect(() => {
                                 <button
                                     onClick={() => modifyGuest("infants", true)}
                                     disabled={isAtMax("infants")}
-                                    className="w-10 h-10 rounded-full border border-border-subtle flex items-center justify-center text-text-primary hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-strong disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="w-10 h-10 rounded-full border border-border-subtle flex items-center justify-center text-text-primary hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     +
                                 </button>
@@ -782,7 +804,7 @@ useEffect(() => {
                                 <button
                                     onClick={() => modifyGuest("pets", false)}
                                     disabled={isAtMin("pets")}
-                                    className="w-10 h-10 rounded-full border border-border-subtle flex items-center justify-center text-text-primary hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-strong disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="w-10 h-10 rounded-full border border-border-subtle flex items-center justify-center text-text-primary hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     -
                                 </button>
@@ -790,7 +812,7 @@ useEffect(() => {
                                 <button
                                     onClick={() => modifyGuest("pets", true)}
                                     disabled={isAtMax("pets")}
-                                    className="w-10 h-10 rounded-full border border-border-subtle flex items-center justify-center text-text-primary hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-strong disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="w-10 h-10 rounded-full border border-border-subtle flex items-center justify-center text-text-primary hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     +
                                 </button>
@@ -925,7 +947,7 @@ useEffect(() => {
               <button
                 onClick={initiatePayment}
                 disabled={isLoading || !termsAccepted}
-                className="bg-cta-primary hover:bg-cta-secondary text-[var(--text-contrast)] w-full rounded-full py-4 text-lg font-semibold transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center shadow-level1"
+                className="bg-cta-primary hover:bg-cta-secondary text-[var(--text-contrast)] w-full rounded-full py-4 text-lg font-semibold transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center shadow-level1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
               >
                 {isLoading ? (
                   <>
@@ -1020,7 +1042,7 @@ useEffect(() => {
                     <button
                         onClick={initiatePayment}
                         disabled={isLoading || !termsAccepted}
-                        className="mt-1 bg-cta-primary hover:bg-cta-secondary text-[var(--text-contrast)] rounded-full px-4 py-2 text-sm font-semibold transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed shadow-level1"
+                        className="mt-1 bg-cta-primary hover:bg-cta-secondary text-[var(--text-contrast)] rounded-full px-4 py-2 text-sm font-semibold transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed shadow-level1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
                     >
                         {primaryCtaLabel}
                     </button>
