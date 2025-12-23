@@ -78,7 +78,7 @@
   flex-shrink: 0;
 }
 
-@media(min-width: 768px) {
+@media(min-width: 1024px) {
   .navbar-main {
     flex-wrap: nowrap;
   }
@@ -229,7 +229,7 @@
   color: var(--cta-primary);
 }
 
-@media(max-width: 767px) {
+@media(max-width: 1023px) {
   .navbar-right .phone span {
     font-size: 0.9rem;
   }
@@ -283,7 +283,7 @@
   color: var(--cta-primary);
 }
 
-@media(max-width: 767px) {
+@media(max-width: 1023px) {
   .navbar-top-strip {
     justify-content: space-between;
     row-gap: 0.25rem;

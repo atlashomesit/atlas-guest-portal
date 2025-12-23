@@ -243,13 +243,16 @@ const Slider = () => {
 
           <form
             onSubmit={handleSubmit}
-            className="w-full max-w-5xl rounded-3xl bg-[color:color-mix(in_srgb,var(--bg-surface)_92%,transparent)] shadow-level3 backdrop-blur border border-[color:color-mix(in_srgb,var(--bg-surface)_55%,transparent)] p-5 md:p-7 flex flex-col gap-5"
+            className="w-full max-w-5xl rounded-3xl bg-[color:color-mix(in_srgb,var(--bg-surface)_92%,transparent)] shadow-level3 backdrop-blur border border-[color:color-mix(in_srgb,var(--bg-surface)_55%,transparent)] p-4 sm:p-5 md:p-7 flex flex-col gap-4 sm:gap-5"
           >
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-[1.1fr_1.1fr_0.95fr_auto]" ref={calendarWrapperRef}>
+            <div
+              className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-[1.1fr_1.1fr_0.95fr_auto] md:gap-5"
+              ref={calendarWrapperRef}
+            >
               <div className="relative">
                 <button
                   type="button"
-                  className="flex h-full w-full flex-col justify-center rounded-2xl bg-bg-muted px-5 py-4 text-left shadow-inner transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
+                  className="flex h-full w-full min-h-[110px] flex-col justify-center rounded-2xl bg-bg-muted px-4 py-3 sm:px-5 sm:py-4 text-left shadow-inner transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
                   aria-label="Select check-in date"
                   aria-expanded={isCalendarOpen}
                   onClick={() => setIsCalendarOpen((open) => !open)}
@@ -292,7 +295,7 @@ const Slider = () => {
 
               <button
                 type="button"
-                className="flex h-full w-full flex-col justify-center rounded-2xl bg-bg-muted px-5 py-4 text-left shadow-inner transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary md:-ml-[1px]"
+                className="flex h-full w-full min-h-[110px] flex-col justify-center rounded-2xl bg-bg-muted px-4 py-3 sm:px-5 sm:py-4 text-left shadow-inner transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary md:-ml-[1px]"
                 aria-label="Select check-out date"
                 aria-expanded={isCalendarOpen}
                 onClick={() => setIsCalendarOpen((open) => !open)}
@@ -308,7 +311,7 @@ const Slider = () => {
                 <span className="mt-2 text-sm font-medium text-[color-mix(in_srgb,var(--text-primary)_78%,transparent)]">Ensure your stay ends after check-in.</span>
               </button>
 
-              <div className="flex flex-col rounded-2xl bg-bg-muted px-5 py-4 shadow-inner text-left md:-ml-[1px]">
+              <div className="flex flex-col rounded-2xl bg-bg-muted px-4 py-4 shadow-inner text-left md:-ml-[1px]">
                 <span className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-[color-mix(in_srgb,var(--text-primary)_82%,transparent)]">
                   <Users className="h-4 w-4" aria-hidden />
                   Guests
@@ -316,7 +319,7 @@ const Slider = () => {
                 <div className="mt-2 flex items-center justify-between gap-3">
                   <button
                     type="button"
-                    className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border-subtle text-lg font-semibold text-text-primary transition hover:border-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary disabled:opacity-40"
+                    className="inline-flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-full border border-border-subtle text-lg font-semibold text-text-primary transition hover:border-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary disabled:opacity-40"
                     onClick={() => setGuests((prev) => Math.max(1, prev - 1))}
                     disabled={guests <= 1}
                     aria-label="Decrease guests"
@@ -329,7 +332,7 @@ const Slider = () => {
                   </div>
                   <button
                     type="button"
-                    className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border-subtle text-lg font-semibold text-text-primary transition hover:border-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
+                    className="inline-flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-full border border-border-subtle text-lg font-semibold text-text-primary transition hover:border-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
                     onClick={() => setGuests((prev) => Math.min(16, prev + 1))}
                     aria-label="Increase guests"
                   >
@@ -339,10 +342,10 @@ const Slider = () => {
                 <span className="mt-2 text-sm font-medium text-[color-mix(in_srgb,var(--text-primary)_78%,transparent)]">Defaulting to 2 guests; adjust anytime.</span>
               </div>
 
-              <div className="flex flex-col justify-center gap-3 rounded-2xl bg-bg-muted px-5 py-4 shadow-inner md:-ml-[1px]">
+              <div className="flex flex-col justify-center gap-3 rounded-2xl bg-bg-muted px-4 py-4 shadow-inner md:-ml-[1px]">
                 <button
                   type="submit"
-                  className="inline-flex w-full items-center justify-center rounded-full bg-cta-primary px-6 py-3 text-base font-semibold text-[var(--text-contrast)] shadow-level3 transition hover:bg-cta-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
+                  className="inline-flex w-full items-center justify-center rounded-full bg-cta-primary px-6 py-3 text-base font-semibold text-[var(--text-contrast)] shadow-level3 transition hover:bg-cta-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary min-h-[48px]"
                 >
                   Check availability
                 </button>
