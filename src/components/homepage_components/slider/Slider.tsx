@@ -8,9 +8,12 @@ import 'react-date-range/dist/theme/default.css';
 import { LOGO_URL } from '../../../config/branding';
 import { HERO_IMAGE_URL } from '../../../config/hero';
 import { trackEvent } from '../../../utils/analytics';
+import { heroWidgetLayoutFlag } from '../../../config/abFlags';
 import { TrustBadge } from '../../ui/TrustBadge';
 
 const HERO_OVERLAY_GRADIENT =
+  'linear-gradient(118deg, rgba(7, 10, 18, 0.92) 0%, rgba(7, 10, 18, 0.78) 42%, rgba(7, 10, 18, 0.62) 100%)';
+const HERO_OVERLAY_GRADIENT_LEGACY =
   'linear-gradient(115deg, rgba(7, 10, 18, 0.82) 0%, rgba(7, 10, 18, 0.64) 45%, rgba(7, 10, 18, 0.38) 100%)';
 const STORAGE_KEY = 'atlasHeroSearch';
 
@@ -22,11 +25,12 @@ const TRUST_BADGES = [
 
 const Slider = () => {
   const navigate = useNavigate();
+  const enableWidgetExperiment = heroWidgetLayoutFlag();
 
   const overlayStyle = React.useMemo(() => {
     const style: React.CSSProperties = {
-      backgroundColor: 'rgba(0, 0, 0, 0.35)',
-      backgroundImage: HERO_OVERLAY_GRADIENT,
+      backgroundColor: enableWidgetExperiment ? 'rgba(3, 6, 14, 0.55)' : 'rgba(0, 0, 0, 0.35)',
+      backgroundImage: enableWidgetExperiment ? HERO_OVERLAY_GRADIENT : HERO_OVERLAY_GRADIENT_LEGACY,
     };
 
     if (typeof navigator !== 'undefined' && navigator.userAgent?.includes('jsdom')) {
@@ -53,6 +57,13 @@ const Slider = () => {
   const [guests, setGuests] = React.useState(2);
   const [error, setError] = React.useState<string | null>(null);
   const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [statusMessage, setStatusMessage] = React.useState<string>('');
+  const [hasInteracted, setHasInteracted] = React.useState(false);
+  const [calendarReady, setCalendarReady] = React.useState(false);
+  const hasTrackedDropoff = React.useRef(false);
+  const hasInteractedRef = React.useRef(false);
+  const latestWidgetStateRef = React.useRef({ hasSelection: false, guests });
   const calendarWrapperRef = React.useRef<HTMLDivElement | null>(null);
   const monthsToShow = React.useMemo(
     () => (typeof window !== 'undefined' && window.innerWidth < 768 ? 1 : 2),
@@ -137,30 +148,72 @@ const Slider = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isCalendarOpen]);
 
+  React.useEffect(() => {
+    if (!isCalendarOpen) return;
+    const timer = window.setTimeout(() => setCalendarReady(true), 140);
+    return () => {
+      window.clearTimeout(timer);
+      setCalendarReady(false);
+    };
+  }, [isCalendarOpen]);
+
+  React.useEffect(() => {
+    hasInteractedRef.current = hasInteracted;
+  }, [hasInteracted]);
+
+  React.useEffect(() => {
+    latestWidgetStateRef.current = {
+      hasSelection: Boolean(dateRange.startDate && dateRange.endDate),
+      guests,
+    };
+  }, [dateRange.endDate, dateRange.startDate, guests]);
+
+  React.useEffect(
+    () => () => {
+      if (hasInteractedRef.current && !hasTrackedDropoff.current) {
+        hasTrackedDropoff.current = true;
+        trackEvent('hero_widget_dropoff', {
+          surface: 'hero_form',
+          hasDates: latestWidgetStateRef.current.hasSelection,
+          guests: latestWidgetStateRef.current.guests,
+        });
+      }
+    },
+    [],
+  );
+
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
+    if (isSubmitting) return;
+
     setError(null);
+    setStatusMessage('');
+    markHeroInteraction();
 
     const { startDate, endDate } = dateRange;
 
     if (!startDate || !endDate) {
       setError('Please select your check-in and check-out dates.');
+      setStatusMessage('Select both check-in and check-out dates to continue.');
       return;
     }
 
     if (endDate <= startDate) {
       setError('Check-out must be after check-in.');
+      setStatusMessage('Check-out must be after check-in.');
       return;
     }
 
     if (startDate < today) {
       setDateRange(clampRange(today, endDate));
       setError('Check-in cannot be in the past.');
+      setStatusMessage('Check-in adjusted to the next available date.');
       return;
     }
 
     if (guests < 1) {
       setError('Guests must be at least 1.');
+      setStatusMessage('Add at least one guest to continue.');
       return;
     }
 
@@ -190,15 +243,37 @@ const Slider = () => {
       { route: `/apartments?${searchParams.toString()}` },
     );
 
+    trackEvent(
+      'hero_primary_cta_click',
+      {
+        surface: 'hero_form',
+        checkIn: startDate.toISOString(),
+        checkOut: endDate.toISOString(),
+        guests,
+      },
+      { route: `/apartments?${searchParams.toString()}` },
+    );
+
+    setIsSubmitting(true);
+    setStatusMessage('Checking availability...');
+
     navigate(`/apartments?${searchParams.toString()}`);
+    window.setTimeout(() => setIsSubmitting(false), 800);
   };
 
   const handleRangeChange = (ranges: RangeKeyDict) => {
     const selection = ranges.selection ?? { startDate: null, endDate: null };
     const normalizedStart = selection.startDate ? startOfDay(selection.startDate) : null;
     const normalizedEnd = selection.endDate ? startOfDay(selection.endDate) : null;
+    markHeroInteraction();
+    setStatusMessage('Updated dates.');
     setDateRange(clampRange(normalizedStart, normalizedEnd));
     setError(null);
+    trackEvent('hero_dates_changed', {
+      surface: 'hero_form',
+      checkIn: normalizedStart?.toISOString(),
+      checkOut: normalizedEnd?.toISOString(),
+    });
     if (selection.startDate && selection.endDate) {
       setIsCalendarOpen(false);
     }
@@ -206,11 +281,37 @@ const Slider = () => {
 
   const checkInLabel = dateRange.startDate ? format(dateRange.startDate, 'dd MMM yyyy') : 'Check-in';
   const checkOutLabel = dateRange.endDate ? format(dateRange.endDate, 'dd MMM yyyy') : 'Check-out';
+  const isSubmitDisabled =
+    !dateRange.startDate || !dateRange.endDate || dateRange.endDate <= dateRange.startDate || guests < 1;
+
+  const handleGuestChange = (delta: number) => {
+    markHeroInteraction();
+    setGuests((prev) => {
+      const next = Math.min(16, Math.max(1, prev + delta));
+      trackEvent('hero_guests_changed', { surface: 'hero_form', guests: next });
+      return next;
+    });
+  };
+
+  const markHeroInteraction = () => {
+    if (!hasInteractedRef.current) {
+      hasInteractedRef.current = true;
+    }
+    setHasInteracted(true);
+  };
+
+  const formContainerClass = enableWidgetExperiment
+    ? 'w-full max-w-5xl rounded-3xl bg-[color:color-mix(in_srgb,var(--bg-surface)_92%,transparent)] shadow-[0_18px_55px_rgba(0,0,0,0.35)] backdrop-blur border border-[color:color-mix(in_srgb,var(--bg-surface)_55%,transparent)] p-4 sm:p-5 md:p-7 flex flex-col gap-4 sm:gap-5'
+    : 'w-full max-w-5xl rounded-3xl bg-[color:color-mix(in_srgb,var(--bg-surface)_92%,transparent)] shadow-level3 backdrop-blur border border-[color:color-mix(in_srgb,var(--bg-surface)_55%,transparent)] p-4 sm:p-5 md:p-7 flex flex-col gap-4 sm:gap-5';
+
+  const formGridClass = enableWidgetExperiment
+    ? 'grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-[1.05fr_1.05fr_0.9fr_auto] lg:gap-5'
+    : 'grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-[1.1fr_1.1fr_0.95fr_auto] md:gap-5';
 
   return (
     <section className="w-full bg-bg-muted text-text-primary">
       <div
-        className="relative isolate overflow-hidden min-h-[75vh] md:min-h-[70vh] flex items-center justify-center bg-cover bg-center bg-no-repeat"
+        className="relative isolate overflow-hidden min-h-[75vh] md:min-h-[70vh] flex items-center justify-center bg-cover bg-center bg-no-repeat pt-[calc(var(--nav-height,80px)+1.5rem)]"
         style={{ backgroundImage: `url(${HERO_IMAGE_URL})` }}
       >
         <div
@@ -219,10 +320,10 @@ const Slider = () => {
           className="pointer-events-none absolute inset-0 opacity-95"
           style={overlayStyle}
         />
-        <div className="relative z-10 flex max-w-4xl flex-col items-center gap-8 px-6 py-14 text-center">
+        <div className="relative z-10 flex max-w-4xl flex-col items-center gap-8 px-6 pb-14 text-center md:pt-3">
 
           <Link to="/" className="flex items-center gap-3">
-            <img src={LOGO_URL} alt="Atlas Homestays" className="h-14 w-auto rounded-md bg-[color:color-mix(in_srgb,var(--bg-surface)_80%,transparent)] p-2 shadow-level1" />
+            <img src={LOGO_URL} alt="Atlas Homestays" className="h-14 w-auto rounded-md bg-[color:color-mix(in_srgb,var(--bg-surface)_88%,transparent)] p-2 shadow-level2" />
             <span className="text-xl font-semibold text-[var(--text-contrast)] tracking-wide">Atlas Homestays</span>
           </Link>
 
@@ -243,10 +344,13 @@ const Slider = () => {
 
           <form
             onSubmit={handleSubmit}
-            className="w-full max-w-5xl rounded-3xl bg-[color:color-mix(in_srgb,var(--bg-surface)_92%,transparent)] shadow-level3 backdrop-blur border border-[color:color-mix(in_srgb,var(--bg-surface)_55%,transparent)] p-4 sm:p-5 md:p-7 flex flex-col gap-4 sm:gap-5"
+            className={formContainerClass}
           >
+            <div className="sr-only" role="status" aria-live="polite">
+              {statusMessage || error || 'Hero form ready'}
+            </div>
             <div
-              className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-[1.1fr_1.1fr_0.95fr_auto] md:gap-5"
+              className={formGridClass}
               ref={calendarWrapperRef}
             >
               <div className="relative">
@@ -271,24 +375,35 @@ const Slider = () => {
 
                 {isCalendarOpen && (
                   <div className="absolute left-0 right-0 z-[var(--z-dropdown)] mt-2 rounded-2xl border border-border-subtle bg-bg-surface p-3 shadow-level2 md:w-auto">
-                    <DateRange
-                      onChange={handleRangeChange}
-                      months={monthsToShow}
-                      direction="horizontal"
-                      showDateDisplay={false}
-                      rangeColors={['var(--cta-primary)']}
-                      minDate={today}
-                      ranges={[
-                        {
-                          startDate: dateRange.startDate ?? today,
-                          endDate: dateRange.endDate ?? addDays(today, 1),
-                          key: 'selection',
-                        },
-                      ]}
-                      dayContentRenderer={(day) => (
-                        <div data-testid={`hero-date-${format(day, 'yyyy-MM-dd')}`}>{format(day, 'd')}</div>
-                      )}
-                    />
+                    {calendarReady ? (
+                      <DateRange
+                        onChange={handleRangeChange}
+                        months={monthsToShow}
+                        direction="horizontal"
+                        showDateDisplay={false}
+                        rangeColors={['var(--cta-primary)']}
+                        minDate={today}
+                        ranges={[
+                          {
+                            startDate: dateRange.startDate ?? today,
+                            endDate: dateRange.endDate ?? addDays(today, 1),
+                            key: 'selection',
+                          },
+                        ]}
+                        dayContentRenderer={(day) => (
+                          <div data-testid={`hero-date-${format(day, 'yyyy-MM-dd')}`}>{format(day, 'd')}</div>
+                        )}
+                      />
+                    ) : (
+                      <div className="grid grid-cols-7 gap-2">
+                        {Array.from({ length: 14 }).map((_, index) => (
+                          <div
+                            key={index}
+                            className="h-10 rounded-lg bg-[color:color-mix(in_srgb,var(--bg-muted)_75%,var(--bg-surface))] animate-pulse"
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -320,7 +435,7 @@ const Slider = () => {
                   <button
                     type="button"
                     className="inline-flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-full border border-border-subtle text-lg font-semibold text-text-primary transition hover:border-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary disabled:opacity-40"
-                    onClick={() => setGuests((prev) => Math.max(1, prev - 1))}
+                    onClick={() => handleGuestChange(-1)}
                     disabled={guests <= 1}
                     aria-label="Decrease guests"
                   >
@@ -333,7 +448,7 @@ const Slider = () => {
                   <button
                     type="button"
                     className="inline-flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-full border border-border-subtle text-lg font-semibold text-text-primary transition hover:border-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
-                    onClick={() => setGuests((prev) => Math.min(16, prev + 1))}
+                    onClick={() => handleGuestChange(1)}
                     aria-label="Increase guests"
                   >
                     +
@@ -342,12 +457,14 @@ const Slider = () => {
                 <span className="mt-2 text-sm font-medium text-[color-mix(in_srgb,var(--text-primary)_78%,transparent)]">Defaulting to 2 guests; adjust anytime.</span>
               </div>
 
-              <div className="flex flex-col justify-center gap-3 rounded-2xl bg-bg-muted px-4 py-4 shadow-inner md:-ml-[1px]">
+              <div className="flex flex-col justify-center gap-3 rounded-2xl bg-bg-muted px-4 py-4 shadow-inner md:-ml-[1px] lg:min-h-[110px]">
                 <button
                   type="submit"
-                  className="inline-flex w-full items-center justify-center rounded-full bg-cta-primary px-6 py-3 text-base font-semibold text-[var(--text-contrast)] shadow-level3 transition hover:bg-cta-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary min-h-[48px]"
+                  disabled={isSubmitDisabled || isSubmitting}
+                  className="inline-flex w-full items-center justify-center rounded-full bg-cta-primary px-6 py-3 text-base font-semibold text-[var(--text-contrast)] shadow-level3 transition hover:bg-cta-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary min-h-[48px] disabled:opacity-60 disabled:cursor-not-allowed"
+                  onClick={() => setStatusMessage('Checking availability...')}
                 >
-                  Check availability
+                  {isSubmitting ? 'Checking...' : 'Check availability'}
                 </button>
                 <Link
                   to="/apartments"
@@ -370,6 +487,11 @@ const Slider = () => {
                 {error}
               </p>
             )}
+            {!error && statusMessage && (
+              <p className="text-left text-sm font-semibold text-text-primary" aria-live="polite">
+                {statusMessage}
+              </p>
+            )}
 
             <div className="flex flex-col gap-2 rounded-2xl bg-[color:color-mix(in_srgb,var(--bg-surface)_92%,transparent)] px-5 py-4 text-left shadow-inner md:flex-row md:items-center md:gap-4">
               <div className="flex items-center gap-2 text-sm font-semibold text-text-primary">
@@ -385,13 +507,13 @@ const Slider = () => {
       </div>
 
       <div className="bg-bg-surface" data-testid="trust-badges">
-        <div className="mx-auto -mt-2 flex max-w-5xl flex-wrap items-center justify-center gap-4 px-6 py-6 md:gap-5 md:py-7">
+        <div className="mx-auto -mt-6 flex max-w-5xl flex-wrap items-center justify-center gap-3 px-6 pb-6 pt-2 md:gap-4 md:pb-8 md:pt-0">
           {TRUST_BADGES.map(({ label, icon }) => (
             <TrustBadge
               key={label}
               icon={icon}
               label={label}
-              className="min-w-[220px] justify-center sm:min-w-[0]"
+              className="min-w-[215px] justify-center sm:min-w-[0]"
             />
           ))}
         </div>
