@@ -51,7 +51,7 @@ const Navbar = () => {
     <section className="navbar-container" id="navbar_container">
       <div className="navbar-main">
         {/* LEFT: Logo + Name */}
-        <div className="navbar-left flex items-center justify-between w-full md:w-auto">
+        <div className="navbar-left flex items-center justify-between w-full lg:w-auto">
           <Link to="/" className="flex items-center gap-2">
             <img className="navbar-logo" src={LOGO_URL} alt="Atlas Homestays logo" />
             <span className="navbar-logo-text">Atlas Homestays</span>
@@ -59,7 +59,7 @@ const Navbar = () => {
 
           {/* Mobile hamburger */}
           <button
-            className="mobile-menu-button md:hidden"
+            className="mobile-menu-button lg:hidden"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
             aria-label={`${isMenuOpen ? 'Close' : 'Open'} navigation menu`}
           >
@@ -68,7 +68,7 @@ const Navbar = () => {
         </div>
 
         {/* CENTER: Desktop Menu */}
-        <div className="navbar-center hidden md:flex gap-2">
+        <div className="navbar-center hidden lg:flex gap-2">
           {primaryNav.filter(i => !i.hidden).map(item =>
             item.label === 'Apartments' ? (
               <div key={item.label} className="dropdown relative">
@@ -122,7 +122,7 @@ const Navbar = () => {
 
       {/* MOBILE MENU (Slide Down) */}
       {isMenuOpen && (
-        <div className="mobile-menu md:hidden">
+        <div className="mobile-menu lg:hidden">
           {primaryNav.filter((item) => !item.hidden).map((item) => (
             item.label === 'Apartments' ? (
               <div key={item.label}>
