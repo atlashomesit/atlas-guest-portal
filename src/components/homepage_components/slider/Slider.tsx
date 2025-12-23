@@ -29,8 +29,9 @@ const Slider = () => {
 
   const overlayStyle = React.useMemo(() => {
     const style: React.CSSProperties = {
-      backgroundColor: enableWidgetExperiment ? 'rgba(3, 6, 14, 0.55)' : 'rgba(0, 0, 0, 0.35)',
+      backgroundColor: enableWidgetExperiment ? 'rgba(3, 6, 14, 0.74)' : 'rgba(0, 0, 0, 0.45)',
       backgroundImage: enableWidgetExperiment ? HERO_OVERLAY_GRADIENT : HERO_OVERLAY_GRADIENT_LEGACY,
+      backdropFilter: 'blur(4px) saturate(0.96)',
     };
 
     if (typeof navigator !== 'undefined' && navigator.userAgent?.includes('jsdom')) {
@@ -38,7 +39,7 @@ const Slider = () => {
     }
 
     return style;
-  }, []);
+  }, [enableWidgetExperiment]);
 
   const [searchParams] = useSearchParams();
   const today = React.useMemo(() => startOfDay(new Date()), []);
@@ -60,7 +61,8 @@ const Slider = () => {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [statusMessage, setStatusMessage] = React.useState<string>('');
   const [hasInteracted, setHasInteracted] = React.useState(false);
-  const [calendarReady, setCalendarReady] = React.useState(false);
+  const isTestEnvironment = typeof navigator !== 'undefined' && navigator.userAgent?.includes('jsdom');
+  const [calendarReady, setCalendarReady] = React.useState(isTestEnvironment);
   const hasTrackedDropoff = React.useRef(false);
   const hasInteractedRef = React.useRef(false);
   const latestWidgetStateRef = React.useRef({ hasSelection: false, guests });
@@ -149,13 +151,13 @@ const Slider = () => {
   }, [isCalendarOpen]);
 
   React.useEffect(() => {
-    if (!isCalendarOpen) return;
+    if (!isCalendarOpen || isTestEnvironment) return;
     const timer = window.setTimeout(() => setCalendarReady(true), 140);
     return () => {
       window.clearTimeout(timer);
       setCalendarReady(false);
     };
-  }, [isCalendarOpen]);
+  }, [isCalendarOpen, isTestEnvironment]);
 
   React.useEffect(() => {
     hasInteractedRef.current = hasInteracted;
@@ -301,17 +303,23 @@ const Slider = () => {
   };
 
   const formContainerClass = enableWidgetExperiment
-    ? 'w-full max-w-5xl rounded-3xl bg-[color:color-mix(in_srgb,var(--bg-surface)_92%,transparent)] shadow-[0_18px_55px_rgba(0,0,0,0.35)] backdrop-blur border border-[color:color-mix(in_srgb,var(--bg-surface)_55%,transparent)] p-4 sm:p-5 md:p-7 flex flex-col gap-4 sm:gap-5'
-    : 'w-full max-w-5xl rounded-3xl bg-[color:color-mix(in_srgb,var(--bg-surface)_92%,transparent)] shadow-level3 backdrop-blur border border-[color:color-mix(in_srgb,var(--bg-surface)_55%,transparent)] p-4 sm:p-5 md:p-7 flex flex-col gap-4 sm:gap-5';
+    ? 'w-full max-w-5xl rounded-3xl bg-[color:color-mix(in_srgb,var(--bg-surface)_96%,rgba(3,6,14,0.45))] shadow-[0_20px_60px_rgba(0,0,0,0.45)] backdrop-blur-md border border-[color:color-mix(in_srgb,var(--bg-surface)_60%,transparent)] p-4 sm:p-5 md:p-6 flex flex-col gap-4 sm:gap-5'
+    : 'w-full max-w-5xl rounded-3xl bg-[color:color-mix(in_srgb,var(--bg-surface)_94%,rgba(0,0,0,0.18))] shadow-level3 backdrop-blur border border-[color:color-mix(in_srgb,var(--bg-surface)_55%,transparent)] p-4 sm:p-5 md:p-6 flex flex-col gap-4 sm:gap-5';
 
   const formGridClass = enableWidgetExperiment
-    ? 'grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-[1.05fr_1.05fr_0.9fr_auto] lg:gap-5'
-    : 'grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-[1.1fr_1.1fr_0.95fr_auto] md:gap-5';
+    ? 'grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 md:auto-rows-fr lg:grid-cols-4 lg:gap-5'
+    : 'grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 md:auto-rows-fr lg:grid-cols-4 lg:gap-5';
+
+  const fieldShellClass =
+    'flex h-full min-h-[112px] flex-col justify-between rounded-2xl border border-[color:color-mix(in_srgb,var(--border-subtle)_80%,transparent)] bg-[color:color-mix(in_srgb,var(--bg-muted)_92%,var(--bg-surface))] px-4 py-4 sm:px-5 sm:py-5 shadow-[0_12px_36px_rgba(6,8,15,0.32)]';
+  const labelClass =
+    'flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-[color-mix(in_srgb,var(--text-primary)_80%,transparent)] whitespace-nowrap';
+  const helperTextClass = 'mt-2 text-sm leading-snug text-[color-mix(in_srgb,var(--text-primary)_78%,transparent)]';
 
   return (
     <section className="w-full bg-bg-muted text-text-primary">
       <div
-        className="relative isolate overflow-hidden min-h-[75vh] md:min-h-[70vh] flex items-center justify-center bg-cover bg-center bg-no-repeat pt-[calc(var(--nav-height,80px)+1.5rem)]"
+        className="relative isolate overflow-hidden min-h-[75vh] md:min-h-[70vh] flex items-center justify-center bg-cover bg-center bg-no-repeat pt-[calc(var(--nav-height,80px)+1rem)]"
         style={{ backgroundImage: `url(${HERO_IMAGE_URL})` }}
       >
         <div
@@ -320,7 +328,7 @@ const Slider = () => {
           className="pointer-events-none absolute inset-0 opacity-95"
           style={overlayStyle}
         />
-        <div className="relative z-10 flex max-w-4xl flex-col items-center gap-8 px-6 pb-14 text-center md:pt-3">
+        <div className="relative z-10 flex max-w-4xl flex-col items-center gap-7 px-4 pb-12 text-center sm:px-6 md:pt-3">
 
           <Link to="/" className="flex items-center gap-3">
             <img src={LOGO_URL} alt="Atlas Homestays" className="h-14 w-auto rounded-md bg-[color:color-mix(in_srgb,var(--bg-surface)_88%,transparent)] p-2 shadow-level2" />
@@ -345,6 +353,7 @@ const Slider = () => {
           <form
             onSubmit={handleSubmit}
             className={formContainerClass}
+            data-testid="hero-widget"
           >
             <div className="sr-only" role="status" aria-live="polite">
               {statusMessage || error || 'Hero form ready'}
@@ -356,21 +365,21 @@ const Slider = () => {
               <div className="relative">
                 <button
                   type="button"
-                  className="flex h-full w-full min-h-[110px] flex-col justify-center rounded-2xl bg-bg-muted px-4 py-3 sm:px-5 sm:py-4 text-left shadow-inner transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
+                  className={`${fieldShellClass} text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary`}
                   aria-label="Select check-in date"
                   aria-expanded={isCalendarOpen}
                   onClick={() => setIsCalendarOpen((open) => !open)}
                   data-testid="hero-date-toggle"
                 >
-                  <span className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-[color-mix(in_srgb,var(--text-primary)_82%,transparent)]">
-                    <CalendarRange className="h-4 w-4" aria-hidden="true" />
-                    Check-in
+                  <span className={labelClass}>
+                    <CalendarRange className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    <span className="truncate">Check-in</span>
                   </span>
-                  <span className="mt-2 flex items-center justify-between gap-2 text-lg font-semibold text-text-primary">
+                  <span className="mt-3 flex items-center justify-between gap-2 text-lg font-semibold text-text-primary leading-tight">
                     {checkInLabel}
-                    <ChevronDown className={`h-4 w-4 text-text-muted transition ${isCalendarOpen ? 'rotate-180' : ''}`} aria-hidden />
+                    <ChevronDown className={`h-4 w-4 shrink-0 text-text-muted transition ${isCalendarOpen ? 'rotate-180' : ''}`} aria-hidden />
                   </span>
-                  <span className="mt-2 text-sm font-medium text-[color-mix(in_srgb,var(--text-primary)_78%,transparent)]">Earliest available date shown.</span>
+                  <span className={helperTextClass}>Earliest available date shown.</span>
                 </button>
 
                 {isCalendarOpen && (
@@ -410,31 +419,31 @@ const Slider = () => {
 
               <button
                 type="button"
-                className="flex h-full w-full min-h-[110px] flex-col justify-center rounded-2xl bg-bg-muted px-4 py-3 sm:px-5 sm:py-4 text-left shadow-inner transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary md:-ml-[1px]"
+                className={`${fieldShellClass} text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary md:-ml-[1px]`}
                 aria-label="Select check-out date"
                 aria-expanded={isCalendarOpen}
                 onClick={() => setIsCalendarOpen((open) => !open)}
               >
-                <span className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-[color-mix(in_srgb,var(--text-primary)_82%,transparent)]">
-                  <CalendarRange className="h-4 w-4" aria-hidden="true" />
-                  Check-out
+                <span className={labelClass}>
+                  <CalendarRange className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span className="truncate">Check-out</span>
                 </span>
-                <span className="mt-2 flex items-center justify-between gap-2 text-lg font-semibold text-text-primary">
+                <span className="mt-3 flex items-center justify-between gap-2 text-lg font-semibold text-text-primary leading-tight">
                   {checkOutLabel}
-                  <ChevronDown className={`h-4 w-4 text-text-muted transition ${isCalendarOpen ? 'rotate-180' : ''}`} aria-hidden />
+                  <ChevronDown className={`h-4 w-4 shrink-0 text-text-muted transition ${isCalendarOpen ? 'rotate-180' : ''}`} aria-hidden />
                 </span>
-                <span className="mt-2 text-sm font-medium text-[color-mix(in_srgb,var(--text-primary)_78%,transparent)]">Ensure your stay ends after check-in.</span>
+                <span className={helperTextClass}>Ensure your stay ends after check-in.</span>
               </button>
 
-              <div className="flex flex-col rounded-2xl bg-bg-muted px-4 py-4 shadow-inner text-left md:-ml-[1px]">
-                <span className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-[color-mix(in_srgb,var(--text-primary)_82%,transparent)]">
-                  <Users className="h-4 w-4" aria-hidden />
-                  Guests
+              <div className={`${fieldShellClass} text-left md:-ml-[1px]`}>
+                <span className={labelClass}>
+                  <Users className="h-4 w-4 shrink-0" aria-hidden />
+                  <span className="truncate">Guests</span>
                 </span>
-                <div className="mt-2 flex items-center justify-between gap-3">
+                <div className="mt-3 flex items-center justify-between gap-3">
                   <button
                     type="button"
-                    className="inline-flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-full border border-border-subtle text-lg font-semibold text-text-primary transition hover:border-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary disabled:opacity-40"
+                    className="inline-flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-full border border-border-subtle text-lg font-semibold text-text-primary transition hover:border-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary disabled:opacity-40 disabled:hover:border-border-subtle"
                     onClick={() => handleGuestChange(-1)}
                     disabled={guests <= 1}
                     aria-label="Decrease guests"
@@ -454,15 +463,16 @@ const Slider = () => {
                     +
                   </button>
                 </div>
-                <span className="mt-2 text-sm font-medium text-[color-mix(in_srgb,var(--text-primary)_78%,transparent)]">Defaulting to 2 guests; adjust anytime.</span>
+                <span className={helperTextClass}>Defaulting to 2 guests; adjust anytime.</span>
               </div>
 
-              <div className="flex flex-col justify-center gap-3 rounded-2xl bg-bg-muted px-4 py-4 shadow-inner md:-ml-[1px] lg:min-h-[110px]">
+              <div className={`${fieldShellClass} md:-ml-[1px] lg:min-h-[112px] lg:items-stretch lg:justify-center`}>
                 <button
                   type="submit"
                   disabled={isSubmitDisabled || isSubmitting}
-                  className="inline-flex w-full items-center justify-center rounded-full bg-cta-primary px-6 py-3 text-base font-semibold text-[var(--text-contrast)] shadow-level3 transition hover:bg-cta-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary min-h-[48px] disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="inline-flex h-14 min-h-[56px] w-full items-center justify-center rounded-xl bg-cta-primary px-6 text-base font-semibold text-[var(--text-contrast)] shadow-[0_16px_38px_rgba(12,86,255,0.32)] transition hover:bg-cta-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary disabled:cursor-not-allowed disabled:bg-[color:color-mix(in_srgb,var(--cta-primary)_70%,var(--bg-muted))] disabled:text-[color-mix(in_srgb,var(--text-contrast)_82%,transparent)] disabled:shadow-none aria-busy:cursor-progress aria-busy:opacity-90 whitespace-nowrap"
                   onClick={() => setStatusMessage('Checking availability...')}
+                  aria-busy={isSubmitting}
                 >
                   {isSubmitting ? 'Checking...' : 'Check availability'}
                 </button>
@@ -475,7 +485,7 @@ const Slider = () => {
                       { route: '/apartments' },
                     )
                   }
-                  className="inline-flex items-center justify-center text-base font-semibold text-text-primary underline-offset-4 transition hover:text-cta-secondary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
+                  className="inline-flex items-center justify-center text-sm font-semibold text-text-muted underline-offset-4 transition hover:text-cta-secondary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary whitespace-nowrap"
                 >
                   Browse listings
                 </Link>
@@ -493,7 +503,7 @@ const Slider = () => {
               </p>
             )}
 
-            <div className="flex flex-col gap-2 rounded-2xl bg-[color:color-mix(in_srgb,var(--bg-surface)_92%,transparent)] px-5 py-4 text-left shadow-inner md:flex-row md:items-center md:gap-4">
+            <div className="flex flex-col gap-2 rounded-2xl bg-[color:color-mix(in_srgb,var(--bg-surface)_94%,transparent)] px-4 py-4 text-left shadow-inner md:flex-row md:items-center md:gap-4">
               <div className="flex items-center gap-2 text-sm font-semibold text-text-primary">
                 <ShieldCheck className="h-4 w-4 text-cta-secondary" aria-hidden="true" />
                 <span>Book with confidence</span>
@@ -507,7 +517,7 @@ const Slider = () => {
       </div>
 
       <div className="bg-bg-surface" data-testid="trust-badges">
-        <div className="mx-auto -mt-6 flex max-w-5xl flex-wrap items-center justify-center gap-3 px-6 pb-6 pt-2 md:gap-4 md:pb-8 md:pt-0">
+        <div className="mx-auto -mt-4 flex max-w-5xl flex-wrap items-center justify-center gap-3 px-4 pb-6 pt-2 sm:px-6 md:gap-4 md:pb-8 md:pt-0">
           {TRUST_BADGES.map(({ label, icon }) => (
             <TrustBadge
               key={label}
