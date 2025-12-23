@@ -7,7 +7,7 @@ export async function apiFetch(path: string, init?: RequestInit): Promise<Respon
   if (!hasProtocol) {
     if (!API_BASE_URL) {
       throw new Error(
-        "API base URL is not configured. Expected Cloudflare Pages env var VITE_API_BASE_URL (available via /config.js). If you just added it in Cloudflare, redeploy once or confirm the correct environment (Preview vs Production)."
+        "API base URL is not configured. Expected Cloudflare Pages env var VITE_API_BASE_URL (available via /config). If you just added it in Cloudflare, redeploy once or confirm the correct environment (Preview vs Production)."
       );
     }
     url = IS_LOCALHOST ? path : `${API_BASE_URL}${path}`;
