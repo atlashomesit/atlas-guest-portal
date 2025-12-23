@@ -45,6 +45,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     const [openCalendar, setOpenCalendar] = useState(false);
     const [openGuests, setOpenGuests] = useState(false);
     const [bookedDates, setBookedDates] = useState<Date[]>([]);
+    const [bookedRanges, setBookedRanges] = useState<Array<{start: Date, end: Date}>>([]);
     const [isBookedDatesLoading, setIsBookedDatesLoading] = useState(true);
     const [guestMenuBooting, setGuestMenuBooting] = useState(false);
     const [isRazorpayReady, setIsRazorpayReady] = useState(false);
@@ -171,6 +172,55 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
             }),
         }));
     }, [dates.endDate, dates.startDate, totalPeople, unitType]);
+
+    // Fetch and process booked dates
+    useEffect(() => {
+        const fetchBookedDates = async () => {
+            try {
+                // Mock API response - replace with actual API call
+                const mockResponse = [{
+                    "id": 501,
+                    "listingId": 2,
+                    "guestId": 559,
+                    "checkinDate": "2025-09-23T00:00:00",
+                    "checkoutDate": "2025-09-24T00:00:00",
+                    "bookingSource": "airbnb",
+                    "amountReceived": 2358.09,
+                    "bankAccountId": null,
+                    "guestsPlanned": 2,
+                    "guestsActual": 2,
+                    "extraGuestCharge": 0.00,
+                    "commissionAmount": 377.29,
+                    "notes": "-",
+                    "createdAt": "2025-09-23T04:35:36.5110894",
+                    "paymentStatus": "Paid"
+                }];
+                
+                const dates = mockResponse.map(booking => ({
+                    start: new Date(booking.checkinDate),
+                    end: new Date(booking.checkoutDate)
+                }));
+                
+                const allBookedDates: Date[] = [];
+                dates.forEach(range => {
+                    const current = new Date(range.start);
+                    while (current <= range.end) {
+                        allBookedDates.push(new Date(current));
+                        current.setDate(current.getDate() + 1);
+                    }
+                });
+                
+                setBookedRanges(dates);
+                setBookedDates(allBookedDates);
+                setIsBookedDatesLoading(false);
+            } catch (error) {
+                console.error('Error fetching booked dates:', error);
+                setIsBookedDatesLoading(false);
+            }
+        };
+
+        fetchBookedDates();
+    }, [propertyId]);
 
     const nights = nightlyBreakdown.length;
     const staySubtotal = nightlyBreakdown.reduce((sum, night) => sum + night.breakdown.finalNightlyPrice, 0);
@@ -575,7 +625,7 @@ useEffect(() => {
                 ? paymentStatus.reason
                 : '');
     const fieldGridClass = isLayoutExperimentEnabled
-        ? 'grid grid-cols-1 items-stretch gap-3 p-3 sm:grid-cols-2 lg:grid-cols-[1.05fr_1.05fr_1fr_auto]'
+        ? 'grid grid-cols-1 items-stretch gap-3 p-3 sm:grid-cols-2 lg:]'
         : 'grid grid-cols-1 items-stretch gap-3 p-3 md:grid-cols-4';
     const fieldButtonClass =
         'group flex h-full min-h-[4.5rem] flex-col justify-center rounded-xl border border-border-subtle bg-bg-surface/70 px-4 text-left text-text-primary shadow-inner transition hover:border-border-strong hover:bg-bg-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary';
@@ -808,9 +858,30 @@ useEffect(() => {
                             direction="horizontal"
                             className="text-sm"
                             monthDisplayFormat="MMMM yyyy"
-                            weekdayDisplayFormat="EEEE"
+                            weekdayDisplayFormat="EEE"
                             dayDisplayFormat="d"
                             disabledDates={bookedDates}
+                            dayContentRenderer={(date) => {
+                                const isBooked = bookedDates.some(bookedDate => {
+                                    const d = new Date(bookedDate);
+                                    return d.getDate() === date.getDate() && 
+                                           d.getMonth() === date.getMonth() && 
+                                           d.getFullYear() === date.getFullYear();
+                                });
+                                
+                                return (
+                                    <div className="relative">
+                                        {isBooked && (
+                                            <div className="absolute inset-0 flex items-center justify-center">
+                                                <div className="h-px w-6 bg-red-500 transform rotate-12"></div>
+                                            </div>
+                                        )}
+                                        <span className={isBooked ? 'text-gray-400' : ''}>
+                                            {date.getDate()}
+                                        </span>
+                                    </div>
+                                );
+                            }}
                         />
                     )}
                 </div>
