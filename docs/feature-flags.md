@@ -13,6 +13,7 @@ Use the `ff` override tokens listed below. Each token maps to a specific flag in
 - `hideChatbot` → `enableHideUnfinishedChatbot`
 - `trustMicrocopy` → `enableTrustMicrocopy`
 - `closeReassurance` → `enableCloseReassurance`
+- `structureTokens` → `enableDrawerStructureTokens`
 
 Other support drawer flags remain available in the codebase but are not currently overrideable by debug tokens.
 
@@ -47,4 +48,4 @@ Spacing inside the support drawer now comes from CSS custom properties so you ca
 - `--drawer-card-padding-inline`
 - `--drawer-section-gap`
 
-The defaults mirror the current layout (12px block padding, 16px inline padding, 12px gaps). To tweak them temporarily, set overrides on the drawer container in DevTools or apply inline styles when instantiating `SupportDrawer`. Keeping the `ff` tokens above off preserves the existing spacing and close control visuals.
+The defaults mirror the current layout (12px block padding, 16px inline padding, 12px gaps). To tweak them temporarily, set overrides on the drawer container in DevTools or apply inline styles when instantiating `SupportDrawer`. Keeping the `ff` tokens above off preserves the existing spacing and close control visuals; enable the `structureTokens` flag when you want to drive those values from CSS variables without changing default spacing.

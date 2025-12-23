@@ -8,6 +8,7 @@ import { primaryNav, ctaNav } from '../../../config/navigation';
 import { LOGO_URL } from '../../../config/branding';
 import { CONTACT, formatDisplayNumber, getTelLink } from '../../../config/contact';
 import { propertyData } from '../../../data';
+import { trackEvent } from '../../../utils/analytics';
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -20,6 +21,7 @@ const Navbar = () => {
     text: "Hi Atlas Homestays 👋 I'd like to learn more about booking a stay.",
   });
   const telLink = getTelLink();
+  const bookNowTarget = ctaNav.to;
 
   useEffect(() => {
     const onLoadfunction = () => {
@@ -49,7 +51,7 @@ const Navbar = () => {
     <section className="navbar-container" id="navbar_container">
       <div className="navbar-main">
         {/* LEFT: Logo + Name */}
-        <div className="navbar-left flex items-center justify-between w-full md:w-auto">
+        <div className="navbar-left flex items-center justify-between w-full lg:w-auto">
           <Link to="/" className="flex items-center gap-2">
             <img className="navbar-logo" src={LOGO_URL} alt="Atlas Homestays logo" />
             <span className="navbar-logo-text">Atlas Homestays</span>
@@ -57,7 +59,7 @@ const Navbar = () => {
 
           {/* Mobile hamburger */}
           <button
-            className="mobile-menu-button md:hidden"
+            className="mobile-menu-button lg:hidden"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
             aria-label={`${isMenuOpen ? 'Close' : 'Open'} navigation menu`}
           >
@@ -66,7 +68,7 @@ const Navbar = () => {
         </div>
 
         {/* CENTER: Desktop Menu */}
-        <div className="navbar-center hidden md:flex gap-2">
+        <div className="navbar-center hidden lg:flex gap-2">
           {primaryNav.filter(i => !i.hidden).map(item =>
             item.label === 'Apartments' ? (
               <div key={item.label} className="dropdown relative">
@@ -96,15 +98,31 @@ const Navbar = () => {
             <IoIosCall className="text-lg md:text-xl" />
             <span>{formatDisplayNumber()}</span>
           </a>
-          <a href={whatsappLink} target="_blank" rel="noopener noreferrer" className="book-now" aria-label="Book now">
+          <Link
+            to={bookNowTarget}
+            className="book-now"
+            aria-label="Book now"
+            onClick={() => {
+              trackEvent('cta_book_now_clicked', { source: 'header' }, { route: bookNowTarget });
+            }}
+          >
             {ctaNav.label}
+          </Link>
+          <a
+            href={whatsappLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="help-link"
+            aria-label="Need help on WhatsApp"
+          >
+            Need help?
           </a>
         </div>
       </div>
 
       {/* MOBILE MENU (Slide Down) */}
       {isMenuOpen && (
-        <div className="mobile-menu md:hidden">
+        <div className="mobile-menu lg:hidden">
           {primaryNav.filter((item) => !item.hidden).map((item) => (
             item.label === 'Apartments' ? (
               <div key={item.label}>
@@ -147,14 +165,26 @@ const Navbar = () => {
               <IoIosCall className="text-lg" />
               <span>{formatDisplayNumber()}</span>
             </a>
+            <Link
+              to={bookNowTarget}
+              className="book-now text-center"
+              aria-label="Book now"
+              onClick={() => {
+                trackEvent('cta_book_now_clicked', { source: 'header' }, { route: bookNowTarget });
+                closeMobile();
+              }}
+            >
+              {ctaNav.label}
+            </Link>
             <a
               href={whatsappLink}
               target="_blank"
               rel="noopener noreferrer"
-              className="book-now text-center"
-              aria-label="Book now"
+              className="help-link text-center"
+              aria-label="Need help on WhatsApp"
+              onClick={closeMobile}
             >
-              {ctaNav.label}
+              Need help?
             </a>
           </div>
         </div>

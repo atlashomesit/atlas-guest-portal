@@ -1,6 +1,8 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, useId } from 'react';
+import { Link } from 'react-router-dom';
 import { DateRange } from 'react-date-range';
-import { format } from 'date-fns';
+import { addDays, format, startOfDay } from 'date-fns';
+import { api, asArray } from '@/lib/api';
 import { propertyData } from '../../../data';
 import { inlinePolicySnippets } from '../../../content/terms';
 import { baseGuestAllowance, getUnitPolicy } from '../../../config/policyConfig';
@@ -9,6 +11,7 @@ import { SiGooglepay, SiRazorpay } from 'react-icons/si';
 import { trackEvent } from '../../../utils/analytics';
 import { calculateNightlyPrice, inferUnitType } from '../../../utils/pricing';
 import { priceDisplayConfig } from '../../../config/priceDisplay.config';
+import { bookingWidgetLayoutFlag } from '../../../config/abFlags';
 
 declare global {
   interface Window {
@@ -24,9 +27,26 @@ interface BookingCardProps {
     supportPadding?: boolean;
 }
 
+type GuestCountKey = 'adults' | 'children' | 'infants' | 'pets';
+
+const guestLimits: Record<GuestCountKey, { min: number; max?: number }> = {
+    adults: { min: 0, max: 10 },
+    children: { min: 0, max: 10 },
+    infants: { min: 0, max: 2 },
+    pets: { min: 0, max: 4 },
+};
+
 const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = false }) => {
+    const today = startOfDay(new Date());
+    const defaultStartDate = addDays(today, 1);
+    const defaultEndDate = addDays(today, 2);
+    const isLayoutExperimentEnabled = bookingWidgetLayoutFlag();
+
     const [openCalendar, setOpenCalendar] = useState(false);
     const [openGuests, setOpenGuests] = useState(false);
+    const [bookedDates, setBookedDates] = useState<Date[]>([]);
+    const [isBookedDatesLoading, setIsBookedDatesLoading] = useState(true);
+    const [guestMenuBooting, setGuestMenuBooting] = useState(false);
     const [isRazorpayReady, setIsRazorpayReady] = useState(false);
     const [paymentStatus, setPaymentStatus] = useState<
         | { state: 'idle' }
@@ -48,41 +68,51 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     }, []);
 
     const [dates, setDates] = useState({
-        startDate: new Date(),
-        endDate: new Date(Date.now() + 86400000), // Next day by default
+        startDate: defaultStartDate,
+        endDate: defaultEndDate,
         key: "selection",
     });
     
     const handleDateChange = (ranges: any) => {
+        markEngagement();
         const { startDate, endDate } = ranges.selection;
         setHasInteractedWithDates(true);
+        setInlineStatus('Dates updated for your stay.');
+        const normalizedStart = startDate ? startOfDay(startDate) : defaultStartDate;
+        const normalizedEnd = endDate ? startOfDay(endDate) : defaultEndDate;
+        const effectiveStartDate = normalizedStart < today ? defaultStartDate : normalizedStart;
+        let resolvedEndDate = normalizedEnd <= effectiveStartDate ? addDays(effectiveStartDate, 1) : normalizedEnd;
         
         // Always update the dates when a selection is made
         if (startDate && endDate) {
             // If the same date is selected for both start and end, set end to next day
-            if (startDate.getTime() === endDate.getTime()) {
-                const nextDay = new Date(startDate);
-                nextDay.setDate(nextDay.getDate() + 1);
-                setDates({
-                    startDate: startDate,
-                    endDate: nextDay,
-                    key: 'selection'
-                });
-            } else {
-                setDates({
-                    startDate: startDate,
-                    endDate: endDate,
-                    key: 'selection'
-                });
+            if (effectiveStartDate.getTime() === normalizedEnd.getTime()) {
+                resolvedEndDate = addDays(effectiveStartDate, 1);
             }
 
-            const selectedNights = Math.max(1, Math.round(Math.abs((endDate.getTime() - startDate.getTime()) / oneDay)));
+            setDates({
+                startDate: effectiveStartDate,
+                endDate: resolvedEndDate,
+                key: 'selection'
+            });
+
+            trackEvent(
+                'booking_dates_changed',
+                {
+                    surface: 'booking_form',
+                    startDate: effectiveStartDate.toISOString(),
+                    endDate: resolvedEndDate.toISOString(),
+                },
+                { propertyId, listingId: propertyId, unitCode: propertyId },
+            );
+
+            const selectedNights = Math.max(1, Math.round(Math.abs((resolvedEndDate.getTime() - effectiveStartDate.getTime()) / oneDay)));
             trackEvent(
                 'dates_selected',
                 {
                     surface: 'booking_form',
-                    startDate: startDate.toISOString(),
-                    endDate: endDate.toISOString(),
+                    startDate: effectiveStartDate.toISOString(),
+                    endDate: resolvedEndDate.toISOString(),
                     nights: selectedNights,
                     guests: totalPeople,
                 },
@@ -183,6 +213,13 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     const [termsAccepted, setTermsAccepted] = useState(false);
     const [termsAcceptedAt, setTermsAcceptedAt] = useState<string | null>(null);
     const [hasInteractedWithDates, setHasInteractedWithDates] = useState(false);
+    const [inlineStatus, setInlineStatus] = useState('');
+    const [ctaConfirmation, setCtaConfirmation] = useState<string | null>(null);
+    const [isInlineChecking, setIsInlineChecking] = useState(false);
+    const bookingEngagementRef = useRef(false);
+    const bookingDropoffTrackedRef = useRef(false);
+    const latestBookingStateRef = useRef({ guests: totalPeople, hasSelection });
+    const latestPaymentStateRef = useRef(paymentStatus.state);
 
     const preloadRazorpay = () => {
         const existingPreload = document.querySelector("link[rel='preload'][href='https://checkout.razorpay.com/v1/checkout.js']");
@@ -254,6 +291,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     }), [property?.property_name, dates.startDate, dates.endDate, nights, totalPrice, guests]);
 
     const initiatePayment = async () => {
+        markEngagement();
         trackEvent(
             'reserve_click',
             {
@@ -276,6 +314,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
             },
             { propertyId, listingId: propertyId, unitCode: propertyId },
         );
+        setCtaConfirmation('Launching secure checkout...');
 
         if (!termsAccepted) {
             alert('Please confirm the Terms & Conditions before reserving.');
@@ -341,6 +380,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
                     paymentId: response.razorpay_payment_id,
                     bookingId,
                 });
+                setCtaConfirmation('Payment received. We are confirming your stay.');
                 setIsLoading(false);
                 trackEvent(
                     'payment_success',
@@ -368,6 +408,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
                 state: 'failure',
                 reason: `${failureReason} Please try again or choose a different method.`,
             });
+            setCtaConfirmation(failureReason);
             setIsLoading(false);
                 trackEvent(
                     'payment_failed',
@@ -389,6 +430,12 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         }));
     };
 
+    const markEngagement = () => {
+        if (!bookingEngagementRef.current) {
+            bookingEngagementRef.current = true;
+        }
+    };
+
     useEffect(() => {
         const handleClickOutside = (event: any) => {
             if (
@@ -404,25 +451,162 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
                 setOpenCalendar(false);
             }
         };
-
-        document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
+     
 
-    const modifyGuest = (type: keyof typeof guests, increment: boolean) => {
-        setGuests(prev => ({
-            ...prev,
-            [type]: Math.max(0, prev[type] + (increment ? 1 : -1)),
-        }));
+useEffect(() => {
+    const fetchBookedDates = async () => {
+        setIsBookedDatesLoading(true);
+        try {
+            // Replace `{id}` with your propertyId
+            const response = await api.get(`/bookings/${propertyId}`);
+            // Assuming your API returns an array of bookings with startDate and endDate
+            const bookings = asArray(response.data);
+
+            const dates: Date[] = [];
+            bookings.forEach((booking: any) => {
+                const start = new Date(booking.startDate);
+                const end = new Date(booking.endDate);
+
+                // Fill all dates in the range
+                for (
+                    let d = new Date(start);
+                    d <= end;
+                    d.setDate(d.getDate() + 1)
+                ) {
+                    dates.push(new Date(d));
+                }
+            });
+
+            setBookedDates(dates);
+        } catch (error) {
+            console.error("Failed to fetch booked dates:", error);
+        } finally {
+            setIsBookedDatesLoading(false);
+        }
     };
+
+    fetchBookedDates();
+}, [propertyId]);
+
+    useEffect(() => {
+        latestBookingStateRef.current = { guests: totalPeople, hasSelection };
+    }, [hasSelection, totalPeople]);
+
+    useEffect(() => {
+        latestPaymentStateRef.current = paymentStatus.state;
+    }, [paymentStatus.state]);
+
+    useEffect(
+        () => () => {
+            if (bookingEngagementRef.current && !bookingDropoffTrackedRef.current && latestPaymentStateRef.current === 'idle') {
+                bookingDropoffTrackedRef.current = true;
+                trackEvent(
+                    'booking_widget_dropoff',
+                    {
+                        surface: 'booking_form',
+                        guests: latestBookingStateRef.current.guests,
+                        hasSelection: latestBookingStateRef.current.hasSelection,
+                    },
+                    { propertyId, listingId: propertyId, unitCode: propertyId },
+                );
+            }
+        },
+        [propertyId],
+    );
+
+    const modifyGuest = (type: GuestCountKey, increment: boolean) => {
+        markEngagement();
+        setGuests(prev => {
+            const min = guestLimits[type].min ?? 0;
+            const max = guestLimits[type].max;
+            const proposedValue = prev[type] + (increment ? 1 : -1);
+
+            if (!increment && proposedValue < min) return prev;
+            if (increment && typeof max === 'number' && proposedValue > max) return prev;
+
+            const nextValue =
+                typeof max === 'number'
+                    ? Math.min(max, Math.max(min, proposedValue))
+                    : Math.max(min, proposedValue);
+
+            const updatedGuests = {
+                ...prev,
+                [type]: nextValue,
+            };
+            trackEvent(
+                'booking_guest_changed',
+                { surface: 'booking_form', field: type, value: nextValue },
+                { propertyId, listingId: propertyId, unitCode: propertyId },
+            );
+            return updatedGuests;
+        });
+    };
+
+    const isAtMin = (type: GuestCountKey) => guests[type] <= (guestLimits[type].min ?? 0);
+    const isAtMax = (type: GuestCountKey) =>
+        typeof guestLimits[type].max === 'number' && guests[type] >= (guestLimits[type].max ?? Number.MAX_SAFE_INTEGER);
 
     const hasSelection = Boolean(dates.startDate && dates.endDate && guests.adults);
     const primaryCtaLabel = hasSelection && termsAccepted ? 'Book now' : 'Check availability';
-
+    const inlineCtaLabel = hasSelection ? 'Check availability' : 'Select dates';
+    const isCheckoutInvalid = dates.endDate <= dates.startDate;
+    const guestNeedsAdult = guests.adults < 1;
     const containerPaddingBottom = supportPadding ? 'pb-40' : 'pb-28';
+    const validationMessageId = useId();
+    const checkOutErrorId = useId();
+    const guestErrorId = useId();
+    const validationMessage = useMemo(() => {
+        if (isCheckoutInvalid) return 'Check-out must be after check-in.';
+        if (guestNeedsAdult) return 'Add at least one adult.';
+        return '';
+    }, [guestNeedsAdult, isCheckoutInvalid]);
+    const inlineCtaDisabled = !hasSelection || isCheckoutInvalid;
+    const liveRegionMessage =
+        validationMessage ||
+        inlineStatus ||
+        ctaConfirmation ||
+        (paymentStatus.state === 'success'
+            ? 'Payment received successfully.'
+            : paymentStatus.state === 'failure'
+                ? paymentStatus.reason
+                : '');
+    const fieldGridClass = isLayoutExperimentEnabled
+        ? 'grid grid-cols-1 items-stretch gap-3 p-3 sm:grid-cols-2 lg:grid-cols-[1.05fr_1.05fr_1fr_auto]'
+        : 'grid grid-cols-1 items-stretch gap-3 p-3 md:grid-cols-4';
+    const fieldButtonClass =
+        'group flex h-full min-h-[4.5rem] flex-col justify-center rounded-xl border border-border-subtle bg-bg-surface/70 px-4 text-left text-text-primary shadow-inner transition hover:border-border-strong hover:bg-bg-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary';
+    const helperTextClass = 'mt-1 text-xs font-semibold text-text-muted leading-snug';
+
+    const handleInlineCta = () => {
+        markEngagement();
+        setHasInteractedWithDates(true);
+        setIsInlineChecking(true);
+        setOpenCalendar(false);
+        setOpenGuests(false);
+        setInlineStatus('Showing availability for your selection.');
+        trackEvent(
+            'booking_inline_cta_click',
+            { surface: 'booking_form', guests: totalPeople, hasSelection, nights },
+            { propertyId, listingId: propertyId, unitCode: propertyId },
+        );
+        if (typeof document !== 'undefined') {
+            document.getElementById('pricing-breakdown')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        window.setTimeout(() => {
+            setIsInlineChecking(false);
+            setInlineStatus('Availability refreshed. Review the pricing breakdown below.');
+        }, 650);
+    };
 
     return (
         <div id="booking-form" className={`max-w-md mx-auto p-6 bg-bg-surface shadow-level2 rounded-2xl relative ${containerPaddingBottom} lg:pb-0 lg:sticky lg:top-20`}>
+
+            <div className="sr-only" role="status" aria-live="polite">
+                <span id={validationMessageId}>{liveRegionMessage || 'Booking form ready'}</span>
+            </div>
 
             {/* PRICE SECTION */}
             <div className="mb-2 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -481,65 +665,155 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
             </div>
 
 
-            <div className="grid grid-cols-2 gap-3 mb-4">
-                <div
-                    onClick={() => setOpenCalendar(true)}
-                    className="border rounded-xl p-3 cursor-pointer"
-                >
-                    <p className="text-sm text-text-muted">Check-In Date</p>
-                    <p className="font-semibold">
-                        {format(dates.startDate, "dd-MM-yyyy")}
-                    </p>
-                </div>
+            <div className="mb-5 rounded-2xl border border-border-strong/60 bg-[color:color-mix(in_srgb,var(--bg-muted)_72%,var(--bg-surface))] shadow-inner">
+                <div className={fieldGridClass}>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            markEngagement();
+                            setOpenCalendar(true);
+                            setOpenGuests(false);
+                            setInlineStatus('Choose your arrival date.');
+                            trackEvent(
+                                'booking_calendar_opened',
+                                { surface: 'booking_form', trigger: 'checkin' },
+                                { propertyId, listingId: propertyId, unitCode: propertyId },
+                            );
+                        }}
+                        className={fieldButtonClass}
+                        aria-label={`Select check-in date, currently ${format(dates.startDate, "dd MMM yyyy")}`}
+                        aria-describedby={validationMessage ? validationMessageId : undefined}
+                    >
+                        <span className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">Check-in</span>
+                        <span className="mt-1 text-base font-semibold text-text-primary">
+                            {format(dates.startDate, "dd-MM-yyyy")}
+                        </span>
+                        <span className={helperTextClass}>Update check-in without leaving the page.</span>
+                    </button>
 
-                <div
-                    onClick={() => setOpenCalendar(true)}
-                    className="border border-border-subtle bg-bg-surface rounded-xl p-3 cursor-pointer"
-                    title={dates.startDate.getTime() === dates.endDate.getTime() ? "Check-out date must be after check-in date" : ""}
-                >
-                    <p className="text-sm text-text-muted">Check-Out Date</p>
-                    <p className="font-semibold">
-                        {format(dates.endDate, "dd-MM-yyyy")}
-                    </p>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            markEngagement();
+                            setOpenCalendar(true);
+                            setOpenGuests(false);
+                            setHasInteractedWithDates(true);
+                            setInlineStatus('Pick a check-out date after check-in.');
+                            trackEvent(
+                                'booking_calendar_opened',
+                                { surface: 'booking_form', trigger: 'checkout' },
+                                { propertyId, listingId: propertyId, unitCode: propertyId },
+                            );
+                        }}
+                        className={fieldButtonClass}
+                        aria-label={`Select check-out date, currently ${format(dates.endDate, "dd MMM yyyy")}`}
+                        aria-describedby={isCheckoutInvalid ? checkOutErrorId : validationMessage ? validationMessageId : undefined}
+                        aria-invalid={isCheckoutInvalid}
+                    >
+                        <span className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">Check-out</span>
+                        <span className="mt-1 text-base font-semibold text-text-primary">
+                            {format(dates.endDate, "dd-MM-yyyy")}
+                        </span>
+                        {hasInteractedWithDates && isCheckoutInvalid && (
+                            <span className="mt-1 text-xs font-semibold text-support-error" role="alert" id={checkOutErrorId}>
+                                Check-out must be after check-in.
+                            </span>
+                        )}
+                        <span className={helperTextClass}>Minimum one night; we’ll auto-fix overlaps.</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => {
+                            markEngagement();
+                            setGuestMenuBooting(true);
+                            setOpenGuests(true);
+                            setOpenCalendar(false);
+                            setInlineStatus('Adjust guests and add pets if needed.');
+                            trackEvent(
+                                'booking_guests_opened',
+                                { surface: 'booking_form', guests: totalPeople },
+                                { propertyId, listingId: propertyId, unitCode: propertyId },
+                            );
+                            window.setTimeout(() => setGuestMenuBooting(false), 180);
+                        }}
+                        className={fieldButtonClass}
+                        aria-label={`Select guests, currently ${formatGuestLabel()}`}
+                        aria-describedby={guestNeedsAdult ? guestErrorId : undefined}
+                        aria-invalid={guestNeedsAdult}
+                    >
+                        <span className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">Guests</span>
+                        <span className="mt-1 text-base font-semibold text-text-primary">{formatGuestLabel()}</span>
+                        {guestNeedsAdult && (
+                            <span className="mt-1 text-xs font-semibold text-support-error" role="alert" id={guestErrorId}>
+                                Add at least one adult.
+                            </span>
+                        )}
+                        <span className={helperTextClass}>Adults must be present for every booking.</span>
+                    </button>
+
+                    <div className="flex h-full min-h-[4.5rem] flex-col justify-center gap-2">
+                        <button
+                            type="button"
+                            onClick={handleInlineCta}
+                            disabled={inlineCtaDisabled}
+                            className="flex min-h-[4.5rem] items-center justify-center rounded-xl bg-cta-primary px-4 text-base font-semibold text-[var(--text-contrast)] shadow-level2 transition hover:bg-cta-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            {isInlineChecking ? 'Checking availability…' : inlineCtaLabel}
+                        </button>
+                        <Link
+                            to="/apartments"
+                            className="text-center text-sm font-semibold text-text-primary underline-offset-4 hover:text-cta-secondary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
+                        >
+                            Browse listings
+                        </Link>
+                    </div>
                 </div>
             </div>
+
+            {(inlineStatus || ctaConfirmation) && (
+                <p className="mt-2 text-sm font-semibold text-cta-primary" aria-live="polite">
+                    {inlineStatus || ctaConfirmation}
+                </p>
+            )}
 
             {openCalendar && (
                 <div ref={calendarRef} className="absolute right-0 z-[var(--z-overlay)] bg-bg-surface shadow-level2 rounded-xl mt-2 overflow-hidden border border-border-subtle">
-                    <DateRange
-                        editableDateInputs={true}
-                        onChange={handleDateChange}
-                        moveRangeOnFirstSelection={false}
-                        ranges={[{
-                            startDate: dates.startDate,
-                            endDate: dates.endDate,
-                            key: 'selection'
-                        }]}
-                        minDate={new Date()}
-                        rangeColors={[ctaPrimaryColor]}
-                        showDateDisplay={false}
-                        showPreview={false}
-                        showSelectionPreview={true}
-                        months={1}
-                        direction="horizontal"
-                        className="text-sm"
-                        monthDisplayFormat="MMMM yyyy"
-                        weekdayDisplayFormat="EEEE"
-                        dayDisplayFormat="d"
-                    />
+                    {isBookedDatesLoading ? (
+                        <div className="grid grid-cols-7 gap-2 p-3">
+                            {Array.from({ length: 14 }).map((_, index) => (
+                                <div
+                                    key={index}
+                                    className="h-10 rounded-lg bg-[color:color-mix(in_srgb,var(--bg-muted)_75%,var(--bg-surface))] animate-pulse"
+                                />
+                            ))}
+                        </div>
+                    ) : (
+                        <DateRange
+                            editableDateInputs={true}
+                            onChange={handleDateChange}
+                            moveRangeOnFirstSelection={false}
+                            ranges={[{
+                                startDate: dates.startDate,
+                                endDate: dates.endDate,
+                                key: 'selection'
+                            }]}
+                            minDate={defaultStartDate}
+                            rangeColors={[ctaPrimaryColor]}
+                            showDateDisplay={false}
+                            showPreview={false}
+                            showSelectionPreview={true}
+                            months={1}
+                            direction="horizontal"
+                            className="text-sm"
+                            monthDisplayFormat="MMMM yyyy"
+                            weekdayDisplayFormat="EEEE"
+                            dayDisplayFormat="d"
+                            disabledDates={bookedDates}
+                        />
+                    )}
                 </div>
             )}
-
-            {/* GUEST SELECTOR */}
-            <div
-                onClick={() => setOpenGuests(true)}
-                className="border border-border-subtle bg-bg-surface rounded-xl p-3 cursor-pointer flex justify-between items-center"
-            >
-                <div>
-                    <p className="text-sm text-text-muted">Guests</p>
-                    <p className="font-semibold">{formatGuestLabel()}</p>
-                </div>
-            </div>
 
             {/* UPDATED POPUP SECTION */}
             {openGuests && (
@@ -552,157 +826,171 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
                         top: '260px',
                     }}
                 >
-                    <div className="mb-4">
-                        <div className="flex justify-between items-center mb-2">
-                            <div>
-                                <p className="font-medium">Adults</p>
-                                <p className="text-sm text-text-muted">Age 14 or above</p>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <button
-                                    onClick={() => modifyGuest("adults", false)}
-                                    className="w-8 h-8 rounded-full border border-border-subtle flex items-center justify-center"
-                                >
-                                    -
-                                </button>
-                                <span>{guests.adults}</span>
-                                <button
-                                    onClick={() => modifyGuest("adults", true)}
-                                    className="w-8 h-8 rounded-full border border-border-subtle flex items-center justify-center"
-                                >
-                                    +
-                                </button>
-                            </div>
+                    {guestMenuBooting ? (
+                        <div className="grid grid-cols-2 gap-3">
+                            {Array.from({ length: 4 }).map((_, index) => (
+                                <div
+                                    key={index}
+                                    className="h-12 rounded-xl bg-[color:color-mix(in_srgb,var(--bg-muted)_70%,var(--bg-surface))] animate-pulse"
+                                />
+                            ))}
                         </div>
-                    </div>
-
-                    <div className="mb-4">
-                        <div className="flex justify-between items-center mb-2">
-                            <div>
-                                <p className="font-medium">Children</p>
-                                <p className="text-sm text-text-muted">Ages 5-12</p>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <button
-                                    onClick={() => {
-                                        if (guests.children > 0) {
-                                            setGuests(prev => ({
-                                                ...prev,
-                                                children: prev.children - 1,
-                                                childrenAges: prev.childrenAges.slice(0, -1)
-                                            }));
-                                        }
-                                    }}
-                                    className="w-8 h-8 rounded-full border border-border-subtle flex items-center justify-center"
-                                >
-                                    -
-                                </button>
-                                <span>{guests.children}</span>
-                                <button
-                                    onClick={() => {
-                                        setGuests(prev => ({
-                                            ...prev,
-                                            children: prev.children + 1,
-                                            childrenAges: [...prev.childrenAges, 5] // Default age 5
-                                        }));
-                                    }}
-                                    className="w-8 h-8 rounded-full border border-border-subtle flex items-center justify-center"
-                                >
-                                    +
-                                </button>
-                            </div>
-                        </div>
-                        {guests.childrenAges.length > 0 && (
-                            <div className="grid grid-cols-2 gap-2 mt-2">
-                                {guests.childrenAges.map((age, index) => (
-                                    <div key={index} className="flex items-center gap-2">
-                                        <span className="text-sm">Child {index + 1}:</span>
-                                        <select
-                                            value={age}
-                                            onChange={(e) => updateChildAge(index, parseInt(e.target.value))}
-                                            className="border rounded p-1 text-sm w-20"
-                                        >
-                                            {[5, 6, 7, 8, 9, 10, 11, 12].map(num => (
-                                                <option key={num} value={num}>{num} years</option>
-                                            ))}
-                                        </select>
+                    ) : (
+                        <>
+                            <div className="mb-4">
+                                <div className="flex justify-between items-center mb-2">
+                                    <div>
+                                        <p className="font-medium">Adults</p>
+                                        <p className="text-sm text-text-muted">Age 14 or above</p>
                                     </div>
-                                ))}
+                                    <div className="flex items-center gap-3">
+                                        <button
+                                            onClick={() => modifyGuest("adults", false)}
+                                            disabled={isAtMin("adults")}
+                                            className="w-11 h-11 rounded-full border border-border-subtle flex items-center justify-center text-text-primary hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary disabled:cursor-not-allowed disabled:opacity-50"
+                                        >
+                                            -
+                                        </button>
+                                        <span>{guests.adults}</span>
+                                        <button
+                                            onClick={() => modifyGuest("adults", true)}
+                                            disabled={isAtMax("adults")}
+                                            className="w-11 h-11 rounded-full border border-border-subtle flex items-center justify-center text-text-primary hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary disabled:cursor-not-allowed disabled:opacity-50"
+                                        >
+                                            +
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
-                        )}
-                    </div>
 
-                    <div className="mb-4">
-                        <div className="flex justify-between items-center">
-                            <div>
-                                <p className="font-medium">Infants</p>
-                                <p className="text-sm text-text-muted">Under 5 years</p>
+                            <div className="mb-4">
+                                <div className="flex justify-between items-center mb-2">
+                                    <div>
+                                        <p className="font-medium">Children</p>
+                                        <p className="text-sm text-text-muted">Ages 5-12</p>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <button
+                                            onClick={() => {
+                                                if (isAtMin("children")) return;
+                                                setGuests(prev => ({
+                                                    ...prev,
+                                                    children: Math.max(guestLimits.children.min, prev.children - 1),
+                                                    childrenAges: prev.childrenAges.slice(0, -1)
+                                                }));
+                                            }}
+                                            disabled={isAtMin("children")}
+                                            className="w-11 h-11 rounded-full border border-border-subtle flex items-center justify-center text-text-primary hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary disabled:cursor-not-allowed disabled:opacity-50"
+                                        >
+                                            -
+                                        </button>
+                                        <span>{guests.children}</span>
+                                        <button
+                                            onClick={() => {
+                                                if (isAtMax("children")) return;
+                                                setGuests(prev => {
+                                                    const nextChildren = prev.children + 1;
+                                                    const cappedValue =
+                                                        typeof guestLimits.children.max === 'number'
+                                                            ? Math.min(guestLimits.children.max, nextChildren)
+                                                            : nextChildren;
+                                                    return {
+                                                        ...prev,
+                                                        children: cappedValue,
+                                                        childrenAges: [...prev.childrenAges, 5] // Default age 5
+                                                    };
+                                                });
+                                            }}
+                                            disabled={isAtMax("children")}
+                                            className="w-11 h-11 rounded-full border border-border-subtle flex items-center justify-center text-text-primary hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary disabled:cursor-not-allowed disabled:opacity-50"
+                                        >
+                                            +
+                                        </button>
+                                    </div>
+                                </div>
+                                {guests.childrenAges.length > 0 && (
+                                    <div className="grid grid-cols-2 gap-2 mt-2">
+                                        {guests.childrenAges.map((age, index) => (
+                                            <div key={index} className="flex items-center gap-2">
+                                                <span className="text-sm">Child {index + 1}:</span>
+                                                <select
+                                                    value={age}
+                                                    onChange={(e) => updateChildAge(index, parseInt(e.target.value))}
+                                                    className="border rounded p-1 text-sm w-20"
+                                                >
+                                                    {[5, 6, 7, 8, 9, 10, 11, 12].map(num => (
+                                                        <option key={num} value={num}>{num} years</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
-                            <div className="flex items-center gap-3">
-                                <button
-                                    onClick={() => {
-                                        if (guests.infants > 0) {
-                                            setGuests(prev => ({
-                                                ...prev,
-                                                infants: prev.infants - 1
-                                            }));
-                                        }
-                                    }}
-                                    className="w-8 h-8 rounded-full border border-border-subtle flex items-center justify-center"
-                                >
-                                    -
-                                </button>
-                                <span>{guests.infants}</span>
-                                <button
-                                    onClick={() => {
-                                        if (guests.infants < 2) { // Limit to 2 infants
-                                            setGuests(prev => ({
-                                                ...prev,
-                                                infants: prev.infants + 1
-                                            }));
-                                        }
-                                    }}
-                                    className="w-8 h-8 rounded-full border border-border-subtle flex items-center justify-center"
-                                >
-                                    +
-                                </button>
-                            </div>
-                        </div>
-                        {guests.infants > 0 && (
-                            <p className="text-xs text-text-muted mt-1">
-                                Maximum 2 infants allowed (0-4 years)
-                            </p>
-                        )}
-                    </div>
 
-                    <div className="mb-4">
-                        <div className="flex justify-between items-center mb-2">
-                            <div>
-                                <p className="font-medium">Pets</p>
-                                <p className="text-sm text-text-muted"></p>
+                            <div className="mb-4">
+                                <div className="flex justify-between items-center">
+                                    <div>
+                                        <p className="font-medium">Infants</p>
+                                        <p className="text-sm text-text-muted">Under 5 years</p>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <button
+                                            onClick={() => modifyGuest("infants", false)}
+                                            disabled={isAtMin("infants")}
+                                            className="w-11 h-11 rounded-full border border-border-subtle flex items-center justify-center text-text-primary hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary disabled:cursor-not-allowed disabled:opacity-50"
+                                        >
+                                            -
+                                        </button>
+                                        <span>{guests.infants}</span>
+                                        <button
+                                            onClick={() => modifyGuest("infants", true)}
+                                            disabled={isAtMax("infants")}
+                                            className="w-11 h-11 rounded-full border border-border-subtle flex items-center justify-center text-text-primary hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary disabled:cursor-not-allowed disabled:opacity-50"
+                                        >
+                                            +
+                                        </button>
+                                    </div>
+                                </div>
+                                {guests.infants > 0 && (
+                                    <p className="text-xs text-text-muted mt-1">
+                                        Maximum 2 infants allowed (0-4 years)
+                                    </p>
+                                )}
                             </div>
-                            <div className="flex items-center gap-3">
-                                <button
-                                    onClick={() => modifyGuest("pets", false)}
-                                    className="w-8 h-8 rounded-full border border-border-subtle flex items-center justify-center"
-                                >
-                                    -
-                                </button>
-                                <span>{guests.pets}</span>
-                                <button
-                                    onClick={() => modifyGuest("pets", true)}
-                                    className="w-8 h-8 rounded-full border border-border-subtle flex items-center justify-center"
-                                >
-                                    +
-                                </button>
+
+                            <div className="mb-4">
+                                <div className="flex justify-between items-center mb-2">
+                                    <div>
+                                        <p className="font-medium">Pets</p>
+                                        <p className="text-sm text-text-muted"></p>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <button
+                                            onClick={() => modifyGuest("pets", false)}
+                                            disabled={isAtMin("pets")}
+                                            className="w-11 h-11 rounded-full border border-border-subtle flex items-center justify-center text-text-primary hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary disabled:cursor-not-allowed disabled:opacity-50"
+                                        >
+                                            -
+                                        </button>
+                                        <span>{guests.pets}</span>
+                                        <button
+                                            onClick={() => modifyGuest("pets", true)}
+                                            disabled={isAtMax("pets")}
+                                            className="w-11 h-11 rounded-full border border-border-subtle flex items-center justify-center text-text-primary hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary disabled:cursor-not-allowed disabled:opacity-50"
+                                        >
+                                            +
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                    </div>
+                        </>
+                    )}
                 </div>
             )}
 
             {hasSelection && hasInteractedWithDates && (
-                <div className="mt-6 space-y-3 border border-border-subtle rounded-xl p-4 bg-bg-surface shadow-level1">
+                <div id="pricing-breakdown" className="mt-6 space-y-3 border border-border-subtle rounded-xl p-4 bg-bg-surface shadow-level1">
                     <div className="space-y-2">
                         {nightlyBreakdown.map((night) => (
                             <div className="flex justify-between text-sm" key={night.date.toISOString()}>
@@ -826,7 +1114,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
               <button
                 onClick={initiatePayment}
                 disabled={isLoading || !termsAccepted}
-                className="bg-cta-primary hover:bg-cta-secondary text-[var(--text-contrast)] w-full rounded-full py-4 text-lg font-semibold transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center shadow-level1"
+                className="bg-cta-primary hover:bg-cta-secondary text-[var(--text-contrast)] w-full rounded-full py-4 text-lg font-semibold transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center shadow-level1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
               >
                 {isLoading ? (
                   <>
@@ -921,7 +1209,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
                     <button
                         onClick={initiatePayment}
                         disabled={isLoading || !termsAccepted}
-                        className="mt-1 bg-cta-primary hover:bg-cta-secondary text-[var(--text-contrast)] rounded-full px-4 py-2 text-sm font-semibold transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed shadow-level1"
+                        className="mt-1 bg-cta-primary hover:bg-cta-secondary text-[var(--text-contrast)] rounded-full px-4 py-2 text-sm font-semibold transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed shadow-level1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
                     >
                         {primaryCtaLabel}
                     </button>

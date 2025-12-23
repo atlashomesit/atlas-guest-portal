@@ -55,6 +55,9 @@
   --safe-area-bottom: env(safe-area-inset-bottom, 0px);
   --safe-area-left: env(safe-area-inset-left, 0px);
 
+  /* Layout */
+  --nav-height: 80px;
+
   /* Layering / z-index scale */
   --z-base: 0;
   --z-dropdown: 10;

@@ -10,7 +10,7 @@ The hero trust row is intentionally limited to three high-signal badges—**Veri
 - Primary (desktop & mobile): Home, Apartments, Location, FAQs, Contact
 - Header keeps the business phone visible (tel link) alongside a softer-outline Book Now CTA
 - Footer carries the destinations that were previously grouped under “More” (Gallery, About Us, Articles, Offers) plus Sitemap/Policies/Terms
-- CTA: Book Now button remains a WhatsApp booking handoff
+- CTA: Book Now now scrolls in-page to the **Our Homes** discovery block (`/#our-homes`) while WhatsApp sits as the secondary “Need help?” link for people who want a human handoff
 - Mobile: ordered primary links with collapsible Apartments children; tapping any item closes the menu
 
 Rationale: simplify the header for faster wayfinding, surface FAQs in-place of the former Help label without changing content, and keep the full phone number prominent (especially for India users who prefer to call and negotiate) while retaining but softening the Book Now emphasis.
@@ -29,6 +29,14 @@ Optional tooling:
 - npm **10.9.2**
 - Cloudflare Pages build vars → `NODE_VERSION=22.12.0`, `NPM_FLAGS=--no-audit --no-fund`
 - Enforced override → `@jridgewell/sourcemap-codec@1.5.5`
+
+## Environment Variables
+- Vite only surfaces variables prefixed with `VITE_`; CRA-style `REACT_APP_*` keys are ignored at runtime. Make sure API hosts use `VITE_API_BASE_URL` rather than the legacy `REACT_APP_API_BASE_URL` name.
+- `VITE_API_BASE_URL` (required) → Base URL for all API calls (omit trailing slash). The value is resolved at runtime via [`/config`](functions/config.js) and [`src/config/getApiBaseUrl.ts`](src/config/getApiBaseUrl.ts); if it is missing, the app logs an error and renders a friendly fallback screen instead of a blank page.
+- Cloudflare Pages setup:
+  - **Production:** Project → Settings → Environment variables → set `VITE_API_BASE_URL` to the production API host. Save for “Production” scope.
+  - **Preview:** In the same screen, add `VITE_API_BASE_URL` for the “Preview” scope to point at staging/QA APIs so preview builds load data correctly.
+  - Runtime config: Pages Functions serve `/config` that injects `window.__ATLAS_RUNTIME_CONFIG__ = { apiBaseUrl: "..." }`. Changes to the env var apply immediately (no rebuild needed after this change ships); visiting `/config` should return the runtime value or an empty string with a comment if missing. `/config.js` redirects to `/config` to avoid SPA fallbacks while keeping legacy references working.
 
 ### Cloudflare Pages settings
 - In the Pages project dashboard, set the environment variable `NODE_VERSION=22.12.0` so builds align with Vite 7's engine requirement (\`^20.19.0 || >=22.12.0\`).
@@ -75,11 +83,25 @@ Optional tooling:
    npm run preview
    ```
 
+## Tests
+- `npm test` runs the Vitest suite (jsdom) including smoke coverage for the header Book Now anchor and the hero date-range + guests flow.
+- Browser E2E can be layered on later with Playwright/Cypress; npm registry restrictions in this environment currently block installing `@playwright/test` directly.
+
+### Booking funnel entry points
+- Primary header CTA → `/#our-homes` (scrolls to the Our Homes grid on the homepage)
+- Secondary help CTA → WhatsApp link labelled “Need help?”
+- Hero search → Builds `/apartments?checkIn=YYYY-MM-DD&checkOut=YYYY-MM-DD&guests=2` so listings filter on the chosen stay window and party size
+
 ## Theming
 - CSS variables for the active palette are defined per theme in `src/styles/themes/*.css` and loaded globally via `src/styles/themes/index.css`.
 - `applyTheme(themeKey)` in [`src/styles/theme.ts`](src/styles/theme.ts) applies the `data-theme` attribute on `<html>` while falling back to the default when an unknown key is provided.
 - To add a seasonal palette: duplicate `src/styles/themes/default.css` into a new file (for example, `valentine.css`), adjust the variable values, import it in `src/styles/themes/index.css`, and register the key in `themeRegistry` inside `src/styles/theme.ts`. Components do not need refactors because they already consume semantic tokens.
 - For semantic token intent, CTA discipline, z-index governance, safe-area usage, and theme QA steps, see the [Design system and theming guide](docs/design-system.md).
+
+### Homepage search controls
+- The hero booking bar uses a `react-date-range` calendar for check-in/check-out with a single summary line (e.g., `22 Dec 2025 – 23 Dec 2025 · 2 guests`).
+- Query params flow through `checkIn`, `checkOut`, and `guests` so `/apartments` can hydrate filters on reload or direct links.
+- Validation enforces check-out after check-in and defaults to at least one guest; guest steppers cap the party size to 16.
 
 ## Project Map
 | Path | Description |

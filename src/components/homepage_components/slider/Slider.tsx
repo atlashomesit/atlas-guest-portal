@@ -1,13 +1,20 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { BadgePercent, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { BadgePercent, CheckCircle2, CalendarRange, ChevronDown, ShieldCheck, Users } from 'lucide-react';
+import { addDays, format, startOfDay } from 'date-fns';
+import { DateRange, type RangeKeyDict } from 'react-date-range';
+import 'react-date-range/dist/styles.css';
+import 'react-date-range/dist/theme/default.css';
 import { LOGO_URL } from '../../../config/branding';
 import { HERO_IMAGE_URL } from '../../../config/hero';
 import { trackEvent } from '../../../utils/analytics';
+import { heroWidgetLayoutFlag } from '../../../config/abFlags';
 import { TrustBadge } from '../../ui/TrustBadge';
 
 const HERO_OVERLAY_GRADIENT =
-  'linear-gradient(90deg, rgba(0, 0, 0, 0.62) 0%, rgba(0, 0, 0, 0.45) 45%, rgba(0, 0, 0, 0.24) 100%)';
+  'linear-gradient(118deg, rgba(7, 10, 18, 0.92) 0%, rgba(7, 10, 18, 0.78) 42%, rgba(7, 10, 18, 0.62) 100%)';
+const HERO_OVERLAY_GRADIENT_LEGACY =
+  'linear-gradient(115deg, rgba(7, 10, 18, 0.82) 0%, rgba(7, 10, 18, 0.64) 45%, rgba(7, 10, 18, 0.38) 100%)';
 const STORAGE_KEY = 'atlasHeroSearch';
 
 const TRUST_BADGES = [
@@ -18,11 +25,13 @@ const TRUST_BADGES = [
 
 const Slider = () => {
   const navigate = useNavigate();
+  const enableWidgetExperiment = heroWidgetLayoutFlag();
 
   const overlayStyle = React.useMemo(() => {
     const style: React.CSSProperties = {
-      backgroundColor: 'rgba(0, 0, 0, 0.16)',
-      backgroundImage: HERO_OVERLAY_GRADIENT,
+      backgroundColor: enableWidgetExperiment ? 'rgba(3, 6, 14, 0.74)' : 'rgba(0, 0, 0, 0.45)',
+      backgroundImage: enableWidgetExperiment ? HERO_OVERLAY_GRADIENT : HERO_OVERLAY_GRADIENT_LEGACY,
+      backdropFilter: 'blur(4px) saturate(0.96)',
     };
 
     if (typeof navigator !== 'undefined' && navigator.userAgent?.includes('jsdom')) {
@@ -30,118 +39,192 @@ const Slider = () => {
     }
 
     return style;
-  }, []);
+  }, [enableWidgetExperiment]);
 
-  const today = React.useMemo(() => new Date(), []);
+  const [searchParams] = useSearchParams();
+  const today = React.useMemo(() => startOfDay(new Date()), []);
 
-  const defaultDates = React.useMemo(() => {
-    const checkInDate = new Date();
-    const checkOutDate = new Date();
-    checkOutDate.setDate(checkOutDate.getDate() + 1);
+  const defaultRange = React.useMemo(
+    () => ({
+      startDate: today,
+      endDate: addDays(today, 1),
+    }),
+    [today],
+  );
 
-    const toInputValue = (date: Date) => date.toISOString().split('T')[0];
-
-    return {
-      checkIn: toInputValue(checkInDate),
-      checkOut: toInputValue(checkOutDate),
-    };
-  }, []);
-
-  const [checkIn, setCheckIn] = React.useState(defaultDates.checkIn);
-  const [checkOut, setCheckOut] = React.useState(defaultDates.checkOut);
+  const [dateRange, setDateRange] = React.useState<{ startDate: Date | null; endDate: Date | null }>(
+    defaultRange,
+  );
   const [guests, setGuests] = React.useState(2);
   const [error, setError] = React.useState<string | null>(null);
+  const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [statusMessage, setStatusMessage] = React.useState<string>('');
+  const [hasInteracted, setHasInteracted] = React.useState(false);
+  const isTestEnvironment = typeof navigator !== 'undefined' && navigator.userAgent?.includes('jsdom');
+  const [calendarReady, setCalendarReady] = React.useState(isTestEnvironment);
+  const hasTrackedDropoff = React.useRef(false);
+  const hasInteractedRef = React.useRef(false);
+  const latestWidgetStateRef = React.useRef({ hasSelection: false, guests });
+  const calendarWrapperRef = React.useRef<HTMLDivElement | null>(null);
+  const monthsToShow = React.useMemo(
+    () => (typeof window !== 'undefined' && window.innerWidth < 768 ? 1 : 2),
+    [],
+  );
 
-  const isValidDate = (value?: string | null) => {
-    if (!value) return false;
-    const parsed = new Date(value);
-    return !Number.isNaN(parsed.getTime());
+  const parseDate = (value?: string | null) => {
+    if (!value) return null;
+    const parsed = startOfDay(new Date(value));
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  };
+
+  const clampRange = (startDate: Date | null, endDate: Date | null) => {
+    const normalizedStart = startDate && startDate < today ? today : startDate;
+    if (normalizedStart && endDate && endDate <= normalizedStart) {
+      return { startDate: normalizedStart, endDate: addDays(normalizedStart, 1) };
+    }
+    return { startDate: normalizedStart ?? null, endDate: endDate ?? null };
+  };
+
+  const hydrateFromStorage = () => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (!saved) return null;
+      const parsed = JSON.parse(saved) as { checkIn?: string; checkOut?: string; guests?: number };
+      return {
+        startDate: parseDate(parsed.checkIn),
+        endDate: parseDate(parsed.checkOut),
+        guests: typeof parsed.guests === 'number' && parsed.guests > 0 ? parsed.guests : null,
+      };
+    } catch {
+      return null;
+    }
   };
 
   React.useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (!saved) return;
+    const stored = hydrateFromStorage();
+    const paramRange = {
+      startDate: parseDate(searchParams.get('checkIn')),
+      endDate: parseDate(searchParams.get('checkOut')),
+      guests: Number(searchParams.get('guests')) || null,
+    };
 
-      const parsed = JSON.parse(saved) as { checkIn?: string; checkOut?: string; guests?: number };
+    const startDate = paramRange.startDate ?? stored?.startDate ?? defaultRange.startDate;
+    const endDate = paramRange.endDate ?? stored?.endDate ?? defaultRange.endDate;
 
-      const minDate = defaultDates.checkIn;
+    const nextRange = clampRange(startDate, endDate);
 
-      if (isValidDate(parsed.checkIn)) {
-        const storedCheckIn = new Date(parsed.checkIn!);
-        const minCheckInDate = new Date(minDate);
-        setCheckIn((storedCheckIn < minCheckInDate ? minDate : parsed.checkIn!) || defaultDates.checkIn);
-      }
-
-      if (isValidDate(parsed.checkOut)) {
-        const storedCheckOut = new Date(parsed.checkOut!);
-        const referenceCheckIn = isValidDate(parsed.checkIn) ? new Date(parsed.checkIn!) : new Date(minDate);
-        setCheckOut(
-          storedCheckOut > referenceCheckIn ? parsed.checkOut! : defaultDates.checkOut,
-        );
-      }
-
-      if (typeof parsed.guests === 'number' && parsed.guests > 0) {
-        setGuests(parsed.guests);
-      }
-    } catch {
-      // Ignore storage parse errors
+    setDateRange(nextRange);
+    if (paramRange.guests && paramRange.guests > 0) {
+      setGuests(paramRange.guests);
+    } else if (stored?.guests) {
+      setGuests(stored.guests);
     }
-  }, [defaultDates.checkIn, defaultDates.checkOut]);
+  }, [defaultRange.endDate, defaultRange.startDate, searchParams]);
 
   React.useEffect(() => {
     try {
       localStorage.setItem(
         STORAGE_KEY,
         JSON.stringify({
-          checkIn,
-          checkOut,
+          checkIn: dateRange.startDate?.toISOString(),
+          checkOut: dateRange.endDate?.toISOString(),
           guests,
         }),
       );
     } catch {
       // Ignore storage write errors
     }
-  }, [checkIn, checkOut, guests]);
+  }, [dateRange.endDate, dateRange.startDate, guests]);
 
-  const minCheckIn = React.useMemo(() => today.toISOString().split('T')[0], [today]);
+  React.useEffect(() => {
+    if (!isCalendarOpen) return;
 
-  const minCheckOut = React.useMemo(() => {
-    const base = isValidDate(checkIn) ? new Date(checkIn) : new Date();
-    base.setDate(base.getDate() + 1);
-    return base.toISOString().split('T')[0];
-  }, [checkIn]);
+    const handleClickOutside = (event: MouseEvent) => {
+      if (calendarWrapperRef.current && !calendarWrapperRef.current.contains(event.target as Node)) {
+        setIsCalendarOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isCalendarOpen]);
+
+  React.useEffect(() => {
+    if (!isCalendarOpen || isTestEnvironment) return;
+    const timer = window.setTimeout(() => setCalendarReady(true), 140);
+    return () => {
+      window.clearTimeout(timer);
+      setCalendarReady(false);
+    };
+  }, [isCalendarOpen, isTestEnvironment]);
+
+  React.useEffect(() => {
+    hasInteractedRef.current = hasInteracted;
+  }, [hasInteracted]);
+
+  React.useEffect(() => {
+    latestWidgetStateRef.current = {
+      hasSelection: Boolean(dateRange.startDate && dateRange.endDate),
+      guests,
+    };
+  }, [dateRange.endDate, dateRange.startDate, guests]);
+
+  React.useEffect(
+    () => () => {
+      if (hasInteractedRef.current && !hasTrackedDropoff.current) {
+        hasTrackedDropoff.current = true;
+        trackEvent('hero_widget_dropoff', {
+          surface: 'hero_form',
+          hasDates: latestWidgetStateRef.current.hasSelection,
+          guests: latestWidgetStateRef.current.guests,
+        });
+      }
+    },
+    [],
+  );
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
+    if (isSubmitting) return;
+
     setError(null);
+    setStatusMessage('');
+    markHeroInteraction();
 
-    if (!isValidDate(checkIn) || !isValidDate(checkOut)) {
-      setError('Please select valid check-in and check-out dates.');
+    const { startDate, endDate } = dateRange;
+
+    if (!startDate || !endDate) {
+      setError('Please select your check-in and check-out dates.');
+      setStatusMessage('Select both check-in and check-out dates to continue.');
       return;
     }
 
-    const checkInDate = new Date(checkIn);
-    const checkOutDate = new Date(checkOut);
-
-    if (checkInDate < new Date(minCheckIn)) {
-      setError('Check-in cannot be in the past.');
-      return;
-    }
-
-    if (checkOutDate <= checkInDate) {
+    if (endDate <= startDate) {
       setError('Check-out must be after check-in.');
+      setStatusMessage('Check-out must be after check-in.');
+      return;
+    }
+
+    if (startDate < today) {
+      setDateRange(clampRange(today, endDate));
+      setError('Check-in cannot be in the past.');
+      setStatusMessage('Check-in adjusted to the next available date.');
       return;
     }
 
     if (guests < 1) {
       setError('Guests must be at least 1.');
+      setStatusMessage('Add at least one guest to continue.');
       return;
     }
 
+    const formattedCheckIn = format(startDate, 'yyyy-MM-dd');
+    const formattedCheckOut = format(endDate, 'yyyy-MM-dd');
+
     const searchParams = new URLSearchParams({
-      checkIn: checkInDate.toISOString().split('T')[0],
-      checkOut: checkOutDate.toISOString().split('T')[0],
+      checkIn: formattedCheckIn,
+      checkOut: formattedCheckOut,
       guests: guests.toString(),
     });
 
@@ -149,8 +232,8 @@ const Slider = () => {
       'availability_search',
       {
         surface: 'hero_form',
-        checkIn: checkInDate.toISOString(),
-        checkOut: checkOutDate.toISOString(),
+        checkIn: startDate.toISOString(),
+        checkOut: endDate.toISOString(),
         guests,
       },
       { route: `/apartments?${searchParams.toString()}` },
@@ -158,17 +241,85 @@ const Slider = () => {
 
     trackEvent(
       'listings_browse',
-      { surface: 'hero_form', checkIn: checkInDate.toISOString(), checkOut: checkOutDate.toISOString(), guests },
+      { surface: 'hero_form', checkIn: startDate.toISOString(), checkOut: endDate.toISOString(), guests },
       { route: `/apartments?${searchParams.toString()}` },
     );
 
+    trackEvent(
+      'hero_primary_cta_click',
+      {
+        surface: 'hero_form',
+        checkIn: startDate.toISOString(),
+        checkOut: endDate.toISOString(),
+        guests,
+      },
+      { route: `/apartments?${searchParams.toString()}` },
+    );
+
+    setIsSubmitting(true);
+    setStatusMessage('Checking availability...');
+
     navigate(`/apartments?${searchParams.toString()}`);
+    window.setTimeout(() => setIsSubmitting(false), 800);
   };
+
+  const handleRangeChange = (ranges: RangeKeyDict) => {
+    const selection = ranges.selection ?? { startDate: null, endDate: null };
+    const normalizedStart = selection.startDate ? startOfDay(selection.startDate) : null;
+    const normalizedEnd = selection.endDate ? startOfDay(selection.endDate) : null;
+    markHeroInteraction();
+    setStatusMessage('Updated dates.');
+    setDateRange(clampRange(normalizedStart, normalizedEnd));
+    setError(null);
+    trackEvent('hero_dates_changed', {
+      surface: 'hero_form',
+      checkIn: normalizedStart?.toISOString(),
+      checkOut: normalizedEnd?.toISOString(),
+    });
+    if (selection.startDate && selection.endDate) {
+      setIsCalendarOpen(false);
+    }
+  };
+
+  const checkInLabel = dateRange.startDate ? format(dateRange.startDate, 'dd MMM yyyy') : 'Check-in';
+  const checkOutLabel = dateRange.endDate ? format(dateRange.endDate, 'dd MMM yyyy') : 'Check-out';
+  const isSubmitDisabled =
+    !dateRange.startDate || !dateRange.endDate || dateRange.endDate <= dateRange.startDate || guests < 1;
+
+  const handleGuestChange = (delta: number) => {
+    markHeroInteraction();
+    setGuests((prev) => {
+      const next = Math.min(16, Math.max(1, prev + delta));
+      trackEvent('hero_guests_changed', { surface: 'hero_form', guests: next });
+      return next;
+    });
+  };
+
+  const markHeroInteraction = () => {
+    if (!hasInteractedRef.current) {
+      hasInteractedRef.current = true;
+    }
+    setHasInteracted(true);
+  };
+
+  const formContainerClass = enableWidgetExperiment
+    ? 'w-full max-w-5xl rounded-3xl bg-[color:color-mix(in_srgb,var(--bg-surface)_96%,rgba(3,6,14,0.45))] shadow-[0_20px_60px_rgba(0,0,0,0.45)] backdrop-blur-md border border-[color:color-mix(in_srgb,var(--bg-surface)_60%,transparent)] p-4 sm:p-5 md:p-6 flex flex-col gap-4 sm:gap-5'
+    : 'w-full max-w-5xl rounded-3xl bg-[color:color-mix(in_srgb,var(--bg-surface)_94%,rgba(0,0,0,0.18))] shadow-level3 backdrop-blur border border-[color:color-mix(in_srgb,var(--bg-surface)_55%,transparent)] p-4 sm:p-5 md:p-6 flex flex-col gap-4 sm:gap-5';
+
+  const formGridClass = enableWidgetExperiment
+    ? 'grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 md:auto-rows-fr lg:grid-cols-4 lg:gap-5'
+    : 'grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 md:auto-rows-fr lg:grid-cols-4 lg:gap-5';
+
+  const fieldShellClass =
+    'flex h-full min-h-[112px] flex-col justify-between rounded-2xl border border-[color:color-mix(in_srgb,var(--border-subtle)_80%,transparent)] bg-[color:color-mix(in_srgb,var(--bg-muted)_92%,var(--bg-surface))] px-4 py-4 sm:px-5 sm:py-5 shadow-[0_12px_36px_rgba(6,8,15,0.32)]';
+  const labelClass =
+    'flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-[color-mix(in_srgb,var(--text-primary)_80%,transparent)] whitespace-nowrap';
+  const helperTextClass = 'mt-2 text-sm leading-snug text-[color-mix(in_srgb,var(--text-primary)_78%,transparent)]';
 
   return (
     <section className="w-full bg-bg-muted text-text-primary">
       <div
-        className="relative isolate overflow-hidden min-h-[75vh] md:min-h-[70vh] flex items-center justify-center bg-cover bg-center bg-no-repeat"
+        className="relative isolate overflow-hidden min-h-[75vh] md:min-h-[70vh] flex items-center justify-center bg-cover bg-center bg-no-repeat pt-[calc(var(--nav-height,80px)+1rem)]"
         style={{ backgroundImage: `url(${HERO_IMAGE_URL})` }}
       >
         <div
@@ -177,92 +328,153 @@ const Slider = () => {
           className="pointer-events-none absolute inset-0 opacity-95"
           style={overlayStyle}
         />
-        <div className="relative top-[40px] z-10 flex flex-col items-center gap-7 px-6 py-12 text-center max-w-4xl">
+        <div className="relative z-10 flex max-w-4xl flex-col items-center gap-7 px-4 pb-12 text-center sm:px-6 md:pt-3">
 
           <Link to="/" className="flex items-center gap-3">
-            <img src={LOGO_URL} alt="Atlas Homestays" className="h-14 w-auto rounded-md bg-[color:color-mix(in_srgb,var(--bg-surface)_80%,transparent)] p-2 shadow-level1" />
+            <img src={LOGO_URL} alt="Atlas Homestays" className="h-14 w-auto rounded-md bg-[color:color-mix(in_srgb,var(--bg-surface)_88%,transparent)] p-2 shadow-level2" />
             <span className="text-xl font-semibold text-[var(--text-contrast)] tracking-wide">Atlas Homestays</span>
           </Link>
 
           <div className="space-y-4 max-w-3xl">
-            <p
-              className="text-3xl md:text-5xl font-semibold text-[var(--text-on-hero)] drop-shadow-lg text-pretty"
+            <h1
+              className="text-4xl md:text-6xl font-bold leading-tight text-[var(--text-on-hero)] drop-shadow-lg text-pretty"
               style={{ textWrap: 'balance' }}
             >
               Thoughtfully curated stays in Hyderabad
-            </p>
-            <p
-              className="text-base md:text-lg text-[color-mix(in_srgb,var(--text-on-hero)_88%,transparent)] text-pretty"
+            </h1>
+            <h2
+              className="text-lg md:text-xl font-medium text-[color-mix(in_srgb,var(--text-on-hero)_88%,transparent)] text-pretty"
               style={{ textWrap: 'balance' }}
             >
               Discover verified apartments with flexible bookings, transparent pricing, and secure payments.
-            </p>
+            </h2>
           </div>
 
           <form
             onSubmit={handleSubmit}
-            className="w-full max-w-4xl rounded-2xl bg-[color:color-mix(in_srgb,var(--bg-surface)_92%,transparent)] shadow-level2 backdrop-blur border border-[color:color-mix(in_srgb,var(--bg-surface)_55%,transparent)] p-4 md:p-5 flex flex-col gap-3"
+            className={formContainerClass}
+            data-testid="hero-widget"
           >
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_auto]">
-              <label className="flex flex-col rounded-xl bg-bg-muted px-4 py-3 shadow-inner text-left">
-                <span className="text-xs font-semibold uppercase tracking-wide text-text-muted">Check-in</span>
-                <input
-                  type="date"
-                  min={minCheckIn}
-                  value={checkIn}
-                  onChange={(event) => setCheckIn(event.target.value)}
-                  className="w-full bg-transparent text-lg font-semibold text-text-primary placeholder:text-text-muted focus:outline-none"
-                  required
-                />
-              </label>
-              <label className="flex flex-col rounded-xl bg-bg-muted px-4 py-3 shadow-inner text-left">
-                <span className="text-xs font-semibold uppercase tracking-wide text-text-muted">Check-out</span>
-                <input
-                  type="date"
-                  min={minCheckOut}
-                  value={checkOut}
-                  onChange={(event) => setCheckOut(event.target.value)}
-                  className="w-full bg-transparent text-lg font-semibold text-text-primary placeholder:text-text-muted focus:outline-none"
-                  required
-                />
-              </label>
-              <label className="flex flex-col rounded-xl bg-bg-muted px-4 py-3 shadow-inner text-left md:max-w-[180px]">
-                <span className="text-xs font-semibold uppercase tracking-wide text-text-muted">Guests</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={10}
-                  value={guests}
-                  onChange={(event) => setGuests(Math.max(1, Number(event.target.value)))}
-                  className="w-full bg-transparent text-lg font-semibold text-text-primary placeholder:text-text-muted focus:outline-none"
-                  required
-                />
-              </label>
+            <div className="sr-only" role="status" aria-live="polite">
+              {statusMessage || error || 'Hero form ready'}
             </div>
+            <div
+              className={formGridClass}
+              ref={calendarWrapperRef}
+            >
+              <div className="relative">
+                <button
+                  type="button"
+                  className={`${fieldShellClass} text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary`}
+                  aria-label="Select check-in date"
+                  aria-expanded={isCalendarOpen}
+                  onClick={() => setIsCalendarOpen((open) => !open)}
+                  data-testid="hero-date-toggle"
+                >
+                  <span className={labelClass}>
+                    <CalendarRange className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    <span className="truncate">Check-in</span>
+                  </span>
+                  <span className="mt-3 flex items-center justify-between gap-2 text-lg font-semibold text-text-primary leading-tight">
+                    {checkInLabel}
+                    <ChevronDown className={`h-4 w-4 shrink-0 text-text-muted transition ${isCalendarOpen ? 'rotate-180' : ''}`} aria-hidden />
+                  </span>
+                  <span className={helperTextClass}>Earliest available date shown.</span>
+                </button>
 
-            {error && (
-              <p className="text-left text-sm font-semibold text-[color-mix(in_srgb,var(--cta-secondary)_90%,transparent)]">
-                {error}
-              </p>
-            )}
-
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex flex-col gap-1 rounded-xl bg-[color:color-mix(in_srgb,var(--bg-surface)_92%,transparent)] px-4 py-3 text-left shadow-inner sm:flex-row sm:items-center sm:gap-3">
-                <div className="flex items-center gap-2 text-sm font-semibold text-text-primary">
-                  <ShieldCheck className="h-4 w-4 text-cta-secondary" aria-hidden="true" />
-                  <span>Book with confidence</span>
-                </div>
-                <p className="text-sm text-text-secondary sm:border-l sm:border-[color:color-mix(in_srgb,var(--text-muted)_60%,transparent)] sm:pl-3">
-                  Instant confirmation • Secure payments • No hidden charges
-                </p>
+                {isCalendarOpen && (
+                  <div className="absolute left-0 right-0 z-[var(--z-dropdown)] mt-2 rounded-2xl border border-border-subtle bg-bg-surface p-3 shadow-level2 md:w-auto">
+                    {calendarReady ? (
+                      <DateRange
+                        onChange={handleRangeChange}
+                        months={monthsToShow}
+                        direction="horizontal"
+                        showDateDisplay={false}
+                        rangeColors={['var(--cta-primary)']}
+                        minDate={today}
+                        ranges={[
+                          {
+                            startDate: dateRange.startDate ?? today,
+                            endDate: dateRange.endDate ?? addDays(today, 1),
+                            key: 'selection',
+                          },
+                        ]}
+                        dayContentRenderer={(day) => (
+                          <div data-testid={`hero-date-${format(day, 'yyyy-MM-dd')}`}>{format(day, 'd')}</div>
+                        )}
+                      />
+                    ) : (
+                      <div className="grid grid-cols-7 gap-2">
+                        {Array.from({ length: 14 }).map((_, index) => (
+                          <div
+                            key={index}
+                            className="h-10 rounded-lg bg-[color:color-mix(in_srgb,var(--bg-muted)_75%,var(--bg-surface))] animate-pulse"
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+              <button
+                type="button"
+                className={`${fieldShellClass} text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary md:-ml-[1px]`}
+                aria-label="Select check-out date"
+                aria-expanded={isCalendarOpen}
+                onClick={() => setIsCalendarOpen((open) => !open)}
+              >
+                <span className={labelClass}>
+                  <CalendarRange className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span className="truncate">Check-out</span>
+                </span>
+                <span className="mt-3 flex items-center justify-between gap-2 text-lg font-semibold text-text-primary leading-tight">
+                  {checkOutLabel}
+                  <ChevronDown className={`h-4 w-4 shrink-0 text-text-muted transition ${isCalendarOpen ? 'rotate-180' : ''}`} aria-hidden />
+                </span>
+                <span className={helperTextClass}>Ensure your stay ends after check-in.</span>
+              </button>
+
+              <div className={`${fieldShellClass} text-left md:-ml-[1px]`}>
+                <span className={labelClass}>
+                  <Users className="h-4 w-4 shrink-0" aria-hidden />
+                  <span className="truncate">Guests</span>
+                </span>
+                <div className="mt-3 flex items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    className="inline-flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-full border border-border-subtle text-lg font-semibold text-text-primary transition hover:border-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary disabled:opacity-40 disabled:hover:border-border-subtle"
+                    onClick={() => handleGuestChange(-1)}
+                    disabled={guests <= 1}
+                    aria-label="Decrease guests"
+                  >
+                    −
+                  </button>
+                  <div className="flex flex-col items-center">
+                    <span className="text-lg font-semibold text-text-primary">{guests}</span>
+                    <span className="text-xs font-medium text-text-muted">guest{guests === 1 ? '' : 's'}</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="inline-flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-full border border-border-subtle text-lg font-semibold text-text-primary transition hover:border-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
+                    onClick={() => handleGuestChange(1)}
+                    aria-label="Increase guests"
+                  >
+                    +
+                  </button>
+                </div>
+                <span className={helperTextClass}>Defaulting to 2 guests; adjust anytime.</span>
+              </div>
+
+              <div className={`${fieldShellClass} md:-ml-[1px] lg:min-h-[112px] lg:items-stretch lg:justify-center`}>
                 <button
                   type="submit"
-                  className="inline-flex items-center justify-center rounded-full bg-cta-primary px-6 py-3 text-base font-semibold text-[var(--text-contrast)] shadow-level2 transition hover:bg-cta-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
+                  disabled={isSubmitDisabled || isSubmitting}
+                  className="inline-flex h-14 min-h-[56px] w-full items-center justify-center rounded-xl bg-cta-primary px-6 text-base font-semibold text-[var(--text-contrast)] shadow-[0_16px_38px_rgba(12,86,255,0.32)] transition hover:bg-cta-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary disabled:cursor-not-allowed disabled:bg-[color:color-mix(in_srgb,var(--cta-primary)_70%,var(--bg-muted))] disabled:text-[color-mix(in_srgb,var(--text-contrast)_82%,transparent)] disabled:shadow-none aria-busy:cursor-progress aria-busy:opacity-90 whitespace-nowrap"
+                  onClick={() => setStatusMessage('Checking availability...')}
+                  aria-busy={isSubmitting}
                 >
-                  Check availability
+                  {isSubmitting ? 'Checking...' : 'Check availability'}
                 </button>
                 <Link
                   to="/apartments"
@@ -273,25 +485,45 @@ const Slider = () => {
                       { route: '/apartments' },
                     )
                   }
-                  className="inline-flex items-center justify-center text-base font-semibold text-text-primary underline-offset-4 transition hover:text-cta-secondary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
+                  className="inline-flex items-center justify-center text-sm font-semibold text-text-muted underline-offset-4 transition hover:text-cta-secondary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary whitespace-nowrap"
                 >
                   Browse listings
                 </Link>
-
               </div>
+            </div>
+
+            {error && (
+              <p className="text-left text-sm font-semibold text-[color-mix(in_srgb,var(--cta-secondary)_90%,transparent)]">
+                {error}
+              </p>
+            )}
+            {!error && statusMessage && (
+              <p className="text-left text-sm font-semibold text-text-primary" aria-live="polite">
+                {statusMessage}
+              </p>
+            )}
+
+            <div className="flex flex-col gap-2 rounded-2xl bg-[color:color-mix(in_srgb,var(--bg-surface)_94%,transparent)] px-4 py-4 text-left shadow-inner md:flex-row md:items-center md:gap-4">
+              <div className="flex items-center gap-2 text-sm font-semibold text-text-primary">
+                <ShieldCheck className="h-4 w-4 text-cta-secondary" aria-hidden="true" />
+                <span>Book with confidence</span>
+              </div>
+              <p className="text-sm text-[color-mix(in_srgb,var(--text-primary)_78%,transparent)] md:border-l md:border-[color:color-mix(in_srgb,var(--text-muted)_60%,transparent)] md:pl-4">
+                Instant confirmation • Secure payments • No hidden charges
+              </p>
             </div>
           </form>
         </div>
       </div>
 
       <div className="bg-bg-surface" data-testid="trust-badges">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-4 px-6 py-8 md:gap-5">
+        <div className="mx-auto -mt-4 flex max-w-5xl flex-wrap items-center justify-center gap-3 px-4 pb-6 pt-2 sm:px-6 md:gap-4 md:pb-8 md:pt-0">
           {TRUST_BADGES.map(({ label, icon }) => (
             <TrustBadge
               key={label}
               icon={icon}
               label={label}
-              className="min-w-[220px] justify-center sm:min-w-[0]"
+              className="min-w-[215px] justify-center sm:min-w-[0]"
             />
           ))}
         </div>

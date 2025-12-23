@@ -26,4 +26,4 @@ export const moreNav: NavItem[] = [
     { label: 'Offers', to: '/offers' },
 ];
 
-export const ctaNav: NavItem = { label: 'Book Now', to: '/book-now' };
+export const ctaNav: NavItem = { label: 'Book Now', to: '/#our-homes' };
