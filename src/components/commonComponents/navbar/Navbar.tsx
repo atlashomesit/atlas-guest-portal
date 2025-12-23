@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import './navbar.css';
 
 import { IoIosCall } from 'react-icons/io';
@@ -16,6 +16,7 @@ const Navbar = () => {
   const [isApartmentsOpen, setIsApartmentsOpen] = useState(false);
 
   const navigate = useNavigate();
+  const location = useLocation();
 
   const apartments = sanitizeItems(propertyData);
 
@@ -55,18 +56,24 @@ const Navbar = () => {
   };
 
   /* =========================
-     BOOK NOW HANDLER
+     ✅ FINAL BOOK NOW HANDLER
   ========================= */
   const handleBookNow = () => {
-    trackEvent(
-      'cta_book_now_clicked',
-      { source: 'header' },
-      { route: '/' }
-    );
+    trackEvent('cta_book_now_clicked', { source: 'header' }, { route: '/' });
 
-    navigate('/', {
-      state: { scrollTo: 'our-homes' }
-    });
+    // CASE 1: Already on home page → scroll
+    if (location.pathname === '/') {
+      const el = document.getElementById('our-homes');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+    // CASE 2: On another page → navigate then scroll
+    else {
+      navigate('/', {
+        state: { scrollTo: 'our-homes' },
+      });
+    }
 
     closeMobile();
   };
@@ -74,10 +81,15 @@ const Navbar = () => {
   return (
     <section className="navbar-container" id="navbar_container">
       <div className="navbar-main">
+
         {/* LEFT */}
         <div className="navbar-left flex items-center justify-between w-full lg:w-auto">
           <Link to="/" className="flex items-center gap-2">
-            <img className="navbar-logo" src={LOGO_URL} alt="Atlas Homestays logo" />
+            <img
+              src={LOGO_URL}
+              alt="Atlas Homestays"
+              className="navbar-logo"
+            />
             <span className="navbar-logo-text">Atlas Homestays</span>
           </Link>
 
@@ -97,10 +109,11 @@ const Navbar = () => {
                 <button className="dropdown-button">{item.label}</button>
                 <div className="dropdown-menu">
                   <NavLink to={item.to}>Apartments Overview</NavLink>
+
                   {apartments.map((apt, index) => (
                     <NavLink
                       key={getItemKey(apt, index)}
-                      to={`/property_details/${apt.id ?? apt.listingId ?? getItemKey(apt, index)}`}
+                      to={`/property_details/${apt.id ?? apt.listingId ?? index}`}
                     >
                       {apt.property_name || apt.title || `Property ${index + 1}`}
                     </NavLink>
@@ -108,7 +121,11 @@ const Navbar = () => {
                 </div>
               </div>
             ) : (
-              <NavLink key={item.label} to={item.to} className={navLinkClass}>
+              <NavLink
+                key={item.label}
+                to={item.to}
+                className={navLinkClass}
+              >
                 {item.label}
               </NavLink>
             )
@@ -165,7 +182,7 @@ const Navbar = () => {
                       <NavLink
                         key={getItemKey(apt, idx)}
                         onClick={closeMobile}
-                        to={`/property_details/${apt.id ?? apt.listingId ?? getItemKey(apt, idx)}`}
+                        to={`/property_details/${apt.id ?? apt.listingId ?? idx}`}
                         className="block py-1"
                       >
                         {apt.property_name || apt.title}
