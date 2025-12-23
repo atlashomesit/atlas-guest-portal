@@ -25,6 +25,15 @@ interface BookingCardProps {
     supportPadding?: boolean;
 }
 
+type GuestCountKey = 'adults' | 'children' | 'infants' | 'pets';
+
+const guestLimits: Record<GuestCountKey, { min: number; max?: number }> = {
+    adults: { min: 0, max: 10 },
+    children: { min: 0, max: 10 },
+    infants: { min: 0, max: 2 },
+    pets: { min: 0, max: 4 },
+};
+
 const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = false }) => {
     const [openCalendar, setOpenCalendar] = useState(false);
     const [openGuests, setOpenGuests] = useState(false);
@@ -443,18 +452,41 @@ useEffect(() => {
     fetchBookedDates();
 }, [propertyId]);
 
-   
-    const modifyGuest = (type: keyof typeof guests, increment: boolean) => {
-        setGuests(prev => ({
-            ...prev,
-            [type]: Math.max(0, prev[type] + (increment ? 1 : -1)),
-        }));
+    const modifyGuest = (type: GuestCountKey, increment: boolean) => {
+        setGuests(prev => {
+            const min = guestLimits[type].min ?? 0;
+            const max = guestLimits[type].max;
+            const proposedValue = prev[type] + (increment ? 1 : -1);
+
+            if (!increment && proposedValue < min) return prev;
+            if (increment && typeof max === 'number' && proposedValue > max) return prev;
+
+            return {
+                ...prev,
+                [type]: Math.max(min, proposedValue),
+            };
+        });
     };
+
+    const isAtMin = (type: GuestCountKey) => guests[type] <= (guestLimits[type].min ?? 0);
+    const isAtMax = (type: GuestCountKey) =>
+        typeof guestLimits[type].max === 'number' && guests[type] >= (guestLimits[type].max ?? Number.MAX_SAFE_INTEGER);
 
     const hasSelection = Boolean(dates.startDate && dates.endDate && guests.adults);
     const primaryCtaLabel = hasSelection && termsAccepted ? 'Book now' : 'Check availability';
-
+    const inlineCtaLabel = hasSelection ? 'Check availability' : 'Select dates';
+    const isCheckoutInvalid = dates.endDate <= dates.startDate;
+    const guestNeedsAdult = guests.adults < 1;
     const containerPaddingBottom = supportPadding ? 'pb-40' : 'pb-28';
+
+    const handleInlineCta = () => {
+        setHasInteractedWithDates(true);
+        setOpenCalendar(false);
+        setOpenGuests(false);
+        if (typeof document !== 'undefined') {
+            document.getElementById('pricing-breakdown')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    };
 
     return (
         <div id="booking-form" className={`max-w-md mx-auto p-6 bg-bg-surface shadow-level2 rounded-2xl relative ${containerPaddingBottom} lg:pb-0 lg:sticky lg:top-20`}>
@@ -516,26 +548,67 @@ useEffect(() => {
             </div>
 
 
-            <div className="grid grid-cols-2 gap-3 mb-4">
-                <div
-                    onClick={() => setOpenCalendar(true)}
-                    className="border rounded-xl p-3 cursor-pointer"
-                >
-                    <p className="text-sm text-text-muted">Check-In Date</p>
-                    <p className="font-semibold">
-                        {format(dates.startDate, "dd-MM-yyyy")}
-                    </p>
-                </div>
+            <div className="mb-5 rounded-2xl border border-border-strong/60 bg-[color:color-mix(in_srgb,var(--bg-muted)_72%,var(--bg-surface))] shadow-inner">
+                <div className="grid grid-cols-1 items-stretch gap-3 p-3 md:grid-cols-4">
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setOpenCalendar(true);
+                            setOpenGuests(false);
+                        }}
+                        className="group flex h-full min-h-[4.5rem] flex-col justify-center rounded-xl border border-border-subtle bg-bg-surface/70 px-4 text-left text-text-primary shadow-inner transition hover:border-border-strong hover:bg-bg-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary"
+                    >
+                        <span className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">Check-in</span>
+                        <span className="mt-1 text-base font-semibold text-text-primary">
+                            {format(dates.startDate, "dd-MM-yyyy")}
+                        </span>
+                    </button>
 
-                <div
-                    onClick={() => setOpenCalendar(true)}
-                    className="border border-border-subtle bg-bg-surface rounded-xl p-3 cursor-pointer"
-                    title={dates.startDate.getTime() === dates.endDate.getTime() ? "Check-out date must be after check-in date" : ""}
-                >
-                    <p className="text-sm text-text-muted">Check-Out Date</p>
-                    <p className="font-semibold">
-                        {format(dates.endDate, "dd-MM-yyyy")}
-                    </p>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setOpenCalendar(true);
+                            setOpenGuests(false);
+                            setHasInteractedWithDates(true);
+                        }}
+                        className="group flex h-full min-h-[4.5rem] flex-col justify-center rounded-xl border border-border-subtle bg-bg-surface/70 px-4 text-left text-text-primary shadow-inner transition hover:border-border-strong hover:bg-bg-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary"
+                    >
+                        <span className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">Check-out</span>
+                        <span className="mt-1 text-base font-semibold text-text-primary">
+                            {format(dates.endDate, "dd-MM-yyyy")}
+                        </span>
+                        {hasInteractedWithDates && isCheckoutInvalid && (
+                            <span className="mt-1 text-xs font-semibold text-support-error">
+                                Check-out must be after check-in.
+                            </span>
+                        )}
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setOpenGuests(true);
+                            setOpenCalendar(false);
+                        }}
+                        className="group flex h-full min-h-[4.5rem] flex-col justify-center rounded-xl border border-border-subtle bg-bg-surface/70 px-4 text-left text-text-primary shadow-inner transition hover:border-border-strong hover:bg-bg-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary"
+                    >
+                        <span className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">Guests</span>
+                        <span className="mt-1 text-base font-semibold text-text-primary">{formatGuestLabel()}</span>
+                        {guestNeedsAdult && (
+                            <span className="mt-1 text-xs font-semibold text-support-error">
+                                Add at least one adult.
+                            </span>
+                        )}
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={handleInlineCta}
+                        disabled={!hasSelection || isCheckoutInvalid}
+                        className="flex h-full min-h-[4.5rem] items-center justify-center rounded-xl bg-cta-primary px-4 text-base font-semibold text-[var(--text-contrast)] shadow-level2 transition hover:bg-cta-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        {inlineCtaLabel}
+                    </button>
                 </div>
             </div>
 
@@ -566,17 +639,6 @@ useEffect(() => {
                 </div>
             )}
 
-            {/* GUEST SELECTOR */}
-            <div
-                onClick={() => setOpenGuests(true)}
-                className="border border-border-subtle bg-bg-surface rounded-xl p-3 cursor-pointer flex justify-between items-center"
-            >
-                <div>
-                    <p className="text-sm text-text-muted">Guests</p>
-                    <p className="font-semibold">{formatGuestLabel()}</p>
-                </div>
-            </div>
-
             {/* UPDATED POPUP SECTION */}
             {openGuests && (
                 <div
@@ -597,14 +659,16 @@ useEffect(() => {
                             <div className="flex items-center gap-3">
                                 <button
                                     onClick={() => modifyGuest("adults", false)}
-                                    className="w-8 h-8 rounded-full border border-border-subtle flex items-center justify-center"
+                                    disabled={isAtMin("adults")}
+                                    className="w-10 h-10 rounded-full border border-border-subtle flex items-center justify-center text-text-primary hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-strong disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     -
                                 </button>
                                 <span>{guests.adults}</span>
                                 <button
                                     onClick={() => modifyGuest("adults", true)}
-                                    className="w-8 h-8 rounded-full border border-border-subtle flex items-center justify-center"
+                                    disabled={isAtMax("adults")}
+                                    className="w-10 h-10 rounded-full border border-border-subtle flex items-center justify-center text-text-primary hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-strong disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     +
                                 </button>
@@ -621,28 +685,37 @@ useEffect(() => {
                             <div className="flex items-center gap-3">
                                 <button
                                     onClick={() => {
-                                        if (guests.children > 0) {
-                                            setGuests(prev => ({
-                                                ...prev,
-                                                children: prev.children - 1,
-                                                childrenAges: prev.childrenAges.slice(0, -1)
-                                            }));
-                                        }
+                                        if (isAtMin("children")) return;
+                                        setGuests(prev => ({
+                                            ...prev,
+                                            children: Math.max(guestLimits.children.min, prev.children - 1),
+                                            childrenAges: prev.childrenAges.slice(0, -1)
+                                        }));
                                     }}
-                                    className="w-8 h-8 rounded-full border border-border-subtle flex items-center justify-center"
+                                    disabled={isAtMin("children")}
+                                    className="w-10 h-10 rounded-full border border-border-subtle flex items-center justify-center text-text-primary hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-strong disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     -
                                 </button>
                                 <span>{guests.children}</span>
                                 <button
                                     onClick={() => {
-                                        setGuests(prev => ({
-                                            ...prev,
-                                            children: prev.children + 1,
-                                            childrenAges: [...prev.childrenAges, 5] // Default age 5
-                                        }));
+                                        if (isAtMax("children")) return;
+                                        setGuests(prev => {
+                                            const nextChildren = prev.children + 1;
+                                            const cappedValue =
+                                                typeof guestLimits.children.max === 'number'
+                                                    ? Math.min(guestLimits.children.max, nextChildren)
+                                                    : nextChildren;
+                                            return {
+                                                ...prev,
+                                                children: cappedValue,
+                                                childrenAges: [...prev.childrenAges, 5] // Default age 5
+                                            };
+                                        });
                                     }}
-                                    className="w-8 h-8 rounded-full border border-border-subtle flex items-center justify-center"
+                                    disabled={isAtMax("children")}
+                                    className="w-10 h-10 rounded-full border border-border-subtle flex items-center justify-center text-text-primary hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-strong disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     +
                                 </button>
@@ -676,29 +749,17 @@ useEffect(() => {
                             </div>
                             <div className="flex items-center gap-3">
                                 <button
-                                    onClick={() => {
-                                        if (guests.infants > 0) {
-                                            setGuests(prev => ({
-                                                ...prev,
-                                                infants: prev.infants - 1
-                                            }));
-                                        }
-                                    }}
-                                    className="w-8 h-8 rounded-full border border-border-subtle flex items-center justify-center"
+                                    onClick={() => modifyGuest("infants", false)}
+                                    disabled={isAtMin("infants")}
+                                    className="w-10 h-10 rounded-full border border-border-subtle flex items-center justify-center text-text-primary hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-strong disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     -
                                 </button>
                                 <span>{guests.infants}</span>
                                 <button
-                                    onClick={() => {
-                                        if (guests.infants < 2) { // Limit to 2 infants
-                                            setGuests(prev => ({
-                                                ...prev,
-                                                infants: prev.infants + 1
-                                            }));
-                                        }
-                                    }}
-                                    className="w-8 h-8 rounded-full border border-border-subtle flex items-center justify-center"
+                                    onClick={() => modifyGuest("infants", true)}
+                                    disabled={isAtMax("infants")}
+                                    className="w-10 h-10 rounded-full border border-border-subtle flex items-center justify-center text-text-primary hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-strong disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     +
                                 </button>
@@ -720,14 +781,16 @@ useEffect(() => {
                             <div className="flex items-center gap-3">
                                 <button
                                     onClick={() => modifyGuest("pets", false)}
-                                    className="w-8 h-8 rounded-full border border-border-subtle flex items-center justify-center"
+                                    disabled={isAtMin("pets")}
+                                    className="w-10 h-10 rounded-full border border-border-subtle flex items-center justify-center text-text-primary hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-strong disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     -
                                 </button>
                                 <span>{guests.pets}</span>
                                 <button
                                     onClick={() => modifyGuest("pets", true)}
-                                    className="w-8 h-8 rounded-full border border-border-subtle flex items-center justify-center"
+                                    disabled={isAtMax("pets")}
+                                    className="w-10 h-10 rounded-full border border-border-subtle flex items-center justify-center text-text-primary hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-strong disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     +
                                 </button>
@@ -738,7 +801,7 @@ useEffect(() => {
             )}
 
             {hasSelection && hasInteractedWithDates && (
-                <div className="mt-6 space-y-3 border border-border-subtle rounded-xl p-4 bg-bg-surface shadow-level1">
+                <div id="pricing-breakdown" className="mt-6 space-y-3 border border-border-subtle rounded-xl p-4 bg-bg-surface shadow-level1">
                     <div className="space-y-2">
                         {nightlyBreakdown.map((night) => (
                             <div className="flex justify-between text-sm" key={night.date.toISOString()}>
