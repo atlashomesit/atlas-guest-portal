@@ -335,24 +335,71 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
               weekdayDisplayFormat="EEE"
               dayDisplayFormat="d"
               disabledDates={bookedDates}
-              dayContentRenderer={(date) => {
+              dayContentRenderer={(date: Date) => {
+                // Normalize dates to start of day for accurate comparison
+                const dateToCheck = new Date(date);
+                dateToCheck.setHours(0, 0, 0, 0);
+                const dateToCheckTime = dateToCheck.getTime();
+                
                 const isBooked = bookedDates.some((bookedDate) => {
-                  const d = new Date(bookedDate);
-                  return (
-                    d.getDate() === date.getDate() &&
-                    d.getMonth() === date.getMonth() &&
-                    d.getFullYear() === date.getFullYear()
-                  );
+                  const normalizedBooked = new Date(bookedDate);
+                  normalizedBooked.setHours(0, 0, 0, 0);
+                  return normalizedBooked.getTime() === dateToCheckTime;
                 });
 
+                // Check if date is in the past
+                const isPastDate = dateToCheck < defaultStartDate;
+                const isAvailable = !isBooked && !isPastDate;
+                
+                // Debug logging for specific dates (only log first few to avoid spam)
+                if (bookedDates.length > 0 && date.getDate() <= 3) {
+                  console.log(`[Calendar] Date ${format(date, 'dd-MM-yyyy')}:`, {
+                    isBooked,
+                    isAvailable,
+                    bookedDatesCount: bookedDates.length,
+                    sampleBooked: bookedDates[0] ? format(bookedDates[0], 'dd-MM-yyyy') : 'none'
+                  });
+                }
+
                 return (
-                  <div className="relative">
+                  <div className="relative w-full h-full flex items-center justify-center">
+                    {/* Background color: red for blocked, green for available, gray for past */}
+                    <div
+                      className={`absolute inset-0 rounded ${
+                        isBooked
+                          ? 'bg-red-200 dark:bg-red-900/40 border border-red-400'
+                          : isAvailable
+                          ? 'bg-green-200 dark:bg-green-900/40 border border-green-400'
+                          : 'bg-gray-100 dark:bg-gray-800/30'
+                      }`}
+                    />
+                    
+                    {/* Red strike-through for booked dates */}
                     {isBooked && (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="h-px w-6 bg-red-500 transform rotate-12"></div>
+                      <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+                        <div className="h-1 w-full bg-red-600 dark:bg-red-500 transform rotate-45 opacity-80"></div>
                       </div>
                     )}
-                    <span className={isBooked ? 'text-gray-400' : ''}>{date.getDate()}</span>
+                    
+                    {/* Green indicator dot for available dates */}
+                    {isAvailable && !isBooked && (
+                      <div className="absolute top-1 right-1 z-10 pointer-events-none">
+                        <div className="w-2 h-2 bg-green-600 dark:bg-green-400 rounded-full shadow-sm"></div>
+                      </div>
+                    )}
+                    
+                    {/* Date number */}
+                    <span
+                      className={`relative z-20 font-medium ${
+                        isBooked
+                          ? 'text-red-700 dark:text-red-300 line-through'
+                          : isAvailable
+                          ? 'text-green-800 dark:text-green-300'
+                          : 'text-gray-500 dark:text-gray-400'
+                      }`}
+                    >
+                      {date.getDate()}
+                    </span>
                   </div>
                 );
               }}

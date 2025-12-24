@@ -124,54 +124,13 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     }));
   }, [dates.endDate, dates.startDate, totalPeople, unitType]);
 
-  useEffect(() => {
-    const fetchBookedDates = async () => {
-      try {
-        const mockResponse = [
-          {
-            id: 501,
-            listingId: 2,
-            guestId: 559,
-            checkinDate: '2025-09-23T00:00:00',
-            checkoutDate: '2025-09-24T00:00:00',
-            bookingSource: 'airbnb',
-            amountReceived: 2358.09,
-            bankAccountId: null,
-            guestsPlanned: 2,
-            guestsActual: 2,
-            extraGuestCharge: 0.0,
-            commissionAmount: 377.29,
-            notes: '-',
-            createdAt: '2025-09-23T04:35:36.5110894',
-            paymentStatus: 'Paid',
-          },
-        ];
-
-        const datesRanges = mockResponse.map((booking) => ({
-          start: new Date(booking.checkinDate),
-          end: new Date(booking.checkoutDate),
-        }));
-
-        const allBookedDates: Date[] = [];
-        datesRanges.forEach((range) => {
-          const current = new Date(range.start);
-          while (current <= range.end) {
-            allBookedDates.push(new Date(current));
-            current.setDate(current.getDate() + 1);
-          }
-        });
-
-        setBookedRanges(datesRanges);
-        setBookedDates(allBookedDates);
-        setIsBookedDatesLoading(false);
-      } catch (error) {
-        console.error('Error fetching booked dates:', error);
-        setIsBookedDatesLoading(false);
-      }
-    };
-
-    fetchBookedDates();
-  }, [propertyId]);
+  // Mock data useEffect - disabled, using real API call below
+  // useEffect(() => {
+  //   const fetchBookedDates = async () => {
+  //     ...
+  //   };
+  //   fetchBookedDates();
+  // }, [propertyId]);
 
   const nights = nightlyBreakdown.length;
   const staySubtotal = nightlyBreakdown.reduce((sum, night) => sum + night.breakdown.finalNightlyPrice, 0);
@@ -388,22 +347,118 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     const fetchBookedDates = async () => {
       setIsBookedDatesLoading(true);
       try {
-        const response = await api.get(`/bookings/${propertyId}`);
-        const bookings = asArray(response.data);
+        // Fetch all bookings from API
+        const response = await api.get('/bookings');
+        const allBookings = asArray(response.data, 'bookings');
 
-        const datesArray: Date[] = [];
-        bookings.forEach((booking: any) => {
-          const start = new Date(booking.startDate);
-          const end = new Date(booking.endDate);
+        console.log('[BookingCard] ===== FETCHING BOOKINGS =====');
+        console.log('[BookingCard] PropertyId:', propertyId);
+        console.log('[BookingCard] Total bookings from API:', allBookings.length);
 
-          for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-            datesArray.push(new Date(d));
+        // Extract number from propertyId to match with API listing numbers
+        // API listings: "Atlas301", "Atlas501_PH", etc. - extract the number part
+        // Property data: propertyId is already a number (301, 501, etc.)
+        const targetNumber = String(propertyId);
+
+        console.log('[BookingCard] Looking for property number:', targetNumber);
+        console.log('[BookingCard] Sample bookings listing values:', 
+          allBookings.slice(0, 10).map((b: any) => ({ id: b.id, listing: b.listing })));
+
+        // Filter bookings by extracting number from API listing and comparing with propertyId
+        const filteredBookings = allBookings.filter((booking: any) => {
+          const bookingListing = String(booking.listing).trim();
+          
+          // Extract number from API listing (e.g., "Atlas301" -> "301", "Atlas501_PH" -> "501")
+          const numberMatch = bookingListing.match(/(\d+)/);
+          if (!numberMatch) {
+            return false;
+          }
+          
+          const bookingNumber = numberMatch[1];
+          const matches = bookingNumber === targetNumber;
+          
+          if (matches) {
+            console.log('[BookingCard] ✓ Matched booking:', {
+              id: booking.id,
+              listing: bookingListing,
+              extractedNumber: bookingNumber,
+              propertyId: targetNumber,
+              checkin: booking.checkinDate,
+              checkout: booking.checkoutDate
+            });
+          }
+          return matches;
+        });
+
+        console.log('[BookingCard] Filtered bookings count:', filteredBookings.length);
+
+        // Generate blocked dates: checkinDate (inclusive) to checkoutDate (exclusive)
+        // ONLY block dates from today onwards (not past dates)
+        const blockedDates: Date[] = [];
+        const today = startOfDay(new Date());
+        
+        filteredBookings.forEach((booking: any) => {
+          if (!booking.checkinDate || !booking.checkoutDate) {
+            console.warn('[BookingCard] Missing dates in booking:', booking);
+            return;
+          }
+
+          const checkinDate = startOfDay(new Date(booking.checkinDate));
+          const checkoutDate = startOfDay(new Date(booking.checkoutDate));
+
+          // Validate dates
+          if (isNaN(checkinDate.getTime()) || isNaN(checkoutDate.getTime())) {
+            console.warn('[BookingCard] Invalid dates:', { 
+              checkin: booking.checkinDate, 
+              checkout: booking.checkoutDate 
+            });
+            return;
+          }
+
+          console.log(`[BookingCard] Processing booking ${booking.id}:`);
+          console.log(`  Check-in: ${format(checkinDate, 'dd-MM-yyyy')}`);
+          console.log(`  Check-out: ${format(checkoutDate, 'dd-MM-yyyy')}`);
+          console.log(`  Today: ${format(today, 'dd-MM-yyyy')}`);
+
+          // Block from checkinDate (inclusive) to checkoutDate (exclusive)
+          // But only include dates that are today or in the future (not past dates)
+          const datesForThisBooking: Date[] = [];
+          let currentDate = new Date(checkinDate);
+          
+          while (currentDate < checkoutDate) {
+            const dateToBlock = startOfDay(new Date(currentDate));
+            
+            // Only block if date is today or in the future (skip past dates)
+            if (dateToBlock >= today) {
+              datesForThisBooking.push(dateToBlock);
+              blockedDates.push(dateToBlock);
+            }
+            
+            currentDate.setDate(currentDate.getDate() + 1);
+          }
+
+          console.log(`  Blocked dates (future only): ${datesForThisBooking.map(d => format(d, 'dd-MM-yyyy')).join(', ')}`);
+          if (checkinDate < today && checkoutDate > today) {
+            console.log(`  Note: Booking started in the past, only blocking from today onwards`);
           }
         });
 
-        setBookedDates(datesArray);
+        // Remove duplicates and sort
+        const uniqueBlocked = Array.from(
+          new Set(blockedDates.map((d) => d.getTime()))
+        )
+          .map((time) => new Date(time))
+          .sort((a, b) => a.getTime() - b.getTime());
+
+        console.log('[BookingCard] ===== FINAL RESULT =====');
+        console.log('[BookingCard] Total unique blocked dates:', uniqueBlocked.length);
+        console.log('[BookingCard] Blocked dates:', uniqueBlocked.map(d => format(d, 'dd-MM-yyyy')).join(', '));
+        console.log('[BookingCard] ========================');
+
+        setBookedDates(uniqueBlocked);
       } catch (error) {
         console.error('Failed to fetch booked dates:', error);
+        setBookedDates([]);
       } finally {
         setIsBookedDatesLoading(false);
       }

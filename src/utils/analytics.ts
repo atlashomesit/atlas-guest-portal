@@ -3,7 +3,7 @@ type AnalyticsEnv = 'dev' | 'prod';
 type AnalyticsIdentifiers = {
   listingId?: string | number;
   unitCode?: string | number;
-  propertyId?: string | number;
+  listing?: string | number;
   route?: string;
 };
 
