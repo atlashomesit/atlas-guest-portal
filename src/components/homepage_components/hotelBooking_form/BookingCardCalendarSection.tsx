@@ -1,7 +1,7 @@
 // BookingCardCalendarSection.tsx
 import { Link } from 'react-router-dom';
 import { DateRange } from 'react-date-range';
-import { format } from 'date-fns';
+import { format, startOfDay } from 'date-fns';
 import { inlinePolicySnippets } from '../../../content/terms';
 import { priceDisplayConfig } from '../../../config/priceDisplay.config';
 import React from 'react';
@@ -46,7 +46,11 @@ interface BookingCardCalendarSectionProps {
   openCalendar: boolean;
   calendarRef: React.RefObject<HTMLDivElement>;
   isBookedDatesLoading: boolean;
-  bookedDates: Date[];
+ bookedDates: {
+  checkinDate: string;
+  checkoutDate: string;
+}[];
+
   DateRangeComponent: typeof DateRange;
   handleDateChange: (ranges: any) => void;
   defaultStartDate: Date;
@@ -98,6 +102,9 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
   defaultStartDate,
   ctaPrimaryColor,
 }) => {
+  // Normalize defaultStartDate to start of day (allows booking today)
+  const normalizedStartDate = startOfDay(defaultStartDate);
+
   return (
     <>
       <div className="mb-2 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -323,7 +330,7 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
                   key: 'selection',
                 },
               ]}
-              minDate={defaultStartDate}
+             minDate={normalizedStartDate}
               rangeColors={[ctaPrimaryColor]}
               showDateDisplay={false}
               showPreview={false}
@@ -335,31 +342,35 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
               weekdayDisplayFormat="EEE"
               dayDisplayFormat="d"
               disabledDates={bookedDates}
+              disabledDay={(date: Date) => {
+                // Disable dates that are in the bookedDates array
+                const dateToCheck = startOfDay(date);
+                const dateTime = dateToCheck.getTime();
+                return bookedDates.some((bookedDate) => {
+                  const normalizedBooked = startOfDay(bookedDate);
+                  return normalizedBooked.getTime() === dateTime;
+                });
+              }}
               dayContentRenderer={(date: Date) => {
                 // Normalize dates to start of day for accurate comparison
                 const dateToCheck = new Date(date);
                 dateToCheck.setHours(0, 0, 0, 0);
                 const dateToCheckTime = dateToCheck.getTime();
                 
+                // Check if this date is in the blocked dates array
+                // bookedDates is an array of Date objects representing blocked dates
                 const isBooked = bookedDates.some((bookedDate) => {
                   const normalizedBooked = new Date(bookedDate);
                   normalizedBooked.setHours(0, 0, 0, 0);
                   return normalizedBooked.getTime() === dateToCheckTime;
                 });
 
-                // Check if date is in the past
-                const isPastDate = dateToCheck < defaultStartDate;
+                // Check if date is in the past (before today)
+                // Today should be available if not booked
+                const todayDate = startOfDay(new Date());
+                const isPastDate = dateToCheck < todayDate;
+                // Today is available if it's not booked; future dates are available if not booked
                 const isAvailable = !isBooked && !isPastDate;
-                
-                // Debug logging for specific dates (only log first few to avoid spam)
-                if (bookedDates.length > 0 && date.getDate() <= 3) {
-                  console.log(`[Calendar] Date ${format(date, 'dd-MM-yyyy')}:`, {
-                    isBooked,
-                    isAvailable,
-                    bookedDatesCount: bookedDates.length,
-                    sampleBooked: bookedDates[0] ? format(bookedDates[0], 'dd-MM-yyyy') : 'none'
-                  });
-                }
 
                 return (
                   <div className="relative w-full h-full flex items-center justify-center">

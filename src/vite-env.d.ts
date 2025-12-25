@@ -5,6 +5,7 @@ interface ImportMetaEnv {
   readonly VITE_EMAILJS_TEMPLATE_ID?: string;
   readonly VITE_EMAILJS_PUBLIC_KEY?: string;
   readonly VITE_OWNER_EMAIL?: string;
+  readonly VITE_RAZORPAY_KEY_ID?: string;
 }
 
 interface ImportMeta {

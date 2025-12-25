@@ -49,8 +49,8 @@ export interface GuestCounts {
 
 const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = false }) => {
   const today = startOfDay(new Date());
-  const defaultStartDate = addDays(today, 1);
-  const defaultEndDate = addDays(today, 2);
+  const defaultStartDate = today; // Allow booking from today
+  const defaultEndDate = addDays(today, 1);
   const isLayoutExperimentEnabled = bookingWidgetLayoutFlag();
 
   const [openCalendar, setOpenCalendar] = useState(false);
@@ -92,6 +92,21 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     infants: 0,
     pets: 0,
   });
+
+  const [userEmail, setUserEmail] = useState<string>('');
+  const [userPhone, setUserPhone] = useState<string>('');
+
+  // Load saved email and phone from localStorage on mount
+  useEffect(() => {
+    try {
+      const savedEmail = localStorage.getItem('atlas_user_email');
+      const savedPhone = localStorage.getItem('atlas_user_phone');
+      if (savedEmail) setUserEmail(savedEmail);
+      if (savedPhone) setUserPhone(savedPhone);
+    } catch (error) {
+      console.warn('Unable to load saved contact info', error);
+    }
+  }, []);
 
   const property = propertyData.find((p) => p.id === Number(propertyId));
   const unitType = inferUnitType({ id: property?.id, property_name: property?.property_name });
@@ -183,46 +198,11 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
   const hasSelection = Boolean(dates.startDate && dates.endDate && guests.adults);
   const latestBookingStateRef = useRef({ guests: totalPeople, hasSelection });
 
-  const preloadRazorpay = () => {
-    const existingPreload = document.querySelector(
-      "link[rel='preload'][href='https://checkout.razorpay.com/v1/checkout.js']",
-    );
-    if (!existingPreload) {
-      const preloadLink = document.createElement('link');
-      preloadLink.rel = 'preload';
-      preloadLink.as = 'script';
-      preloadLink.href = 'https://checkout.razorpay.com/v1/checkout.js';
-      document.head.appendChild(preloadLink);
-    }
-
-    const existingPreconnect = document.querySelector(
-      "link[rel='preconnect'][href='https://checkout.razorpay.com']",
-    );
-    if (!existingPreconnect) {
-      const preconnectLink = document.createElement('link');
-      preconnectLink.rel = 'preconnect';
-      preconnectLink.href = 'https://checkout.razorpay.com';
-      document.head.appendChild(preconnectLink);
-    }
-  };
-
-  const loadRazorpay = (): Promise<boolean> => {
-    return new Promise((resolve) => {
+  // Load Razorpay Checkout script
+  useEffect(() => {
+    const loadRazorpay = () => {
       if (window.Razorpay) {
         setIsRazorpayReady(true);
-        resolve(true);
-        return;
-      }
-
-      const existingScript = document.querySelector(
-        "script[src='https://checkout.razorpay.com/v1/checkout.js']",
-      ) as HTMLScriptElement | null;
-      if (existingScript) {
-        existingScript.addEventListener('load', () => {
-          setIsRazorpayReady(true);
-          resolve(true);
-        });
-        existingScript.addEventListener('error', () => resolve(false));
         return;
       }
 
@@ -231,26 +211,24 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
       script.async = true;
       script.onload = () => {
         setIsRazorpayReady(true);
-        resolve(true);
       };
-      script.onerror = () => resolve(false);
+      script.onerror = () => {
+        console.error('Failed to load Razorpay script');
+        setIsRazorpayReady(false);
+      };
       document.body.appendChild(script);
-    });
-  };
 
-  useEffect(() => {
-    preloadRazorpay();
+      return () => {
+        // Cleanup: remove script if component unmounts
+        const existingScript = document.querySelector('script[src="https://checkout.razorpay.com/v1/checkout.js"]');
+        if (existingScript) {
+          document.body.removeChild(existingScript);
+        }
+      };
+    };
+
     loadRazorpay();
   }, []);
-
-  const userPrefill = useMemo(
-    () => ({
-      name: 'Atlas Guest',
-      email: 'guest@example.com',
-      contact: '+919999999999',
-    }),
-    [],
-  );
 
   const bookingSummary = useMemo(
     () => ({
@@ -277,7 +255,8 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     setInlineStatus('Dates updated for your stay.');
     const normalizedStart = startDate ? startOfDay(startDate) : defaultStartDate;
     const normalizedEnd = endDate ? startOfDay(endDate) : defaultEndDate;
-    const effectiveStartDate = normalizedStart < today ? defaultStartDate : normalizedStart;
+    // Allow today to be selected (normalizedStart >= today)
+    const effectiveStartDate = normalizedStart < today ? today : normalizedStart;
     let resolvedEndDate = normalizedEnd <= effectiveStartDate ? addDays(effectiveStartDate, 1) : normalizedEnd;
 
     if (startDate && endDate) {
@@ -394,8 +373,9 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
 
         // Generate blocked dates: checkinDate (inclusive) to checkoutDate (exclusive)
         // ONLY block dates from today onwards (not past dates)
+        // Today is only blocked if it falls within a booking range
         const blockedDates: Date[] = [];
-        const today = startOfDay(new Date());
+        const todayDate = startOfDay(new Date());
         
         filteredBookings.forEach((booking: any) => {
           if (!booking.checkinDate || !booking.checkoutDate) {
@@ -418,10 +398,11 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
           console.log(`[BookingCard] Processing booking ${booking.id}:`);
           console.log(`  Check-in: ${format(checkinDate, 'dd-MM-yyyy')}`);
           console.log(`  Check-out: ${format(checkoutDate, 'dd-MM-yyyy')}`);
-          console.log(`  Today: ${format(today, 'dd-MM-yyyy')}`);
+          console.log(`  Today: ${format(todayDate, 'dd-MM-yyyy')}`);
 
           // Block from checkinDate (inclusive) to checkoutDate (exclusive)
-          // But only include dates that are today or in the future (not past dates)
+          // Only include dates that are today or in the future (skip past dates)
+          // Today is only blocked if: today >= checkinDate AND today < checkoutDate
           const datesForThisBooking: Date[] = [];
           let currentDate = new Date(checkinDate);
           
@@ -429,7 +410,8 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
             const dateToBlock = startOfDay(new Date(currentDate));
             
             // Only block if date is today or in the future (skip past dates)
-            if (dateToBlock >= today) {
+            // This ensures today is only blocked if it's actually in the booking range
+            if (dateToBlock >= todayDate) {
               datesForThisBooking.push(dateToBlock);
               blockedDates.push(dateToBlock);
             }
@@ -437,8 +419,13 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
             currentDate.setDate(currentDate.getDate() + 1);
           }
 
-          console.log(`  Blocked dates (future only): ${datesForThisBooking.map(d => format(d, 'dd-MM-yyyy')).join(', ')}`);
-          if (checkinDate < today && checkoutDate > today) {
+          console.log(`  Blocked dates (today and future only): ${datesForThisBooking.map(d => format(d, 'dd-MM-yyyy')).join(', ')}`);
+          
+          // Check if today is in this booking
+          const todayIsInBooking = todayDate >= checkinDate && todayDate < checkoutDate;
+          if (todayIsInBooking) {
+            console.log(`  ✓ Today is blocked by this booking`);
+          } else if (checkinDate < todayDate && checkoutDate > todayDate) {
             console.log(`  Note: Booking started in the past, only blocking from today onwards`);
           }
         });
@@ -466,6 +453,45 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
 
     fetchBookedDates();
   }, [propertyId]);
+
+  // Handle payment redirect from Razorpay Payment Page
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const paymentStatus = urlParams.get('payment');
+    const bookingId = urlParams.get('bookingId');
+    const razorpayPaymentId = urlParams.get('razorpay_payment_id');
+
+    if (paymentStatus === 'success' && bookingId) {
+      // Retrieve booking details from sessionStorage
+      try {
+        const pendingBooking = sessionStorage.getItem('pending_booking');
+        if (pendingBooking) {
+          const booking = JSON.parse(pendingBooking);
+          setPaymentStatus({
+            state: 'success',
+            paymentId: razorpayPaymentId || 'N/A',
+            bookingId: bookingId || booking.bookingId,
+          });
+          setCtaConfirmation('Payment received. We are confirming your stay.');
+          
+          // Clean up URL
+          window.history.replaceState({}, '', window.location.pathname);
+          sessionStorage.removeItem('pending_booking');
+        }
+      } catch (error) {
+        console.error('Error processing payment success:', error);
+      }
+    } else if (paymentStatus === 'failed' && bookingId) {
+      setPaymentStatus({
+        state: 'failure',
+        reason: 'Payment could not be completed. Please try again or choose a different method.',
+      });
+      setCtaConfirmation('Payment was not completed.');
+      
+      // Clean up URL
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
 
   useEffect(() => {
     latestBookingStateRef.current = { guests: totalPeople, hasSelection };
@@ -583,7 +609,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     }, 650);
   };
 
-  const initiatePayment = async () => {
+  const initiatePayment = () => {
     markEngagement();
     trackEvent(
       'reserve_click',
@@ -614,15 +640,22 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
       return;
     }
 
-    setIsLoading(true);
-    setPaymentStatus({ state: 'idle' });
+    // Validate email and phone from input fields
+    const autoEmail = userEmail.trim();
+    const autoPhone = userPhone.trim();
 
-    const scriptReady = await loadRazorpay();
-    if (!scriptReady) {
-      setIsLoading(false);
-      alert('Payment gateway could not be initialized. Please check your connection and try again.');
+    if (!autoEmail || !autoEmail.includes('@')) {
+      alert('Please enter a valid email address.');
       return;
     }
+
+    if (!autoPhone || autoPhone.trim().length < 10) {
+      alert('Please enter a valid phone number (at least 10 digits).');
+      return;
+    }
+
+    setIsLoading(true);
+    setPaymentStatus({ state: 'idle' });
 
     const acceptedAt = termsAcceptedAt || new Date().toISOString();
     setTermsAcceptedAt(acceptedAt);
@@ -646,35 +679,78 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
       { propertyId, listingId: propertyId, unitCode: propertyId },
     );
 
+    // Check if Razorpay is loaded
+    if (!window.Razorpay || !isRazorpayReady) {
+      alert('Payment system is loading. Please try again in a moment.');
+      setIsLoading(false);
+      return;
+    }
+
+    // Store booking details in sessionStorage for post-payment handling
+    try {
+        sessionStorage.setItem('pending_booking', JSON.stringify({
+          bookingId,
+          propertyId,
+          checkIn: bookingSummary.checkIn,
+          checkOut: bookingSummary.checkOut,
+          guests: bookingSummary.guests,
+          nights,
+          total: totalPrice,
+          email: autoEmail,
+          phone: autoPhone,
+          termsAcceptedAt: acceptedAt,
+        }));
+        
+        // Also save email and phone to localStorage for future bookings
+        try {
+          if (autoEmail) localStorage.setItem('atlas_user_email', autoEmail);
+          if (autoPhone) localStorage.setItem('atlas_user_phone', autoPhone);
+        } catch (error) {
+          console.warn('Unable to save user contact info', error);
+        }
+    } catch (error) {
+      console.warn('Unable to store booking details', error);
+    }
+
+    // Razorpay Key ID - Get from environment variable or use default
+    // You need to set VITE_RAZORPAY_KEY_ID in your .env file
+    const razorpayKeyId = import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_1DP5mmOlF5G5ag'; // Replace with your actual key
+
+    // Initialize Razorpay Checkout
     const razorpayOptions = {
-      key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_placeholder',
-      amount: totalPrice * 100,
+      key: razorpayKeyId,
+      amount: Math.round(totalPrice * 100), // Amount in paise
       currency: 'INR',
       name: property?.property_name || 'Atlas Homestays',
-      description: 'Secure checkout powered by Razorpay',
+      description: `Booking for ${bookingSummary.checkIn} to ${bookingSummary.checkOut}`,
+      prefill: {
+        email: autoEmail,
+        contact: autoPhone,
+        name: autoEmail.split('@')[0], // Use email username as name
+      },
       notes: {
-        termsAcceptedAt: acceptedAt,
-        propertyId: propertyId,
-        nights,
         bookingId,
+        propertyId: String(propertyId),
         checkIn: bookingSummary.checkIn,
         checkOut: bookingSummary.checkOut,
         guests: bookingSummary.guests,
-      },
-      prefill: {
-        ...userPrefill,
+        nights: String(nights),
+        total: String(totalPrice),
+        termsAcceptedAt: acceptedAt,
       },
       theme: {
-        color: ctaPrimaryColor,
+        color: '#6366f1', // Indigo color
       },
-      handler: (response: any) => {
+      handler: function (response: any) {
+        // Payment success callback
+        console.log('[Razorpay] Payment successful:', response);
+        setIsLoading(false);
         setPaymentStatus({
           state: 'success',
           paymentId: response.razorpay_payment_id,
           bookingId,
         });
-        setCtaConfirmation('Payment received. We are confirming your stay.');
-        setIsLoading(false);
+        
         trackEvent(
           'payment_success',
           {
@@ -687,28 +763,31 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         );
       },
       modal: {
-        ondismiss: () => {
+        ondismiss: function () {
+          // Payment modal closed without payment
+          console.log('[Razorpay] Payment modal closed');
           setIsLoading(false);
+          setPaymentStatus({
+            state: 'failure',
+            reason: 'Payment was cancelled',
+          });
         },
       },
     };
 
-    const razorpay = new window.Razorpay(razorpayOptions);
-    razorpay.open();
-    razorpay.on('payment.failed', (response: any) => {
-      const failureReason = response.error?.description || 'Payment could not be completed.';
+    try {
+      const razorpay = new window.Razorpay(razorpayOptions);
+      razorpay.open();
+      console.log('[Razorpay] Checkout opened');
+    } catch (error) {
+      console.error('[Razorpay] Error opening checkout:', error);
+      setIsLoading(false);
+      alert('Failed to open payment options. Please try again.');
       setPaymentStatus({
         state: 'failure',
-        reason: `${failureReason} Please try again or choose a different method.`,
+        reason: 'Failed to initialize payment',
       });
-      setCtaConfirmation(failureReason);
-      setIsLoading(false);
-      trackEvent(
-        'payment_failed',
-        { surface: 'booking_form', bookingId, reason: failureReason },
-        { propertyId, listingId: propertyId, unitCode: propertyId },
-      );
-    });
+    }
   };
 
   return (
@@ -811,6 +890,10 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         SiGooglepayIcon={SiGooglepay}
         FaCcVisaIcon={FaCcVisa}
         FaCcMastercardIcon={FaCcMastercard}
+        userEmail={userEmail}
+        setUserEmail={setUserEmail}
+        userPhone={userPhone}
+        setUserPhone={setUserPhone}
       />
     </div>
   );

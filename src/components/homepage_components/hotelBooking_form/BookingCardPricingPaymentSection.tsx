@@ -65,6 +65,10 @@ interface BookingCardPricingPaymentSectionProps {
   SiGooglepayIcon: typeof SiGooglepay;
   FaCcVisaIcon: typeof FaCcVisa;
   FaCcMastercardIcon: typeof FaCcMastercard;
+  userEmail: string;
+  setUserEmail: React.Dispatch<React.SetStateAction<string>>;
+  userPhone: string;
+  setUserPhone: React.Dispatch<React.SetStateAction<string>>;
 }
 
 export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymentSectionProps> = ({
@@ -96,22 +100,26 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
   SiGooglepayIcon,
   FaCcVisaIcon,
   FaCcMastercardIcon,
+  userEmail,
+  setUserEmail,
+  userPhone,
+  setUserPhone,
 }) => {
   return (
     <>
       {hasSelection && hasInteractedWithDates && (
         <div
           id="pricing-breakdown"
-          className="mt-6 space-y-3 border border-border-subtle rounded-xl p-4 bg-bg-surface shadow-level1"
+          className="mt-4 space-y-2 border border-border-subtle rounded-lg p-3 bg-bg-surface shadow-level1"
         >
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             {nightlyBreakdown.map((night) => (
-              <div className="flex justify-between text-sm" key={night.date.toISOString()}>
-                <span className="flex items-center gap-2">
+              <div className="flex justify-between text-xs" key={night.date.toISOString()}>
+                <span className="flex items-center gap-1.5">
                   {format(night.date, 'dd MMM')}{' '}
                   {night.breakdown.isNewYearsEve && (
-                    <span className="rounded-full bg-[color:var(--bg-muted)] px-2 py-0.5 text-[11px] font-semibold text-cta-primary">
-                      New Year’s Eve pricing (2×)
+                    <span className="rounded-full bg-[color:var(--bg-muted)] px-1.5 py-0.5 text-[10px] font-semibold text-cta-primary">
+                      New Year's Eve pricing (2×)
                     </span>
                   )}
                 </span>
@@ -119,29 +127,29 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
               </div>
             ))}
           </div>
-          <div className="flex justify-between text-sm text-text-muted">
+          <div className="flex justify-between text-xs text-text-muted">
             <span>Base price</span>
             <span>₹{baseNightlyRate.toLocaleString('en-IN')}</span>
           </div>
-          <div className="flex justify-between text-sm text-cta-primary">
+          <div className="flex justify-between text-xs text-cta-primary">
             <span>Discount ({discountPercentApplied}%) applied</span>
             <span>Included</span>
           </div>
           {extraGuestsCount > 0 && (
-            <div className="flex justify-between text-sm text-text-primary">
+            <div className="flex justify-between text-xs text-text-primary">
               <span>Extra guests ({extraGuestsCount})</span>
               <span>₹{totalExtraGuestCharges.toLocaleString('en-IN')}</span>
             </div>
           )}
-          <div className="flex justify-between text-sm text-text-primary">
+          <div className="flex justify-between text-xs text-text-primary">
             <span>Fees &amp; taxes (est.)</span>
             <span>₹{feesAndTaxes.toLocaleString('en-IN')}</span>
           </div>
-          <div className="flex justify-between text-base font-semibold text-text-primary border-t pt-3">
+          <div className="flex justify-between text-sm font-semibold text-text-primary border-t pt-2 mt-1">
             <span>Total</span>
             <span>₹{totalPrice.toLocaleString('en-IN')}</span>
           </div>
-          <p className="text-xs text-text-muted">
+          <p className="text-[10px] text-text-muted">
             No hidden charges — everything is shown upfront for your dates and guest count.
           </p>
         </div>
@@ -179,6 +187,43 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
       </div>
 
       <div className="space-y-4 mt-6">
+        {/* Payment Form - Email and Phone */}
+        <div className="p-4 border border-border-subtle rounded-xl bg-bg-surface shadow-level1 space-y-4">
+          <div>
+            <label htmlFor="booking-email" className="block text-sm font-semibold text-text-primary mb-2">
+              Email <span className="text-support-error">*</span>
+            </label>
+            <input
+              id="booking-email"
+              type="email"
+              value={userEmail}
+              onChange={(e) => setUserEmail(e.target.value)}
+              placeholder="your.email@example.com"
+              required
+              disabled={isLoading}
+              className="w-full px-4 py-2.5 rounded-lg border border-border-subtle bg-bg-surface text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-cta-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+            />
+            <p className="text-xs text-text-muted mt-1">We'll send your booking confirmation here</p>
+          </div>
+
+          <div>
+            <label htmlFor="booking-phone" className="block text-sm font-semibold text-text-primary mb-2">
+              Phone Number <span className="text-support-error">*</span>
+            </label>
+            <input
+              id="booking-phone"
+              type="tel"
+              value={userPhone}
+              onChange={(e) => setUserPhone(e.target.value)}
+              placeholder="+91 98765 43210"
+              required
+              disabled={isLoading}
+              className="w-full px-4 py-2.5 rounded-lg border border-border-subtle bg-bg-surface text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-cta-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+            />
+            <p className="text-xs text-text-muted mt-1">For booking confirmation and support</p>
+          </div>
+        </div>
+
         <div className="p-4 border border-border-subtle rounded-xl bg-bg-surface shadow-level1">
           <label className="flex items-center space-x-3 cursor-pointer">
             <input
@@ -195,9 +240,7 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
           </label>
           <p className="text-sm text-text-muted mt-2">{inlineSnippets.paymentConsent}</p>
           <p className="text-xs text-text-muted mt-1">
-            {isRazorpayReady
-              ? 'Inline Razorpay checkout is ready.'
-              : 'Preloading secure Razorpay checkout...'}
+            Secure Razorpay Checkout - Payment options will open in a popup
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-text-muted">
             <span
@@ -248,8 +291,13 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
         </label>
 
         <button
-          onClick={initiatePayment}
-          disabled={isLoading || !termsAccepted}
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            initiatePayment();
+          }}
+          disabled={isLoading || !termsAccepted || !userEmail || !userPhone}
           className="bg-cta-primary hover:bg-cta-secondary text-[var(--text-contrast)] w-full rounded-full py-4 text-lg font-semibold transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center shadow-level1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
         >
           {isLoading ? (
