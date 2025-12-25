@@ -85,33 +85,71 @@ const deriveAmenityFlag = (property: PropertyRecord, keyword: string): boolean =
   );
 
 // Simple error boundary for the component
-class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
   constructor(props: { children: React.ReactNode }) {
     super(props);
-    this.state = { hasError: false };
+    this.state = { hasError: false, error: null };
   }
 
-  static getDerivedStateFromError() {
-    return { hasError: true };
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('Error in Apartments component:', error, errorInfo);
+    console.error('Error stack:', error.stack);
+    console.error('Error info:', errorInfo);
+  }
+
+  componentDidUpdate(prevProps: { children: React.ReactNode }) {
+    // Reset error state if children change (e.g., navigation)
+    if (prevProps.children !== this.props.children && this.state.hasError) {
+      this.setState({ hasError: false, error: null });
+    }
   }
 
   render() {
     if (this.state.hasError) {
       return (
-        <div className="p-8 text-center">
-          <h2 className="text-xl font-semibold text-red-600 mb-2">Something went wrong</h2>
-          <p className="text-gray-600">We're having trouble loading the apartments. Please try again later.</p>
-          <button 
-            onClick={() => window.location.reload()} 
-            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-          >
-            Reload Page
-          </button>
-        </div>
+        <main className="bg-bg-muted py-10">
+          <div className="mx-auto max-w-6xl px-4 md:px-8">
+            <div className="rounded-2xl bg-bg-surface p-8 text-center shadow-level1 border border-border-subtle">
+              <h2 className="text-2xl font-semibold text-text-primary mb-2">Something went wrong</h2>
+              <p className="text-text-muted mb-4">
+                We're having trouble loading the apartments. Please try again later.
+              </p>
+              {this.state.error && process.env.NODE_ENV === 'development' && (
+                <details className="mt-4 text-left">
+                  <summary className="cursor-pointer text-sm text-text-muted">Error details</summary>
+                  <pre className="mt-2 text-xs bg-bg-muted p-2 rounded overflow-auto">
+                    {this.state.error.toString()}
+                    {this.state.error.stack}
+                  </pre>
+                </details>
+              )}
+              <div className="mt-6 flex gap-4 justify-center">
+                <button 
+                  onClick={() => {
+                    this.setState({ hasError: false, error: null });
+                    window.location.reload();
+                  }} 
+                  className="px-6 py-2 bg-cta-primary text-[var(--text-contrast)] rounded-full hover:bg-cta-secondary transition-colors"
+                >
+                  Reload Page
+                </button>
+                <button 
+                  onClick={() => window.location.href = '/'} 
+                  className="px-6 py-2 bg-bg-muted text-text-primary rounded-full hover:bg-border-subtle transition-colors"
+                >
+                  Go to Home
+                </button>
+              </div>
+            </div>
+          </div>
+        </main>
       );
     }
 
@@ -125,10 +163,22 @@ const Apartments = () => {
 
   const safeListings = React.useMemo(() => {
     try {
+      // Check if LISTINGS is defined
+      if (!LISTINGS) {
+        console.error('LISTINGS is undefined');
+        return [];
+      }
+      
       if (!Array.isArray(LISTINGS)) {
         console.error('LISTINGS is not an array:', LISTINGS);
         return [];
       }
+      
+      if (LISTINGS.length === 0) {
+        console.warn('LISTINGS is empty');
+        return [];
+      }
+      
       return LISTINGS.map(listing => ({
         ...listing,
         id: String(listing?.id || '') // Ensure ID is a string
@@ -141,8 +191,19 @@ const Apartments = () => {
 
   const safeProperties = React.useMemo(() => {
     try {
+      // Check if propertyData is defined and is an array
+      if (!propertyData) {
+        console.error('propertyData is undefined');
+        return [];
+      }
+      
       if (!Array.isArray(propertyData)) {
         console.error('propertyData is not an array:', propertyData);
+        return [];
+      }
+      
+      if (propertyData.length === 0) {
+        console.warn('propertyData is empty');
         return [];
       }
       
@@ -174,7 +235,7 @@ const Apartments = () => {
       console.error('Error processing propertyData:', error);
       return [];
     }
-  }, [propertyData]);
+  }, []);
 
   const [guests, setGuests] = React.useState(2);
   const [checkIn, setCheckIn] = React.useState<string | null>(null);
@@ -204,17 +265,33 @@ const Apartments = () => {
   );
 
   const priceBounds = React.useMemo(() => {
-    const prices = safeProperties
-      .map((property) => computeNightlyPrice(property)?.finalNightlyPrice)
-      .filter((price): price is number => typeof price === "number" && price > 0);
+    try {
+      const prices = safeProperties
+        .map((property) => {
+          try {
+            return computeNightlyPrice(property)?.finalNightlyPrice;
+          } catch (error) {
+            console.warn(`Error computing price for property ${property.id}:`, error);
+            return null;
+          }
+        })
+        .filter((price): price is number => typeof price === "number" && price > 0);
 
-    const min = Math.min(...prices);
-    const max = Math.max(...prices);
+      if (prices.length === 0) {
+        return { min: 0, max: 10000 };
+      }
 
-    return {
-      min: Number.isFinite(min) ? min : 0,
-      max: Number.isFinite(max) ? max : 10000,
-    };
+      const min = Math.min(...prices);
+      const max = Math.max(...prices);
+
+      return {
+        min: Number.isFinite(min) ? min : 0,
+        max: Number.isFinite(max) ? max : 10000,
+      };
+    } catch (error) {
+      console.error('Error calculating price bounds:', error);
+      return { min: 0, max: 10000 };
+    }
   }, [computeNightlyPrice, safeProperties]);
 
   const [minPrice, setMinPrice] = React.useState(priceBounds.min);
@@ -226,48 +303,63 @@ const Apartments = () => {
   }, [priceBounds.max, priceBounds.min]);
 
   const listings = React.useMemo<CombinedListing[]>(() => {
-    const merged = safeListings.map((listing) => {
-      const property = safeProperties.find(
-        (item) => String(item.id) === String(listing.id)
-      ) || { 
-        id: listing.id,
-        property_name: listing.title,
-        property_location: 'Hyderabad',
-        property_price: 0,
-        property_rating: 0,
-        property_reviews: 0,
-        property_amenities: [],
-        property_policy_details: []
-      };
+    try {
+      if (!safeListings || safeListings.length === 0) {
+        console.warn('No listings available');
+        return [];
+      }
 
-      // Ensure we have a valid image URL
-      const images = property.property_img || propertyImages[String(listing.id)] || [LOGO_URL];
-      const name = property.property_name || listing.title || `Property ${listing.id}`;
-      const location = property.property_location || listing.subtitle || "Hyderabad";
-      const pricing = computeNightlyPrice(property);
-      const price = pricing?.finalNightlyPrice ?? 0;
+      const merged = safeListings.map((listing) => {
+        try {
+          const property = safeProperties.find(
+            (item) => String(item.id) === String(listing.id)
+          ) || { 
+            id: listing.id,
+            property_name: listing.title,
+            property_location: 'Hyderabad',
+            property_price: 0,
+            property_rating: 0,
+            property_reviews: 0,
+            property_amenities: [],
+            property_policy_details: []
+          };
 
-      return {
-        id: String(listing.id),
-        name,
-        location,
-        price,
-        pricingBreakdown: pricing,
-        rating: property.property_rating || 0,
-        reviews: property.property_reviews || 0,
-        featured: Boolean(listing.featured),
-        propertyType: derivePropertyType(name),
-        guests: deriveGuests(property),
-        bedrooms: deriveBedrooms(property),
-        hasWifi: deriveAmenityFlag(property, "wifi"),
-        hasParking: deriveAmenityFlag(property, "park"),
-        petFriendly: derivePetFriendly(property),
-        image: images?.[0] || LOGO_URL,
-        property,
-      };
-    });
+          // Ensure we have a valid image URL
+          const images = property.property_img || propertyImages?.[String(listing.id)] || [LOGO_URL];
+          const name = property.property_name || listing.title || `Property ${listing.id}`;
+          const location = property.property_location || listing.subtitle || "Hyderabad";
+          const pricing = computeNightlyPrice(property);
+          const price = pricing?.finalNightlyPrice ?? 0;
 
-    return merged.filter((item) => item.price > 0 && item.image);
+          return {
+            id: String(listing.id),
+            name,
+            location,
+            price,
+            pricingBreakdown: pricing,
+            rating: property.property_rating || 0,
+            reviews: property.property_reviews || 0,
+            featured: Boolean(listing.featured),
+            propertyType: derivePropertyType(name),
+            guests: deriveGuests(property),
+            bedrooms: deriveBedrooms(property),
+            hasWifi: deriveAmenityFlag(property, "wifi"),
+            hasParking: deriveAmenityFlag(property, "park"),
+            petFriendly: derivePetFriendly(property),
+            image: images?.[0] || LOGO_URL,
+            property,
+          };
+        } catch (error) {
+          console.error(`Error processing listing ${listing.id}:`, error);
+          return null;
+        }
+      }).filter((item): item is CombinedListing => item !== null && item.price > 0 && item.image);
+
+      return merged;
+    } catch (error) {
+      console.error('Error creating listings:', error);
+      return [];
+    }
   }, [computeNightlyPrice, safeListings, safeProperties]);
 
   const filteredListings = React.useMemo(() => {
@@ -368,6 +460,28 @@ const Apartments = () => {
 
     return { displayCheckIn, displayCheckOut };
   }, [checkIn, checkOut]);
+
+  // Early return if no data is available
+  if (!safeListings || safeListings.length === 0) {
+    return (
+      <main className="bg-bg-muted py-10">
+        <div className="mx-auto max-w-6xl px-4 md:px-8">
+          <div className="rounded-2xl bg-bg-surface p-8 text-center shadow-level1 border border-border-subtle">
+            <h2 className="text-2xl font-semibold text-text-primary mb-2">No listings available</h2>
+            <p className="text-text-muted mb-4">
+              We're currently updating our listings. Please check back soon.
+            </p>
+            <button 
+              onClick={() => window.location.href = '/'} 
+              className="mt-4 px-6 py-2 bg-cta-primary text-[var(--text-contrast)] rounded-full hover:bg-cta-secondary transition-colors"
+            >
+              Go to Home
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="bg-bg-muted py-10">
