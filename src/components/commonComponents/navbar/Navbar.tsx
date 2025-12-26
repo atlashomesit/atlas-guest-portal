@@ -4,21 +4,16 @@ import './navbar.css';
 
 import { IoIosCall } from 'react-icons/io';
 import { buildWaLink } from '../../../utils/whatsapp';
-import { sanitizeItems, getItemKey } from '../../../utils/sanitizeItems';
 import { primaryNav, ctaNav } from '../../../config/navigation';
 import { LOGO_URL } from '../../../config/branding';
 import { CONTACT, formatDisplayNumber, getTelLink } from '../../../config/contact';
-import { propertyData } from '../../../data';
 import { trackEvent } from '../../../utils/analytics';
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isApartmentsOpen, setIsApartmentsOpen] = useState(false);
 
   const navigate = useNavigate();
   const location = useLocation();
-
-  const apartments = sanitizeItems(propertyData);
 
   const whatsappLink = buildWaLink({
     phoneE164: CONTACT.business.whatsapp,
@@ -52,7 +47,6 @@ const Navbar = () => {
 
   const closeMobile = () => {
     setIsMenuOpen(false);
-    setIsApartmentsOpen(false);
   };
 
   /* =========================
@@ -103,33 +97,15 @@ const Navbar = () => {
 
         {/* CENTER */}
         <div className="navbar-center hidden lg:flex gap-2">
-          {primaryNav.filter(i => !i.hidden).map(item =>
-            item.label === 'Apartments' ? (
-              <div key={item.label} className="dropdown relative">
-                <button className="dropdown-button">{item.label}</button>
-                <div className="dropdown-menu">
-                  <NavLink to={item.to}>Apartments Overview</NavLink>
-
-                  {apartments.map((apt, index) => (
-                    <NavLink
-                      key={getItemKey(apt, index)}
-                      to={`/property_details/${apt.id ?? apt.listingId ?? index}`}
-                    >
-                      {apt.property_name || apt.title || `Property ${index + 1}`}
-                    </NavLink>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <NavLink
-                key={item.label}
-                to={item.to}
-                className={navLinkClass}
-              >
-                {item.label}
-              </NavLink>
-            )
-          )}
+          {primaryNav.filter(i => !i.hidden).map(item => (
+            <NavLink
+              key={item.label}
+              to={item.to}
+              className={navLinkClass}
+            >
+              {item.label}
+            </NavLink>
+          ))}
         </div>
 
         {/* RIGHT */}
@@ -162,46 +138,16 @@ const Navbar = () => {
       {/* MOBILE MENU */}
       {isMenuOpen && (
         <div className="mobile-menu lg:hidden">
-          {primaryNav.filter(i => !i.hidden).map(item =>
-            item.label === 'Apartments' ? (
-              <div key={item.label}>
-                <button
-                  onClick={() => setIsApartmentsOpen(!isApartmentsOpen)}
-                  className="block py-2 font-semibold w-full text-left"
-                >
-                  {item.label}
-                </button>
-
-                {isApartmentsOpen && (
-                  <div className="pl-2">
-                    <NavLink onClick={closeMobile} to={item.to}>
-                      Apartments Overview
-                    </NavLink>
-
-                    {apartments.map((apt, idx) => (
-                      <NavLink
-                        key={getItemKey(apt, idx)}
-                        onClick={closeMobile}
-                        to={`/property_details/${apt.id ?? apt.listingId ?? idx}`}
-                        className="block py-1"
-                      >
-                        {apt.property_name || apt.title}
-                      </NavLink>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <NavLink
-                key={item.label}
-                onClick={closeMobile}
-                to={item.to}
-                className="block py-2"
-              >
-                {item.label}
-              </NavLink>
-            )
-          )}
+          {primaryNav.filter(i => !i.hidden).map(item => (
+            <NavLink
+              key={item.label}
+              onClick={closeMobile}
+              to={item.to}
+              className="block py-2"
+            >
+              {item.label}
+            </NavLink>
+          ))}
 
           {/* MOBILE ACTIONS */}
           <div className="mt-2 flex flex-col gap-2">

@@ -13,7 +13,7 @@ export const helpNav: NavItem[] = [
 
 export const primaryNav: NavItem[] = [
     { label: 'Home', to: '/' },
-    { label: 'Apartments', to: '/apartments' },
+    { label: 'Our Homes', to: '/#our-homes' },
     { label: 'Location', to: '/location' },
     { label: 'FAQs', to: '/faq' },
     { label: 'Contact', to: '/contact' },

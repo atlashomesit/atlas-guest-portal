@@ -90,7 +90,7 @@ Optional tooling:
 ### Booking funnel entry points
 - Primary header CTA → `/#our-homes` (scrolls to the Our Homes grid on the homepage)
 - Secondary help CTA → WhatsApp link labelled “Need help?”
-- Hero search → Builds `/apartments?checkIn=YYYY-MM-DD&checkOut=YYYY-MM-DD&guests=2` so listings filter on the chosen stay window and party size
+- Hero search → Builds `/?checkIn=YYYY-MM-DD&checkOut=YYYY-MM-DD&guests=2#our-homes` so listings filter on the chosen stay window and party size
 
 ## Theming
 - CSS variables for the active palette are defined per theme in `src/styles/themes/*.css` and loaded globally via `src/styles/themes/index.css`.
@@ -100,7 +100,7 @@ Optional tooling:
 
 ### Homepage search controls
 - The hero booking bar uses a `react-date-range` calendar for check-in/check-out with a single summary line (e.g., `22 Dec 2025 – 23 Dec 2025 · 2 guests`).
-- Query params flow through `checkIn`, `checkOut`, and `guests` so `/apartments` can hydrate filters on reload or direct links.
+- Query params flow through `checkIn`, `checkOut`, and `guests` so the homepage listings grid can hydrate filters on reload or direct links.
 - Validation enforces check-out after check-in and defaults to at least one guest; guest steppers cap the party size to 16.
 
 ## Project Map

@@ -289,7 +289,7 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
               {isInlineChecking ? 'Checking availability…' : inlineCtaLabel}
             </button>
             <Link
-              to="/apartments"
+              to="/#our-homes"
               className="text-center text-sm font-semibold text-text-primary underline-offset-4 hover:text-cta-secondary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
             >
               Browse listings

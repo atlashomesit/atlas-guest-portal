@@ -15,8 +15,8 @@ The homepage hero search now aligns with booking intent. It captures dates, gues
 - Invalid stored values fall back to the defaults above.
 
 ### CTA behavior
-- **Primary**: “Check availability” submits the form. On success, the app navigates to `/apartments` with query params.
-- **Secondary**: “Browse listings” links to `/apartments` without additional params.
+- **Primary**: “Check availability” submits the form. On success, the app navigates to `/?{query}#our-homes` with the selected filters.
+- **Secondary**: “Browse listings” links to `/#our-homes` without additional params.
 
 ### Hero visual system
 - Background photography is sourced from `HERO_IMAGE_URL` in `src/config/hero.ts` so swaps are a single-line change.
@@ -28,7 +28,7 @@ The homepage hero search now aligns with booking intent. It captures dates, gues
 The hero form encodes selections into the listings route:
 
 ```
-/apartments?checkIn=YYYY-MM-DD&checkOut=YYYY-MM-DD&guests=2
+/?checkIn=YYYY-MM-DD&checkOut=YYYY-MM-DD&guests=2#our-homes
 ```
 
 Listings read these params on load:

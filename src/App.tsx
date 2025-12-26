@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, useLocation, matchPath } from "react-router-dom"
+import { BrowserRouter as Router, Routes, Route, useLocation, matchPath, Navigate } from "react-router-dom"
 import './App.css'
 import PageNotFound from "./pages/pagenotfound/PageNotFound"
 import Home from "./pages/home/Home"
@@ -10,7 +10,6 @@ import ScrollToTop from "./ScrollTop"
 import Homepage_LocationDetails from "./components/homepage_components/homepage_locationsdetails/Homepage_LocationDetails"
 import Policies from "./pages/Policies"
 import Terms from "./pages/Terms"
-import Apartments from "./pages/Apartments"
 import Amenities from "./pages/Amenities"
 import LocationPage from "./pages/LocationPage"
 import GalleryPage from "./pages/GalleryPage"
@@ -39,7 +38,7 @@ function AppWrapper() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/contact" element={<ContactUs />} />
-        <Route path="/apartments" element={<Apartments />} />
+        <Route path="/apartments" element={<Navigate to="/#our-homes" replace />} />
         <Route path="/amenities" element={<Amenities />} />
         <Route path="/location" element={<LocationPage />} />
         <Route path="/gallery" element={<GalleryPage />} />
