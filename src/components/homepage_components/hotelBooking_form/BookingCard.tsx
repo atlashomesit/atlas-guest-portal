@@ -370,7 +370,6 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         });
 
         console.log('[BookingCard] Filtered bookings count:', filteredBookings.length);
-
         // Generate blocked dates: checkinDate (inclusive) to checkoutDate (exclusive)
         // ONLY block dates from today onwards (not past dates)
         // Today is only blocked if it falls within a booking range
