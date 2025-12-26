@@ -9,7 +9,7 @@ import { Navigation, Pagination, Scrollbar, A11y, Autoplay } from 'swiper/module
 import PropertyModal from "../propertymodal/PropertyModal";
 import { useState } from "react";
 import Subheading from "../../commonComponents/subheading/Subheading";
-import Homepage_form from "../hotelBooking_form/HotelBooking_Form";
+import Homepage_form from "../hotelBooking_form/BookingCard";
 
 const Homepage_LocationDetails = () => {
     const location = useLocation();

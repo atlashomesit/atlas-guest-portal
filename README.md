@@ -179,7 +179,7 @@ Each command should return a 301/302 with a `Location` header set to `/property_
 - **Policies route:** `/policies` renders a single-column page with a table of contents and anchored sections (e.g., `#cancellation-refund-policy`, `#house-rules`). The header and footer link to these anchors, so keep the IDs stable.
 - **Edit policies:** update the content blocks in `src/pages/Policies.tsx` to change wording or add new clauses while keeping the existing anchors to preserve deep links from navigation and the footer.
 - **Booking confirmations:** the booking confirmation alerts and EmailJS payloads reference the policy URL and cancellation/reschedule anchors (see `BookingFrom.tsx`). Update the shared `policyMessage` string there if the canonical URL ever changes.
-- **Sitemap URL:** a static sitemap is served from `public/sitemap.xml` and referenced in `public/robots.txt` for Cloudflare Pages deployments.
+- **Sitemap URL:** served from a Cloudflare Pages Function at `/sitemap.xml`, which builds entries from the incoming request origin so preview/staging domains emit the correct links; `public/robots.txt` references the same path.
 
 ### Terms & Conditions and stay policies
 - **Content source:** `src/content/terms.ts` holds the numbered Terms & Conditions sections, inline policy snippets, and the Razorpay consent note used across the booking flow.

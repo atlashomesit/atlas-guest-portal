@@ -1,12 +1,13 @@
 import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
-import { LOGO_URL } from "../config/branding";
-import { propertyData, propertyImages } from "../data";
-import { LISTINGS, type Listing } from "../data/listings";
+import ErrorBoundary from "../components/ErrorBoundary";
 import ListingCard from "../components/apartments/ListingCard";
 import ListingFilters from "../components/apartments/ListingFilters";
-import { sanitizeItems } from "../utils/sanitizeItems";
+import { LOGO_URL } from "../config/branding";
+import { LISTINGS, type Listing } from "../data/listings";
+import { propertyData, propertyImages } from "../data/propertyData";
+import getApiBaseUrl from "../utils/apiBaseUrl";
 import { trackEvent } from "../utils/analytics";
 import { calculateNightlyPrice, inferUnitType, type NightlyPriceBreakdown } from "../utils/pricing";
 
@@ -84,19 +85,200 @@ const deriveAmenityFlag = (property: PropertyRecord, keyword: string): boolean =
     )
   );
 
+const configurationMissingMessage =
+  "Configuration missing: API base URL not set for this environment.";
+
+const buildApiUrl = (baseUrl: string, path: string): string => {
+  const normalizedBase = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return `${normalizedBase}${normalizedPath}`;
+};
+
+const sanitizeListings = (listingsInput: unknown): Listing[] => {
+  try {
+    if (!listingsInput) {
+      console.error("LISTINGS is undefined");
+      return [];
+    }
+
+    if (!Array.isArray(listingsInput)) {
+      console.error("LISTINGS is not an array:", listingsInput);
+      return [];
+    }
+
+    if (listingsInput.length === 0) {
+      console.warn("LISTINGS is empty");
+      return [];
+    }
+
+    return listingsInput
+      .map((listing) => ({
+        ...listing,
+        id: String((listing as Listing | { id?: string }).id || ""),
+      }))
+      .filter((listing) => Boolean(listing.id));
+  } catch (error) {
+    console.error("Error processing LISTINGS:", error);
+    return [];
+  }
+};
+
+const sanitizeProperties = (propertiesInput: unknown): PropertyRecord[] => {
+  try {
+    if (!propertiesInput) {
+      console.error("propertyData is undefined");
+      return [];
+    }
+
+    if (!Array.isArray(propertiesInput)) {
+      console.error("propertyData is not an array:", propertiesInput);
+      return [];
+    }
+
+    if (propertiesInput.length === 0) {
+      console.warn("propertyData is empty");
+      return [];
+    }
+
+    return propertiesInput.map((property) => {
+      const safeProperty = {
+        id: String((property as PropertyRecord).id || ""),
+        property_name: (property as PropertyRecord)?.property_name || `Property ${(property as PropertyRecord)?.id || ""}`,
+        property_location: (property as PropertyRecord)?.property_location || "Hyderabad",
+        property_description:
+          (property as PropertyRecord)?.property_description || "A comfortable place to stay",
+        property_price:
+          typeof (property as PropertyRecord)?.property_price === "number"
+            ? (property as PropertyRecord).property_price
+            : 0,
+        property_rating:
+          typeof (property as PropertyRecord)?.property_rating === "number"
+            ? (property as PropertyRecord).property_rating
+            : 0,
+        property_reviews:
+          typeof (property as PropertyRecord)?.property_reviews === "number"
+            ? (property as PropertyRecord).property_reviews
+            : 0,
+        property_img: Array.isArray((property as PropertyRecord)?.property_img)
+          ? (property as PropertyRecord).property_img
+          : [],
+        property_amenities: Array.isArray((property as PropertyRecord)?.property_amenities)
+          ? (property as PropertyRecord).property_amenities
+          : [],
+        property_policy_details: Array.isArray((property as PropertyRecord)?.property_policy_details)
+          ? (property as PropertyRecord).property_policy_details
+          : [],
+        ...property,
+      } satisfies PropertyRecord;
+
+      if (!safeProperty.property_img || safeProperty.property_img.length === 0) {
+        safeProperty.property_img = [LOGO_URL];
+      }
+
+      return safeProperty;
+    });
+  } catch (error) {
+    console.error("Error processing propertyData:", error);
+    return [];
+  }
+};
+
 const Apartments = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const safeListings = React.useMemo(
-    () => sanitizeItems<Listing>(LISTINGS),
-    []
+  const [listingsSource, setListingsSource] = React.useState<Listing[]>(() => sanitizeListings(LISTINGS));
+  const [propertiesSource, setPropertiesSource] = React.useState<PropertyRecord[]>(() =>
+    sanitizeProperties(propertyData)
+  );
+  const [fetchState, setFetchState] = React.useState<"idle" | "loading" | "error" | "success">("idle");
+  const [statusMessage, setStatusMessage] = React.useState<string | null>(null);
+  const [apiBaseUrlUsed, setApiBaseUrlUsed] = React.useState<string>("");
+
+  const safeListings = React.useMemo(() => sanitizeListings(listingsSource), [listingsSource]);
+  const safeProperties = React.useMemo(() => sanitizeProperties(propertiesSource), [propertiesSource]);
+
+  const logStructuredError = React.useCallback(
+    (details: { url: string; status?: number; responseSnippet?: string }) => {
+      console.error({
+        page: "apartments",
+        url: details.url,
+        status: details.status,
+        responseSnippet: details.responseSnippet,
+        apiBaseUrlUsed,
+      });
+    },
+    [apiBaseUrlUsed],
   );
 
-  const safeProperties = React.useMemo(
-    () => sanitizeItems<PropertyRecord>(propertyData),
-    []
+  const fetchFromApi = React.useCallback(
+    async <T,>(baseUrl: string, path: string): Promise<T | null> => {
+      const url = buildApiUrl(baseUrl, path);
+      try {
+        const response = await fetch(url);
+        const text = await response.text();
+        const snippet = text.slice(0, 200);
+
+        if (!response.ok) {
+          logStructuredError({ url, status: response.status, responseSnippet: snippet });
+          throw new Error(`Request failed with status ${response.status}`);
+        }
+
+        try {
+          return JSON.parse(text) as T;
+        } catch (parseError) {
+          logStructuredError({ url, status: response.status, responseSnippet: snippet });
+          throw parseError;
+        }
+      } catch (error) {
+        if (!(error instanceof Error)) {
+          logStructuredError({ url, responseSnippet: String(error) });
+        } else {
+          logStructuredError({ url, responseSnippet: error.message });
+        }
+        throw error;
+      }
+    },
+    [logStructuredError],
   );
+
+  const fetchData = React.useCallback(async () => {
+    const resolvedBaseUrl = getApiBaseUrl();
+    setApiBaseUrlUsed(resolvedBaseUrl);
+
+    if (!resolvedBaseUrl) {
+      setStatusMessage(configurationMissingMessage);
+      setFetchState("error");
+      return;
+    }
+
+    setFetchState("loading");
+    setStatusMessage(null);
+
+    try {
+      const [listingsResponse, propertiesResponse] = await Promise.all([
+        fetchFromApi<Listing[]>(resolvedBaseUrl, "/listings"),
+        fetchFromApi<PropertyRecord[]>(resolvedBaseUrl, "/properties"),
+      ]);
+
+      if (listingsResponse) {
+        setListingsSource(sanitizeListings(listingsResponse));
+      }
+
+      if (propertiesResponse) {
+        setPropertiesSource(sanitizeProperties(propertiesResponse));
+      }
+
+      setFetchState("success");
+    } catch {
+      setStatusMessage("We're having trouble loading apartments right now. Please try again.");
+      setFetchState("error");
+    }
+  }, [fetchFromApi]);
+
+  React.useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const [guests, setGuests] = React.useState(2);
   const [checkIn, setCheckIn] = React.useState<string | null>(null);
@@ -126,17 +308,33 @@ const Apartments = () => {
   );
 
   const priceBounds = React.useMemo(() => {
-    const prices = safeProperties
-      .map((property) => computeNightlyPrice(property)?.finalNightlyPrice)
-      .filter((price): price is number => typeof price === "number" && price > 0);
+    try {
+      const prices = safeProperties
+        .map((property) => {
+          try {
+            return computeNightlyPrice(property)?.finalNightlyPrice;
+          } catch (error) {
+            console.warn(`Error computing price for property ${property.id}:`, error);
+            return null;
+          }
+        })
+        .filter((price): price is number => typeof price === "number" && price > 0);
 
-    const min = Math.min(...prices);
-    const max = Math.max(...prices);
+      if (prices.length === 0) {
+        return { min: 0, max: 10000 };
+      }
 
-    return {
-      min: Number.isFinite(min) ? min : 0,
-      max: Number.isFinite(max) ? max : 10000,
-    };
+      const min = Math.min(...prices);
+      const max = Math.max(...prices);
+
+      return {
+        min: Number.isFinite(min) ? min : 0,
+        max: Number.isFinite(max) ? max : 10000,
+      };
+    } catch (error) {
+      console.error('Error calculating price bounds:', error);
+      return { min: 0, max: 10000 };
+    }
   }, [computeNightlyPrice, safeProperties]);
 
   const [minPrice, setMinPrice] = React.useState(priceBounds.min);
@@ -148,38 +346,63 @@ const Apartments = () => {
   }, [priceBounds.max, priceBounds.min]);
 
   const listings = React.useMemo<CombinedListing[]>(() => {
-    const merged = safeListings.map((listing) => {
-      const property = safeProperties.find(
-        (item) => String(item.id) === String(listing.id)
-      ) || { id: listing.id };
+    try {
+      if (!safeListings || safeListings.length === 0) {
+        console.warn('No listings available');
+        return [];
+      }
 
-      const images = property.property_img || propertyImages[String(listing.id)];
-      const name = property.property_name || listing.title || `Property ${listing.id}`;
-      const location = property.property_location || listing.subtitle || "Hyderabad";
-      const pricing = computeNightlyPrice(property);
-      const price = pricing?.finalNightlyPrice ?? 0;
+      const merged = safeListings.map((listing) => {
+        try {
+          const property = safeProperties.find(
+            (item) => String(item.id) === String(listing.id)
+          ) || { 
+            id: listing.id,
+            property_name: listing.title,
+            property_location: 'Hyderabad',
+            property_price: 0,
+            property_rating: 0,
+            property_reviews: 0,
+            property_amenities: [],
+            property_policy_details: []
+          };
 
-      return {
-        id: String(listing.id),
-        name,
-        location,
-        price,
-        pricingBreakdown: pricing,
-        rating: property.property_rating || 0,
-        reviews: property.property_reviews || 0,
-        featured: Boolean(listing.featured),
-        propertyType: derivePropertyType(name),
-        guests: deriveGuests(property),
-        bedrooms: deriveBedrooms(property),
-        hasWifi: deriveAmenityFlag(property, "wifi"),
-        hasParking: deriveAmenityFlag(property, "park"),
-        petFriendly: derivePetFriendly(property),
-        image: images?.[0] || LOGO_URL,
-        property,
-      };
-    });
+          // Ensure we have a valid image URL
+          const images = property.property_img || propertyImages?.[String(listing.id)] || [LOGO_URL];
+          const name = property.property_name || listing.title || `Property ${listing.id}`;
+          const location = property.property_location || listing.subtitle || "Hyderabad";
+          const pricing = computeNightlyPrice(property);
+          const price = pricing?.finalNightlyPrice ?? 0;
 
-    return merged.filter((item) => item.price > 0 && item.image);
+          return {
+            id: String(listing.id),
+            name,
+            location,
+            price,
+            pricingBreakdown: pricing,
+            rating: property.property_rating || 0,
+            reviews: property.property_reviews || 0,
+            featured: Boolean(listing.featured),
+            propertyType: derivePropertyType(name),
+            guests: deriveGuests(property),
+            bedrooms: deriveBedrooms(property),
+            hasWifi: deriveAmenityFlag(property, "wifi"),
+            hasParking: deriveAmenityFlag(property, "park"),
+            petFriendly: derivePetFriendly(property),
+            image: images?.[0] || LOGO_URL,
+            property,
+          };
+        } catch (error) {
+          console.error(`Error processing listing ${listing.id}:`, error);
+          return null;
+        }
+      }).filter((item): item is CombinedListing => item !== null && item.price > 0 && item.image);
+
+      return merged;
+    } catch (error) {
+      console.error('Error creating listings:', error);
+      return [];
+    }
   }, [computeNightlyPrice, safeListings, safeProperties]);
 
   const filteredListings = React.useMemo(() => {
@@ -281,6 +504,34 @@ const Apartments = () => {
     return { displayCheckIn, displayCheckOut };
   }, [checkIn, checkOut]);
 
+  const statusCard = statusMessage ? (
+    <div className="rounded-2xl bg-bg-surface p-4 shadow-level1 border border-border-subtle">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="text-left">
+          <p className="text-base font-semibold text-text-primary">{statusMessage}</p>
+          {apiBaseUrlUsed && (
+            <p className="text-xs text-text-muted">Using: {apiBaseUrlUsed}</p>
+          )}
+        </div>
+        <div className="flex gap-3 flex-wrap items-center">
+          {fetchState === "loading" && (
+            <span className="text-sm text-text-muted">Refreshing listings…</span>
+          )}
+          <button
+            type="button"
+            onClick={fetchData}
+            className="px-5 py-2 rounded-full border border-border-subtle text-text-primary hover:bg-bg-muted transition-colors"
+            disabled={fetchState === "loading"}
+          >
+            {fetchState === "loading" ? "Retrying..." : "Retry"}
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
+  const shouldShowEmptyState = !safeListings || safeListings.length === 0;
+
   return (
     <main className="bg-bg-muted py-10">
       <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 md:px-8">
@@ -293,82 +544,117 @@ const Apartments = () => {
           </p>
         </header>
 
-        <div className="rounded-2xl bg-bg-surface p-4 shadow-level1 border border-border-subtle text-sm text-text-muted">
-          <p className="text-base font-semibold text-text-primary">Trip details</p>
-          <p className="mt-1 flex flex-wrap gap-2">
-            <span className="rounded-full bg-bg-muted px-3 py-1 text-xs font-semibold uppercase tracking-wide text-text-primary">
-              Guests: {guests}
-            </span>
-            {formattedDates.displayCheckIn && (
-              <span className="rounded-full bg-bg-muted px-3 py-1 text-xs font-semibold uppercase tracking-wide text-text-primary">
-                Check-in: {formattedDates.displayCheckIn}
-              </span>
-            )}
-            {formattedDates.displayCheckOut && (
-              <span className="rounded-full bg-bg-muted px-3 py-1 text-xs font-semibold uppercase tracking-wide text-text-primary">
-                Check-out: {formattedDates.displayCheckOut}
-              </span>
-            )}
-            {!formattedDates.displayCheckIn && !formattedDates.displayCheckOut && (
-              <span>Adjust dates anytime to refine the availability you see.</span>
-            )}
-          </p>
-        </div>
+        {statusCard}
 
-        <ListingFilters
-          priceMin={priceBounds.min}
-          priceMax={priceBounds.max}
-          selectedMinPrice={minPrice}
-          selectedMaxPrice={maxPrice}
-          guests={guests}
-          propertyType={propertyType}
-          petFriendlyOnly={petFriendlyOnly}
-          sortBy={sortBy}
-          onPriceChange={(field, value) => {
-            if (field === "min") {
-              setMinPrice(Math.max(priceBounds.min, Math.min(value, maxPrice)));
-            } else {
-              setMaxPrice(Math.min(priceBounds.max, Math.max(value, minPrice)));
-            }
-          }}
-          onGuestsChange={(value) => setGuests(Math.max(1, value))}
-          onPropertyTypeChange={setPropertyType}
-          onPetFriendlyChange={setPetFriendlyOnly}
-          onSortChange={setSortBy}
-        />
-
-        <section className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          {filteredListings.map((listing) => (
-            <ListingCard
-              key={listing.id}
-              id={listing.id}
-              name={listing.name}
-              location={listing.location}
-              image={listing.image}
-              price={listing.price}
-              pricingBreakdown={listing.pricingBreakdown}
-              rating={listing.rating}
-              reviews={listing.reviews}
-              propertyType={listing.propertyType}
-              guests={listing.guests}
-              bedrooms={listing.bedrooms}
-              hasWifi={listing.hasWifi}
-              hasParking={listing.hasParking}
-              petFriendly={listing.petFriendly}
-              onClick={() => handleNavigate(listing.property)}
-            />
-          ))}
-        </section>
-
-        {filteredListings.length === 0 && (
-          <div className="rounded-2xl bg-bg-surface p-6 text-center shadow-sm border border-border-subtle">
-            <h2 className="text-xl font-semibold text-text-primary">No homes match these filters</h2>
-            <p className="mt-2 text-text-muted">Try adjusting your price range or guest count to see more options.</p>
+        {shouldShowEmptyState ? (
+          <div className="rounded-2xl bg-bg-surface p-8 text-center shadow-level1 border border-border-subtle">
+            <h2 className="text-2xl font-semibold text-text-primary mb-2">No listings available</h2>
+            <p className="text-text-muted mb-4">
+              We're currently updating our listings. Please check back soon or try reloading.
+            </p>
+            <div className="flex flex-wrap gap-4 justify-center">
+              <button
+                onClick={fetchData}
+                className="px-6 py-2 bg-cta-primary text-[var(--text-contrast)] rounded-full hover:bg-cta-secondary transition-colors"
+                disabled={fetchState === "loading"}
+              >
+                {fetchState === "loading" ? "Refreshing..." : "Retry loading"}
+              </button>
+              <button
+                onClick={() => window.location.href = '/'}
+                className="px-6 py-2 bg-bg-muted text-text-primary rounded-full hover:bg-border-subtle transition-colors"
+              >
+                Go to Home
+              </button>
+            </div>
           </div>
+        ) : (
+          <>
+            <div className="rounded-2xl bg-bg-surface p-4 shadow-level1 border border-border-subtle text-sm text-text-muted">
+              <p className="text-base font-semibold text-text-primary">Trip details</p>
+              <p className="mt-1 flex flex-wrap gap-2">
+                <span className="rounded-full bg-bg-muted px-3 py-1 text-xs font-semibold uppercase tracking-wide text-text-primary">
+                  Guests: {guests}
+                </span>
+                {formattedDates.displayCheckIn && (
+                  <span className="rounded-full bg-bg-muted px-3 py-1 text-xs font-semibold uppercase tracking-wide text-text-primary">
+                    Check-in: {formattedDates.displayCheckIn}
+                  </span>
+                )}
+                {formattedDates.displayCheckOut && (
+                  <span className="rounded-full bg-bg-muted px-3 py-1 text-xs font-semibold uppercase tracking-wide text-text-primary">
+                    Check-out: {formattedDates.displayCheckOut}
+                  </span>
+                )}
+                {!formattedDates.displayCheckIn && !formattedDates.displayCheckOut && (
+                  <span>Adjust dates anytime to refine the availability you see.</span>
+                )}
+              </p>
+            </div>
+
+            <ListingFilters
+              priceMin={priceBounds.min}
+              priceMax={priceBounds.max}
+              selectedMinPrice={minPrice}
+              selectedMaxPrice={maxPrice}
+              guests={guests}
+              propertyType={propertyType}
+              petFriendlyOnly={petFriendlyOnly}
+              sortBy={sortBy}
+              onPriceChange={(field, value) => {
+                if (field === "min") {
+                  setMinPrice(Math.max(priceBounds.min, Math.min(value, maxPrice)));
+                } else {
+                  setMaxPrice(Math.min(priceBounds.max, Math.max(value, minPrice)));
+                }
+              }}
+              onGuestsChange={(value) => setGuests(Math.max(1, value))}
+              onPropertyTypeChange={setPropertyType}
+              onPetFriendlyChange={setPetFriendlyOnly}
+              onSortChange={setSortBy}
+            />
+
+            <section className="grid grid-cols-1 gap-6 md:grid-cols-2">
+              {filteredListings.map((listing) => (
+                <ListingCard
+                  key={listing.id}
+                  id={listing.id}
+                  name={listing.name}
+                  location={listing.location}
+                  image={listing.image}
+                  price={listing.price}
+                  pricingBreakdown={listing.pricingBreakdown}
+                  rating={listing.rating}
+                  reviews={listing.reviews}
+                  propertyType={listing.propertyType}
+                  guests={listing.guests}
+                  bedrooms={listing.bedrooms}
+                  hasWifi={listing.hasWifi}
+                  hasParking={listing.hasParking}
+                  petFriendly={listing.petFriendly}
+                  onClick={() => handleNavigate(listing.property)}
+                />
+              ))}
+            </section>
+
+            {filteredListings.length === 0 && (
+              <div className="rounded-2xl bg-bg-surface p-6 text-center shadow-sm border border-border-subtle">
+                <h2 className="text-xl font-semibold text-text-primary">No homes match these filters</h2>
+                <p className="mt-2 text-text-muted">Try adjusting your price range or guest count to see more options.</p>
+              </div>
+            )}
+          </>
         )}
       </div>
     </main>
   );
 };
 
-export default Apartments;
+// Wrap the component with the error boundary
+export default function ApartmentsWithErrorBoundary() {
+  return (
+    <ErrorBoundary>
+      <Apartments />
+    </ErrorBoundary>
+  );
+}

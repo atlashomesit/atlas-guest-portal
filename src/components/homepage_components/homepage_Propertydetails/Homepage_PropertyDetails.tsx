@@ -14,7 +14,7 @@ import { propertyData, propertyImages } from '../../../data.ts';
 import { getUnitPolicy } from '../../../config/policyConfig';
 import { inlinePolicySnippets } from '../../../content/terms';
 import Subheading from '../../commonComponents/subheading/Subheading';
-import HotelBooking_Form from '../hotelBooking_form/HotelBooking_Form';
+import HotelBooking_Form from '../hotelBooking_form/BookingCard.tsx';
 import { trackEvent } from '../../../utils/analytics';
 import { Button } from '../../ui/Button';
 import { calculateNightlyPrice, inferUnitType } from '../../../utils/pricing';
