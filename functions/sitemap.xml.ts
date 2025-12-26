@@ -1,6 +1,5 @@
-const SITEMAP_PATHS = [
+export const SITEMAP_PATHS = [
   "/",
-  "/apartments",
   "/amenities",
   "/location",
   "/gallery",

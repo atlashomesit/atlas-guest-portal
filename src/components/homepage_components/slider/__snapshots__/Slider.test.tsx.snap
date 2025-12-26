@@ -10,13 +10,13 @@ exports[`Slider hero search > captures hero widget snapshots for desktop, tablet
     >
       <div
         class="relative isolate overflow-hidden min-h-[75vh] md:min-h-[70vh] flex items-center justify-center bg-cover bg-center bg-no-repeat pt-[calc(var(--nav-height,80px)+1rem)]"
-        style="background-image: url("https://atlashomestorage.blob.core.windows.net/listing-images/fallback.jpeg");"
+        style="background-image: url(https://atlashomestorage.blob.core.windows.net/listing-images/fallback.jpeg);"
       >
         <div
           aria-hidden="true"
           class="pointer-events-none absolute inset-0 opacity-95"
           data-testid="hero-overlay"
-          style="background-color: rgba(3, 6, 14, 0.74); background-image: url("linear-gradient-overlay");"
+          style="background-color: rgba(3, 6, 14, 0.74); background-image: url(linear-gradient-overlay);"
         />
         <div
           class="relative z-10 flex max-w-4xl flex-col items-center gap-7 px-4 pb-12 text-center sm:px-6 md:pt-3"
@@ -331,7 +331,7 @@ exports[`Slider hero search > captures hero widget snapshots for desktop, tablet
                 </button>
                 <a
                   class="inline-flex items-center justify-center text-sm font-semibold text-text-muted underline-offset-4 transition hover:text-cta-secondary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary whitespace-nowrap"
-                  href="/apartments"
+                  href="/#our-homes"
                 >
                   Browse listings
                 </a>
@@ -510,13 +510,13 @@ exports[`Slider hero search > captures hero widget snapshots for desktop, tablet
     >
       <div
         class="relative isolate overflow-hidden min-h-[75vh] md:min-h-[70vh] flex items-center justify-center bg-cover bg-center bg-no-repeat pt-[calc(var(--nav-height,80px)+1rem)]"
-        style="background-image: url("https://atlashomestorage.blob.core.windows.net/listing-images/fallback.jpeg");"
+        style="background-image: url(https://atlashomestorage.blob.core.windows.net/listing-images/fallback.jpeg);"
       >
         <div
           aria-hidden="true"
           class="pointer-events-none absolute inset-0 opacity-95"
           data-testid="hero-overlay"
-          style="background-color: rgba(3, 6, 14, 0.74); background-image: url("linear-gradient-overlay");"
+          style="background-color: rgba(3, 6, 14, 0.74); background-image: url(linear-gradient-overlay);"
         />
         <div
           class="relative z-10 flex max-w-4xl flex-col items-center gap-7 px-4 pb-12 text-center sm:px-6 md:pt-3"
@@ -831,7 +831,7 @@ exports[`Slider hero search > captures hero widget snapshots for desktop, tablet
                 </button>
                 <a
                   class="inline-flex items-center justify-center text-sm font-semibold text-text-muted underline-offset-4 transition hover:text-cta-secondary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary whitespace-nowrap"
-                  href="/apartments"
+                  href="/#our-homes"
                 >
                   Browse listings
                 </a>
@@ -1010,13 +1010,13 @@ exports[`Slider hero search > captures hero widget snapshots for desktop, tablet
     >
       <div
         class="relative isolate overflow-hidden min-h-[75vh] md:min-h-[70vh] flex items-center justify-center bg-cover bg-center bg-no-repeat pt-[calc(var(--nav-height,80px)+1rem)]"
-        style="background-image: url("https://atlashomestorage.blob.core.windows.net/listing-images/fallback.jpeg");"
+        style="background-image: url(https://atlashomestorage.blob.core.windows.net/listing-images/fallback.jpeg);"
       >
         <div
           aria-hidden="true"
           class="pointer-events-none absolute inset-0 opacity-95"
           data-testid="hero-overlay"
-          style="background-color: rgba(3, 6, 14, 0.74); background-image: url("linear-gradient-overlay");"
+          style="background-color: rgba(3, 6, 14, 0.74); background-image: url(linear-gradient-overlay);"
         />
         <div
           class="relative z-10 flex max-w-4xl flex-col items-center gap-7 px-4 pb-12 text-center sm:px-6 md:pt-3"
@@ -1331,7 +1331,7 @@ exports[`Slider hero search > captures hero widget snapshots for desktop, tablet
                 </button>
                 <a
                   class="inline-flex items-center justify-center text-sm font-semibold text-text-muted underline-offset-4 transition hover:text-cta-secondary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary whitespace-nowrap"
-                  href="/apartments"
+                  href="/#our-homes"
                 >
                   Browse listings
                 </a>

@@ -488,7 +488,7 @@ const Apartments = () => {
         propertyType,
         petFriendlyOnly,
       },
-      { route: "/apartments" },
+      { route: "/#our-homes" },
     );
   }, [filteredListings.length, sortBy, guests, minPrice, maxPrice, propertyType, petFriendlyOnly, checkIn, checkOut]);
 

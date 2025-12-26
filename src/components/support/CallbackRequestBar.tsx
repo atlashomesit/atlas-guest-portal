@@ -16,7 +16,7 @@ const VIEW_DELAY_MS = 10_000;
 const SCROLL_THRESHOLD = 0.25;
 
 const isValidIndiaPhone = (value: string) => /^[6-9]\d{9}$/.test(value);
-const listingPrefixes = ["/apartments", "/property_details", "/location", "/gallery", "/offers"];
+const listingPrefixes = ["/property_details", "/location", "/gallery", "/offers"];
 const checkoutPatterns = /(checkout|payment|pay|reserve|booking|book|payment-method|confirmation)/i;
 
 const getHideUntil = () => {

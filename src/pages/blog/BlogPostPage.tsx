@@ -50,7 +50,7 @@ const BlogPostPage = () => {
             For booking offers and property policies, explore our Apartments, Offers, and Policies pages.
           </p>
           <div className="flex gap-3 mt-3 flex-wrap">
-            <Link to="/apartments" className="btn-chip">Apartments</Link>
+            <Link to="/#our-homes" className="btn-chip">Our Homes</Link>
             <Link to="/offers" className="btn-chip">Offers</Link>
             <Link to="/policies" className="btn-chip">Policies</Link>
           </div>

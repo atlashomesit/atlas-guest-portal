@@ -228,6 +228,8 @@ const Slider = () => {
       guests: guests.toString(),
     });
 
+    const listingSearchRoute = `/?${searchParams.toString()}#our-homes`;
+
     trackEvent(
       'availability_search',
       {
@@ -236,13 +238,13 @@ const Slider = () => {
         checkOut: endDate.toISOString(),
         guests,
       },
-      { route: `/apartments?${searchParams.toString()}` },
+      { route: listingSearchRoute },
     );
 
     trackEvent(
       'listings_browse',
       { surface: 'hero_form', checkIn: startDate.toISOString(), checkOut: endDate.toISOString(), guests },
-      { route: `/apartments?${searchParams.toString()}` },
+      { route: listingSearchRoute },
     );
 
     trackEvent(
@@ -253,13 +255,13 @@ const Slider = () => {
         checkOut: endDate.toISOString(),
         guests,
       },
-      { route: `/apartments?${searchParams.toString()}` },
+      { route: listingSearchRoute },
     );
 
     setIsSubmitting(true);
     setStatusMessage('Checking availability...');
 
-    navigate(`/apartments?${searchParams.toString()}`);
+    navigate({ pathname: '/', search: searchParams.toString(), hash: 'our-homes' });
     window.setTimeout(() => setIsSubmitting(false), 800);
   };
 
@@ -477,12 +479,12 @@ const Slider = () => {
                   {isSubmitting ? 'Checking...' : 'Check availability'}
                 </button>
                 <Link
-                  to="/apartments"
+                  to="/#our-homes"
                   onClick={() =>
                     trackEvent(
                       'listings_browse',
                       { surface: 'hero_secondary' },
-                      { route: '/apartments' },
+                      { route: '/#our-homes' },
                     )
                   }
                   className="inline-flex items-center justify-center text-sm font-semibold text-text-muted underline-offset-4 transition hover:text-cta-secondary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary whitespace-nowrap"
