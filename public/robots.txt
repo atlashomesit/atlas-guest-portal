@@ -1,3 +1,3 @@
 User-agent: *
 Allow: /
-Sitemap: https://atlashomestays.com/sitemap.xml
+Sitemap: /sitemap.xml
