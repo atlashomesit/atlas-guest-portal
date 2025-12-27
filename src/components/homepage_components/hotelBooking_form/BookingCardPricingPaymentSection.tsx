@@ -105,6 +105,12 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
   userPhone,
   setUserPhone,
 }) => {
+  const handlePrimaryActionClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    initiatePayment();
+  };
+
   return (
     <>
       {hasSelection && hasInteractedWithDates && (
@@ -278,7 +284,11 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
           />
           <span>
             I agree to the{' '}
-            <a className="underline" href="/terms">
+            <a
+              className="underline"
+              href="/terms"
+              onClick={(event) => event.stopPropagation()}
+            >
               Terms &amp; Conditions
             </a>{' '}
             and the policies above.
@@ -292,11 +302,7 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
 
         <button
           type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            initiatePayment();
-          }}
+          onClick={handlePrimaryActionClick}
           disabled={isLoading || !termsAccepted || !userEmail || !userPhone}
           className="bg-cta-primary hover:bg-cta-secondary text-[var(--text-contrast)] w-full rounded-full py-4 text-lg font-semibold transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center shadow-level1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
         >
@@ -442,10 +448,7 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
           <p className="text-lg font-semibold">₹{totalPrice.toLocaleString('en-IN')}</p>
           <button
             type="button"
-            onClick={(event) => {
-              event.preventDefault();
-              initiatePayment();
-            }}
+            onClick={handlePrimaryActionClick}
             disabled={isLoading || !termsAccepted}
             className="mt-1 bg-cta-primary hover:bg-cta-secondary text-[var(--text-contrast)] rounded-full px-4 py-2 text-sm font-semibold transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed shadow-level1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
           >
