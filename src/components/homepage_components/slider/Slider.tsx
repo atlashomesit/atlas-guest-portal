@@ -305,12 +305,12 @@ const Slider = () => {
   };
 
   const formContainerClass = enableWidgetExperiment
-    ? 'w-full max-w-5xl rounded-3xl bg-[color:color-mix(in_srgb,var(--bg-surface)_96%,rgba(3,6,14,0.45))] shadow-[0_20px_60px_rgba(0,0,0,0.45)] backdrop-blur-md border border-[color:color-mix(in_srgb,var(--bg-surface)_60%,transparent)] p-4 sm:p-5 md:p-6 flex flex-col gap-4 sm:gap-5'
-    : 'w-full max-w-5xl rounded-3xl bg-[color:color-mix(in_srgb,var(--bg-surface)_94%,rgba(0,0,0,0.18))] shadow-level3 backdrop-blur border border-[color:color-mix(in_srgb,var(--bg-surface)_55%,transparent)] p-4 sm:p-5 md:p-6 flex flex-col gap-4 sm:gap-5';
+    ? 'hero-form w-full max-w-5xl rounded-3xl bg-[color:color-mix(in_srgb,var(--bg-surface)_96%,rgba(3,6,14,0.45))] shadow-[0_20px_60px_rgba(0,0,0,0.45)] backdrop-blur-md border border-[color:color-mix(in_srgb,var(--bg-surface)_60%,transparent)] p-4 sm:p-5 md:p-6 flex flex-col gap-4 sm:gap-5'
+    : 'hero-form w-full max-w-5xl rounded-3xl bg-[color:color-mix(in_srgb,var(--bg-surface)_94%,rgba(0,0,0,0.18))] shadow-level3 backdrop-blur border border-[color:color-mix(in_srgb,var(--bg-surface)_55%,transparent)] p-4 sm:p-5 md:p-6 flex flex-col gap-4 sm:gap-5';
 
   const formGridClass = enableWidgetExperiment
-    ? 'grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 md:auto-rows-fr lg:grid-cols-4 lg:gap-5'
-    : 'grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 md:auto-rows-fr lg:grid-cols-4 lg:gap-5';
+    ? 'hero-form-grid grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 md:auto-rows-fr lg:grid-cols-4 lg:gap-5'
+    : 'hero-form-grid grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 md:auto-rows-fr lg:grid-cols-4 lg:gap-5';
 
   const fieldShellClass =
     'flex h-full min-h-[112px] flex-col justify-between rounded-2xl border border-[color:color-mix(in_srgb,var(--border-subtle)_80%,transparent)] bg-[color:color-mix(in_srgb,var(--bg-muted)_92%,var(--bg-surface))] px-4 py-4 sm:px-5 sm:py-5 shadow-[0_12px_36px_rgba(6,8,15,0.32)]';
@@ -385,7 +385,7 @@ const Slider = () => {
                 </button>
 
                 {isCalendarOpen && (
-                  <div className="absolute left-0 right-0 z-[var(--z-dropdown)] mt-2 rounded-2xl border border-border-subtle bg-bg-surface p-3 shadow-level2 md:w-auto">
+                  <div className="hero-date-dropdown absolute left-0 right-0 z-[var(--z-dropdown)] mt-2 rounded-2xl border border-border-subtle bg-bg-surface p-3 shadow-level2 md:w-auto">
                     {calendarReady ? (
                       <DateRange
                         onChange={handleRangeChange}

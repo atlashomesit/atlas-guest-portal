@@ -111,10 +111,17 @@ const Navbar = () => {
           </Link>
 
           <button
-            className="mobile-menu-button lg:hidden"
+            type="button"
+            className={`mobile-menu-button lg:hidden ${isMenuOpen ? 'open' : ''}`}
             onClick={() => setIsMenuOpen(!isMenuOpen)}
+            aria-label="Toggle navigation"
+            aria-expanded={isMenuOpen}
+            aria-controls="mobile-menu-panel"
           >
-            ☰
+            <span className="sr-only">Toggle navigation</span>
+            <span className="hamburger-bar" aria-hidden />
+            <span className="hamburger-bar" aria-hidden />
+            <span className="hamburger-bar" aria-hidden />
           </button>
         </div>
 
@@ -186,7 +193,7 @@ const Navbar = () => {
 
       {/* MOBILE MENU */}
       {isMenuOpen && (
-        <div className="mobile-menu lg:hidden open">
+        <div className="mobile-menu lg:hidden open" id="mobile-menu-panel">
           {visibleNavItems.map((item) => (
             item.label === 'Our Homes' ? (
               <div key={item.label}>

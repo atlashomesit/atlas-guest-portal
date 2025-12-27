@@ -177,7 +177,7 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
       </div>
 
       <div className="mb-5 rounded-2xl border border-border-strong/60 bg-[color:color-mix(in_srgb,var(--bg-muted)_72%,var(--bg-surface))] shadow-inner">
-        <div className={fieldGridClass}>
+        <div className={`booking-card-grid ${fieldGridClass}`}>
           <button
             type="button"
             onClick={() => {
@@ -307,7 +307,7 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
       {openCalendar && (
         <div
           ref={calendarRef}
-          className="absolute right-0 z-[var(--z-overlay)] bg-bg-surface shadow-level2 rounded-xl mt-2 overflow-hidden border border-border-subtle"
+          className="booking-calendar-popover absolute right-0 z-[var(--z-overlay)] bg-bg-surface shadow-level2 rounded-xl mt-2 overflow-hidden border border-border-subtle"
         >
           {isBookedDatesLoading ? (
             <div className="grid grid-cols-7 gap-2 p-3">
