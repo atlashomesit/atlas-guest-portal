@@ -192,6 +192,28 @@ describe("Slider hero search", () => {
     expect(capturedEvents.map((event) => event.event)).toContain("hero_primary_cta_click");
   });
 
+  it("clears dates and resets validation messaging", () => {
+    renderSlider();
+
+    const defaultStartLabel = format(new Date(), "dd MMM yyyy");
+    const defaultEndLabel = format(addDays(new Date(), 1), "dd MMM yyyy");
+    const statusRegion = screen.getByRole("status");
+
+    expect(statusRegion).toHaveTextContent(/hero form ready/i);
+    expect(screen.getByRole("button", { name: /select check-in date/i })).toHaveTextContent(defaultStartLabel);
+    expect(screen.getByRole("button", { name: /select check-out date/i })).toHaveTextContent(defaultEndLabel);
+
+    fireEvent.click(screen.getByTestId("hero-date-toggle"));
+    fireEvent.click(screen.getAllByTestId(`hero-date-${format(new Date(), "yyyy-MM-dd")}`)[0]);
+    expect(screen.getByRole("status")).toHaveTextContent(/updated dates/i);
+
+    fireEvent.click(screen.getByTestId("hero-date-clear"));
+
+    expect(screen.getByRole("status")).toHaveTextContent(/hero form ready/i);
+    expect(screen.getByRole("button", { name: /select check-in date/i })).not.toHaveTextContent(defaultStartLabel);
+    expect(screen.getByRole("button", { name: /select check-out date/i })).not.toHaveTextContent(defaultEndLabel);
+  });
+
   it("shows exactly three high-signal trust badges", () => {
     renderSlider();
     const trustBadges = screen.getByTestId("trust-badges");
