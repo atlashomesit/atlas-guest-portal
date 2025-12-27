@@ -5,7 +5,7 @@ import { format, startOfDay } from 'date-fns';
 import { getIstStartOfDay } from '@/utils/date';
 import { inlinePolicySnippets } from '../../../content/terms';
 import { priceDisplayConfig } from '../../../config/priceDisplay.config';
-import React, { useId } from 'react';
+import React, { useEffect, useId } from 'react';
 
 interface BookingCardCalendarSectionProps {
   hasDiscountToShow: boolean;
@@ -62,6 +62,7 @@ interface BookingCardCalendarSectionProps {
   minBookingDate: Date;
   ctaPrimaryColor: string;
   calendarRenderVersion?: string;
+  setLastTriggerRef: (element: HTMLButtonElement | null) => void;
 }
 
 export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProps> = ({
@@ -118,6 +119,7 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
   minBookingDate,
   ctaPrimaryColor,
   calendarRenderVersion,
+  setLastTriggerRef,
 }) => {
   const todayStart = getIstStartOfDay();
   const minSelectableDate = minBookingDate < todayStart ? todayStart : minBookingDate;
@@ -126,6 +128,17 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
   const nightLabel = nights === 1 ? '1 night' : `${nights} nights`;
   const loadingLabel = `Loading ${format(calendarVisibleMonth, 'MMMM yyyy')}...`;
   const calendarDialogLabelId = useId();
+  const calendarContentId = useId();
+
+  useEffect(() => {
+    if (!openCalendar || !calendarRef.current) return;
+
+    const navButtons = calendarRef.current.querySelectorAll<HTMLButtonElement>('.rdrNextPrevButton');
+    navButtons.forEach((button) => {
+      button.setAttribute('aria-controls', calendarContentId);
+      button.setAttribute('aria-expanded', 'true');
+    });
+  }, [calendarContentId, calendarRef, openCalendar]);
 
   return (
     <>
@@ -208,7 +221,8 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
         <div ref={triggerRowRef} className={`booking-card-grid ${fieldGridClass}`}>
           <button
             type="button"
-            onClick={() => {
+            onClick={(event) => {
+              setLastTriggerRef(event.currentTarget);
               markEngagement();
               setOpenCalendar(true);
               setOpenGuests(false);
@@ -223,6 +237,8 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
             aria-label={`Select check-in date, currently ${format(dates.startDate, 'dd MMM yyyy')}`}
             aria-describedby={dateError ? dateErrorId : validationMessage ? validationMessageId : undefined}
             aria-invalid={hasDateIssue}
+            aria-expanded={openCalendar}
+            aria-controls={calendarContentId}
           >
             <span className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">
               Check-in
@@ -240,7 +256,8 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
 
           <button
             type="button"
-            onClick={() => {
+            onClick={(event) => {
+              setLastTriggerRef(event.currentTarget);
               markEngagement();
               setOpenCalendar(true);
               setOpenGuests(false);
@@ -258,6 +275,8 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
               dateError ? dateErrorId : isCheckoutInvalid ? checkOutErrorId : validationMessage ? validationMessageId : undefined
             }
             aria-invalid={hasDateIssue}
+            aria-expanded={openCalendar}
+            aria-controls={calendarContentId}
           >
             <span className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">
               Check-out
@@ -279,7 +298,8 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
 
           <button
             type="button"
-            onClick={() => {
+            onClick={(event) => {
+              setLastTriggerRef(event.currentTarget);
               markEngagement();
               setOpenGuests(true);
               setOpenCalendar(false);
@@ -344,6 +364,7 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
           role="dialog"
           aria-modal="true"
           aria-labelledby={calendarDialogLabelId}
+          id={calendarContentId}
           className="booking-calendar-popover absolute left-0 right-0 z-[var(--z-overlay)] bg-bg-surface shadow-level2 rounded-xl mt-3 overflow-hidden border border-border-subtle"
           style={{ top: triggerRowBottom + 8 }}
           tabIndex={-1}
@@ -391,6 +412,18 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
                 monthDisplayFormat="MMMM yyyy"
                 weekdayDisplayFormat="EEE"
                 dayDisplayFormat="d"
+                ariaLabels={{
+                  prevButton: 'Go to previous month',
+                  nextButton: 'Go to next month',
+                  monthPicker: 'Change displayed month',
+                  yearPicker: 'Change displayed year',
+                  dateInput: {
+                    selection: {
+                      startDate: 'Check-in date input',
+                      endDate: 'Check-out date input',
+                    },
+                  },
+                }}
                 disabledDates={bookedDates}
                 shownDate={calendarVisibleMonth}
                 onShownDateChange={(date) => {

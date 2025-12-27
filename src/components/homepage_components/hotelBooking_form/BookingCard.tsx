@@ -95,7 +95,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     if (typeof window === 'undefined') return 'var(--cta-primary)';
     const value = getComputedStyle(document.documentElement).getPropertyValue('--cta-primary').trim();
     return value || 'var(--cta-primary)';
-  }, []);
+  }, [openCalendar, openGuests]);
 
   const [dates, setDates] = useState({
     startDate: defaultStartDate,
@@ -272,6 +272,9 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
   const calendarRef = useRef<HTMLDivElement | null>(null);
   const triggerRowRef = useRef<HTMLDivElement | null>(null);
   const previousOverflowRef = useRef<string>('');
+  const lastTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const previousOverlayStateRef = useRef({ calendar: false, guests: false });
+  const shouldRestoreFocusRef = useRef(false);
   const [triggerRowBottom, setTriggerRowBottom] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
@@ -283,19 +286,17 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     }
   }, []);
 
+  const setLastTriggerRef = (element: HTMLButtonElement | null) => {
+    if (element) {
+      lastTriggerRef.current = element;
+    }
+  };
+
   useEffect(() => {
     updateTriggerRowPosition();
     window.addEventListener('resize', updateTriggerRowPosition);
     return () => window.removeEventListener('resize', updateTriggerRowPosition);
   }, [updateTriggerRowPosition]);
-
-  useEffect(() => {
-    updateTriggerRowPosition();
-  }, [openCalendar, openGuests, updateTriggerRowPosition]);
-
-  useEffect(() => {
-    updateTriggerRowPosition();
-  }, [ctaConfirmation, dateError, guestNeedsAdult, inlineStatus, updateTriggerRowPosition]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -554,16 +555,23 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
 
   useEffect(() => {
     const handleClickOutside = (event: any) => {
-      if (guestMenuRef.current && !guestMenuRef.current.contains(event.target)) {
+      const clickedOutsideGuests = guestMenuRef.current && !guestMenuRef.current.contains(event.target);
+      const clickedOutsideCalendar = calendarRef.current && !calendarRef.current.contains(event.target);
+
+      if ((openGuests && clickedOutsideGuests) || (openCalendar && clickedOutsideCalendar)) {
+        shouldRestoreFocusRef.current = true;
+      }
+
+      if (clickedOutsideGuests) {
         setOpenGuests(false);
       }
-      if (calendarRef.current && !calendarRef.current.contains(event.target)) {
+      if (clickedOutsideCalendar) {
         setOpenCalendar(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [openCalendar, openGuests]);
 
   useEffect(() => {
     const body = document.body;
@@ -577,6 +585,9 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        if (openCalendar || openGuests) {
+          shouldRestoreFocusRef.current = true;
+        }
         setOpenCalendar(false);
         setOpenGuests(false);
         return;
@@ -620,6 +631,21 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
       document.removeEventListener('keydown', handleKeyDown);
       body.style.overflow = previousOverflowRef.current;
     };
+  }, [openCalendar, openGuests]);
+
+  useEffect(() => {
+    const previousState = previousOverlayStateRef.current;
+    const wasOpen = previousState.calendar || previousState.guests;
+    const isOpen = openCalendar || openGuests;
+
+    if (wasOpen && !isOpen && shouldRestoreFocusRef.current) {
+      requestAnimationFrame(() => {
+        lastTriggerRef.current?.focus({ preventScroll: true });
+      });
+      shouldRestoreFocusRef.current = false;
+    }
+
+    previousOverlayStateRef.current = { calendar: openCalendar, guests: openGuests };
   }, [openCalendar, openGuests]);
 
   useEffect(() => {
@@ -934,6 +960,14 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
   const checkOutErrorId = useId();
   const guestErrorId = useId();
   const capacityMessage = `Maximum capacity: ${propertyMaxCapacity} guests. Extra guests ₹${formattedExtraGuestFee} per additional guest.`;
+
+  useEffect(() => {
+    updateTriggerRowPosition();
+  }, [openCalendar, openGuests, updateTriggerRowPosition]);
+
+  useEffect(() => {
+    updateTriggerRowPosition();
+  }, [ctaConfirmation, dateError, guestNeedsAdult, inlineStatus, updateTriggerRowPosition]);
   const validationMessage = useMemo(() => {
     if (dateError) return dateError;
     if (isCheckoutInvalid) return 'Check-out must be at least 1 night after check-in.';
@@ -1497,11 +1531,12 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
           window.setTimeout(() => setIsCalendarTransitioning(false), 200);
         }}
         isCalendarTransitioning={isCalendarTransitioning}
-        maxBookingDate={bookingWindowEnd}
-        minBookingDate={todayIstBoundary}
-        ctaPrimaryColor={ctaPrimaryColor}
-        nights={nights}
-      />
+          maxBookingDate={bookingWindowEnd}
+          minBookingDate={todayIstBoundary}
+          ctaPrimaryColor={ctaPrimaryColor}
+          setLastTriggerRef={setLastTriggerRef}
+          nights={nights}
+        />
 
       <BookingCardGuestsSection
         openGuests={openGuests}
