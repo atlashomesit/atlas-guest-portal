@@ -634,6 +634,18 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     );
     setCtaConfirmation('Launching secure checkout...');
 
+    if (!hasSelection || isCheckoutInvalid) {
+      setCtaConfirmation('Please select valid check-in and check-out dates.');
+      setIsLoading(false);
+      return;
+    }
+
+    if (guestNeedsAdult) {
+      setCtaConfirmation('Add at least one adult to continue.');
+      setIsLoading(false);
+      return;
+    }
+
     if (!termsAccepted) {
       alert('Please confirm the Terms & Conditions before reserving.');
       return;

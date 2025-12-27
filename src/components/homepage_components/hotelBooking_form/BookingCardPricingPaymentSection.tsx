@@ -441,7 +441,11 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
           <p className="text-xs text-text-muted">Total</p>
           <p className="text-lg font-semibold">₹{totalPrice.toLocaleString('en-IN')}</p>
           <button
-            onClick={initiatePayment}
+            type="button"
+            onClick={(event) => {
+              event.preventDefault();
+              initiatePayment();
+            }}
             disabled={isLoading || !termsAccepted}
             className="mt-1 bg-cta-primary hover:bg-cta-secondary text-[var(--text-contrast)] rounded-full px-4 py-2 text-sm font-semibold transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed shadow-level1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
           >
