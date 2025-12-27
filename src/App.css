@@ -16,6 +16,35 @@
   --floating-gap: 1rem;
 }
 
+.hero-date-portal {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-dropdown);
+  pointer-events: none;
+}
+
+.hero-date-overlay {
+  position: fixed;
+  inset: 0;
+  background: color-mix(in srgb, var(--bg-surface) 10%, black 35%);
+  backdrop-filter: blur(2px);
+  pointer-events: auto;
+}
+
+.hero-date-dropdown {
+  position: absolute;
+  z-index: calc(var(--z-dropdown) + 1);
+  pointer-events: auto;
+  max-width: min(720px, calc(100vw - 2rem));
+  min-width: min(360px, calc(100vw - 2rem));
+}
+
+.hero-date-dropdown .rdrCalendarWrapper,
+.hero-date-dropdown .rdrMonths,
+.hero-date-dropdown .rdrMonth {
+  width: 100% !important;
+}
+
 @media (max-height: 720px) {
   :root {
     --floating-offset: 3.5rem;
@@ -95,17 +124,8 @@ body::-webkit-scrollbar {
   }
 
   .hero-date-dropdown {
-    width: calc(100vw - 2rem);
-    max-width: 360px;
-    margin: 0 auto;
-    left: 0;
-    right: 0;
-  }
-
-  .hero-date-dropdown .rdrCalendarWrapper,
-  .hero-date-dropdown .rdrMonths,
-  .hero-date-dropdown .rdrMonth {
-    width: 100% !important;
+    max-width: calc(100vw - 1.5rem);
+    min-width: calc(100vw - 1.5rem);
   }
 
   .booking-card-grid {
