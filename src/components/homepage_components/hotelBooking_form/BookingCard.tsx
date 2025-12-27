@@ -75,6 +75,9 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
   const [isCalendarTransitioning, setIsCalendarTransitioning] = useState(false);
   const [guestMenuBooting, setGuestMenuBooting] = useState(false);
   const [isRazorpayReady, setIsRazorpayReady] = useState(false);
+  const [calendarRenderVersion, setCalendarRenderVersion] = useState(() =>
+    getIstStartOfDay(defaultStartDate).toISOString(),
+  );
   const [paymentStatus, setPaymentStatus] = useState<
     | { state: 'idle' }
     | {
@@ -310,7 +313,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
   const [formErrors, setFormErrors] = useState<{ email?: string; phone?: string; dates?: string; guests?: string; terms?: string }>(
     {},
   );
-  const emailRegex = /^[\w.!#$%&'*+/=?^`{|}~-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$/;
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
   const phoneRegex = /^\+\d{1,3}\s?\d{6,14}$/;
 
   useEffect(() => {
@@ -418,6 +421,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     }
 
     setCalendarVisibleMonth(getIstStartOfDay(normalizedStart));
+    setCalendarRenderVersion(getIstStartOfDay(normalizedStart).toISOString());
     const isSingleClick = normalizedStart.getTime() === normalizedEnd.getTime();
 
     const restartSelection = isSingleClick && !awaitingCheckout;
@@ -442,12 +446,14 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     let errorMessage: string | null = null;
 
     if (getIstStartOfDay(effectiveStartDate) < todayIstBoundary) {
-      errorMessage = 'Check-in cannot be in the past.';
+      errorMessage = 'Check-in date must be today or later';
+      toast.error('Check-in date must be today or later');
     }
 
     if (resolvedEndDate <= effectiveStartDate) {
       resolvedEndDate = addDays(effectiveStartDate, 1);
       errorMessage = 'Check-out must be at least 1 night after check-in.';
+      toast.error('Minimum 1-night stay required. Please select a later check-out date.');
     }
 
     if (resolvedEndDate > bookingWindowEnd) {
@@ -456,6 +462,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         resolvedEndDate = addDays(bookingWindowEnd, 1);
       }
       errorMessage = 'Bookings are limited to 180 days from today.';
+      toast.error('Bookings available up to 180 days in advance');
     }
 
     if (resolvedEndDate <= effectiveStartDate) {
@@ -905,6 +912,60 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     }, 650);
   };
 
+  const formatPhoneInput = (value: string) => {
+    if (!value) return '';
+    const cleaned = value.replace(/[^\d+]/g, '');
+    const withPlus = cleaned.startsWith('+') ? cleaned : `+${cleaned.replace(/^\+/, '')}`;
+    const match = withPlus.match(/^\+(\d{1,3})(\d{0,14})$/);
+    if (!match) return withPlus;
+    const [, code, rest] = match;
+    return rest ? `+${code} ${rest}` : `+${code}`;
+  };
+
+  const handleEmailBlur = () => {
+    setFormErrors((current) => ({
+      ...current,
+      email:
+        userEmail.trim().length === 0
+          ? 'Email is required'
+          : emailRegex.test(userEmail.trim())
+          ? undefined
+          : 'Please enter a valid email address (e.g., user@example.com)',
+    }));
+  };
+
+  const handlePhoneBlur = () => {
+    const trimmed = userPhone.trim();
+    setFormErrors((current) => ({
+      ...current,
+      phone:
+        trimmed.length === 0
+          ? 'Phone number is required'
+          : phoneRegex.test(trimmed)
+          ? undefined
+          : 'Enter phone with country code (e.g., +91 9876543210)',
+    }));
+  };
+
+  const handleEmailChange: React.Dispatch<React.SetStateAction<string>> = (value) => {
+    const nextValue = typeof value === 'function' ? value(userEmail) : value;
+    setUserEmail(nextValue);
+    setFormErrors((current) => ({
+      ...current,
+      email: current.email && emailRegex.test(nextValue.trim()) ? undefined : current.email,
+    }));
+  };
+
+  const handlePhoneChange: React.Dispatch<React.SetStateAction<string>> = (value) => {
+    const nextValue = typeof value === 'function' ? value(userPhone) : value;
+    const formatted = formatPhoneInput(nextValue);
+    setUserPhone(formatted);
+    setFormErrors((current) => ({
+      ...current,
+      phone: current.phone && phoneRegex.test(formatted.trim()) ? undefined : current.phone,
+    }));
+  };
+
   const validateForm = (autoEmail: string, autoPhone: string) => {
     const errors: typeof formErrors = {};
 
@@ -921,11 +982,11 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     }
 
     if (!autoEmail || !emailRegex.test(autoEmail)) {
-      errors.email = 'Enter a valid email address (e.g. name@example.com).';
+      errors.email = 'Please enter a valid email address (e.g., user@example.com)';
     }
 
     if (!autoPhone || !phoneRegex.test(autoPhone.trim())) {
-      errors.phone = 'Use an international format like +91 9876543210.';
+      errors.phone = 'Enter phone with country code (e.g., +91 9876543210)';
     }
 
     if (!termsAccepted) {
@@ -1340,8 +1401,11 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         DateRangeComponent={undefined as never}
         handleDateChange={handleDateChange}
         calendarVisibleMonth={calendarVisibleMonth}
+        calendarRenderVersion={calendarRenderVersion}
         onMonthYearChange={(date) => {
-          setCalendarVisibleMonth(getIstStartOfDay(date));
+          const nextMonth = getIstStartOfDay(date);
+          setCalendarVisibleMonth(nextMonth);
+          setCalendarRenderVersion(nextMonth.toISOString());
           setIsCalendarTransitioning(true);
           window.setTimeout(() => setIsCalendarTransitioning(false), 200);
         }}
@@ -1404,9 +1468,11 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         FaCcVisaIcon={FaCcVisa}
         FaCcMastercardIcon={FaCcMastercard}
         userEmail={userEmail}
-        setUserEmail={setUserEmail}
+        setUserEmail={handleEmailChange}
+        onEmailBlur={handleEmailBlur}
         userPhone={userPhone}
-        setUserPhone={setUserPhone}
+        setUserPhone={handlePhoneChange}
+        onPhoneBlur={handlePhoneBlur}
         formErrors={formErrors}
         averageRating={property?.property_rating}
         reviewCount={property?.property_reviews}
