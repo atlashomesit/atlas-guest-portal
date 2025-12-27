@@ -28,10 +28,12 @@ interface BookingCardCalendarSectionProps {
   trackEvent: (...args: any[]) => void;
   propertyId: number;
   dates: { startDate: Date; endDate: Date; key: 'selection' };
+  dateError: string | null;
   validationMessage: string;
   validationMessageId: string;
   setHasInteractedWithDates: React.Dispatch<React.SetStateAction<boolean>>;
   isCheckoutInvalid: boolean;
+  dateErrorId: string;
   checkOutErrorId: string;
   hasInteractedWithDates: boolean;
   guestNeedsAdult: boolean;
@@ -79,10 +81,12 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
   trackEvent,
   propertyId,
   dates,
+  dateError,
   validationMessage,
   validationMessageId,
   setHasInteractedWithDates,
   isCheckoutInvalid,
+  dateErrorId,
   checkOutErrorId,
   hasInteractedWithDates,
   guestNeedsAdult,
@@ -104,6 +108,8 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
 }) => {
   // Normalize defaultStartDate to start of day (allows booking today)
   const normalizedStartDate = startOfDay(defaultStartDate);
+  const hasDateIssue = Boolean(dateError) || isCheckoutInvalid;
+  const dateFieldButtonClass = `${fieldButtonClass} ${hasDateIssue ? 'border-support-error ring-1 ring-support-error/40 focus-visible:outline-support-error' : ''}`;
 
   return (
     <>
@@ -191,9 +197,10 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
                 { propertyId, listingId: propertyId, unitCode: propertyId },
               );
             }}
-            className={fieldButtonClass}
+            className={dateFieldButtonClass}
             aria-label={`Select check-in date, currently ${format(dates.startDate, 'dd MMM yyyy')}`}
-            aria-describedby={validationMessage ? validationMessageId : undefined}
+            aria-describedby={dateError ? dateErrorId : validationMessage ? validationMessageId : undefined}
+            aria-invalid={hasDateIssue}
           >
             <span className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">
               Check-in
@@ -202,6 +209,11 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
               {format(dates.startDate, 'dd-MM-yyyy')}
             </span>
             <span className={helperTextClass}>Update check-in without leaving the page.</span>
+            {hasInteractedWithDates && dateError && (
+              <span className="mt-1 text-xs font-semibold text-support-error" role="alert" id={dateErrorId}>
+                {dateError}
+              </span>
+            )}
           </button>
 
           <button
@@ -218,12 +230,12 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
                 { propertyId, listingId: propertyId, unitCode: propertyId },
               );
             }}
-            className={fieldButtonClass}
+            className={dateFieldButtonClass}
             aria-label={`Select check-out date, currently ${format(dates.endDate, 'dd MMM yyyy')}`}
             aria-describedby={
-              isCheckoutInvalid ? checkOutErrorId : validationMessage ? validationMessageId : undefined
+              dateError ? dateErrorId : isCheckoutInvalid ? checkOutErrorId : validationMessage ? validationMessageId : undefined
             }
-            aria-invalid={isCheckoutInvalid}
+            aria-invalid={hasDateIssue}
           >
             <span className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">
               Check-out
@@ -231,13 +243,13 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
             <span className="mt-1 text-base font-semibold text-text-primary">
               {format(dates.endDate, 'dd-MM-yyyy')}
             </span>
-            {hasInteractedWithDates && isCheckoutInvalid && (
+            {hasInteractedWithDates && (isCheckoutInvalid || dateError) && (
               <span
                 className="mt-1 text-xs font-semibold text-support-error"
                 role="alert"
-                id={checkOutErrorId}
+                id={dateError ? dateErrorId : checkOutErrorId}
               >
-                Check-out must be after check-in.
+                {dateError || 'Check-out must be at least 1 night after check-in.'}
               </span>
             )}
             <span className={helperTextClass}>Minimum one night; we’ll auto-fix overlaps.</span>
@@ -331,7 +343,7 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
                 },
               ]}
              minDate={normalizedStartDate}
-              rangeColors={[ctaPrimaryColor]}
+              rangeColors={[dateError ? 'var(--support-error, #ef4444)' : ctaPrimaryColor]}
               showDateDisplay={false}
               showPreview={false}
               showSelectionPreview={true}
