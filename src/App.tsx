@@ -20,6 +20,7 @@ import FaqPage from "./pages/FaqPage"
 import BlogHome from "./pages/blog/BlogHome"
 import BlogCategory from "./pages/blog/BlogCategory"
 import BlogPostPage from "./pages/blog/BlogPostPage"
+import SearchPage from "./pages/SearchPage"
 import ShortLinkRedirect from "./components/ShortLinkRedirect"
 import SupportWidget from "./components/support/SupportWidget"
 import ErrorBoundary from "./components/ErrorBoundary"
@@ -62,6 +63,7 @@ function AppWrapper() {
           <Route path="/offers" element={withBoundary(<OffersPage />, "offers-route")} />
           <Route path="/about" element={withBoundary(<AboutPage />, "about-route")} />
           <Route path="/faq" element={withBoundary(<FaqPage />, "faq-route")} />
+          <Route path="/search" element={withBoundary(<SearchPage />, "search-route")} />
           <Route path="/blog" element={withBoundary(<BlogHome />, "blog-home-route")} />
           <Route path="/blog/:category" element={withBoundary(<BlogCategory />, "blog-category-route")} />
           <Route path="/blog/:category/:slug" element={withBoundary(<BlogPostPage />, "blog-post-route")} />

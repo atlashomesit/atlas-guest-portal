@@ -333,7 +333,7 @@ exports[`Slider hero search > captures hero widget snapshots for desktop, tablet
                   class="inline-flex items-center justify-center text-sm font-semibold text-text-muted underline-offset-4 transition hover:text-cta-secondary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary whitespace-nowrap"
                   href="/#our-homes"
                 >
-                  Browse listings
+                  Browse all apartments
                 </a>
               </div>
             </div>
@@ -833,7 +833,7 @@ exports[`Slider hero search > captures hero widget snapshots for desktop, tablet
                   class="inline-flex items-center justify-center text-sm font-semibold text-text-muted underline-offset-4 transition hover:text-cta-secondary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary whitespace-nowrap"
                   href="/#our-homes"
                 >
-                  Browse listings
+                  Browse all apartments
                 </a>
               </div>
             </div>
@@ -1333,7 +1333,7 @@ exports[`Slider hero search > captures hero widget snapshots for desktop, tablet
                   class="inline-flex items-center justify-center text-sm font-semibold text-text-muted underline-offset-4 transition hover:text-cta-secondary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary whitespace-nowrap"
                   href="/#our-homes"
                 >
-                  Browse listings
+                  Browse all apartments
                 </a>
               </div>
             </div>
