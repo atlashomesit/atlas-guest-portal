@@ -259,7 +259,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
         <Heading title="Our Homes" id="our-homes" />
 
         <div className="grid gap-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch rounded-3xl overflow-hidden shadow-level2 bg-white border border-border-subtle">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch rounded-3xl overflow-hidden shadow-level2 bg-white border border-border-subtle property-card">
             <div className="relative h-full">
               <img
                 src={heroModel.images[activeImageIndex[heroModel.listing.id] ?? 0] ?? FALLBACK_IMAGE}
@@ -308,18 +308,18 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
 
               {renderAmenities(heroModel.property)}
 
-              <div className="flex gap-3 flex-wrap mt-auto">
+              <div className="property-card__actions flex gap-3 flex-wrap mt-auto">
                 <button
                   type="button"
                   onClick={() => handleNavigate(heroModel)}
-                  className="inline-flex items-center justify-center rounded-full bg-[color:var(--cta-primary)] px-5 py-3 text-sm font-semibold text-white shadow-level2 transition hover:-translate-y-0.5"
+                  className="property-card__button inline-flex items-center justify-center rounded-full bg-[color:var(--cta-primary)] px-5 py-3 text-sm font-semibold text-white shadow-level2 transition hover:-translate-y-0.5"
                 >
                   Check availability
                 </button>
                 <button
                   type="button"
                   onClick={() => handleNavigate(heroModel)}
-                  className="inline-flex items-center justify-center rounded-full border border-border-subtle px-5 py-3 text-sm font-semibold text-text-primary transition hover:border-[color:var(--cta-primary)] hover:text-[color:var(--cta-primary)]"
+                  className="property-card__button inline-flex items-center justify-center rounded-full border border-border-subtle px-5 py-3 text-sm font-semibold text-text-primary transition hover:border-[color:var(--cta-primary)] hover:text-[color:var(--cta-primary)]"
                 >
                   View details
                 </button>
@@ -335,7 +335,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
               return (
                 <div
                   key={getItemKey(model.listing, index)}
-                  className="rounded-2xl shadow-level1 bg-white overflow-hidden border border-border-subtle flex flex-col"
+                  className="property-card rounded-2xl shadow-level1 bg-white overflow-hidden border border-border-subtle flex flex-col"
                 >
                   <div className="relative h-56">
                     <img
@@ -385,11 +385,11 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
 
                     {renderAmenities(model.property)}
 
-                    <div className="flex gap-3 flex-wrap mt-auto">
+                    <div className="property-card__actions flex gap-3 flex-wrap mt-auto">
                       <button
                         type="button"
                         onClick={() => handleNavigate(model)}
-                        className="inline-flex items-center justify-center rounded-full bg-[color:var(--cta-primary)] px-4 py-2 text-sm font-semibold text-white shadow-level1 transition hover:-translate-y-0.5"
+                        className="property-card__button inline-flex items-center justify-center rounded-full bg-[color:var(--cta-primary)] px-5 py-3 text-sm font-semibold text-white shadow-level1 transition hover:-translate-y-0.5"
                       >
                         Book now
                       </button>
@@ -399,7 +399,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
                           event.preventDefault();
                           handleNavigate(model);
                         }}
-                        className="inline-flex items-center justify-center rounded-full border border-border-subtle px-4 py-2 text-sm font-semibold text-text-primary transition hover:border-[color:var(--cta-primary)] hover:text-[color:var(--cta-primary)]"
+                        className="property-card__button inline-flex items-center justify-center rounded-full border border-border-subtle px-5 py-3 text-sm font-semibold text-text-primary transition hover:border-[color:var(--cta-primary)] hover:text-[color:var(--cta-primary)]"
                       >
                         View details
                       </Link>

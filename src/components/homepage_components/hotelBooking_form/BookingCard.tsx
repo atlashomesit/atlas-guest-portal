@@ -639,8 +639,8 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
       ? paymentStatus.reason
       : '');
   const fieldGridClass = isLayoutExperimentEnabled
-    ? 'grid grid-cols-1 items-stretch gap-3 p-3 sm:grid-cols-2 lg:]'
-    : 'grid grid-cols-1 items-stretch gap-3 p-3 md:grid-cols-4';
+    ? 'grid grid-cols-1 items-stretch gap-3 p-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-4'
+    : 'grid grid-cols-1 items-stretch gap-3 p-3 md:grid-cols-4 lg:gap-4';
   const fieldButtonClass =
     'group flex h-full min-h-[4.5rem] flex-col justify-center rounded-xl border border-border-subtle bg-bg-surface/70 px-4 text-left text-text-primary shadow-inner transition hover:border-border-strong hover:bg-bg-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary';
   const helperTextClass = 'mt-1 text-xs font-semibold text-text-muted leading-snug';

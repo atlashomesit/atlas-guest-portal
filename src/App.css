@@ -49,6 +49,10 @@ body::-webkit-scrollbar {
   padding-bottom: var(--safe-area-bottom);
 }
 
+.property-card__button {
+  min-height: 44px;
+}
+
 @media (min-width: 640px) {
   :root {
     --floating-offset: 2.25rem;
@@ -74,5 +78,60 @@ body::-webkit-scrollbar {
 @media (max-width: 767px) and (max-height: 640px) {
   .support-launcher {
     bottom: calc(1.25rem + var(--safe-area-bottom));
+  }
+}
+
+@media (max-width: 768px) {
+  .hero-form {
+    width: min(100%, 375px);
+    margin: 0 auto;
+    padding: 1rem;
+    gap: 1rem;
+  }
+
+  .hero-form-grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .hero-date-dropdown {
+    width: calc(100vw - 2rem);
+    max-width: 360px;
+    margin: 0 auto;
+    left: 0;
+    right: 0;
+  }
+
+  .hero-date-dropdown .rdrCalendarWrapper,
+  .hero-date-dropdown .rdrMonths,
+  .hero-date-dropdown .rdrMonth {
+    width: 100% !important;
+  }
+
+  .booking-card-grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+    padding: 0.75rem;
+  }
+
+  .booking-calendar-popover {
+    left: 0;
+    right: 0;
+    width: calc(100vw - 2rem);
+    max-width: 360px;
+    margin: 0 auto;
+  }
+
+  .property-card {
+    min-width: 0;
+  }
+
+  .property-card__actions {
+    gap: 0.75rem;
+  }
+
+  .property-card__button {
+    width: 100%;
+    justify-content: center;
   }
 }
