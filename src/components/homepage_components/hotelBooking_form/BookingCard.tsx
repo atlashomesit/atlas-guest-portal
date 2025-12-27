@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect, useMemo, useId } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { format, addDays, startOfDay } from 'date-fns';
+import { API_BASE_URL, IS_API_BASE_CONFIGURED } from '@/config/api';
 import { api, asArray } from '@/lib/api';
 import { propertyData } from '../../../data';
 import { inlinePolicySnippets } from '../../../content/terms';
@@ -427,13 +428,40 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
   useEffect(() => {
     const fetchBookedDates = async () => {
       setIsBookedDatesLoading(true);
+
+      const requestUrl = `${API_BASE_URL ?? ''}/bookings`;
+      const tags = { surface: 'booking_form', propertyId: String(propertyId) };
+      const envMode = (import.meta as any)?.env?.MODE ?? 'unknown';
+
+      const useMockBookings = !IS_API_BASE_CONFIGURED && envMode !== 'production';
+
+      logUserAction('booking_availability_fetch_start', {
+        apiBaseConfigured: IS_API_BASE_CONFIGURED,
+        requestUrl,
+        envMode,
+        propertyId,
+      });
+
       try {
+        if (!IS_API_BASE_CONFIGURED && envMode === 'production') {
+          throw new Error('API base URL is not configured for availability checks');
+        }
+
+        if (useMockBookings) {
+          console.info('[BookingCard] Using mock bookings for development');
+          setBookedDates([]);
+          setInlineStatus('Using demo availability. Configure the API base URL to view live bookings.');
+          logUserAction('booking_availability_fetch_mock', { propertyId, envMode });
+          return;
+        }
+
         // Fetch all bookings from API
         const response = await api.get('/bookings');
         const allBookings = asArray(response.data, 'bookings');
 
         console.log('[BookingCard] ===== FETCHING BOOKINGS =====');
         console.log('[BookingCard] PropertyId:', propertyId);
+        console.log('[BookingCard] API Base:', API_BASE_URL);
         console.log('[BookingCard] Total bookings from API:', allBookings.length);
 
         // Extract number from propertyId to match with API listing numbers
@@ -442,22 +470,22 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         const targetNumber = String(propertyId);
 
         console.log('[BookingCard] Looking for property number:', targetNumber);
-        console.log('[BookingCard] Sample bookings listing values:', 
+        console.log('[BookingCard] Sample bookings listing values:',
           allBookings.slice(0, 10).map((b: any) => ({ id: b.id, listing: b.listing })));
 
         // Filter bookings by extracting number from API listing and comparing with propertyId
         const filteredBookings = allBookings.filter((booking: any) => {
           const bookingListing = String(booking.listing).trim();
-          
+
           // Extract number from API listing (e.g., "Atlas301" -> "301", "Atlas501_PH" -> "501")
           const numberMatch = bookingListing.match(/(\d+)/);
           if (!numberMatch) {
             return false;
           }
-          
+
           const bookingNumber = numberMatch[1];
           const matches = bookingNumber === targetNumber;
-          
+
           if (matches) {
             console.log('[BookingCard] ✓ Matched booking:', {
               id: booking.id,
@@ -477,7 +505,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         // Today is only blocked if it falls within a booking range
         const blockedDates: Date[] = [];
         const todayDate = startOfDay(new Date());
-        
+
         filteredBookings.forEach((booking: any) => {
           if (!booking.checkinDate || !booking.checkoutDate) {
             console.warn('[BookingCard] Missing dates in booking:', booking);
@@ -489,9 +517,9 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
 
           // Validate dates
           if (isNaN(checkinDate.getTime()) || isNaN(checkoutDate.getTime())) {
-            console.warn('[BookingCard] Invalid dates:', { 
-              checkin: booking.checkinDate, 
-              checkout: booking.checkoutDate 
+            console.warn('[BookingCard] Invalid dates:', {
+              checkin: booking.checkinDate,
+              checkout: booking.checkoutDate
             });
             return;
           }
@@ -506,22 +534,22 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
           // Today is only blocked if: today >= checkinDate AND today < checkoutDate
           const datesForThisBooking: Date[] = [];
           let currentDate = new Date(checkinDate);
-          
+
           while (currentDate < checkoutDate) {
             const dateToBlock = startOfDay(new Date(currentDate));
-            
+
             // Only block if date is today or in the future (skip past dates)
             // This ensures today is only blocked if it's actually in the booking range
             if (dateToBlock >= todayDate) {
               datesForThisBooking.push(dateToBlock);
               blockedDates.push(dateToBlock);
             }
-            
+
             currentDate.setDate(currentDate.getDate() + 1);
           }
 
-          console.log(`  Blocked dates (today and future only): ${datesForThisBooking.map(d => format(d, 'dd-MM-yyyy')).join(', ')}`);
-          
+          console.log(`  Blocked dates (today and future only): ${datesForThisBooking.map(d => format(d, 'dd-MM-yyyy')).join(',')}`);
+
           // Check if today is in this booking
           const todayIsInBooking = todayDate >= checkinDate && todayDate < checkoutDate;
           if (todayIsInBooking) {
@@ -543,19 +571,27 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         console.log('[BookingCard] Blocked dates:', uniqueBlocked.map(d => format(d, 'dd-MM-yyyy')).join(', '));
         console.log('[BookingCard] ========================');
 
+        logUserAction('booking_availability_fetch_success', {
+          propertyId,
+          bookingCount: filteredBookings.length,
+          apiBase: API_BASE_URL,
+        });
+
+        setInlineStatus('Availability refreshed. Review the latest pricing and dates below.');
         setBookedDates(uniqueBlocked);
       } catch (error) {
         console.error('Failed to fetch booked dates:', error);
         logApiError(error, {
-          url: '/bookings',
+          url: requestUrl,
           method: 'GET',
           category: 'network',
-          tags: { surface: 'booking_form', propertyId: String(propertyId) },
+          tags,
         });
-        setInlineStatus('Unable to refresh availability right now. Please try again in a few minutes.');
+        setInlineStatus('We could not refresh availability. Please refresh the page or try again shortly.');
         setBookedDates([]);
       } finally {
         setIsBookedDatesLoading(false);
+        logUserAction('booking_availability_fetch_end', { propertyId, apiBase: API_BASE_URL });
       }
     };
 
