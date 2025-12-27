@@ -69,6 +69,7 @@ const Slider = () => {
   const [hasInteracted, setHasInteracted] = React.useState(false);
   const isTestEnvironment = typeof navigator !== 'undefined' && navigator.userAgent?.includes('jsdom');
   const [calendarReady, setCalendarReady] = React.useState(isTestEnvironment);
+  const [shownDate, setShownDate] = React.useState<Date>(() => defaultRange.startDate ?? today);
   const hasTrackedDropoff = React.useRef(false);
   const hasInteractedRef = React.useRef(false);
   const latestWidgetStateRef = React.useRef({ hasSelection: false, guests });
@@ -173,6 +174,7 @@ const Slider = () => {
     setDateError(null);
     setGuestError(validateGuests(normalizedGuests));
     setGuests(normalizedGuests);
+    setShownDate(nextRange.startDate ?? today);
     updateBooking({
       checkIn: nextRange.startDate?.toISOString() ?? null,
       checkOut: nextRange.endDate?.toISOString() ?? null,
@@ -265,6 +267,12 @@ const Slider = () => {
       guests,
     });
   }, [dateRange.endDate, dateRange.startDate, guests, updateBooking]);
+
+  React.useEffect(() => {
+    if (dateRange.startDate) {
+      setShownDate(dateRange.startDate);
+    }
+  }, [dateRange.startDate]);
 
   React.useEffect(
     () => () => {
@@ -424,6 +432,20 @@ const Slider = () => {
     const normalizedStart = selection.startDate ? startOfDay(selection.startDate) : null;
     const normalizedEnd = selection.endDate ? startOfDay(selection.endDate) : null;
     markHeroInteraction();
+
+    const attemptedStart = normalizedStart ?? dateRange.startDate;
+    const attemptedEnd = normalizedEnd ?? dateRange.endDate;
+    const hasPastAttempt =
+      (attemptedStart && attemptedStart < today) ||
+      (attemptedEnd && attemptedEnd < today);
+
+    if (hasPastAttempt) {
+      const errorMessage = 'Check-in cannot be in the past; minimum 1-night stay applies.';
+      setStatusMessage(errorMessage);
+      setDateError(errorMessage);
+      setError(errorMessage);
+      return;
+    }
 
     if (normalizedStart && normalizedEnd && normalizedStart.getTime() === normalizedEnd.getTime()) {
       const errorMessage = 'Minimum stay is 1 night after check-in.';
@@ -604,6 +626,9 @@ const Slider = () => {
                             showDateDisplay={false}
                             rangeColors={[dateError ? 'var(--support-error, #ef4444)' : 'var(--cta-primary)']}
                             minDate={today}
+                            shownDate={shownDate}
+                            onShownDateChange={(date) => setShownDate(startOfDay(date))}
+                            disabledDay={(date) => startOfDay(date) < today}
                             ranges={[
                               {
                                 startDate: dateRange.startDate ?? today,
@@ -612,7 +637,12 @@ const Slider = () => {
                               },
                             ]}
                             dayContentRenderer={(day) => (
-                              <div data-testid={`hero-date-${format(day, 'yyyy-MM-dd')}`}>{format(day, 'd')}</div>
+                              <div
+                                data-testid={`hero-date-${format(day, 'yyyy-MM-dd')}`}
+                                className={`${startOfDay(day) < today ? 'opacity-60 line-through' : ''}`}
+                              >
+                                {format(day, 'd')}
+                              </div>
                             )}
                           />
                         ) : (

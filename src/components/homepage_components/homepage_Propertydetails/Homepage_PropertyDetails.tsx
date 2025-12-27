@@ -1,4 +1,4 @@
-import { useLocation, useParams } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
 import { FaBed, FaShower, FaSwimmingPool, FaCar, FaWifi, FaTv } from "react-icons/fa";
 import { TbAirConditioning } from "react-icons/tb";
 import { PiElevatorDuotone, PiSecurityCameraDuotone } from "react-icons/pi";
@@ -60,6 +60,7 @@ const PropertyDetails = () => {
     const propertySlug = propertySlugParam ?? legacyPropertySlug;
     const unitSlug = unitSlugParam ?? legacyUnitSlug ?? legacyIdParam;
     const [data, setData] = useState<Property | null>(null);
+    const [notFound, setNotFound] = useState(false);
     const [showAmenitiesModal, setShowAmenitiesModal] = useState(false);
     const [showAboutMore, setShowAboutMore] = useState(false);
     const [showNeighborhoodMore, setShowNeighborhoodMore] = useState(false);
@@ -80,6 +81,9 @@ const PropertyDetails = () => {
     }, [data, unitType]);
 
     useEffect(() => {
+        setNotFound(false);
+        setData(null);
+
         const normalizeSlug = (value?: string | number | null) =>
             String(value ?? '')
                 .trim()
@@ -94,11 +98,12 @@ const PropertyDetails = () => {
             const idSlug = normalizeSlug(item.id);
             const nameSlug = normalizeSlug(item.property_name);
             const unitMatches = normalizedUnitSlug && (idSlug === normalizedUnitSlug || nameSlug === normalizedUnitSlug);
+            const propertySlugMatches =
+                !normalizedPropertySlug ||
+                nameSlug === normalizedPropertySlug ||
+                nameSlug.includes(normalizedPropertySlug);
 
-            if (!unitMatches) return false;
-            if (!normalizedPropertySlug) return true;
-
-            return nameSlug === normalizedPropertySlug;
+            return unitMatches && propertySlugMatches;
         });
 
         if (foundByUnitSlug) {
@@ -145,6 +150,7 @@ const PropertyDetails = () => {
         }
 
         console.error('No property found for slug:', unitSlug);
+        setNotFound(true);
     }, [propertySlug, unitSlug, location.state]);
 
     useEffect(() => {
@@ -209,7 +215,7 @@ const PropertyDetails = () => {
         return name.charAt(0).toUpperCase() + name.slice(1);
     };
 
-    if (!data) {
+    if (!data && !notFound) {
         return (
             <div className="min-h-screen flex items-center justify-center">
                 <div className="text-center">
@@ -225,7 +231,30 @@ const PropertyDetails = () => {
             </div>
         );
     }
-    if (!data) return <p className='mt-40 mb-20 text-center text-3xl'>Loading...</p>;
+
+    if (!data && notFound) {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <div className="text-center max-w-xl px-4">
+                    <div className="text-2xl font-semibold text-text-primary mb-4">We couldn’t find that home.</div>
+                    <div className="text-text-muted">
+                        Please check the link and try again, or head back to our homes catalog to continue browsing.
+                    </div>
+                    <div className="mt-6 flex flex-wrap gap-3 justify-center">
+                        <Button onClick={() => window.history.back()} className="w-full sm:w-auto">
+                            Go Back
+                        </Button>
+                        <Link
+                            to="/"
+                            className="inline-flex items-center justify-center rounded-full border border-border-subtle px-5 py-3 text-sm font-semibold text-text-primary transition hover:border-[color:var(--cta-primary)] hover:text-[color:var(--cta-primary)]"
+                        >
+                            Return to homepage
+                        </Link>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     const unitPolicy = getUnitPolicy(data?.id);
 
