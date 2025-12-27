@@ -8,7 +8,7 @@ import { primaryNav, ctaNav } from '../../../config/navigation';
 import { LOGO_URL } from '../../../config/branding';
 import { CONTACT, formatDisplayNumber, getTelLink } from '../../../config/contact';
 import { trackEvent } from '../../../utils/analytics';
-import { rooms } from '../../../content/rooms';
+import { homes } from '../../../content/homes';
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -99,7 +99,7 @@ const Navbar = () => {
     };
   }, []);
 
-  const baseNavItems = primaryNav.filter((item) => item.label !== 'Our Homes');
+  const visibleNavItems = primaryNav.filter((item) => !item.hidden);
 
   return (
     <section className="navbar-container" id="navbar_container">
@@ -126,45 +126,49 @@ const Navbar = () => {
 
         {/* CENTER */}
         <div className="navbar-center hidden lg:flex gap-2">
-          {baseNavItems.filter(i => !i.hidden).map(item => (
-            <NavLink
-              key={item.label}
-              to={item.to}
-              className={navLinkClass}
-            >
-              {item.label}
-            </NavLink>
-          ))}
-
-          <div
-            className={`dropdown ${isHomesOpen ? 'open' : ''}`}
-            ref={homesDropdownRef}
-            onMouseEnter={() => setIsHomesOpen(true)}
-            onMouseLeave={() => setIsHomesOpen(false)}
-          >
-            <button
-              type="button"
-              className="dropdown-button"
-              aria-haspopup="menu"
-              aria-expanded={isHomesOpen}
-              onClick={() => setIsHomesOpen((prev) => !prev)}
-            >
-              Our Homes
-            </button>
-
-            <div className="dropdown-menu" role="menu">
-              {rooms.map((room) => (
-                <Link
-                  key={room.roomNo}
-                  to={room.route}
-                  role="menuitem"
-                  onClick={() => setIsHomesOpen(false)}
+          {visibleNavItems.map((item) => (
+            item.label === 'Our Homes' ? (
+              <div
+                key={item.label}
+                className={`dropdown ${isHomesOpen ? 'open' : ''}`}
+                ref={homesDropdownRef}
+                onMouseEnter={() => setIsHomesOpen(true)}
+                onMouseLeave={() => setIsHomesOpen(false)}
+              >
+                <button
+                  type="button"
+                  className="dropdown-button"
+                  aria-haspopup="menu"
+                  aria-expanded={isHomesOpen}
+                  aria-controls="homes-menu"
+                  onClick={() => setIsHomesOpen((prev) => !prev)}
                 >
-                  {room.title}
-                </Link>
-              ))}
-            </div>
-          </div>
+                  Our Homes
+                </button>
+
+                <div className="dropdown-menu" role="menu" id="homes-menu">
+                  {homes.map((home) => (
+                    <Link
+                      key={home.roomNo}
+                      to={home.href}
+                      role="menuitem"
+                      onClick={() => setIsHomesOpen(false)}
+                    >
+                      {home.title}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <NavLink
+                key={item.label}
+                to={item.to}
+                className={navLinkClass}
+              >
+                {item.label}
+              </NavLink>
+            )
+          ))}
         </div>
 
         {/* RIGHT */}
@@ -197,42 +201,47 @@ const Navbar = () => {
       {/* MOBILE MENU */}
       {isMenuOpen && (
         <div className="mobile-menu lg:hidden open">
-          {baseNavItems.filter(i => !i.hidden).map(item => (
-            <NavLink
-              key={item.label}
-              onClick={closeMobile}
-              to={item.to}
-              className="block py-2"
-            >
-              {item.label}
-            </NavLink>
-          ))}
-
-          <button
-            type="button"
-            className="block py-2 text-left font-semibold"
-            aria-expanded={isHomesMobileOpen}
-            aria-controls="mobile-homes-menu"
-            onClick={() => setIsHomesMobileOpen((prev) => !prev)}
-          >
-            Our Homes
-          </button>
-
-          {isHomesMobileOpen && (
-            <div id="mobile-homes-menu" className="mobile-submenu">
-              {rooms.map((room) => (
-                <Link
-                  key={room.roomNo}
-                  to={room.route}
-                  role="menuitem"
-                  className="block py-1 text-sm"
-                  onClick={closeMobile}
+          {visibleNavItems.map((item) => (
+            item.label === 'Our Homes' ? (
+              <div key={item.label}>
+                <button
+                  type="button"
+                  className="block py-2 text-left font-semibold"
+                  aria-expanded={isHomesMobileOpen}
+                  aria-controls="mobile-homes-menu"
+                  aria-haspopup="menu"
+                  onClick={() => setIsHomesMobileOpen((prev) => !prev)}
                 >
-                  {room.title}
-                </Link>
-              ))}
-            </div>
-          )}
+                  Our Homes
+                </button>
+
+                {isHomesMobileOpen && (
+                  <div id="mobile-homes-menu" className="mobile-submenu">
+                    {homes.map((home) => (
+                      <Link
+                        key={home.roomNo}
+                        to={home.href}
+                        role="menuitem"
+                        className="block py-1 text-sm"
+                        onClick={closeMobile}
+                      >
+                        {home.title}
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <NavLink
+                key={item.label}
+                onClick={closeMobile}
+                to={item.to}
+                className="block py-2"
+              >
+                {item.label}
+              </NavLink>
+            )
+          ))}
 
           {/* MOBILE ACTIONS */}
           <div className="mt-2 flex flex-col gap-2">

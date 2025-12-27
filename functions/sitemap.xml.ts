@@ -1,4 +1,4 @@
-import { rooms } from "../src/content/rooms";
+import { homes } from "../src/content/homes";
 
 const CORE_PATHS = [
   "/",
@@ -16,9 +16,9 @@ const CORE_PATHS = [
   "/terms",
 ];
 
-const ROOM_PATHS = rooms.map((room) => room.route);
+const HOME_PATHS = homes.map((home) => home.href);
 
-export const SITEMAP_PATHS = Array.from(new Set([...CORE_PATHS, ...ROOM_PATHS]));
+export const SITEMAP_PATHS = Array.from(new Set([...CORE_PATHS, ...HOME_PATHS]));
 
 export function buildSitemapXml(baseUrl: string, paths: string[]): string {
   const normalizedBase = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
