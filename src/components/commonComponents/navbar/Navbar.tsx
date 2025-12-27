@@ -65,7 +65,7 @@ const Navbar = () => {
       matchPath('/property_details/:id', location.pathname) ?? matchPath('/properties/:id', location.pathname);
     const propertyIdFromRoute = propertyMatch?.params.id ?? null;
     const isPropertyDetailsRoute = Boolean(propertyMatch);
-    const bookingTarget = isPropertyDetailsRoute ? 'booking-form' : 'reserve';
+    const bookingTarget = isPropertyDetailsRoute ? 'booking-form' : 'search';
     const bookingSurface = isPropertyDetailsRoute ? 'property_details' : 'navbar';
 
     setCtaStatus(isPropertyDetailsRoute ? 'scrolling' : 'navigating');
