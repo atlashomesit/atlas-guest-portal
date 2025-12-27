@@ -1,4 +1,4 @@
-import { ReactNode } from "react"
+import { ReactNode, useEffect } from "react"
 import { BrowserRouter as Router, Routes, Route, useLocation, matchPath, Navigate } from "react-router-dom"
 import './App.css'
 import PageNotFound from "./pages/pagenotfound/PageNotFound"
@@ -26,6 +26,7 @@ import ErrorBoundary from "./components/ErrorBoundary"
 import { ToastContainer } from "react-toastify"
 import { BookingProvider } from "./contexts/BookingContext"
 import Reserve from "./pages/Reserve"
+import { trackEvent } from "./utils/analytics"
 
 function AppWrapper() {
   const location = useLocation();
@@ -41,6 +42,10 @@ function AppWrapper() {
       {element}
     </ErrorBoundary>
   );
+
+  useEffect(() => {
+    trackEvent('page_view', { surface: 'router' }, { route: location.pathname });
+  }, [location.pathname]);
 
   return (
     <>
