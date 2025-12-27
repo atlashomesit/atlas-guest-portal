@@ -49,6 +49,11 @@ const Navbar = () => {
     setIsHomesMobileOpen(false);
   };
 
+  const handleHomeSelect = () => {
+    setIsHomesOpen(false);
+    closeMobile();
+  };
+
   /* =========================
      ✅ FINAL BOOK NOW HANDLER
   ========================= */
@@ -92,6 +97,12 @@ const Navbar = () => {
       document.removeEventListener('keydown', handleEscape);
     };
   }, []);
+
+  useEffect(() => {
+    setIsHomesOpen(false);
+    setIsHomesMobileOpen(false);
+    setIsMenuOpen(false);
+  }, [location.pathname, location.search, location.hash]);
 
   const visibleNavItems = primaryNav.filter((item) => !item.hidden);
 
@@ -153,7 +164,7 @@ const Navbar = () => {
                       key={home.roomNo}
                       to={home.href}
                       role="menuitem"
-                      onClick={() => setIsHomesOpen(false)}
+                      onClick={handleHomeSelect}
                     >
                       {home.title}
                     </Link>
@@ -216,7 +227,7 @@ const Navbar = () => {
                         to={home.href}
                         role="menuitem"
                         className="block py-1 text-sm"
-                        onClick={closeMobile}
+                        onClick={handleHomeSelect}
                       >
                         {home.title}
                       </Link>
