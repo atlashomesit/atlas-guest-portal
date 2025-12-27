@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useLocation, useMatch } from "react-router-dom";
+import { matchPath, useLocation } from "react-router-dom";
 
 import { CONTACT } from "../../config/contact";
 import { getFeatureFlags } from "../../config/featureFlags";
@@ -20,7 +20,8 @@ const DISMISS_KEY = "supportDrawer:dismissed";
 
 const SupportWidgetContent = () => {
   const location = useLocation();
-  const matchPropertyDetails = useMatch("/property_details/:id");
+  const matchPropertyDetails =
+    matchPath("/property_details/:id", location.pathname) ?? matchPath("/properties/:id", location.pathname);
   const listingId = matchPropertyDetails?.params?.id ?? null;
 
   const [isOpen, setIsOpen] = useState(false);

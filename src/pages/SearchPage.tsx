@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
-import { SEARCH_UNITS, type SearchUnit } from "../data/searchUnits";
+import { propertyData } from "../data";
 
 const parseDate = (value: string | null): Date | null => {
   if (!value) return null;
@@ -9,17 +9,10 @@ const parseDate = (value: string | null): Date | null => {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
-const isWithinRange = (start: Date | null, end: Date | null, unit: SearchUnit): boolean => {
-  if (!start || !end) return true;
-
-  const availableStart = new Date(unit.availableFrom);
-  const availableEnd = new Date(unit.availableTo);
-
-  return start >= availableStart && end <= availableEnd;
-};
-
 const formatCurrency = (amount: number): string =>
   new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(amount);
+
+const buildSlug = (value: string): string => value.toLowerCase().replace(/\s+/g, "-");
 
 const SearchPage = () => {
   const [searchParams] = useSearchParams();
@@ -30,17 +23,34 @@ const SearchPage = () => {
 
   const hasInvalidDates = Boolean(checkIn && checkOut && checkOut <= checkIn);
 
+  const listings = useMemo(
+    () =>
+      propertyData.map((property) => {
+        const slug = buildSlug(property.property_name);
+        return {
+          id: slug,
+          title: property.property_name,
+          location: property.property_location ?? "Hyderabad",
+          pricePerNight: property.property_price ?? 0,
+          maxGuests: property.maxCapacity ?? 4,
+          imageUrl: property.property_img?.[0] ?? "/hero_images/slider_bg.png",
+          amenities: property.property_amenities?.slice(0, 3) ?? [],
+        };
+      }),
+    [],
+  );
+
   const filteredUnits = useMemo(() => {
     if (hasInvalidDates) return [];
 
-    return SEARCH_UNITS.filter((unit) => {
+    return listings.filter((unit) => {
       const matchesGuests = !guests || guests <= unit.maxGuests;
-      const matchesDates = isWithinRange(checkIn, checkOut, unit);
-      return matchesGuests && matchesDates;
+      return matchesGuests;
     });
-  }, [checkIn, checkOut, guests, hasInvalidDates]);
+  }, [guests, hasInvalidDates, listings]);
 
   const showEmptyState = !hasInvalidDates && filteredUnits.length === 0;
+  const queryString = searchParams.toString();
 
   return (
     <main className="min-h-screen bg-bg-muted py-10">
@@ -97,13 +107,20 @@ const SearchPage = () => {
                       {unit.location}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-4">
                     <div className="space-y-1">
                       <p className="text-2xl font-bold text-text-primary">{formatCurrency(unit.pricePerNight)}</p>
                       <p className="text-sm text-text-muted">per night</p>
                     </div>
+                    <div className="flex flex-col gap-1 text-right text-xs text-text-muted">
+                      {unit.amenities.map((amenity, index) => (
+                        <span key={`${unit.id}-amenity-${index}`} className="font-semibold text-text-secondary">
+                          {amenity.amenities_icon}
+                        </span>
+                      ))}
+                    </div>
                     <Link
-                      to={`/property_details/${unit.id}`}
+                      to={`/properties/${unit.id}${queryString ? `?${queryString}` : ""}`}
                       className="inline-flex items-center justify-center rounded-xl bg-cta-primary px-4 py-2 text-sm font-semibold text-[var(--text-contrast)] shadow hover:bg-cta-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
                     >
                       View details

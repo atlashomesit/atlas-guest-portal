@@ -72,6 +72,7 @@ function AppWrapper() {
           <Route path="/terms" element={withBoundary(<Terms />, "terms-route")} />
           <Route path="/terms-and-conditions" element={withBoundary(<Terms />, "terms-legacy-route")} />
           <Route path="/property_details/:id" element={withBoundary(<Homepage_PropertyDetails />, "property-details-route")} />
+          <Route path="/properties/:id" element={withBoundary(<Homepage_PropertyDetails />, "property-details-modern-route")} />
           <Route path="/reserve" element={withBoundary(<Reserve />, "reserve-route")} />
           <Route path="/property_LocationDetails/:id" element={withBoundary(<Homepage_LocationDetails />, "location-details-route")} />
           <Route path="/:shortCode" element={withBoundary(<ShortLinkRedirect />, "shortlink-route")} />
