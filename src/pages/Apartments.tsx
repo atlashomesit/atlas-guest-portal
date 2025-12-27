@@ -10,16 +10,28 @@ import { LISTINGS, type Listing } from "../data/listings";
 import { propertyData, propertyImages } from "../data/propertyData";
 import getApiBaseUrl from "../utils/apiBaseUrl";
 import { trackEvent } from "../utils/analytics";
+import { buildHomeUnitPath, navigateToHomeUnit } from "../utils/navigation";
 import { calculateNightlyPrice, inferUnitType, type NightlyPriceBreakdown } from "../utils/pricing";
 import { isAtlasApiRequest, logApiError, monitoredFetch } from "../lib/monitoring";
 import type { UnitType } from "../config/pricing.config";
+
+type PropertyMetadata = {
+  unitType?: UnitType;
+  unit_type?: UnitType;
+  property_name?: string;
+  property_slug?: string;
+  slug?: string;
+  name?: string;
+};
 
 type PropertyRecord = {
   id: number | string;
   unitType?: UnitType;
   unit_type?: UnitType;
-  metadata?: { unitType?: UnitType; unit_type?: UnitType };
-  property_metadata?: { unitType?: UnitType; unit_type?: UnitType };
+  metadata?: PropertyMetadata;
+  property_metadata?: PropertyMetadata;
+  property_slug?: string;
+  slug?: string;
   property_name?: string;
   property_location?: string;
   property_neighborhoods?: string[];
@@ -455,18 +467,40 @@ export const Apartments = () => {
   }, [guests, listings, maxPrice, minPrice, petFriendlyOnly, propertyType, sortBy]);
 
   const handleNavigate = (property: PropertyRecord) => {
-    const propertyName = property.property_name || property.id;
-    if (!propertyName) return;
+    const propertySlugInput =
+      property.property_slug ||
+      property.slug ||
+      property.property_name ||
+      property.property_metadata?.property_slug ||
+      property.property_metadata?.property_name ||
+      property.metadata?.property_slug ||
+      property.metadata?.property_name ||
+      property.metadata?.slug ||
+      property.property_metadata?.slug ||
+      property.metadata?.name ||
+      property.property_metadata?.name ||
+      String(property.id ?? "");
 
-    const slug = String(propertyName).toLowerCase().replace(/\s+/g, "-");
+    let propertySlug = String(propertySlugInput || "")
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "-");
+
+    if (!propertySlug) {
+      console.warn("Missing property slug for property; defaulting to 'atlashomes'", property);
+      propertySlug = "atlashomes";
+    }
+
+    const unitSlug = String(property.id ?? propertySlug ?? "unit").trim() || "unit";
+    const canonicalPath = buildHomeUnitPath(propertySlug, unitSlug);
 
     trackEvent(
       "listing_selected",
-      { surface: "apartments", listingName: propertyName },
-      { listingId: property.id, unitCode: property.id, route: `/property_details/${slug}` },
+      { surface: "apartments", listingName: propertySlugInput },
+      { listingId: property.id, unitCode: unitSlug, route: canonicalPath },
     );
 
-    navigate(`/property_details/${slug}`, {
+    navigateToHomeUnit(navigate, propertySlug, unitSlug, {
       state: { property },
     });
   };
