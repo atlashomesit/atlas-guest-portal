@@ -33,6 +33,7 @@ declare global {
 
 const MAP_LOCATION = { lat: 17.4746, lng: 78.3872 } as const;
 const MAP_SCRIPT_ID = "atlas-homestays-google-maps-script";
+const FALLBACK_STATIC_MAP_URL = "/images/atlas-homestays-static-map.svg";
 
 const transportOptions = [
   {
@@ -82,13 +83,14 @@ const landmarks = [
 const createStaticMapUrl = (apiKey?: string) =>
   apiKey
     ? `https://maps.googleapis.com/maps/api/staticmap?center=${MAP_LOCATION.lat},${MAP_LOCATION.lng}&zoom=15&size=800x420&scale=2&markers=color:red%7C${MAP_LOCATION.lat},${MAP_LOCATION.lng}&key=${apiKey}`
-    : undefined;
+    : FALLBACK_STATIC_MAP_URL;
 
 type MapStatus = "loading" | "ready" | "failed";
 
 const LocationPage = () => {
   const [mapStatus, setMapStatus] = useState<MapStatus>("loading");
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
+  const [mapHealth, setMapHealth] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const hasInitializedMap = useRef(false);
@@ -132,17 +134,20 @@ const LocationPage = () => {
 
     hasInitializedMap.current = true;
     setMapStatus("ready");
+    setMapHealth(null);
   };
 
   useEffect(() => {
     setMapStatus("loading");
     setErrorDetails(null);
+    setMapHealth(null);
     hasInitializedMap.current = false;
 
     if (!apiKey) {
       const message = "Google Maps API key is missing";
       logMapFailure(message);
       setErrorDetails(message);
+      setMapHealth("missing-api-key");
       setMapStatus("failed");
       return;
     }
@@ -154,6 +159,7 @@ const LocationPage = () => {
         logMapFailure("Failed to initialize Google Maps with an existing library", initializationError);
         setErrorDetails("We could not load the interactive map just yet.");
         setMapStatus("failed");
+        setMapHealth("initialization-failed");
       }
       return;
     }
@@ -176,13 +182,16 @@ const LocationPage = () => {
         logMapFailure("Google Maps library loaded but initialization failed", initializationError);
         setErrorDetails("We could not load the interactive map just yet.");
         setMapStatus("failed");
+        setMapHealth("initialization-failed");
       }
     };
 
     const handleError = (event: ErrorEvent | Event) => {
+      console.log("[LocationPage] Map script failed, switching to static preview");
       logMapFailure("Failed to load Google Maps script", event);
       setErrorDetails("Google Maps could not be reached right now.");
       setMapStatus("failed");
+      setMapHealth("script-failed");
     };
 
     script.addEventListener("load", handleLoad);
@@ -219,6 +228,19 @@ const LocationPage = () => {
         <Card className="p-0 overflow-hidden shadow-level2">
           <div className="relative bg-bg-surface border border-border-subtle rounded-2xl overflow-hidden">
             <div className="relative h-[280px] md:h-[420px]">
+              {mapHealth && (
+                <div className="absolute left-4 top-4 z-10 flex items-center gap-2 rounded-full border border-border-subtle bg-bg-surface/90 px-3 py-1 text-xs font-semibold text-destructive">
+                  <span className="h-2.5 w-2.5 rounded-full bg-destructive animate-pulse" aria-hidden />
+                  <span>
+                    {mapHealth === "script-failed"
+                      ? "Map script failed"
+                      : mapHealth === "missing-api-key"
+                        ? "Static map mode (no API key)"
+                        : "Map fallback active"}
+                  </span>
+                </div>
+              )}
+
               <div
                 aria-busy={mapStatus === "loading"}
                 aria-live="polite"
