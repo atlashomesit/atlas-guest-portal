@@ -299,7 +299,11 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
           />
           <span>
             I agree to the{' '}
-            <a className="underline" href="/terms">
+            <a
+              className="underline"
+              href="/terms"
+              onClick={(event) => event.stopPropagation()}
+            >
               Terms &amp; Conditions
             </a>{' '}
             and the policies above.
