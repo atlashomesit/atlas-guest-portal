@@ -71,6 +71,7 @@ function AppWrapper() {
           <Route path="/policies" element={withBoundary(<Policies />, "policies-route")} />
           <Route path="/terms" element={withBoundary(<Terms />, "terms-route")} />
           <Route path="/terms-and-conditions" element={withBoundary(<Terms />, "terms-legacy-route")} />
+          <Route path="/homes/:propertySlug/:unitSlug" element={withBoundary(<Homepage_PropertyDetails />, "property-details-home-route")} />
           <Route path="/property_details/:id" element={withBoundary(<Homepage_PropertyDetails />, "property-details-route")} />
           <Route path="/properties/:id" element={withBoundary(<Homepage_PropertyDetails />, "property-details-modern-route")} />
           <Route path="/reserve" element={withBoundary(<Reserve />, "reserve-route")} />
