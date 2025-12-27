@@ -63,7 +63,7 @@ const Navbar = () => {
     const propertyMatch = matchPath('/property_details/:id', location.pathname);
     const propertyIdFromRoute = propertyMatch?.params.id ?? null;
     const isPropertyDetailsRoute = Boolean(propertyMatch);
-    const bookingTarget = isPropertyDetailsRoute ? 'booking-form' : 'search-form';
+    const bookingTarget = isPropertyDetailsRoute ? 'booking-form' : 'reserve';
     const bookingSurface = isPropertyDetailsRoute ? 'property_details' : 'navbar';
 
     const bookingState = {
@@ -72,6 +72,8 @@ const Navbar = () => {
       checkOut: booking.checkOut ?? undefined,
       guests: booking.guests,
     };
+
+    const destination = isPropertyDetailsRoute ? `${location.pathname}#${bookingTarget}` : ctaNav.to;
 
     trackEvent(
       'cta_book_now_clicked',
@@ -84,7 +86,7 @@ const Navbar = () => {
         checkOut: bookingState.checkOut,
         guests: booking.guests,
       },
-      { route: isPropertyDetailsRoute ? `${location.pathname}#${bookingTarget}` : '/#search-form' },
+      { route: destination },
     );
 
     if (isPropertyDetailsRoute) {
@@ -96,17 +98,9 @@ const Navbar = () => {
       }
     }
 
-    if (location.pathname === '/') {
-      const el = document.getElementById('search-form');
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-    } else {
-      setPendingScrollTarget('search-form');
-      navigate('/', {
-        state: { scrollTo: 'search-form', bookingPrefill: bookingState },
-      });
-    }
+    navigate(ctaNav.to, {
+      state: { bookingPrefill: bookingState },
+    });
 
     closeMobile();
   };
