@@ -1,6 +1,6 @@
 // BookingCardGuestsSection.tsx
 import React from 'react';
-import { GuestCounts, GuestCountKey, guestLimits } from './BookingCard';
+import { GuestCounts, GuestCountKey } from './BookingCard';
 
 interface BookingCardGuestsSectionProps {
   openGuests: boolean;
@@ -11,6 +11,10 @@ interface BookingCardGuestsSectionProps {
   isAtMin: (type: GuestCountKey) => boolean;
   isAtMax: (type: GuestCountKey) => boolean;
   setGuests: React.Dispatch<React.SetStateAction<GuestCounts>>;
+  guestLimits: Record<GuestCountKey, { min: number; max?: number }>;
+  maxCapacity: number;
+  extraGuestFee: number;
+  totalGuests: number;
   updateChildAge: (index: number, age: number) => void;
   markEngagement: () => void;
   setOpenGuests: React.Dispatch<React.SetStateAction<boolean>>;
@@ -25,10 +29,22 @@ export const BookingCardGuestsSection: React.FC<BookingCardGuestsSectionProps> =
   isAtMin,
   isAtMax,
   setGuests,
+  guestLimits,
+  maxCapacity,
+  extraGuestFee,
+  totalGuests,
   updateChildAge,
   markEngagement,
   setOpenGuests,
 }) => {
+  const formattedExtraGuestFee = new Intl.NumberFormat('en-IN').format(extraGuestFee);
+  const capacityTooltip =
+    totalGuests >= maxCapacity
+      ? `Maximum capacity: ${maxCapacity} guests. Extra guests ₹${formattedExtraGuestFee} per additional.`
+      : undefined;
+
+  const isAtCapacity = totalGuests >= maxCapacity;
+
   return (
     <>
       {openGuests && (
@@ -70,6 +86,8 @@ export const BookingCardGuestsSection: React.FC<BookingCardGuestsSectionProps> =
                     <button
                       onClick={() => modifyGuest('adults', true)}
                       disabled={isAtMax('adults')}
+                      title={capacityTooltip}
+                      aria-label={capacityTooltip}
                       className="w-11 h-11 rounded-full border border-border-subtle flex items-center justify-center text-text-primary hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       +
@@ -109,6 +127,9 @@ export const BookingCardGuestsSection: React.FC<BookingCardGuestsSectionProps> =
                             typeof guestLimits.children.max === 'number'
                               ? Math.min(guestLimits.children.max, nextChildren)
                               : nextChildren;
+                          if (prev.adults + cappedValue + prev.infants > maxCapacity) {
+                            return prev;
+                          }
                           return {
                             ...prev,
                             children: cappedValue,
@@ -117,6 +138,8 @@ export const BookingCardGuestsSection: React.FC<BookingCardGuestsSectionProps> =
                         });
                       }}
                       disabled={isAtMax('children')}
+                      title={capacityTooltip}
+                      aria-label={capacityTooltip}
                       className="w-11 h-11 rounded-full border border-border-subtle flex items-center justify-center text-text-primary hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       +
@@ -163,6 +186,8 @@ export const BookingCardGuestsSection: React.FC<BookingCardGuestsSectionProps> =
                     <button
                       onClick={() => modifyGuest('infants', true)}
                       disabled={isAtMax('infants')}
+                      title={capacityTooltip}
+                      aria-label={capacityTooltip}
                       className="w-11 h-11 rounded-full border border-border-subtle flex items-center justify-center text-text-primary hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       +
@@ -201,6 +226,12 @@ export const BookingCardGuestsSection: React.FC<BookingCardGuestsSectionProps> =
                   </div>
                 </div>
               </div>
+
+              {isAtCapacity && (
+                <p className="text-xs font-semibold text-cta-primary mt-2">
+                  Maximum capacity: {maxCapacity} guests. Extra guest fee: ₹{formattedExtraGuestFee} per additional guest.
+                </p>
+              )}
             </>
           )}
         </div>
