@@ -1,22 +1,21 @@
 import { ReactNode } from "react";
 import { API_BASE_URL } from "@/config/api";
+import ErrorLayout from "./ErrorLayout";
 
 interface ApiConfigGuardProps {
   children: ReactNode;
 }
 
-const MissingApiConfigNotice = () => (
-  <div className="min-h-screen flex flex-col items-center justify-center bg-bg-muted text-center p-6 gap-4">
-    <h1 className="text-2xl font-semibold text-text-primary">We&rsquo;re setting things up</h1>
-    <p className="text-text-muted max-w-xl">
-      The guest portal can&rsquo;t reach its API right now. Please refresh the page or contact support if this problem
-      continues.
-    </p>
-  </div>
-);
-
 export const ApiConfigGuard = ({ children }: ApiConfigGuardProps) => {
-  if (!API_BASE_URL) return <MissingApiConfigNotice />;
+  if (!API_BASE_URL)
+    return (
+      <ErrorLayout
+        title="We couldn’t load this page"
+        description="We’re still connecting to the API for this environment. Refresh to try again, or head back to the home page while we sort things out."
+        primaryAction={{ label: "Try again", onClick: () => window.location.reload() }}
+        secondaryAction={{ label: "Back to home", href: "/" }}
+      />
+    );
   return <>{children}</>;
 };
 

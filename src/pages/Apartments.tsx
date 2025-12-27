@@ -2,6 +2,7 @@ import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import ErrorBoundary from "../components/ErrorBoundary";
+import ErrorLayout from "../components/ErrorLayout";
 import ListingCard from "../components/apartments/ListingCard";
 import ListingFilters from "../components/apartments/ListingFilters";
 import { LOGO_URL } from "../config/branding";
@@ -184,7 +185,7 @@ const sanitizeProperties = (propertiesInput: unknown): PropertyRecord[] => {
   }
 };
 
-const Apartments = () => {
+export const Apartments = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -506,33 +507,26 @@ const Apartments = () => {
     return { displayCheckIn, displayCheckOut };
   }, [checkIn, checkOut]);
 
-  const statusCard = statusMessage ? (
-    <div className="rounded-2xl bg-bg-surface p-4 shadow-level1 border border-border-subtle">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="text-left">
-          <p className="text-base font-semibold text-text-primary">{statusMessage}</p>
-          {apiBaseUrlUsed && (
-            <p className="text-xs text-text-muted">Using: {apiBaseUrlUsed}</p>
-          )}
-        </div>
-        <div className="flex gap-3 flex-wrap items-center">
-          {fetchState === "loading" && (
-            <span className="text-sm text-text-muted">Refreshing listings…</span>
-          )}
-          <button
-            type="button"
-            onClick={fetchData}
-            className="px-5 py-2 rounded-full border border-border-subtle text-text-primary hover:bg-bg-muted transition-colors"
-            disabled={fetchState === "loading"}
-          >
-            {fetchState === "loading" ? "Retrying..." : "Retry"}
-          </button>
-        </div>
-      </div>
-    </div>
-  ) : null;
-
   const shouldShowEmptyState = !safeListings || safeListings.length === 0;
+
+  if (fetchState === "error") {
+    return (
+      <main className="bg-bg-muted py-10">
+        <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 md:px-8">
+          <ErrorLayout
+            title="We couldn’t load this page"
+            description={statusMessage ?? "We’re having trouble loading apartments right now. Please try again."}
+            primaryAction={{ label: "Try again", onClick: fetchData, disabled: fetchState === "loading" }}
+            secondaryAction={{ label: "Back to home", href: "/" }}
+          >
+            {apiBaseUrlUsed && (
+              <p className="text-sm text-text-muted">Attempted to reach: {apiBaseUrlUsed}</p>
+            )}
+          </ErrorLayout>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="bg-bg-muted py-10">
@@ -545,8 +539,6 @@ const Apartments = () => {
             Browse our curated apartments and penthouses, complete with clear pricing and trusted ratings.
           </p>
         </header>
-
-        {statusCard}
 
         {shouldShowEmptyState ? (
           <div className="rounded-2xl bg-bg-surface p-8 text-center shadow-level1 border border-border-subtle">
