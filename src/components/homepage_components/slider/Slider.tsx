@@ -322,7 +322,7 @@ const Slider = () => {
       guests: guests.toString(),
     });
 
-    const listingSearchRoute = `/?${searchParams.toString()}#our-homes`;
+    const listingSearchRoute = `/search?${searchParams.toString()}`;
 
     trackEvent(
       'availability_search',
@@ -376,7 +376,7 @@ const Slider = () => {
       );
       setStatusMessage('Showing all homes while we resolve a configuration issue.');
       setError('We could not confirm availability due to a configuration issue. Showing all homes instead.');
-      navigate({ pathname: '/', search: searchParams.toString(), hash: 'our-homes' });
+      navigate({ pathname: '/search', search: searchParams.toString() });
       return;
     }
 
@@ -415,7 +415,7 @@ const Slider = () => {
     } finally {
       if (timeoutId) window.clearTimeout(timeoutId);
       setIsSubmitting(false);
-      navigate({ pathname: '/', search: searchParams.toString(), hash: 'our-homes' });
+      navigate({ pathname: '/search', search: searchParams.toString() });
     }
   };
 

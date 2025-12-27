@@ -36,7 +36,7 @@ const Homepage_Properties = () => {
     };
 
     const handleNavigate = (property: any) => {
-        navigate(`/property_details/${property?.id}`, { state: { property } });
+        navigate(`/properties/${property?.id}`, { state: { property } });
     };
 
     // const handleModal = (property: any) => () => {

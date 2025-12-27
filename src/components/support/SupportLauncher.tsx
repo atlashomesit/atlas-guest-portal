@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useLocation, useMatch } from "react-router-dom";
+import { matchPath, useLocation } from "react-router-dom";
 
 import { CONTACT } from "../../config/contact";
 import { trackEvent } from "../../utils/analytics";
@@ -48,7 +48,8 @@ const persistMessages = (messages: ChatMessage[]) => {
 
 const SupportLauncher = () => {
   const location = useLocation();
-  const matchPropertyDetails = useMatch("/property_details/:id");
+  const matchPropertyDetails =
+    matchPath("/property_details/:id", location.pathname) ?? matchPath("/properties/:id", location.pathname);
   const unitCode = matchPropertyDetails?.params?.id ?? null;
 
   const isCheckoutContext = /checkout|reserve/i.test(location.pathname);

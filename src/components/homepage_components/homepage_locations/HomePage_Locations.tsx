@@ -164,7 +164,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
 
       const propertyName = model.property?.property_name ?? model.listing.title;
       const slug = buildSlug(propertyName);
-      const path = `/property_details/${slug}`;
+      const path = `/properties/${slug}`;
       const nextSearch = searchString ? `?${searchString}` : "";
 
       trackEvent(
@@ -405,7 +405,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
                         Book now
                       </button>
                       <Link
-                        to={{ pathname: `/property_details/${buildSlug(model.listing.title)}`, search: searchString ? `?${searchString}` : "" }}
+                        to={{ pathname: `/properties/${buildSlug(model.listing.title)}`, search: searchString ? `?${searchString}` : "" }}
                         onClick={(event) => {
                           event.preventDefault();
                           handleNavigate(model);

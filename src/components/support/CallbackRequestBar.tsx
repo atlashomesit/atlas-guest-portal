@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { FiPhoneCall, FiX } from "react-icons/fi";
-import { useLocation, useMatch } from "react-router-dom";
+import { matchPath, useLocation } from "react-router-dom";
 
 import { trackEvent } from "../../utils/analytics";
 import { submitCallbackLead } from "../../utils/callbackLeads";
@@ -16,7 +16,7 @@ const VIEW_DELAY_MS = 10_000;
 const SCROLL_THRESHOLD = 0.25;
 
 const isValidIndiaPhone = (value: string) => /^[6-9]\d{9}$/.test(value);
-const listingPrefixes = ["/property_details", "/location", "/gallery", "/offers"];
+const listingPrefixes = ["/property_details", "/properties", "/location", "/gallery", "/offers"];
 const checkoutPatterns = /(checkout|payment|pay|reserve|booking|book|payment-method|confirmation)/i;
 
 const getHideUntil = () => {
@@ -39,7 +39,8 @@ const setHideUntil = (timestamp: number) => {
 
 const CallbackRequestBar = ({ hidden = false }: CallbackRequestBarProps) => {
   const location = useLocation();
-  const matchPropertyDetails = useMatch("/property_details/:id");
+  const matchPropertyDetails =
+    matchPath("/property_details/:id", location.pathname) ?? matchPath("/properties/:id", location.pathname);
   const listingId = matchPropertyDetails?.params?.id;
 
   const [phone, setPhone] = useState("");
