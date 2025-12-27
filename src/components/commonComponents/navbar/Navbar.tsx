@@ -14,12 +14,13 @@ const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isHomesOpen, setIsHomesOpen] = useState(false);
   const [isHomesMobileOpen, setIsHomesMobileOpen] = useState(false);
+  const [ctaStatus, setCtaStatus] = useState<'idle' | 'navigating' | 'scrolling'>('idle');
 
   const homesDropdownRef = useRef<HTMLDivElement | null>(null);
 
   const navigate = useNavigate();
   const location = useLocation();
-  const { booking, setPendingScrollTarget } = useBooking();
+  const { booking } = useBooking();
 
   const telLink = getTelLink();
 
@@ -66,6 +67,8 @@ const Navbar = () => {
     const bookingTarget = isPropertyDetailsRoute ? 'booking-form' : 'reserve';
     const bookingSurface = isPropertyDetailsRoute ? 'property_details' : 'navbar';
 
+    setCtaStatus(isPropertyDetailsRoute ? 'scrolling' : 'navigating');
+
     const bookingState = {
       propertyId: booking.propertyId ?? propertyIdFromRoute ?? undefined,
       checkIn: booking.checkIn ?? undefined,
@@ -93,6 +96,15 @@ const Navbar = () => {
       const bookingForm = document.getElementById('booking-form');
       if (bookingForm) {
         bookingForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+        if (bookingForm instanceof HTMLElement) {
+          const hadTabIndex = bookingForm.hasAttribute('tabindex');
+          if (!hadTabIndex) bookingForm.setAttribute('tabindex', '-1');
+          bookingForm.focus({ preventScroll: true });
+          if (!hadTabIndex) bookingForm.removeAttribute('tabindex');
+        }
+
+        window.setTimeout(() => setCtaStatus('idle'), 1200);
         closeMobile();
         return;
       }
@@ -133,6 +145,10 @@ const Navbar = () => {
   }, [location.pathname, location.search, location.hash]);
 
   const visibleNavItems = primaryNav.filter((item) => !item.hidden);
+
+  useEffect(() => {
+    setCtaStatus('idle');
+  }, [location.pathname]);
 
   return (
     <section className="navbar-container" id="navbar_container">
@@ -219,13 +235,24 @@ const Navbar = () => {
           </a>
 
           {/* BOOK NOW */}
-          <button
-            type="button"
-            className="book-now"
-            onClick={handleBookNow}
-          >
-            {ctaNav.label}
-          </button>
+          <div className="flex flex-col items-end gap-1">
+            <button
+              type="button"
+              className="book-now"
+              onClick={handleBookNow}
+              aria-busy={ctaStatus === 'navigating'}
+              data-state={ctaStatus}
+            >
+              {ctaNav.label}
+            </button>
+            {ctaStatus !== 'idle' && (
+              <span className="book-now-status" role="status" aria-live="polite">
+                {ctaStatus === 'navigating'
+                  ? 'Opening reservation...'
+                  : 'Bringing booking form into view...'}
+              </span>
+            )}
+          </div>
 
         </div>
       </div>
@@ -286,9 +313,19 @@ const Navbar = () => {
               type="button"
               className="book-now text-center"
               onClick={handleBookNow}
+              aria-busy={ctaStatus === 'navigating'}
+              data-state={ctaStatus}
             >
               {ctaNav.label}
             </button>
+
+            {ctaStatus !== 'idle' && (
+              <span className="book-now-status" role="status" aria-live="polite">
+                {ctaStatus === 'navigating'
+                  ? 'Opening reservation...'
+                  : 'Bringing booking form into view...'}
+              </span>
+            )}
 
           </div>
         </div>

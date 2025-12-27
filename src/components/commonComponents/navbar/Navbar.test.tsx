@@ -2,6 +2,16 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { vi } from "vitest";
 
+const mockNavigate = vi.fn();
+
+vi.mock("react-router-dom", async () => {
+  const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
+  return {
+    ...actual,
+    useNavigate: () => mockNavigate,
+  };
+});
+
 vi.mock("../../../utils/analytics", async () => {
   const actual = await vi.importActual<typeof import("../../../utils/analytics")>("../../../utils/analytics");
   return {
@@ -15,62 +25,77 @@ import { trackEvent } from "../../../utils/analytics";
 import { homes } from "../../../content/homes";
 import { BookingProvider } from "../../../contexts/BookingContext";
 
-const renderNavbar = () =>
+const renderNavbar = (initialEntries: string[] = ["/"]) => {
   render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={initialEntries}>
       <BookingProvider>
         <Navbar />
       </BookingProvider>
     </MemoryRouter>,
   );
+};
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockNavigate.mockClear();
+});
 
 describe("Navbar CTA", () => {
-  it("routes Book Now to the dedicated reserve flow", () => {
+  it("renders Contact navigation as internal links across desktop and mobile", () => {
     renderNavbar();
 
-    const bookNow = screen.getByRole("button", { name: /book now/i });
-    bookNow.click();
+    const contactLink = screen.getByRole("link", { name: /^Contact$/i });
+    expect(contactLink).toHaveAttribute("href", "/contact");
 
-    expect(trackEvent).toHaveBeenCalledWith(
-      "cta_book_now_clicked",
-      expect.objectContaining({ source: "header", target: "reserve", surface: "navbar" }),
-      { route: "/reserve" },
-    );
+    const menuToggle = screen.getByRole("button", { name: /toggle navigation/i });
+    fireEvent.click(menuToggle);
+
+    const contactMobile = screen
+      .getAllByRole("link", { name: /^Contact$/i })
+      .find((link) => link.closest("#mobile-menu-panel"));
+
+    expect(contactMobile).toBeDefined();
+    expect(contactMobile).toHaveAttribute("href", "/contact");
   });
 
-  it("emits a tracking event when Book Now is clicked", () => {
+  it("routes Book Now to the dedicated reserve flow with a visible transition", () => {
     renderNavbar();
-
-    const bookNow = screen.getByRole("button", { name: /book now/i });
-    bookNow.click();
-
-    expect(trackEvent).toHaveBeenCalledWith(
-      "cta_book_now_clicked",
-      expect.objectContaining({ source: "header", target: "reserve", surface: "navbar" }),
-      { route: "/reserve" },
-    );
-  });
-
-  it("smoothly scrolls to the booking form on property detail pages", () => {
-    const scrollIntoView = vi.fn();
-    const bookingForm = document.createElement("div");
-    bookingForm.id = "booking-form";
-    // @ts-expect-error jsdom type
-    bookingForm.scrollIntoView = scrollIntoView;
-    document.body.appendChild(bookingForm);
-
-    render(
-      <MemoryRouter initialEntries={["/property_details/123"]}>
-        <BookingProvider>
-          <Navbar />
-        </BookingProvider>
-      </MemoryRouter>,
-    );
 
     const bookNow = screen.getByRole("button", { name: /book now/i });
     fireEvent.click(bookNow);
 
+    expect(screen.getByText(/opening reservation/i)).toBeInTheDocument();
+    expect(mockNavigate).toHaveBeenCalledWith("/reserve", {
+      state: { bookingPrefill: expect.objectContaining({ guests: 2 }) },
+    });
+
+    expect(trackEvent).toHaveBeenCalledWith(
+      "cta_book_now_clicked",
+      expect.objectContaining({ source: "header", target: "reserve", surface: "navbar" }),
+      { route: "/reserve" },
+    );
+  });
+
+  it("smoothly scrolls to and focuses the booking form on property detail pages", () => {
+    const scrollIntoView = vi.fn();
+    const focus = vi.fn();
+    const bookingForm = document.createElement("div");
+    bookingForm.id = "booking-form";
+    bookingForm.setAttribute("tabindex", "0");
+    // @ts-expect-error jsdom type
+    bookingForm.scrollIntoView = scrollIntoView;
+    Object.defineProperty(bookingForm, "focus", { value: focus });
+    document.body.appendChild(bookingForm);
+
+    renderNavbar(["/property_details/123"]);
+
+    const bookNow = screen.getByRole("button", { name: /book now/i });
+    fireEvent.click(bookNow);
+
+    expect(screen.getByText(/bringing booking form into view/i)).toBeInTheDocument();
     expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
+    expect(focus).toHaveBeenCalled();
+    expect(mockNavigate).not.toHaveBeenCalled();
     expect(trackEvent).toHaveBeenCalledWith(
       "cta_book_now_clicked",
       expect.objectContaining({ target: "booking-form", surface: "property_details" }),
