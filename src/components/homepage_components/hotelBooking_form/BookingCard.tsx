@@ -17,6 +17,7 @@ import { SiGooglepay, SiRazorpay } from 'react-icons/si';
 import { toast } from 'react-toastify';
 import { logApiError, logUserAction, reportError } from '../../../lib/monitoring';
 import { useBooking } from '../../../contexts/BookingContext';
+import { getIstCalendarDate, getIstStartOfDay } from '@/utils/date';
 
 import 'react-date-range/dist/styles.css';
 import 'react-date-range/dist/theme/default.css';
@@ -54,9 +55,10 @@ export interface GuestCounts {
 }
 
 const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = false }) => {
-  const today = startOfDay(new Date());
-  const defaultStartDate = today; // Allow booking from today
-  const defaultEndDate = addDays(today, 1);
+  const todayIst = getIstCalendarDate();
+  const todayIstBoundary = getIstStartOfDay();
+  const defaultStartDate = todayIst; // Allow booking from today
+  const defaultEndDate = addDays(todayIst, 1);
   const isLayoutExperimentEnabled = bookingWidgetLayoutFlag();
   const navigate = useNavigate();
   const location = useLocation();
@@ -348,7 +350,8 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
 
     const restartSelection = !awaitingCheckout || isSingleClick;
     if (restartSelection) {
-      const newStart = normalizedStart < today ? today : normalizedStart;
+      const startIsBeforeIstToday = getIstStartOfDay(normalizedStart) < todayIstBoundary;
+      const newStart = startIsBeforeIstToday ? todayIst : normalizedStart;
       setAwaitingCheckout(true);
       setDates({
         startDate: newStart,
@@ -356,8 +359,8 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         key: 'selection',
       });
 
-      const restartMessage = newStart < today ? 'Check-in cannot be in the past.' : 'Choose a check-out date.';
-      setDateError(newStart < today ? restartMessage : null);
+      const restartMessage = startIsBeforeIstToday ? 'Check-in cannot be in the past.' : 'Choose a check-out date.';
+      setDateError(startIsBeforeIstToday ? restartMessage : null);
       setInlineStatus(restartMessage);
       return;
     }
@@ -366,7 +369,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     let resolvedEndDate = normalizedEnd;
     let errorMessage: string | null = null;
 
-    if (effectiveStartDate < today) {
+    if (getIstStartOfDay(effectiveStartDate) < todayIstBoundary) {
       errorMessage = 'Check-in cannot be in the past.';
     }
 
@@ -522,7 +525,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         // ONLY block dates from today onwards (not past dates)
         // Today is only blocked if it falls within a booking range
         const blockedDates: Date[] = [];
-        const todayDate = startOfDay(new Date());
+        const todayDate = getIstStartOfDay();
 
         filteredBookings.forEach((booking: any) => {
           if (!booking.checkinDate || !booking.checkoutDate) {
@@ -530,8 +533,8 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
             return;
           }
 
-          const checkinDate = startOfDay(new Date(booking.checkinDate));
-          const checkoutDate = startOfDay(new Date(booking.checkoutDate));
+          const checkinDate = getIstStartOfDay(new Date(booking.checkinDate));
+          const checkoutDate = getIstStartOfDay(new Date(booking.checkoutDate));
 
           // Validate dates
           if (isNaN(checkinDate.getTime()) || isNaN(checkoutDate.getTime())) {
@@ -554,7 +557,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
           let currentDate = new Date(checkinDate);
 
           while (currentDate < checkoutDate) {
-            const dateToBlock = startOfDay(new Date(currentDate));
+            const dateToBlock = getIstStartOfDay(new Date(currentDate));
 
             // Only block if date is today or in the future (skip past dates)
             // This ensures today is only blocked if it's actually in the booking range
@@ -865,16 +868,16 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
       const allBookings = asArray(response.data, 'bookings');
       const targetNumber = String(propertyId);
 
-      const selectionStart = startOfDay(new Date(dates.startDate));
-      const selectionEnd = startOfDay(new Date(dates.endDate));
+      const selectionStart = getIstStartOfDay(new Date(dates.startDate));
+      const selectionEnd = getIstStartOfDay(new Date(dates.endDate));
 
       const hasConflict = allBookings.some((booking: any) => {
         const bookingListing = String(booking.listing).trim();
         const numberMatch = bookingListing.match(/(\d+)/);
         if (!numberMatch || numberMatch[1] !== targetNumber) return false;
 
-        const checkinDate = startOfDay(new Date(booking.checkin_date || booking.checkinDate));
-        const checkoutDate = startOfDay(new Date(booking.checkout_date || booking.checkoutDate));
+        const checkinDate = getIstStartOfDay(new Date(booking.checkin_date || booking.checkinDate));
+        const checkoutDate = getIstStartOfDay(new Date(booking.checkout_date || booking.checkoutDate));
 
         return selectionStart < checkoutDate && selectionEnd > checkinDate;
       });
