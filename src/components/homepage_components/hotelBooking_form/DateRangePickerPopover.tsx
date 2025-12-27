@@ -121,8 +121,10 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
   return createPortal(
     <>
       <div
-        className={`fixed inset-0 ${isMobile ? 'bg-black/50' : 'bg-transparent'} z-[90] backdrop-blur-[1px]`}
-        onClick={onClose}
+        className={`fixed inset-0 ${
+          isMobile ? 'bg-black/50 backdrop-blur-[1px]' : 'pointer-events-none bg-transparent'
+        } z-[90]`}
+        onClick={isMobile ? onClose : undefined}
         aria-hidden
       />
       <div
