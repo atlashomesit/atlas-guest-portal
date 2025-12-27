@@ -86,6 +86,13 @@ const BookingForm = ({ propertyData }: { propertyData: Property }) => {
   const nights = nightlyBreakdown.length;
   const totalPrice = nightlyBreakdown.reduce((sum, breakdown) => sum + breakdown.finalNightlyPrice, 0);
 
+  const sanitizeInput = (value: string) =>
+    value
+      .replace(/<[^>]*>/g, '') // strip HTML tags
+      .replace(/[\u0000-\u001F\u007F]+/g, ' ') // remove control characters
+      .replace(/\s+/g, ' ') // normalize whitespace
+      .trim();
+
   const validateEmail = (email: string) => {
     // Simple email regex validation
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -119,16 +126,23 @@ const BookingForm = ({ propertyData }: { propertyData: Property }) => {
     }
 
     setIsLoading(true);
+    const sanitizedName = sanitizeInput(name);
+    const sanitizedContactNumber = sanitizeInput(contactNumber);
+    const sanitizedEmail = sanitizeInput(email);
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
     const policyMessage =
       `Policies: ${origin}/policies | Cancel: ${origin}/policies#cancellation-refund-policy | Reschedule: ${origin}/policies#reschedule-date-change-policy | Terms: ${origin}/terms`;
 
+    const sanitizedMessage = sanitizeInput(
+      `New booking request for ${nights} nights from ${checkIn} to ${checkOut}. Guests: ${adults} adults, ${children} children, ${infants} infants, ${pets} pets. Total Price: ₹${totalPrice.toLocaleString()} ${policyMessage}`,
+    );
+
     const templateParams = {
       to_email: emailJsConfig.ownerEmail,
       to_name: 'Property Owner',
-      from_name: name,
-      contact_number: contactNumber,
-      from_email: email,
+      from_name: sanitizedName,
+      contact_number: sanitizedContactNumber,
+      from_email: sanitizedEmail,
       check_in: checkIn,
       check_out: checkOut,
       nights,
@@ -142,10 +156,7 @@ const BookingForm = ({ propertyData }: { propertyData: Property }) => {
       termsAcceptedAt: termsAcceptedAt || new Date().toISOString(),
       // total_price: `₹${totalPrice.toLocaleString()}`,
       property_name: propertyData?.property_name || 'Property',
-      message: `New booking request for ${nights} nights from ${checkIn} to ${checkOut}.
-Guests: ${adults} adults, ${children} children, ${infants} infants, ${pets} pets.
-Total Price: ₹${totalPrice.toLocaleString()}
-${policyMessage}`
+      message: sanitizedMessage,
     };
     try {
       await emailjs.send(
