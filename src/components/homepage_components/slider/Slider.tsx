@@ -75,6 +75,8 @@ const Slider = () => {
   const latestWidgetStateRef = React.useRef({ hasSelection: false, guests });
   const calendarWrapperRef = React.useRef<HTMLDivElement | null>(null);
   const calendarDropdownRef = React.useRef<HTMLDivElement | null>(null);
+  const toggleButtonRef = React.useRef<HTMLButtonElement | null>(null);
+  const lastFocusedTriggerRef = React.useRef<HTMLElement | null>(null);
   const [calendarPosition, setCalendarPosition] = React.useState<{ top: number; left: number; width: number }>();
   const dateErrorId = React.useId();
   const guestsLabelId = React.useId();
@@ -85,6 +87,7 @@ const Slider = () => {
     () => (typeof window !== 'undefined' && window.innerWidth < 768 ? 1 : 2),
     [],
   );
+  const isMobileViewport = React.useMemo(() => (typeof window !== 'undefined' ? window.innerWidth < 768 : false), []);
 
   const parseDate = (value?: string | null) => {
     if (!value) return null;
@@ -252,6 +255,20 @@ const Slider = () => {
   React.useEffect(() => {
     hasInteractedRef.current = hasInteracted;
   }, [hasInteracted]);
+
+  const toggleCalendar = () => {
+    lastFocusedTriggerRef.current = document.activeElement as HTMLElement | null;
+    setIsCalendarOpen((open) => !open);
+  };
+
+  const wasOpenRef = React.useRef(isCalendarOpen);
+  React.useEffect(() => {
+    if (wasOpenRef.current && !isCalendarOpen && lastFocusedTriggerRef.current) {
+      lastFocusedTriggerRef.current.focus();
+    }
+
+    wasOpenRef.current = isCalendarOpen;
+  }, [isCalendarOpen]);
 
   React.useEffect(() => {
     latestWidgetStateRef.current = {
@@ -582,8 +599,9 @@ const Slider = () => {
                 aria-expanded={isCalendarOpen}
                 aria-describedby={dateError ? dateErrorId : undefined}
                 aria-invalid={dateError ? true : undefined}
-                onClick={() => setIsCalendarOpen((open) => !open)}
+                onClick={toggleCalendar}
                 data-testid="hero-date-toggle"
+                ref={toggleButtonRef}
               >
                   <span className={labelClass}>
                     <CalendarRange className="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -606,7 +624,12 @@ const Slider = () => {
                 {isCalendarOpen &&
                   calendarPosition &&
                   createPortal(
-                    <div className="hero-date-portal" role="presentation">
+                    <div
+                      className="hero-date-portal"
+                      role={isMobileViewport ? 'dialog' : 'presentation'}
+                      aria-modal={isMobileViewport || undefined}
+                      aria-label={isMobileViewport ? 'Choose your stay dates' : undefined}
+                    >
                       <div className="hero-date-overlay" onClick={() => setIsCalendarOpen(false)} />
                       <div
                         className="hero-date-dropdown rounded-2xl border border-border-subtle bg-bg-surface p-3 shadow-level2"
@@ -710,7 +733,7 @@ const Slider = () => {
                 aria-expanded={isCalendarOpen}
                 aria-describedby={dateError ? dateErrorId : undefined}
                 aria-invalid={dateError ? true : undefined}
-                onClick={() => setIsCalendarOpen((open) => !open)}
+                onClick={toggleCalendar}
               >
                 <span className={labelClass}>
                   <CalendarRange className="h-4 w-4 shrink-0" aria-hidden="true" />
