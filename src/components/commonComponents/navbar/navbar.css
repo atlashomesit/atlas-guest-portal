@@ -278,6 +278,12 @@
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--cta-primary) 35%, transparent);
 }
 
+.book-now-status {
+  font-size: 0.75rem;
+  color: var(--cta-primary);
+  line-height: 1.1;
+}
+
 @media(max-width: 1023px) {
   .navbar-right .phone span {
     font-size: 0.9rem;

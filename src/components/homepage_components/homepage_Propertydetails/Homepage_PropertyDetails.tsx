@@ -230,16 +230,19 @@ const PropertyDetails = () => {
               {/* Image Gallery */}
 <div className="flex gap-2 h-64 md:h-96 lg:h-[450px] overflow-hidden ">
   {/* Main image */}
-  <div className="flex-1 relative h-full">
-    <a href={propertyImages[data.id]?.[0] || data.property_img[0]} data-fancybox="property-gallery">
-      <img
-        src={propertyImages[String(data.id)]?.[0] || data.property_img[0]}
-        alt="Main property"
-        className="w-full h-full object-cover rounded-md"
-        onError={(e) => {
-          const target = e.target as HTMLImageElement;
-          target.onerror = null;
-          target.src = data.property_img[0] || '';
+      <div className="flex-1 relative h-full">
+        <a href={propertyImages[data.id]?.[0] || data.property_img[0]} data-fancybox="property-gallery">
+          <img
+            src={propertyImages[String(data.id)]?.[0] || data.property_img[0]}
+            alt="Main property"
+            loading="lazy"
+            decoding="async"
+            sizes="(min-width: 1024px) 50vw, 100vw"
+            className="w-full h-full object-cover rounded-md"
+            onError={(e) => {
+              const target = e.target as HTMLImageElement;
+              target.onerror = null;
+              target.src = data.property_img[0] || '';
         }}
       />
     </a>
@@ -253,6 +256,9 @@ const PropertyDetails = () => {
           <img
             src={img}
             alt={`Thumbnail ${index + 1}`}
+            loading="lazy"
+            decoding="async"
+            sizes="(min-width: 1024px) 25vw, 50vw"
             className="w-full h-full object-cover rounded-md hover:opacity-80 transition"
             onError={(e) => {
               const target = e.target as HTMLImageElement;

@@ -49,7 +49,7 @@ const Footer = () => {
                                 {item.label}
                             </Link>
                         ))}
-                        <a href='/sitemap.xml' className='text-[color:var(--footer-link)] hover:text-[color:var(--footer-link-hover)] transition-colors'>Sitemap</a>
+                        <Link to='/sitemap.xml' className='text-[color:var(--footer-link)] hover:text-[color:var(--footer-link-hover)] transition-colors'>Sitemap</Link>
                     </div>
                 </div>
 
