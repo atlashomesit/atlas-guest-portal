@@ -17,7 +17,7 @@ import { SiGooglepay, SiRazorpay } from 'react-icons/si';
 import { toast } from 'react-toastify';
 import { logApiError, logUserAction, reportError } from '../../../lib/monitoring';
 import { useBooking } from '../../../contexts/BookingContext';
-import { getIstCalendarDate, getIstStartOfDay } from '@/utils/date';
+import { getIstStartOfDay } from '@/utils/date';
 
 import 'react-date-range/dist/styles.css';
 import 'react-date-range/dist/theme/default.css';
@@ -55,9 +55,11 @@ export interface GuestCounts {
 }
 
 const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = false }) => {
-  const todayIst = getIstCalendarDate();
-  const todayIstBoundary = getIstStartOfDay();
-  const defaultStartDate = todayIst; // Allow booking from today
+  const serverAnchor = getIstStartOfDay(new Date('2025-12-28T00:00:00+05:30'));
+  const todayIst = serverAnchor;
+  const todayIstBoundary = serverAnchor;
+  const bookingWindowEnd = addDays(serverAnchor, 180);
+  const defaultStartDate = todayIst; // Allow booking from server-calculated today
   const defaultEndDate = addDays(todayIst, 1);
   const isLayoutExperimentEnabled = bookingWidgetLayoutFlag();
   const navigate = useNavigate();
@@ -69,6 +71,8 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
   const [bookedDates, setBookedDates] = useState<Date[]>([]);
   const [bookedRanges, setBookedRanges] = useState<Array<{ start: Date; end: Date }>>([]);
   const [isBookedDatesLoading, setIsBookedDatesLoading] = useState(true);
+  const [calendarVisibleMonth, setCalendarVisibleMonth] = useState(getIstStartOfDay(defaultStartDate));
+  const [isCalendarTransitioning, setIsCalendarTransitioning] = useState(false);
   const [guestMenuBooting, setGuestMenuBooting] = useState(false);
   const [isRazorpayReady, setIsRazorpayReady] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<
@@ -213,10 +217,13 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     ? 'inline-flex items-center rounded-full bg-[color:var(--bg-muted)] px-3 py-1 text-xs font-semibold text-cta-primary text-center'
     : 'inline-flex items-center rounded-full bg-[color:color-mix(in_srgb,var(--cta-primary)_12%,transparent)] px-3 py-1 text-xs font-semibold text-cta-primary text-center';
   const propertyMaxCapacity =
-    property?.maxCapacity ??
-    pricingConfig.maxGuestsByUnitType?.[unitType] ??
-    defaultGuestLimits.adults.max ??
-    10;
+    Math.min(
+      property?.maxCapacity ??
+        pricingConfig.maxGuestsByUnitType?.[unitType] ??
+        defaultGuestLimits.adults.max ??
+        10,
+      20,
+    );
   const propertyExtraGuestFee =
     property?.extraGuestFee ?? pricingConfig.extraGuestFeeByUnitType?.[unitType] ?? 0;
   const formattedExtraGuestFee = useMemo(
@@ -303,6 +310,16 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
   const [formErrors, setFormErrors] = useState<{ email?: string; phone?: string; dates?: string; guests?: string; terms?: string }>(
     {},
   );
+  const emailRegex = /^[\w.!#$%&'*+/=?^`{|}~-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$/;
+  const phoneRegex = /^\+\d{1,3}\s?\d{6,14}$/;
+
+  useEffect(() => {
+    setFormErrors((current) => ({
+      ...current,
+      email: current.email && emailRegex.test(userEmail) ? undefined : current.email,
+      phone: current.phone && phoneRegex.test(userPhone.trim()) ? undefined : current.phone,
+    }));
+  }, [userEmail, userPhone]);
   const bookingEngagementRef = useRef(false);
   const bookingDropoffTrackedRef = useRef(false);
   const latestPaymentStateRef = useRef(paymentStatus.state);
@@ -380,8 +397,27 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     const { startDate, endDate } = ranges.selection;
     setHasInteractedWithDates(true);
 
-    const normalizedStart = startDate ? startOfDay(startDate) : startOfDay(dates.startDate);
-    const normalizedEnd = endDate ? startOfDay(endDate) : startOfDay(dates.endDate);
+    let normalizedStart = startDate ? startOfDay(startDate) : startOfDay(dates.startDate);
+    let normalizedEnd = endDate ? startOfDay(endDate) : startOfDay(dates.endDate);
+    if (normalizedStart < todayIstBoundary) {
+      normalizedStart = todayIstBoundary;
+    }
+
+    if (normalizedStart > bookingWindowEnd) {
+      normalizedStart = bookingWindowEnd;
+    }
+
+    const latestCheckIn = addDays(bookingWindowEnd, -1);
+    if (normalizedStart > latestCheckIn) {
+      normalizedStart = latestCheckIn;
+      normalizedEnd = bookingWindowEnd;
+    }
+
+    if (normalizedEnd > bookingWindowEnd) {
+      normalizedEnd = bookingWindowEnd;
+    }
+
+    setCalendarVisibleMonth(getIstStartOfDay(normalizedStart));
     const isSingleClick = normalizedStart.getTime() === normalizedEnd.getTime();
 
     const restartSelection = isSingleClick && !awaitingCheckout;
@@ -401,7 +437,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
       return;
     }
 
-    const effectiveStartDate = startOfDay(dates.startDate);
+    const effectiveStartDate = startOfDay(normalizedStart);
     let resolvedEndDate = normalizedEnd;
     let errorMessage: string | null = null;
 
@@ -412,6 +448,18 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     if (resolvedEndDate <= effectiveStartDate) {
       resolvedEndDate = addDays(effectiveStartDate, 1);
       errorMessage = 'Check-out must be at least 1 night after check-in.';
+    }
+
+    if (resolvedEndDate > bookingWindowEnd) {
+      resolvedEndDate = bookingWindowEnd;
+      if (effectiveStartDate >= bookingWindowEnd) {
+        resolvedEndDate = addDays(bookingWindowEnd, 1);
+      }
+      errorMessage = 'Bookings are limited to 180 days from today.';
+    }
+
+    if (resolvedEndDate <= effectiveStartDate) {
+      resolvedEndDate = addDays(effectiveStartDate, 1);
     }
 
     setAwaitingCheckout(false);
@@ -802,6 +850,16 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     return '';
   }, [dateError, guestNeedsAdult, isCheckoutInvalid]);
   const inlineCtaDisabled = !hasSelection || isCheckoutInvalid;
+  const sanitizedPhone = userPhone.trim();
+  const submitButtonDisabled =
+    availabilityStatus === 'checking' ||
+    isLoading ||
+    !termsAccepted ||
+    !emailRegex.test(userEmail || '') ||
+    !phoneRegex.test(sanitizedPhone) ||
+    !hasSelection ||
+    isCheckoutInvalid ||
+    Boolean(formErrors.dates || formErrors.guests || formErrors.email || formErrors.phone || formErrors.terms);
   const liveRegionMessage =
     validationMessage ||
     inlineStatus ||
@@ -862,12 +920,12 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
       errors.guests = capacityMessage;
     }
 
-    if (!autoEmail || !autoEmail.includes('@')) {
-      errors.email = 'Enter a valid email address.';
+    if (!autoEmail || !emailRegex.test(autoEmail)) {
+      errors.email = 'Enter a valid email address (e.g. name@example.com).';
     }
 
-    if (!autoPhone || autoPhone.trim().length < 10) {
-      errors.phone = 'Enter a valid phone number (at least 10 digits).';
+    if (!autoPhone || !phoneRegex.test(autoPhone.trim())) {
+      errors.phone = 'Use an international format like +91 9876543210.';
     }
 
     if (!termsAccepted) {
@@ -1281,7 +1339,15 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         bookedDates={bookedDates}
         DateRangeComponent={undefined as never}
         handleDateChange={handleDateChange}
-        defaultStartDate={defaultStartDate}
+        calendarVisibleMonth={calendarVisibleMonth}
+        onMonthYearChange={(date) => {
+          setCalendarVisibleMonth(getIstStartOfDay(date));
+          setIsCalendarTransitioning(true);
+          window.setTimeout(() => setIsCalendarTransitioning(false), 200);
+        }}
+        isCalendarTransitioning={isCalendarTransitioning}
+        maxBookingDate={bookingWindowEnd}
+        minBookingDate={todayIstBoundary}
         ctaPrimaryColor={ctaPrimaryColor}
         nights={nights}
       />
@@ -1344,6 +1410,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         formErrors={formErrors}
         averageRating={property?.property_rating}
         reviewCount={property?.property_reviews}
+        submitButtonDisabled={submitButtonDisabled}
       />
     </div>
   );

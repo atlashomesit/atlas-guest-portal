@@ -50,13 +50,14 @@ interface BookingCardCalendarSectionProps {
   openCalendar: boolean;
   calendarRef: React.RefObject<HTMLDivElement>;
   isBookedDatesLoading: boolean;
-  bookedDates: {
-    checkinDate: string;
-    checkoutDate: string;
-  }[];
+  bookedDates: Date[];
   DateRangeComponent: typeof DateRange;
   handleDateChange: (ranges: any) => void;
-  defaultStartDate: Date;
+  calendarVisibleMonth: Date;
+  onMonthYearChange: (date: Date) => void;
+  isCalendarTransitioning: boolean;
+  maxBookingDate: Date;
+  minBookingDate: Date;
   ctaPrimaryColor: string;
 }
 
@@ -105,12 +106,15 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
   isBookedDatesLoading,
   bookedDates,
   handleDateChange,
-  defaultStartDate,
+  calendarVisibleMonth,
+  onMonthYearChange,
+  isCalendarTransitioning,
+  maxBookingDate,
+  minBookingDate,
   ctaPrimaryColor,
 }) => {
   const todayStart = getIstStartOfDay();
-  const normalizedStartDate = getIstStartOfDay(defaultStartDate);
-  const minSelectableDate = normalizedStartDate < todayStart ? todayStart : normalizedStartDate;
+  const minSelectableDate = minBookingDate < todayStart ? todayStart : minBookingDate;
   const hasDateIssue = Boolean(dateError) || isCheckoutInvalid;
   const dateFieldButtonClass = `${fieldButtonClass} ${hasDateIssue ? 'border-support-error ring-1 ring-support-error/40 focus-visible:outline-support-error' : ''}`;
   const nightLabel = nights === 1 ? '1 night' : `${nights} nights`;
@@ -329,7 +333,7 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
       {openCalendar && (
         <div
           ref={calendarRef}
-          className="booking-calendar-popover absolute right-0 z-[var(--z-overlay)] bg-bg-surface shadow-level2 rounded-xl mt-2 overflow-hidden border border-border-subtle"
+          className="booking-calendar-popover absolute right-0 z-[var(--z-overlay)] bg-bg-surface shadow-level2 rounded-xl mt-2 overflow-hidden border border-border-subtle relative"
         >
           {isBookedDatesLoading ? (
             <div className="grid grid-cols-7 gap-2 p-3">
@@ -355,6 +359,7 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
                 },
               ]}
               minDate={minSelectableDate}
+              maxDate={maxBookingDate}
               rangeColors={[dateError ? 'var(--support-error, #ef4444)' : ctaPrimaryColor]}
               showDateDisplay={false}
               showPreview={false}
@@ -366,11 +371,14 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
               weekdayDisplayFormat="EEE"
               dayDisplayFormat="d"
               disabledDates={bookedDates}
+              shownDate={calendarVisibleMonth}
+              onShownDateChange={(date) => {
+                onMonthYearChange(getIstStartOfDay(date));
+              }}
               disabledDay={(date: Date) => {
-                // Disable dates that are in the bookedDates array or in the past
                 const dateToCheck = getIstStartOfDay(date);
                 const dateTime = dateToCheck.getTime();
-                if (dateToCheck < todayStart) return true;
+                if (dateToCheck < minSelectableDate || dateToCheck > maxBookingDate) return true;
 
                 return bookedDates.some((bookedDate) => {
                   const normalizedBooked = getIstStartOfDay(new Date(bookedDate));
@@ -398,16 +406,17 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
                   return normalizedBooked.getTime() === dateToCheckTime;
                 });
 
-                // Check if date is in the past (before today)
-                // Today should be available if not booked
-                const isPastDate = dateToCheck < todayStart;
+                const isPastDate = dateToCheck < minSelectableDate;
+                const isBeyondWindow = dateToCheck > maxBookingDate;
 
-                const isAvailable = !isBooked && !isPastDate;
+                const isAvailable = !isBooked && !isPastDate && !isBeyondWindow;
 
                 const dayStatus = isBooked
                   ? 'Unavailable: already booked'
                   : isPastDate
                   ? 'Unavailable: date has passed'
+                  : isBeyondWindow
+                  ? 'Unavailable: beyond booking window'
                   : 'Available date';
 
                 return (
@@ -439,7 +448,7 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
                           : isAvailable
                           ? 'text-green-800 dark:text-green-300'
                           : 'text-gray-500 dark:text-gray-400 opacity-70 cursor-not-allowed'
-                      } ${isPastDate ? 'pointer-events-none select-none' : ''}`}
+                      } ${isPastDate || isBeyondWindow ? 'pointer-events-none select-none' : ''}`}
                     >
                       {date.getDate()}
                     </span>
@@ -447,6 +456,12 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
                 );
               }}
             />
+            {isCalendarTransitioning && (
+              <div className="absolute inset-0 bg-bg-surface/60 backdrop-blur-[1px] flex items-center justify-center">
+                <div className="h-8 w-8 border-2 border-border-subtle border-t-cta-primary rounded-full animate-spin" aria-hidden />
+                <span className="sr-only">Updating calendar…</span>
+              </div>
+            )}
           )}
         </div>
       )}
