@@ -10,6 +10,7 @@ import { LOGO_URL } from '../../../config/branding';
 import { HERO_IMAGE_URL } from '../../../config/hero';
 import { trackEvent } from '../../../utils/analytics';
 import { heroWidgetLayoutFlag } from '../../../config/abFlags';
+import getApiBaseUrl from '../../../utils/apiBaseUrl';
 import { TrustBadge } from '../../ui/TrustBadge';
 import { useBooking } from '../../../contexts/BookingContext';
 
@@ -222,7 +223,7 @@ const Slider = () => {
     [],
   );
 
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (isSubmitting) return;
 
@@ -292,11 +293,52 @@ const Slider = () => {
       { route: listingSearchRoute },
     );
 
+    const apiBaseUrl = getApiBaseUrl();
+    const availabilityUrl = apiBaseUrl
+      ? `${apiBaseUrl}/availability?checkIn=${formattedCheckIn}&checkOut=${formattedCheckOut}&guests=${guests}`
+      : '';
+
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timeoutId = controller ? window.setTimeout(() => controller.abort(), 10_000) : null;
+    const startedAt = performance.now();
+
     setIsSubmitting(true);
     setStatusMessage('Checking availability...');
 
-    navigate({ pathname: '/', search: searchParams.toString(), hash: 'our-homes' });
-    window.setTimeout(() => setIsSubmitting(false), 800);
+    try {
+      if (availabilityUrl) {
+        const response = await fetch(availabilityUrl, { signal: controller?.signal });
+        const durationMs = Math.round(performance.now() - startedAt);
+
+        trackEvent(
+          'availability_search_result',
+          { surface: 'hero_form', ok: response.ok, status: response.status, durationMs },
+          { route: listingSearchRoute },
+        );
+
+        if (!response.ok) {
+          throw new Error(`Availability check failed with status ${response.status}`);
+        }
+
+        setStatusMessage('Showing available homes for your dates.');
+      } else {
+        setStatusMessage('Showing all homes while we confirm availability.');
+      }
+    } catch (fetchError) {
+      const durationMs = Math.round(performance.now() - startedAt);
+      trackEvent(
+        'availability_search_result',
+        { surface: 'hero_form', ok: false, status: 'error', durationMs },
+        { route: listingSearchRoute },
+      );
+      setError('We could not confirm availability right now. Showing all homes instead.');
+      setStatusMessage('Unable to confirm availability right now. Showing all homes.');
+      console.error('Hero availability check failed:', fetchError);
+    } finally {
+      if (timeoutId) window.clearTimeout(timeoutId);
+      setIsSubmitting(false);
+      navigate({ pathname: '/', search: searchParams.toString(), hash: 'our-homes' });
+    }
   };
 
   const handleRangeChange = (ranges: RangeKeyDict) => {
@@ -407,14 +449,14 @@ const Slider = () => {
               <div className="relative">
                 <button
                   type="button"
-                  className={`${dateFieldShellClass} text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary`}
-                  aria-label="Select check-in date"
-                  aria-expanded={isCalendarOpen}
-                  aria-describedby={dateError ? dateErrorId : undefined}
-                  aria-invalid={dateError ? true : undefined}
-                  onClick={() => setIsCalendarOpen((open) => !open)}
-                  data-testid="hero-date-toggle"
-                >
+                className={`${dateFieldShellClass} text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary`}
+                aria-label="Select check-in date"
+                aria-expanded={isCalendarOpen}
+                aria-describedby={dateError ? dateErrorId : undefined}
+                aria-invalid={dateError ? true : undefined}
+                onClick={() => setIsCalendarOpen((open) => !open)}
+                data-testid="hero-date-toggle"
+              >
                   <span className={labelClass}>
                     <CalendarRange className="h-4 w-4 shrink-0" aria-hidden="true" />
                     <span className="truncate">Check-in</span>

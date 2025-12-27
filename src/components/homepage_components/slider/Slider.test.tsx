@@ -5,6 +5,7 @@ import { vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 
 const navigateMock = vi.fn();
+const fetchMock = vi.fn();
 
 vi.mock("react-router-dom", () => {
   const searchParams = new URLSearchParams();
@@ -83,11 +84,15 @@ const renderSliderAtWidth = (width: number) => {
 describe("Slider hero search", () => {
   beforeEach(() => {
     navigateMock.mockReset();
-    vi.useFakeTimers({ shouldAdvanceTime: true });
+    fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => ({}) });
+    vi.stubGlobal("fetch", fetchMock);
+    vi.useFakeTimers();
     vi.setSystemTime(new Date("2025-12-22T00:00:00.000Z"));
   });
 
   afterEach(() => {
+    fetchMock.mockReset();
+    vi.unstubAllGlobals();
     analytics.resetAnalyticsTransport();
     vi.runAllTimers();
     vi.runOnlyPendingTimers();
