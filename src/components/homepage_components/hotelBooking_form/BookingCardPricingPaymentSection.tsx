@@ -76,6 +76,8 @@ interface BookingCardPricingPaymentSectionProps {
   userPhone: string;
   setUserPhone: React.Dispatch<React.SetStateAction<string>>;
   formErrors: { email?: string; phone?: string; dates?: string; guests?: string; terms?: string };
+  onEmailBlur?: () => void;
+  onPhoneBlur?: () => void;
   averageRating?: number;
   reviewCount?: number;
   submitButtonDisabled: boolean;
@@ -119,6 +121,8 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
   userPhone,
   setUserPhone,
   formErrors,
+  onEmailBlur,
+  onPhoneBlur,
   averageRating,
   reviewCount,
   submitButtonDisabled,
@@ -224,6 +228,7 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
               type="email"
               value={userEmail}
               onChange={(e) => setUserEmail(e.target.value)}
+              onBlur={onEmailBlur}
               placeholder="your.email@example.com"
               required
               pattern="^[\\w.!#$%&'*+/=?^`{|}~-]+@[A-Za-z0-9-]+(?:\\.[A-Za-z0-9-]+)+$"
@@ -249,6 +254,7 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
               type="tel"
               value={userPhone}
               onChange={(e) => setUserPhone(e.target.value)}
+              onBlur={onPhoneBlur}
               placeholder="+91 98765 43210"
               required
               pattern="^\\+\\d{1,3}\\s?\\d{6,14}$"

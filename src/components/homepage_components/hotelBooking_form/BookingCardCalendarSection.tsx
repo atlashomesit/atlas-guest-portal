@@ -59,6 +59,7 @@ interface BookingCardCalendarSectionProps {
   maxBookingDate: Date;
   minBookingDate: Date;
   ctaPrimaryColor: string;
+  calendarRenderVersion?: string;
 }
 
 export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProps> = ({
@@ -112,12 +113,14 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
   maxBookingDate,
   minBookingDate,
   ctaPrimaryColor,
+  calendarRenderVersion,
 }) => {
   const todayStart = getIstStartOfDay();
   const minSelectableDate = minBookingDate < todayStart ? todayStart : minBookingDate;
   const hasDateIssue = Boolean(dateError) || isCheckoutInvalid;
   const dateFieldButtonClass = `${fieldButtonClass} ${hasDateIssue ? 'border-support-error ring-1 ring-support-error/40 focus-visible:outline-support-error' : ''}`;
   const nightLabel = nights === 1 ? '1 night' : `${nights} nights`;
+  const loadingLabel = `Loading ${format(calendarVisibleMonth, 'MMMM yyyy')}...`;
 
   return (
     <>
@@ -347,6 +350,7 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
           ) : (
             <div className="relative">
               <DateRange
+                key={calendarRenderVersion ?? calendarVisibleMonth.toISOString()}
                 editableDateInputs={true}
                 onChange={handleDateChange}
                 retainEndDateOnFirstSelection={true}
@@ -409,6 +413,7 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
 
                   const isPastDate = dateToCheck < minSelectableDate;
                   const isBeyondWindow = dateToCheck > maxBookingDate;
+                  const isToday = dateToCheck.getTime() === minSelectableDate.getTime();
 
                   const isAvailable = !isBooked && !isPastDate && !isBeyondWindow;
 
@@ -438,10 +443,12 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
                       )}
 
                       <span
-                        title={dayStatus}
+                        title={isPastDate ? 'Past dates cannot be selected' : dayStatus}
                         className={`relative z-20 flex h-10 w-10 items-center justify-center rounded-full border text-sm font-semibold transition ${
                           isRangeStart || isRangeEnd
                             ? 'bg-cta-primary text-[var(--text-contrast)] border-cta-primary/60 shadow-sm'
+                            : isToday
+                            ? 'border-cta-primary/60 bg-[color:color-mix(in_srgb,var(--cta-primary)_6%,transparent)]'
                             : 'border-transparent'
                         } ${
                           isBooked
@@ -449,7 +456,11 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
                             : isAvailable
                             ? 'text-green-800 dark:text-green-300'
                             : 'text-gray-500 dark:text-gray-400 opacity-70 cursor-not-allowed'
-                        } ${isPastDate || isBeyondWindow ? 'pointer-events-none select-none' : ''}`}
+                        } ${
+                          isPastDate
+                            ? 'opacity-30 text-gray-400 line-through cursor-not-allowed pointer-events-none'
+                            : ''
+                        } ${isBeyondWindow ? 'opacity-40 cursor-not-allowed pointer-events-none' : ''}`}
                       >
                         {date.getDate()}
                       </span>
@@ -460,7 +471,10 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
               {isCalendarTransitioning && (
                 <div className="absolute inset-0 bg-bg-surface/60 backdrop-blur-[1px] flex items-center justify-center">
                   <div className="h-8 w-8 border-2 border-border-subtle border-t-cta-primary rounded-full animate-spin" aria-hidden />
-                  <span className="sr-only">Updating calendar…</span>
+                  <span className="sr-only">{loadingLabel}</span>
+                  <span className="ml-3 text-xs font-semibold text-text-muted" aria-hidden>
+                    {loadingLabel}
+                  </span>
                 </div>
               )}
             </div>
