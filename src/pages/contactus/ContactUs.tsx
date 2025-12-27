@@ -59,8 +59,17 @@ const ContactUs = () => {
             }
 
             logUserAction("contact_form_submitted", { status: "success", feature: "contact-form" });
-            toast.success("Message sent! We'll be in touch soon.");
-            setStatusMessage({ type: "success", text: "Message sent successfully!" });
+            if (data?.queued) {
+                toast.info("We received your message and will follow up even while email is in maintenance.");
+                setStatusMessage({
+                    type: "info",
+                    text: "Your request is queued while email delivery is offline. We'll reach out shortly.",
+                });
+            } else {
+                toast.success("Message sent! We'll be in touch soon.");
+                setStatusMessage({ type: "success", text: "Message sent successfully!" });
+            }
+
             setFormData({ name: "", email: "", contactnumber: "", destination: "", description: "" });
         } catch (error) {
             reportError(error, { feature: "contact-form" });

@@ -1,5 +1,6 @@
 import { sendEmail } from "../../src/lib/email/emailService";
 import { emailJsConfig } from "../../src/utils/emailjsConfig";
+import { reportError } from "../../src/lib/monitoring";
 
 type ContactRequest = {
   name?: string;
@@ -25,6 +26,7 @@ type ErrorResponse = {
 type SuccessResponse = {
   success: true;
   provider: string;
+  queued?: boolean;
 };
 
 const jsonResponse = (body: SuccessResponse | ErrorResponse, init?: ResponseInit) =>
@@ -107,7 +109,17 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
 
   try {
     const result = await sendEmail(payload);
-    return jsonResponse({ success: true, provider: result.provider });
+
+    if (result.simulated) {
+      reportError(new Error("Email delivery simulated via console fallback"), {
+        level: "warning",
+        provider: result.provider,
+        providerHealth: result.providerHealth,
+        tags: { area: "contact-api" },
+      });
+    }
+
+    return jsonResponse({ success: true, provider: result.provider, queued: result.simulated });
   } catch (error) {
     const queued = await queueFailedAttempt(env, body, error);
 
