@@ -32,6 +32,8 @@ interface BookingCardPricingPaymentSectionProps {
   setTermsAcceptedAt: React.Dispatch<React.SetStateAction<string | null>>;
   initiatePayment: () => void;
   primaryCtaLabel: string;
+  availabilityStatus: 'idle' | 'checking' | 'available';
+  ctaConfirmation: string | null;
   paymentStatus:
     | { state: 'idle' }
     | {
@@ -69,6 +71,7 @@ interface BookingCardPricingPaymentSectionProps {
   setUserEmail: React.Dispatch<React.SetStateAction<string>>;
   userPhone: string;
   setUserPhone: React.Dispatch<React.SetStateAction<string>>;
+  formErrors: { email?: string; phone?: string; dates?: string; guests?: string; terms?: string };
 }
 
 export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymentSectionProps> = ({
@@ -90,6 +93,8 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
   setTermsAcceptedAt,
   initiatePayment,
   primaryCtaLabel,
+  availabilityStatus,
+  ctaConfirmation,
   paymentStatus,
   setPaymentStatus,
   formatGuestLabel,
@@ -104,12 +109,10 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
   setUserEmail,
   userPhone,
   setUserPhone,
+  formErrors,
 }) => {
-  const handlePrimaryActionClick = (event: React.MouseEvent<HTMLButtonElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-    initiatePayment();
-  };
+  const isCheckingAvailability = availabilityStatus === 'checking';
+  const buttonIsBusy = isCheckingAvailability || isLoading;
 
   return (
     <>
@@ -206,10 +209,16 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
               onChange={(e) => setUserEmail(e.target.value)}
               placeholder="your.email@example.com"
               required
-              disabled={isLoading}
-              className="w-full px-4 py-2.5 rounded-lg border border-border-subtle bg-bg-surface text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-cta-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={buttonIsBusy}
+              aria-invalid={Boolean(formErrors.email)}
+              className={`w-full px-4 py-2.5 rounded-lg bg-bg-surface text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed ${
+                formErrors.email
+                  ? 'border border-support-error focus:ring-support-error focus:border-support-error'
+                  : 'border border-border-subtle focus:ring-cta-primary focus:border-transparent'
+              }`}
             />
             <p className="text-xs text-text-muted mt-1">We'll send your booking confirmation here</p>
+            {formErrors.email && <p className="text-xs text-support-error mt-1" role="alert">{formErrors.email}</p>}
           </div>
 
           <div>
@@ -223,10 +232,16 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
               onChange={(e) => setUserPhone(e.target.value)}
               placeholder="+91 98765 43210"
               required
-              disabled={isLoading}
-              className="w-full px-4 py-2.5 rounded-lg border border-border-subtle bg-bg-surface text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-cta-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={buttonIsBusy}
+              aria-invalid={Boolean(formErrors.phone)}
+              className={`w-full px-4 py-2.5 rounded-lg bg-bg-surface text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed ${
+                formErrors.phone
+                  ? 'border border-support-error focus:ring-support-error focus:border-support-error'
+                  : 'border border-border-subtle focus:ring-cta-primary focus:border-transparent'
+              }`}
             />
             <p className="text-xs text-text-muted mt-1">For booking confirmation and support</p>
+            {formErrors.phone && <p className="text-xs text-support-error mt-1" role="alert">{formErrors.phone}</p>}
           </div>
         </div>
 
@@ -237,7 +252,7 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
               name="payment-method"
               className="h-5 w-5 text-cta-primary focus:ring-cta-primary"
               defaultChecked
-              disabled={isLoading}
+              disabled={buttonIsBusy}
             />
             <div className="flex items-center">
               <img src="https://cdn.razorpay.com/logo.svg" alt="Razorpay" className="h-6 mr-2" />
@@ -297,16 +312,25 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
                 Accepted at {new Date(termsAcceptedAt).toLocaleString()}
               </span>
             )}
+            {formErrors.terms && (
+              <span className="block text-support-error text-xs" role="alert">
+                {formErrors.terms}
+              </span>
+            )}
           </span>
         </label>
 
         <button
           type="button"
-          onClick={handlePrimaryActionClick}
-          disabled={isLoading || !termsAccepted || !userEmail || !userPhone}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            initiatePayment();
+          }}
+          disabled={buttonIsBusy || !termsAccepted || !userEmail || !userPhone}
           className="bg-cta-primary hover:bg-cta-secondary text-[var(--text-contrast)] w-full rounded-full py-4 text-lg font-semibold transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center shadow-level1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
         >
-          {isLoading ? (
+          {buttonIsBusy ? (
             <>
               <svg
                 className="animate-spin -ml-1 mr-3 h-5 w-5 text-[var(--text-contrast)]"
@@ -328,12 +352,25 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
                   d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                 ></path>
               </svg>
-              Processing...
+              {isCheckingAvailability ? 'Checking availability...' : 'Processing...'}
             </>
           ) : (
             primaryCtaLabel
           )}
         </button>
+
+        {(formErrors.dates || formErrors.guests) && (
+          <div className="mt-2 space-y-1 text-sm text-support-error" role="alert">
+            {formErrors.dates && <p>{formErrors.dates}</p>}
+            {formErrors.guests && <p>{formErrors.guests}</p>}
+          </div>
+        )}
+
+        {ctaConfirmation && (
+          <p className="mt-3 text-sm font-semibold text-cta-primary" aria-live="polite">
+            {ctaConfirmation}
+          </p>
+        )}
 
         {paymentStatus.state === 'success' && (
           <div
@@ -448,8 +485,11 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
           <p className="text-lg font-semibold">₹{totalPrice.toLocaleString('en-IN')}</p>
           <button
             type="button"
-            onClick={handlePrimaryActionClick}
-            disabled={isLoading || !termsAccepted}
+            onClick={(event) => {
+              event.preventDefault();
+              initiatePayment();
+            }}
+            disabled={buttonIsBusy || !termsAccepted}
             className="mt-1 bg-cta-primary hover:bg-cta-secondary text-[var(--text-contrast)] rounded-full px-4 py-2 text-sm font-semibold transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed shadow-level1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
           >
             {primaryCtaLabel}
