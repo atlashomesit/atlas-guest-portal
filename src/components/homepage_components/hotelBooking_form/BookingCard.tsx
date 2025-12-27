@@ -6,6 +6,7 @@ import { propertyData } from '../../../data';
 import { inlinePolicySnippets } from '../../../content/terms';
 import { baseGuestAllowance, getUnitPolicy } from '../../../config/policyConfig';
 import { trackEvent } from '../../../utils/analytics';
+import pricingConfig from '../../../config/pricing.config';
 import { calculateNightlyPrice, inferUnitType } from '../../../utils/pricing';
 import { priceDisplayConfig } from '../../../config/priceDisplay.config';
 import { bookingWidgetLayoutFlag } from '../../../config/abFlags';
@@ -33,7 +34,7 @@ interface BookingCardProps {
 
 export type GuestCountKey = 'adults' | 'children' | 'infants' | 'pets';
 
-export const guestLimits: Record<GuestCountKey, { min: number; max?: number }> = {
+export const defaultGuestLimits: Record<GuestCountKey, { min: number; max?: number }> = {
   adults: { min: 0, max: 10 },
   children: { min: 0, max: 10 },
   infants: { min: 0, max: 2 },
@@ -145,7 +146,9 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
   const property = propertyData.find((p) => p.id === Number(propertyId));
   const unitType = inferUnitType({ id: property?.id, property_name: property?.property_name });
 
+  const getTotalGuests = (counts: GuestCounts) => counts.adults + counts.children + counts.infants;
   const totalPeople = guests.adults + guests.children;
+  const totalGuests = getTotalGuests(guests);
   const oneDay = 24 * 60 * 60 * 1000;
 
   const nightlyBreakdown = useMemo(() => {
@@ -200,6 +203,31 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
   const priceBadgeClass = hasSpecialPricing
     ? 'inline-flex items-center rounded-full bg-[color:var(--bg-muted)] px-3 py-1 text-xs font-semibold text-cta-primary text-center'
     : 'inline-flex items-center rounded-full bg-[color:color-mix(in_srgb,var(--cta-primary)_12%,transparent)] px-3 py-1 text-xs font-semibold text-cta-primary text-center';
+  const propertyMaxCapacity =
+    property?.maxCapacity ??
+    pricingConfig.maxGuestsByUnitType?.[unitType] ??
+    defaultGuestLimits.adults.max ??
+    10;
+  const propertyExtraGuestFee =
+    property?.extraGuestFee ?? pricingConfig.extraGuestFeeByUnitType?.[unitType] ?? 0;
+  const formattedExtraGuestFee = useMemo(
+    () => new Intl.NumberFormat('en-IN').format(propertyExtraGuestFee),
+    [propertyExtraGuestFee],
+  );
+
+  const propertyGuestLimits = useMemo(
+    () => ({
+      adults: { ...defaultGuestLimits.adults, max: propertyMaxCapacity },
+      children: { ...defaultGuestLimits.children, max: propertyMaxCapacity },
+      infants: {
+        ...defaultGuestLimits.infants,
+        max: Math.min(defaultGuestLimits.infants.max ?? propertyMaxCapacity, propertyMaxCapacity),
+      },
+      pets: defaultGuestLimits.pets,
+    }),
+    [propertyMaxCapacity],
+  );
+
   const extraGuestsCount = Math.max(0, totalPeople - baseGuestAllowance);
   const totalExtraGuestCharges = nightlyBreakdown.reduce((sum, night) => sum + night.breakdown.extraGuestFee, 0);
 
@@ -585,12 +613,17 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
   const modifyGuest = (type: GuestCountKey, increment: boolean) => {
     markEngagement();
     setGuests((prev) => {
-      const min = guestLimits[type].min ?? 0;
-      const max = guestLimits[type].max;
+      const min = propertyGuestLimits[type].min ?? 0;
+      const max = propertyGuestLimits[type].max;
       const proposedValue = prev[type] + (increment ? 1 : -1);
+
+      const proposedCounts = { ...prev, [type]: proposedValue } as GuestCounts;
+      const exceedsCapacity =
+        type !== 'pets' && increment && getTotalGuests(proposedCounts) > propertyMaxCapacity;
 
       if (!increment && proposedValue < min) return prev;
       if (increment && typeof max === 'number' && proposedValue > max) return prev;
+      if (exceedsCapacity) return prev;
 
       const nextValue =
         typeof max === 'number'
@@ -610,10 +643,22 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     });
   };
 
-  const isAtMin = (type: GuestCountKey) => guests[type] <= (guestLimits[type].min ?? 0);
-  const isAtMax = (type: GuestCountKey) =>
-    typeof guestLimits[type].max === 'number' &&
-    guests[type] >= (guestLimits[type].max ?? Number.MAX_SAFE_INTEGER);
+  const isAtMin = (type: GuestCountKey) => guests[type] <= (propertyGuestLimits[type].min ?? 0);
+  const isAtMax = (type: GuestCountKey) => {
+    if (type === 'pets') {
+      return (
+        typeof propertyGuestLimits[type].max === 'number' &&
+        guests[type] >= (propertyGuestLimits[type].max ?? Number.MAX_SAFE_INTEGER)
+      );
+    }
+
+    const hitsTypeMax =
+      typeof propertyGuestLimits[type].max === 'number' &&
+      guests[type] >= (propertyGuestLimits[type].max ?? Number.MAX_SAFE_INTEGER);
+    const hitsCapacity = totalGuests >= propertyMaxCapacity;
+
+    return hitsTypeMax || hitsCapacity;
+  };
 
   const primaryCtaLabel = hasSelection && termsAccepted ? 'Book now' : 'Check availability';
   const inlineCtaLabel = hasSelection ? 'Check availability' : 'Select dates';
@@ -623,12 +668,14 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
   const validationMessageId = useId();
   const checkOutErrorId = useId();
   const guestErrorId = useId();
+  const capacityMessage = `Maximum capacity: ${propertyMaxCapacity} guests. Extra guests ₹${formattedExtraGuestFee} per additional guest.`;
   const validationMessage = useMemo(() => {
     if (isCheckoutInvalid) return 'Check-out must be after check-in.';
     if (guestNeedsAdult) return 'Add at least one adult.';
+    if (totalGuests >= propertyMaxCapacity) return capacityMessage;
     return '';
-  }, [guestNeedsAdult, isCheckoutInvalid]);
-  const inlineCtaDisabled = !hasSelection || isCheckoutInvalid;
+  }, [capacityMessage, guestNeedsAdult, isCheckoutInvalid, propertyMaxCapacity, totalGuests]);
+  const inlineCtaDisabled = !hasSelection || isCheckoutInvalid || totalGuests > propertyMaxCapacity;
   const liveRegionMessage =
     validationMessage ||
     inlineStatus ||
@@ -683,6 +730,10 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
 
     if (guestNeedsAdult) {
       errors.guests = 'Add at least one adult.';
+    }
+
+    if (totalGuests > propertyMaxCapacity) {
+      errors.guests = capacityMessage;
     }
 
     if (!autoEmail || !autoEmail.includes('@')) {
@@ -1030,7 +1081,10 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         isAtMin={isAtMin}
         isAtMax={isAtMax}
         setGuests={setGuests}
-        guestLimits={guestLimits}
+        guestLimits={propertyGuestLimits}
+        maxCapacity={propertyMaxCapacity}
+        extraGuestFee={propertyExtraGuestFee}
+        totalGuests={totalGuests}
         updateChildAge={updateChildAge}
         markEngagement={markEngagement}
         setOpenGuests={setOpenGuests}
