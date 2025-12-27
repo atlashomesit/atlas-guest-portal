@@ -282,6 +282,13 @@
   padding: 0.5rem;
 }
 
+.mobile-submenu {
+  padding-left: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
 .mobile-menu a,
 .mobile-menu button {
   display: block;

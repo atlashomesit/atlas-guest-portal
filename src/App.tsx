@@ -21,6 +21,7 @@ import BlogCategory from "./pages/blog/BlogCategory"
 import BlogPostPage from "./pages/blog/BlogPostPage"
 import ShortLinkRedirect from "./components/ShortLinkRedirect"
 import SupportWidget from "./components/support/SupportWidget"
+import HomeDetails from "./pages/home/HomeDetails"
 
 function AppWrapper() {
   const location = useLocation();
@@ -52,6 +53,7 @@ function AppWrapper() {
         <Route path="/policies" element={<Policies />} />
         <Route path="/terms" element={<Terms />} />
         <Route path="/terms-and-conditions" element={<Terms />} />
+        <Route path="/homes/:roomNo" element={<HomeDetails />} />
         <Route path="/property_details/:id" element={<Homepage_PropertyDetails />} />
         <Route path="/property_LocationDetails/:id" element={<Homepage_LocationDetails />} />
         <Route path="/:shortCode" element={<ShortLinkRedirect />} />

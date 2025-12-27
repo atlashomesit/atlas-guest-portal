@@ -20,7 +20,8 @@ describe("buildSitemapXml", () => {
     expect(xml).toContain("<loc>https://example.com/no-leading-slash</loc>");
   });
 
-  it("uses the request origin for the sitemap and omits the retired apartments path", async () => {
+  it("includes core paths and each home in the sitemap using the request origin", async () => {
+    expect(SITEMAP_PATHS).toContain("/homes/101");
     expect(SITEMAP_PATHS).not.toContain("/apartments");
 
     const request = new Request("https://dev.atlashomestays.com/sitemap.xml");
@@ -28,6 +29,8 @@ describe("buildSitemapXml", () => {
     const xml = await response.text();
 
     expect(xml).toContain("<loc>https://dev.atlashomestays.com/</loc>");
+    expect(xml).toContain("/homes/101</loc>");
+    expect(xml).toContain("/amenities</loc>");
     expect(xml).not.toContain("/apartments");
   });
 });

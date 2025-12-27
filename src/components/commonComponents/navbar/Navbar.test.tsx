@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { vi } from "vitest";
 
@@ -12,6 +12,7 @@ vi.mock("../../../utils/analytics", async () => {
 
 import Navbar from "./Navbar";
 import { trackEvent } from "../../../utils/analytics";
+import { rooms } from "../../../content/rooms";
 
 const renderNavbar = () =>
   render(
@@ -24,14 +25,20 @@ describe("Navbar CTA", () => {
   it("routes Book Now to the on-site Our Homes anchor", () => {
     renderNavbar();
 
-    const bookNow = screen.getByRole("link", { name: /book now/i });
-    expect(bookNow).toHaveAttribute("href", "/#our-homes");
+    const bookNow = screen.getByRole("button", { name: /book now/i });
+    bookNow.click();
+
+    expect(trackEvent).toHaveBeenCalledWith(
+      "cta_book_now_clicked",
+      { source: "header" },
+      { route: "/#our-homes" },
+    );
   });
 
   it("emits a tracking event when Book Now is clicked", () => {
     renderNavbar();
 
-    const bookNow = screen.getByRole("link", { name: /book now/i });
+    const bookNow = screen.getByRole("button", { name: /book now/i });
     bookNow.click();
 
     expect(trackEvent).toHaveBeenCalledWith(
@@ -47,5 +54,16 @@ describe("Navbar CTA", () => {
     const helpLink = screen.getByRole("link", { name: /need help/i });
     expect(helpLink).toHaveAttribute("href");
     expect(helpLink.getAttribute("href")).toContain("wa.me");
+  });
+
+  it("shows the Our Homes dropdown", async () => {
+    renderNavbar();
+
+    const trigger = screen.getByRole("button", { name: /our homes/i });
+    fireEvent.click(trigger);
+
+    for (const room of rooms) {
+      expect(await screen.findByRole("menuitem", { name: room.title })).toBeInTheDocument();
+    }
   });
 });

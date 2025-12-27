@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import './navbar.css';
 
@@ -8,9 +8,14 @@ import { primaryNav, ctaNav } from '../../../config/navigation';
 import { LOGO_URL } from '../../../config/branding';
 import { CONTACT, formatDisplayNumber, getTelLink } from '../../../config/contact';
 import { trackEvent } from '../../../utils/analytics';
+import { rooms } from '../../../content/rooms';
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isHomesOpen, setIsHomesOpen] = useState(false);
+  const [isHomesMobileOpen, setIsHomesMobileOpen] = useState(false);
+
+  const homesDropdownRef = useRef<HTMLDivElement | null>(null);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -47,13 +52,14 @@ const Navbar = () => {
 
   const closeMobile = () => {
     setIsMenuOpen(false);
+    setIsHomesMobileOpen(false);
   };
 
   /* =========================
      ✅ FINAL BOOK NOW HANDLER
   ========================= */
   const handleBookNow = () => {
-    trackEvent('cta_book_now_clicked', { source: 'header' }, { route: '/' });
+    trackEvent('cta_book_now_clicked', { source: 'header' }, { route: '/#our-homes' });
 
     // CASE 1: Already on home page → scroll
     if (location.pathname === '/') {
@@ -71,6 +77,29 @@ const Navbar = () => {
 
     closeMobile();
   };
+
+  const handleOutsideClick = (event: MouseEvent) => {
+    if (homesDropdownRef.current && !homesDropdownRef.current.contains(event.target as Node)) {
+      setIsHomesOpen(false);
+    }
+  };
+
+  const handleEscape = (event: KeyboardEvent) => {
+    if (event.key === 'Escape') {
+      setIsHomesOpen(false);
+    }
+  };
+
+  useEffect(() => {
+    document.addEventListener('mousedown', handleOutsideClick);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, []);
+
+  const baseNavItems = primaryNav.filter((item) => item.label !== 'Our Homes');
 
   return (
     <section className="navbar-container" id="navbar_container">
@@ -97,7 +126,7 @@ const Navbar = () => {
 
         {/* CENTER */}
         <div className="navbar-center hidden lg:flex gap-2">
-          {primaryNav.filter(i => !i.hidden).map(item => (
+          {baseNavItems.filter(i => !i.hidden).map(item => (
             <NavLink
               key={item.label}
               to={item.to}
@@ -106,6 +135,36 @@ const Navbar = () => {
               {item.label}
             </NavLink>
           ))}
+
+          <div
+            className={`dropdown ${isHomesOpen ? 'open' : ''}`}
+            ref={homesDropdownRef}
+            onMouseEnter={() => setIsHomesOpen(true)}
+            onMouseLeave={() => setIsHomesOpen(false)}
+          >
+            <button
+              type="button"
+              className="dropdown-button"
+              aria-haspopup="menu"
+              aria-expanded={isHomesOpen}
+              onClick={() => setIsHomesOpen((prev) => !prev)}
+            >
+              Our Homes
+            </button>
+
+            <div className="dropdown-menu" role="menu">
+              {rooms.map((room) => (
+                <Link
+                  key={room.roomNo}
+                  to={room.route}
+                  role="menuitem"
+                  onClick={() => setIsHomesOpen(false)}
+                >
+                  {room.title}
+                </Link>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* RIGHT */}
@@ -137,8 +196,8 @@ const Navbar = () => {
 
       {/* MOBILE MENU */}
       {isMenuOpen && (
-        <div className="mobile-menu lg:hidden">
-          {primaryNav.filter(i => !i.hidden).map(item => (
+        <div className="mobile-menu lg:hidden open">
+          {baseNavItems.filter(i => !i.hidden).map(item => (
             <NavLink
               key={item.label}
               onClick={closeMobile}
@@ -148,6 +207,32 @@ const Navbar = () => {
               {item.label}
             </NavLink>
           ))}
+
+          <button
+            type="button"
+            className="block py-2 text-left font-semibold"
+            aria-expanded={isHomesMobileOpen}
+            aria-controls="mobile-homes-menu"
+            onClick={() => setIsHomesMobileOpen((prev) => !prev)}
+          >
+            Our Homes
+          </button>
+
+          {isHomesMobileOpen && (
+            <div id="mobile-homes-menu" className="mobile-submenu">
+              {rooms.map((room) => (
+                <Link
+                  key={room.roomNo}
+                  to={room.route}
+                  role="menuitem"
+                  className="block py-1 text-sm"
+                  onClick={closeMobile}
+                >
+                  {room.title}
+                </Link>
+              ))}
+            </div>
+          )}
 
           {/* MOBILE ACTIONS */}
           <div className="mt-2 flex flex-col gap-2">
