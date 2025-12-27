@@ -1,0 +1,52 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Homepage UX wrappers (default path) > keeps services on the production path without placeholders 1`] = `
+<DocumentFragment>
+  <div
+    data-testid="exclusive-service"
+  >
+    Exclusive services baseline
+  </div>
+</DocumentFragment>
+`;
+
+exports[`Homepage UX wrappers (default path) > renders the default secondary banner when flags are off 1`] = `
+<DocumentFragment>
+  <div
+    class="m-8"
+  >
+    <div
+      data-testid="parallax"
+    >
+      <h2
+        data-testid="parallax-title"
+      >
+        Atlas Homes – Where Every Stay Feels Like Home
+      </h2>
+      <p>
+        At Atlas Homes, every detail is designed for your comfort. Relax in beautifully appointed spaces, enjoy modern amenities, and make every moment unforgettable.
+      </p>
+    </div>
+  </div>
+</DocumentFragment>
+`;
+
+exports[`Homepage UX wrappers (default path) > shows the established Why Choose experience 1`] = `
+<DocumentFragment>
+  <div
+    data-testid="why-choose-default"
+  >
+    Why Choose baseline
+  </div>
+</DocumentFragment>
+`;
+
+exports[`Homepage UX wrappers (default path) > uses the live testimonials carousel instead of placeholders 1`] = `
+<DocumentFragment>
+  <div
+    data-testid="testimonials-default"
+  >
+    Testimonials carousel baseline
+  </div>
+</DocumentFragment>
+`;

@@ -4,9 +4,30 @@ import {
   enableServicesConcreteCopy,
   enableServicesIconography,
   enableServicesOneLineDescriptions,
+  servicesConcreteCopy,
+  servicesSummaryCopy,
 } from "../../config/homepageUxFlags";
+import { KeyRound, PercentCircle, Plane, UsersRound } from "lucide-react";
 
-export const SERVICES_CONTENT = {
+const SERVICE_ICONS = {
+  plane: Plane,
+  key: KeyRound,
+  percent: PercentCircle,
+  users: UsersRound,
+} as const;
+
+type ServiceItem = {
+  title: string;
+  description: string;
+  thumbnail?: string;
+  icon?: keyof typeof SERVICE_ICONS;
+  oneLine?: string;
+};
+
+export const SERVICES_CONTENT: {
+  poeticCopy: ServiceItem[];
+  concreteCopy: ServiceItem[];
+} = {
   poeticCopy: [
     {
       title: "Sanctuary of Serenity",
@@ -29,12 +50,7 @@ export const SERVICES_CONTENT = {
       thumbnail: "https://atlashomestorage.blob.core.windows.net/listing-images/501/IMG_2378.jpg",
     },
   ],
-  concreteCopy: [
-    { title: "Airport pickup", description: "TODO: Add precise copy once operations confirm coverage windows" },
-    { title: "Self check-in support", description: "TODO: Add one-line support SOP for lockbox + remote KYC" },
-    { title: "Long-stay discounts", description: "TODO: Add % or ₹ ranges after pricing signs off" },
-    { title: "Family-friendly stays", description: "TODO: Add crib/toy/meal details for verified units" },
-  ],
+  concreteCopy: servicesConcreteCopy,
 };
 
 const ServicesSection = () => {
@@ -54,10 +70,7 @@ const ServicesSection = () => {
             <span className="text-accent-primary font-medium tracking-wider uppercase text-sm">Elite Experiences</span>
             <h2 className="text-3xl lg:text-4xl font-bold text-text-primary">Discover Our Exclusive Services</h2>
             <div className="w-24 h-1 bg-accent-primary mx-auto rounded"></div>
-            <p className="text-text-muted max-w-2xl mx-auto">
-              {/* TODO: Replace with concise one-line summary per concrete service set */}
-              Experience the finest in hospitality with our exclusive range of services and luxurious amenities.
-            </p>
+            <p className="text-text-muted max-w-2xl mx-auto">{servicesSummaryCopy}</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 py-16">
@@ -70,14 +83,24 @@ const ServicesSection = () => {
               >
                 {enableServicesIconography && (
                   <div className="flex items-center justify-center bg-bg-muted p-6">
-                    {/* TODO: Replace placeholder with service-specific icon */}
-                    <div className="h-12 w-12 rounded-full border border-dashed border-border-subtle" aria-hidden />
+                    {item.icon ? (
+                      (() => {
+                        const Icon = SERVICE_ICONS[item.icon as keyof typeof SERVICE_ICONS];
+                        return Icon ? (
+                          <Icon className="h-10 w-10 text-accent-primary" aria-hidden />
+                        ) : (
+                          <div className="h-12 w-12 rounded-full border border-dashed border-border-subtle" aria-hidden />
+                        );
+                      })()
+                    ) : (
+                      <div className="h-12 w-12 rounded-full border border-dashed border-border-subtle" aria-hidden />
+                    )}
                   </div>
                 )}
                 <div className="flex-1 flex flex-col gap-2 p-6">
                   <h3 className="text-lg font-semibold text-text-primary">{item.title}</h3>
                   <p className="text-text-muted mb-4 flex-1">
-                    {enableServicesOneLineDescriptions ? 'TODO: add single-sentence promise once validated' : item.description}
+                    {enableServicesOneLineDescriptions && item.oneLine ? item.oneLine : item.description}
                   </p>
                 </div>
               </div>

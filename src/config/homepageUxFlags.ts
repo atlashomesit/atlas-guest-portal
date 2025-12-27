@@ -18,3 +18,83 @@ export const enableTestimonialsStatic3 = false;
 export const enableTestimonialsSingleCentered = false;
 
 export const enableFooterMiniCtaAboveFooter = false;
+
+// Production-safe defaults for experimental variants. These keep copy and
+// icon selections centralized so that enabling a variant never shows TODO
+// placeholders.
+export const secondaryBannerDefaults = {
+  title: "Atlas Homes – Where Every Stay Feels Like Home",
+  description:
+    "At Atlas Homes, every detail is designed for your comfort. Relax in beautifully appointed spaces, enjoy modern amenities, and make every moment unforgettable.",
+};
+
+export const servicesSummaryCopy =
+  "Experience the finest in hospitality with our exclusive range of services and luxurious amenities.";
+
+export const servicesConcreteCopy = [
+  {
+    title: "Airport pickup",
+    description: "Pre-booked rides with vetted drivers who track your arrival and help with luggage.",
+    icon: "plane",
+    oneLine: "Vetted drivers ready when your flight lands.",
+  },
+  {
+    title: "Self check-in support",
+    description: "Guided lockbox and KYC steps with on-call help to get you settled quickly.",
+    icon: "key",
+    oneLine: "Clear lockbox steps with instant help if needed.",
+  },
+  {
+    title: "Long-stay discounts",
+    description: "Tiered savings for weekly and monthly stays so you can plan with confidence.",
+    icon: "percent",
+    oneLine: "Save more on weekly and monthly bookings.",
+  },
+  {
+    title: "Family-friendly stays",
+    description: "Spacious homes with extra bedding options and layouts suited for groups.",
+    icon: "users",
+    oneLine: "Room to spread out for families and groups.",
+  },
+];
+
+export const whyChooseHighlights = [
+  {
+    title: "Comfort Redefined",
+    description: "Thoughtfully designed stays that balance cozy textures with modern finishes.",
+  },
+  {
+    title: "Unmatched Hospitality",
+    description: "Responsive hosts who handle airport pickups, late check-ins, and local tips.",
+  },
+  {
+    title: "Prime Locations",
+    description: "Homes near Hitech City, KPHB, and commute-friendly hubs around Hyderabad.",
+  },
+  {
+    title: "Value for Money",
+    description: "Premium stays at competitive rates with transparent pricing and offers.",
+  },
+  {
+    title: "Memorable Experiences",
+    description: "Curated recommendations that make work trips, family visits, and staycations feel effortless.",
+  },
+];
+
+export const whyChooseStatsBadges = [
+  "4.8+ avg rating",
+  "Near Hitech City / KPHB",
+  "Fast support on WhatsApp",
+];
+
+export const testimonialsCopy = {
+  headline: "What guests are saying",
+  supporting: "Recent guests call out spotless homes, attentive hosts, and smooth check-ins.",
+  spotlightHeadline: "Guest spotlight",
+  spotlightSupporting: "Highlights from recent stays across Atlas Homes properties.",
+};
+
+export const footerMiniCtaCopy = {
+  headline: "Need help choosing a room? WhatsApp us",
+  buttonLabel: "Chat with our team",
+};
