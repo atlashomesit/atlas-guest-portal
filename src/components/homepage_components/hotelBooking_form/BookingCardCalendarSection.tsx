@@ -345,123 +345,125 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
               ))}
             </div>
           ) : (
-            <DateRange
-              editableDateInputs={true}
-              onChange={handleDateChange}
-              retainEndDateOnFirstSelection={true}
-              dragSelectionEnabled={false}
-              moveRangeOnFirstSelection={false}
-              ranges={[
-                {
-                  startDate: dates.startDate,
-                  endDate: dates.endDate,
-                  key: 'selection',
-                },
-              ]}
-              minDate={minSelectableDate}
-              maxDate={maxBookingDate}
-              rangeColors={[dateError ? 'var(--support-error, #ef4444)' : ctaPrimaryColor]}
-              showDateDisplay={false}
-              showPreview={false}
-              showSelectionPreview={true}
-              months={1}
-              direction="horizontal"
-              className="text-sm"
-              monthDisplayFormat="MMMM yyyy"
-              weekdayDisplayFormat="EEE"
-              dayDisplayFormat="d"
-              disabledDates={bookedDates}
-              shownDate={calendarVisibleMonth}
-              onShownDateChange={(date) => {
-                onMonthYearChange(getIstStartOfDay(date));
-              }}
-              disabledDay={(date: Date) => {
-                const dateToCheck = getIstStartOfDay(date);
-                const dateTime = dateToCheck.getTime();
-                if (dateToCheck < minSelectableDate || dateToCheck > maxBookingDate) return true;
+            <div className="relative">
+              <DateRange
+                editableDateInputs={true}
+                onChange={handleDateChange}
+                retainEndDateOnFirstSelection={true}
+                dragSelectionEnabled={false}
+                moveRangeOnFirstSelection={false}
+                ranges={[
+                  {
+                    startDate: dates.startDate,
+                    endDate: dates.endDate,
+                    key: 'selection',
+                  },
+                ]}
+                minDate={minSelectableDate}
+                maxDate={maxBookingDate}
+                rangeColors={[dateError ? 'var(--support-error, #ef4444)' : ctaPrimaryColor]}
+                showDateDisplay={false}
+                showPreview={false}
+                showSelectionPreview={true}
+                months={1}
+                direction="horizontal"
+                className="text-sm"
+                monthDisplayFormat="MMMM yyyy"
+                weekdayDisplayFormat="EEE"
+                dayDisplayFormat="d"
+                disabledDates={bookedDates}
+                shownDate={calendarVisibleMonth}
+                onShownDateChange={(date) => {
+                  onMonthYearChange(getIstStartOfDay(date));
+                }}
+                disabledDay={(date: Date) => {
+                  const dateToCheck = getIstStartOfDay(date);
+                  const dateTime = dateToCheck.getTime();
+                  if (dateToCheck < minSelectableDate || dateToCheck > maxBookingDate) return true;
 
-                return bookedDates.some((bookedDate) => {
-                  const normalizedBooked = getIstStartOfDay(new Date(bookedDate));
-                  return normalizedBooked.getTime() === dateTime;
-                });
-              }}
-              dayContentRenderer={(date: Date) => {
-                // Normalize dates to start of day for accurate comparison
-                const dateToCheck = getIstStartOfDay(date);
-                const dateToCheckTime = dateToCheck.getTime();
+                  return bookedDates.some((bookedDate) => {
+                    const normalizedBooked = getIstStartOfDay(new Date(bookedDate));
+                    return normalizedBooked.getTime() === dateTime;
+                  });
+                }}
+                dayContentRenderer={(date: Date) => {
+                  // Normalize dates to start of day for accurate comparison
+                  const dateToCheck = getIstStartOfDay(date);
+                  const dateToCheckTime = dateToCheck.getTime();
 
-                const selectionStart = startOfDay(dates.startDate).getTime();
-                const selectionEnd = startOfDay(dates.endDate).getTime();
-                const rangeStart = Math.min(selectionStart, selectionEnd);
-                const rangeEnd = Math.max(selectionStart, selectionEnd);
+                  const selectionStart = startOfDay(dates.startDate).getTime();
+                  const selectionEnd = startOfDay(dates.endDate).getTime();
+                  const rangeStart = Math.min(selectionStart, selectionEnd);
+                  const rangeEnd = Math.max(selectionStart, selectionEnd);
 
-                const isRangeStart = dateToCheckTime === selectionStart;
-                const isRangeEnd = dateToCheckTime === selectionEnd;
-                const isInRange = dateToCheckTime >= rangeStart && dateToCheckTime <= rangeEnd;
+                  const isRangeStart = dateToCheckTime === selectionStart;
+                  const isRangeEnd = dateToCheckTime === selectionEnd;
+                  const isInRange = dateToCheckTime >= rangeStart && dateToCheckTime <= rangeEnd;
 
-                // Check if this date is in the blocked dates array
-                // bookedDates is an array of Date objects representing blocked dates
-                const isBooked = bookedDates.some((bookedDate) => {
-                  const normalizedBooked = getIstStartOfDay(new Date(bookedDate));
-                  return normalizedBooked.getTime() === dateToCheckTime;
-                });
+                  // Check if this date is in the blocked dates array
+                  // bookedDates is an array of Date objects representing blocked dates
+                  const isBooked = bookedDates.some((bookedDate) => {
+                    const normalizedBooked = getIstStartOfDay(new Date(bookedDate));
+                    return normalizedBooked.getTime() === dateToCheckTime;
+                  });
 
-                const isPastDate = dateToCheck < minSelectableDate;
-                const isBeyondWindow = dateToCheck > maxBookingDate;
+                  const isPastDate = dateToCheck < minSelectableDate;
+                  const isBeyondWindow = dateToCheck > maxBookingDate;
 
-                const isAvailable = !isBooked && !isPastDate && !isBeyondWindow;
+                  const isAvailable = !isBooked && !isPastDate && !isBeyondWindow;
 
-                const dayStatus = isBooked
-                  ? 'Unavailable: already booked'
-                  : isPastDate
-                  ? 'Unavailable: date has passed'
-                  : isBeyondWindow
-                  ? 'Unavailable: beyond booking window'
-                  : 'Available date';
+                  const dayStatus = isBooked
+                    ? 'Unavailable: already booked'
+                    : isPastDate
+                    ? 'Unavailable: date has passed'
+                    : isBeyondWindow
+                    ? 'Unavailable: beyond booking window'
+                    : 'Available date';
 
-                return (
-                  <div className="relative w-full h-full flex items-center justify-center">
-                    {isInRange && (
-                      <div
-                        className={`absolute inset-0 bg-[color:color-mix(in_srgb,var(--cta-primary)_14%,transparent)] ${
-                          isRangeStart && isRangeEnd
-                            ? 'rounded-full'
-                            : isRangeStart
-                            ? 'rounded-l-full'
-                            : isRangeEnd
-                            ? 'rounded-r-full'
-                            : 'rounded-none'
-                        }`}
-                        aria-hidden
-                      />
-                    )}
+                  return (
+                    <div className="relative w-full h-full flex items-center justify-center">
+                      {isInRange && (
+                        <div
+                          className={`absolute inset-0 bg-[color:color-mix(in_srgb,var(--cta-primary)_14%,transparent)] ${
+                            isRangeStart && isRangeEnd
+                              ? 'rounded-full'
+                              : isRangeStart
+                              ? 'rounded-l-full'
+                              : isRangeEnd
+                              ? 'rounded-r-full'
+                              : 'rounded-none'
+                          }`}
+                          aria-hidden
+                        />
+                      )}
 
-                    <span
-                      title={dayStatus}
-                      className={`relative z-20 flex h-10 w-10 items-center justify-center rounded-full border text-sm font-semibold transition ${
-                        isRangeStart || isRangeEnd
-                          ? 'bg-cta-primary text-[var(--text-contrast)] border-cta-primary/60 shadow-sm'
-                          : 'border-transparent'
-                      } ${
-                        isBooked
-                          ? 'text-red-700 dark:text-red-300 line-through'
-                          : isAvailable
-                          ? 'text-green-800 dark:text-green-300'
-                          : 'text-gray-500 dark:text-gray-400 opacity-70 cursor-not-allowed'
-                      } ${isPastDate || isBeyondWindow ? 'pointer-events-none select-none' : ''}`}
-                    >
-                      {date.getDate()}
-                    </span>
-                  </div>
-                );
-              }}
-            />
-            {isCalendarTransitioning && (
-              <div className="absolute inset-0 bg-bg-surface/60 backdrop-blur-[1px] flex items-center justify-center">
-                <div className="h-8 w-8 border-2 border-border-subtle border-t-cta-primary rounded-full animate-spin" aria-hidden />
-                <span className="sr-only">Updating calendar…</span>
-              </div>
-            )}
+                      <span
+                        title={dayStatus}
+                        className={`relative z-20 flex h-10 w-10 items-center justify-center rounded-full border text-sm font-semibold transition ${
+                          isRangeStart || isRangeEnd
+                            ? 'bg-cta-primary text-[var(--text-contrast)] border-cta-primary/60 shadow-sm'
+                            : 'border-transparent'
+                        } ${
+                          isBooked
+                            ? 'text-red-700 dark:text-red-300 line-through'
+                            : isAvailable
+                            ? 'text-green-800 dark:text-green-300'
+                            : 'text-gray-500 dark:text-gray-400 opacity-70 cursor-not-allowed'
+                        } ${isPastDate || isBeyondWindow ? 'pointer-events-none select-none' : ''}`}
+                      >
+                        {date.getDate()}
+                      </span>
+                    </div>
+                  );
+                }}
+              />
+              {isCalendarTransitioning && (
+                <div className="absolute inset-0 bg-bg-surface/60 backdrop-blur-[1px] flex items-center justify-center">
+                  <div className="h-8 w-8 border-2 border-border-subtle border-t-cta-primary rounded-full animate-spin" aria-hidden />
+                  <span className="sr-only">Updating calendar…</span>
+                </div>
+              )}
+            </div>
           )}
         </div>
       )}
