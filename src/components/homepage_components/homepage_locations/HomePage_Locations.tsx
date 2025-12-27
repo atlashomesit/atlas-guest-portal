@@ -8,6 +8,7 @@ import priceDisplayConfig from "../../../config/priceDisplay.config";
 import { calculateNightlyPrice, inferUnitType } from "../../../utils/pricing";
 import { sanitizeItems, getItemKey } from "../../../utils/sanitizeItems";
 import { trackEvent } from "../../../utils/analytics";
+import OptimizedImage from "../../ui/OptimizedImage";
 
 import "./homepage_location.css";
 
@@ -261,11 +262,19 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
         <div className="grid gap-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch rounded-3xl overflow-hidden shadow-level2 bg-white border border-border-subtle property-card">
             <div className="relative h-full">
-              <img
+              <OptimizedImage
+                key={`${heroModel.listing.id}-${activeImageIndex[heroModel.listing.id] ?? 0}`}
                 src={heroModel.images[activeImageIndex[heroModel.listing.id] ?? 0] ?? FALLBACK_IMAGE}
                 alt={heroModel.listing.title}
                 className="w-full h-full object-cover min-h-[280px]"
-                loading="lazy"
+                wrapperClassName="h-full"
+                sizes="(max-width: 1023px) 100vw, 50vw"
+                onError={(event) => {
+                  const target = event.currentTarget;
+                  if (target.src !== FALLBACK_IMAGE) {
+                    target.src = FALLBACK_IMAGE;
+                  }
+                }}
               />
               {heroModel.images.length > 1 && (
                 <div className="absolute inset-0 flex items-center justify-between px-4">
@@ -338,11 +347,13 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
                   className="property-card rounded-2xl shadow-level1 bg-white overflow-hidden border border-border-subtle flex flex-col"
                 >
                   <div className="relative h-56">
-                    <img
+                    <OptimizedImage
+                      key={`${model.listing.id}-${activeIndex}`}
                       src={imageSrc}
                       alt={model.listing.title}
                       className="w-full h-full object-cover"
-                      loading="lazy"
+                      wrapperClassName="h-full"
+                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                       onError={(event) => {
                         const target = event.currentTarget;
                         if (target.src !== FALLBACK_IMAGE) {

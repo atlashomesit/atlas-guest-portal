@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { resolveOptimizedAsset } from '../../../utils/resolveOptimizedAsset';
+import OptimizedImage from '../../ui/OptimizedImage';
 
 interface Room {
   title: string;
@@ -51,10 +51,12 @@ const ExclusiveService_Card = () => {
               onMouseLeave={() => setHoveredIndex(null)}
             >
               <div className="w-full h-48 overflow-hidden">
-                <img
+                <OptimizedImage
                   className={`object-cover w-full h-full transition-transform duration-700 ${hoveredIndex === index ? 'scale-105' : 'scale-100'}`}
                   src={item.thumbnail}
                   alt={item.title}
+                  wrapperClassName="h-full"
+                  sizes="(max-width: 768px) 100vw, 25vw"
                 />
               </div>
               <div className="flex-1 flex flex-col gap-2 p-6">
