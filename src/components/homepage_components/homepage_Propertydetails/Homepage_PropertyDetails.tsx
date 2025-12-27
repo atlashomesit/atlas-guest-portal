@@ -18,6 +18,7 @@ import HotelBooking_Form from '../hotelBooking_form/BookingCard.tsx';
 import { trackEvent } from '../../../utils/analytics';
 import { Button } from '../../ui/Button';
 import { calculateNightlyPrice, inferUnitType } from '../../../utils/pricing';
+import { useBooking } from '../../../contexts/BookingContext';
 
 import { Fancybox } from "@fancyapps/ui";
 import "@fancyapps/ui/dist/fancybox/fancybox.css";
@@ -56,6 +57,7 @@ const PropertyDetails = () => {
     const [showAboutMore, setShowAboutMore] = useState(false);
     const [showNeighborhoodMore, setShowNeighborhoodMore] = useState(false);
     const unitType = inferUnitType({ id: data?.id, property_name: data?.property_name });
+    const { setProperty } = useBooking();
     const nightlyPrice = useMemo(() => {
         if (!data) return null;
         try {
@@ -113,6 +115,12 @@ const PropertyDetails = () => {
 
         console.error('No property found for slug:', slug);
     }, [slug, location.state]);
+
+    useEffect(() => {
+        if (!data?.id) return;
+        setProperty(data.id);
+        return () => setProperty(null);
+    }, [data?.id, setProperty]);
 
     useEffect(() => {
         if (!data) return;

@@ -24,6 +24,7 @@ import ShortLinkRedirect from "./components/ShortLinkRedirect"
 import SupportWidget from "./components/support/SupportWidget"
 import ErrorBoundary from "./components/ErrorBoundary"
 import { ToastContainer } from "react-toastify"
+import { BookingProvider } from "./contexts/BookingContext"
 
 function AppWrapper() {
   const location = useLocation();
@@ -77,9 +78,11 @@ function AppWrapper() {
 
 function App() {
   return (
-    <Router>
-      <AppWrapper />
-    </Router>
+    <BookingProvider>
+      <Router>
+        <AppWrapper />
+      </Router>
+    </BookingProvider>
   );
 }
 

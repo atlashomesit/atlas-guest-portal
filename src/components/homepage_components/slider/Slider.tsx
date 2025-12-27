@@ -12,13 +12,12 @@ import { trackEvent } from '../../../utils/analytics';
 import { heroWidgetLayoutFlag } from '../../../config/abFlags';
 import getApiBaseUrl from '../../../utils/apiBaseUrl';
 import { TrustBadge } from '../../ui/TrustBadge';
+import { useBooking } from '../../../contexts/BookingContext';
 
 const HERO_OVERLAY_GRADIENT =
   'linear-gradient(118deg, rgba(7, 10, 18, 0.92) 0%, rgba(7, 10, 18, 0.78) 42%, rgba(7, 10, 18, 0.62) 100%)';
 const HERO_OVERLAY_GRADIENT_LEGACY =
   'linear-gradient(115deg, rgba(7, 10, 18, 0.82) 0%, rgba(7, 10, 18, 0.64) 45%, rgba(7, 10, 18, 0.38) 100%)';
-const STORAGE_KEY = 'atlasHeroSearch';
-
 const TRUST_BADGES = [
   { label: 'Verified homes', icon: CheckCircle2 },
   { label: 'Secure Razorpay payments', icon: ShieldCheck },
@@ -73,6 +72,7 @@ const Slider = () => {
   const calendarDropdownRef = React.useRef<HTMLDivElement | null>(null);
   const [calendarPosition, setCalendarPosition] = React.useState<{ top: number; left: number; width: number }>();
   const dateErrorId = React.useId();
+  const { booking, updateBooking } = useBooking();
   const monthsToShow = React.useMemo(
     () => (typeof window !== 'undefined' && window.innerWidth < 768 ? 1 : 2),
     [],
@@ -97,23 +97,17 @@ const Slider = () => {
     return { startDate: normalizedStart ?? null, endDate: normalizedEnd, error: errorMessage };
   };
 
-  const hydrateFromStorage = () => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (!saved) return null;
-      const parsed = JSON.parse(saved) as { checkIn?: string; checkOut?: string; guests?: number };
-      return {
-        startDate: parseDate(parsed.checkIn),
-        endDate: parseDate(parsed.checkOut),
-        guests: typeof parsed.guests === 'number' && parsed.guests > 0 ? parsed.guests : null,
-      };
-    } catch {
-      return null;
-    }
-  };
+  const hydrateFromContext = React.useCallback(
+    () => ({
+      startDate: parseDate(booking.checkIn),
+      endDate: parseDate(booking.checkOut),
+      guests: booking.guests > 0 ? booking.guests : null,
+    }),
+    [booking.checkIn, booking.checkOut, booking.guests],
+  );
 
   React.useEffect(() => {
-    const stored = hydrateFromStorage();
+    const stored = hydrateFromContext();
     const paramRange = {
       startDate: parseDate(searchParams.get('checkIn')),
       endDate: parseDate(searchParams.get('checkOut')),
@@ -124,30 +118,18 @@ const Slider = () => {
     const endDate = paramRange.endDate ?? stored?.endDate ?? defaultRange.endDate;
 
     const nextRange = clampRange(startDate, endDate);
+    const nextGuests =
+      paramRange.guests && paramRange.guests > 0 ? paramRange.guests : stored?.guests ?? guests;
 
     setDateRange({ startDate: nextRange.startDate, endDate: nextRange.endDate });
     setDateError(null);
-    if (paramRange.guests && paramRange.guests > 0) {
-      setGuests(paramRange.guests);
-    } else if (stored?.guests) {
-      setGuests(stored.guests);
-    }
-  }, [defaultRange.endDate, defaultRange.startDate, searchParams]);
-
-  React.useEffect(() => {
-    try {
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({
-          checkIn: dateRange.startDate?.toISOString(),
-          checkOut: dateRange.endDate?.toISOString(),
-          guests,
-        }),
-      );
-    } catch {
-      // Ignore storage write errors
-    }
-  }, [dateRange.endDate, dateRange.startDate, guests]);
+    setGuests(nextGuests);
+    updateBooking({
+      checkIn: nextRange.startDate?.toISOString() ?? null,
+      checkOut: nextRange.endDate?.toISOString() ?? null,
+      guests: nextGuests,
+    });
+  }, [defaultRange.endDate, defaultRange.startDate, hydrateFromContext, searchParams, updateBooking]);
 
   React.useEffect(() => {
     if (!isCalendarOpen || typeof window === 'undefined') return;
@@ -218,6 +200,14 @@ const Slider = () => {
       guests,
     };
   }, [dateRange.endDate, dateRange.startDate, guests]);
+
+  React.useEffect(() => {
+    updateBooking({
+      checkIn: dateRange.startDate?.toISOString() ?? null,
+      checkOut: dateRange.endDate?.toISOString() ?? null,
+      guests,
+    });
+  }, [dateRange.endDate, dateRange.startDate, guests, updateBooking]);
 
   React.useEffect(
     () => () => {
@@ -447,6 +437,7 @@ const Slider = () => {
             onSubmit={handleSubmit}
             className={formContainerClass}
             data-testid="hero-widget"
+            id="search-form"
           >
             <div className="sr-only" role="status" aria-live="polite">
               {statusMessage || error || 'Hero form ready'}

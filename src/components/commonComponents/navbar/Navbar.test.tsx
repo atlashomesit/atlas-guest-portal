@@ -13,11 +13,14 @@ vi.mock("../../../utils/analytics", async () => {
 import Navbar from "./Navbar";
 import { trackEvent } from "../../../utils/analytics";
 import { homes } from "../../../content/homes";
+import { BookingProvider } from "../../../contexts/BookingContext";
 
 const renderNavbar = () =>
   render(
     <MemoryRouter>
-      <Navbar />
+      <BookingProvider>
+        <Navbar />
+      </BookingProvider>
     </MemoryRouter>,
   );
 
@@ -30,8 +33,8 @@ describe("Navbar CTA", () => {
 
     expect(trackEvent).toHaveBeenCalledWith(
       "cta_book_now_clicked",
-      { source: "header" },
-      { route: "/#our-homes" },
+      expect.objectContaining({ source: "header", target: "search-form" }),
+      { route: "/#search-form" },
     );
   });
 
@@ -43,8 +46,8 @@ describe("Navbar CTA", () => {
 
     expect(trackEvent).toHaveBeenCalledWith(
       "cta_book_now_clicked",
-      { source: "header" },
-      { route: "/#our-homes" },
+      expect.objectContaining({ source: "header", target: "search-form" }),
+      { route: "/#search-form" },
     );
   });
 
