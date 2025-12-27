@@ -29,6 +29,7 @@ const HomePage_Locations = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
           {homes.map((home) => {
             const highlights = home.highlights?.length ? home.highlights : defaultHomeHighlights;
+            const primaryImage = home.images?.[0] ?? fallbackImage;
 
             return (
               <div
@@ -37,7 +38,7 @@ const HomePage_Locations = () => {
               >
                 <Link to={home.href} className="block">
                   <img
-                    src={home.imageSrc ?? fallbackImage}
+                    src={primaryImage}
                     alt={home.title}
                     className="w-full h-52 object-cover"
                     loading="lazy"
