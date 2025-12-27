@@ -17,6 +17,7 @@ type PropertyRecord = {
   id: number | string;
   property_name?: string;
   property_location?: string;
+  property_neighborhoods?: string[];
   property_price?: number;
   property_rating?: number;
   property_reviews?: number;
@@ -30,6 +31,7 @@ type CombinedListing = {
   id: string;
   name: string;
   location: string;
+  neighborhoods: string[];
   price: number;
   pricingBreakdown: NightlyPriceBreakdown | null;
   rating: number;
@@ -147,6 +149,9 @@ const sanitizeProperties = (propertiesInput: unknown): PropertyRecord[] => {
         id: String((property as PropertyRecord).id || ""),
         property_name: (property as PropertyRecord)?.property_name || `Property ${(property as PropertyRecord)?.id || ""}`,
         property_location: (property as PropertyRecord)?.property_location || "Hyderabad",
+        property_neighborhoods: Array.isArray((property as PropertyRecord)?.property_neighborhoods)
+          ? (property as PropertyRecord).property_neighborhoods
+          : [],
         property_description:
           (property as PropertyRecord)?.property_description || "A comfortable place to stay",
         property_price:
@@ -359,10 +364,11 @@ export const Apartments = () => {
         try {
           const property = safeProperties.find(
             (item) => String(item.id) === String(listing.id)
-          ) || { 
+          ) || {
             id: listing.id,
             property_name: listing.title,
             property_location: 'Hyderabad',
+            property_neighborhoods: [],
             property_price: 0,
             property_rating: 0,
             property_reviews: 0,
@@ -374,6 +380,7 @@ export const Apartments = () => {
           const images = property.property_img || propertyImages?.[String(listing.id)] || [LOGO_URL];
           const name = property.property_name || listing.title || `Property ${listing.id}`;
           const location = property.property_location || listing.subtitle || "Hyderabad";
+          const neighborhoods = property.property_neighborhoods ?? [];
           const pricing = computeNightlyPrice(property);
           const price = pricing?.finalNightlyPrice ?? 0;
 
@@ -381,6 +388,7 @@ export const Apartments = () => {
             id: String(listing.id),
             name,
             location,
+            neighborhoods,
             price,
             pricingBreakdown: pricing,
             rating: property.property_rating || 0,
@@ -615,6 +623,7 @@ export const Apartments = () => {
                   id={listing.id}
                   name={listing.name}
                   location={listing.location}
+                  neighborhoods={listing.neighborhoods}
                   image={listing.image}
                   price={listing.price}
                   pricingBreakdown={listing.pricingBreakdown}

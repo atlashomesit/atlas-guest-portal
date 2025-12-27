@@ -1273,6 +1273,8 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         userPhone={userPhone}
         setUserPhone={setUserPhone}
         formErrors={formErrors}
+        averageRating={property?.property_rating}
+        reviewCount={property?.property_reviews}
       />
     </div>
   );

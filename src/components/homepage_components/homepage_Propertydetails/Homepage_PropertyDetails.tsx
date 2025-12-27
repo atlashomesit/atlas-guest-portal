@@ -38,6 +38,7 @@ interface Property {
     property_name: string;
     property_img: string[];
     property_location: string;
+    property_neighborhoods?: string[];
     property_amenities: PropertyAmenity[];
     property_description: string;
     property_nearplaces: string[];
@@ -83,6 +84,9 @@ const PropertyDetails = () => {
             const images = propertyImages[String(foundBySlug.id)] || [];
             setData({
                 ...foundBySlug,
+                property_neighborhoods: Array.isArray(foundBySlug.property_neighborhoods)
+                    ? foundBySlug.property_neighborhoods
+                    : [],
                 property_img: Array.isArray(images) ? images : []
             });
             return;
@@ -96,6 +100,9 @@ const PropertyDetails = () => {
                 const images = propertyImages[String(foundById.id)] || [];
                 setData({
                     ...foundById,
+                    property_neighborhoods: Array.isArray(foundById.property_neighborhoods)
+                        ? foundById.property_neighborhoods
+                        : [],
                     property_img: Array.isArray(images) ? images : []
                 });
                 return;
@@ -108,6 +115,9 @@ const PropertyDetails = () => {
             const images = propertyImages[String(prop.id)] || [];
             setData({
                 ...prop,
+                property_neighborhoods: Array.isArray(prop.property_neighborhoods)
+                    ? prop.property_neighborhoods
+                    : [],
                 property_img: Array.isArray(images) ? images : []
             });
             return;
@@ -212,6 +222,19 @@ const PropertyDetails = () => {
                         <FaLocationDot className="mr-2 text-sm" />
                         <span className="text-sm sm:text-base">{data.property_location}</span>
                     </div>
+                    {data.property_neighborhoods && data.property_neighborhoods.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                            {data.property_neighborhoods.map((neighborhood) => (
+                                <span
+                                    key={neighborhood}
+                                    className="inline-flex items-center gap-2 rounded-full bg-[color:color-mix(in_srgb,var(--bg-muted)_45%,var(--bg-surface))] px-3 py-1 text-xs font-semibold text-text-primary"
+                                >
+                                    <span aria-hidden>🏙️</span>
+                                    <span>{neighborhood}</span>
+                                </span>
+                            ))}
+                        </div>
+                    )}
                     <div className="mt-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3 text-sm text-text-muted">
                         <div className="flex items-center gap-2 font-semibold text-text-primary">
                             <FaStar className="text-accent-primary" />

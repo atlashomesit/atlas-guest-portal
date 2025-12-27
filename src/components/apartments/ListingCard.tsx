@@ -7,6 +7,7 @@ type ListingCardProps = {
   id: string;
   name: string;
   location: string;
+  neighborhoods?: string[];
   image: string;
   price: number;
   pricingBreakdown?: NightlyPriceBreakdown | null;
@@ -31,6 +32,7 @@ const formatCurrency = (value: number) =>
 const ListingCard: React.FC<ListingCardProps> = ({
   name,
   location,
+  neighborhoods = [],
   image,
   price,
   pricingBreakdown,
@@ -46,6 +48,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
 }) => {
   const finalPrice = pricingBreakdown?.finalNightlyPrice ?? price;
   const originalPrice = pricingBreakdown?.baseNightlyPrice ?? price;
+  const ratingSnippet = rating > 0 ? `${rating.toFixed(2)} / 5` : "Rating updates soon";
   const hasSpecialPricing = Boolean(pricingBreakdown?.hasSpecialDateMultiplier);
   const specialPricingLabel =
     hasSpecialPricing && pricingBreakdown?.dateKey
@@ -138,6 +141,19 @@ const ListingCard: React.FC<ListingCardProps> = ({
           <div className="min-w-0">
             <h3 className="truncate text-lg font-semibold text-text-primary">{name}</h3>
             <p className="text-sm text-text-muted">{location}</p>
+            {neighborhoods.length > 0 && (
+              <div className="mt-1 flex flex-wrap gap-2">
+                {neighborhoods.map((neighborhood) => (
+                  <span
+                    key={neighborhood}
+                    className="inline-flex items-center gap-1 rounded-full bg-[color:color-mix(in_srgb,var(--bg-muted)_40%,var(--bg-surface))] px-2 py-1 text-[11px] font-semibold text-text-primary"
+                  >
+                    <span aria-hidden>📍</span>
+                    <span>{neighborhood}</span>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
           <div className="flex flex-shrink-0 items-center gap-1 text-sm font-semibold text-text-primary">
             <span aria-hidden>★</span>
@@ -205,6 +221,16 @@ const ListingCard: React.FC<ListingCardProps> = ({
               )}
             </div>
             <div className="flex flex-wrap gap-2">
+              <div className="w-full rounded-xl bg-[color:color-mix(in_srgb,var(--bg-muted)_55%,var(--bg-surface))] px-3 py-2 text-xs font-semibold text-text-primary">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-bg-surface px-2 py-1">No hidden fees</span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-bg-surface px-2 py-1">Secure Razorpay payments</span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-bg-surface px-2 py-1">Avg. rating {ratingSnippet}</span>
+                </div>
+                {rating <= 0 && (
+                  <p className="mt-1 text-[11px] font-normal text-text-muted">Avg. rating placeholder until live reviews sync.</p>
+                )}
+              </div>
               <button
                 type="button"
                 className="inline-flex flex-1 items-center justify-center rounded-full bg-[color:var(--brand)] px-4 py-2 text-sm font-semibold text-[color:var(--text-contrast)] shadow-level1 transition duration-150 hover:-translate-y-0.5 hover:shadow-level2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brand)]"
@@ -216,6 +242,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
               >
                 View room
               </button>
+              <p className="w-full text-xs font-semibold text-text-muted">Total shown before payment; no hidden charges.</p>
             </div>
           </div>
         </div>
