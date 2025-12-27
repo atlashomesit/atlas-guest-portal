@@ -140,7 +140,7 @@ Optional tooling:
 ## Short-link redirects
 - Short-link redirects live in [`public/_redirects`](public/_redirects) so Vite copies them verbatim into the Pages build output.
 - Targets must stay **relative** (e.g., `/property_details/atlas-homes-room-101`) to automatically preserve the current host on dev and production; hardcoding `https://www.atlashomestays.com` would break dev URLs.
-- Ordering matters: the short-link rules should stay at the top of `_redirects`, and the SPA fallback of `/* /index.html 200` must remain last to avoid swallowing redirects.
+- Ordering matters: the short-link rules should stay at the top of `_redirects`, and the SPA fallback of `/* /index.html 200!` must remain last to avoid swallowing redirects.
 
 ### Verification commands
 Use `curl -I` to confirm redirects keep the current domain and point at the right slug:
