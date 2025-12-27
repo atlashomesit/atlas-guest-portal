@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { format, startOfDay } from 'date-fns';
 import BookingCard from './BookingCard';
 import { propertyData } from '../../../data';
+import { BookingProvider } from '../../../contexts/BookingContext';
 
 const getPrimaryCta = () =>
   screen
@@ -87,7 +88,9 @@ const renderCard = async (propertyId = 101) => {
   await act(async () => {
     utils = render(
       <MemoryRouter>
-        <BookingCard propertyId={propertyId} />
+        <BookingProvider>
+          <BookingCard propertyId={propertyId} />
+        </BookingProvider>
       </MemoryRouter>,
     );
   });
