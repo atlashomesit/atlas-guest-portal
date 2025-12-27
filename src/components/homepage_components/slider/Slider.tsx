@@ -167,11 +167,12 @@ const Slider = () => {
         ? stateRange.guests
         : null) || (paramRange.guests && paramRange.guests > 0 ? paramRange.guests : stored?.guests ?? guests);
     const nextPropertyId = stateRange?.propertyId ?? stored?.propertyId ?? null;
+    const normalizedGuests = nextGuests ?? guests;
 
     setDateRange({ startDate: nextRange.startDate, endDate: nextRange.endDate });
     setDateError(null);
-    setGuestError(validateGuests(rawGuests));
-    setGuests(nextGuests);
+    setGuestError(validateGuests(normalizedGuests));
+    setGuests(normalizedGuests);
     updateBooking({
       checkIn: nextRange.startDate?.toISOString() ?? null,
       checkOut: nextRange.endDate?.toISOString() ?? null,

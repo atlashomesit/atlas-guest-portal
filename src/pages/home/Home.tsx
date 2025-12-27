@@ -47,9 +47,6 @@ const Home = () => {
     };
 
     useEffect(() => {
-        console.log("Home component mounted");
-        console.log("propertyData:", propertyData);
-        console.log("propertyImages:", propertyImages);
         trackEvent("home_view", { surface: "home", listings: propertyData.length });
     }, []);
 
