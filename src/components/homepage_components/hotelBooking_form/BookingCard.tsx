@@ -346,7 +346,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     const normalizedEnd = endDate ? startOfDay(endDate) : startOfDay(dates.endDate);
     const isSingleClick = normalizedStart.getTime() === normalizedEnd.getTime();
 
-    const restartSelection = !awaitingCheckout || isSingleClick;
+    const restartSelection = isSingleClick && !awaitingCheckout;
     if (restartSelection) {
       const newStart = normalizedStart < today ? today : normalizedStart;
       setAwaitingCheckout(true);
@@ -1234,6 +1234,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         handleDateChange={handleDateChange}
         defaultStartDate={defaultStartDate}
         ctaPrimaryColor={ctaPrimaryColor}
+        nights={nights}
       />
 
       <BookingCardGuestsSection
@@ -1264,6 +1265,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         totalExtraGuestCharges={totalExtraGuestCharges}
         feesAndTaxes={feesAndTaxes}
         totalPrice={totalPrice}
+        nights={nights}
         inlinePolicySnippets={inlinePolicySnippets}
         isRazorpayReady={isRazorpayReady}
         isLoading={isLoading}
