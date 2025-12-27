@@ -158,6 +158,7 @@ Central air-conditioning with smart zoning, 1 Gbps fiber internet (dual ISP), in
 video intercom, dedicated concierge desk, and bi-weekly housekeeping with on-demand butler service. Guests enjoy access to a
 private bar setup, wine chiller, Nespresso machine, washer-dryer, ironing station, board games, and curated library.`,
         property_location: "Hyderabad, Telangana",
+        property_neighborhoods: ["Hitech City"],
         property_reviews: 128,
         property_rating: 4.95,
         maxCapacity: 6,
@@ -226,6 +227,7 @@ Enjoy fresh air from the attached balcony. Though there’s no garden, the neigh
 Additional Amenities:
 High-speed Wi-Fi (150 Mbps, multiple ISPs), air-conditioning in the bedroom, a fully equipped kitchen (microwave, gas stove, RO filter, refrigerator, toaster), and housekeeping are included. Washing machine access is available at ₹150 per wash.`,
         property_location: "Hyderabad, Telangana",
+        property_neighborhoods: ["Madhapur"],
         property_reviews: 59,
         property_rating: 4.9,
         maxCapacity: 4,
@@ -290,6 +292,7 @@ Step onto the balcony to enjoy a refreshing breeze, or explore the surrounding n
 Additional Amenities:
 Complimentary Wi-Fi, air-conditioning, inverter backup, daily housekeeping, and CCTV in common areas. A fully equipped kitchen includes a microwave, gas stove, refrigerator, toaster, and RO water purifier. Washing machine facility available at ₹150 per wash.`,
         property_location: "Hyderabad, Telangana",
+        property_neighborhoods: ["Kukatpally"],
         property_reviews: 64,
         property_rating: 4.8,
         maxCapacity: 4,
@@ -357,6 +360,7 @@ Enjoy your private balcony, perfect for sipping tea in the evenings, or explore 
 Additional Amenities
 Complimentary Wi-Fi (150 Mbps), fully equipped kitchen (gas stove, microwave, refrigerator, toaster), air-conditioning, and housekeeping services.`,
         property_location: "Hyderabad, Telangana",
+        property_neighborhoods: ["Kukatpally"],
         property_reviews: 72,
         property_rating: 4.7,
         maxCapacity: 4,
@@ -420,6 +424,7 @@ Enjoy fresh air from the attached balcony. Though there’s no garden, the neigh
 Additional Amenities
 High-speed Wi-Fi (150 Mbps, multiple ISPs), air-conditioning in the bedroom, a fully equipped kitchen (microwave, gas stove, RO filter, refrigerator, toaster), and housekeeping are included. Washing machine access is available at ₹150 per wash.`,
         property_location: "Hyderabad, Telangana",
+        property_neighborhoods: ["Hitech City"],
         property_reviews: 85,
         property_rating: 4.9,
         maxCapacity: 4,
@@ -484,6 +489,7 @@ Relax on your private balcony or take a stroll in the neighborhood, known for it
 Additional Amenities
 Enjoy uninterrupted high-speed Wi-Fi, AC, and a fully equipped kitchen with gas stove, microwave, refrigerator, toaster, and RO water filter. Daily housekeeping is included. Washing machine access is available at ₹150 per wash.`,
         property_location: "Hyderabad, Telangana",
+        property_neighborhoods: ["Madhapur"],
         property_reviews: 91,
         property_rating: 4.8,
         maxCapacity: 4,
@@ -550,6 +556,7 @@ The attached balcony provides fresh air and a spot to relax, while the surroundi
 Additional Amenities
 Fully equipped kitchen with microwave, refrigerator, RO water, toaster, and gas stove. Daily housekeeping included. Washing machine available at extra charge.`,
         property_location: "Hyderabad, Telangana",
+        property_neighborhoods: ["Hitech City"],
         property_reviews: 77,
         property_rating: 4.85,
         property_review_snippets: [

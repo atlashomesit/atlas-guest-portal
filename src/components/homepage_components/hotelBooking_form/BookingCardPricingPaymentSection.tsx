@@ -75,6 +75,8 @@ interface BookingCardPricingPaymentSectionProps {
   userPhone: string;
   setUserPhone: React.Dispatch<React.SetStateAction<string>>;
   formErrors: { email?: string; phone?: string; dates?: string; guests?: string; terms?: string };
+  averageRating?: number;
+  reviewCount?: number;
 }
 
 export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymentSectionProps> = ({
@@ -114,9 +116,14 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
   userPhone,
   setUserPhone,
   formErrors,
+  averageRating,
+  reviewCount,
 }) => {
   const isCheckingAvailability = availabilityStatus === 'checking';
   const buttonIsBusy = isCheckingAvailability || isLoading;
+  const ratingSnippet = averageRating
+    ? `${averageRating.toFixed(2)} / 5${reviewCount ? ` · ${reviewCount} reviews` : ''}`
+    : 'Guest ratings updating soon';
 
   return (
     <>
@@ -291,6 +298,12 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
           </div>
         </div>
 
+        <div className="rounded-xl border border-border-subtle bg-[color:color-mix(in_srgb,var(--bg-muted)_45%,var(--bg-surface))] px-4 py-3 flex flex-wrap items-center gap-2 text-xs font-semibold text-text-primary">
+          <span className="inline-flex items-center gap-1 rounded-full bg-bg-surface px-2 py-1">No hidden fees</span>
+          <span className="inline-flex items-center gap-1 rounded-full bg-bg-surface px-2 py-1">Secure Razorpay payments</span>
+          <span className="inline-flex items-center gap-1 rounded-full bg-bg-surface px-2 py-1">Avg. rating: {ratingSnippet}</span>
+        </div>
+
         <label className="flex items-start gap-2 text-sm text-text-primary">
           <input
             type="checkbox"
@@ -384,6 +397,8 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
             primaryCtaLabel
           )}
         </button>
+
+        <p className="mt-1 text-center text-xs font-semibold text-text-muted">Total shown before payment; no hidden charges.</p>
 
         {(formErrors.dates || formErrors.guests) && (
           <div className="mt-2 space-y-1 text-sm text-support-error" role="alert">
@@ -496,16 +511,16 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
             'calc(var(--safe-area-bottom, env(safe-area-inset-bottom, 0px)) + 0.75rem)',
         }}
       >
-        <div className="flex flex-col text-xs text-text-muted">
-          <div className="font-semibold text-text-primary text-sm">
-            {format(dates.startDate, 'dd MMM')} - {format(dates.endDate, 'dd MMM')}
+          <div className="flex flex-col text-xs text-text-muted">
+            <div className="font-semibold text-text-primary text-sm">
+              {format(dates.startDate, 'dd MMM')} - {format(dates.endDate, 'dd MMM')}
+            </div>
+            <div className="flex items-center gap-1 text-text-primary text-sm">
+              <FaUserFriendsIcon className="h-4 w-4" />
+              <span>{formatGuestLabel()}</span>
+            </div>
+          <p className="text-[11px] text-text-muted">Total shown before payment; no hidden charges.</p>
           </div>
-          <div className="flex items-center gap-1 text-text-primary text-sm">
-            <FaUserFriendsIcon className="h-4 w-4" />
-            <span>{formatGuestLabel()}</span>
-          </div>
-          <p className="text-[11px] text-text-muted">No hidden charges</p>
-        </div>
         <div className="text-right">
           <p className="text-xs text-text-muted">Total</p>
           <p className="text-lg font-semibold">₹{totalPrice.toLocaleString('en-IN')}</p>
