@@ -7,9 +7,11 @@ import App from './App.tsx'
 import ErrorBoundary from './components/ErrorBoundary'
 import ApiConfigGuard from './components/ApiConfigGuard'
 import { initMonitoring } from './lib/monitoring'
+import { initAnalytics } from './utils/analytics'
 
 applyTheme(DEFAULT_THEME)
 initMonitoring()
+initAnalytics()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

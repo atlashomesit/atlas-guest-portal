@@ -23,6 +23,8 @@ const TRUST_BADGES = [
   { label: 'Secure Razorpay payments', icon: ShieldCheck },
   { label: 'No hidden fees', icon: BadgePercent },
 ];
+const MIN_GUESTS = 1;
+const MAX_GUESTS = 20;
 
 const Slider = () => {
   const navigate = useNavigate();
@@ -59,6 +61,7 @@ const Slider = () => {
   );
   const [guests, setGuests] = React.useState(2);
   const [dateError, setDateError] = React.useState<string | null>(null);
+  const [guestError, setGuestError] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -73,6 +76,9 @@ const Slider = () => {
   const calendarDropdownRef = React.useRef<HTMLDivElement | null>(null);
   const [calendarPosition, setCalendarPosition] = React.useState<{ top: number; left: number; width: number }>();
   const dateErrorId = React.useId();
+  const guestsLabelId = React.useId();
+  const guestsHelperId = React.useId();
+  const guestsErrorId = React.useId();
   const { booking, updateBooking } = useBooking();
   const monthsToShow = React.useMemo(
     () => (typeof window !== 'undefined' && window.innerWidth < 768 ? 1 : 2),
@@ -92,10 +98,22 @@ const Slider = () => {
 
     if (normalizedStart && normalizedEnd && normalizedEnd <= normalizedStart) {
       normalizedEnd = addDays(normalizedStart, 1);
-      errorMessage = 'Check-out must be at least 1 night after check-in.';
+      errorMessage = 'Minimum stay is 1 night after check-in.';
     }
 
     return { startDate: normalizedStart ?? null, endDate: normalizedEnd, error: errorMessage };
+  };
+
+  const validateGuests = (value: number) => {
+    if (value < MIN_GUESTS) {
+      return 'Guests must be at least 1.';
+    }
+
+    if (value > MAX_GUESTS) {
+      return `Guests cannot exceed ${MAX_GUESTS}.`;
+    }
+
+    return null;
   };
 
   const hydrateFromContext = React.useCallback(
@@ -152,6 +170,7 @@ const Slider = () => {
 
     setDateRange({ startDate: nextRange.startDate, endDate: nextRange.endDate });
     setDateError(null);
+    setGuestError(validateGuests(rawGuests));
     setGuests(nextGuests);
     updateBooking({
       checkIn: nextRange.startDate?.toISOString() ?? null,
@@ -285,9 +304,11 @@ const Slider = () => {
       setError(null);
     }
 
-    if (guests < 1) {
-      setError('Guests must be at least 1.');
-      setStatusMessage('Add at least one guest to continue.');
+    const guestValidation = validateGuests(guests);
+    setGuestError(guestValidation);
+    if (guestValidation) {
+      setError(guestValidation);
+      setStatusMessage(guestValidation);
       return;
     }
 
@@ -401,12 +422,18 @@ const Slider = () => {
   const checkInLabel = dateRange.startDate ? format(dateRange.startDate, 'dd MMM yyyy') : 'Check-in';
   const checkOutLabel = dateRange.endDate ? format(dateRange.endDate, 'dd MMM yyyy') : 'Check-out';
   const isSubmitDisabled =
-    !dateRange.startDate || !dateRange.endDate || dateRange.endDate <= dateRange.startDate || guests < 1;
+    !dateRange.startDate ||
+    !dateRange.endDate ||
+    dateRange.endDate <= dateRange.startDate ||
+    guests < 1 ||
+    Boolean(dateError || guestError);
 
   const handleGuestChange = (delta: number) => {
     markHeroInteraction();
     setGuests((prev) => {
-      const next = Math.min(16, Math.max(1, prev + delta));
+      const proposed = prev + delta;
+      const next = Math.min(MAX_GUESTS, Math.max(MIN_GUESTS, proposed));
+      setGuestError(validateGuests(proposed));
       trackEvent('hero_guests_changed', { surface: 'hero_form', guests: next });
       return next;
     });
@@ -502,7 +529,9 @@ const Slider = () => {
                     {checkInLabel}
                     <ChevronDown className={`h-4 w-4 shrink-0 text-text-muted transition ${isCalendarOpen ? 'rotate-180' : ''}`} aria-hidden />
                   </span>
-                  <span className={helperTextClass}>Earliest available date shown.</span>
+                  <span className={helperTextClass}>
+                    Check-in cannot be in the past; minimum 1-night stay applies.
+                  </span>
                   {dateError && (
                     <span className="mt-2 text-sm font-semibold text-support-error" id={dateErrorId} role="alert">
                       {dateError}
@@ -576,11 +605,17 @@ const Slider = () => {
                   {checkOutLabel}
                   <ChevronDown className={`h-4 w-4 shrink-0 text-text-muted transition ${isCalendarOpen ? 'rotate-180' : ''}`} aria-hidden />
                 </span>
-                <span className={helperTextClass}>Ensure your stay ends after check-in.</span>
+                <span className={helperTextClass}>Check-out must be at least 1 night after check-in.</span>
               </button>
 
-              <div className={`${fieldShellClass} text-left md:-ml-[1px]`}>
-                <span className={labelClass}>
+              <div
+                className={`${fieldShellClass} text-left md:-ml-[1px]`}
+                role="group"
+                aria-labelledby={guestsLabelId}
+                aria-describedby={`${guestsHelperId}${guestError ? ` ${guestsErrorId}` : ''}`}
+                aria-invalid={guestError ? true : undefined}
+              >
+                <span className={labelClass} id={guestsLabelId}>
                   <Users className="h-4 w-4 shrink-0" aria-hidden />
                   <span className="truncate">Guests</span>
                 </span>
@@ -607,7 +642,14 @@ const Slider = () => {
                     +
                   </button>
                 </div>
-                <span className={helperTextClass}>Defaulting to 2 guests; adjust anytime.</span>
+                <span className={helperTextClass} id={guestsHelperId}>
+                  Up to {MAX_GUESTS} guests per booking. Defaulting to 2 guests; adjust anytime.
+                </span>
+                {guestError && (
+                  <span className="mt-2 text-sm font-semibold text-support-error" id={guestsErrorId} role="alert">
+                    {guestError}
+                  </span>
+                )}
               </div>
 
               <div className={`${fieldShellClass} md:-ml-[1px] lg:min-h-[112px] lg:items-stretch lg:justify-center`}>
