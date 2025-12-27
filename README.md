@@ -31,8 +31,10 @@ Optional tooling:
 - Enforced override → `@jridgewell/sourcemap-codec@1.5.5`
 
 ## Environment Variables
-- Vite only surfaces variables prefixed with `VITE_`; CRA-style `REACT_APP_*` keys are ignored at runtime. Make sure API hosts use `VITE_API_BASE_URL` rather than the legacy `REACT_APP_API_BASE_URL` name.
+- The Vite config surfaces variables prefixed with `VITE_` or `NEXT_PUBLIC_`; CRA-style `REACT_APP_*` keys are ignored at runtime. Make sure API hosts use `VITE_API_BASE_URL` rather than the legacy `REACT_APP_API_BASE_URL` name.
 - `VITE_API_BASE_URL` (required) → Base URL for all API calls (omit trailing slash). The value is resolved at runtime via [`/config`](functions/config.js) and [`src/config/getApiBaseUrl.ts`](src/config/getApiBaseUrl.ts); if it is missing, the app logs an error and renders a friendly fallback screen instead of a blank page.
+- `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` (required for `/location`) → Google Maps JavaScript API key. Enable the **Maps JavaScript API** for this key, restrict it to the deployed Atlas Homestays domains (dev/preview/prod), and keep billing active so the interactive map and static fallback both render correctly.
+- See `.env.example` for the full list of required/optional variables (EmailJS, Razorpay, callback leads, Sentry). Copy it locally and fill in the values that apply to your environment.
 - Cloudflare Pages setup:
   - **Production:** Project → Settings → Environment variables → set `VITE_API_BASE_URL` to the production API host. Save for “Production” scope.
   - **Preview:** In the same screen, add `VITE_API_BASE_URL` for the “Preview” scope to point at staging/QA APIs so preview builds load data correctly.
@@ -63,7 +65,8 @@ Optional tooling:
    ```bash
    cp .env.example .env
    ```
-   Populate the EmailJS identifiers before attempting to send booking/contact forms. Phone/WhatsApp
+   Populate the EmailJS identifiers before attempting to send booking/contact forms and set `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`
+   to a key with Maps JS API enabled + domain restrictions. Phone/WhatsApp
    numbers are centralized in [`src/config/contact.ts`](src/config/contact.ts) and default to the business line.
 3. **Run the development server**
    ```bash
