@@ -192,6 +192,10 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
   const [inlineStatus, setInlineStatus] = useState('');
   const [ctaConfirmation, setCtaConfirmation] = useState<string | null>(null);
   const [isInlineChecking, setIsInlineChecking] = useState(false);
+  const [availabilityStatus, setAvailabilityStatus] = useState<'idle' | 'checking' | 'available'>('idle');
+  const [formErrors, setFormErrors] = useState<{ email?: string; phone?: string; dates?: string; guests?: string; terms?: string }>(
+    {},
+  );
   const bookingEngagementRef = useRef(false);
   const bookingDropoffTrackedRef = useRef(false);
   const latestPaymentStateRef = useRef(paymentStatus.state);
@@ -637,7 +641,67 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     }, 650);
   };
 
-  const initiatePayment = () => {
+  const validateForm = (autoEmail: string, autoPhone: string) => {
+    const errors: typeof formErrors = {};
+
+    if (!hasSelection || isCheckoutInvalid) {
+      errors.dates = 'Select valid check-in and check-out dates.';
+    }
+
+    if (guestNeedsAdult) {
+      errors.guests = 'Add at least one adult.';
+    }
+
+    if (!autoEmail || !autoEmail.includes('@')) {
+      errors.email = 'Enter a valid email address.';
+    }
+
+    if (!autoPhone || autoPhone.trim().length < 10) {
+      errors.phone = 'Enter a valid phone number (at least 10 digits).';
+    }
+
+    if (!termsAccepted) {
+      errors.terms = 'Please confirm the Terms & Conditions.';
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const performAvailabilityCheck = async () => {
+    setAvailabilityStatus('checking');
+    setCtaConfirmation('Checking availability...');
+
+    try {
+      const response = await api.get('/bookings');
+      const allBookings = asArray(response.data, 'bookings');
+      const targetNumber = String(propertyId);
+
+      const selectionStart = startOfDay(new Date(dates.startDate));
+      const selectionEnd = startOfDay(new Date(dates.endDate));
+
+      const hasConflict = allBookings.some((booking: any) => {
+        const bookingListing = String(booking.listing).trim();
+        const numberMatch = bookingListing.match(/(\d+)/);
+        if (!numberMatch || numberMatch[1] !== targetNumber) return false;
+
+        const checkinDate = startOfDay(new Date(booking.checkin_date || booking.checkinDate));
+        const checkoutDate = startOfDay(new Date(booking.checkout_date || booking.checkoutDate));
+
+        return selectionStart < checkoutDate && selectionEnd > checkinDate;
+      });
+
+      return !hasConflict;
+    } catch (error) {
+      const isNetworkIssue = error instanceof TypeError;
+      setCtaConfirmation(isNetworkIssue ? 'Connection error. Please try again.' : 'System error. Please contact support.');
+      setAvailabilityStatus('idle');
+      setIsLoading(false);
+      return false;
+    }
+  };
+
+  const startPayment = (autoEmail: string, autoPhone: string) => {
     markEngagement();
     logUserAction('booking_form_submitted', {
       propertyId,
@@ -670,38 +734,6 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     );
     setCtaConfirmation('Launching secure checkout...');
 
-    if (!hasSelection || isCheckoutInvalid) {
-      setCtaConfirmation('Please select valid check-in and check-out dates.');
-      setIsLoading(false);
-      return;
-    }
-
-    if (guestNeedsAdult) {
-      setCtaConfirmation('Add at least one adult to continue.');
-      setIsLoading(false);
-      return;
-    }
-
-    if (!termsAccepted) {
-      alert('Please confirm the Terms & Conditions before reserving.');
-      return;
-    }
-
-    // Validate email and phone from input fields
-    const autoEmail = userEmail.trim();
-    const autoPhone = userPhone.trim();
-
-    if (!autoEmail || !autoEmail.includes('@')) {
-      alert('Please enter a valid email address.');
-      return;
-    }
-
-    if (!autoPhone || autoPhone.trim().length < 10) {
-      alert('Please enter a valid phone number (at least 10 digits).');
-      return;
-    }
-
-    setIsLoading(true);
     setPaymentStatus({ state: 'idle' });
 
     const acceptedAt = termsAcceptedAt || new Date().toISOString();
@@ -862,6 +894,41 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     }
   };
 
+  const initiatePayment = async () => {
+    const autoEmail = userEmail.trim();
+    const autoPhone = userPhone.trim();
+
+    setCtaConfirmation(null);
+    setAvailabilityStatus('idle');
+    setFormErrors({});
+
+    if (!validateForm(autoEmail, autoPhone)) {
+      setCtaConfirmation('Please fix the highlighted fields.');
+      return;
+    }
+
+    setIsLoading(true);
+    const isAvailable = await performAvailabilityCheck();
+
+    if (!isAvailable) {
+      setAvailabilityStatus('idle');
+      if (!ctaConfirmation) {
+        setCtaConfirmation('Selected dates unavailable. Please choose different dates.');
+      }
+      setIsLoading(false);
+      return;
+    }
+
+    setAvailabilityStatus('available');
+    setCtaConfirmation('Available! Proceeding to payment...');
+    setHasInteractedWithDates(true);
+    setInlineStatus('Showing the final pricing breakdown for your dates.');
+
+    window.setTimeout(() => {
+      startPayment(autoEmail, autoPhone);
+    }, 1200);
+  };
+
   return (
     <div
       id="booking-form"
@@ -952,6 +1019,8 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         setTermsAcceptedAt={setTermsAcceptedAt}
         initiatePayment={initiatePayment}
         primaryCtaLabel={primaryCtaLabel}
+        availabilityStatus={availabilityStatus}
+        ctaConfirmation={ctaConfirmation}
         paymentStatus={paymentStatus}
         setPaymentStatus={setPaymentStatus}
         formatGuestLabel={formatGuestLabel}
@@ -966,6 +1035,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         setUserEmail={setUserEmail}
         userPhone={userPhone}
         setUserPhone={setUserPhone}
+        formErrors={formErrors}
       />
     </div>
   );
