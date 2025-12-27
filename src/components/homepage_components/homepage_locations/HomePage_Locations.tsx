@@ -369,6 +369,37 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
                           ›
                         </button>
                       </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+          {homes.map((home) => {
+            const highlights = home.highlights?.length ? home.highlights : defaultHomeHighlights;
+            const primaryImage = home.images?.[0] ?? fallbackImage;
+
+            return (
+              <div
+                key={home.roomNo}
+                className="rounded-2xl shadow-level1 bg-white overflow-hidden border border-border-subtle flex flex-col"
+              >
+                <Link to={home.href} className="block">
+                  <img
+                    src={primaryImage}
+                    alt={home.title}
+                    className="w-full h-52 object-cover"
+                    loading="lazy"
+                    onError={(event) => {
+                      const target = event.currentTarget;
+                      if (target.src !== fallbackImage) {
+                        target.src = fallbackImage;
+                      }
+                    }}
+                  />
+                </Link>
+
+                <div className="p-4 flex flex-col gap-3 flex-1">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">Atlas Homes</p>
+                    <h3 className="text-xl font-semibold text-text-primary">{home.title}</h3>
+                    {home.tagline && (
+                      <p className="text-sm text-text-secondary mt-1">{home.tagline}</p>
                     )}
                   </div>
 

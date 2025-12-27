@@ -2,9 +2,13 @@ import { Link, useParams } from "react-router-dom";
 
 import { homes, defaultHomeHighlights } from "../../content/homes";
 
+const fallbackImage = "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80";
+
 const HomeDetails = () => {
   const { roomNo } = useParams<{ roomNo: string }>();
   const room = homes.find((item) => item.roomNo === roomNo);
+
+  const primaryImage = room?.images?.[0] ?? fallbackImage;
 
   const highlights = room?.highlights?.length ? room.highlights : defaultHomeHighlights;
 
@@ -33,7 +37,7 @@ const HomeDetails = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
           <img
-            src={room.imageSrc}
+            src={primaryImage}
             alt={room.title}
             className="w-full h-80 object-cover rounded-2xl shadow-level1"
             loading="lazy"
