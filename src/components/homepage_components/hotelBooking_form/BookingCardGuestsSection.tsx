@@ -50,6 +50,7 @@ export const BookingCardGuestsSection: React.FC<BookingCardGuestsSectionProps> =
       {openGuests && (
         <div
           ref={guestMenuRef}
+          data-testid="guest-menu"
           className="absolute left-1/2 -translate-x-1/2 bg-bg-surface z-[var(--z-overlay)] rounded-xl shadow-level2 border border-border-subtle p-4 overflow-y-auto"
           style={{
             width: '90%',
@@ -76,18 +77,19 @@ export const BookingCardGuestsSection: React.FC<BookingCardGuestsSectionProps> =
                   </div>
                   <div className="flex items-center gap-3">
                     <button
+                      aria-label="Decrease adults"
                       onClick={() => modifyGuest('adults', false)}
                       disabled={isAtMin('adults')}
                       className="w-11 h-11 rounded-full border border-border-subtle flex items-center justify-center text-text-primary hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       -
                     </button>
-                    <span>{guests.adults}</span>
+                    <span data-testid="adults-count">{guests.adults}</span>
                     <button
+                      aria-label="Increase adults"
                       onClick={() => modifyGuest('adults', true)}
                       disabled={isAtMax('adults')}
                       title={capacityTooltip}
-                      aria-label={capacityTooltip}
                       className="w-11 h-11 rounded-full border border-border-subtle flex items-center justify-center text-text-primary hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       +
@@ -104,6 +106,7 @@ export const BookingCardGuestsSection: React.FC<BookingCardGuestsSectionProps> =
                   </div>
                   <div className="flex items-center gap-3">
                     <button
+                      aria-label="Decrease children"
                       onClick={() => {
                         if (isAtMin('children')) return;
                         setGuests((prev) => ({
@@ -117,8 +120,9 @@ export const BookingCardGuestsSection: React.FC<BookingCardGuestsSectionProps> =
                     >
                       -
                     </button>
-                    <span>{guests.children}</span>
+                    <span data-testid="children-count">{guests.children}</span>
                     <button
+                      aria-label="Increase children"
                       onClick={() => {
                         if (isAtMax('children')) return;
                         setGuests((prev) => {
@@ -139,7 +143,6 @@ export const BookingCardGuestsSection: React.FC<BookingCardGuestsSectionProps> =
                       }}
                       disabled={isAtMax('children')}
                       title={capacityTooltip}
-                      aria-label={capacityTooltip}
                       className="w-11 h-11 rounded-full border border-border-subtle flex items-center justify-center text-text-primary hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       +
@@ -176,18 +179,19 @@ export const BookingCardGuestsSection: React.FC<BookingCardGuestsSectionProps> =
                   </div>
                   <div className="flex items-center gap-3">
                     <button
+                      aria-label="Decrease infants"
                       onClick={() => modifyGuest('infants', false)}
                       disabled={isAtMin('infants')}
                       className="w-11 h-11 rounded-full border border-border-subtle flex items-center justify-center text-text-primary hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       -
                     </button>
-                    <span>{guests.infants}</span>
+                    <span data-testid="infants-count">{guests.infants}</span>
                     <button
+                      aria-label="Increase infants"
                       onClick={() => modifyGuest('infants', true)}
                       disabled={isAtMax('infants')}
                       title={capacityTooltip}
-                      aria-label={capacityTooltip}
                       className="w-11 h-11 rounded-full border border-border-subtle flex items-center justify-center text-text-primary hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       +
@@ -209,14 +213,16 @@ export const BookingCardGuestsSection: React.FC<BookingCardGuestsSectionProps> =
                   </div>
                   <div className="flex items-center gap-3">
                     <button
+                      aria-label="Decrease pets"
                       onClick={() => modifyGuest('pets', false)}
                       disabled={isAtMin('pets')}
                       className="w-11 h-11 rounded-full border border-border-subtle flex items-center justify-center text-text-primary hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       -
                     </button>
-                    <span>{guests.pets}</span>
+                    <span data-testid="pets-count">{guests.pets}</span>
                     <button
+                      aria-label="Increase pets"
                       onClick={() => modifyGuest('pets', true)}
                       disabled={isAtMax('pets')}
                       className="w-11 h-11 rounded-full border border-border-subtle flex items-center justify-center text-text-primary hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary disabled:cursor-not-allowed disabled:opacity-50"
