@@ -4,6 +4,7 @@ import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import OptimizedImage from "../components/ui/OptimizedImage";
 import { Typography } from "../components/ui/Typography";
+import { GOOGLE_MAPS_API_KEY } from "../config/googleMaps";
 
 type GoogleMapsMapOptions = {
   center: { lat: number; lng: number };
@@ -94,7 +95,7 @@ const LocationPage = () => {
   const [retryCount, setRetryCount] = useState(0);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const hasInitializedMap = useRef(false);
-  const apiKey = import.meta.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY as string | undefined;
+  const apiKey = GOOGLE_MAPS_API_KEY;
   const staticMapUrl = useMemo(() => createStaticMapUrl(apiKey), [apiKey]);
 
   const logMapFailure = (message: string, detail?: unknown) => {

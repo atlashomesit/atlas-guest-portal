@@ -2,6 +2,7 @@ declare global {
   interface Window {
     __ATLAS_RUNTIME_CONFIG__?: {
       apiBaseUrl?: string;
+      googleMapsApiKey?: string;
     };
   }
 }
