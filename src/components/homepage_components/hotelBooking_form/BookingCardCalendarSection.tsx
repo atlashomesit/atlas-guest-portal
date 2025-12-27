@@ -5,7 +5,7 @@ import { format, startOfDay } from 'date-fns';
 import { getIstStartOfDay } from '@/utils/date';
 import { inlinePolicySnippets } from '../../../content/terms';
 import { priceDisplayConfig } from '../../../config/priceDisplay.config';
-import React from 'react';
+import React, { useId } from 'react';
 
 interface BookingCardCalendarSectionProps {
   hasDiscountToShow: boolean;
@@ -49,6 +49,8 @@ interface BookingCardCalendarSectionProps {
   ctaConfirmation: string | null;
   openCalendar: boolean;
   calendarRef: React.RefObject<HTMLDivElement>;
+  triggerRowRef: React.RefObject<HTMLDivElement>;
+  triggerRowBottom: number;
   isBookedDatesLoading: boolean;
   bookedDates: Date[];
   DateRangeComponent: typeof DateRange;
@@ -104,6 +106,8 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
   ctaConfirmation,
   openCalendar,
   calendarRef,
+  triggerRowRef,
+  triggerRowBottom,
   isBookedDatesLoading,
   bookedDates,
   handleDateChange,
@@ -121,6 +125,7 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
   const dateFieldButtonClass = `${fieldButtonClass} ${hasDateIssue ? 'border-support-error ring-1 ring-support-error/40 focus-visible:outline-support-error' : ''}`;
   const nightLabel = nights === 1 ? '1 night' : `${nights} nights`;
   const loadingLabel = `Loading ${format(calendarVisibleMonth, 'MMMM yyyy')}...`;
+  const calendarDialogLabelId = useId();
 
   return (
     <>
@@ -199,8 +204,8 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
         </p>
       </div>
 
-      <div className="mb-5 rounded-2xl border border-border-strong/60 bg-[color:color-mix(in_srgb,var(--bg-muted)_72%,var(--bg-surface))] shadow-inner">
-        <div className={`booking-card-grid ${fieldGridClass}`}>
+      <div className="relative mb-5 rounded-2xl border border-border-strong/60 bg-[color:color-mix(in_srgb,var(--bg-muted)_72%,var(--bg-surface))] shadow-inner">
+        <div ref={triggerRowRef} className={`booking-card-grid ${fieldGridClass}`}>
           <button
             type="button"
             onClick={() => {
@@ -336,8 +341,19 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
       {openCalendar && (
         <div
           ref={calendarRef}
-          className="booking-calendar-popover absolute right-0 z-[var(--z-overlay)] bg-bg-surface shadow-level2 rounded-xl mt-2 overflow-hidden border border-border-subtle relative"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={calendarDialogLabelId}
+          className="booking-calendar-popover absolute left-0 right-0 z-[var(--z-overlay)] bg-bg-surface shadow-level2 rounded-xl mt-3 overflow-hidden border border-border-subtle"
+          style={{ top: triggerRowBottom + 8 }}
+          tabIndex={-1}
         >
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle bg-bg-muted/60">
+            <p id={calendarDialogLabelId} className="text-sm font-semibold text-text-primary">
+              Choose your stay dates
+            </p>
+            <span className="text-xs text-text-muted">Press Escape to close</span>
+          </div>
           {isBookedDatesLoading ? (
             <div className="grid grid-cols-7 gap-2 p-3">
               {Array.from({ length: 14 }).map((_, index) => (
@@ -481,6 +497,17 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
           )}
         </div>
       )}
+
+      <style>{`
+        .booking-calendar-popover .rdrDay:focus-visible,
+        .booking-calendar-popover .rdrDayNumber span:focus-visible,
+        .booking-calendar-popover .rdrNextPrevButton:focus-visible,
+        .booking-calendar-popover select:focus-visible {
+          outline: 2px solid var(--cta-primary);
+          outline-offset: 2px;
+          border-radius: 9999px;
+        }
+      `}</style>
     </>
   );
 };

@@ -1,5 +1,5 @@
 // BookingCardGuestsSection.tsx
-import React from 'react';
+import React, { useId } from 'react';
 import { GuestCounts, GuestCountKey } from './BookingCard';
 
 interface BookingCardGuestsSectionProps {
@@ -18,6 +18,7 @@ interface BookingCardGuestsSectionProps {
   updateChildAge: (index: number, age: number) => void;
   markEngagement: () => void;
   setOpenGuests: React.Dispatch<React.SetStateAction<boolean>>;
+  triggerRowBottom: number;
 }
 
 export const BookingCardGuestsSection: React.FC<BookingCardGuestsSectionProps> = ({
@@ -36,7 +37,9 @@ export const BookingCardGuestsSection: React.FC<BookingCardGuestsSectionProps> =
   updateChildAge,
   markEngagement,
   setOpenGuests,
+  triggerRowBottom,
 }) => {
+  const dialogLabelId = useId();
   const formattedExtraGuestFee = new Intl.NumberFormat('en-IN').format(extraGuestFee);
   const capacityTooltip =
     totalGuests >= maxCapacity
@@ -50,14 +53,20 @@ export const BookingCardGuestsSection: React.FC<BookingCardGuestsSectionProps> =
       {openGuests && (
         <div
           ref={guestMenuRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={dialogLabelId}
           data-testid="guest-menu"
-          className="absolute left-1/2 -translate-x-1/2 bg-bg-surface z-[var(--z-overlay)] rounded-xl shadow-level2 border border-border-subtle p-4 overflow-y-auto"
-          style={{
-            width: '90%',
-            maxHeight: '200px',
-            top: '260px',
-          }}
+          className="absolute left-0 right-0 z-[var(--z-overlay)] translate-y-0 bg-bg-surface rounded-xl shadow-level2 border border-border-subtle p-4 overflow-y-auto max-h-[320px]"
+          style={{ top: triggerRowBottom + 8 }}
+          tabIndex={-1}
         >
+          <div className="flex items-center justify-between pb-3 border-b border-border-subtle mb-3">
+            <p id={dialogLabelId} className="text-sm font-semibold text-text-primary">
+              Adjust guests and pets
+            </p>
+            <span className="text-xs text-text-muted">Press Escape to close</span>
+          </div>
           {guestMenuBooting ? (
             <div className="grid grid-cols-2 gap-3">
               {Array.from({ length: 4 }).map((_, index) => (
