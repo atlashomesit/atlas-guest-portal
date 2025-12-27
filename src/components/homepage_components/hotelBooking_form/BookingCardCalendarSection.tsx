@@ -1,11 +1,10 @@
 // BookingCardCalendarSection.tsx
 import { Link } from 'react-router-dom';
-import { DateRange } from 'react-date-range';
 import { format, startOfDay } from 'date-fns';
 import { getIstStartOfDay } from '@/utils/date';
 import { priceDisplayConfig } from '../../../config/priceDisplay.config';
 import React, { useEffect, useId } from 'react';
-import { DateRangePickerPopover } from './DateRangePickerPopover';
+import { AtlasDateRangePicker, type AtlasDateRangePickerValue } from '../../date/AtlasDateRangePicker';
 
 interface BookingCardCalendarSectionProps {
   hasDiscountToShow: boolean;
@@ -127,162 +126,121 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
   const calendarDialogLabelId = useId();
   const calendarContentId = useId();
 
-  const calendarBody = isBookedDatesLoading ? (
-    <div className="grid grid-cols-7 gap-2 p-3">
-      {Array.from({ length: 14 }).map((_, index) => (
-        <div
-          key={index}
-          className="h-10 rounded-lg bg-[color:color-mix(in_srgb,var(--bg-muted)_75%,var(--bg-surface))] animate-pulse"
-        />
-      ))}
+  const disabledDay = (date: Date) => {
+    const dateToCheck = getIstStartOfDay(date);
+    const dateTime = dateToCheck.getTime();
+    if (dateToCheck < minSelectableDate || dateToCheck > maxBookingDate) return true;
+
+    return bookedDates.some((bookedDate) => {
+      const normalizedBooked = getIstStartOfDay(new Date(bookedDate));
+      return normalizedBooked.getTime() === dateTime;
+    });
+  };
+
+  const renderDayContent = (date: Date) => {
+    // Normalize dates to start of day for accurate comparison
+    const dateToCheck = getIstStartOfDay(date);
+    const dateToCheckTime = dateToCheck.getTime();
+
+    const selectionStart = startOfDay(dates.startDate).getTime();
+    const selectionEnd = startOfDay(dates.endDate).getTime();
+
+    const isPastDate = dateToCheck < minSelectableDate;
+    const isBeyondWindow = dateToCheck > maxBookingDate;
+    const isBooked = bookedDates.some((bookedDate) => {
+      const normalizedBooked = getIstStartOfDay(new Date(bookedDate));
+      return normalizedBooked.getTime() === dateToCheckTime;
+    });
+
+    const selectionStartTime = Math.min(selectionStart, selectionEnd);
+    const selectionEndTime = Math.max(selectionStart, selectionEnd);
+    const isInSelectionRange =
+      dateToCheckTime >= selectionStartTime && dateToCheckTime <= selectionEndTime && !isBooked && !isBeyondWindow;
+    const isRangeStart = dateToCheckTime === selectionStart;
+    const isRangeEnd = dateToCheckTime === selectionEnd;
+    const isEdgeCaseSameDaySelection = selectionStart === selectionEnd;
+    const isSpecialPricingDay = false;
+    const isSelected = dateToCheckTime === selectionStartTime || dateToCheckTime === selectionEndTime;
+    const selectionTreatment =
+      isSelected && !isBooked
+        ? 'bg-cta-primary text-[var(--text-contrast)] border-cta-primary shadow-sm ring-2 ring-[color:color-mix(in_srgb,var(--cta-secondary)_60%,transparent)]'
+        : 'border-transparent bg-transparent';
+    const dayTextColor = isInSelectionRange || isSelected ? 'text-[var(--text-contrast)]' : 'text-text-primary';
+    const dayBackground = isSpecialPricingDay
+      ? 'bg-[color:color-mix(in_srgb,var(--cta-secondary)_16%,transparent)]'
+      : isInSelectionRange
+      ? 'bg-cta-primary'
+      : 'bg-transparent';
+    return (
+      <div className="relative flex h-full w-full items-center justify-center">
+        {isInSelectionRange && (
+          <span
+            className={`absolute inset-0 ${
+              isEdgeCaseSameDaySelection
+                ? 'rounded-full bg-cta-primary'
+                : isRangeStart
+                ? 'rounded-l-full bg-cta-primary'
+                : isRangeEnd
+                ? 'rounded-r-full bg-cta-primary'
+                : dayBackground
+            }`}
+            aria-hidden
+          />
+        )}
+        <span
+          className={`relative z-10 flex h-10 w-10 items-center justify-center rounded-full border text-sm font-semibold transition ${selectionTreatment} ${dayTextColor} ${
+            isBooked ? 'line-through' : ''
+          } ${
+            isPastDate
+              ? 'opacity-30 line-through pointer-events-none'
+              : ''
+          } ${isBeyondWindow ? 'opacity-40 pointer-events-none' : ''}`}
+          style={{ minHeight: 40, minWidth: 40 }}
+        >
+          {date.getDate()}
+        </span>
+      </div>
+    );
+  };
+
+  const calendarOverlay = isCalendarTransitioning ? (
+    <div className="absolute inset-0 bg-bg-surface/60 backdrop-blur-[1px] flex items-center justify-center">
+      <div className="h-8 w-8 border-2 border-border-subtle border-t-cta-primary rounded-full animate-spin" aria-hidden />
+      <span className="sr-only">{loadingLabel}</span>
+      <span className="ml-3 text-xs font-semibold text-text-muted" aria-hidden>
+        {loadingLabel}
+      </span>
     </div>
-  ) : (
-    <div className="relative">
-      <DateRange
-        key={calendarRenderVersion ?? calendarVisibleMonth.toISOString()}
-        editableDateInputs={true}
-        onChange={handleDateChange}
-        retainEndDateOnFirstSelection={true}
-        dragSelectionEnabled={false}
-        moveRangeOnFirstSelection={false}
-        ranges={[
-          {
-            startDate: dates.startDate,
-            endDate: dates.endDate,
-            key: 'selection',
-          },
-        ]}
-        minDate={minSelectableDate}
-        maxDate={maxBookingDate}
-        rangeColors={[dateError ? 'var(--support-error, #ef4444)' : ctaPrimaryColor]}
-        showDateDisplay={false}
-        showPreview={false}
-        showSelectionPreview={true}
-        months={1}
-        direction="horizontal"
-        className="text-sm"
-        monthDisplayFormat="MMMM yyyy"
-        weekdayDisplayFormat="EEE"
-        dayDisplayFormat="d"
-        ariaLabels={{
-          prevButton: 'Go to previous month',
-          nextButton: 'Go to next month',
-          monthPicker: 'Change displayed month',
-          yearPicker: 'Change displayed year',
-          dateInput: {
-            selection: {
-              startDate: 'Check-in date input',
-              endDate: 'Check-out date input',
-            },
-          },
-        }}
-        disabledDates={bookedDates}
-        shownDate={calendarVisibleMonth}
-        onShownDateChange={(date) => {
-          onMonthYearChange(getIstStartOfDay(date));
-        }}
-        disabledDay={(date: Date) => {
-          const dateToCheck = getIstStartOfDay(date);
-          const dateTime = dateToCheck.getTime();
-          if (dateToCheck < minSelectableDate || dateToCheck > maxBookingDate) return true;
+  ) : null;
 
-          return bookedDates.some((bookedDate) => {
-            const normalizedBooked = getIstStartOfDay(new Date(bookedDate));
-            return normalizedBooked.getTime() === dateTime;
-          });
-        }}
-        dayContentRenderer={(date: Date) => {
-          // Normalize dates to start of day for accurate comparison
-          const dateToCheck = getIstStartOfDay(date);
-          const dateToCheckTime = dateToCheck.getTime();
+  const handlePickerChange = (selection: AtlasDateRangePickerValue) => {
+    handleDateChange({
+      selection: {
+        startDate: selection.startDate ?? dates.startDate,
+        endDate: selection.endDate ?? dates.endDate,
+        key: 'selection',
+      },
+    });
+  };
 
-          const selectionStart = startOfDay(dates.startDate).getTime();
-          const selectionEnd = startOfDay(dates.endDate).getTime();
-          const rangeStart = Math.min(selectionStart, selectionEnd);
-          const rangeEnd = Math.max(selectionStart, selectionEnd);
-
-          const isRangeStart = dateToCheckTime === selectionStart;
-          const isRangeEnd = dateToCheckTime === selectionEnd;
-          const isInRange = dateToCheckTime >= rangeStart && dateToCheckTime <= rangeEnd;
-
-          // Check if this date is in the blocked dates array
-          // bookedDates is an array of Date objects representing blocked dates
-          const isBooked = bookedDates.some((bookedDate) => {
-            const normalizedBooked = getIstStartOfDay(new Date(bookedDate));
-            return normalizedBooked.getTime() === dateToCheckTime;
-          });
-
-          const isPastDate = dateToCheck < minSelectableDate;
-          const isBeyondWindow = dateToCheck > maxBookingDate;
-          const isToday = dateToCheck.getTime() === minSelectableDate.getTime();
-
-          const isAvailable = !isBooked && !isPastDate && !isBeyondWindow;
-
-          const dayStatus = isBooked
-            ? 'Unavailable: already booked'
-            : isPastDate
-            ? 'Unavailable: date has passed'
-            : isBeyondWindow
-            ? 'Unavailable: beyond booking window'
-            : 'Available date';
-
-          const selectionTreatment =
-            isRangeStart || isRangeEnd
-              ? 'bg-cta-primary text-[var(--text-contrast)] border-cta-primary shadow-sm ring-2 ring-[color:color-mix(in_srgb,var(--cta-secondary)_60%,transparent)]'
-              : isToday
-              ? 'border-cta-primary/70 bg-[color:color-mix(in_srgb,var(--cta-primary)_10%,transparent)]'
-              : 'border-transparent bg-transparent';
-
-          const availabilityTreatment = isAvailable
-            ? 'text-text-primary'
-            : 'text-text-muted cursor-not-allowed';
-
-          return (
-            <div className="relative w-full h-full flex items-center justify-center">
-              {isInRange && (
-                <div
-                  className={`absolute inset-0 bg-[color:color-mix(in_srgb,var(--cta-primary)_18%,transparent)] ${
-                    isRangeStart && isRangeEnd
-                      ? 'rounded-full'
-                      : isRangeStart
-                      ? 'rounded-l-full'
-                      : isRangeEnd
-                      ? 'rounded-r-full'
-                      : 'rounded-none'
-                  }`}
-                  aria-hidden
-                />
-              )}
-
-              <span
-                title={isPastDate ? 'Past dates cannot be selected' : dayStatus}
-                className={`relative z-20 flex h-10 w-10 items-center justify-center rounded-full border text-sm font-semibold transition ${selectionTreatment} ${availabilityTreatment} ${
-                  isBooked ? 'line-through' : ''
-                } ${
-                  isPastDate
-                    ? 'opacity-30 line-through pointer-events-none'
-                    : ''
-                } ${isBeyondWindow ? 'opacity-40 pointer-events-none' : ''}`}
-                style={{ minHeight: 40, minWidth: 40 }}
-              >
-                {date.getDate()}
-              </span>
-            </div>
-          );
-        }}
-      />
-      {isCalendarTransitioning && (
-        <div className="absolute inset-0 bg-bg-surface/60 backdrop-blur-[1px] flex items-center justify-center">
-          <div className="h-8 w-8 border-2 border-border-subtle border-t-cta-primary rounded-full animate-spin" aria-hidden />
-          <span className="sr-only">{loadingLabel}</span>
-          <span className="ml-3 text-xs font-semibold text-text-muted" aria-hidden>
-            {loadingLabel}
-          </span>
-        </div>
-      )}
-    </div>
-  );
-
+  const dateRangeProps: NonNullable<React.ComponentProps<typeof AtlasDateRangePicker>['dateRangeProps']> = {
+    className: 'text-sm',
+    monthDisplayFormat: 'MMMM yyyy',
+    weekdayDisplayFormat: 'EEE',
+    dayDisplayFormat: 'd',
+    ariaLabels: {
+      prevButton: 'Go to previous month',
+      nextButton: 'Go to next month',
+      monthPicker: 'Change displayed month',
+      yearPicker: 'Change displayed year',
+      dateInput: {
+        selection: {
+          startDate: 'Check-in date input',
+          endDate: 'Check-out date input',
+        },
+      },
+    },
+  };
   useEffect(() => {
     if (!openCalendar || !calendarRef.current) return;
 
@@ -511,7 +469,8 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
         </p>
       )}
 
-      <DateRangePickerPopover
+      <AtlasDateRangePicker
+        key={calendarRenderVersion ?? calendarVisibleMonth.toISOString()}
         anchorRef={triggerRowRef}
         calendarRef={calendarRef}
         contentId={calendarContentId}
@@ -520,9 +479,21 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
         loadingLabel={loadingLabel}
         onClose={() => setOpenCalendar(false)}
         open={openCalendar}
-      >
-        {calendarBody}
-      </DateRangePickerPopover>
+        value={{ startDate: dates.startDate, endDate: dates.endDate }}
+        onChange={handlePickerChange}
+        minDate={minSelectableDate}
+        maxDate={maxBookingDate}
+        disabledDates={bookedDates}
+        disabledDay={disabledDay}
+        months={1}
+        shownDate={calendarVisibleMonth}
+        onShownDateChange={(date) => onMonthYearChange(getIstStartOfDay(date))}
+        rangeColors={[dateError ? 'var(--support-error, #ef4444)' : ctaPrimaryColor]}
+        loading={isBookedDatesLoading}
+        dayContentRenderer={renderDayContent}
+        afterCalendar={calendarOverlay}
+        dateRangeProps={dateRangeProps}
+      />
 
       <style>{`
         .booking-calendar-popover .rdrDay:focus-visible,

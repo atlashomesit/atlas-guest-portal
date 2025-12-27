@@ -1,9 +1,7 @@
 import React from 'react';
-import { createPortal } from 'react-dom';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { BadgePercent, CheckCircle2, CalendarRange, ChevronDown, ShieldCheck, Users } from 'lucide-react';
 import { addDays, format, startOfDay } from 'date-fns';
-import { DateRange, type RangeKeyDict } from 'react-date-range';
 import 'react-date-range/dist/styles.css';
 import 'react-date-range/dist/theme/default.css';
 import { LOGO_URL } from '../../../config/branding';
@@ -13,6 +11,7 @@ import { heroWidgetLayoutFlag } from '../../../config/abFlags';
 import getApiBaseUrl from '../../../utils/apiBaseUrl';
 import { TrustBadge } from '../../ui/TrustBadge';
 import { useBooking } from '../../../contexts/BookingContext';
+import { AtlasDateRangePicker, type AtlasDateRangePickerValue } from '../../date/AtlasDateRangePicker';
 
 const HERO_OVERLAY_GRADIENT =
   'linear-gradient(118deg, rgba(7, 10, 18, 0.92) 0%, rgba(7, 10, 18, 0.78) 42%, rgba(7, 10, 18, 0.62) 100%)';
@@ -74,10 +73,10 @@ const Slider = () => {
   const hasInteractedRef = React.useRef(false);
   const latestWidgetStateRef = React.useRef({ hasSelection: false, guests });
   const calendarWrapperRef = React.useRef<HTMLDivElement | null>(null);
-  const calendarDropdownRef = React.useRef<HTMLDivElement | null>(null);
   const toggleButtonRef = React.useRef<HTMLButtonElement | null>(null);
   const lastFocusedTriggerRef = React.useRef<HTMLElement | null>(null);
-  const [calendarPosition, setCalendarPosition] = React.useState<{ top: number; left: number; width: number }>();
+  const calendarContentId = React.useId();
+  const calendarLabelId = React.useId();
   const dateErrorId = React.useId();
   const guestsLabelId = React.useId();
   const guestsHelperId = React.useId();
@@ -87,7 +86,6 @@ const Slider = () => {
     () => (typeof window !== 'undefined' && window.innerWidth < 768 ? 1 : 2),
     [],
   );
-  const isMobileViewport = React.useMemo(() => (typeof window !== 'undefined' ? window.innerWidth < 768 : false), []);
 
   const parseDate = (value?: string | null) => {
     if (!value) return null;
@@ -192,56 +190,6 @@ const Slider = () => {
     searchParams,
     updateBooking,
   ]);
-
-  React.useEffect(() => {
-    if (!isCalendarOpen || typeof window === 'undefined') return;
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
-    const updateDropdownPosition = () => {
-      if (!calendarWrapperRef.current) return;
-      const rect = calendarWrapperRef.current.getBoundingClientRect();
-      const spacing = 12;
-      const viewportWidth = window.innerWidth;
-      const desiredWidth = Math.min(Math.max(rect.width, 360), viewportWidth - spacing * 2);
-      const left = Math.min(Math.max(rect.left, spacing), viewportWidth - desiredWidth - spacing) + window.scrollX;
-      const top = rect.bottom + window.scrollY + 8;
-      setCalendarPosition({ top, left, width: desiredWidth });
-    };
-
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (
-        calendarDropdownRef.current &&
-        !calendarDropdownRef.current.contains(target) &&
-        calendarWrapperRef.current &&
-        !calendarWrapperRef.current.contains(target)
-      ) {
-        setIsCalendarOpen(false);
-      }
-    };
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setIsCalendarOpen(false);
-      }
-    };
-
-    updateDropdownPosition();
-    document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('keydown', handleEscape);
-    window.addEventListener('resize', updateDropdownPosition);
-    window.addEventListener('scroll', updateDropdownPosition, true);
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleEscape);
-      window.removeEventListener('resize', updateDropdownPosition);
-      window.removeEventListener('scroll', updateDropdownPosition, true);
-    };
-  }, [isCalendarOpen]);
 
   React.useEffect(() => {
     if (!isCalendarOpen || isTestEnvironment) return;
@@ -444,8 +392,7 @@ const Slider = () => {
     }
   };
 
-  const handleRangeChange = (ranges: RangeKeyDict) => {
-    const selection = ranges.selection ?? { startDate: null, endDate: null };
+  const handleRangeChange = (selection: AtlasDateRangePickerValue) => {
     const normalizedStart = selection.startDate ? startOfDay(selection.startDate) : null;
     const normalizedEnd = selection.endDate ? startOfDay(selection.endDate) : null;
     markHeroInteraction();
@@ -602,6 +549,7 @@ const Slider = () => {
                 onClick={toggleCalendar}
                 data-testid="hero-date-toggle"
                 ref={toggleButtonRef}
+                aria-controls={calendarContentId}
               >
                   <span className={labelClass}>
                     <CalendarRange className="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -620,110 +568,6 @@ const Slider = () => {
                     </span>
                   )}
                 </button>
-
-                {isCalendarOpen &&
-                  calendarPosition &&
-                  createPortal(
-                    <div
-                      className="hero-date-portal"
-                      role={isMobileViewport ? 'dialog' : 'presentation'}
-                      aria-modal={isMobileViewport || undefined}
-                      aria-label={isMobileViewport ? 'Choose your stay dates' : undefined}
-                    >
-                      <div className="hero-date-overlay" onClick={() => setIsCalendarOpen(false)} />
-                      <div
-                        className="hero-date-dropdown rounded-2xl border border-border-subtle bg-bg-surface p-3 shadow-level2"
-                        style={{
-                          top: calendarPosition.top,
-                          left: calendarPosition.left,
-                          width: calendarPosition.width,
-                        }}
-                        ref={calendarDropdownRef}
-                      >
-                        {calendarReady ? (
-                          <DateRange
-                            onChange={handleRangeChange}
-                            months={monthsToShow}
-                            direction="horizontal"
-                            showDateDisplay={false}
-                            rangeColors={[dateError ? 'var(--support-error, #ef4444)' : 'var(--cta-primary)']}
-                            minDate={today}
-                            shownDate={shownDate}
-                            onShownDateChange={(date) => setShownDate(startOfDay(date))}
-                            disabledDay={(date) => startOfDay(date) < today}
-                            ranges={[
-                              {
-                                startDate: dateRange.startDate ?? today,
-                                endDate: dateRange.endDate ?? addDays(today, 1),
-                                key: 'selection',
-                              },
-                            ]}
-                            dayContentRenderer={(day) => {
-                              const dayStart = startOfDay(day);
-                              const selectionStart = dateRange.startDate
-                                ? startOfDay(dateRange.startDate).getTime()
-                                : null;
-                              const selectionEnd = dateRange.endDate
-                                ? startOfDay(dateRange.endDate).getTime()
-                                : null;
-                              const isRangeStart = selectionStart !== null && dayStart.getTime() === selectionStart;
-                              const isRangeEnd = selectionEnd !== null && dayStart.getTime() === selectionEnd;
-                              const rangeStart = selectionStart !== null && selectionEnd !== null ? Math.min(selectionStart, selectionEnd) : null;
-                              const rangeEnd = selectionStart !== null && selectionEnd !== null ? Math.max(selectionStart, selectionEnd) : null;
-                              const isInRange =
-                                rangeStart !== null && rangeEnd !== null
-                                  ? dayStart.getTime() >= rangeStart && dayStart.getTime() <= rangeEnd
-                                  : false;
-                              const isDisabled = dayStart < today;
-
-                              const selectionTreatment =
-                                isRangeStart || isRangeEnd
-                                  ? 'bg-cta-primary text-[var(--text-contrast)] border-cta-primary shadow-sm ring-2 ring-[color:color-mix(in_srgb,var(--cta-secondary)_60%,transparent)]'
-                                  : 'border-transparent bg-transparent';
-
-                              return (
-                                <div className="relative flex h-full w-full items-center justify-center">
-                                  {isInRange && (
-                                    <span
-                                      className={`absolute inset-0 bg-[color:color-mix(in_srgb,var(--cta-primary)_18%,transparent)] ${
-                                        isRangeStart && isRangeEnd
-                                          ? 'rounded-full'
-                                          : isRangeStart
-                                          ? 'rounded-l-full'
-                                          : isRangeEnd
-                                          ? 'rounded-r-full'
-                                          : 'rounded-none'
-                                      }`}
-                                      aria-hidden
-                                    />
-                                  )}
-                                  <span
-                                    data-testid={`hero-date-${format(day, 'yyyy-MM-dd')}`}
-                                    className={`relative z-10 flex h-10 w-10 items-center justify-center rounded-full border text-sm font-semibold transition ${selectionTreatment} ${
-                                      isDisabled ? 'text-text-muted opacity-60 line-through cursor-not-allowed' : 'text-text-primary'
-                                    }`}
-                                    style={{ minHeight: 40, minWidth: 40 }}
-                                  >
-                                    {format(day, 'd')}
-                                  </span>
-                                </div>
-                              );
-                            }}
-                          />
-                        ) : (
-                          <div className="grid grid-cols-7 gap-2">
-                            {Array.from({ length: 14 }).map((_, index) => (
-                              <div
-                                key={index}
-                                className="h-10 rounded-lg bg-[color:color-mix(in_srgb,var(--bg-muted)_75%,var(--bg-surface))] animate-pulse"
-                              />
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>,
-                    document.body,
-                  )}
               </div>
 
               <button
@@ -734,6 +578,7 @@ const Slider = () => {
                 aria-describedby={dateError ? dateErrorId : undefined}
                 aria-invalid={dateError ? true : undefined}
                 onClick={toggleCalendar}
+                aria-controls={calendarContentId}
               >
                 <span className={labelClass}>
                   <CalendarRange className="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -756,6 +601,72 @@ const Slider = () => {
                   Clear dates
                 </button>
               </div>
+
+              <AtlasDateRangePicker
+                anchorRef={calendarWrapperRef}
+                contentId={calendarContentId}
+                labelId={calendarLabelId}
+                heading="Choose your stay dates"
+                loadingLabel="Loading calendar…"
+                open={isCalendarOpen}
+                onClose={() => setIsCalendarOpen(false)}
+                value={dateRange}
+                onChange={handleRangeChange}
+                minDate={today}
+                disabledDay={(date) => startOfDay(date) < today}
+                months={monthsToShow}
+                shownDate={shownDate}
+                onShownDateChange={(date) => setShownDate(startOfDay(date))}
+                rangeColors={[dateError ? 'var(--support-error, #ef4444)' : 'var(--cta-primary)']}
+                loading={!calendarReady}
+                dayContentRenderer={(day) => {
+                  const dayStart = startOfDay(day);
+                  const selectionStart = dateRange.startDate ? startOfDay(dateRange.startDate).getTime() : null;
+                  const selectionEnd = dateRange.endDate ? startOfDay(dateRange.endDate).getTime() : null;
+                  const isRangeStart = selectionStart !== null && dayStart.getTime() === selectionStart;
+                  const isRangeEnd = selectionEnd !== null && dayStart.getTime() === selectionEnd;
+                  const rangeStart = selectionStart !== null && selectionEnd !== null ? Math.min(selectionStart, selectionEnd) : null;
+                  const rangeEnd = selectionStart !== null && selectionEnd !== null ? Math.max(selectionStart, selectionEnd) : null;
+                  const isInRange =
+                    rangeStart !== null && rangeEnd !== null
+                      ? dayStart.getTime() >= rangeStart && dayStart.getTime() <= rangeEnd
+                      : false;
+                  const isDisabled = dayStart < today;
+
+                  const selectionTreatment =
+                    isRangeStart || isRangeEnd
+                      ? 'bg-cta-primary text-[var(--text-contrast)] border-cta-primary shadow-sm ring-2 ring-[color:color-mix(in_srgb,var(--cta-secondary)_60%,transparent)]'
+                      : 'border-transparent bg-transparent';
+
+                  return (
+                    <div className="relative flex h-full w-full items-center justify-center">
+                      {isInRange && (
+                        <span
+                          className={`absolute inset-0 bg-[color:color-mix(in_srgb,var(--cta-primary)_18%,transparent)] ${
+                            isRangeStart && isRangeEnd
+                              ? 'rounded-full'
+                              : isRangeStart
+                              ? 'rounded-l-full'
+                              : isRangeEnd
+                              ? 'rounded-r-full'
+                              : 'rounded-none'
+                          }`}
+                          aria-hidden
+                        />
+                      )}
+                      <span
+                        data-testid={`hero-date-${format(day, 'yyyy-MM-dd')}`}
+                        className={`relative z-10 flex h-10 w-10 items-center justify-center rounded-full border text-sm font-semibold transition ${selectionTreatment} ${
+                          isDisabled ? 'text-text-muted opacity-60 line-through cursor-not-allowed' : 'text-text-primary'
+                        }`}
+                        style={{ minHeight: 40, minWidth: 40 }}
+                      >
+                        {format(day, 'd')}
+                      </span>
+                    </div>
+                  );
+                }}
+              />
 
               <div
                 className={`${fieldShellClass} text-left md:-ml-[1px]`}
