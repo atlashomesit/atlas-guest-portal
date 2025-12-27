@@ -11,6 +11,7 @@ import { priceDisplayConfig } from '../../../config/priceDisplay.config';
 import { bookingWidgetLayoutFlag } from '../../../config/abFlags';
 import { FaUserFriends, FaCreditCard, FaCcVisa, FaCcMastercard } from 'react-icons/fa';
 import { SiGooglepay, SiRazorpay } from 'react-icons/si';
+import { logApiError, logUserAction } from '../../../lib/monitoring';
 
 import 'react-date-range/dist/styles.css';
 import 'react-date-range/dist/theme/default.css';
@@ -203,6 +204,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     const loadRazorpay = () => {
       if (window.Razorpay) {
         setIsRazorpayReady(true);
+        logUserAction('payment_gateway_cached', { provider: 'razorpay', propertyId });
         return;
       }
 
@@ -211,10 +213,17 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
       script.async = true;
       script.onload = () => {
         setIsRazorpayReady(true);
+        logUserAction('payment_gateway_loaded', { provider: 'razorpay', propertyId });
       };
       script.onerror = () => {
         console.error('Failed to load Razorpay script');
         setIsRazorpayReady(false);
+        logApiError(new Error('Failed to load Razorpay script'), {
+          url: script.src,
+          method: 'GET',
+          category: 'network',
+          tags: { provider: 'razorpay', surface: 'booking_form' },
+        });
       };
       document.body.appendChild(script);
 
@@ -279,6 +288,13 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         },
         { propertyId, listingId: propertyId, unitCode: propertyId },
       );
+
+      logUserAction('booking_dates_selected', {
+        propertyId,
+        startDate: effectiveStartDate.toISOString(),
+        endDate: resolvedEndDate.toISOString(),
+        nights: Math.max(1, Math.round(Math.abs((resolvedEndDate.getTime() - effectiveStartDate.getTime()) / oneDay))),
+      });
 
       const selectedNights = Math.max(
         1,
@@ -444,6 +460,13 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         setBookedDates(uniqueBlocked);
       } catch (error) {
         console.error('Failed to fetch booked dates:', error);
+        logApiError(error, {
+          url: '/bookings',
+          method: 'GET',
+          category: 'network',
+          tags: { surface: 'booking_form', propertyId: String(propertyId) },
+        });
+        setInlineStatus('Unable to refresh availability right now. Please try again in a few minutes.');
         setBookedDates([]);
       } finally {
         setIsBookedDatesLoading(false);
@@ -587,6 +610,12 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
 
   const handleInlineCta = () => {
     markEngagement();
+    logUserAction('booking_inline_cta_clicked', {
+      propertyId,
+      hasSelection,
+      nights,
+      guests: totalPeople,
+    });
     setHasInteractedWithDates(true);
     setIsInlineChecking(true);
     setOpenCalendar(false);
@@ -610,6 +639,13 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
 
   const initiatePayment = () => {
     markEngagement();
+    logUserAction('booking_form_submitted', {
+      propertyId,
+      nights,
+      guests: totalPeople,
+      hasSelection,
+      termsAccepted,
+    });
     trackEvent(
       'reserve_click',
       {
@@ -692,10 +728,23 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
 
     // Check if Razorpay is loaded
     if (!window.Razorpay || !isRazorpayReady) {
+      logApiError(new Error('Payment gateway unavailable'), {
+        url: 'https://checkout.razorpay.com/v1/checkout.js',
+        method: 'GET',
+        category: 'network',
+        tags: { provider: 'razorpay', surface: 'booking_form' },
+      });
       alert('Payment system is loading. Please try again in a moment.');
       setIsLoading(false);
       return;
     }
+
+    logUserAction('payment_gateway_initializing', {
+      provider: 'razorpay',
+      bookingId,
+      propertyId,
+      total: totalPrice,
+    });
 
     // Store booking details in sessionStorage for post-payment handling
     try {
@@ -788,10 +837,22 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
 
     try {
       const razorpay = new window.Razorpay(razorpayOptions);
+      logUserAction('payment_gateway_initialized', {
+        provider: 'razorpay',
+        bookingId,
+        total: totalPrice,
+        nights,
+      });
       razorpay.open();
       console.log('[Razorpay] Checkout opened');
     } catch (error) {
       console.error('[Razorpay] Error opening checkout:', error);
+      logApiError(error, {
+        url: 'https://checkout.razorpay.com/v1/checkout.js',
+        method: 'GET',
+        category: 'network',
+        tags: { provider: 'razorpay', surface: 'booking_form' },
+      });
       setIsLoading(false);
       alert('Failed to open payment options. Please try again.');
       setPaymentStatus({

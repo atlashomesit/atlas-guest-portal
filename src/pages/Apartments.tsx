@@ -10,6 +10,7 @@ import { propertyData, propertyImages } from "../data/propertyData";
 import getApiBaseUrl from "../utils/apiBaseUrl";
 import { trackEvent } from "../utils/analytics";
 import { calculateNightlyPrice, inferUnitType, type NightlyPriceBreakdown } from "../utils/pricing";
+import { isAtlasApiRequest, logApiError, monitoredFetch } from "../lib/monitoring";
 
 type PropertyRecord = {
   id: number | string;
@@ -199,13 +200,14 @@ const Apartments = () => {
   const safeProperties = React.useMemo(() => sanitizeProperties(propertiesSource), [propertiesSource]);
 
   const logStructuredError = React.useCallback(
-    (details: { url: string; status?: number; responseSnippet?: string }) => {
-      console.error({
-        page: "apartments",
+    (details: { url: string; status?: number; responseSnippet?: string; category?: "http" | "network" }) => {
+      logApiError(new Error("Apartments API request failed"), {
         url: details.url,
         status: details.status,
+        method: "GET",
         responseSnippet: details.responseSnippet,
-        apiBaseUrlUsed,
+        category: details.category ?? "http",
+        tags: { page: "apartments", apiBaseUrlUsed, atlasApi: String(isAtlasApiRequest(details.url)) },
       });
     },
     [apiBaseUrlUsed],
@@ -215,13 +217,13 @@ const Apartments = () => {
     async <T,>(baseUrl: string, path: string): Promise<T | null> => {
       const url = buildApiUrl(baseUrl, path);
       try {
-        const response = await fetch(url);
+        const response = await monitoredFetch(url, { requestName: path });
         const text = await response.text();
         const snippet = text.slice(0, 200);
 
         if (!response.ok) {
-          logStructuredError({ url, status: response.status, responseSnippet: snippet });
-          throw new Error(`Request failed with status ${response.status}`);
+          logStructuredError({ url, status: response.status, responseSnippet: snippet, category: "http" });
+          throw new Error("We are unable to load apartments right now. Please try again shortly.");
         }
 
         try {
@@ -232,9 +234,9 @@ const Apartments = () => {
         }
       } catch (error) {
         if (!(error instanceof Error)) {
-          logStructuredError({ url, responseSnippet: String(error) });
+          logStructuredError({ url, responseSnippet: String(error), category: "network" });
         } else {
-          logStructuredError({ url, responseSnippet: error.message });
+          logStructuredError({ url, responseSnippet: error.message, category: "network" });
         }
         throw error;
       }

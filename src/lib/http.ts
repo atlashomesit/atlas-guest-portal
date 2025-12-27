@@ -1,5 +1,6 @@
 import { API_BASE_URL } from '@/config/api';
 import { IS_LOCALHOST } from '@/config/env';
+import { logApiError, monitoredFetch } from './monitoring';
 
 export async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
   const hasProtocol = /^https?:\/\//i.test(path);
@@ -15,11 +16,23 @@ export async function apiFetch(path: string, init?: RequestInit): Promise<Respon
   if (!IS_LOCALHOST && url.includes('localhost')) {
     throw new Error('Refusing localhost request from non-localhost host');
   }
-  const res = await fetch(url, { credentials: 'include', ...(init || {}) });
-  if (!res.ok) {
-    let body = '';
-    try { body = await res.text(); } catch {}
-    throw new Error(`HTTP ${res.status}: ${body}`);
+  try {
+    const res = await monitoredFetch(url, { credentials: 'include', ...(init || {}) });
+    if (!res.ok) {
+      let body = '';
+      try { body = await res.text(); } catch {}
+      logApiError(new Error(`HTTP ${res.status}`), {
+        url,
+        status: res.status,
+        method: init?.method,
+        responseSnippet: body.slice(0, 200),
+        category: 'http',
+      });
+      throw new Error(`HTTP ${res.status}: ${body}`);
+    }
+    return res;
+  } catch (error) {
+    logApiError(error, { url, method: init?.method, category: 'network' });
+    throw error instanceof Error ? error : new Error('Unexpected network error');
   }
-  return res;
 }
