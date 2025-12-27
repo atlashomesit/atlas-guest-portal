@@ -1,6 +1,6 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { BadgePercent, CheckCircle2, CalendarRange, ChevronDown, ShieldCheck, Users } from 'lucide-react';
 import { addDays, format, startOfDay } from 'date-fns';
 import { DateRange, type RangeKeyDict } from 'react-date-range';
@@ -28,6 +28,7 @@ const MAX_GUESTS = 20;
 
 const Slider = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const enableWidgetExperiment = heroWidgetLayoutFlag();
 
   const overlayStyle = React.useMemo(() => {
@@ -120,9 +121,25 @@ const Slider = () => {
       startDate: parseDate(booking.checkIn),
       endDate: parseDate(booking.checkOut),
       guests: booking.guests > 0 ? booking.guests : null,
+      propertyId: booking.propertyId ?? null,
     }),
-    [booking.checkIn, booking.checkOut, booking.guests],
+    [booking.checkIn, booking.checkOut, booking.guests, booking.propertyId],
   );
+
+  const bookingPrefill = React.useMemo(() => {
+    const state = location.state as
+      | {
+          bookingPrefill?: {
+            propertyId?: string | number | null;
+            checkIn?: string | null;
+            checkOut?: string | null;
+            guests?: number | null;
+          };
+        }
+      | null;
+
+    return state?.bookingPrefill ?? null;
+  }, [location.state]);
 
   React.useEffect(() => {
     const stored = hydrateFromContext();
@@ -132,12 +149,24 @@ const Slider = () => {
       guests: Number(searchParams.get('guests')) || null,
     };
 
-    const startDate = paramRange.startDate ?? stored?.startDate ?? defaultRange.startDate;
-    const endDate = paramRange.endDate ?? stored?.endDate ?? defaultRange.endDate;
+    const stateRange = bookingPrefill
+      ? {
+          startDate: parseDate(bookingPrefill.checkIn),
+          endDate: parseDate(bookingPrefill.checkOut),
+          guests: bookingPrefill.guests && bookingPrefill.guests > 0 ? bookingPrefill.guests : null,
+          propertyId: bookingPrefill.propertyId ?? null,
+        }
+      : null;
+
+    const startDate = stateRange?.startDate ?? paramRange.startDate ?? stored?.startDate ?? defaultRange.startDate;
+    const endDate = stateRange?.endDate ?? paramRange.endDate ?? stored?.endDate ?? defaultRange.endDate;
 
     const nextRange = clampRange(startDate, endDate);
-    const rawGuests = paramRange.guests && paramRange.guests > 0 ? paramRange.guests : stored?.guests ?? guests;
-    const nextGuests = Math.min(MAX_GUESTS, Math.max(MIN_GUESTS, rawGuests));
+    const nextGuests =
+      (stateRange?.guests && stateRange.guests > 0
+        ? stateRange.guests
+        : null) || (paramRange.guests && paramRange.guests > 0 ? paramRange.guests : stored?.guests ?? guests);
+    const nextPropertyId = stateRange?.propertyId ?? stored?.propertyId ?? null;
 
     setDateRange({ startDate: nextRange.startDate, endDate: nextRange.endDate });
     setDateError(null);
@@ -147,8 +176,16 @@ const Slider = () => {
       checkIn: nextRange.startDate?.toISOString() ?? null,
       checkOut: nextRange.endDate?.toISOString() ?? null,
       guests: nextGuests,
+      propertyId: nextPropertyId,
     });
-  }, [defaultRange.endDate, defaultRange.startDate, hydrateFromContext, searchParams, updateBooking]);
+  }, [
+    bookingPrefill,
+    defaultRange.endDate,
+    defaultRange.startDate,
+    hydrateFromContext,
+    searchParams,
+    updateBooking,
+  ]);
 
   React.useEffect(() => {
     if (!isCalendarOpen || typeof window === 'undefined') return;
