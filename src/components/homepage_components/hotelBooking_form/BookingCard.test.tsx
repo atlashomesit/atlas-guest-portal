@@ -1,6 +1,6 @@
 import { describe, expect, vi, beforeEach, afterEach, it, test } from 'vitest';
-import { render, screen, within, fireEvent } from '@testing-library/react';
-import { act } from 'react';
+import { render, screen, within, fireEvent, waitFor } from '@testing-library/react';
+import { act, ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { format, startOfDay } from 'date-fns';
 import BookingCard from './BookingCard';
@@ -42,6 +42,7 @@ vi.mock('@/config/api', () => ({
 
 vi.mock('../../../contexts/BookingContext', () => ({
   useBooking: () => ({ updateBooking: mockUpdateBooking }),
+  BookingProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
 
 vi.mock('@/utils/analytics', () => ({
@@ -132,6 +133,11 @@ afterEach(() => {
 });
 
 describe('BookingCard end-to-end flow', () => {
+  const openGuestMenu = async () => {
+    fireEvent.click(screen.getByRole('button', { name: /guests/i }));
+    return screen.findByTestId('guest-menu');
+  };
+
   it('walks through availability check, validation, and Razorpay init without redirects', async () => {
     await renderCard();
     fireEvent.click(screen.getByRole('button', { name: /check-in/i }));
@@ -194,6 +200,42 @@ describe('BookingCard end-to-end flow', () => {
     expect(checkInButton.getAttribute('aria-label')).toContain(format(startOfDay(new Date()), 'dd MMM yyyy'));
   });
 
+  it('opens the detailed guest selector with all counters from the Guests field', async () => {
+    await renderCard();
+
+    const menu = await openGuestMenu();
+
+    expect(within(menu).getByText(/adults/i)).toBeInTheDocument();
+    expect(within(menu).getByText(/children/i)).toBeInTheDocument();
+    expect(within(menu).getByText(/infants/i)).toBeInTheDocument();
+    expect(within(menu).getByText(/pets/i)).toBeInTheDocument();
+  });
+
+  it('increments and decrements every guest type independently', async () => {
+    await renderCard();
+    await openGuestMenu();
+
+    fireEvent.click(screen.getByRole('button', { name: /increase adults/i }));
+    await waitFor(() => expect(screen.getByTestId('adults-count')).toHaveTextContent('2'));
+    fireEvent.click(screen.getByRole('button', { name: /decrease adults/i }));
+    expect(screen.getByTestId('adults-count')).toHaveTextContent('1');
+
+    fireEvent.click(screen.getByRole('button', { name: /increase children/i }));
+    await waitFor(() => expect(screen.getByTestId('children-count')).toHaveTextContent('1'));
+    fireEvent.click(screen.getByRole('button', { name: /decrease children/i }));
+    expect(screen.getByTestId('children-count')).toHaveTextContent('0');
+
+    fireEvent.click(screen.getByRole('button', { name: /increase infants/i }));
+    await waitFor(() => expect(screen.getByTestId('infants-count')).toHaveTextContent('1'));
+    fireEvent.click(screen.getByRole('button', { name: /decrease infants/i }));
+    expect(screen.getByTestId('infants-count')).toHaveTextContent('0');
+
+    fireEvent.click(screen.getByRole('button', { name: /increase pets/i }));
+    await waitFor(() => expect(screen.getByTestId('pets-count')).toHaveTextContent('1'));
+    fireEvent.click(screen.getByRole('button', { name: /decrease pets/i }));
+    expect(screen.getByTestId('pets-count')).toHaveTextContent('0');
+  });
+
   it('advances inline status after a successful bookings fetch', async () => {
     const checkinDate = startOfDay(new Date(Date.now() + 2 * 24 * 60 * 60 * 1000));
     const checkoutDate = startOfDay(new Date(Date.now() + 5 * 24 * 60 * 60 * 1000));
@@ -225,7 +267,8 @@ describe('BookingCard end-to-end flow', () => {
     await renderCard(propertyId);
     const property = propertyData.find((p) => p.id === propertyId);
     expect(property).toBeDefined();
-    expect(await screen.findByText(/reviews/)).toBeInTheDocument();
+    const reviewsText = await screen.findAllByText(/reviews/i);
+    expect(reviewsText.length).toBeGreaterThan(0);
     expect(getPrimaryCta()).toBeDisabled();
   });
 });
