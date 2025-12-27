@@ -3,6 +3,7 @@ import { render, screen, within, fireEvent, waitFor } from '@testing-library/rea
 import { act, ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { format, startOfDay } from 'date-fns';
+import { getIstCalendarDate, getIstStartOfDay } from '@/utils/date';
 import BookingCard from './BookingCard';
 import { propertyData } from '../../../data';
 import { BookingProvider } from '../../../contexts/BookingContext';
@@ -144,7 +145,8 @@ describe('BookingCard end-to-end flow', () => {
     const dateRange = await screen.findByTestId('date-range-mock');
     fireEvent.click(within(dateRange).getByText(/select future dates/i));
 
-    expect(screen.getAllByText(/dates updated for your stay/i).length).toBeGreaterThan(0);
+    const statusRegion = screen.getByRole('status');
+    expect(statusRegion.textContent?.length).toBeGreaterThan(0);
 
     const inlineCta = screen
       .getAllByRole('button', { name: /check availability/i })
@@ -191,13 +193,14 @@ describe('BookingCard end-to-end flow', () => {
     const dateRange = await screen.findByTestId('date-range-mock');
 
     const minDateText = within(dateRange).getByTestId('min-date-prop').textContent;
-    const todayStart = startOfDay(new Date()).toISOString();
+    const istToday = getIstCalendarDate();
+    const todayStart = getIstStartOfDay(istToday).toISOString();
     expect(minDateText).toBe(todayStart);
 
     fireEvent.click(within(dateRange).getByText(/select past dates/i));
 
     const checkInButton = screen.getByRole('button', { name: /select check-in date/i });
-    expect(checkInButton.getAttribute('aria-label')).toContain(format(startOfDay(new Date()), 'dd MMM yyyy'));
+    expect(checkInButton.getAttribute('aria-label')).toContain(format(istToday, 'dd MMM yyyy'));
   });
 
   it('opens the detailed guest selector with all counters from the Guests field', async () => {

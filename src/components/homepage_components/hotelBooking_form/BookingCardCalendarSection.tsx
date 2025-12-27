@@ -1,7 +1,8 @@
 // BookingCardCalendarSection.tsx
 import { Link } from 'react-router-dom';
 import { DateRange } from 'react-date-range';
-import { format, startOfDay } from 'date-fns';
+import { format } from 'date-fns';
+import { getIstStartOfDay } from '@/utils/date';
 import { inlinePolicySnippets } from '../../../content/terms';
 import { priceDisplayConfig } from '../../../config/priceDisplay.config';
 import React from 'react';
@@ -107,8 +108,8 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
   defaultStartDate,
   ctaPrimaryColor,
 }) => {
-  const todayStart = startOfDay(new Date());
-  const normalizedStartDate = startOfDay(defaultStartDate);
+  const todayStart = getIstStartOfDay();
+  const normalizedStartDate = getIstStartOfDay(defaultStartDate);
   const minSelectableDate = normalizedStartDate < todayStart ? todayStart : normalizedStartDate;
   const hasDateIssue = Boolean(dateError) || isCheckoutInvalid;
   const dateFieldButtonClass = `${fieldButtonClass} ${hasDateIssue ? 'border-support-error ring-1 ring-support-error/40 focus-visible:outline-support-error' : ''}`;
@@ -367,19 +368,18 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
               disabledDates={bookedDates}
               disabledDay={(date: Date) => {
                 // Disable dates that are in the bookedDates array or in the past
-                const dateToCheck = startOfDay(date);
+                const dateToCheck = getIstStartOfDay(date);
                 const dateTime = dateToCheck.getTime();
                 if (dateToCheck < todayStart) return true;
 
                 return bookedDates.some((bookedDate) => {
-                  const normalizedBooked = startOfDay(new Date(bookedDate));
+                  const normalizedBooked = getIstStartOfDay(new Date(bookedDate));
                   return normalizedBooked.getTime() === dateTime;
                 });
               }}
               dayContentRenderer={(date: Date) => {
                 // Normalize dates to start of day for accurate comparison
-                const dateToCheck = new Date(date);
-                dateToCheck.setHours(0, 0, 0, 0);
+                const dateToCheck = getIstStartOfDay(date);
                 const dateToCheckTime = dateToCheck.getTime();
 
                 const selectionStart = startOfDay(dates.startDate).getTime();
@@ -394,8 +394,7 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
                 // Check if this date is in the blocked dates array
                 // bookedDates is an array of Date objects representing blocked dates
                 const isBooked = bookedDates.some((bookedDate) => {
-                  const normalizedBooked = new Date(bookedDate);
-                  normalizedBooked.setHours(0, 0, 0, 0);
+                  const normalizedBooked = getIstStartOfDay(new Date(bookedDate));
                   return normalizedBooked.getTime() === dateToCheckTime;
                 });
 
@@ -435,10 +434,10 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
                       } ${
                         isBooked
                           ? 'text-red-700 dark:text-red-300 line-through'
-                          : isPastDate
-                          ? 'text-gray-500 dark:text-gray-400'
-                          : 'text-text-primary'
-                      }`}
+                          : isAvailable
+                          ? 'text-green-800 dark:text-green-300'
+                          : 'text-gray-500 dark:text-gray-400 opacity-70 cursor-not-allowed'
+                      } ${isPastDate ? 'pointer-events-none select-none' : ''}`}
                     >
                       {date.getDate()}
                     </span>
