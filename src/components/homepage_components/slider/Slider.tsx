@@ -351,17 +351,36 @@ const Slider = () => {
       { route: listingSearchRoute },
     );
 
-    const apiBaseUrl = getApiBaseUrl();
-    const availabilityUrl = apiBaseUrl
-      ? `${apiBaseUrl}/availability?checkIn=${formattedCheckIn}&checkOut=${formattedCheckOut}&guests=${guests}`
-      : '';
-
-    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-    const timeoutId = controller ? window.setTimeout(() => controller.abort(), 10_000) : null;
+    let availabilityUrl = '';
+    let controller: AbortController | null = null;
+    let timeoutId: number | null = null;
     const startedAt = performance.now();
 
+    try {
+      const apiBaseUrl = getApiBaseUrl();
+      availabilityUrl = apiBaseUrl
+        ? `${apiBaseUrl}/availability?checkIn=${formattedCheckIn}&checkOut=${formattedCheckOut}&guests=${guests}`
+        : '';
+      controller = availabilityUrl && typeof AbortController !== 'undefined' ? new AbortController() : null;
+      timeoutId = controller ? window.setTimeout(() => controller.abort(), 10_000) : null;
+    } catch (configError) {
+      console.error('Hero availability configuration error:', configError);
+      trackEvent(
+        'availability_search_config_error',
+        {
+          surface: 'hero_form',
+          message: configError instanceof Error ? configError.message : 'Unknown configuration error',
+        },
+        { route: listingSearchRoute },
+      );
+      setStatusMessage('Showing all homes while we resolve a configuration issue.');
+      setError('We could not confirm availability due to a configuration issue. Showing all homes instead.');
+      navigate({ pathname: '/', search: searchParams.toString(), hash: 'our-homes' });
+      return;
+    }
+
     setIsSubmitting(true);
-    setStatusMessage('Checking availability...');
+    setStatusMessage(availabilityUrl ? 'Checking availability...' : 'Showing all homes while we confirm availability.');
 
     try {
       if (availabilityUrl) {
