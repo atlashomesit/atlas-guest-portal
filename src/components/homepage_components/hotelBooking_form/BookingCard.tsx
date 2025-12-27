@@ -12,7 +12,8 @@ import { priceDisplayConfig } from '../../../config/priceDisplay.config';
 import { bookingWidgetLayoutFlag } from '../../../config/abFlags';
 import { FaUserFriends, FaCreditCard, FaCcVisa, FaCcMastercard } from 'react-icons/fa';
 import { SiGooglepay, SiRazorpay } from 'react-icons/si';
-import { logApiError, logUserAction } from '../../../lib/monitoring';
+import { toast } from 'react-toastify';
+import { logApiError, logUserAction, reportError } from '../../../lib/monitoring';
 
 import 'react-date-range/dist/styles.css';
 import 'react-date-range/dist/theme/default.css';
@@ -875,7 +876,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         category: 'network',
         tags: { provider: 'razorpay', surface: 'booking_form' },
       });
-      alert('Payment system is loading. Please try again in a moment.');
+      toast.error('Payment system is still loading. Please try again in a moment.');
       setPaymentStatus({ state: 'failure', reason: 'Payment setup unavailable. Please retry shortly.' });
       setCtaConfirmation('Payment setup unavailable. Please retry shortly.');
       setIsLoading(false);
@@ -935,7 +936,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         category: 'config',
         tags: { provider: 'razorpay', surface: 'booking_form' },
       });
-      alert(reason);
+      toast.error(reason);
       setIsLoading(false);
       return;
     }
@@ -967,14 +968,15 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
       },
       handler: function (response: any) {
         // Payment success callback
-        console.log('[Razorpay] Payment successful:', response);
         setIsLoading(false);
         setPaymentStatus({
           state: 'success',
           paymentId: response.razorpay_payment_id,
           bookingId,
         });
-        
+
+        toast.success('Payment received. We will confirm your stay shortly.');
+
         trackEvent(
           'payment_success',
           {
@@ -989,12 +991,13 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
       modal: {
         ondismiss: function () {
           // Payment modal closed without payment
-          console.log('[Razorpay] Payment modal closed');
           setIsLoading(false);
           setPaymentStatus({
             state: 'failure',
             reason: 'Payment was cancelled',
           });
+          toast.info('Payment was cancelled. You can try again when ready.');
+          logUserAction('payment_modal_closed', { provider: 'razorpay', bookingId });
         },
       },
     };
@@ -1009,12 +1012,12 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
 
       const razorpay = new window.Razorpay(razorpayOptions);
       razorpay.on('payment.failed', (response: any) => {
-        console.error('[Razorpay] Payment failed:', response);
         setPaymentStatus({
           state: 'failure',
           reason: response?.error?.description || 'Payment failed. Please try again.',
         });
         setIsLoading(false);
+        toast.error(response?.error?.description || 'Payment failed. Please try again.');
         logApiError(new Error(response?.error?.description || 'Razorpay payment failed'), {
           url: 'https://checkout.razorpay.com/v1/checkout.js',
           method: 'POST',
@@ -1030,9 +1033,8 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         total: totalPrice,
         nights,
       });
-      console.log('[Razorpay] Checkout opened');
     } catch (error) {
-      console.error('[Razorpay] Error opening checkout:', error);
+      reportError(error, { feature: 'razorpay', bookingId, propertyId });
       logApiError(error, {
         url: 'https://checkout.razorpay.com/v1/checkout.js',
         method: 'GET',
@@ -1040,7 +1042,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         tags: { provider: 'razorpay', surface: 'booking_form' },
       });
       setIsLoading(false);
-      alert('Failed to open payment options. Please try again.');
+      toast.error('Failed to open payment options. Please try again.');
       setPaymentStatus({
         state: 'failure',
         reason: 'Failed to initialize payment',

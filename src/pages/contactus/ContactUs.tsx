@@ -11,6 +11,8 @@ import { Typography } from "../../components/ui/Typography";
 import { Input } from "../../components/ui/Input";
 import { Button } from "../../components/ui/Button";
 import ErrorBoundary from "../../components/ErrorBoundary";
+import { toast } from "react-toastify";
+import { logUserAction, reportError, reportMessage } from "../../lib/monitoring";
 
 type StatusMessage = {
     type: "info" | "success" | "error";
@@ -37,7 +39,11 @@ const ContactUs = () => {
     useEffect(() => {
         if (emailUnavailable) {
             const missingKeys = getMissingEmailJsEnvKeys().join(", ");
-            console.warn("EmailJS environment variables are not fully configured.", missingKeys);
+            reportMessage("emailjs_config_missing", "warning", {
+                missingKeys,
+                feature: "contact-form",
+            });
+            toast.info("Email delivery is temporarily unavailable. Please reach us via phone or WhatsApp.");
             setStatusMessage({
                 type: "info",
                 text: "Email delivery is temporarily unavailable. Call or WhatsApp us for the quickest reply while we restore our inbox integration.",
@@ -50,7 +56,11 @@ const ContactUs = () => {
 
         if (emailUnavailable) {
             const missingKeys = getMissingEmailJsEnvKeys().join(", ");
-            console.error("EmailJS environment variables are not fully configured.", missingKeys);
+            reportError(new Error("EmailJS configuration missing"), {
+                feature: "contact-form",
+                missingKeys,
+            });
+            toast.error("Email is down right now. Please reach out by phone or WhatsApp.");
             setStatusMessage({
                 type: "error",
                 text: "We couldn't send your message because our email service is offline. Please reach us by phone or WhatsApp.",
@@ -74,11 +84,13 @@ const ContactUs = () => {
                 },
                 emailJsConfig.publicKey!,
             );
-            console.log("SUCCESS!", response.status, response.text);
+            logUserAction("contact_form_submitted", { status: response.status, feature: "contact-form" });
+            toast.success("Message sent! We'll be in touch soon.");
             setStatusMessage({ type: "success", text: "Message sent successfully!" });
             setFormData({ name: "", email: "", contactnumber: "", destination: "", description: "" });
         } catch (error) {
-            console.log("FAILED...", error);
+            reportError(error, { feature: "contact-form" });
+            toast.error("We couldn't send your message right now. Please try again or call us.");
             setStatusMessage({
                 type: "error",
                 text: "Failed to send message. Please try again or contact us through phone or WhatsApp.",

@@ -8,6 +8,8 @@ import { Card } from '../../ui/Card';
 import { Input } from '../../ui/Input';
 import { Button } from '../../ui/Button';
 import { calculateNightlyPrice, inferUnitType } from '../../../utils/pricing';
+import { toast } from 'react-toastify';
+import { logUserAction, reportError } from '../../../lib/monitoring';
 interface Property {
   property_name: string;
 }
@@ -90,25 +92,28 @@ const BookingForm = ({ propertyData }: { propertyData: Property }) => {
   };
   const handleSubmit = async () => {
     if (!name.trim()) {
-      alert('Please enter your name.');
+      toast.warning('Please enter your name.');
       return;
     }
     if (!contactNumber.trim()) {
-      alert('Please enter your contact number.');
+      toast.warning('Please enter your contact number.');
       return;
     }
     if (!email.trim() || !validateEmail(email)) {
-      alert('Please enter a valid email address.');
+      toast.warning('Please enter a valid email address.');
       return;
     }
     if (!termsAccepted) {
-      alert('Please review and accept the Terms & Conditions before reserving.');
+      toast.info('Please review and accept the Terms & Conditions before reserving.');
       return;
     }
     if (!isEmailJsConfigured()) {
       const missingKeys = getMissingEmailJsEnvKeys().join(', ');
-      console.error('EmailJS environment variables are not fully configured.', missingKeys);
-      alert('Booking is temporarily unavailable. Please contact support.');
+      reportError(new Error('EmailJS environment variables are not fully configured.'), {
+        feature: 'booking-form',
+        missingKeys,
+      });
+      toast.error('Booking is temporarily unavailable. Please contact support.');
       return;
     }
 
@@ -148,8 +153,8 @@ ${policyMessage}`
         templateParams,
         emailJsConfig.publicKey!
       );
-
-      alert(`Booking request sent successfully!\nPolicies (Cancellation, House Rules, Refunds): ${origin}/policies\nTerms & Conditions: ${origin}/terms`);
+      logUserAction('booking_form_submitted', { feature: 'booking-form', unitType, guests: totalGuests });
+      toast.success('Booking request sent successfully! We will confirm details shortly.');
       // Optionally clear the form or keep data as is
       setName('');
       setContactNumber('');
@@ -169,8 +174,8 @@ ${policyMessage}`
       setIsLoading(false);
       // Resetting the form fields after successful submission
     } catch (error) {
-      console.error('EmailJS error:', error);
-      alert('Failed to send booking request. Please try again.');
+      reportError(error, { feature: 'booking-form' });
+      toast.error('Failed to send booking request. Please try again.');
     } finally {
       setIsLoading(false);
     }

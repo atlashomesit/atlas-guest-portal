@@ -1,5 +1,6 @@
 // BookingCardPricingPaymentSection.tsx
 import React from 'react';
+import { toast } from 'react-toastify';
 import { format } from 'date-fns';
 import { inlinePolicySnippets } from '../../../content/terms';
 import { logApiError } from '../../../lib/monitoring';
@@ -337,13 +338,13 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
             try {
               initiatePayment();
             } catch (error) {
-              console.error('[BookingCardPricingPaymentSection] Failed to initiate checkout', error);
               logApiError(error, {
                 url: '/api/payment',
                 method: 'POST',
                 category: 'payment',
                 tags: { provider: 'razorpay', surface: 'booking_form' },
               });
+              toast.error('Could not start checkout. Please try again.');
               setPaymentStatus({
                 state: 'failure',
                 reason: 'Could not start checkout. Please try again.',
