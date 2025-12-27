@@ -1,5 +1,5 @@
 // BookingCard.tsx
-import { useState, useRef, useEffect, useMemo, useId } from 'react';
+import { useState, useRef, useEffect, useMemo, useId, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { format, addDays, startOfDay } from 'date-fns';
 import { API_BASE_URL, IS_API_BASE_CONFIGURED } from '@/config/api';
@@ -40,7 +40,7 @@ interface BookingCardProps {
 export type GuestCountKey = 'adults' | 'children' | 'infants' | 'pets';
 
 export const defaultGuestLimits: Record<GuestCountKey, { min: number; max?: number }> = {
-  adults: { min: 0, max: 10 },
+  adults: { min: 1, max: 10 },
   children: { min: 0, max: 10 },
   infants: { min: 0, max: 2 },
   pets: { min: 0, max: 4 },
@@ -162,8 +162,9 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
   const property = propertyData.find((p) => p.id === Number(propertyId));
   const unitType = inferUnitType({ id: property?.id, property_name: property?.property_name });
 
-  const getTotalGuests = (counts: GuestCounts) => counts.adults + counts.children + counts.infants;
+  const getTotalGuests = (counts: GuestCounts) => counts.adults + counts.children;
   const totalPeople = guests.adults + guests.children;
+  const totalGuestsWithInfants = guests.adults + guests.children + guests.infants;
   const totalGuests = getTotalGuests(guests);
   const oneDay = 24 * 60 * 60 * 1000;
 
@@ -252,11 +253,15 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
 
   const formatGuestLabel = () => {
     const { adults, children, infants, pets } = guests;
-    const guestCount = adults + children + infants;
+    const guestCount = adults + children;
     const guestText = guestCount === 1 ? 'guest' : 'guests';
+    const infantText = infants === 1 ? 'infant' : 'infants';
     const petText = pets === 1 ? 'pet' : 'pets';
 
     let label = `${guestCount} ${guestText}`;
+    if (infants > 0) {
+      label += `, ${infants} ${infantText}`;
+    }
     if (pets > 0) {
       label += `, ${pets} ${petText}`;
     }
@@ -265,9 +270,32 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
 
   const guestMenuRef = useRef<HTMLDivElement | null>(null);
   const calendarRef = useRef<HTMLDivElement | null>(null);
+  const triggerRowRef = useRef<HTMLDivElement | null>(null);
+  const previousOverflowRef = useRef<string>('');
+  const [triggerRowBottom, setTriggerRowBottom] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [termsAcceptedAt, setTermsAcceptedAt] = useState<string | null>(null);
+
+  const updateTriggerRowPosition = useCallback(() => {
+    if (triggerRowRef.current) {
+      setTriggerRowBottom(triggerRowRef.current.offsetTop + triggerRowRef.current.offsetHeight);
+    }
+  }, []);
+
+  useEffect(() => {
+    updateTriggerRowPosition();
+    window.addEventListener('resize', updateTriggerRowPosition);
+    return () => window.removeEventListener('resize', updateTriggerRowPosition);
+  }, [updateTriggerRowPosition]);
+
+  useEffect(() => {
+    updateTriggerRowPosition();
+  }, [openCalendar, openGuests, updateTriggerRowPosition]);
+
+  useEffect(() => {
+    updateTriggerRowPosition();
+  }, [ctaConfirmation, dateError, guestNeedsAdult, inlineStatus, updateTriggerRowPosition]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -536,6 +564,63 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    const body = document.body;
+
+    if (openCalendar || openGuests) {
+      previousOverflowRef.current = body.style.overflow;
+      body.style.overflow = 'hidden';
+    } else {
+      body.style.overflow = previousOverflowRef.current;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setOpenCalendar(false);
+        setOpenGuests(false);
+        return;
+      }
+
+      if (event.key !== 'Tab') return;
+
+      const activeDialog = openCalendar
+        ? calendarRef.current
+        : openGuests
+        ? guestMenuRef.current
+        : null;
+
+      if (!activeDialog) return;
+
+      const focusable = activeDialog.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])',
+      );
+
+      if (focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      } else if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      }
+    };
+
+    const focusTarget = openCalendar ? calendarRef.current : openGuests ? guestMenuRef.current : null;
+    focusTarget?.setAttribute('tabIndex', '-1');
+    focusTarget?.focus({ preventScroll: true });
+
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      body.style.overflow = previousOverflowRef.current;
+    };
+  }, [openCalendar, openGuests]);
 
   useEffect(() => {
     const fetchBookedDates = async () => {
@@ -842,7 +927,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
   const primaryCtaLabel = hasSelection && termsAccepted ? 'Book now' : 'Check availability';
   const inlineCtaLabel = hasSelection ? 'Check availability' : 'Select dates';
   const isCheckoutInvalid = dates.endDate <= dates.startDate;
-  const guestNeedsAdult = guests.adults < 1;
+  const guestNeedsAdult = guests.adults < (propertyGuestLimits.adults.min ?? 1);
   const containerPaddingBottom = supportPadding ? 'pb-40' : 'pb-28';
   const validationMessageId = useId();
   const dateErrorId = useId();
@@ -877,8 +962,8 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
       ? paymentStatus.reason
       : '');
   const fieldGridClass = isLayoutExperimentEnabled
-    ? 'grid grid-cols-1 items-stretch gap-3 p-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-4'
-    : 'grid grid-cols-1 items-stretch gap-3 p-3 md:grid-cols-4 lg:gap-4';
+    ? 'grid grid-cols-1 items-stretch gap-3 p-3 sm:grid-cols-2 xl:grid-cols-4 xl:gap-6'
+    : 'grid grid-cols-1 items-stretch gap-3 p-3 sm:grid-cols-2 xl:grid-cols-4 xl:gap-6';
   const fieldButtonClass =
     'group flex h-full min-h-[4.5rem] flex-col justify-center rounded-xl border border-border-subtle bg-bg-surface/70 px-4 text-left text-text-primary shadow-inner transition hover:border-border-strong hover:bg-bg-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary';
   const helperTextClass = 'mt-1 text-xs font-semibold text-text-muted leading-snug';
@@ -1002,7 +1087,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
       propertyId,
       checkIn: dates.startDate.toISOString(),
       checkOut: dates.endDate.toISOString(),
-      guests: totalGuests,
+      guests: totalGuestsWithInfants,
     });
   };
 
@@ -1349,7 +1434,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
   return (
     <div
       id="booking-form"
-      className={`max-w-md mx-auto p-6 bg-bg-surface shadow-level2 rounded-2xl relative ${containerPaddingBottom} lg:pb-0 lg:sticky lg:top-20`}
+      className={`mx-auto w-full max-w-6xl p-6 bg-bg-surface shadow-level2 rounded-2xl relative ${containerPaddingBottom}`}
     >
       <div className="sr-only" role="status" aria-live="polite">
         <span id={validationMessageId}>{liveRegionMessage || 'Booking form ready'}</span>
@@ -1396,6 +1481,8 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         ctaConfirmation={ctaConfirmation}
         openCalendar={openCalendar}
         calendarRef={calendarRef}
+        triggerRowRef={triggerRowRef}
+        triggerRowBottom={triggerRowBottom}
         isBookedDatesLoading={isBookedDatesLoading}
         bookedDates={bookedDates}
         DateRangeComponent={undefined as never}
@@ -1432,6 +1519,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         updateChildAge={updateChildAge}
         markEngagement={markEngagement}
         setOpenGuests={setOpenGuests}
+        triggerRowBottom={triggerRowBottom}
       />
 
       <BookingCardPricingPaymentSection
