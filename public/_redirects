@@ -6,4 +6,5 @@
 /302  /property_details/atlas-homes-room-302  301
 /501  /property_details/atlas-homes-room-501  301
 /config.js   /config   302
-/* /index.html 200
+# SPA fallback: keep last. The trailing "!" prevents Cloudflare Pages from flagging an infinite loop.
+/* /index.html 200!

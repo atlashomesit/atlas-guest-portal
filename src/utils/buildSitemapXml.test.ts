@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildSitemapXml } from "../../functions/sitemap.xml";
+import { SITEMAP_PATHS, buildSitemapXml, onRequestGet } from "../../functions/sitemap.xml";
 
 describe("buildSitemapXml", () => {
   it("uses the provided base URL for every <loc> entry", () => {
@@ -18,5 +18,19 @@ describe("buildSitemapXml", () => {
 
     expect(xml).toContain("<loc>https://example.com/</loc>");
     expect(xml).toContain("<loc>https://example.com/no-leading-slash</loc>");
+  });
+
+  it("includes core paths and each home in the sitemap using the request origin", async () => {
+    expect(SITEMAP_PATHS).toContain("/property_details/atlas-homes-room-101");
+    expect(SITEMAP_PATHS).not.toContain("/apartments");
+
+    const request = new Request("https://dev.atlashomestays.com/sitemap.xml");
+    const response = await onRequestGet({ request });
+    const xml = await response.text();
+
+    expect(xml).toContain("<loc>https://dev.atlashomestays.com/</loc>");
+    expect(xml).toContain("/property_details/atlas-homes-room-101</loc>");
+    expect(xml).toContain("/amenities</loc>");
+    expect(xml).not.toContain("/apartments");
   });
 });

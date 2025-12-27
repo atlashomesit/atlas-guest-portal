@@ -1,15 +1,21 @@
 import CommonBanner from "../../components/commonComponents/banner/CommonBanner";
 import { resolveOptimizedAsset } from "../../utils/resolveOptimizedAsset";
 import React, { useState } from "react";
-import emailjs from "@emailjs/browser";
 import { Link } from "react-router-dom";
 import { formatDisplayNumber, getTelLink, getWhatsAppLink } from "../../config/contact";
 import { ctaNav } from "../../config/navigation";
-import { emailJsConfig, getMissingEmailJsEnvKeys, isEmailJsConfigured } from "../../utils/emailjsConfig";
 import { Card } from "../../components/ui/Card";
 import { Typography } from "../../components/ui/Typography";
 import { Input } from "../../components/ui/Input";
 import { Button } from "../../components/ui/Button";
+import ErrorBoundary from "../../components/ErrorBoundary";
+import { toast } from "react-toastify";
+import { logUserAction, reportError } from "../../lib/monitoring";
+
+type StatusMessage = {
+    type: "info" | "success" | "error";
+    text: string;
+};
 
 const ContactUs = () => {
 
@@ -21,6 +27,8 @@ const ContactUs = () => {
         description: "",
     });
 
+    const [statusMessage, setStatusMessage] = useState<StatusMessage | null>(null);
+
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
@@ -28,33 +36,48 @@ const ContactUs = () => {
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
 
-        if (!isEmailJsConfigured()) {
-            const missingKeys = getMissingEmailJsEnvKeys().join(", ");
-            console.error("EmailJS environment variables are not fully configured.", missingKeys);
-            alert("Contact form is temporarily unavailable. Please reach out via phone or email.");
-            return;
-        }
+        setStatusMessage({ type: "info", text: "Sending your message..." });
 
         try {
-            const response = await emailjs.send(
-                emailJsConfig.serviceId!,
-                emailJsConfig.templateId!,
-                {
-                    user_name: formData.name,
-                    user_email: formData.email,
-                    user_contactnumber: formData.contactnumber,
-                    destination: formData.destination,
-                    message: formData.description,
-                    to_email: emailJsConfig.ownerEmail,
-                },
-                emailJsConfig.publicKey!
-            );
-            console.log("SUCCESS!", response.status, response.text);
-            alert("Message sent successfully!");
+            const response = await fetch("/api/contact", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(formData),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                const message = data?.message || "We couldn't send your message right now.";
+                toast.error(message);
+                setStatusMessage({
+                    type: "error",
+                    text: `${message}${data?.queued ? " We've queued your request and will retry." : ""} Please try again or contact us through phone or WhatsApp.`,
+                });
+                logUserAction("contact_form_submitted", { status: "failed", feature: "contact-form" });
+                return;
+            }
+
+            logUserAction("contact_form_submitted", { status: "success", feature: "contact-form" });
+            if (data?.queued) {
+                toast.info("We received your message and will follow up even while email is in maintenance.");
+                setStatusMessage({
+                    type: "info",
+                    text: "Your request is queued while email delivery is offline. We'll reach out shortly.",
+                });
+            } else {
+                toast.success("Message sent! We'll be in touch soon.");
+                setStatusMessage({ type: "success", text: "Message sent successfully!" });
+            }
+
             setFormData({ name: "", email: "", contactnumber: "", destination: "", description: "" });
         } catch (error) {
-            console.log("FAILED...", error);
-            alert("Failed to send message. Please try again.");
+            reportError(error, { feature: "contact-form" });
+            toast.error("We couldn't send your message right now. Please try again or call us.");
+            setStatusMessage({
+                type: "error",
+                text: "Failed to send message. Please try again or contact us through phone or WhatsApp.",
+            });
         }
     };
 
@@ -127,46 +150,86 @@ const ContactUs = () => {
                 <Card className="space-y-2">
                     <Typography variant="h2" className="text-center">Send us a note</Typography>
                     <Typography variant="muted" className="text-center">Share your trip details and we will reply with tailored options.</Typography>
+                    {statusMessage && (
+                        <div
+                            role="status"
+                            className={`rounded-lg border px-4 py-3 text-sm ${
+                                statusMessage.type === "success"
+                                    ? "border-green-600/30 bg-green-50 text-green-800"
+                                    : statusMessage.type === "error"
+                                        ? "border-red-600/30 bg-red-50 text-red-800"
+                                        : "border-amber-600/30 bg-amber-50 text-amber-800"
+                            }`}
+                        >
+                            {statusMessage.text}
+                        </div>
+                    )}
                     <form onSubmit={handleSubmit} className="space-y-4 mt-4">
-                        <Input
-                            type="text"
-                            name="name"
-                            placeholder="Your Name"
-                            value={formData.name}
-                            onChange={handleChange}
-                            required
-                        />
-                        <Input
-                            type="email"
-                            name="email"
-                            placeholder="Your Email"
-                            value={formData.email}
-                            onChange={handleChange}
-                            required
-                        />
-                        <Input
-                            type="tel"
-                            name="contactnumber"
-                            placeholder="Your Contact Number"
-                            value={formData.contactnumber}
-                            onChange={handleChange}
-                            required
-                        />
-                        <Input as="select" name="destination" value={formData.destination} onChange={handleChange}>
-                            <option value="">Select Destination</option>
-                            <option value="Lonavala">Lonavala</option>
-                            <option value="Dapoli">Dapoli</option>
-                        </Input>
-                        <Input
-                            as="textarea"
-                            name="description"
-                            placeholder="Tell us about your stay"
-                            value={formData.description}
-                            onChange={handleChange}
-                            required
-                            rows={5}
-                        />
-                        <Button type="submit" fullWidth>
+                        <div className="space-y-1">
+                            <label htmlFor="name" className="text-sm font-semibold text-text-primary">Name</label>
+                            <Input
+                                id="name"
+                                type="text"
+                                name="name"
+                                placeholder="Your Name"
+                                value={formData.name}
+                                onChange={handleChange}
+                                required
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label htmlFor="email" className="text-sm font-semibold text-text-primary">Email</label>
+                            <Input
+                                id="email"
+                                type="email"
+                                name="email"
+                                placeholder="your@email.com"
+                                value={formData.email}
+                                onChange={handleChange}
+                                required
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label htmlFor="contactnumber" className="text-sm font-semibold text-text-primary">Phone</label>
+                            <Input
+                                id="contactnumber"
+                                type="tel"
+                                name="contactnumber"
+                                placeholder="Your Contact Number"
+                                value={formData.contactnumber}
+                                onChange={handleChange}
+                                required
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label htmlFor="destination" className="text-sm font-semibold text-text-primary">Destination</label>
+                            <Input
+                                as="select"
+                                id="destination"
+                                name="destination"
+                                value={formData.destination}
+                                onChange={handleChange}
+                                required
+                            >
+                                <option value="">Select Destination</option>
+                                <option value="Lonavala">Lonavala</option>
+                                <option value="Dapoli">Dapoli</option>
+                            </Input>
+                        </div>
+                        <div className="space-y-1">
+                            <label htmlFor="description" className="text-sm font-semibold text-text-primary">Message</label>
+                            <Input
+                                as="textarea"
+                                id="description"
+                                name="description"
+                                placeholder="Tell us about your stay"
+                                value={formData.description}
+                                onChange={handleChange}
+                                required
+                                rows={5}
+                            />
+                        </div>
+                        <Button type="submit" fullWidth disabled={statusMessage?.type === "info"}>
                             Send message
                         </Button>
                     </form>
@@ -200,4 +263,10 @@ const ContactUs = () => {
     );
 };
 
-export default ContactUs;
+const ContactUsWithErrorBoundary = () => (
+    <ErrorBoundary name="contact-us-page">
+        <ContactUs />
+    </ErrorBoundary>
+);
+
+export default ContactUsWithErrorBoundary;

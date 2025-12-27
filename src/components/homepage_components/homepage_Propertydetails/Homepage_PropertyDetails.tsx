@@ -18,6 +18,7 @@ import HotelBooking_Form from '../hotelBooking_form/BookingCard.tsx';
 import { trackEvent } from '../../../utils/analytics';
 import { Button } from '../../ui/Button';
 import { calculateNightlyPrice, inferUnitType } from '../../../utils/pricing';
+import { useBooking } from '../../../contexts/BookingContext';
 
 import { Fancybox } from "@fancyapps/ui";
 import "@fancyapps/ui/dist/fancybox/fancybox.css";
@@ -37,6 +38,7 @@ interface Property {
     property_name: string;
     property_img: string[];
     property_location: string;
+    property_neighborhoods?: string[];
     property_amenities: PropertyAmenity[];
     property_description: string;
     property_nearplaces: string[];
@@ -56,6 +58,7 @@ const PropertyDetails = () => {
     const [showAboutMore, setShowAboutMore] = useState(false);
     const [showNeighborhoodMore, setShowNeighborhoodMore] = useState(false);
     const unitType = inferUnitType({ id: data?.id, property_name: data?.property_name });
+    const { setProperty } = useBooking();
     const nightlyPrice = useMemo(() => {
         if (!data) return null;
         try {
@@ -81,6 +84,9 @@ const PropertyDetails = () => {
             const images = propertyImages[String(foundBySlug.id)] || [];
             setData({
                 ...foundBySlug,
+                property_neighborhoods: Array.isArray(foundBySlug.property_neighborhoods)
+                    ? foundBySlug.property_neighborhoods
+                    : [],
                 property_img: Array.isArray(images) ? images : []
             });
             return;
@@ -94,6 +100,9 @@ const PropertyDetails = () => {
                 const images = propertyImages[String(foundById.id)] || [];
                 setData({
                     ...foundById,
+                    property_neighborhoods: Array.isArray(foundById.property_neighborhoods)
+                        ? foundById.property_neighborhoods
+                        : [],
                     property_img: Array.isArray(images) ? images : []
                 });
                 return;
@@ -106,6 +115,9 @@ const PropertyDetails = () => {
             const images = propertyImages[String(prop.id)] || [];
             setData({
                 ...prop,
+                property_neighborhoods: Array.isArray(prop.property_neighborhoods)
+                    ? prop.property_neighborhoods
+                    : [],
                 property_img: Array.isArray(images) ? images : []
             });
             return;
@@ -113,6 +125,12 @@ const PropertyDetails = () => {
 
         console.error('No property found for slug:', slug);
     }, [slug, location.state]);
+
+    useEffect(() => {
+        if (!data?.id) return;
+        setProperty(data.id);
+        return () => setProperty(null);
+    }, [data?.id, setProperty]);
 
     useEffect(() => {
         if (!data) return;
@@ -204,6 +222,19 @@ const PropertyDetails = () => {
                         <FaLocationDot className="mr-2 text-sm" />
                         <span className="text-sm sm:text-base">{data.property_location}</span>
                     </div>
+                    {data.property_neighborhoods && data.property_neighborhoods.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                            {data.property_neighborhoods.map((neighborhood) => (
+                                <span
+                                    key={neighborhood}
+                                    className="inline-flex items-center gap-2 rounded-full bg-[color:color-mix(in_srgb,var(--bg-muted)_45%,var(--bg-surface))] px-3 py-1 text-xs font-semibold text-text-primary"
+                                >
+                                    <span aria-hidden>🏙️</span>
+                                    <span>{neighborhood}</span>
+                                </span>
+                            ))}
+                        </div>
+                    )}
                     <div className="mt-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3 text-sm text-text-muted">
                         <div className="flex items-center gap-2 font-semibold text-text-primary">
                             <FaStar className="text-accent-primary" />
@@ -222,16 +253,19 @@ const PropertyDetails = () => {
               {/* Image Gallery */}
 <div className="flex gap-2 h-64 md:h-96 lg:h-[450px] overflow-hidden ">
   {/* Main image */}
-  <div className="flex-1 relative h-full">
-    <a href={propertyImages[data.id]?.[0] || data.property_img[0]} data-fancybox="property-gallery">
-      <img
-        src={propertyImages[String(data.id)]?.[0] || data.property_img[0]}
-        alt="Main property"
-        className="w-full h-full object-cover rounded-md"
-        onError={(e) => {
-          const target = e.target as HTMLImageElement;
-          target.onerror = null;
-          target.src = data.property_img[0] || '';
+      <div className="flex-1 relative h-full">
+        <a href={propertyImages[data.id]?.[0] || data.property_img[0]} data-fancybox="property-gallery">
+          <img
+            src={propertyImages[String(data.id)]?.[0] || data.property_img[0]}
+            alt="Main property"
+            loading="lazy"
+            decoding="async"
+            sizes="(min-width: 1024px) 50vw, 100vw"
+            className="w-full h-full object-cover rounded-md"
+            onError={(e) => {
+              const target = e.target as HTMLImageElement;
+              target.onerror = null;
+              target.src = data.property_img[0] || '';
         }}
       />
     </a>
@@ -245,6 +279,9 @@ const PropertyDetails = () => {
           <img
             src={img}
             alt={`Thumbnail ${index + 1}`}
+            loading="lazy"
+            decoding="async"
+            sizes="(min-width: 1024px) 25vw, 50vw"
             className="w-full h-full object-cover rounded-md hover:opacity-80 transition"
             onError={(e) => {
               const target = e.target as HTMLImageElement;

@@ -134,6 +134,7 @@ export { propertyImages };
 export const propertyData = [
     {
         id: 501,
+        unitType: "penthouse",
         property_name: "Atlas Penthouse 501",
         property_description: `Perched high above Hyderabad’s energetic skyline, Atlas Penthouse 501 delivers a five-star
 retreat for guests who want a private sanctuary near the city’s tech corridor. Spanning more than 1,600 sq. ft. with
@@ -158,8 +159,11 @@ Central air-conditioning with smart zoning, 1 Gbps fiber internet (dual ISP), in
 video intercom, dedicated concierge desk, and bi-weekly housekeeping with on-demand butler service. Guests enjoy access to a
 private bar setup, wine chiller, Nespresso machine, washer-dryer, ironing station, board games, and curated library.`,
         property_location: "Hyderabad, Telangana",
+        property_neighborhoods: ["Hitech City"],
         property_reviews: 128,
         property_rating: 4.95,
+        maxCapacity: 6,
+        extraGuestFee: 1200,
         property_review_snippets: [
             "Guests love the rooftop plunge pool and skyline views.",
             "Concierge support and housekeeping were prompt and thoughtful."
@@ -212,6 +216,7 @@ private bar setup, wine chiller, Nespresso machine, washer-dryer, ironing statio
     },
     {
         id: 201,
+        unitType: "1bhk",
         property_name: "Atlas Homes Room 201",
         property_description: `Imagine the convenience of being just 2 km from Hyderabad’s Cyber Towers while staying in a cozy 1BHK apartment designed for comfort. Atlas Homes Room 101, a 450 sq. ft. first-floor unit, blends affordability with modern amenities, making it ideal for professionals and families.
 
@@ -224,8 +229,11 @@ Enjoy fresh air from the attached balcony. Though there’s no garden, the neigh
 Additional Amenities:
 High-speed Wi-Fi (150 Mbps, multiple ISPs), air-conditioning in the bedroom, a fully equipped kitchen (microwave, gas stove, RO filter, refrigerator, toaster), and housekeeping are included. Washing machine access is available at ₹150 per wash.`,
         property_location: "Hyderabad, Telangana",
+        property_neighborhoods: ["Madhapur"],
         property_reviews: 59,
         property_rating: 4.9,
+        maxCapacity: 4,
+        extraGuestFee: 500,
         property_review_snippets: [
             "Check-in was smooth and the apartment was spotless.",
             "Proximity to Cyber Towers made daily commuting simple."
@@ -274,6 +282,7 @@ High-speed Wi-Fi (150 Mbps, multiple ISPs), air-conditioning in the bedroom, a f
     },
     {
         id: 202,
+        unitType: "1bhk",
         property_name: "Atlas Homes Room 202",
         property_description: `Welcome to Atlas Homes Room 202, a thoughtfully designed 450 sq. ft. 1BHK apartment in Hyderabad’s KPHB, just 2 km from Cyber Towers. This first-floor unit blends comfort and affordability, making it ideal for business travelers, couples, or families seeking a convenient stay near Hitech City.
 
@@ -286,8 +295,11 @@ Step onto the balcony to enjoy a refreshing breeze, or explore the surrounding n
 Additional Amenities:
 Complimentary Wi-Fi, air-conditioning, inverter backup, daily housekeeping, and CCTV in common areas. A fully equipped kitchen includes a microwave, gas stove, refrigerator, toaster, and RO water purifier. Washing machine facility available at ₹150 per wash.`,
         property_location: "Hyderabad, Telangana",
+        property_neighborhoods: ["Kukatpally"],
         property_reviews: 64,
         property_rating: 4.8,
+        maxCapacity: 4,
+        extraGuestFee: 500,
         property_review_snippets: [
             "Families appreciated the quiet lane and airy balconies.",
             "Hosts responded quickly to every small request."
@@ -339,6 +351,7 @@ Complimentary Wi-Fi, air-conditioning, inverter backup, daily housekeeping, and 
     },
     {
         id: 301,
+        unitType: "1bhk",
         property_name: "Atlas Homes Room 301",
         property_description: `Welcome to Atlas Homes Room 301, a 450 sq. ft. apartment that offers the perfect balance of affordability and functionality in Hyderabad’s tech hub. Located in KPHB, just 2 km from Cyber Towers, this unit is ideal for both work and leisure stays.
 
@@ -351,8 +364,11 @@ Enjoy your private balcony, perfect for sipping tea in the evenings, or explore 
 Additional Amenities
 Complimentary Wi-Fi (150 Mbps), fully equipped kitchen (gas stove, microwave, refrigerator, toaster), air-conditioning, and housekeeping services.`,
         property_location: "Hyderabad, Telangana",
+        property_neighborhoods: ["Kukatpally"],
         property_reviews: 72,
         property_rating: 4.7,
+        maxCapacity: 4,
+        extraGuestFee: 500,
         property_review_snippets: [
             "Guests mention spotless rooms and reliable Wi-Fi for work.",
             "Walking distance to markets and eateries was a big plus."
@@ -400,6 +416,7 @@ Complimentary Wi-Fi (150 Mbps), fully equipped kitchen (gas stove, microwave, re
     },
     {
         id: 101,
+        unitType: "1bhk",
         property_name: "Atlas Homes Room 101",
         property_description: `Imagine the convenience of being just 2 km from Hyderabad’s Cyber Towers while staying in a cozy 1BHK apartment designed for comfort. Atlas Homes Room 101, a 450 sq. ft. first-floor unit, blends affordability with modern amenities, making it ideal for professionals and families.
 
@@ -412,8 +429,11 @@ Enjoy fresh air from the attached balcony. Though there’s no garden, the neigh
 Additional Amenities
 High-speed Wi-Fi (150 Mbps, multiple ISPs), air-conditioning in the bedroom, a fully equipped kitchen (microwave, gas stove, RO filter, refrigerator, toaster), and housekeeping are included. Washing machine access is available at ₹150 per wash.`,
         property_location: "Hyderabad, Telangana",
+        property_neighborhoods: ["Hitech City"],
         property_reviews: 85,
         property_rating: 4.9,
+        maxCapacity: 4,
+        extraGuestFee: 500,
         property_review_snippets: [
             "Hosts were proactive with check-in guidance and local tips.",
             "Guests highlight the pristine linens and airy bedrooms."
@@ -462,6 +482,7 @@ High-speed Wi-Fi (150 Mbps, multiple ISPs), air-conditioning in the bedroom, a f
     },
     {
         id: 102,
+        unitType: "1bhk",
         property_name: "Atlas Homes Room 102",
         property_description: `Step into Atlas Homes Room 102, a spacious and affordable 450 sq. ft. 1BHK in KPHB, just minutes from Cyber Towers. This first-floor apartment combines homely comfort with modern conveniences, perfect for couples, business travelers, or small families.
 
@@ -474,8 +495,11 @@ Relax on your private balcony or take a stroll in the neighborhood, known for it
 Additional Amenities
 Enjoy uninterrupted high-speed Wi-Fi, AC, and a fully equipped kitchen with gas stove, microwave, refrigerator, toaster, and RO water filter. Daily housekeeping is included. Washing machine access is available at ₹150 per wash.`,
         property_location: "Hyderabad, Telangana",
+        property_neighborhoods: ["Madhapur"],
         property_reviews: 91,
         property_rating: 4.8,
+        maxCapacity: 4,
+        extraGuestFee: 500,
         property_review_snippets: [
             "Travelers noted fast Wi-Fi and comfy beds for longer stays.",
             "Neighborhood felt safe and everything was within a short drive."
@@ -526,6 +550,7 @@ Enjoy uninterrupted high-speed Wi-Fi, AC, and a fully equipped kitchen with gas 
     },
     {
         id: 302,
+        unitType: "1bhk",
         property_name: "Atlas Homes Room 302",
         property_description: `Atlas Homes Room 302 is a stylish 450 sq. ft. third-floor unit designed for comfort and convenience. Located in the vibrant KPHB area, it is perfect for travelers looking to stay near Hyderabad’s IT corridor without compromising on modern amenities.
 
@@ -538,6 +563,7 @@ The attached balcony provides fresh air and a spot to relax, while the surroundi
 Additional Amenities
 Fully equipped kitchen with microwave, refrigerator, RO water, toaster, and gas stove. Daily housekeeping included. Washing machine available at extra charge.`,
         property_location: "Hyderabad, Telangana",
+        property_neighborhoods: ["Hitech City"],
         property_reviews: 77,
         property_rating: 4.85,
         property_review_snippets: [

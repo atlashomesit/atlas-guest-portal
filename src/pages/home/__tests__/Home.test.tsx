@@ -1,21 +1,9 @@
 import React from "react";
 import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { describe, it, expect, vi } from "vitest";
+import { BookingProvider } from "../../../contexts/BookingContext";
 import Home from "../Home";
-
-vi.mock("react-router-dom", async () => {
-  const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
-  return {
-    ...actual,
-    MemoryRouter: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-    useNavigate: () => vi.fn(),
-    Link: ({ children, to, ...props }: React.PropsWithChildren<{ to: string }>) => (
-      <a href={to} {...props}>
-        {children}
-      </a>
-    ),
-  };
-});
 
 vi.mock("../../../components/homepage_components/slider/Slider", () => ({
   __esModule: true,
@@ -52,7 +40,13 @@ vi.mock("../../../utils/analytics", async () => {
 
 describe("Home", () => {
   it("renders default sections when all UX flags are disabled", () => {
-    render(<Home />);
+    render(
+      <BookingProvider>
+        <MemoryRouter>
+          <Home />
+        </MemoryRouter>
+      </BookingProvider>,
+    );
 
     expect(screen.getByText(/Atlas Homes – Where Every Stay Feels Like Home/i)).toBeInTheDocument();
     expect(screen.getByText(/Discover Our Exclusive Services/i)).toBeInTheDocument();

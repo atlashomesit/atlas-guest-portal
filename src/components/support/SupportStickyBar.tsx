@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { FaWhatsapp } from "react-icons/fa";
 import { FiPhone } from "react-icons/fi";
-import { useLocation, useMatch } from "react-router-dom";
+import { matchPath, useLocation } from "react-router-dom";
 
 import { CONTACT } from "../../config/contact";
 import { trackEvent } from "../../utils/analytics";
@@ -14,7 +14,8 @@ interface SupportStickyBarProps {
 
 const SupportStickyBar = ({ hidden = false }: SupportStickyBarProps) => {
   const location = useLocation();
-  const matchPropertyDetails = useMatch("/property_details/:id");
+  const matchPropertyDetails =
+    matchPath("/property_details/:id", location.pathname) ?? matchPath("/properties/:id", location.pathname);
   const isCheckoutContext = /checkout|reserve/i.test(location.pathname);
   const [pageUrl, setPageUrl] = useState("");
   const [isHiddenForModal, setIsHiddenForModal] = useState(false);

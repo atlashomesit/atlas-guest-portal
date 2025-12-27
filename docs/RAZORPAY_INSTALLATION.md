@@ -642,6 +642,16 @@ Expiry: 12/25
 
 ---
 
+## Sandbox verification checklist (web + webhook)
+
+- Set `VITE_RAZORPAY_KEY_ID` to a Razorpay **test** key (format `rzp_test_******`). Checkout will block if the key is missing or not a test credential.
+- Deploy `/api/payment/webhook` with `RAZORPAY_WEBHOOK_SECRET`; optionally bind `BOOKINGS_KV` to persist booking receipts.
+- In the Razorpay dashboard, point a webhook to `https://<your-domain>/api/payment/webhook` for `payment.authorized` and `payment.captured` events.
+- Walk through the booking form, accept Terms & Conditions, and open checkout. Use the sandbox card `4111111111111111` with any future expiry + CVV to simulate a capture.
+- Confirm the webhook logs (or KV entry) show the booking update with `bookingId`, `paymentId`, and event status.
+
+---
+
 ## Summary
 
 ✅ **Installation Complete!**

@@ -21,8 +21,9 @@ describe('ErrorBoundary', () => {
       </ErrorBoundary>
     );
 
-    expect(screen.getByText(/something went wrong/i)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /reload/i }));
+    expect(screen.getByTestId('error-layout')).toBeInTheDocument();
+    expect(screen.getByText(/we couldn’t load this page/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /try again/i }));
     expect(reloadSpy).toHaveBeenCalled();
 
     Object.defineProperty(window, 'location', {

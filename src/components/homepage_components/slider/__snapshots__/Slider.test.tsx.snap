@@ -10,13 +10,13 @@ exports[`Slider hero search > captures hero widget snapshots for desktop, tablet
     >
       <div
         class="relative isolate overflow-hidden min-h-[75vh] md:min-h-[70vh] flex items-center justify-center bg-cover bg-center bg-no-repeat pt-[calc(var(--nav-height,80px)+1rem)]"
-        style="background-image: url("https://atlashomestorage.blob.core.windows.net/listing-images/fallback.jpeg");"
+        style="background-image: url(https://atlashomestorage.blob.core.windows.net/listing-images/fallback.jpeg);"
       >
         <div
           aria-hidden="true"
           class="pointer-events-none absolute inset-0 opacity-95"
           data-testid="hero-overlay"
-          style="background-color: rgba(3, 6, 14, 0.74); background-image: url("linear-gradient-overlay");"
+          style="background-color: rgba(3, 6, 14, 0.74); background-image: url(linear-gradient-overlay);"
         />
         <div
           class="relative z-10 flex max-w-4xl flex-col items-center gap-7 px-4 pb-12 text-center sm:px-6 md:pt-3"
@@ -53,7 +53,7 @@ exports[`Slider hero search > captures hero widget snapshots for desktop, tablet
             </h2>
           </div>
           <form
-            class="w-full max-w-5xl rounded-3xl bg-[color:color-mix(in_srgb,var(--bg-surface)_96%,rgba(3,6,14,0.45))] shadow-[0_20px_60px_rgba(0,0,0,0.45)] backdrop-blur-md border border-[color:color-mix(in_srgb,var(--bg-surface)_60%,transparent)] p-4 sm:p-5 md:p-6 flex flex-col gap-4 sm:gap-5"
+            class="hero-form w-full max-w-5xl rounded-3xl bg-[color:color-mix(in_srgb,var(--bg-surface)_96%,rgba(3,6,14,0.45))] shadow-[0_20px_60px_rgba(0,0,0,0.45)] backdrop-blur-md border border-[color:color-mix(in_srgb,var(--bg-surface)_60%,transparent)] p-4 sm:p-5 md:p-6 flex flex-col gap-4 sm:gap-5"
             data-testid="hero-widget"
           >
             <div
@@ -64,7 +64,7 @@ exports[`Slider hero search > captures hero widget snapshots for desktop, tablet
               Hero form ready
             </div>
             <div
-              class="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 md:auto-rows-fr lg:grid-cols-4 lg:gap-5"
+              class="hero-form-grid grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 md:auto-rows-fr lg:grid-cols-4 lg:gap-5"
             >
               <div
                 class="relative"
@@ -331,9 +331,9 @@ exports[`Slider hero search > captures hero widget snapshots for desktop, tablet
                 </button>
                 <a
                   class="inline-flex items-center justify-center text-sm font-semibold text-text-muted underline-offset-4 transition hover:text-cta-secondary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary whitespace-nowrap"
-                  href="/apartments"
+                  href="/#our-homes"
                 >
-                  Browse listings
+                  Browse all apartments
                 </a>
               </div>
             </div>
@@ -510,13 +510,13 @@ exports[`Slider hero search > captures hero widget snapshots for desktop, tablet
     >
       <div
         class="relative isolate overflow-hidden min-h-[75vh] md:min-h-[70vh] flex items-center justify-center bg-cover bg-center bg-no-repeat pt-[calc(var(--nav-height,80px)+1rem)]"
-        style="background-image: url("https://atlashomestorage.blob.core.windows.net/listing-images/fallback.jpeg");"
+        style="background-image: url(https://atlashomestorage.blob.core.windows.net/listing-images/fallback.jpeg);"
       >
         <div
           aria-hidden="true"
           class="pointer-events-none absolute inset-0 opacity-95"
           data-testid="hero-overlay"
-          style="background-color: rgba(3, 6, 14, 0.74); background-image: url("linear-gradient-overlay");"
+          style="background-color: rgba(3, 6, 14, 0.74); background-image: url(linear-gradient-overlay);"
         />
         <div
           class="relative z-10 flex max-w-4xl flex-col items-center gap-7 px-4 pb-12 text-center sm:px-6 md:pt-3"
@@ -553,7 +553,7 @@ exports[`Slider hero search > captures hero widget snapshots for desktop, tablet
             </h2>
           </div>
           <form
-            class="w-full max-w-5xl rounded-3xl bg-[color:color-mix(in_srgb,var(--bg-surface)_96%,rgba(3,6,14,0.45))] shadow-[0_20px_60px_rgba(0,0,0,0.45)] backdrop-blur-md border border-[color:color-mix(in_srgb,var(--bg-surface)_60%,transparent)] p-4 sm:p-5 md:p-6 flex flex-col gap-4 sm:gap-5"
+            class="hero-form w-full max-w-5xl rounded-3xl bg-[color:color-mix(in_srgb,var(--bg-surface)_96%,rgba(3,6,14,0.45))] shadow-[0_20px_60px_rgba(0,0,0,0.45)] backdrop-blur-md border border-[color:color-mix(in_srgb,var(--bg-surface)_60%,transparent)] p-4 sm:p-5 md:p-6 flex flex-col gap-4 sm:gap-5"
             data-testid="hero-widget"
           >
             <div
@@ -564,7 +564,7 @@ exports[`Slider hero search > captures hero widget snapshots for desktop, tablet
               Hero form ready
             </div>
             <div
-              class="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 md:auto-rows-fr lg:grid-cols-4 lg:gap-5"
+              class="hero-form-grid grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 md:auto-rows-fr lg:grid-cols-4 lg:gap-5"
             >
               <div
                 class="relative"
@@ -831,9 +831,9 @@ exports[`Slider hero search > captures hero widget snapshots for desktop, tablet
                 </button>
                 <a
                   class="inline-flex items-center justify-center text-sm font-semibold text-text-muted underline-offset-4 transition hover:text-cta-secondary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary whitespace-nowrap"
-                  href="/apartments"
+                  href="/#our-homes"
                 >
-                  Browse listings
+                  Browse all apartments
                 </a>
               </div>
             </div>
@@ -1010,13 +1010,13 @@ exports[`Slider hero search > captures hero widget snapshots for desktop, tablet
     >
       <div
         class="relative isolate overflow-hidden min-h-[75vh] md:min-h-[70vh] flex items-center justify-center bg-cover bg-center bg-no-repeat pt-[calc(var(--nav-height,80px)+1rem)]"
-        style="background-image: url("https://atlashomestorage.blob.core.windows.net/listing-images/fallback.jpeg");"
+        style="background-image: url(https://atlashomestorage.blob.core.windows.net/listing-images/fallback.jpeg);"
       >
         <div
           aria-hidden="true"
           class="pointer-events-none absolute inset-0 opacity-95"
           data-testid="hero-overlay"
-          style="background-color: rgba(3, 6, 14, 0.74); background-image: url("linear-gradient-overlay");"
+          style="background-color: rgba(3, 6, 14, 0.74); background-image: url(linear-gradient-overlay);"
         />
         <div
           class="relative z-10 flex max-w-4xl flex-col items-center gap-7 px-4 pb-12 text-center sm:px-6 md:pt-3"
@@ -1053,7 +1053,7 @@ exports[`Slider hero search > captures hero widget snapshots for desktop, tablet
             </h2>
           </div>
           <form
-            class="w-full max-w-5xl rounded-3xl bg-[color:color-mix(in_srgb,var(--bg-surface)_96%,rgba(3,6,14,0.45))] shadow-[0_20px_60px_rgba(0,0,0,0.45)] backdrop-blur-md border border-[color:color-mix(in_srgb,var(--bg-surface)_60%,transparent)] p-4 sm:p-5 md:p-6 flex flex-col gap-4 sm:gap-5"
+            class="hero-form w-full max-w-5xl rounded-3xl bg-[color:color-mix(in_srgb,var(--bg-surface)_96%,rgba(3,6,14,0.45))] shadow-[0_20px_60px_rgba(0,0,0,0.45)] backdrop-blur-md border border-[color:color-mix(in_srgb,var(--bg-surface)_60%,transparent)] p-4 sm:p-5 md:p-6 flex flex-col gap-4 sm:gap-5"
             data-testid="hero-widget"
           >
             <div
@@ -1064,7 +1064,7 @@ exports[`Slider hero search > captures hero widget snapshots for desktop, tablet
               Hero form ready
             </div>
             <div
-              class="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 md:auto-rows-fr lg:grid-cols-4 lg:gap-5"
+              class="hero-form-grid grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 md:auto-rows-fr lg:grid-cols-4 lg:gap-5"
             >
               <div
                 class="relative"
@@ -1331,9 +1331,9 @@ exports[`Slider hero search > captures hero widget snapshots for desktop, tablet
                 </button>
                 <a
                   class="inline-flex items-center justify-center text-sm font-semibold text-text-muted underline-offset-4 transition hover:text-cta-secondary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary whitespace-nowrap"
-                  href="/apartments"
+                  href="/#our-homes"
                 >
-                  Browse listings
+                  Browse all apartments
                 </a>
               </div>
             </div>

@@ -9,6 +9,8 @@ import { termsSections } from "../content/legal/terms";
 import { useScrollToHash } from "../hooks/useScrollToHash";
 import { CONTACT } from "../config/contact";
 import { buildWaLink, defaultPrefill } from "../utils/whatsapp";
+import FaqHighlights from "../components/faq/FaqHighlights";
+import { faqHighlights } from "../content/faqHighlights";
 
 const FaqPage = () => {
   useScrollToHash();
@@ -39,6 +41,16 @@ const FaqPage = () => {
 
   const sectionNav = grouped.map(({ category }) => ({ id: category.toLowerCase().replace(/\s+/g, "-"), label: category }));
 
+  const faqStructuredData = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faqHighlights.map((item) => ({
+      "@type": "Question",
+      name: item.question,
+      acceptedAnswer: { "@type": "Answer", text: item.answer },
+    })),
+  } as const;
+
   const resolveTitle = (link: { type: "policy" | "terms"; id: string }) => {
     if (link.type === "policy") {
       return policySections.find((p) => p.id === link.id)?.title ?? link.id;
@@ -56,6 +68,7 @@ const FaqPage = () => {
         title="FAQs | Atlas Guest Portal"
         description="Common questions about bookings, payments, check-in, guests, amenities, and deposits."
         url="/faq"
+        jsonLd={faqStructuredData}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6">
@@ -71,6 +84,8 @@ const FaqPage = () => {
               </div>
             </div>
           </div>
+
+          <FaqHighlights />
 
           <div className="space-y-6">
             {grouped.map(({ category, items }) => (

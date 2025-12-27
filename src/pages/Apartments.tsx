@@ -2,6 +2,7 @@ import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import ErrorBoundary from "../components/ErrorBoundary";
+import ErrorLayout from "../components/ErrorLayout";
 import ListingCard from "../components/apartments/ListingCard";
 import ListingFilters from "../components/apartments/ListingFilters";
 import { LOGO_URL } from "../config/branding";
@@ -10,11 +11,18 @@ import { propertyData, propertyImages } from "../data/propertyData";
 import getApiBaseUrl from "../utils/apiBaseUrl";
 import { trackEvent } from "../utils/analytics";
 import { calculateNightlyPrice, inferUnitType, type NightlyPriceBreakdown } from "../utils/pricing";
+import { isAtlasApiRequest, logApiError, monitoredFetch } from "../lib/monitoring";
+import type { UnitType } from "../config/pricing.config";
 
 type PropertyRecord = {
   id: number | string;
+  unitType?: UnitType;
+  unit_type?: UnitType;
+  metadata?: { unitType?: UnitType; unit_type?: UnitType };
+  property_metadata?: { unitType?: UnitType; unit_type?: UnitType };
   property_name?: string;
   property_location?: string;
+  property_neighborhoods?: string[];
   property_price?: number;
   property_rating?: number;
   property_reviews?: number;
@@ -28,6 +36,7 @@ type CombinedListing = {
   id: string;
   name: string;
   location: string;
+  neighborhoods: string[];
   price: number;
   pricingBreakdown: NightlyPriceBreakdown | null;
   rating: number;
@@ -112,10 +121,20 @@ const sanitizeListings = (listingsInput: unknown): Listing[] => {
     }
 
     return listingsInput
-      .map((listing) => ({
-        ...listing,
-        id: String((listing as Listing | { id?: string }).id || ""),
-      }))
+      .map((listing) => {
+        const unitType = inferUnitType({
+          ...listing,
+          name: (listing as Listing).title ?? (listing as { name?: string }).name,
+          unitType: (listing as Listing).unitType ?? (listing as { unit_type?: UnitType }).unit_type,
+          metadata: (listing as { metadata?: { unitType?: UnitType; unit_type?: UnitType } }).metadata,
+        });
+
+        return {
+          ...listing,
+          unitType,
+          id: String((listing as Listing | { id?: string }).id || ""),
+        } satisfies Listing;
+      })
       .filter((listing) => Boolean(listing.id));
   } catch (error) {
     console.error("Error processing LISTINGS:", error);
@@ -141,35 +160,38 @@ const sanitizeProperties = (propertiesInput: unknown): PropertyRecord[] => {
     }
 
     return propertiesInput.map((property) => {
-      const safeProperty = {
-        id: String((property as PropertyRecord).id || ""),
-        property_name: (property as PropertyRecord)?.property_name || `Property ${(property as PropertyRecord)?.id || ""}`,
-        property_location: (property as PropertyRecord)?.property_location || "Hyderabad",
-        property_description:
-          (property as PropertyRecord)?.property_description || "A comfortable place to stay",
-        property_price:
-          typeof (property as PropertyRecord)?.property_price === "number"
-            ? (property as PropertyRecord).property_price
-            : 0,
-        property_rating:
-          typeof (property as PropertyRecord)?.property_rating === "number"
-            ? (property as PropertyRecord).property_rating
-            : 0,
-        property_reviews:
-          typeof (property as PropertyRecord)?.property_reviews === "number"
-            ? (property as PropertyRecord).property_reviews
-            : 0,
-        property_img: Array.isArray((property as PropertyRecord)?.property_img)
-          ? (property as PropertyRecord).property_img
+      const baseProperty = property as PropertyRecord;
+      const safeProperty: PropertyRecord = {
+        id: String(baseProperty.id || ""),
+        property_name: baseProperty?.property_name || `Property ${baseProperty?.id || ""}`,
+        property_location: baseProperty?.property_location || "Hyderabad",
+        property_neighborhoods: Array.isArray(baseProperty?.property_neighborhoods)
+          ? baseProperty.property_neighborhoods
           : [],
-        property_amenities: Array.isArray((property as PropertyRecord)?.property_amenities)
-          ? (property as PropertyRecord).property_amenities
-          : [],
-        property_policy_details: Array.isArray((property as PropertyRecord)?.property_policy_details)
-          ? (property as PropertyRecord).property_policy_details
+        property_description: baseProperty?.property_description || "A comfortable place to stay",
+        property_price: typeof baseProperty?.property_price === "number" ? baseProperty.property_price : 0,
+        property_rating: typeof baseProperty?.property_rating === "number" ? baseProperty.property_rating : 0,
+        property_reviews: typeof baseProperty?.property_reviews === "number" ? baseProperty.property_reviews : 0,
+        property_img: Array.isArray(baseProperty?.property_img) ? baseProperty.property_img : [],
+        property_amenities: Array.isArray(baseProperty?.property_amenities) ? baseProperty.property_amenities : [],
+        property_policy_details: Array.isArray(baseProperty?.property_policy_details)
+          ? baseProperty.property_policy_details
           : [],
         ...property,
       } satisfies PropertyRecord;
+
+      const metadataUnitType =
+        baseProperty?.unitType ??
+        baseProperty?.unit_type ??
+        baseProperty?.metadata?.unitType ??
+        baseProperty?.metadata?.unit_type ??
+        baseProperty?.property_metadata?.unitType ??
+        baseProperty?.property_metadata?.unit_type;
+
+      safeProperty.unitType =
+        typeof metadataUnitType === "string" && metadataUnitType.trim()
+          ? metadataUnitType
+          : inferUnitType(safeProperty);
 
       if (!safeProperty.property_img || safeProperty.property_img.length === 0) {
         safeProperty.property_img = [LOGO_URL];
@@ -183,7 +205,7 @@ const sanitizeProperties = (propertiesInput: unknown): PropertyRecord[] => {
   }
 };
 
-const Apartments = () => {
+export const Apartments = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -199,13 +221,14 @@ const Apartments = () => {
   const safeProperties = React.useMemo(() => sanitizeProperties(propertiesSource), [propertiesSource]);
 
   const logStructuredError = React.useCallback(
-    (details: { url: string; status?: number; responseSnippet?: string }) => {
-      console.error({
-        page: "apartments",
+    (details: { url: string; status?: number; responseSnippet?: string; category?: "http" | "network" }) => {
+      logApiError(new Error("Apartments API request failed"), {
         url: details.url,
         status: details.status,
+        method: "GET",
         responseSnippet: details.responseSnippet,
-        apiBaseUrlUsed,
+        category: details.category ?? "http",
+        tags: { page: "apartments", apiBaseUrlUsed, atlasApi: String(isAtlasApiRequest(details.url)) },
       });
     },
     [apiBaseUrlUsed],
@@ -215,13 +238,13 @@ const Apartments = () => {
     async <T,>(baseUrl: string, path: string): Promise<T | null> => {
       const url = buildApiUrl(baseUrl, path);
       try {
-        const response = await fetch(url);
+        const response = await monitoredFetch(url, { requestName: path });
         const text = await response.text();
         const snippet = text.slice(0, 200);
 
         if (!response.ok) {
-          logStructuredError({ url, status: response.status, responseSnippet: snippet });
-          throw new Error(`Request failed with status ${response.status}`);
+          logStructuredError({ url, status: response.status, responseSnippet: snippet, category: "http" });
+          throw new Error("We are unable to load apartments right now. Please try again shortly.");
         }
 
         try {
@@ -232,9 +255,9 @@ const Apartments = () => {
         }
       } catch (error) {
         if (!(error instanceof Error)) {
-          logStructuredError({ url, responseSnippet: String(error) });
+          logStructuredError({ url, responseSnippet: String(error), category: "network" });
         } else {
-          logStructuredError({ url, responseSnippet: error.message });
+          logStructuredError({ url, responseSnippet: error.message, category: "network" });
         }
         throw error;
       }
@@ -356,10 +379,11 @@ const Apartments = () => {
         try {
           const property = safeProperties.find(
             (item) => String(item.id) === String(listing.id)
-          ) || { 
+          ) || {
             id: listing.id,
             property_name: listing.title,
             property_location: 'Hyderabad',
+            property_neighborhoods: [],
             property_price: 0,
             property_rating: 0,
             property_reviews: 0,
@@ -371,6 +395,7 @@ const Apartments = () => {
           const images = property.property_img || propertyImages?.[String(listing.id)] || [LOGO_URL];
           const name = property.property_name || listing.title || `Property ${listing.id}`;
           const location = property.property_location || listing.subtitle || "Hyderabad";
+          const neighborhoods = property.property_neighborhoods ?? [];
           const pricing = computeNightlyPrice(property);
           const price = pricing?.finalNightlyPrice ?? 0;
 
@@ -378,6 +403,7 @@ const Apartments = () => {
             id: String(listing.id),
             name,
             location,
+            neighborhoods,
             price,
             pricingBreakdown: pricing,
             rating: property.property_rating || 0,
@@ -488,7 +514,7 @@ const Apartments = () => {
         propertyType,
         petFriendlyOnly,
       },
-      { route: "/apartments" },
+      { route: "/#our-homes" },
     );
   }, [filteredListings.length, sortBy, guests, minPrice, maxPrice, propertyType, petFriendlyOnly, checkIn, checkOut]);
 
@@ -504,33 +530,26 @@ const Apartments = () => {
     return { displayCheckIn, displayCheckOut };
   }, [checkIn, checkOut]);
 
-  const statusCard = statusMessage ? (
-    <div className="rounded-2xl bg-bg-surface p-4 shadow-level1 border border-border-subtle">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="text-left">
-          <p className="text-base font-semibold text-text-primary">{statusMessage}</p>
-          {apiBaseUrlUsed && (
-            <p className="text-xs text-text-muted">Using: {apiBaseUrlUsed}</p>
-          )}
-        </div>
-        <div className="flex gap-3 flex-wrap items-center">
-          {fetchState === "loading" && (
-            <span className="text-sm text-text-muted">Refreshing listings…</span>
-          )}
-          <button
-            type="button"
-            onClick={fetchData}
-            className="px-5 py-2 rounded-full border border-border-subtle text-text-primary hover:bg-bg-muted transition-colors"
-            disabled={fetchState === "loading"}
-          >
-            {fetchState === "loading" ? "Retrying..." : "Retry"}
-          </button>
-        </div>
-      </div>
-    </div>
-  ) : null;
-
   const shouldShowEmptyState = !safeListings || safeListings.length === 0;
+
+  if (fetchState === "error") {
+    return (
+      <main className="bg-bg-muted py-10">
+        <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 md:px-8">
+          <ErrorLayout
+            title="We couldn’t load this page"
+            description={statusMessage ?? "We’re having trouble loading apartments right now. Please try again."}
+            primaryAction={{ label: "Try again", onClick: fetchData, disabled: fetchState === "loading" }}
+            secondaryAction={{ label: "Back to home", href: "/" }}
+          >
+            {apiBaseUrlUsed && (
+              <p className="text-sm text-text-muted">Attempted to reach: {apiBaseUrlUsed}</p>
+            )}
+          </ErrorLayout>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="bg-bg-muted py-10">
@@ -543,8 +562,6 @@ const Apartments = () => {
             Browse our curated apartments and penthouses, complete with clear pricing and trusted ratings.
           </p>
         </header>
-
-        {statusCard}
 
         {shouldShowEmptyState ? (
           <div className="rounded-2xl bg-bg-surface p-8 text-center shadow-level1 border border-border-subtle">
@@ -621,6 +638,7 @@ const Apartments = () => {
                   id={listing.id}
                   name={listing.name}
                   location={listing.location}
+                  neighborhoods={listing.neighborhoods}
                   image={listing.image}
                   price={listing.price}
                   pricingBreakdown={listing.pricingBreakdown}

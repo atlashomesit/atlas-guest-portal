@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { resolveOptimizedAsset } from '../../../utils/resolveOptimizedAsset';
 import { MdOutlineDone } from 'react-icons/md';
+import OptimizedImage from '../../ui/OptimizedImage';
 // import { FaArrowRightLong } from 'react-icons/fa6';
 // import { Link } from 'react-router-dom';
 
@@ -58,13 +58,21 @@ const Homepage_WhyChoose = () => {
                     {/* Left Side - Images */}
                     <div className="flex-1 relative">
                         <div className="relative z-10 rounded-xl overflow-hidden shadow-2xl transform transition duration-500 hover:-translate-y-2">
-                            <img src={featureData.images[0]} alt="Luxury accommodation" className="w-full h-80 lg:h-96 object-cover" />
+                            <OptimizedImage
+                                src={featureData.images[0]}
+                                alt="Luxury accommodation"
+                                className="w-full h-full object-cover"
+                                wrapperClassName="w-full h-80 lg:h-96"
+                                sizes="(max-width: 1024px) 100vw, 45vw"
+                            />
                             <div className="absolute inset-0 bg-accent-primary/10 mix-blend-multiply"></div>
                         </div>
-                        <img
+                        <OptimizedImage
                             src={featureData.images[1]}
                             alt="Garden swing area"
-                            className="w-56 sm:w-64 absolute -bottom-8 -right-6 sm:right-0 lg:-right-8 rounded-xl shadow-2xl object-cover border-4 border-[color:var(--bg-surface)] z-20 transition duration-500 hover:scale-105"
+                            className="w-full h-full object-cover"
+                            wrapperClassName="w-56 sm:w-64 absolute -bottom-8 -right-6 sm:right-0 lg:-right-8 rounded-xl shadow-2xl border-4 border-[color:var(--bg-surface)] z-20 transition duration-500 hover:scale-105"
+                            sizes="(max-width: 1024px) 50vw, 28vw"
                         />
                     </div>
 

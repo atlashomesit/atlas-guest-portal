@@ -1,16 +1,22 @@
 // BookingCard.tsx
 import { useState, useRef, useEffect, useMemo, useId } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { format, addDays, startOfDay } from 'date-fns';
+import { API_BASE_URL, IS_API_BASE_CONFIGURED } from '@/config/api';
 import { api, asArray } from '@/lib/api';
 import { propertyData } from '../../../data';
 import { inlinePolicySnippets } from '../../../content/terms';
 import { baseGuestAllowance, getUnitPolicy } from '../../../config/policyConfig';
 import { trackEvent } from '../../../utils/analytics';
+import pricingConfig from '../../../config/pricing.config';
 import { calculateNightlyPrice, inferUnitType } from '../../../utils/pricing';
 import { priceDisplayConfig } from '../../../config/priceDisplay.config';
 import { bookingWidgetLayoutFlag } from '../../../config/abFlags';
 import { FaUserFriends, FaCreditCard, FaCcVisa, FaCcMastercard } from 'react-icons/fa';
 import { SiGooglepay, SiRazorpay } from 'react-icons/si';
+import { toast } from 'react-toastify';
+import { logApiError, logUserAction, reportError } from '../../../lib/monitoring';
+import { useBooking } from '../../../contexts/BookingContext';
 
 import 'react-date-range/dist/styles.css';
 import 'react-date-range/dist/theme/default.css';
@@ -32,7 +38,7 @@ interface BookingCardProps {
 
 export type GuestCountKey = 'adults' | 'children' | 'infants' | 'pets';
 
-export const guestLimits: Record<GuestCountKey, { min: number; max?: number }> = {
+export const defaultGuestLimits: Record<GuestCountKey, { min: number; max?: number }> = {
   adults: { min: 0, max: 10 },
   children: { min: 0, max: 10 },
   infants: { min: 0, max: 2 },
@@ -52,6 +58,9 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
   const defaultStartDate = today; // Allow booking from today
   const defaultEndDate = addDays(today, 1);
   const isLayoutExperimentEnabled = bookingWidgetLayoutFlag();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { updateBooking } = useBooking();
 
   const [openCalendar, setOpenCalendar] = useState(false);
   const [openGuests, setOpenGuests] = useState(false);
@@ -96,11 +105,44 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
   const [userEmail, setUserEmail] = useState<string>('');
   const [userPhone, setUserPhone] = useState<string>('');
 
+  const isTestContactValue = (value: string) => {
+    const trimmed = value.trim();
+    return trimmed === 'test@example.com' || trimmed === '9999999999';
+  };
+
+  const sanitizeStoredContact = (
+    value: string | null,
+    key: 'atlas_user_email' | 'atlas_user_phone',
+  ) => {
+    if (!value) return '';
+    const trimmed = value.trim();
+
+    if (!trimmed || isTestContactValue(trimmed)) {
+      try {
+        localStorage.removeItem(key);
+      } catch (error) {
+        console.warn('Unable to clear invalid stored contact info', error);
+      }
+      return '';
+    }
+
+    return trimmed;
+  };
+
   // Load saved email and phone from localStorage on mount
   useEffect(() => {
     try {
-      const savedEmail = localStorage.getItem('atlas_user_email');
-      const savedPhone = localStorage.getItem('atlas_user_phone');
+      const sessionInitialized = sessionStorage.getItem('atlas_contact_session_initialized');
+      if (!sessionInitialized) {
+        sessionStorage.setItem('atlas_contact_session_initialized', 'true');
+        localStorage.removeItem('atlas_user_email');
+        localStorage.removeItem('atlas_user_phone');
+        return;
+      }
+
+      const savedEmail = sanitizeStoredContact(localStorage.getItem('atlas_user_email'), 'atlas_user_email');
+      const savedPhone = sanitizeStoredContact(localStorage.getItem('atlas_user_phone'), 'atlas_user_phone');
+
       if (savedEmail) setUserEmail(savedEmail);
       if (savedPhone) setUserPhone(savedPhone);
     } catch (error) {
@@ -111,7 +153,9 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
   const property = propertyData.find((p) => p.id === Number(propertyId));
   const unitType = inferUnitType({ id: property?.id, property_name: property?.property_name });
 
+  const getTotalGuests = (counts: GuestCounts) => counts.adults + counts.children + counts.infants;
   const totalPeople = guests.adults + guests.children;
+  const totalGuests = getTotalGuests(guests);
   const oneDay = 24 * 60 * 60 * 1000;
 
   const nightlyBreakdown = useMemo(() => {
@@ -166,6 +210,31 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
   const priceBadgeClass = hasSpecialPricing
     ? 'inline-flex items-center rounded-full bg-[color:var(--bg-muted)] px-3 py-1 text-xs font-semibold text-cta-primary text-center'
     : 'inline-flex items-center rounded-full bg-[color:color-mix(in_srgb,var(--cta-primary)_12%,transparent)] px-3 py-1 text-xs font-semibold text-cta-primary text-center';
+  const propertyMaxCapacity =
+    property?.maxCapacity ??
+    pricingConfig.maxGuestsByUnitType?.[unitType] ??
+    defaultGuestLimits.adults.max ??
+    10;
+  const propertyExtraGuestFee =
+    property?.extraGuestFee ?? pricingConfig.extraGuestFeeByUnitType?.[unitType] ?? 0;
+  const formattedExtraGuestFee = useMemo(
+    () => new Intl.NumberFormat('en-IN').format(propertyExtraGuestFee),
+    [propertyExtraGuestFee],
+  );
+
+  const propertyGuestLimits = useMemo(
+    () => ({
+      adults: { ...defaultGuestLimits.adults, max: propertyMaxCapacity },
+      children: { ...defaultGuestLimits.children, max: propertyMaxCapacity },
+      infants: {
+        ...defaultGuestLimits.infants,
+        max: Math.min(defaultGuestLimits.infants.max ?? propertyMaxCapacity, propertyMaxCapacity),
+      },
+      pets: defaultGuestLimits.pets,
+    }),
+    [propertyMaxCapacity],
+  );
+
   const extraGuestsCount = Math.max(0, totalPeople - baseGuestAllowance);
   const totalExtraGuestCharges = nightlyBreakdown.reduce((sum, night) => sum + night.breakdown.extraGuestFee, 0);
 
@@ -189,8 +258,13 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
   const [termsAcceptedAt, setTermsAcceptedAt] = useState<string | null>(null);
   const [hasInteractedWithDates, setHasInteractedWithDates] = useState(false);
   const [inlineStatus, setInlineStatus] = useState('');
+  const [dateError, setDateError] = useState<string | null>(null);
   const [ctaConfirmation, setCtaConfirmation] = useState<string | null>(null);
   const [isInlineChecking, setIsInlineChecking] = useState(false);
+  const [availabilityStatus, setAvailabilityStatus] = useState<'idle' | 'checking' | 'available'>('idle');
+  const [formErrors, setFormErrors] = useState<{ email?: string; phone?: string; dates?: string; guests?: string; terms?: string }>(
+    {},
+  );
   const bookingEngagementRef = useRef(false);
   const bookingDropoffTrackedRef = useRef(false);
   const latestPaymentStateRef = useRef(paymentStatus.state);
@@ -203,6 +277,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     const loadRazorpay = () => {
       if (window.Razorpay) {
         setIsRazorpayReady(true);
+        logUserAction('payment_gateway_cached', { provider: 'razorpay', propertyId });
         return;
       }
 
@@ -211,10 +286,22 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
       script.async = true;
       script.onload = () => {
         setIsRazorpayReady(true);
+        logUserAction('payment_gateway_loaded', { provider: 'razorpay', propertyId });
       };
       script.onerror = () => {
         console.error('Failed to load Razorpay script');
         setIsRazorpayReady(false);
+        setPaymentStatus({
+          state: 'failure',
+          reason: 'Payment setup unavailable. Please refresh to retry.',
+        });
+        setCtaConfirmation('Payment setup unavailable. Please refresh to retry.');
+        logApiError(new Error('Failed to load Razorpay script'), {
+          url: script.src,
+          method: 'GET',
+          category: 'network',
+          tags: { provider: 'razorpay', surface: 'booking_form' },
+        });
       };
       document.body.appendChild(script);
 
@@ -252,23 +339,32 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     markEngagement();
     const { startDate, endDate } = ranges.selection;
     setHasInteractedWithDates(true);
-    setInlineStatus('Dates updated for your stay.');
     const normalizedStart = startDate ? startOfDay(startDate) : defaultStartDate;
     const normalizedEnd = endDate ? startOfDay(endDate) : defaultEndDate;
-    // Allow today to be selected (normalizedStart >= today)
-    const effectiveStartDate = normalizedStart < today ? today : normalizedStart;
-    let resolvedEndDate = normalizedEnd <= effectiveStartDate ? addDays(effectiveStartDate, 1) : normalizedEnd;
+
+    let effectiveStartDate = normalizedStart;
+    let resolvedEndDate = normalizedEnd;
+    let errorMessage: string | null = null;
+
+    if (normalizedStart < today) {
+      effectiveStartDate = today;
+      errorMessage = 'Check-in cannot be in the past.';
+    }
+
+    if (normalizedEnd <= effectiveStartDate) {
+      resolvedEndDate = addDays(effectiveStartDate, 1);
+      errorMessage = 'Check-out must be at least 1 night after check-in.';
+    }
 
     if (startDate && endDate) {
-      if (effectiveStartDate.getTime() === normalizedEnd.getTime()) {
-        resolvedEndDate = addDays(effectiveStartDate, 1);
-      }
-
       setDates({
         startDate: effectiveStartDate,
         endDate: resolvedEndDate,
         key: 'selection',
       });
+
+      setDateError(errorMessage);
+      setInlineStatus(errorMessage ?? 'Dates updated for your stay.');
 
       trackEvent(
         'booking_dates_changed',
@@ -279,6 +375,13 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         },
         { propertyId, listingId: propertyId, unitCode: propertyId },
       );
+
+      logUserAction('booking_dates_selected', {
+        propertyId,
+        startDate: effectiveStartDate.toISOString(),
+        endDate: resolvedEndDate.toISOString(),
+        nights: Math.max(1, Math.round(Math.abs((resolvedEndDate.getTime() - effectiveStartDate.getTime()) / oneDay))),
+      });
 
       const selectedNights = Math.max(
         1,
@@ -325,13 +428,40 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
   useEffect(() => {
     const fetchBookedDates = async () => {
       setIsBookedDatesLoading(true);
+
+      const requestUrl = `${API_BASE_URL ?? ''}/bookings`;
+      const tags = { surface: 'booking_form', propertyId: String(propertyId) };
+      const envMode = (import.meta as any)?.env?.MODE ?? 'unknown';
+
+      const useMockBookings = !IS_API_BASE_CONFIGURED && envMode !== 'production';
+
+      logUserAction('booking_availability_fetch_start', {
+        apiBaseConfigured: IS_API_BASE_CONFIGURED,
+        requestUrl,
+        envMode,
+        propertyId,
+      });
+
       try {
+        if (!IS_API_BASE_CONFIGURED && envMode === 'production') {
+          throw new Error('API base URL is not configured for availability checks');
+        }
+
+        if (useMockBookings) {
+          console.info('[BookingCard] Using mock bookings for development');
+          setBookedDates([]);
+          setInlineStatus('Using demo availability. Configure the API base URL to view live bookings.');
+          logUserAction('booking_availability_fetch_mock', { propertyId, envMode });
+          return;
+        }
+
         // Fetch all bookings from API
         const response = await api.get('/bookings');
         const allBookings = asArray(response.data, 'bookings');
 
         console.log('[BookingCard] ===== FETCHING BOOKINGS =====');
         console.log('[BookingCard] PropertyId:', propertyId);
+        console.log('[BookingCard] API Base:', API_BASE_URL);
         console.log('[BookingCard] Total bookings from API:', allBookings.length);
 
         // Extract number from propertyId to match with API listing numbers
@@ -340,22 +470,22 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         const targetNumber = String(propertyId);
 
         console.log('[BookingCard] Looking for property number:', targetNumber);
-        console.log('[BookingCard] Sample bookings listing values:', 
+        console.log('[BookingCard] Sample bookings listing values:',
           allBookings.slice(0, 10).map((b: any) => ({ id: b.id, listing: b.listing })));
 
         // Filter bookings by extracting number from API listing and comparing with propertyId
         const filteredBookings = allBookings.filter((booking: any) => {
           const bookingListing = String(booking.listing).trim();
-          
+
           // Extract number from API listing (e.g., "Atlas301" -> "301", "Atlas501_PH" -> "501")
           const numberMatch = bookingListing.match(/(\d+)/);
           if (!numberMatch) {
             return false;
           }
-          
+
           const bookingNumber = numberMatch[1];
           const matches = bookingNumber === targetNumber;
-          
+
           if (matches) {
             console.log('[BookingCard] ✓ Matched booking:', {
               id: booking.id,
@@ -375,7 +505,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         // Today is only blocked if it falls within a booking range
         const blockedDates: Date[] = [];
         const todayDate = startOfDay(new Date());
-        
+
         filteredBookings.forEach((booking: any) => {
           if (!booking.checkinDate || !booking.checkoutDate) {
             console.warn('[BookingCard] Missing dates in booking:', booking);
@@ -387,9 +517,9 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
 
           // Validate dates
           if (isNaN(checkinDate.getTime()) || isNaN(checkoutDate.getTime())) {
-            console.warn('[BookingCard] Invalid dates:', { 
-              checkin: booking.checkinDate, 
-              checkout: booking.checkoutDate 
+            console.warn('[BookingCard] Invalid dates:', {
+              checkin: booking.checkinDate,
+              checkout: booking.checkoutDate
             });
             return;
           }
@@ -404,22 +534,22 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
           // Today is only blocked if: today >= checkinDate AND today < checkoutDate
           const datesForThisBooking: Date[] = [];
           let currentDate = new Date(checkinDate);
-          
+
           while (currentDate < checkoutDate) {
             const dateToBlock = startOfDay(new Date(currentDate));
-            
+
             // Only block if date is today or in the future (skip past dates)
             // This ensures today is only blocked if it's actually in the booking range
             if (dateToBlock >= todayDate) {
               datesForThisBooking.push(dateToBlock);
               blockedDates.push(dateToBlock);
             }
-            
+
             currentDate.setDate(currentDate.getDate() + 1);
           }
 
-          console.log(`  Blocked dates (today and future only): ${datesForThisBooking.map(d => format(d, 'dd-MM-yyyy')).join(', ')}`);
-          
+          console.log(`  Blocked dates (today and future only): ${datesForThisBooking.map(d => format(d, 'dd-MM-yyyy')).join(',')}`);
+
           // Check if today is in this booking
           const todayIsInBooking = todayDate >= checkinDate && todayDate < checkoutDate;
           if (todayIsInBooking) {
@@ -441,12 +571,27 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         console.log('[BookingCard] Blocked dates:', uniqueBlocked.map(d => format(d, 'dd-MM-yyyy')).join(', '));
         console.log('[BookingCard] ========================');
 
+        logUserAction('booking_availability_fetch_success', {
+          propertyId,
+          bookingCount: filteredBookings.length,
+          apiBase: API_BASE_URL,
+        });
+
+        setInlineStatus('Availability refreshed. Review the latest pricing and dates below.');
         setBookedDates(uniqueBlocked);
       } catch (error) {
         console.error('Failed to fetch booked dates:', error);
+        logApiError(error, {
+          url: requestUrl,
+          method: 'GET',
+          category: 'network',
+          tags,
+        });
+        setInlineStatus('We could not refresh availability. Please refresh the page or try again shortly.');
         setBookedDates([]);
       } finally {
         setIsBookedDatesLoading(false);
+        logUserAction('booking_availability_fetch_end', { propertyId, apiBase: API_BASE_URL });
       }
     };
 
@@ -525,12 +670,17 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
   const modifyGuest = (type: GuestCountKey, increment: boolean) => {
     markEngagement();
     setGuests((prev) => {
-      const min = guestLimits[type].min ?? 0;
-      const max = guestLimits[type].max;
+      const min = propertyGuestLimits[type].min ?? 0;
+      const max = propertyGuestLimits[type].max;
       const proposedValue = prev[type] + (increment ? 1 : -1);
+
+      const proposedCounts = { ...prev, [type]: proposedValue } as GuestCounts;
+      const exceedsCapacity =
+        type !== 'pets' && increment && getTotalGuests(proposedCounts) > propertyMaxCapacity;
 
       if (!increment && proposedValue < min) return prev;
       if (increment && typeof max === 'number' && proposedValue > max) return prev;
+      if (exceedsCapacity) return prev;
 
       const nextValue =
         typeof max === 'number'
@@ -550,10 +700,22 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     });
   };
 
-  const isAtMin = (type: GuestCountKey) => guests[type] <= (guestLimits[type].min ?? 0);
-  const isAtMax = (type: GuestCountKey) =>
-    typeof guestLimits[type].max === 'number' &&
-    guests[type] >= (guestLimits[type].max ?? Number.MAX_SAFE_INTEGER);
+  const isAtMin = (type: GuestCountKey) => guests[type] <= (propertyGuestLimits[type].min ?? 0);
+  const isAtMax = (type: GuestCountKey) => {
+    if (type === 'pets') {
+      return (
+        typeof propertyGuestLimits[type].max === 'number' &&
+        guests[type] >= (propertyGuestLimits[type].max ?? Number.MAX_SAFE_INTEGER)
+      );
+    }
+
+    const hitsTypeMax =
+      typeof propertyGuestLimits[type].max === 'number' &&
+      guests[type] >= (propertyGuestLimits[type].max ?? Number.MAX_SAFE_INTEGER);
+    const hitsCapacity = totalGuests >= propertyMaxCapacity;
+
+    return hitsTypeMax || hitsCapacity;
+  };
 
   const primaryCtaLabel = hasSelection && termsAccepted ? 'Book now' : 'Check availability';
   const inlineCtaLabel = hasSelection ? 'Check availability' : 'Select dates';
@@ -561,13 +723,17 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
   const guestNeedsAdult = guests.adults < 1;
   const containerPaddingBottom = supportPadding ? 'pb-40' : 'pb-28';
   const validationMessageId = useId();
+  const dateErrorId = useId();
   const checkOutErrorId = useId();
   const guestErrorId = useId();
+  const capacityMessage = `Maximum capacity: ${propertyMaxCapacity} guests. Extra guests ₹${formattedExtraGuestFee} per additional guest.`;
   const validationMessage = useMemo(() => {
-    if (isCheckoutInvalid) return 'Check-out must be after check-in.';
+    if (dateError) return dateError;
+    if (isCheckoutInvalid) return 'Check-out must be at least 1 night after check-in.';
     if (guestNeedsAdult) return 'Add at least one adult.';
+    if (totalGuests >= propertyMaxCapacity) return capacityMessage;
     return '';
-  }, [guestNeedsAdult, isCheckoutInvalid]);
+  }, [dateError, guestNeedsAdult, isCheckoutInvalid]);
   const inlineCtaDisabled = !hasSelection || isCheckoutInvalid;
   const liveRegionMessage =
     validationMessage ||
@@ -579,14 +745,20 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
       ? paymentStatus.reason
       : '');
   const fieldGridClass = isLayoutExperimentEnabled
-    ? 'grid grid-cols-1 items-stretch gap-3 p-3 sm:grid-cols-2 lg:]'
-    : 'grid grid-cols-1 items-stretch gap-3 p-3 md:grid-cols-4';
+    ? 'grid grid-cols-1 items-stretch gap-3 p-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-4'
+    : 'grid grid-cols-1 items-stretch gap-3 p-3 md:grid-cols-4 lg:gap-4';
   const fieldButtonClass =
     'group flex h-full min-h-[4.5rem] flex-col justify-center rounded-xl border border-border-subtle bg-bg-surface/70 px-4 text-left text-text-primary shadow-inner transition hover:border-border-strong hover:bg-bg-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary';
   const helperTextClass = 'mt-1 text-xs font-semibold text-text-muted leading-snug';
 
   const handleInlineCta = () => {
     markEngagement();
+    logUserAction('booking_inline_cta_clicked', {
+      propertyId,
+      hasSelection,
+      nights,
+      guests: totalPeople,
+    });
     setHasInteractedWithDates(true);
     setIsInlineChecking(true);
     setOpenCalendar(false);
@@ -608,8 +780,114 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     }, 650);
   };
 
-  const initiatePayment = () => {
+  const validateForm = (autoEmail: string, autoPhone: string) => {
+    const errors: typeof formErrors = {};
+
+    if (!hasSelection || isCheckoutInvalid) {
+      errors.dates = 'Select valid check-in and check-out dates.';
+    }
+
+    if (guestNeedsAdult) {
+      errors.guests = 'Add at least one adult.';
+    }
+
+    if (totalGuests > propertyMaxCapacity) {
+      errors.guests = capacityMessage;
+    }
+
+    if (!autoEmail || !autoEmail.includes('@')) {
+      errors.email = 'Enter a valid email address.';
+    }
+
+    if (!autoPhone || autoPhone.trim().length < 10) {
+      errors.phone = 'Enter a valid phone number (at least 10 digits).';
+    }
+
+    if (!termsAccepted) {
+      errors.terms = 'Please confirm the Terms & Conditions.';
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const prefillBookingContext = () => {
+    updateBooking({
+      propertyId,
+      checkIn: dates.startDate.toISOString(),
+      checkOut: dates.endDate.toISOString(),
+      guests: totalGuests,
+    });
+  };
+
+  const handleCheckoutNavigation = () => {
+    const isValid = validateForm(userEmail, userPhone);
+    if (!isValid) {
+      setCtaConfirmation('Update the highlighted fields before continuing to checkout.');
+      return;
+    }
+
+    prefillBookingContext();
+
+    const proceed = window.confirm('Proceed to checkout to reserve this stay?');
+    if (!proceed) {
+      setCtaConfirmation('Checkout cancelled. You can adjust your details and try again.');
+      return;
+    }
+
+    navigate('/reserve', { state: { from: location.pathname } });
+  };
+
+  const performAvailabilityCheck = async () => {
+    setAvailabilityStatus('checking');
+    setCtaConfirmation('Checking availability...');
+
+    try {
+      const response = await api.get('/bookings');
+      const allBookings = asArray(response.data, 'bookings');
+      const targetNumber = String(propertyId);
+
+      const selectionStart = startOfDay(new Date(dates.startDate));
+      const selectionEnd = startOfDay(new Date(dates.endDate));
+
+      const hasConflict = allBookings.some((booking: any) => {
+        const bookingListing = String(booking.listing).trim();
+        const numberMatch = bookingListing.match(/(\d+)/);
+        if (!numberMatch || numberMatch[1] !== targetNumber) return false;
+
+        const checkinDate = startOfDay(new Date(booking.checkin_date || booking.checkinDate));
+        const checkoutDate = startOfDay(new Date(booking.checkout_date || booking.checkoutDate));
+
+        return selectionStart < checkoutDate && selectionEnd > checkinDate;
+      });
+
+      return !hasConflict;
+    } catch (error) {
+      const isNetworkIssue = error instanceof TypeError;
+      setCtaConfirmation(isNetworkIssue ? 'Connection error. Please try again.' : 'System error. Please contact support.');
+      setAvailabilityStatus('idle');
+      setIsLoading(false);
+      return false;
+    }
+  };
+
+  const startPayment = (autoEmail: string, autoPhone: string) => {
+    if (!termsAccepted) {
+      setPaymentStatus({ state: 'failure', reason: 'Please accept the Terms & Conditions to continue.' });
+      setFormErrors((current) => ({ ...current, terms: 'Please confirm the Terms & Conditions.' }));
+      setCtaConfirmation('Please confirm the Terms & Conditions.');
+      setIsLoading(false);
+      return;
+    }
+
     markEngagement();
+    logUserAction('booking_form_submitted', {
+      propertyId,
+      nights,
+      guests: totalPeople,
+      hasSelection,
+      termsAccepted,
+    });
     trackEvent(
       'reserve_click',
       {
@@ -634,26 +912,6 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     );
     setCtaConfirmation('Launching secure checkout...');
 
-    if (!termsAccepted) {
-      alert('Please confirm the Terms & Conditions before reserving.');
-      return;
-    }
-
-    // Validate email and phone from input fields
-    const autoEmail = userEmail.trim();
-    const autoPhone = userPhone.trim();
-
-    if (!autoEmail || !autoEmail.includes('@')) {
-      alert('Please enter a valid email address.');
-      return;
-    }
-
-    if (!autoPhone || autoPhone.trim().length < 10) {
-      alert('Please enter a valid phone number (at least 10 digits).');
-      return;
-    }
-
-    setIsLoading(true);
     setPaymentStatus({ state: 'idle' });
 
     const acceptedAt = termsAcceptedAt || new Date().toISOString();
@@ -680,10 +938,25 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
 
     // Check if Razorpay is loaded
     if (!window.Razorpay || !isRazorpayReady) {
-      alert('Payment system is loading. Please try again in a moment.');
+      logApiError(new Error('Payment gateway unavailable'), {
+        url: 'https://checkout.razorpay.com/v1/checkout.js',
+        method: 'GET',
+        category: 'network',
+        tags: { provider: 'razorpay', surface: 'booking_form' },
+      });
+      toast.error('Payment system is still loading. Please try again in a moment.');
+      setPaymentStatus({ state: 'failure', reason: 'Payment setup unavailable. Please retry shortly.' });
+      setCtaConfirmation('Payment setup unavailable. Please retry shortly.');
       setIsLoading(false);
       return;
     }
+
+    logUserAction('payment_gateway_initializing', {
+      provider: 'razorpay',
+      bookingId,
+      propertyId,
+      total: totalPrice,
+    });
 
     // Store booking details in sessionStorage for post-payment handling
     try {
@@ -702,8 +975,11 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         
         // Also save email and phone to localStorage for future bookings
         try {
-          if (autoEmail) localStorage.setItem('atlas_user_email', autoEmail);
-          if (autoPhone) localStorage.setItem('atlas_user_phone', autoPhone);
+          const safeEmail = autoEmail && !isTestContactValue(autoEmail) ? autoEmail : '';
+          const safePhone = autoPhone && !isTestContactValue(autoPhone) ? autoPhone : '';
+
+          if (safeEmail) localStorage.setItem('atlas_user_email', safeEmail.trim());
+          if (safePhone) localStorage.setItem('atlas_user_phone', safePhone.trim());
         } catch (error) {
           console.warn('Unable to save user contact info', error);
         }
@@ -711,9 +987,27 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
       console.warn('Unable to store booking details', error);
     }
 
-    // Razorpay Key ID - Get from environment variable or use default
-    // You need to set VITE_RAZORPAY_KEY_ID in your .env file
-    const razorpayKeyId = import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_1DP5mmOlF5G5ag'; // Replace with your actual key
+    // Razorpay Key ID - Get from environment variable and ensure we are using a test key in non-production builds
+    const razorpayKeyId = import.meta.env.VITE_RAZORPAY_KEY_ID?.trim();
+    const isTestKey = razorpayKeyId?.startsWith('rzp_test_');
+
+    if (!razorpayKeyId || !isTestKey) {
+      const reason = !razorpayKeyId
+        ? 'Payment configuration missing. Please contact support.'
+        : 'Invalid Razorpay test key. Please use a key starting with rzp_test_.';
+
+      setPaymentStatus({ state: 'failure', reason });
+      setCtaConfirmation(reason);
+      logApiError(new Error('Missing or invalid Razorpay key'), {
+        url: 'https://checkout.razorpay.com/v1/checkout.js',
+        method: 'GET',
+        category: 'config',
+        tags: { provider: 'razorpay', surface: 'booking_form' },
+      });
+      toast.error(reason);
+      setIsLoading(false);
+      return;
+    }
 
     // Initialize Razorpay Checkout
     const razorpayOptions = {
@@ -742,14 +1036,15 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
       },
       handler: function (response: any) {
         // Payment success callback
-        console.log('[Razorpay] Payment successful:', response);
         setIsLoading(false);
         setPaymentStatus({
           state: 'success',
           paymentId: response.razorpay_payment_id,
           bookingId,
         });
-        
+
+        toast.success('Payment received. We will confirm your stay shortly.');
+
         trackEvent(
           'payment_success',
           {
@@ -764,29 +1059,105 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
       modal: {
         ondismiss: function () {
           // Payment modal closed without payment
-          console.log('[Razorpay] Payment modal closed');
           setIsLoading(false);
           setPaymentStatus({
             state: 'failure',
             reason: 'Payment was cancelled',
           });
+          toast.info('Payment was cancelled. You can try again when ready.');
+          logUserAction('payment_modal_closed', { provider: 'razorpay', bookingId });
         },
       },
     };
 
     try {
+      logUserAction('payment_gateway_initializing_checkout', {
+        provider: 'razorpay',
+        bookingId,
+        total: totalPrice,
+        nights,
+      });
+
       const razorpay = new window.Razorpay(razorpayOptions);
+      razorpay.on('payment.failed', (response: any) => {
+        setPaymentStatus({
+          state: 'failure',
+          reason: response?.error?.description || 'Payment failed. Please try again.',
+        });
+        setIsLoading(false);
+        toast.error(response?.error?.description || 'Payment failed. Please try again.');
+        logApiError(new Error(response?.error?.description || 'Razorpay payment failed'), {
+          url: 'https://checkout.razorpay.com/v1/checkout.js',
+          method: 'POST',
+          category: 'payment',
+          tags: { provider: 'razorpay', surface: 'booking_form' },
+        });
+      });
+
       razorpay.open();
-      console.log('[Razorpay] Checkout opened');
+      logUserAction('payment_gateway_initialized', {
+        provider: 'razorpay',
+        bookingId,
+        total: totalPrice,
+        nights,
+      });
     } catch (error) {
-      console.error('[Razorpay] Error opening checkout:', error);
+      reportError(error, { feature: 'razorpay', bookingId, propertyId });
+      logApiError(error, {
+        url: 'https://checkout.razorpay.com/v1/checkout.js',
+        method: 'GET',
+        category: 'network',
+        tags: { provider: 'razorpay', surface: 'booking_form' },
+      });
       setIsLoading(false);
-      alert('Failed to open payment options. Please try again.');
+      toast.error('Failed to open payment options. Please try again.');
       setPaymentStatus({
         state: 'failure',
         reason: 'Failed to initialize payment',
       });
     }
+  };
+
+  const initiatePayment = async () => {
+    const autoEmail = userEmail.trim();
+    const autoPhone = userPhone.trim();
+
+    setCtaConfirmation(null);
+    setAvailabilityStatus('idle');
+    setFormErrors({});
+
+    if (!termsAccepted) {
+      setFormErrors((current) => ({ ...current, terms: 'Please confirm the Terms & Conditions.' }));
+      setPaymentStatus({ state: 'failure', reason: 'Please accept the Terms & Conditions to continue.' });
+      setCtaConfirmation('Please confirm the Terms & Conditions.');
+      return;
+    }
+
+    if (!validateForm(autoEmail, autoPhone)) {
+      setCtaConfirmation('Please fix the highlighted fields.');
+      return;
+    }
+
+    setIsLoading(true);
+    const isAvailable = await performAvailabilityCheck();
+
+    if (!isAvailable) {
+      setAvailabilityStatus('idle');
+      if (!ctaConfirmation) {
+        setCtaConfirmation('Selected dates unavailable. Please choose different dates.');
+      }
+      setIsLoading(false);
+      return;
+    }
+
+    setAvailabilityStatus('available');
+    setCtaConfirmation('Available! Proceeding to payment...');
+    setHasInteractedWithDates(true);
+    setInlineStatus('Showing the final pricing breakdown for your dates.');
+
+    window.setTimeout(() => {
+      startPayment(autoEmail, autoPhone);
+    }, 1200);
   };
 
   return (
@@ -820,10 +1191,12 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         trackEvent={trackEvent}
         propertyId={propertyId}
         dates={dates}
+        dateError={dateError}
         validationMessage={validationMessage}
         validationMessageId={validationMessageId}
         setHasInteractedWithDates={setHasInteractedWithDates}
         isCheckoutInvalid={isCheckoutInvalid}
+        dateErrorId={dateErrorId}
         checkOutErrorId={checkOutErrorId}
         hasInteractedWithDates={hasInteractedWithDates}
         guestNeedsAdult={guestNeedsAdult}
@@ -854,7 +1227,10 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         isAtMin={isAtMin}
         isAtMax={isAtMax}
         setGuests={setGuests}
-        guestLimits={guestLimits}
+        guestLimits={propertyGuestLimits}
+        maxCapacity={propertyMaxCapacity}
+        extraGuestFee={propertyExtraGuestFee}
+        totalGuests={totalGuests}
         updateChildAge={updateChildAge}
         markEngagement={markEngagement}
         setOpenGuests={setOpenGuests}
@@ -878,7 +1254,10 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         termsAcceptedAt={termsAcceptedAt}
         setTermsAcceptedAt={setTermsAcceptedAt}
         initiatePayment={initiatePayment}
+        onProceedToCheckout={handleCheckoutNavigation}
         primaryCtaLabel={primaryCtaLabel}
+        availabilityStatus={availabilityStatus}
+        ctaConfirmation={ctaConfirmation}
         paymentStatus={paymentStatus}
         setPaymentStatus={setPaymentStatus}
         formatGuestLabel={formatGuestLabel}
@@ -893,6 +1272,9 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         setUserEmail={setUserEmail}
         userPhone={userPhone}
         setUserPhone={setUserPhone}
+        formErrors={formErrors}
+        averageRating={property?.property_rating}
+        reviewCount={property?.property_reviews}
       />
     </div>
   );

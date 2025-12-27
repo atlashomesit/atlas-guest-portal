@@ -31,12 +31,15 @@ Optional tooling:
 - Enforced override → `@jridgewell/sourcemap-codec@1.5.5`
 
 ## Environment Variables
-- Vite only surfaces variables prefixed with `VITE_`; CRA-style `REACT_APP_*` keys are ignored at runtime. Make sure API hosts use `VITE_API_BASE_URL` rather than the legacy `REACT_APP_API_BASE_URL` name.
+- The Vite config surfaces variables prefixed with `VITE_` or `NEXT_PUBLIC_`; CRA-style `REACT_APP_*` keys are ignored at runtime. Make sure API hosts use `VITE_API_BASE_URL` rather than the legacy `REACT_APP_API_BASE_URL` name.
 - `VITE_API_BASE_URL` (required) → Base URL for all API calls (omit trailing slash). The value is resolved at runtime via [`/config`](functions/config.js) and [`src/config/getApiBaseUrl.ts`](src/config/getApiBaseUrl.ts); if it is missing, the app logs an error and renders a friendly fallback screen instead of a blank page.
+- `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` (required for `/location`) → Google Maps JavaScript API key. Enable the **Maps JavaScript API** for this key, restrict it to the deployed Atlas Homestays domains (dev/preview/prod), and keep billing active so the interactive map and static fallback both render correctly. The value is exposed through `/config` at runtime so client pages can decide whether to load the JS API or stay on the static map preview.
+- See `.env.example` for the full list of required/optional variables (EmailJS, Razorpay, callback leads, Sentry). Copy it locally and fill in the values that apply to your environment.
 - Cloudflare Pages setup:
   - **Production:** Project → Settings → Environment variables → set `VITE_API_BASE_URL` to the production API host. Save for “Production” scope.
   - **Preview:** In the same screen, add `VITE_API_BASE_URL` for the “Preview” scope to point at staging/QA APIs so preview builds load data correctly.
-  - Runtime config: Pages Functions serve `/config` that injects `window.__ATLAS_RUNTIME_CONFIG__ = { apiBaseUrl: "..." }`. Changes to the env var apply immediately (no rebuild needed after this change ships); visiting `/config` should return the runtime value or an empty string with a comment if missing. `/config.js` redirects to `/config` to avoid SPA fallbacks while keeping legacy references working.
+  - Add `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` in both scopes (Production + Preview) so the runtime `/config` endpoint can hand the key to the Location page and avoid hitting the interactive map when it is missing.
+  - Runtime config: Pages Functions serve `/config` that injects `window.__ATLAS_RUNTIME_CONFIG__ = { apiBaseUrl: "...", googleMapsApiKey: "..." }`. Changes to the env vars apply immediately (no rebuild needed after this change ships); visiting `/config` should return the runtime value or an empty string with a comment if missing. `/config.js` redirects to `/config` to avoid SPA fallbacks while keeping legacy references working.
 
 ### Cloudflare Pages settings
 - In the Pages project dashboard, set the environment variable `NODE_VERSION=22.12.0` so builds align with Vite 7's engine requirement (\`^20.19.0 || >=22.12.0\`).
@@ -63,7 +66,8 @@ Optional tooling:
    ```bash
    cp .env.example .env
    ```
-   Populate the EmailJS identifiers before attempting to send booking/contact forms. Phone/WhatsApp
+   Populate the EmailJS identifiers before attempting to send booking/contact forms and set `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`
+   to a key with Maps JS API enabled + domain restrictions. Phone/WhatsApp
    numbers are centralized in [`src/config/contact.ts`](src/config/contact.ts) and default to the business line.
 3. **Run the development server**
    ```bash
@@ -90,7 +94,7 @@ Optional tooling:
 ### Booking funnel entry points
 - Primary header CTA → `/#our-homes` (scrolls to the Our Homes grid on the homepage)
 - Secondary help CTA → WhatsApp link labelled “Need help?”
-- Hero search → Builds `/apartments?checkIn=YYYY-MM-DD&checkOut=YYYY-MM-DD&guests=2` so listings filter on the chosen stay window and party size
+- Hero search → Builds `/?checkIn=YYYY-MM-DD&checkOut=YYYY-MM-DD&guests=2#our-homes` so listings filter on the chosen stay window and party size
 
 ## Theming
 - CSS variables for the active palette are defined per theme in `src/styles/themes/*.css` and loaded globally via `src/styles/themes/index.css`.
@@ -100,7 +104,7 @@ Optional tooling:
 
 ### Homepage search controls
 - The hero booking bar uses a `react-date-range` calendar for check-in/check-out with a single summary line (e.g., `22 Dec 2025 – 23 Dec 2025 · 2 guests`).
-- Query params flow through `checkIn`, `checkOut`, and `guests` so `/apartments` can hydrate filters on reload or direct links.
+- Query params flow through `checkIn`, `checkOut`, and `guests` so the homepage listings grid can hydrate filters on reload or direct links.
 - Validation enforces check-out after check-in and defaults to at least one guest; guest steppers cap the party size to 16.
 
 ## Project Map
@@ -140,7 +144,7 @@ Optional tooling:
 ## Short-link redirects
 - Short-link redirects live in [`public/_redirects`](public/_redirects) so Vite copies them verbatim into the Pages build output.
 - Targets must stay **relative** (e.g., `/property_details/atlas-homes-room-101`) to automatically preserve the current host on dev and production; hardcoding `https://www.atlashomestays.com` would break dev URLs.
-- Ordering matters: the short-link rules should stay at the top of `_redirects`, and the SPA fallback of `/* /index.html 200` must remain last to avoid swallowing redirects.
+- Ordering matters: the short-link rules should stay at the top of `_redirects`, and the SPA fallback of `/* /index.html 200!` must remain last to avoid swallowing redirects.
 
 ### Verification commands
 Use `curl -I` to confirm redirects keep the current domain and point at the right slug:

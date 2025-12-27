@@ -1,410 +1,428 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import Slider, { Settings } from "react-slick";
-import { Bath, Snowflake, Wifi } from "lucide-react";
+import React from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
-import { propertyData, propertyImages } from "../../../data.ts";
-import { LISTINGS, type Listing } from "../../../data/listings";
-import { sanitizeItems, getItemKey } from "../../../utils/sanitizeItems";
-import { LOGO_URL } from "../../../config/branding";
-import { trackEvent } from "../../../utils/analytics";
-import { calculateNightlyPrice, inferUnitType } from "../../../utils/pricing";
-import { priceDisplayConfig } from "../../../config/priceDisplay.config";
 import Heading from "../../commonComponents/heading/Heading";
+import { LISTINGS, type Listing } from "../../../data/listings";
+import { propertyData, propertyImages } from "../../../data";
+import priceDisplayConfig from "../../../config/priceDisplay.config";
+import { calculateNightlyPrice, inferUnitType } from "../../../utils/pricing";
+import { sanitizeItems, getItemKey } from "../../../utils/sanitizeItems";
+import { trackEvent } from "../../../utils/analytics";
+import OptimizedImage from "../../ui/OptimizedImage";
 
 import "./homepage_location.css";
-import "slick-carousel/slick/slick.css";
-import "slick-carousel/slick/slick-theme.css";
 
 type HomePageLocationsProps = {
   listings?: unknown;
 };
 
-const HomePage_Locations = ({ listings = LISTINGS }: HomePageLocationsProps) => {
+type PropertyRecord = (typeof propertyData)[number];
+
+type ListingModel = {
+  listing: Listing;
+  property?: PropertyRecord;
+  images: string[];
+  price?: ReturnType<typeof calculateNightlyPrice>;
+};
+
+const FALLBACK_IMAGE =
+  "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80";
+
+const formatAmenityName = (value?: string) =>
+  (value ?? "")
+    .replace(/[-_]/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase())
+    .trim();
+
+const buildSlug = (value: string) =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .trim()
+    .replace(/\s+/g, "-");
+
+const useSearchSelections = (search: string) => {
+  return React.useMemo(() => {
+    const params = new URLSearchParams(search);
+
+    const parseDate = (value: string | null) => {
+      if (!value) return null;
+      const parsed = new Date(value);
+      return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+    };
+
+    const parseGuests = (value: string | null) => {
+      if (!value) return null;
+      const parsed = Number(value);
+      return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+    };
+
+    const checkIn = parseDate(params.get("checkIn"));
+    const checkOut = parseDate(params.get("checkOut"));
+    const guests = parseGuests(params.get("guests"));
+
+    const normalizedCheckOut =
+      checkOut && checkIn && new Date(checkOut) <= new Date(checkIn) ? null : checkOut;
+
+    const nextSearch = new URLSearchParams();
+    if (checkIn) nextSearch.set("checkIn", checkIn);
+    if (normalizedCheckOut) nextSearch.set("checkOut", normalizedCheckOut);
+    if (guests) nextSearch.set("guests", String(guests));
+
+    return {
+      checkIn,
+      checkOut: normalizedCheckOut,
+      guests,
+      searchString: nextSearch.toString(),
+    };
+  }, [search]);
+};
+
+const createListingModel = (
+  listing: Listing,
+  propertyLookup: Record<string, PropertyRecord>,
+  checkInDate: string | null,
+  guests: number | null,
+): ListingModel => {
+  const property = propertyLookup[listing.id];
+  const images = propertyImages[listing.id] ?? property?.property_img ?? [FALLBACK_IMAGE];
+
+  let price: ListingModel["price"];
+
+  try {
+    price = calculateNightlyPrice({
+      unitType: inferUnitType(
+        property ?? { id: listing.id, name: listing.title, unitType: listing.unitType }
+      ),
+      checkInDate: checkInDate ?? new Date(),
+      guests: guests ?? undefined,
+    });
+  } catch (error) {
+    console.warn("Failed to compute nightly price", error);
+    price = undefined;
+  }
+
+  return { listing, property, images, price };
+};
+
+const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
+  const location = useLocation();
   const navigate = useNavigate();
+  const { checkIn, checkOut, guests, searchString } = useSearchSelections(location.search);
+  const [activeImageIndex, setActiveImageIndex] = React.useState<Record<string, number>>({});
+
+  const propertyLookup = React.useMemo(
+    () =>
+      propertyData.reduce<Record<string, PropertyRecord>>((acc, property) => {
+        acc[String(property.id)] = property;
+        return acc;
+      }, {}),
+    [],
+  );
 
   const safeListings = React.useMemo(
-    () => sanitizeItems<Listing>(listings),
-    [listings]
+    () => sanitizeItems<Listing>(listings ?? LISTINGS),
+    [listings],
   );
 
-  const safePropertyData = React.useMemo(() => sanitizeItems(propertyData), []);
+  const sortedListings = React.useMemo(
+    () => [...safeListings].sort((a, b) => Number(b.featured) - Number(a.featured)),
+    [safeListings],
+  );
 
-  const fallbackCover = LOGO_URL;
+  const heroListing = sortedListings.find((item) => item.featured) ?? sortedListings[0];
+  const otherListings = sortedListings.filter((item) => item !== heroListing);
 
-  const items = React.useMemo(
+  const heroModel = React.useMemo(
+    () => (heroListing ? createListingModel(heroListing, propertyLookup, checkIn, guests) : null),
+    [checkIn, guests, heroListing, propertyLookup],
+  );
+
+  const listingModels = React.useMemo(
     () =>
-      [...safeListings].sort(
-        (a, b) => Number(!!b.featured) - Number(!!a.featured)
-      ),
-    [safeListings]
+      otherListings.map((item) => createListingModel(item, propertyLookup, checkIn, guests)),
+    [checkIn, guests, otherListings, propertyLookup],
   );
 
-  const heroSearchParams = useMemo(() => {
-    try {
-      const stored = localStorage.getItem("atlasHeroSearch");
-      if (!stored) return null;
-      const parsed = JSON.parse(stored) as { checkIn?: string; checkOut?: string; guests?: number };
-      if (!parsed.checkIn || !parsed.checkOut) return null;
-      return {
-        checkIn: parsed.checkIn,
-        checkOut: parsed.checkOut,
-        guests: parsed.guests && parsed.guests > 0 ? parsed.guests : 2,
-      };
-    } catch {
-      return null;
-    }
-  }, []);
+  React.useEffect(() => {
+    if (!sortedListings.length) return;
 
-  const AMENITY_MAP: Record<string, string[]> = useMemo(
-    () => ({
-      "501": ["Wi-Fi", "Air conditioning", "Private bath"],
-      "201": ["Wi-Fi", "Air conditioning"],
-      "202": ["Wi-Fi", "Air conditioning"],
-      "301": ["Wi-Fi", "Air conditioning"],
-      "101": ["Wi-Fi", "Air conditioning"],
-      "102": ["Wi-Fi", "Air conditioning"],
-      "302": ["Wi-Fi", "Air conditioning"],
-    }),
-    []
-  );
-
-  const penthouse = items.find((item) => item.featured);
-  const otherProperties = items.filter((item) => !item.featured);
-  const firstRow = otherProperties.slice(0, 3);
-  const secondRow = otherProperties.slice(3);
-
-  useEffect(() => {
     trackEvent(
       "listings_browse",
       {
-        total: items.length,
-        featured: Number(Boolean(penthouse)),
         surface: "home_locations",
+        total: sortedListings.length,
+        checkIn,
+        checkOut,
+        guests,
       },
-      { route: "/" },
+      { route: `/${searchString ? `?${searchString}` : ""}#our-homes` },
     );
-  }, [items.length, penthouse]);
+  }, [checkIn, checkOut, guests, searchString, sortedListings.length]);
 
-  const handleNavigate = (property: any, query?: string) => {
-    try {
-      const propertyName = property.property_name || property.title || property.id;
-      if (!propertyName) return;
+  const handleNavigate = React.useCallback(
+    (model: ListingModel | null) => {
+      if (!model) return;
 
-      const slug = String(propertyName).toLowerCase().replace(/\s+/g, "-");
-      const path = query ? `/property_details/${slug}?${query}` : `/property_details/${slug}`;
+      const propertyName = model.property?.property_name ?? model.listing.title;
+      const slug = buildSlug(propertyName);
+      const path = `/properties/${slug}`;
+      const nextSearch = searchString ? `?${searchString}` : "";
 
       trackEvent(
         "listing_selected",
         {
           surface: "home_locations",
           listingName: propertyName,
+          checkIn,
+          checkOut,
+          guests,
         },
-        { listingId: property?.id, unitCode: property?.id, route: `/property_details/${slug}` },
+        { listingId: model.property?.id ?? model.listing.id, unitCode: model.listing.id, route: `${path}${nextSearch}` },
       );
 
-      navigate(path, {
-        state: { property },
-      });
-    } catch (error) {
-      console.error("Navigation error:", error);
-    }
+      navigate(
+        { pathname: path, search: nextSearch },
+        { state: { property: model.property ?? undefined } },
+      );
+    },
+    [checkIn, checkOut, guests, navigate, searchString],
+  );
+
+  const handleSlideChange = (id: string, direction: "next" | "prev", imagesLength: number) => {
+    setActiveImageIndex((prev) => {
+      const current = prev[id] ?? 0;
+      const nextIndex = direction === "next" ? current + 1 : current - 1;
+      const normalized = (nextIndex + imagesLength) % imagesLength;
+      return { ...prev, [id]: normalized };
+    });
   };
 
-  /* ============================
-      CUSTOM ARROWS
-  ============================ */
+  const renderPrice = (model: ListingModel) => {
+    if (!model.price) return null;
 
-  const NextArrow = ({ onClick, className }: any) => (
-    <div
-      className={`w-8 h-8 text-[color:var(--text-contrast)] rounded-full flex items-center justify-center cursor-pointer ${className}`}
-      style={{
-        background:
-          "color-mix(in srgb, var(--text-primary) 62%, transparent)",
-        boxShadow: "0 8px 18px color-mix(in srgb, var(--text-primary) 28%, transparent)",
-        backdropFilter: "blur(2px)",
-      }}
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick?.();
-      }}
-    >
-      ❯
-    </div>
-  );
+    const { baseNightlyPrice, finalNightlyPrice, currency, appliedDiscountPercent, hasSpecialDateMultiplier, dateKey } =
+      model.price;
 
-  const PrevArrow = ({ onClick, className }: any) => (
-    <div
-      className={`w-8 h-8 text-[color:var(--text-contrast)] rounded-full flex items-center justify-center cursor-pointer ${className}`}
-      style={{
-        background:
-          "color-mix(in srgb, var(--text-primary) 62%, transparent)",
-        boxShadow: "0 8px 18px color-mix(in srgb, var(--text-primary) 28%, transparent)",
-        backdropFilter: "blur(2px)",
-      }}
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick?.();
-      }}
-    >
-      ❮
-    </div>
-  );
-
-  /* ============================
-      PROPERTY CARD
-  ============================ */
-
-  const PropertyCard = ({
-    property,
-    isPenthouse = false,
-  }: {
-    property: Listing;
-    isPenthouse?: boolean;
-  }) => {
-    const listing = property;
-    const propertyDataItem = safePropertyData.find(
-      (p) => String(p.id) === String(listing.id)
-    );
-
-    const images = propertyImages[String(listing.id)] || [fallbackCover];
-    const displayName =
-      propertyDataItem?.property_name || listing.title || `Property ${listing.id}`;
-
-    const sliderRef = useRef<Slider>(null);
-    const [current, setCurrent] = useState(0);
-
-    const sliderSettings: Settings = {
-      dots: false,
-      infinite: true,
-      speed: 500,
-      slidesToShow: 1,
-      slidesToScroll: 1,
-      arrows: true,
-      autoplay: false,
-      nextArrow: <NextArrow />,
-      prevArrow: <PrevArrow />,
-      beforeChange: (_old, newIndex) => setCurrent(newIndex),
-    };
-
-    const totalDots = images.length;
-    const visibleDots = Math.min(4, totalDots);
-
-    const getVisibleDots = () => {
-      if (totalDots === 0) return [];
-      let start = Math.max(current - Math.floor((visibleDots - 1) / 2), 0);
-      if (start + (visibleDots - 1) >= totalDots) start = Math.max(totalDots - visibleDots, 0);
-      return Array.from({ length: visibleDots }, (_, i) => start + i);
-    };
-
-    const formatCurrency = (value?: number | null) =>
-      value != null
-        ? new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(value)
-        : null;
-
-    const nightlyPrice = React.useMemo(() => {
-      try {
-        const unitType = inferUnitType({
-          id: propertyDataItem?.id ?? listing.id,
-          property_name: propertyDataItem?.property_name ?? displayName,
-        });
-
-        return calculateNightlyPrice({
-          unitType,
-          checkInDate: new Date(),
-          guests: 2,
-        });
-      } catch (error) {
-        console.warn("Unable to derive nightly price for property", listing.id, error);
-        return null;
-      }
-    }, [displayName, listing.id, propertyDataItem?.id, propertyDataItem?.property_name]);
-
-    const hasSpecialPricing = Boolean(nightlyPrice?.hasSpecialDateMultiplier);
-    const specialPricingLabel =
-      hasSpecialPricing && nightlyPrice?.dateKey
-        ? priceDisplayConfig.specialPricingLabels[nightlyPrice.dateKey] ?? priceDisplayConfig.defaultSpecialLabel
-        : hasSpecialPricing
-          ? priceDisplayConfig.defaultSpecialLabel
-          : null;
-    const showDiscount =
-      Boolean(nightlyPrice?.discountAmount) &&
-      !hasSpecialPricing &&
-      (nightlyPrice?.discountAmount ?? 0) > 0;
-    const savingsAmount = showDiscount ? nightlyPrice?.discountAmount ?? 0 : 0;
-    const badgeLabel =
-      showDiscount
-        ? priceDisplayConfig.discount.primaryBadgeLabel
-        : specialPricingLabel || null;
-
-    const amenities = AMENITY_MAP[String(listing.id)] ?? [];
+    const formatter = new Intl.NumberFormat("en-IN", { style: "currency", currency });
+    const formattedBase = formatter.format(baseNightlyPrice);
+    const formattedFinal = formatter.format(finalNightlyPrice);
+    const specialLabel = priceDisplayConfig.specialPricingLabels[dateKey];
 
     return (
-      <div
-        className={`bg-bg-surface rounded-2xl overflow-hidden shadow-level1 hover:shadow-level2 transition-shadow duration-300 cursor-pointer border border-border-subtle ${
-          isPenthouse ? "lg:col-span-3" : ""
-        }`}
-        onClick={() => handleNavigate(propertyDataItem)}
-      >
-        <div className="relative slider-wrapper group">
-          <Slider ref={sliderRef} {...sliderSettings}>
-            {images.map((imgUrl, index) => (
-              <div key={index}>
-                <img
-                  src={imgUrl}
-                  alt={`${displayName} ${index + 1}`}
-                  className="w-full h-64 object-cover rounded-b-3xl"
-                />
-              </div>
-            ))}
-          </Slider>
-
-          {/* Arrows only visible on hover */}
-          <PrevArrow className="absolute left-2 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-300" onClick={() => sliderRef.current?.slickPrev()} />
-          <NextArrow className="absolute right-2 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-300" onClick={() => sliderRef.current?.slickNext()} />
-
-          {/* Custom dots overlay */}
-          {totalDots > 1 && (
-            <div className="absolute bottom-3 left-1/2 z-[var(--z-overlay)] flex -translate-x-1/2 transform items-center gap-2 opacity-80 transition-opacity duration-300 md:opacity-0 md:group-hover:opacity-80 md:group-focus-within:opacity-80">
-              {getVisibleDots().map((idx) => (
-                <button
-                  key={idx}
-                  className={`h-2.5 w-2.5 rounded-full transition-colors duration-300 ${
-                    current === idx
-                      ? "bg-[color:var(--text-contrast)]"
-                      : "bg-[color:color-mix(in_srgb,var(--text-contrast)_55%,transparent)]"
-                  }`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    sliderRef.current?.slickGoTo(idx);
-                  }}
-                  aria-label={`Go to image ${idx + 1} of ${totalDots}`}
-                ></button>
-              ))}
-            </div>
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-sm font-semibold rounded-full bg-[color:color-mix(in_srgb,var(--cta-primary)_18%,transparent)] px-3 py-1 text-[color:color-mix(in_srgb,var(--cta-primary)_80%,transparent)]">
+            {priceDisplayConfig.discount.primaryBadgeLabel}
+          </span>
+          <span className="text-xs text-text-muted">{priceDisplayConfig.discount.secondaryBadgeLabel}</span>
+        </div>
+        <div className="flex items-baseline gap-2">
+          <span className="text-2xl font-bold text-text-primary">{formattedFinal}</span>
+          {appliedDiscountPercent > 0 && (
+            <span className="text-sm text-text-muted line-through">{formattedBase}</span>
+          )}
+          {appliedDiscountPercent > 0 && (
+            <span className="text-sm font-semibold text-[color:color-mix(in_srgb,var(--cta-primary)_80%,transparent)]">
+              {priceDisplayConfig.discount.savingsPrefix} {appliedDiscountPercent}%
+            </span>
           )}
         </div>
-
-        {/* DETAILS */}
-        <div className="p-4">
-          <h2 className="text-xl font-bold text-text-primary truncate">{displayName}</h2>
-          <div className="text-text-muted text-sm mt-1">Hyderabad, Telangana</div>
-          <div className="mt-2 flex items-center">
-            <span className="text-accent-primary text-lg">⭐</span>
-            <span className="font-semibold ml-1">
-              {propertyDataItem?.property_rating?.toFixed(1) || "4.8"}
-            </span>
-            <span className="text-text-muted text-sm ml-1">
-              ({propertyDataItem?.property_reviews || "0"} reviews)
-            </span>
-          </div>
-          <div className="mt-3 space-y-2">
-            <div className="flex flex-col gap-1 text-sm text-text-muted">
-              <div className="flex flex-wrap items-baseline gap-2">
-                {showDiscount && (
-                  <span className="text-xs font-semibold text-text-muted line-through">
-                    {formatCurrency(nightlyPrice?.baseNightlyPrice) ?? "₹3,500"}
-                  </span>
-                )}
-                <div className="text-2xl font-bold leading-tight text-cta-primary">
-                  {formatCurrency(nightlyPrice?.finalNightlyPrice) ?? "₹4,999"}
-                  <span className="ml-1 text-sm font-semibold text-text-muted">/ night</span>
-                </div>
-              </div>
-              {showDiscount && savingsAmount > 0 && (
-                <span className="text-xs font-semibold text-cta-primary">
-                  {priceDisplayConfig.discount.savingsPrefix} {formatCurrency(savingsAmount) ?? "₹175"}
-                </span>
-              )}
-              {badgeLabel && (
-                <span className="inline-flex w-fit items-center rounded-full bg-[color:color-mix(in_srgb,var(--cta-primary)_12%,transparent)] px-3 py-1 text-[11px] font-semibold text-cta-primary">
-                  {badgeLabel}
-                </span>
-              )}
-            </div>
-
-            {amenities.length > 0 && (
-              <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-text-primary">
-                {amenities.slice(0, 3).map((amenity) => (
-                  <span key={amenity} className="inline-flex items-center gap-1">
-                    {amenity.toLowerCase().includes("wi-fi") ? (
-                      <Wifi className="h-4 w-4" aria-hidden />
-                    ) : amenity.toLowerCase().includes("air") ? (
-                      <Snowflake className="h-4 w-4" aria-hidden />
-                    ) : (
-                      <Bath className="h-4 w-4" aria-hidden />
-                    )}
-                    <span className="truncate max-w-[140px]">{amenity}</span>
-                  </span>
-                ))}
-              </div>
-            )}
-
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-[color:var(--brand)] px-4 py-2 text-sm font-semibold text-[color:var(--text-contrast)] shadow-level1 transition duration-150 hover:-translate-y-0.5 hover:shadow-level2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brand)]"
-                aria-label={`View room ${displayName}`}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  handleNavigate(propertyDataItem);
-                }}
-              >
-                View room
-              </button>
-              {heroSearchParams && (
-                <button
-                  type="button"
-                  className="inline-flex items-center justify-center rounded-full border border-border-subtle px-3 py-2 text-sm font-semibold text-text-primary transition duration-150 hover:-translate-y-0.5 hover:border-[color:var(--text-primary)] hover:shadow-level1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brand)]"
-                  aria-label={`Check dates for ${displayName}`}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    const params = new URLSearchParams({
-                      checkIn: heroSearchParams.checkIn,
-                      checkOut: heroSearchParams.checkOut,
-                      guests: heroSearchParams.guests.toString(),
-                    });
-                    handleNavigate(propertyDataItem, params.toString());
-                  }}
-                >
-                  Check dates
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
+        {(hasSpecialDateMultiplier || specialLabel) && (
+          <p className="text-xs font-medium text-[color:color-mix(in_srgb,var(--cta-primary)_85%,transparent)]">
+            {specialLabel ?? priceDisplayConfig.defaultSpecialLabel}
+          </p>
+        )}
       </div>
     );
   };
 
-  /* ============================
-      MAIN RETURN
-  ============================ */
+  const renderAmenities = (property?: PropertyRecord) => {
+    if (!property?.property_amenities?.length) return null;
+
+    return (
+      <ul className="grid grid-cols-2 gap-2 text-sm text-text-secondary">
+        {property.property_amenities.slice(0, 6).map((amenity, index) => (
+          <li key={`${amenity.amenities_icon}-${index}`} className="flex items-center gap-2">
+            <span className="text-lg">•</span>
+            <span>{formatAmenityName(amenity.amenities_icon)}</span>
+          </li>
+        ))}
+      </ul>
+    );
+  };
+
+  if (!heroModel) {
+    return null;
+  }
 
   return (
     <section className="py-12 px-4 sm:px-6 lg:px-8 bg-bg-surface scroll-mt-28" id="our-homes">
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-7xl mx-auto flex flex-col gap-8">
         <Heading title="Our Homes" id="our-homes" />
 
-        {penthouse && (
-          <div className="mb-6 w-full">
-            <PropertyCard property={penthouse} isPenthouse />
+        <div className="grid gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch rounded-3xl overflow-hidden shadow-level2 bg-white border border-border-subtle property-card">
+            <div className="relative h-full">
+              <OptimizedImage
+                key={`${heroModel.listing.id}-${activeImageIndex[heroModel.listing.id] ?? 0}`}
+                src={heroModel.images[activeImageIndex[heroModel.listing.id] ?? 0] ?? FALLBACK_IMAGE}
+                alt={heroModel.listing.title}
+                className="w-full h-full object-cover min-h-[280px]"
+                wrapperClassName="h-full"
+                sizes="(max-width: 1023px) 100vw, 50vw"
+                onError={(event) => {
+                  const target = event.currentTarget;
+                  if (target.src !== FALLBACK_IMAGE) {
+                    target.src = FALLBACK_IMAGE;
+                  }
+                }}
+              />
+              {heroModel.images.length > 1 && (
+                <div className="absolute inset-0 flex items-center justify-between px-4">
+                  <button
+                    type="button"
+                    aria-label="Previous image"
+                    onClick={() => handleSlideChange(heroModel.listing.id, "prev", heroModel.images.length)}
+                    className="rounded-full bg-[color:color-mix(in_srgb,var(--bg-surface)_80%,transparent)] p-2 shadow"
+                  >
+                    ‹
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Next image"
+                    onClick={() => handleSlideChange(heroModel.listing.id, "next", heroModel.images.length)}
+                    className="rounded-full bg-[color:color-mix(in_srgb,var(--bg-surface)_80%,transparent)] p-2 shadow"
+                  >
+                    ›
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="p-6 flex flex-col gap-4">
+              <div className="flex items-center gap-2">
+                <span className="rounded-full bg-[color:color-mix(in_srgb,var(--cta-primary)_12%,transparent)] px-3 py-1 text-xs font-semibold text-[color:color-mix(in_srgb,var(--cta-primary)_80%,transparent)]">
+                  Featured
+                </span>
+                <span className="text-xs uppercase tracking-[0.08em] font-semibold text-text-muted">Penthouse</span>
+              </div>
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-wide text-text-muted">Atlas Homes</p>
+                <h3 className="text-3xl font-bold text-text-primary">{heroModel.listing.title}</h3>
+                {heroModel.listing.subtitle && (
+                  <p className="text-base text-text-secondary mt-1">{heroModel.listing.subtitle}</p>
+                )}
+              </div>
+
+              {renderPrice(heroModel)}
+
+              {renderAmenities(heroModel.property)}
+
+              <div className="property-card__actions flex gap-3 flex-wrap mt-auto">
+                <button
+                  type="button"
+                  onClick={() => handleNavigate(heroModel)}
+                  className="property-card__button inline-flex items-center justify-center rounded-full bg-[color:var(--cta-primary)] px-5 py-3 text-sm font-semibold text-white shadow-level2 transition hover:-translate-y-0.5"
+                >
+                  Check availability
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleNavigate(heroModel)}
+                  className="property-card__button inline-flex items-center justify-center rounded-full border border-border-subtle px-5 py-3 text-sm font-semibold text-text-primary transition hover:border-[color:var(--cta-primary)] hover:text-[color:var(--cta-primary)]"
+                >
+                  View details
+                </button>
+              </div>
+            </div>
           </div>
-        )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-          {firstRow.map((property, index) => (
-            <PropertyCard key={getItemKey(property, index)} property={property} />
-          ))}
-        </div>
-
-        {secondRow.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {secondRow.map((property, index) => (
-              <PropertyCard key={getItemKey(property, index)} property={property} />
-            ))}
+            {listingModels.map((model, index) => {
+              const activeIndex = activeImageIndex[model.listing.id] ?? 0;
+              const imageSrc = model.images[activeIndex] ?? FALLBACK_IMAGE;
+
+              return (
+                <div
+                  key={getItemKey(model.listing, index)}
+                  className="property-card rounded-2xl shadow-level1 bg-white overflow-hidden border border-border-subtle flex flex-col"
+                >
+                  <div className="relative h-56">
+                    <OptimizedImage
+                      key={`${model.listing.id}-${activeIndex}`}
+                      src={imageSrc}
+                      alt={model.listing.title}
+                      className="w-full h-full object-cover"
+                      wrapperClassName="h-full"
+                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                      onError={(event) => {
+                        const target = event.currentTarget;
+                        if (target.src !== FALLBACK_IMAGE) {
+                          target.src = FALLBACK_IMAGE;
+                        }
+                      }}
+                    />
+                    {model.images.length > 1 && (
+                      <div className="absolute inset-0 flex items-center justify-between px-3">
+                        <button
+                          type="button"
+                          aria-label="Previous image"
+                          onClick={() => handleSlideChange(model.listing.id, "prev", model.images.length)}
+                          className="rounded-full bg-[color:color-mix(in_srgb,var(--bg-surface)_80%,transparent)] p-2 shadow"
+                        >
+                          ‹
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="Next image"
+                          onClick={() => handleSlideChange(model.listing.id, "next", model.images.length)}
+                          className="rounded-full bg-[color:color-mix(in_srgb,var(--bg-surface)_80%,transparent)] p-2 shadow"
+                        >
+                          ›
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="p-4 flex flex-col gap-3 flex-1">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">Atlas Homes</p>
+                      <h3 className="text-lg font-semibold text-text-primary">{model.listing.title}</h3>
+                      {model.listing.subtitle && (
+                        <p className="text-sm text-text-secondary mt-1">{model.listing.subtitle}</p>
+                      )}
+                    </div>
+
+                    {renderPrice(model)}
+
+                    {renderAmenities(model.property)}
+
+                    <div className="property-card__actions flex gap-3 flex-wrap mt-auto">
+                      <button
+                        type="button"
+                        onClick={() => handleNavigate(model)}
+                        className="property-card__button inline-flex items-center justify-center rounded-full bg-[color:var(--cta-primary)] px-5 py-3 text-sm font-semibold text-white shadow-level1 transition hover:-translate-y-0.5"
+                      >
+                        Book now
+                      </button>
+                      <Link
+                        to={{ pathname: `/properties/${buildSlug(model.listing.title)}`, search: searchString ? `?${searchString}` : "" }}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          handleNavigate(model);
+                        }}
+                        className="property-card__button inline-flex items-center justify-center rounded-full border border-border-subtle px-5 py-3 text-sm font-semibold text-text-primary transition hover:border-[color:var(--cta-primary)] hover:text-[color:var(--cta-primary)]"
+                      >
+                        View details
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        )}
+        </div>
       </div>
     </section>
   );

@@ -1,3 +1,5 @@
+import { logApiError, logUserAction, monitoredFetch } from "../lib/monitoring";
+
 type CallbackLeadIdentifiers = {
   listingId?: string | number;
   unitCode?: string | number;
@@ -14,6 +16,7 @@ export type CallbackLeadResponse<T = unknown> = {
   storedLocally?: boolean;
   error?: unknown;
   data?: T;
+  message?: string;
 };
 
 const CALLBACK_LEADS_ENDPOINT = import.meta.env.VITE_CALLBACK_LEADS_ENDPOINT || "/api/leads/callback";
@@ -54,8 +57,10 @@ export const submitCallbackLead = async <T = unknown>(payload: CallbackLeadPaylo
     return { ok: false, storedLocally: true };
   }
 
+  logUserAction("callback_lead_submitted", payload);
+
   try {
-    const response = await fetch(CALLBACK_LEADS_ENDPOINT, {
+    const response = await monitoredFetch(CALLBACK_LEADS_ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -65,17 +70,30 @@ export const submitCallbackLead = async <T = unknown>(payload: CallbackLeadPaylo
         unitCode: payload.unitCode,
         context: payload.context,
       }),
+      requestName: "callback-lead",
     });
 
     if (!response.ok) {
+      logApiError(new Error("Callback lead submission failed"), {
+        url: CALLBACK_LEADS_ENDPOINT,
+        status: response.status,
+        method: "POST",
+        category: "http",
+      });
       throw new Error(`Callback lead submission failed (${response.status})`);
     }
 
     const data = (await response.json().catch(() => ({}))) as T;
-    return { ok: true, data };
+    logUserAction("callback_lead_stored", { listingId: payload.listingId, unitCode: payload.unitCode });
+    return { ok: true, data, message: "We have received your request and will call you back shortly." };
   } catch (error) {
     persistBacklog(payload);
-    console.warn("[callback-leads] submission failed, stored locally", error);
-    return { ok: false, error, storedLocally: true };
+    logApiError(error, { url: CALLBACK_LEADS_ENDPOINT, method: "POST", category: "network" });
+    return {
+      ok: false,
+      error,
+      storedLocally: true,
+      message: "We saved your details and will follow up as soon as we are back online.",
+    };
   }
 };

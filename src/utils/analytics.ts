@@ -16,8 +16,17 @@ export type AnalyticsEventPayload = {
 
 type AnalyticsTransport = (payload: AnalyticsEventPayload) => void;
 
+declare global {
+  interface Window {
+    dataLayer?: unknown[];
+    gtag?: (...args: unknown[]) => void;
+  }
+}
+
 const getEnv = (): AnalyticsEnv =>
   import.meta.env.MODE === 'production' ? 'prod' : 'dev';
+
+const getGaMeasurementId = () => import.meta.env.VITE_GA_MEASUREMENT_ID as string | undefined;
 
 const getCurrentRoute = () => {
   if (typeof window === 'undefined') return undefined;
@@ -32,6 +41,57 @@ const defaultTransport: AnalyticsTransport = (payload) => {
 };
 
 let transport: AnalyticsTransport = defaultTransport;
+let gtagInitialized = false;
+
+const ensureGtag = (measurementId: string) => {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return false;
+
+  if (!window.dataLayer) {
+    window.dataLayer = [];
+  }
+
+  window.gtag = window.gtag || function gtag(...args: unknown[]) {
+    window.dataLayer?.push(args);
+  };
+
+  if (!document.getElementById('gtag-js')) {
+    const script = document.createElement('script');
+    script.async = true;
+    script.src = `https://www.googletagmanager.com/gtag/js?id=${measurementId}`;
+    script.id = 'gtag-js';
+    document.head.appendChild(script);
+  }
+
+  if (!gtagInitialized) {
+    window.gtag('js', new Date());
+    window.gtag('config', measurementId);
+    gtagInitialized = true;
+  }
+
+  return true;
+};
+
+const createGtagTransport = (measurementId: string): AnalyticsTransport => (payload) => {
+  const shouldLogToConsole = getEnv() === 'dev';
+
+  if (shouldLogToConsole) {
+    defaultTransport(payload);
+  }
+
+  if (!ensureGtag(measurementId)) return;
+
+  const { event, env, timestamp, route, ...rest } = payload;
+  const attributes = {
+    event_category: env,
+    event_label: route,
+    page_location: route,
+    event_time: timestamp,
+    send_to: measurementId,
+    ...rest,
+  };
+
+  window.gtag?.('event', event, attributes);
+};
 
 export const setAnalyticsTransport = (customTransport: AnalyticsTransport) => {
   transport = customTransport;
@@ -39,6 +99,18 @@ export const setAnalyticsTransport = (customTransport: AnalyticsTransport) => {
 
 export const resetAnalyticsTransport = () => {
   transport = defaultTransport;
+};
+
+export const initAnalytics = () => {
+  if (transport !== defaultTransport) return;
+
+  const measurementId = getGaMeasurementId();
+
+  if (!measurementId) {
+    return;
+  }
+
+  setAnalyticsTransport(createGtagTransport(measurementId));
 };
 
 const buildPayload = (

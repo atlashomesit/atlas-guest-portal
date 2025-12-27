@@ -1,29 +1,26 @@
-import { useEffect, useState } from 'react';
-import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Link, NavLink, useNavigate, useLocation, matchPath } from 'react-router-dom';
 import './navbar.css';
 
 import { IoIosCall } from 'react-icons/io';
-import { buildWaLink } from '../../../utils/whatsapp';
-import { sanitizeItems, getItemKey } from '../../../utils/sanitizeItems';
 import { primaryNav, ctaNav } from '../../../config/navigation';
 import { LOGO_URL } from '../../../config/branding';
-import { CONTACT, formatDisplayNumber, getTelLink } from '../../../config/contact';
-import { propertyData } from '../../../data';
+import { formatDisplayNumber, getTelLink } from '../../../config/contact';
 import { trackEvent } from '../../../utils/analytics';
+import { homes } from '../../../content/homes';
+import { useBooking } from '../../../contexts/BookingContext';
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isApartmentsOpen, setIsApartmentsOpen] = useState(false);
+  const [isHomesOpen, setIsHomesOpen] = useState(false);
+  const [isHomesMobileOpen, setIsHomesMobileOpen] = useState(false);
+  const [ctaStatus, setCtaStatus] = useState<'idle' | 'navigating' | 'scrolling'>('idle');
+
+  const homesDropdownRef = useRef<HTMLDivElement | null>(null);
 
   const navigate = useNavigate();
   const location = useLocation();
-
-  const apartments = sanitizeItems(propertyData);
-
-  const whatsappLink = buildWaLink({
-    phoneE164: CONTACT.business.whatsapp,
-    text: "Hi Atlas Homestays 👋 I'd like to learn more about booking a stay.",
-  });
+  const { booking } = useBooking();
 
   const telLink = getTelLink();
 
@@ -52,31 +49,107 @@ const Navbar = () => {
 
   const closeMobile = () => {
     setIsMenuOpen(false);
-    setIsApartmentsOpen(false);
+    setIsHomesMobileOpen(false);
+  };
+
+  const handleHomeSelect = () => {
+    setIsHomesOpen(false);
+    closeMobile();
   };
 
   /* =========================
      ✅ FINAL BOOK NOW HANDLER
   ========================= */
   const handleBookNow = () => {
-    trackEvent('cta_book_now_clicked', { source: 'header' }, { route: '/' });
+    const propertyMatch =
+      matchPath('/property_details/:id', location.pathname) ?? matchPath('/properties/:id', location.pathname);
+    const propertyIdFromRoute = propertyMatch?.params.id ?? null;
+    const isPropertyDetailsRoute = Boolean(propertyMatch);
+    const bookingTarget = isPropertyDetailsRoute ? 'booking-form' : 'search';
+    const bookingSurface = isPropertyDetailsRoute ? 'property_details' : 'navbar';
 
-    // CASE 1: Already on home page → scroll
-    if (location.pathname === '/') {
-      const el = document.getElementById('our-homes');
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setCtaStatus(isPropertyDetailsRoute ? 'scrolling' : 'navigating');
+
+    const bookingState = {
+      propertyId: booking.propertyId ?? propertyIdFromRoute ?? undefined,
+      checkIn: booking.checkIn ?? undefined,
+      checkOut: booking.checkOut ?? undefined,
+      guests: booking.guests,
+    };
+
+    const destination = isPropertyDetailsRoute ? `${location.pathname}#${bookingTarget}` : ctaNav.to;
+
+    trackEvent(
+      'cta_book_now_clicked',
+      {
+        source: 'header',
+        target: bookingTarget,
+        surface: bookingSurface,
+        propertyId: bookingState.propertyId,
+        checkIn: bookingState.checkIn,
+        checkOut: bookingState.checkOut,
+        guests: booking.guests,
+      },
+      { route: destination },
+    );
+
+    if (isPropertyDetailsRoute) {
+      const bookingForm = document.getElementById('booking-form');
+      if (bookingForm) {
+        bookingForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+        if (bookingForm instanceof HTMLElement) {
+          const hadTabIndex = bookingForm.hasAttribute('tabindex');
+          if (!hadTabIndex) bookingForm.setAttribute('tabindex', '-1');
+          bookingForm.focus({ preventScroll: true });
+          if (!hadTabIndex) bookingForm.removeAttribute('tabindex');
+        }
+
+        window.setTimeout(() => setCtaStatus('idle'), 1200);
+        closeMobile();
+        return;
       }
     }
-    // CASE 2: On another page → navigate then scroll
-    else {
-      navigate('/', {
-        state: { scrollTo: 'our-homes' },
-      });
-    }
+
+    navigate(ctaNav.to, {
+      state: { bookingPrefill: bookingState },
+    });
 
     closeMobile();
   };
+
+  const handleOutsideClick = (event: MouseEvent) => {
+    if (homesDropdownRef.current && !homesDropdownRef.current.contains(event.target as Node)) {
+      setIsHomesOpen(false);
+    }
+  };
+
+  const handleEscape = (event: KeyboardEvent) => {
+    if (event.key === 'Escape') {
+      setIsHomesOpen(false);
+    }
+  };
+
+  useEffect(() => {
+    document.addEventListener('mousedown', handleOutsideClick);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, []);
+
+  useEffect(() => {
+    setIsHomesOpen(false);
+    setIsHomesMobileOpen(false);
+    setIsMenuOpen(false);
+  }, [location.pathname, location.search, location.hash]);
+
+  const visibleNavItems = primaryNav.filter((item) => !item.hidden);
+
+  useEffect(() => {
+    setCtaStatus('idle');
+  }, [location.pathname]);
 
   return (
     <section className="navbar-container" id="navbar_container">
@@ -94,29 +167,52 @@ const Navbar = () => {
           </Link>
 
           <button
-            className="mobile-menu-button lg:hidden"
+            type="button"
+            className={`mobile-menu-button lg:hidden ${isMenuOpen ? 'open' : ''}`}
             onClick={() => setIsMenuOpen(!isMenuOpen)}
+            aria-label="Toggle navigation"
+            aria-expanded={isMenuOpen}
+            aria-controls="mobile-menu-panel"
           >
-            ☰
+            <span className="sr-only">Toggle navigation</span>
+            <span className="hamburger-bar" aria-hidden />
+            <span className="hamburger-bar" aria-hidden />
+            <span className="hamburger-bar" aria-hidden />
           </button>
         </div>
 
         {/* CENTER */}
         <div className="navbar-center hidden lg:flex gap-2">
-          {primaryNav.filter(i => !i.hidden).map(item =>
-            item.label === 'Apartments' ? (
-              <div key={item.label} className="dropdown relative">
-                <button className="dropdown-button">{item.label}</button>
-                <div className="dropdown-menu">
-                  <NavLink to={item.to}>Apartments Overview</NavLink>
+          {visibleNavItems.map((item) => (
+            item.label === 'Our Homes' ? (
+              <div
+                key={item.label}
+                className={`dropdown ${isHomesOpen ? 'open' : ''}`}
+                ref={homesDropdownRef}
+                onMouseEnter={() => setIsHomesOpen(true)}
+                onMouseLeave={() => setIsHomesOpen(false)}
+              >
+                <button
+                  type="button"
+                  className="dropdown-button"
+                  aria-haspopup="menu"
+                  aria-expanded={isHomesOpen}
+                  aria-controls="homes-menu"
+                  onClick={() => setIsHomesOpen((prev) => !prev)}
+                >
+                  Our Homes
+                </button>
 
-                  {apartments.map((apt, index) => (
-                    <NavLink
-                      key={getItemKey(apt, index)}
-                      to={`/property_details/${apt.id ?? apt.listingId ?? index}`}
+                <div className="dropdown-menu" role="menu" id="homes-menu">
+                  {homes.map((home) => (
+                    <Link
+                      key={home.roomNo}
+                      to={home.href}
+                      role="menuitem"
+                      onClick={handleHomeSelect}
                     >
-                      {apt.property_name || apt.title || `Property ${index + 1}`}
-                    </NavLink>
+                      {home.title}
+                    </Link>
                   ))}
                 </div>
               </div>
@@ -129,7 +225,7 @@ const Navbar = () => {
                 {item.label}
               </NavLink>
             )
-          )}
+          ))}
         </div>
 
         {/* RIGHT */}
@@ -140,53 +236,57 @@ const Navbar = () => {
           </a>
 
           {/* BOOK NOW */}
-          <button
-            type="button"
-            className="book-now"
-            onClick={handleBookNow}
-          >
-            {ctaNav.label}
-          </button>
+          <div className="flex flex-col items-end gap-1">
+            <button
+              type="button"
+              className="book-now"
+              onClick={handleBookNow}
+              aria-busy={ctaStatus === 'navigating'}
+              data-state={ctaStatus}
+            >
+              {ctaNav.label}
+            </button>
+            {ctaStatus !== 'idle' && (
+              <span className="book-now-status" role="status" aria-live="polite">
+                {ctaStatus === 'navigating'
+                  ? 'Opening reservation...'
+                  : 'Bringing booking form into view...'}
+              </span>
+            )}
+          </div>
 
-          <a
-            href={whatsappLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="help-link"
-          >
-            Need help?
-          </a>
         </div>
       </div>
 
       {/* MOBILE MENU */}
       {isMenuOpen && (
-        <div className="mobile-menu lg:hidden">
-          {primaryNav.filter(i => !i.hidden).map(item =>
-            item.label === 'Apartments' ? (
+        <div className="mobile-menu lg:hidden open" id="mobile-menu-panel">
+          {visibleNavItems.map((item) => (
+            item.label === 'Our Homes' ? (
               <div key={item.label}>
                 <button
-                  onClick={() => setIsApartmentsOpen(!isApartmentsOpen)}
-                  className="block py-2 font-semibold w-full text-left"
+                  type="button"
+                  className="block py-2 text-left font-semibold"
+                  aria-expanded={isHomesMobileOpen}
+                  aria-controls="mobile-homes-menu"
+                  aria-haspopup="menu"
+                  onClick={() => setIsHomesMobileOpen((prev) => !prev)}
                 >
-                  {item.label}
+                  Our Homes
                 </button>
 
-                {isApartmentsOpen && (
-                  <div className="pl-2">
-                    <NavLink onClick={closeMobile} to={item.to}>
-                      Apartments Overview
-                    </NavLink>
-
-                    {apartments.map((apt, idx) => (
-                      <NavLink
-                        key={getItemKey(apt, idx)}
-                        onClick={closeMobile}
-                        to={`/property_details/${apt.id ?? apt.listingId ?? idx}`}
-                        className="block py-1"
+                {isHomesMobileOpen && (
+                  <div id="mobile-homes-menu" className="mobile-submenu">
+                    {homes.map((home) => (
+                      <Link
+                        key={home.roomNo}
+                        to={home.href}
+                        role="menuitem"
+                        className="block py-1 text-sm"
+                        onClick={handleHomeSelect}
                       >
-                        {apt.property_name || apt.title}
-                      </NavLink>
+                        {home.title}
+                      </Link>
                     ))}
                   </div>
                 )}
@@ -201,7 +301,7 @@ const Navbar = () => {
                 {item.label}
               </NavLink>
             )
-          )}
+          ))}
 
           {/* MOBILE ACTIONS */}
           <div className="mt-2 flex flex-col gap-2">
@@ -214,19 +314,20 @@ const Navbar = () => {
               type="button"
               className="book-now text-center"
               onClick={handleBookNow}
+              aria-busy={ctaStatus === 'navigating'}
+              data-state={ctaStatus}
             >
               {ctaNav.label}
             </button>
 
-            <a
-              href={whatsappLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="help-link text-center"
-              onClick={closeMobile}
-            >
-              Need help?
-            </a>
+            {ctaStatus !== 'idle' && (
+              <span className="book-now-status" role="status" aria-live="polite">
+                {ctaStatus === 'navigating'
+                  ? 'Opening reservation...'
+                  : 'Bringing booking form into view...'}
+              </span>
+            )}
+
           </div>
         </div>
       )}

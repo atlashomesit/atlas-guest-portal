@@ -1,8 +1,10 @@
 import { Component, ReactNode } from 'react';
-import { Button } from './ui/Button';
+import ErrorLayout from './ErrorLayout';
+import { reportError, logUserAction } from '../lib/monitoring';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
+  name?: string;
 }
 
 interface ErrorBoundaryState {
@@ -21,9 +23,9 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   }
 
   componentDidCatch(error: Error, errorInfo: unknown) {
-    if (import.meta.env.DEV) {
-      console.error('Application error caught by boundary', error, errorInfo);
-    }
+    const boundaryName = this.props.name ?? 'app';
+    logUserAction('error_boundary_triggered', { boundary: boundaryName });
+    reportError(error, { boundaryName, errorInfo, tags: { boundary: boundaryName } });
   }
 
   handleReload = () => {
@@ -33,24 +35,12 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-bg-muted text-center p-6 gap-4">
-          <h1 className="text-2xl font-semibold text-text-primary">Something went wrong</h1>
-          <p className="text-text-muted max-w-xl">
-            Please try reloading the page. If the problem persists, contact support or return to the home page to continue
-            browsing.
-          </p>
-          <div className="flex gap-3 flex-wrap justify-center">
-            <Button type="button" onClick={this.handleReload}>
-              Reload
-            </Button>
-            <a
-              href="/"
-              className="px-5 py-2 border border-border-subtle text-text-primary rounded-lg shadow-level1 hover:bg-bg-muted transition"
-            >
-              Back to Home
-            </a>
-          </div>
-        </div>
+        <ErrorLayout
+          title="We couldn’t load this page"
+          description="Something unexpected happened while rendering this view. Please try again or head back to the home page."
+          primaryAction={{ label: "Try again", onClick: this.handleReload }}
+          secondaryAction={{ label: "Back to home", href: "/" }}
+        />
       );
     }
 

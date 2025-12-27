@@ -36,6 +36,11 @@ No structured flags or placeholders exist for banner, services, why-choose, test
 - [ ] Sanity check that enabling each flag swaps to placeholder variants without crashing.
 - [ ] Run lint/tests if applicable.
 
+### Navigation + sitemap QA (routing cleanup)
+- Apartments overview entry is removed from header/footer navigation; discovery now happens from the Home “Our Homes” section anchor.
+- Visiting `/apartments` should redirect to `/#our-homes` without throwing an app error.
+- Sitemap generation uses the current host (dev/prod) and excludes `/apartments`.
+
 ## Rollout flags per section (5–8)
 - Secondary banner: `enableSecondaryBannerRemoved`, `enableSecondaryBannerValueBlock`, `enableSecondaryBannerImprovedOverlay`.
 - Services: `enableServicesConcreteCopy`, `enableServicesIconography`, `enableServicesOneLineDescriptions`, `enableServicesAlternatingBackgrounds`.

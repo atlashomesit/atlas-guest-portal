@@ -1,7 +1,9 @@
 // BookingCardPricingPaymentSection.tsx
 import React from 'react';
+import { toast } from 'react-toastify';
 import { format } from 'date-fns';
 import { inlinePolicySnippets } from '../../../content/terms';
+import { logApiError } from '../../../lib/monitoring';
 import { FaUserFriends, FaCreditCard, FaCcVisa, FaCcMastercard } from 'react-icons/fa';
 import { SiGooglepay, SiRazorpay } from 'react-icons/si';
 
@@ -31,7 +33,10 @@ interface BookingCardPricingPaymentSectionProps {
   termsAcceptedAt: string | null;
   setTermsAcceptedAt: React.Dispatch<React.SetStateAction<string | null>>;
   initiatePayment: () => void;
+  onProceedToCheckout: () => void;
   primaryCtaLabel: string;
+  availabilityStatus: 'idle' | 'checking' | 'available';
+  ctaConfirmation: string | null;
   paymentStatus:
     | { state: 'idle' }
     | {
@@ -69,6 +74,9 @@ interface BookingCardPricingPaymentSectionProps {
   setUserEmail: React.Dispatch<React.SetStateAction<string>>;
   userPhone: string;
   setUserPhone: React.Dispatch<React.SetStateAction<string>>;
+  formErrors: { email?: string; phone?: string; dates?: string; guests?: string; terms?: string };
+  averageRating?: number;
+  reviewCount?: number;
 }
 
 export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymentSectionProps> = ({
@@ -89,7 +97,10 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
   termsAcceptedAt,
   setTermsAcceptedAt,
   initiatePayment,
+  onProceedToCheckout,
   primaryCtaLabel,
+  availabilityStatus,
+  ctaConfirmation,
   paymentStatus,
   setPaymentStatus,
   formatGuestLabel,
@@ -104,7 +115,16 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
   setUserEmail,
   userPhone,
   setUserPhone,
+  formErrors,
+  averageRating,
+  reviewCount,
 }) => {
+  const isCheckingAvailability = availabilityStatus === 'checking';
+  const buttonIsBusy = isCheckingAvailability || isLoading;
+  const ratingSnippet = averageRating
+    ? `${averageRating.toFixed(2)} / 5${reviewCount ? ` · ${reviewCount} reviews` : ''}`
+    : 'Guest ratings updating soon';
+
   return (
     <>
       {hasSelection && hasInteractedWithDates && (
@@ -200,10 +220,16 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
               onChange={(e) => setUserEmail(e.target.value)}
               placeholder="your.email@example.com"
               required
-              disabled={isLoading}
-              className="w-full px-4 py-2.5 rounded-lg border border-border-subtle bg-bg-surface text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-cta-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={buttonIsBusy}
+              aria-invalid={Boolean(formErrors.email)}
+              className={`w-full px-4 py-2.5 rounded-lg bg-bg-surface text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed ${
+                formErrors.email
+                  ? 'border border-support-error focus:ring-support-error focus:border-support-error'
+                  : 'border border-border-subtle focus:ring-cta-primary focus:border-transparent'
+              }`}
             />
             <p className="text-xs text-text-muted mt-1">We'll send your booking confirmation here</p>
+            {formErrors.email && <p className="text-xs text-support-error mt-1" role="alert">{formErrors.email}</p>}
           </div>
 
           <div>
@@ -217,10 +243,16 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
               onChange={(e) => setUserPhone(e.target.value)}
               placeholder="+91 98765 43210"
               required
-              disabled={isLoading}
-              className="w-full px-4 py-2.5 rounded-lg border border-border-subtle bg-bg-surface text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-cta-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={buttonIsBusy}
+              aria-invalid={Boolean(formErrors.phone)}
+              className={`w-full px-4 py-2.5 rounded-lg bg-bg-surface text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed ${
+                formErrors.phone
+                  ? 'border border-support-error focus:ring-support-error focus:border-support-error'
+                  : 'border border-border-subtle focus:ring-cta-primary focus:border-transparent'
+              }`}
             />
             <p className="text-xs text-text-muted mt-1">For booking confirmation and support</p>
+            {formErrors.phone && <p className="text-xs text-support-error mt-1" role="alert">{formErrors.phone}</p>}
           </div>
         </div>
 
@@ -231,7 +263,7 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
               name="payment-method"
               className="h-5 w-5 text-cta-primary focus:ring-cta-primary"
               defaultChecked
-              disabled={isLoading}
+              disabled={buttonIsBusy}
             />
             <div className="flex items-center">
               <img src="https://cdn.razorpay.com/logo.svg" alt="Razorpay" className="h-6 mr-2" />
@@ -266,6 +298,12 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
           </div>
         </div>
 
+        <div className="rounded-xl border border-border-subtle bg-[color:color-mix(in_srgb,var(--bg-muted)_45%,var(--bg-surface))] px-4 py-3 flex flex-wrap items-center gap-2 text-xs font-semibold text-text-primary">
+          <span className="inline-flex items-center gap-1 rounded-full bg-bg-surface px-2 py-1">No hidden fees</span>
+          <span className="inline-flex items-center gap-1 rounded-full bg-bg-surface px-2 py-1">Secure Razorpay payments</span>
+          <span className="inline-flex items-center gap-1 rounded-full bg-bg-surface px-2 py-1">Avg. rating: {ratingSnippet}</span>
+        </div>
+
         <label className="flex items-start gap-2 text-sm text-text-primary">
           <input
             type="checkbox"
@@ -278,13 +316,22 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
           />
           <span>
             I agree to the{' '}
-            <a className="underline" href="/terms">
+            <a
+              className="underline"
+              href="/terms"
+              onClick={(event) => event.stopPropagation()}
+            >
               Terms &amp; Conditions
             </a>{' '}
             and the policies above.
             {termsAcceptedAt && (
               <span className="block text-text-muted">
                 Accepted at {new Date(termsAcceptedAt).toLocaleString()}
+              </span>
+            )}
+            {formErrors.terms && (
+              <span className="block text-support-error text-xs" role="alert">
+                {formErrors.terms}
               </span>
             )}
           </span>
@@ -295,12 +342,34 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            initiatePayment();
+            if (!termsAccepted) {
+              setPaymentStatus({
+                state: 'failure',
+                reason: 'Please accept the Terms & Conditions to continue.',
+              });
+              return;
+            }
+
+            try {
+              onProceedToCheckout();
+            } catch (error) {
+              logApiError(error, {
+                url: '/api/payment',
+                method: 'POST',
+                category: 'payment',
+                tags: { provider: 'razorpay', surface: 'booking_form' },
+              });
+              toast.error('Could not start checkout. Please try again.');
+              setPaymentStatus({
+                state: 'failure',
+                reason: 'Could not start checkout. Please try again.',
+              });
+            }
           }}
-          disabled={isLoading || !termsAccepted || !userEmail || !userPhone}
+          disabled={buttonIsBusy || !termsAccepted || !userEmail || !userPhone}
           className="bg-cta-primary hover:bg-cta-secondary text-[var(--text-contrast)] w-full rounded-full py-4 text-lg font-semibold transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center shadow-level1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
         >
-          {isLoading ? (
+          {buttonIsBusy ? (
             <>
               <svg
                 className="animate-spin -ml-1 mr-3 h-5 w-5 text-[var(--text-contrast)]"
@@ -322,12 +391,27 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
                   d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                 ></path>
               </svg>
-              Processing...
+              {isCheckingAvailability ? 'Checking availability...' : 'Processing...'}
             </>
           ) : (
             primaryCtaLabel
           )}
         </button>
+
+        <p className="mt-1 text-center text-xs font-semibold text-text-muted">Total shown before payment; no hidden charges.</p>
+
+        {(formErrors.dates || formErrors.guests) && (
+          <div className="mt-2 space-y-1 text-sm text-support-error" role="alert">
+            {formErrors.dates && <p>{formErrors.dates}</p>}
+            {formErrors.guests && <p>{formErrors.guests}</p>}
+          </div>
+        )}
+
+        {ctaConfirmation && (
+          <p className="mt-3 text-sm font-semibold text-cta-primary" aria-live="polite">
+            {ctaConfirmation}
+          </p>
+        )}
 
         {paymentStatus.state === 'success' && (
           <div
@@ -427,22 +511,26 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
             'calc(var(--safe-area-bottom, env(safe-area-inset-bottom, 0px)) + 0.75rem)',
         }}
       >
-        <div className="flex flex-col text-xs text-text-muted">
-          <div className="font-semibold text-text-primary text-sm">
-            {format(dates.startDate, 'dd MMM')} - {format(dates.endDate, 'dd MMM')}
+          <div className="flex flex-col text-xs text-text-muted">
+            <div className="font-semibold text-text-primary text-sm">
+              {format(dates.startDate, 'dd MMM')} - {format(dates.endDate, 'dd MMM')}
+            </div>
+            <div className="flex items-center gap-1 text-text-primary text-sm">
+              <FaUserFriendsIcon className="h-4 w-4" />
+              <span>{formatGuestLabel()}</span>
+            </div>
+          <p className="text-[11px] text-text-muted">Total shown before payment; no hidden charges.</p>
           </div>
-          <div className="flex items-center gap-1 text-text-primary text-sm">
-            <FaUserFriendsIcon className="h-4 w-4" />
-            <span>{formatGuestLabel()}</span>
-          </div>
-          <p className="text-[11px] text-text-muted">No hidden charges</p>
-        </div>
         <div className="text-right">
           <p className="text-xs text-text-muted">Total</p>
           <p className="text-lg font-semibold">₹{totalPrice.toLocaleString('en-IN')}</p>
           <button
-            onClick={initiatePayment}
-            disabled={isLoading || !termsAccepted}
+            type="button"
+            onClick={(event) => {
+              event.preventDefault();
+              onProceedToCheckout();
+            }}
+            disabled={buttonIsBusy || !termsAccepted}
             className="mt-1 bg-cta-primary hover:bg-cta-secondary text-[var(--text-contrast)] rounded-full px-4 py-2 text-sm font-semibold transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed shadow-level1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
           >
             {primaryCtaLabel}

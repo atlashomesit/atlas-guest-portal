@@ -1,5 +1,6 @@
 import React from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { createPortal } from 'react-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { BadgePercent, CheckCircle2, CalendarRange, ChevronDown, ShieldCheck, Users } from 'lucide-react';
 import { addDays, format, startOfDay } from 'date-fns';
 import { DateRange, type RangeKeyDict } from 'react-date-range';
@@ -9,22 +10,25 @@ import { LOGO_URL } from '../../../config/branding';
 import { HERO_IMAGE_URL } from '../../../config/hero';
 import { trackEvent } from '../../../utils/analytics';
 import { heroWidgetLayoutFlag } from '../../../config/abFlags';
+import getApiBaseUrl from '../../../utils/apiBaseUrl';
 import { TrustBadge } from '../../ui/TrustBadge';
+import { useBooking } from '../../../contexts/BookingContext';
 
 const HERO_OVERLAY_GRADIENT =
   'linear-gradient(118deg, rgba(7, 10, 18, 0.92) 0%, rgba(7, 10, 18, 0.78) 42%, rgba(7, 10, 18, 0.62) 100%)';
 const HERO_OVERLAY_GRADIENT_LEGACY =
   'linear-gradient(115deg, rgba(7, 10, 18, 0.82) 0%, rgba(7, 10, 18, 0.64) 45%, rgba(7, 10, 18, 0.38) 100%)';
-const STORAGE_KEY = 'atlasHeroSearch';
-
 const TRUST_BADGES = [
   { label: 'Verified homes', icon: CheckCircle2 },
   { label: 'Secure Razorpay payments', icon: ShieldCheck },
   { label: 'No hidden fees', icon: BadgePercent },
 ];
+const MIN_GUESTS = 1;
+const MAX_GUESTS = 20;
 
 const Slider = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const enableWidgetExperiment = heroWidgetLayoutFlag();
 
   const overlayStyle = React.useMemo(() => {
@@ -56,6 +60,8 @@ const Slider = () => {
     defaultRange,
   );
   const [guests, setGuests] = React.useState(2);
+  const [dateError, setDateError] = React.useState<string | null>(null);
+  const [guestError, setGuestError] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -67,6 +73,13 @@ const Slider = () => {
   const hasInteractedRef = React.useRef(false);
   const latestWidgetStateRef = React.useRef({ hasSelection: false, guests });
   const calendarWrapperRef = React.useRef<HTMLDivElement | null>(null);
+  const calendarDropdownRef = React.useRef<HTMLDivElement | null>(null);
+  const [calendarPosition, setCalendarPosition] = React.useState<{ top: number; left: number; width: number }>();
+  const dateErrorId = React.useId();
+  const guestsLabelId = React.useId();
+  const guestsHelperId = React.useId();
+  const guestsErrorId = React.useId();
+  const { booking, updateBooking } = useBooking();
   const monthsToShow = React.useMemo(
     () => (typeof window !== 'undefined' && window.innerWidth < 768 ? 1 : 2),
     [],
@@ -80,74 +93,149 @@ const Slider = () => {
 
   const clampRange = (startDate: Date | null, endDate: Date | null) => {
     const normalizedStart = startDate && startDate < today ? today : startDate;
-    if (normalizedStart && endDate && endDate <= normalizedStart) {
-      return { startDate: normalizedStart, endDate: addDays(normalizedStart, 1) };
+    let normalizedEnd = endDate ?? null;
+    let errorMessage: string | null = startDate && startDate < today ? 'Check-in cannot be in the past.' : null;
+
+    if (normalizedStart && normalizedEnd && normalizedEnd <= normalizedStart) {
+      normalizedEnd = addDays(normalizedStart, 1);
+      errorMessage = 'Minimum stay is 1 night after check-in.';
     }
-    return { startDate: normalizedStart ?? null, endDate: endDate ?? null };
+
+    return { startDate: normalizedStart ?? null, endDate: normalizedEnd, error: errorMessage };
   };
 
-  const hydrateFromStorage = () => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (!saved) return null;
-      const parsed = JSON.parse(saved) as { checkIn?: string; checkOut?: string; guests?: number };
-      return {
-        startDate: parseDate(parsed.checkIn),
-        endDate: parseDate(parsed.checkOut),
-        guests: typeof parsed.guests === 'number' && parsed.guests > 0 ? parsed.guests : null,
-      };
-    } catch {
-      return null;
+  const validateGuests = (value: number) => {
+    if (value < MIN_GUESTS) {
+      return 'Guests must be at least 1.';
     }
+
+    if (value > MAX_GUESTS) {
+      return `Guests cannot exceed ${MAX_GUESTS}.`;
+    }
+
+    return null;
   };
+
+  const hydrateFromContext = React.useCallback(
+    () => ({
+      startDate: parseDate(booking.checkIn),
+      endDate: parseDate(booking.checkOut),
+      guests: booking.guests > 0 ? booking.guests : null,
+      propertyId: booking.propertyId ?? null,
+    }),
+    [booking.checkIn, booking.checkOut, booking.guests, booking.propertyId],
+  );
+
+  const bookingPrefill = React.useMemo(() => {
+    const state = location.state as
+      | {
+          bookingPrefill?: {
+            propertyId?: string | number | null;
+            checkIn?: string | null;
+            checkOut?: string | null;
+            guests?: number | null;
+          };
+        }
+      | null;
+
+    return state?.bookingPrefill ?? null;
+  }, [location.state]);
 
   React.useEffect(() => {
-    const stored = hydrateFromStorage();
+    const stored = hydrateFromContext();
     const paramRange = {
       startDate: parseDate(searchParams.get('checkIn')),
       endDate: parseDate(searchParams.get('checkOut')),
       guests: Number(searchParams.get('guests')) || null,
     };
 
-    const startDate = paramRange.startDate ?? stored?.startDate ?? defaultRange.startDate;
-    const endDate = paramRange.endDate ?? stored?.endDate ?? defaultRange.endDate;
+    const stateRange = bookingPrefill
+      ? {
+          startDate: parseDate(bookingPrefill.checkIn),
+          endDate: parseDate(bookingPrefill.checkOut),
+          guests: bookingPrefill.guests && bookingPrefill.guests > 0 ? bookingPrefill.guests : null,
+          propertyId: bookingPrefill.propertyId ?? null,
+        }
+      : null;
+
+    const startDate = stateRange?.startDate ?? paramRange.startDate ?? stored?.startDate ?? defaultRange.startDate;
+    const endDate = stateRange?.endDate ?? paramRange.endDate ?? stored?.endDate ?? defaultRange.endDate;
 
     const nextRange = clampRange(startDate, endDate);
+    const nextGuests =
+      (stateRange?.guests && stateRange.guests > 0
+        ? stateRange.guests
+        : null) || (paramRange.guests && paramRange.guests > 0 ? paramRange.guests : stored?.guests ?? guests);
+    const nextPropertyId = stateRange?.propertyId ?? stored?.propertyId ?? null;
+    const normalizedGuests = nextGuests ?? guests;
 
-    setDateRange(nextRange);
-    if (paramRange.guests && paramRange.guests > 0) {
-      setGuests(paramRange.guests);
-    } else if (stored?.guests) {
-      setGuests(stored.guests);
-    }
-  }, [defaultRange.endDate, defaultRange.startDate, searchParams]);
+    setDateRange({ startDate: nextRange.startDate, endDate: nextRange.endDate });
+    setDateError(null);
+    setGuestError(validateGuests(normalizedGuests));
+    setGuests(normalizedGuests);
+    updateBooking({
+      checkIn: nextRange.startDate?.toISOString() ?? null,
+      checkOut: nextRange.endDate?.toISOString() ?? null,
+      guests: nextGuests,
+      propertyId: nextPropertyId,
+    });
+  }, [
+    bookingPrefill,
+    defaultRange.endDate,
+    defaultRange.startDate,
+    hydrateFromContext,
+    searchParams,
+    updateBooking,
+  ]);
 
   React.useEffect(() => {
-    try {
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({
-          checkIn: dateRange.startDate?.toISOString(),
-          checkOut: dateRange.endDate?.toISOString(),
-          guests,
-        }),
-      );
-    } catch {
-      // Ignore storage write errors
-    }
-  }, [dateRange.endDate, dateRange.startDate, guests]);
+    if (!isCalendarOpen || typeof window === 'undefined') return;
 
-  React.useEffect(() => {
-    if (!isCalendarOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const updateDropdownPosition = () => {
+      if (!calendarWrapperRef.current) return;
+      const rect = calendarWrapperRef.current.getBoundingClientRect();
+      const spacing = 12;
+      const viewportWidth = window.innerWidth;
+      const desiredWidth = Math.min(Math.max(rect.width, 360), viewportWidth - spacing * 2);
+      const left = Math.min(Math.max(rect.left, spacing), viewportWidth - desiredWidth - spacing) + window.scrollX;
+      const top = rect.bottom + window.scrollY + 8;
+      setCalendarPosition({ top, left, width: desiredWidth });
+    };
 
     const handleClickOutside = (event: MouseEvent) => {
-      if (calendarWrapperRef.current && !calendarWrapperRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (
+        calendarDropdownRef.current &&
+        !calendarDropdownRef.current.contains(target) &&
+        calendarWrapperRef.current &&
+        !calendarWrapperRef.current.contains(target)
+      ) {
         setIsCalendarOpen(false);
       }
     };
 
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsCalendarOpen(false);
+      }
+    };
+
+    updateDropdownPosition();
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+    window.addEventListener('resize', updateDropdownPosition);
+    window.addEventListener('scroll', updateDropdownPosition, true);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+      window.removeEventListener('resize', updateDropdownPosition);
+      window.removeEventListener('scroll', updateDropdownPosition, true);
+    };
   }, [isCalendarOpen]);
 
   React.useEffect(() => {
@@ -170,6 +258,14 @@ const Slider = () => {
     };
   }, [dateRange.endDate, dateRange.startDate, guests]);
 
+  React.useEffect(() => {
+    updateBooking({
+      checkIn: dateRange.startDate?.toISOString() ?? null,
+      checkOut: dateRange.endDate?.toISOString() ?? null,
+      guests,
+    });
+  }, [dateRange.endDate, dateRange.startDate, guests, updateBooking]);
+
   React.useEffect(
     () => () => {
       if (hasInteractedRef.current && !hasTrackedDropoff.current) {
@@ -184,7 +280,7 @@ const Slider = () => {
     [],
   );
 
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (isSubmitting) return;
 
@@ -192,7 +288,9 @@ const Slider = () => {
     setStatusMessage('');
     markHeroInteraction();
 
-    const { startDate, endDate } = dateRange;
+    const { startDate, endDate, error: rangeError } = clampRange(dateRange.startDate, dateRange.endDate);
+    setDateRange({ startDate, endDate });
+    setDateError(rangeError);
 
     if (!startDate || !endDate) {
       setError('Please select your check-in and check-out dates.');
@@ -200,22 +298,18 @@ const Slider = () => {
       return;
     }
 
-    if (endDate <= startDate) {
-      setError('Check-out must be after check-in.');
-      setStatusMessage('Check-out must be after check-in.');
-      return;
+    if (rangeError) {
+      setError(rangeError);
+      setStatusMessage(rangeError);
+    } else {
+      setError(null);
     }
 
-    if (startDate < today) {
-      setDateRange(clampRange(today, endDate));
-      setError('Check-in cannot be in the past.');
-      setStatusMessage('Check-in adjusted to the next available date.');
-      return;
-    }
-
-    if (guests < 1) {
-      setError('Guests must be at least 1.');
-      setStatusMessage('Add at least one guest to continue.');
+    const guestValidation = validateGuests(guests);
+    setGuestError(guestValidation);
+    if (guestValidation) {
+      setError(guestValidation);
+      setStatusMessage(guestValidation);
       return;
     }
 
@@ -228,6 +322,8 @@ const Slider = () => {
       guests: guests.toString(),
     });
 
+    const listingSearchRoute = `/search?${searchParams.toString()}`;
+
     trackEvent(
       'availability_search',
       {
@@ -236,13 +332,13 @@ const Slider = () => {
         checkOut: endDate.toISOString(),
         guests,
       },
-      { route: `/apartments?${searchParams.toString()}` },
+      { route: listingSearchRoute },
     );
 
     trackEvent(
       'listings_browse',
       { surface: 'hero_form', checkIn: startDate.toISOString(), checkOut: endDate.toISOString(), guests },
-      { route: `/apartments?${searchParams.toString()}` },
+      { route: listingSearchRoute },
     );
 
     trackEvent(
@@ -253,14 +349,74 @@ const Slider = () => {
         checkOut: endDate.toISOString(),
         guests,
       },
-      { route: `/apartments?${searchParams.toString()}` },
+      { route: listingSearchRoute },
     );
 
-    setIsSubmitting(true);
-    setStatusMessage('Checking availability...');
+    let availabilityUrl = '';
+    let controller: AbortController | null = null;
+    let timeoutId: number | null = null;
+    const startedAt = performance.now();
 
-    navigate(`/apartments?${searchParams.toString()}`);
-    window.setTimeout(() => setIsSubmitting(false), 800);
+    try {
+      const apiBaseUrl = getApiBaseUrl();
+      availabilityUrl = apiBaseUrl
+        ? `${apiBaseUrl}/availability?checkIn=${formattedCheckIn}&checkOut=${formattedCheckOut}&guests=${guests}`
+        : '';
+      controller = availabilityUrl && typeof AbortController !== 'undefined' ? new AbortController() : null;
+      timeoutId = controller ? window.setTimeout(() => controller.abort(), 10_000) : null;
+    } catch (configError) {
+      console.error('Hero availability configuration error:', configError);
+      trackEvent(
+        'availability_search_config_error',
+        {
+          surface: 'hero_form',
+          message: configError instanceof Error ? configError.message : 'Unknown configuration error',
+        },
+        { route: listingSearchRoute },
+      );
+      setStatusMessage('Showing all homes while we resolve a configuration issue.');
+      setError('We could not confirm availability due to a configuration issue. Showing all homes instead.');
+      navigate({ pathname: '/search', search: searchParams.toString() });
+      return;
+    }
+
+    setIsSubmitting(true);
+    setStatusMessage(availabilityUrl ? 'Checking availability...' : 'Showing all homes while we confirm availability.');
+
+    try {
+      if (availabilityUrl) {
+        const response = await fetch(availabilityUrl, { signal: controller?.signal });
+        const durationMs = Math.round(performance.now() - startedAt);
+
+        trackEvent(
+          'availability_search_result',
+          { surface: 'hero_form', ok: response.ok, status: response.status, durationMs },
+          { route: listingSearchRoute },
+        );
+
+        if (!response.ok) {
+          throw new Error(`Availability check failed with status ${response.status}`);
+        }
+
+        setStatusMessage('Showing available homes for your dates.');
+      } else {
+        setStatusMessage('Showing all homes while we confirm availability.');
+      }
+    } catch (fetchError) {
+      const durationMs = Math.round(performance.now() - startedAt);
+      trackEvent(
+        'availability_search_result',
+        { surface: 'hero_form', ok: false, status: 'error', durationMs },
+        { route: listingSearchRoute },
+      );
+      setError('We could not confirm availability right now. Showing all homes instead.');
+      setStatusMessage('Unable to confirm availability right now. Showing all homes.');
+      console.error('Hero availability check failed:', fetchError);
+    } finally {
+      if (timeoutId) window.clearTimeout(timeoutId);
+      setIsSubmitting(false);
+      navigate({ pathname: '/search', search: searchParams.toString() });
+    }
   };
 
   const handleRangeChange = (ranges: RangeKeyDict) => {
@@ -268,9 +424,11 @@ const Slider = () => {
     const normalizedStart = selection.startDate ? startOfDay(selection.startDate) : null;
     const normalizedEnd = selection.endDate ? startOfDay(selection.endDate) : null;
     markHeroInteraction();
-    setStatusMessage('Updated dates.');
-    setDateRange(clampRange(normalizedStart, normalizedEnd));
-    setError(null);
+    const nextRange = clampRange(normalizedStart, normalizedEnd);
+    setStatusMessage(nextRange.error ?? 'Updated dates.');
+    setDateError(nextRange.error);
+    setDateRange({ startDate: nextRange.startDate, endDate: nextRange.endDate });
+    setError(nextRange.error);
     trackEvent('hero_dates_changed', {
       surface: 'hero_form',
       checkIn: normalizedStart?.toISOString(),
@@ -284,12 +442,18 @@ const Slider = () => {
   const checkInLabel = dateRange.startDate ? format(dateRange.startDate, 'dd MMM yyyy') : 'Check-in';
   const checkOutLabel = dateRange.endDate ? format(dateRange.endDate, 'dd MMM yyyy') : 'Check-out';
   const isSubmitDisabled =
-    !dateRange.startDate || !dateRange.endDate || dateRange.endDate <= dateRange.startDate || guests < 1;
+    !dateRange.startDate ||
+    !dateRange.endDate ||
+    dateRange.endDate <= dateRange.startDate ||
+    guests < 1 ||
+    Boolean(dateError || guestError);
 
   const handleGuestChange = (delta: number) => {
     markHeroInteraction();
     setGuests((prev) => {
-      const next = Math.min(16, Math.max(1, prev + delta));
+      const proposed = prev + delta;
+      const next = Math.min(MAX_GUESTS, Math.max(MIN_GUESTS, proposed));
+      setGuestError(validateGuests(proposed));
       trackEvent('hero_guests_changed', { surface: 'hero_form', guests: next });
       return next;
     });
@@ -303,15 +467,18 @@ const Slider = () => {
   };
 
   const formContainerClass = enableWidgetExperiment
-    ? 'w-full max-w-5xl rounded-3xl bg-[color:color-mix(in_srgb,var(--bg-surface)_96%,rgba(3,6,14,0.45))] shadow-[0_20px_60px_rgba(0,0,0,0.45)] backdrop-blur-md border border-[color:color-mix(in_srgb,var(--bg-surface)_60%,transparent)] p-4 sm:p-5 md:p-6 flex flex-col gap-4 sm:gap-5'
-    : 'w-full max-w-5xl rounded-3xl bg-[color:color-mix(in_srgb,var(--bg-surface)_94%,rgba(0,0,0,0.18))] shadow-level3 backdrop-blur border border-[color:color-mix(in_srgb,var(--bg-surface)_55%,transparent)] p-4 sm:p-5 md:p-6 flex flex-col gap-4 sm:gap-5';
+    ? 'hero-form w-full max-w-5xl rounded-3xl bg-[color:color-mix(in_srgb,var(--bg-surface)_96%,rgba(3,6,14,0.45))] shadow-[0_20px_60px_rgba(0,0,0,0.45)] backdrop-blur-md border border-[color:color-mix(in_srgb,var(--bg-surface)_60%,transparent)] p-4 sm:p-5 md:p-6 flex flex-col gap-4 sm:gap-5'
+    : 'hero-form w-full max-w-5xl rounded-3xl bg-[color:color-mix(in_srgb,var(--bg-surface)_94%,rgba(0,0,0,0.18))] shadow-level3 backdrop-blur border border-[color:color-mix(in_srgb,var(--bg-surface)_55%,transparent)] p-4 sm:p-5 md:p-6 flex flex-col gap-4 sm:gap-5';
 
   const formGridClass = enableWidgetExperiment
-    ? 'grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 md:auto-rows-fr lg:grid-cols-4 lg:gap-5'
-    : 'grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 md:auto-rows-fr lg:grid-cols-4 lg:gap-5';
+    ? 'hero-form-grid grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 md:auto-rows-fr lg:grid-cols-4 lg:gap-5'
+    : 'hero-form-grid grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 md:auto-rows-fr lg:grid-cols-4 lg:gap-5';
 
   const fieldShellClass =
     'flex h-full min-h-[112px] flex-col justify-between rounded-2xl border border-[color:color-mix(in_srgb,var(--border-subtle)_80%,transparent)] bg-[color:color-mix(in_srgb,var(--bg-muted)_92%,var(--bg-surface))] px-4 py-4 sm:px-5 sm:py-5 shadow-[0_12px_36px_rgba(6,8,15,0.32)]';
+  const dateFieldShellClass = `${fieldShellClass}${
+    dateError ? ' border-support-error shadow-[0_0_0_1px_var(--support-error)]' : ''
+  }`;
   const labelClass =
     'flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-[color-mix(in_srgb,var(--text-primary)_80%,transparent)] whitespace-nowrap';
   const helperTextClass = 'mt-2 text-sm leading-snug text-[color-mix(in_srgb,var(--text-primary)_78%,transparent)]';
@@ -354,6 +521,7 @@ const Slider = () => {
             onSubmit={handleSubmit}
             className={formContainerClass}
             data-testid="hero-widget"
+            id="search-form"
           >
             <div className="sr-only" role="status" aria-live="polite">
               {statusMessage || error || 'Hero form ready'}
@@ -365,12 +533,14 @@ const Slider = () => {
               <div className="relative">
                 <button
                   type="button"
-                  className={`${fieldShellClass} text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary`}
-                  aria-label="Select check-in date"
-                  aria-expanded={isCalendarOpen}
-                  onClick={() => setIsCalendarOpen((open) => !open)}
-                  data-testid="hero-date-toggle"
-                >
+                className={`${dateFieldShellClass} text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary`}
+                aria-label="Select check-in date"
+                aria-expanded={isCalendarOpen}
+                aria-describedby={dateError ? dateErrorId : undefined}
+                aria-invalid={dateError ? true : undefined}
+                onClick={() => setIsCalendarOpen((open) => !open)}
+                data-testid="hero-date-toggle"
+              >
                   <span className={labelClass}>
                     <CalendarRange className="h-4 w-4 shrink-0" aria-hidden="true" />
                     <span className="truncate">Check-in</span>
@@ -379,49 +549,72 @@ const Slider = () => {
                     {checkInLabel}
                     <ChevronDown className={`h-4 w-4 shrink-0 text-text-muted transition ${isCalendarOpen ? 'rotate-180' : ''}`} aria-hidden />
                   </span>
-                  <span className={helperTextClass}>Earliest available date shown.</span>
+                  <span className={helperTextClass}>
+                    Check-in cannot be in the past; minimum 1-night stay applies.
+                  </span>
+                  {dateError && (
+                    <span className="mt-2 text-sm font-semibold text-support-error" id={dateErrorId} role="alert">
+                      {dateError}
+                    </span>
+                  )}
                 </button>
 
-                {isCalendarOpen && (
-                  <div className="absolute left-0 right-0 z-[var(--z-dropdown)] mt-2 rounded-2xl border border-border-subtle bg-bg-surface p-3 shadow-level2 md:w-auto">
-                    {calendarReady ? (
-                      <DateRange
-                        onChange={handleRangeChange}
-                        months={monthsToShow}
-                        direction="horizontal"
-                        showDateDisplay={false}
-                        rangeColors={['var(--cta-primary)']}
-                        minDate={today}
-                        ranges={[
-                          {
-                            startDate: dateRange.startDate ?? today,
-                            endDate: dateRange.endDate ?? addDays(today, 1),
-                            key: 'selection',
-                          },
-                        ]}
-                        dayContentRenderer={(day) => (
-                          <div data-testid={`hero-date-${format(day, 'yyyy-MM-dd')}`}>{format(day, 'd')}</div>
-                        )}
-                      />
-                    ) : (
-                      <div className="grid grid-cols-7 gap-2">
-                        {Array.from({ length: 14 }).map((_, index) => (
-                          <div
-                            key={index}
-                            className="h-10 rounded-lg bg-[color:color-mix(in_srgb,var(--bg-muted)_75%,var(--bg-surface))] animate-pulse"
+                {isCalendarOpen &&
+                  calendarPosition &&
+                  createPortal(
+                    <div className="hero-date-portal" role="presentation">
+                      <div className="hero-date-overlay" onClick={() => setIsCalendarOpen(false)} />
+                      <div
+                        className="hero-date-dropdown rounded-2xl border border-border-subtle bg-bg-surface p-3 shadow-level2"
+                        style={{
+                          top: calendarPosition.top,
+                          left: calendarPosition.left,
+                          width: calendarPosition.width,
+                        }}
+                        ref={calendarDropdownRef}
+                      >
+                        {calendarReady ? (
+                          <DateRange
+                            onChange={handleRangeChange}
+                            months={monthsToShow}
+                            direction="horizontal"
+                            showDateDisplay={false}
+                            rangeColors={[dateError ? 'var(--support-error, #ef4444)' : 'var(--cta-primary)']}
+                            minDate={today}
+                            ranges={[
+                              {
+                                startDate: dateRange.startDate ?? today,
+                                endDate: dateRange.endDate ?? addDays(today, 1),
+                                key: 'selection',
+                              },
+                            ]}
+                            dayContentRenderer={(day) => (
+                              <div data-testid={`hero-date-${format(day, 'yyyy-MM-dd')}`}>{format(day, 'd')}</div>
+                            )}
                           />
-                        ))}
+                        ) : (
+                          <div className="grid grid-cols-7 gap-2">
+                            {Array.from({ length: 14 }).map((_, index) => (
+                              <div
+                                key={index}
+                                className="h-10 rounded-lg bg-[color:color-mix(in_srgb,var(--bg-muted)_75%,var(--bg-surface))] animate-pulse"
+                              />
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                )}
+                    </div>,
+                    document.body,
+                  )}
               </div>
 
               <button
                 type="button"
-                className={`${fieldShellClass} text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary md:-ml-[1px]`}
+                className={`${dateFieldShellClass} text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary md:-ml-[1px]`}
                 aria-label="Select check-out date"
                 aria-expanded={isCalendarOpen}
+                aria-describedby={dateError ? dateErrorId : undefined}
+                aria-invalid={dateError ? true : undefined}
                 onClick={() => setIsCalendarOpen((open) => !open)}
               >
                 <span className={labelClass}>
@@ -432,11 +625,17 @@ const Slider = () => {
                   {checkOutLabel}
                   <ChevronDown className={`h-4 w-4 shrink-0 text-text-muted transition ${isCalendarOpen ? 'rotate-180' : ''}`} aria-hidden />
                 </span>
-                <span className={helperTextClass}>Ensure your stay ends after check-in.</span>
+                <span className={helperTextClass}>Check-out must be at least 1 night after check-in.</span>
               </button>
 
-              <div className={`${fieldShellClass} text-left md:-ml-[1px]`}>
-                <span className={labelClass}>
+              <div
+                className={`${fieldShellClass} text-left md:-ml-[1px]`}
+                role="group"
+                aria-labelledby={guestsLabelId}
+                aria-describedby={`${guestsHelperId}${guestError ? ` ${guestsErrorId}` : ''}`}
+                aria-invalid={guestError ? true : undefined}
+              >
+                <span className={labelClass} id={guestsLabelId}>
                   <Users className="h-4 w-4 shrink-0" aria-hidden />
                   <span className="truncate">Guests</span>
                 </span>
@@ -463,7 +662,14 @@ const Slider = () => {
                     +
                   </button>
                 </div>
-                <span className={helperTextClass}>Defaulting to 2 guests; adjust anytime.</span>
+                <span className={helperTextClass} id={guestsHelperId}>
+                  Up to {MAX_GUESTS} guests per booking. Defaulting to 2 guests; adjust anytime.
+                </span>
+                {guestError && (
+                  <span className="mt-2 text-sm font-semibold text-support-error" id={guestsErrorId} role="alert">
+                    {guestError}
+                  </span>
+                )}
               </div>
 
               <div className={`${fieldShellClass} md:-ml-[1px] lg:min-h-[112px] lg:items-stretch lg:justify-center`}>
@@ -477,17 +683,17 @@ const Slider = () => {
                   {isSubmitting ? 'Checking...' : 'Check availability'}
                 </button>
                 <Link
-                  to="/apartments"
+                  to="/search"
                   onClick={() =>
                     trackEvent(
                       'listings_browse',
                       { surface: 'hero_secondary' },
-                      { route: '/apartments' },
+                      { route: '/search' },
                     )
                   }
                   className="inline-flex items-center justify-center text-sm font-semibold text-text-muted underline-offset-4 transition hover:text-cta-secondary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary whitespace-nowrap"
                 >
-                  Browse listings
+                  Browse all apartments
                 </Link>
               </div>
             </div>
