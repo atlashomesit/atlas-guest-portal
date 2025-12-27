@@ -1,11 +1,28 @@
 export const onRequestGet = ({ env }) => {
-  const rawValue = typeof env?.VITE_API_BASE_URL === "string" ? env.VITE_API_BASE_URL : "";
-  const trimmed = rawValue.trim();
-  const normalized = trimmed.endsWith("/") ? trimmed.slice(0, -1) : trimmed;
-  const apiBaseUrl = normalized;
-  const missingComment = apiBaseUrl ? "" : "// VITE_API_BASE_URL is missing from Cloudflare Pages environment variables.\n";
+  const normalize = (value) => {
+    const trimmed = typeof value === "string" ? value.trim() : "";
+    return trimmed;
+  };
 
-  const body = `${missingComment}window.__ATLAS_RUNTIME_CONFIG__ = { apiBaseUrl: ${JSON.stringify(apiBaseUrl)} };\n`;
+  const normalizeUrl = (value) => {
+    const normalized = normalize(value);
+    return normalized.endsWith("/") ? normalized.slice(0, -1) : normalized;
+  };
+
+  const apiBaseUrl = normalizeUrl(env?.VITE_API_BASE_URL);
+  const googleMapsApiKey = normalize(env?.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY);
+
+  const missingApiBaseComment = apiBaseUrl
+    ? ""
+    : "// VITE_API_BASE_URL is missing from Cloudflare Pages environment variables.\n";
+
+  const missingMapsKeyComment = googleMapsApiKey
+    ? ""
+    : "// NEXT_PUBLIC_GOOGLE_MAPS_API_KEY is missing from Cloudflare Pages environment variables.\n";
+
+  const body = `${missingApiBaseComment}${missingMapsKeyComment}window.__ATLAS_RUNTIME_CONFIG__ = { apiBaseUrl: ${JSON.stringify(
+    apiBaseUrl,
+  )}, googleMapsApiKey: ${JSON.stringify(googleMapsApiKey)} };\n`;
 
   return new Response(body, {
     headers: {
