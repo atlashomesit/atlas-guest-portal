@@ -25,7 +25,7 @@ const renderNavbar = () =>
   );
 
 describe("Navbar CTA", () => {
-  it("routes Book Now to the on-site Our Homes anchor", () => {
+  it("routes Book Now to the dedicated reserve flow", () => {
     renderNavbar();
 
     const bookNow = screen.getByRole("button", { name: /book now/i });
@@ -33,8 +33,8 @@ describe("Navbar CTA", () => {
 
     expect(trackEvent).toHaveBeenCalledWith(
       "cta_book_now_clicked",
-      expect.objectContaining({ source: "header", target: "search-form", surface: "navbar" }),
-      { route: "/#search-form" },
+      expect.objectContaining({ source: "header", target: "reserve", surface: "navbar" }),
+      { route: "/reserve" },
     );
   });
 
@@ -46,8 +46,8 @@ describe("Navbar CTA", () => {
 
     expect(trackEvent).toHaveBeenCalledWith(
       "cta_book_now_clicked",
-      expect.objectContaining({ source: "header", target: "search-form", surface: "navbar" }),
-      { route: "/#search-form" },
+      expect.objectContaining({ source: "header", target: "reserve", surface: "navbar" }),
+      { route: "/reserve" },
     );
   });
 
