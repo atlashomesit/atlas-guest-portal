@@ -3,10 +3,9 @@ import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import './navbar.css';
 
 import { IoIosCall } from 'react-icons/io';
-import { buildWaLink } from '../../../utils/whatsapp';
 import { primaryNav, ctaNav } from '../../../config/navigation';
 import { LOGO_URL } from '../../../config/branding';
-import { CONTACT, formatDisplayNumber, getTelLink } from '../../../config/contact';
+import { formatDisplayNumber, getTelLink } from '../../../config/contact';
 import { trackEvent } from '../../../utils/analytics';
 import { homes } from '../../../content/homes';
 
@@ -19,11 +18,6 @@ const Navbar = () => {
 
   const navigate = useNavigate();
   const location = useLocation();
-
-  const whatsappLink = buildWaLink({
-    phoneE164: CONTACT.business.whatsapp,
-    text: "Hi Atlas Homestays 👋 I'd like to learn more about booking a stay.",
-  });
 
   const telLink = getTelLink();
 
@@ -187,14 +181,6 @@ const Navbar = () => {
             {ctaNav.label}
           </button>
 
-          <a
-            href={whatsappLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="help-link"
-          >
-            Need help?
-          </a>
         </div>
       </div>
 
@@ -258,15 +244,6 @@ const Navbar = () => {
               {ctaNav.label}
             </button>
 
-            <a
-              href={whatsappLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="help-link text-center"
-              onClick={closeMobile}
-            >
-              Need help?
-            </a>
           </div>
         </div>
       )}

@@ -48,14 +48,6 @@ describe("Navbar CTA", () => {
     );
   });
 
-  it("keeps WhatsApp as the secondary help link", () => {
-    renderNavbar();
-
-    const helpLink = screen.getByRole("link", { name: /need help/i });
-    expect(helpLink).toHaveAttribute("href");
-    expect(helpLink.getAttribute("href")).toContain("wa.me");
-  });
-
   it("shows the Our Homes dropdown", async () => {
     renderNavbar();
 
