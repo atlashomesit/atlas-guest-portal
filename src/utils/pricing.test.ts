@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { calculateNightlyPrice } from "./pricing";
+import { calculateNightlyPrice, inferUnitType } from "./pricing";
 
 const resetEnv = () => {
   delete (process as any).env.VITE_GLOBAL_DISCOUNT_PERCENT;
@@ -82,5 +82,33 @@ describe("calculateNightlyPrice", () => {
 
     expect(result.dateMultiplier).toBe(3);
     expect(result.finalNightlyPrice).toBe(14940);
+  });
+});
+
+describe("inferUnitType", () => {
+  it("returns the metadata unit type when provided", () => {
+    expect(
+      inferUnitType({
+        property_name: "Atlas Homes Room 101",
+        metadata: { unitType: "1bhk" },
+      }),
+    ).toBe("1bhk");
+  });
+
+  it("supports snake_case metadata keys", () => {
+    expect(
+      inferUnitType({
+        name: "Atlas Penthouse 501",
+        property_metadata: { unit_type: "penthouse" },
+      }),
+    ).toBe("penthouse");
+  });
+
+  it("falls back to property name when metadata is missing", () => {
+    expect(inferUnitType({ name: "Skyline Penthouse" })).toBe("penthouse");
+  });
+
+  it("defaults to 1bhk when no hints are present", () => {
+    expect(inferUnitType({ id: "999", name: "Unknown" })).toBe("1bhk");
   });
 });

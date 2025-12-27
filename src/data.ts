@@ -134,6 +134,7 @@ export { propertyImages };
 export const propertyData = [
     {
         id: 501,
+        unitType: "penthouse",
         property_name: "Atlas Penthouse 501",
         property_description: `Perched high above Hyderabad’s energetic skyline, Atlas Penthouse 501 delivers a five-star
 retreat for guests who want a private sanctuary near the city’s tech corridor. Spanning more than 1,600 sq. ft. with
@@ -215,6 +216,7 @@ private bar setup, wine chiller, Nespresso machine, washer-dryer, ironing statio
     },
     {
         id: 201,
+        unitType: "1bhk",
         property_name: "Atlas Homes Room 201",
         property_description: `Imagine the convenience of being just 2 km from Hyderabad’s Cyber Towers while staying in a cozy 1BHK apartment designed for comfort. Atlas Homes Room 101, a 450 sq. ft. first-floor unit, blends affordability with modern amenities, making it ideal for professionals and families.
 
@@ -280,6 +282,7 @@ High-speed Wi-Fi (150 Mbps, multiple ISPs), air-conditioning in the bedroom, a f
     },
     {
         id: 202,
+        unitType: "1bhk",
         property_name: "Atlas Homes Room 202",
         property_description: `Welcome to Atlas Homes Room 202, a thoughtfully designed 450 sq. ft. 1BHK apartment in Hyderabad’s KPHB, just 2 km from Cyber Towers. This first-floor unit blends comfort and affordability, making it ideal for business travelers, couples, or families seeking a convenient stay near Hitech City.
 
@@ -348,6 +351,7 @@ Complimentary Wi-Fi, air-conditioning, inverter backup, daily housekeeping, and 
     },
     {
         id: 301,
+        unitType: "1bhk",
         property_name: "Atlas Homes Room 301",
         property_description: `Welcome to Atlas Homes Room 301, a 450 sq. ft. apartment that offers the perfect balance of affordability and functionality in Hyderabad’s tech hub. Located in KPHB, just 2 km from Cyber Towers, this unit is ideal for both work and leisure stays.
 
@@ -412,6 +416,7 @@ Complimentary Wi-Fi (150 Mbps), fully equipped kitchen (gas stove, microwave, re
     },
     {
         id: 101,
+        unitType: "1bhk",
         property_name: "Atlas Homes Room 101",
         property_description: `Imagine the convenience of being just 2 km from Hyderabad’s Cyber Towers while staying in a cozy 1BHK apartment designed for comfort. Atlas Homes Room 101, a 450 sq. ft. first-floor unit, blends affordability with modern amenities, making it ideal for professionals and families.
 
@@ -477,6 +482,7 @@ High-speed Wi-Fi (150 Mbps, multiple ISPs), air-conditioning in the bedroom, a f
     },
     {
         id: 102,
+        unitType: "1bhk",
         property_name: "Atlas Homes Room 102",
         property_description: `Step into Atlas Homes Room 102, a spacious and affordable 450 sq. ft. 1BHK in KPHB, just minutes from Cyber Towers. This first-floor apartment combines homely comfort with modern conveniences, perfect for couples, business travelers, or small families.
 
@@ -544,6 +550,7 @@ Enjoy uninterrupted high-speed Wi-Fi, AC, and a fully equipped kitchen with gas 
     },
     {
         id: 302,
+        unitType: "1bhk",
         property_name: "Atlas Homes Room 302",
         property_description: `Atlas Homes Room 302 is a stylish 450 sq. ft. third-floor unit designed for comfort and convenience. Located in the vibrant KPHB area, it is perfect for travelers looking to stay near Hyderabad’s IT corridor without compromising on modern amenities.
 
