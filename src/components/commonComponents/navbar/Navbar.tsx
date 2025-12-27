@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { Link, NavLink, useNavigate, useLocation, matchPath } from 'react-router-dom';
 import './navbar.css';
 
 import { IoIosCall } from 'react-icons/io';
@@ -60,18 +60,41 @@ const Navbar = () => {
      ✅ FINAL BOOK NOW HANDLER
   ========================= */
   const handleBookNow = () => {
+    const propertyMatch = matchPath('/property_details/:id', location.pathname);
+    const propertyIdFromRoute = propertyMatch?.params.id ?? null;
+    const isPropertyDetailsRoute = Boolean(propertyMatch);
+    const bookingTarget = isPropertyDetailsRoute ? 'booking-form' : 'search-form';
+    const bookingSurface = isPropertyDetailsRoute ? 'property_details' : 'navbar';
+
+    const bookingState = {
+      propertyId: booking.propertyId ?? propertyIdFromRoute ?? undefined,
+      checkIn: booking.checkIn ?? undefined,
+      checkOut: booking.checkOut ?? undefined,
+      guests: booking.guests,
+    };
+
     trackEvent(
       'cta_book_now_clicked',
       {
         source: 'header',
-        target: 'search-form',
-        propertyId: booking.propertyId ?? undefined,
-        checkIn: booking.checkIn ?? undefined,
-        checkOut: booking.checkOut ?? undefined,
+        target: bookingTarget,
+        surface: bookingSurface,
+        propertyId: bookingState.propertyId,
+        checkIn: bookingState.checkIn,
+        checkOut: bookingState.checkOut,
         guests: booking.guests,
       },
-      { route: '/#search-form' },
+      { route: isPropertyDetailsRoute ? `${location.pathname}#${bookingTarget}` : '/#search-form' },
     );
+
+    if (isPropertyDetailsRoute) {
+      const bookingForm = document.getElementById('booking-form');
+      if (bookingForm) {
+        bookingForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        closeMobile();
+        return;
+      }
+    }
 
     if (location.pathname === '/') {
       const el = document.getElementById('search-form');
@@ -81,7 +104,7 @@ const Navbar = () => {
     } else {
       setPendingScrollTarget('search-form');
       navigate('/', {
-        state: { scrollTo: 'search-form' },
+        state: { scrollTo: 'search-form', bookingPrefill: bookingState },
       });
     }
 

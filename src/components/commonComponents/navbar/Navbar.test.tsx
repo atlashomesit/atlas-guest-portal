@@ -33,7 +33,7 @@ describe("Navbar CTA", () => {
 
     expect(trackEvent).toHaveBeenCalledWith(
       "cta_book_now_clicked",
-      expect.objectContaining({ source: "header", target: "search-form" }),
+      expect.objectContaining({ source: "header", target: "search-form", surface: "navbar" }),
       { route: "/#search-form" },
     );
   });
@@ -46,8 +46,35 @@ describe("Navbar CTA", () => {
 
     expect(trackEvent).toHaveBeenCalledWith(
       "cta_book_now_clicked",
-      expect.objectContaining({ source: "header", target: "search-form" }),
+      expect.objectContaining({ source: "header", target: "search-form", surface: "navbar" }),
       { route: "/#search-form" },
+    );
+  });
+
+  it("smoothly scrolls to the booking form on property detail pages", () => {
+    const scrollIntoView = vi.fn();
+    const bookingForm = document.createElement("div");
+    bookingForm.id = "booking-form";
+    // @ts-expect-error jsdom type
+    bookingForm.scrollIntoView = scrollIntoView;
+    document.body.appendChild(bookingForm);
+
+    render(
+      <MemoryRouter initialEntries={["/property_details/123"]}>
+        <BookingProvider>
+          <Navbar />
+        </BookingProvider>
+      </MemoryRouter>,
+    );
+
+    const bookNow = screen.getByRole("button", { name: /book now/i });
+    fireEvent.click(bookNow);
+
+    expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
+    expect(trackEvent).toHaveBeenCalledWith(
+      "cta_book_now_clicked",
+      expect.objectContaining({ target: "booking-form", surface: "property_details" }),
+      { route: "/property_details/123#booking-form" },
     );
   });
 
