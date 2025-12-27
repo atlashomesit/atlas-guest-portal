@@ -6,6 +6,13 @@ type EmailPayloadValue = string | number | boolean | null | undefined;
 
 export type EmailPayload = Record<string, EmailPayloadValue>;
 
+export type EmailProviderHealth = {
+  provider: string;
+  healthy: boolean;
+  missingCredentials: string[];
+  isConnected: boolean;
+};
+
 interface EmailProvider {
   name: string;
   validateCredentials: () => string[];
@@ -112,8 +119,8 @@ export const sendEmail = async (payload: EmailPayload) => {
   throw new Error('All email providers failed to send the message');
 };
 
-export const runEmailHealthCheck = async () => {
-  const results = await Promise.all(
+export const getEmailHealthSnapshot = async (): Promise<EmailProviderHealth[]> =>
+  Promise.all(
     providers.map(async (provider) => {
       const missing = provider.validateCredentials();
       const isConnected = missing.length === 0 ? await provider.checkConnectivity() : false;
@@ -122,9 +129,12 @@ export const runEmailHealthCheck = async () => {
         healthy: missing.length === 0 && isConnected,
         missingCredentials: missing,
         isConnected,
-      };
+      } satisfies EmailProviderHealth;
     })
   );
+
+export const runEmailHealthCheck = async () => {
+  const results = await getEmailHealthSnapshot();
 
   const failed = results.filter((result) => !result.healthy);
   if (failed.length) {
@@ -136,3 +146,13 @@ export const runEmailHealthCheck = async () => {
 
   return results;
 };
+
+export const sendEmailCanary = async () =>
+  sendEmail({
+    user_name: 'Email Canary',
+    user_email: emailJsConfig.ownerEmail ?? 'unknown@example.com',
+    user_contactnumber: 'health-check',
+    destination: 'email-health-check',
+    message: `Automated canary from deployment at ${new Date().toISOString()}`,
+    to_email: emailJsConfig.ownerEmail ?? 'owner-email-not-configured@example.com',
+  });
