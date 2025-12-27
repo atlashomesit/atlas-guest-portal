@@ -55,7 +55,11 @@ function AppWrapper() {
       return <Navigate to="/" replace />;
     }
 
-    return <Navigate to={`/homes/atlashomes/${id}`} replace />;
+    const normalizedId = id.toLowerCase();
+    const idParts = normalizedId.split('-').filter(Boolean);
+    const canonicalPropertySlug = idParts.length >= 2 ? idParts.slice(0, 2).join('-') : 'atlas-homes';
+
+    return <Navigate to={`/homes/${canonicalPropertySlug}/${normalizedId}`} replace />;
   };
 
   return (

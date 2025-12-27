@@ -90,8 +90,11 @@ const PropertyDetails = () => {
                 .toLowerCase()
                 .replace(/\s+/g, '-');
 
+        const stripHyphens = (value: string) => value.replace(/-/g, '');
+
         const normalizedUnitSlug = normalizeSlug(unitSlug);
         const normalizedPropertySlug = normalizeSlug(propertySlug);
+        const normalizedPropertySlugStripped = stripHyphens(normalizedPropertySlug);
 
         // Prefer matching by unit slug, with optional property slug guard
         const foundByUnitSlug = propertyData.find((item: any) => {
@@ -101,7 +104,9 @@ const PropertyDetails = () => {
             const propertySlugMatches =
                 !normalizedPropertySlug ||
                 nameSlug === normalizedPropertySlug ||
-                nameSlug.includes(normalizedPropertySlug);
+                nameSlug.includes(normalizedPropertySlug) ||
+                stripHyphens(nameSlug) === normalizedPropertySlugStripped ||
+                stripHyphens(nameSlug).includes(normalizedPropertySlugStripped);
 
             return unitMatches && propertySlugMatches;
         });
