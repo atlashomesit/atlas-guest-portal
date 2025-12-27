@@ -454,8 +454,6 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
       const tags = { surface: 'booking_form', propertyId: String(propertyId) };
       const envMode = (import.meta as any)?.env?.MODE ?? 'unknown';
 
-      const useMockBookings = !IS_API_BASE_CONFIGURED && envMode !== 'production';
-
       logUserAction('booking_availability_fetch_start', {
         apiBaseConfigured: IS_API_BASE_CONFIGURED,
         requestUrl,
@@ -464,15 +462,27 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
       });
 
       try {
-        if (!IS_API_BASE_CONFIGURED && envMode === 'production') {
-          throw new Error('API base URL is not configured for availability checks');
-        }
+        if (!IS_API_BASE_CONFIGURED) {
+          const useMockBookings = envMode !== 'production';
+          logUserAction('booking_availability_fetch_skipped_config_missing', {
+            propertyId,
+            envMode,
+            requestUrl,
+            mockMode: useMockBookings,
+          });
 
-        if (useMockBookings) {
-          console.info('[BookingCard] Using mock bookings for development');
+          if (useMockBookings) {
+            console.info('[BookingCard] Using mock bookings for development');
+            setBookedDates([]);
+            setInlineStatus('Using demo availability. Configure the API base URL to view live bookings.');
+            logUserAction('booking_availability_fetch_mock', { propertyId, envMode });
+            setIsBookedDatesLoading(false);
+            return;
+          }
+
+          setInlineStatus('Demo data shown until API is configured.');
           setBookedDates([]);
-          setInlineStatus('Using demo availability. Configure the API base URL to view live bookings.');
-          logUserAction('booking_availability_fetch_mock', { propertyId, envMode });
+          setIsBookedDatesLoading(false);
           return;
         }
 
