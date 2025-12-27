@@ -424,6 +424,20 @@ const Slider = () => {
     const normalizedStart = selection.startDate ? startOfDay(selection.startDate) : null;
     const normalizedEnd = selection.endDate ? startOfDay(selection.endDate) : null;
     markHeroInteraction();
+
+    if (normalizedStart && normalizedEnd && normalizedStart.getTime() === normalizedEnd.getTime()) {
+      const errorMessage = 'Minimum stay is 1 night after check-in.';
+      setStatusMessage(errorMessage);
+      setDateError(errorMessage);
+      setError(errorMessage);
+      trackEvent('hero_dates_changed', {
+        surface: 'hero_form',
+        checkIn: normalizedStart.toISOString(),
+        checkOut: normalizedEnd.toISOString(),
+      });
+      return;
+    }
+
     const nextRange = clampRange(normalizedStart, normalizedEnd);
     setStatusMessage(nextRange.error ?? 'Updated dates.');
     setDateError(nextRange.error);
