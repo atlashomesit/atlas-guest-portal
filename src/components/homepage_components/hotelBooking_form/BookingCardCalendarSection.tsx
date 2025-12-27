@@ -21,6 +21,7 @@ interface BookingCardCalendarSectionProps {
   fieldGridClass: string;
   fieldButtonClass: string;
   helperTextClass: string;
+  nights: number;
   markEngagement: () => void;
   setOpenCalendar: React.Dispatch<React.SetStateAction<boolean>>;
   setOpenGuests: React.Dispatch<React.SetStateAction<boolean>>;
@@ -48,11 +49,10 @@ interface BookingCardCalendarSectionProps {
   openCalendar: boolean;
   calendarRef: React.RefObject<HTMLDivElement>;
   isBookedDatesLoading: boolean;
- bookedDates: {
-  checkinDate: string;
-  checkoutDate: string;
-}[];
-
+  bookedDates: {
+    checkinDate: string;
+    checkoutDate: string;
+  }[];
   DateRangeComponent: typeof DateRange;
   handleDateChange: (ranges: any) => void;
   defaultStartDate: Date;
@@ -80,6 +80,7 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
   setInlineStatus,
   trackEvent,
   propertyId,
+  nights,
   dates,
   dateError,
   validationMessage,
@@ -111,6 +112,7 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
   const minSelectableDate = normalizedStartDate < todayStart ? todayStart : normalizedStartDate;
   const hasDateIssue = Boolean(dateError) || isCheckoutInvalid;
   const dateFieldButtonClass = `${fieldButtonClass} ${hasDateIssue ? 'border-support-error ring-1 ring-support-error/40 focus-visible:outline-support-error' : ''}`;
+  const nightLabel = nights === 1 ? '1 night' : `${nights} nights`;
 
   return (
     <>
@@ -143,6 +145,12 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
               {priceDisplayConfig.discount.reasonLabel} · Discount ({discountPercentApplied}%)
             </p>
           )}
+          <p className="inline-flex items-center gap-2 text-xs font-semibold text-text-primary" aria-live="polite">
+            <span className="inline-flex h-6 min-w-[4rem] items-center justify-center rounded-full bg-bg-muted px-3 text-[11px] uppercase tracking-wide">
+              {nightLabel}
+            </span>
+            <span className="sr-only">Stay length updated: {nightLabel}</span>
+          </p>
         </div>
         {(hasSpecialPricing || hasDiscountToShow) && (
           <span className={`mt-1 ${priceBadgeClass}`}>
