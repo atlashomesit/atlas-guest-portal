@@ -10,25 +10,12 @@ import { Button } from '../../ui/Button';
 import { calculateNightlyPrice, inferUnitType } from '../../../utils/pricing';
 import { toast } from 'react-toastify';
 import { logUserAction, reportError } from '../../../lib/monitoring';
+import { formatDateForDisplay, formatDateForInput, parseDate } from '../../../utils/formatting';
 interface Property {
   property_name: string;
 }
 
 const BookingForm = ({ propertyData }: { propertyData: Property }) => {
-  // Format date to yyyy-mm-dd for input[type=date]
-  const formatDateForInput = (date: Date) => {
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getDate() + 1).padStart(2, '0');
-    const year = date.getFullYear();
-    return `${year}-${month}-${day}`;
-  };
-
-  // Format date to dd-mm-yyyy for display
-  const formatDateForDisplay = (dateStr: string) => {
-    const [year, month, day] = dateStr.split('-').map(Number);
-    return `${String(day).padStart(2, '0')}-${String(month).padStart(2, '0')}-${year}`;
-  };
-
   // Set default dates
   const today = new Date();
   const tomorrow = new Date(today);
@@ -52,9 +39,9 @@ const BookingForm = ({ propertyData }: { propertyData: Property }) => {
   const totalGuests = adults + children + infants;
 
   const stayDates = useMemo(() => {
-    const start = new Date(checkIn);
-    const end = new Date(checkOut);
-    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return [];
+    const start = parseDate(checkIn);
+    const end = parseDate(checkOut);
+    if (!start || !end) return [];
 
     const nights: Date[] = [];
     const cursor = new Date(start);
