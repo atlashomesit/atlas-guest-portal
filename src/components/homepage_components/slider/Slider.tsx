@@ -683,17 +683,17 @@ const Slider = () => {
                   {isSubmitting ? 'Checking...' : 'Check availability'}
                 </button>
                 <Link
-                  to="/#our-homes"
+                  to="/search"
                   onClick={() =>
                     trackEvent(
                       'listings_browse',
                       { surface: 'hero_secondary' },
-                      { route: '/#our-homes' },
+                      { route: '/search' },
                     )
                   }
                   className="inline-flex items-center justify-center text-sm font-semibold text-text-muted underline-offset-4 transition hover:text-cta-secondary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary whitespace-nowrap"
                 >
-                  Browse listings
+                  Browse all apartments
                 </Link>
               </div>
             </div>
