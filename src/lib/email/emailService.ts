@@ -1,5 +1,5 @@
 import emailjs from '@emailjs/browser';
-import { emailJsConfig, getMissingEmailJsEnvKeys, isEmailJsConfigured } from '@/utils/emailjsConfig';
+import { emailJsConfig, getMissingEmailJsEnvKeys, isEmailJsConfigured } from '../../utils/emailjsConfig';
 import { reportError } from '../monitoring';
 
 type EmailPayloadValue = string | number | boolean | null | undefined;
