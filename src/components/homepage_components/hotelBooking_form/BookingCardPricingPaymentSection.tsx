@@ -25,6 +25,7 @@ interface BookingCardPricingPaymentSectionProps {
   totalExtraGuestCharges: number;
   feesAndTaxes: number;
   totalPrice: number;
+  nights: number;
   inlinePolicySnippets: typeof import('../../../content/terms').inlinePolicySnippets;
   isRazorpayReady: boolean;
   isLoading: boolean;
@@ -89,6 +90,7 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
   totalExtraGuestCharges,
   feesAndTaxes,
   totalPrice,
+  nights,
   inlinePolicySnippets: inlineSnippets,
   isRazorpayReady,
   isLoading,
@@ -124,6 +126,8 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
   const ratingSnippet = averageRating
     ? `${averageRating.toFixed(2)} / 5${reviewCount ? ` · ${reviewCount} reviews` : ''}`
     : 'Guest ratings updating soon';
+  const nightLabel = nights === 1 ? '1 night' : `${nights} nights`;
+  const stayRangeLabel = `${format(dates.startDate, 'dd MMM')} - ${format(dates.endDate, 'dd MMM')}`;
 
   return (
     <>
@@ -499,6 +503,10 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
           <p className="text-lg font-semibold">Total Amount</p>
           <p className="text-sm text-text-muted">
             Inclusive of estimated taxes and fees
+            <span className="sr-only" aria-live="polite">
+              {' '}
+              {nightLabel} selected for {stayRangeLabel}
+            </span>
           </p>
         </div>
         <p className="text-lg font-bold">₹{totalPrice.toLocaleString('en-IN')}</p>
@@ -511,16 +519,19 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
             'calc(var(--safe-area-bottom, env(safe-area-inset-bottom, 0px)) + 0.75rem)',
         }}
       >
-          <div className="flex flex-col text-xs text-text-muted">
-            <div className="font-semibold text-text-primary text-sm">
-              {format(dates.startDate, 'dd MMM')} - {format(dates.endDate, 'dd MMM')}
-            </div>
-            <div className="flex items-center gap-1 text-text-primary text-sm">
-              <FaUserFriendsIcon className="h-4 w-4" />
-              <span>{formatGuestLabel()}</span>
-            </div>
-          <p className="text-[11px] text-text-muted">Total shown before payment; no hidden charges.</p>
+        <div className="flex flex-col text-xs text-text-muted">
+          <div className="font-semibold text-text-primary text-sm" aria-live="polite">
+            {stayRangeLabel}
+            <span className="ml-2 rounded-full bg-bg-muted px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-text-primary">
+              {nightLabel}
+            </span>
           </div>
+          <div className="flex items-center gap-1 text-text-primary text-sm">
+            <FaUserFriendsIcon className="h-4 w-4" />
+            <span>{formatGuestLabel()}</span>
+          </div>
+          <p className="text-[11px] text-text-muted">Total shown before payment; no hidden charges.</p>
+        </div>
         <div className="text-right">
           <p className="text-xs text-text-muted">Total</p>
           <p className="text-lg font-semibold">₹{totalPrice.toLocaleString('en-IN')}</p>
