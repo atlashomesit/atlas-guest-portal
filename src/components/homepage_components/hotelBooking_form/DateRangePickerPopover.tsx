@@ -57,14 +57,37 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
   };
 
   useEffect(() => {
-    if (!open || !isMobile) return;
+    if (!open || !isMobile || typeof document === 'undefined' || typeof window === 'undefined') return;
 
     const body = document.body;
-    const previousOverflow = body.style.overflow;
+    const previousStyles = {
+      overflow: body.style.overflow,
+      paddingRight: body.style.paddingRight,
+      position: body.style.position,
+      top: body.style.top,
+      width: body.style.width,
+    };
+
+    const previousScrollTop = window.scrollY;
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    const computedPaddingRight = Number.parseFloat(getComputedStyle(body).paddingRight) || 0;
+
     body.style.overflow = 'hidden';
+    body.style.position = 'fixed';
+    body.style.top = `-${previousScrollTop}px`;
+    body.style.width = '100%';
+
+    if (scrollbarWidth > 0) {
+      body.style.paddingRight = `${computedPaddingRight + scrollbarWidth}px`;
+    }
 
     return () => {
-      body.style.overflow = previousOverflow;
+      body.style.overflow = previousStyles.overflow;
+      body.style.paddingRight = previousStyles.paddingRight;
+      body.style.position = previousStyles.position;
+      body.style.top = previousStyles.top;
+      body.style.width = previousStyles.width;
+      window.scrollTo({ top: previousScrollTop, left: 0 });
     };
   }, [open, isMobile]);
 
