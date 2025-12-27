@@ -196,8 +196,12 @@ const Slider = () => {
   React.useEffect(() => {
     if (!isCalendarOpen || typeof window === 'undefined') return;
 
+    const shouldLockBody = isMobileViewport;
     const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+
+    if (shouldLockBody) {
+      document.body.style.overflow = 'hidden';
+    }
 
     const updateDropdownPosition = () => {
       if (!calendarWrapperRef.current) return;
@@ -235,13 +239,15 @@ const Slider = () => {
     window.addEventListener('scroll', updateDropdownPosition, true);
 
     return () => {
-      document.body.style.overflow = previousOverflow;
+      if (shouldLockBody) {
+        document.body.style.overflow = previousOverflow;
+      }
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleEscape);
       window.removeEventListener('resize', updateDropdownPosition);
       window.removeEventListener('scroll', updateDropdownPosition, true);
     };
-  }, [isCalendarOpen]);
+  }, [isCalendarOpen, isMobileViewport]);
 
   React.useEffect(() => {
     if (!isCalendarOpen || isTestEnvironment) return;
