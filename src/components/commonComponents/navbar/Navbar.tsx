@@ -8,6 +8,7 @@ import { LOGO_URL } from '../../../config/branding';
 import { formatDisplayNumber, getTelLink } from '../../../config/contact';
 import { trackEvent } from '../../../utils/analytics';
 import { homes } from '../../../content/homes';
+import { useBooking } from '../../../contexts/BookingContext';
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -18,6 +19,7 @@ const Navbar = () => {
 
   const navigate = useNavigate();
   const location = useLocation();
+  const { booking, setPendingScrollTarget } = useBooking();
 
   const telLink = getTelLink();
 
@@ -58,19 +60,28 @@ const Navbar = () => {
      ✅ FINAL BOOK NOW HANDLER
   ========================= */
   const handleBookNow = () => {
-    trackEvent('cta_book_now_clicked', { source: 'header' }, { route: '/#our-homes' });
+    trackEvent(
+      'cta_book_now_clicked',
+      {
+        source: 'header',
+        target: 'search-form',
+        propertyId: booking.propertyId ?? undefined,
+        checkIn: booking.checkIn ?? undefined,
+        checkOut: booking.checkOut ?? undefined,
+        guests: booking.guests,
+      },
+      { route: '/#search-form' },
+    );
 
-    // CASE 1: Already on home page → scroll
     if (location.pathname === '/') {
-      const el = document.getElementById('our-homes');
+      const el = document.getElementById('search-form');
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
-    }
-    // CASE 2: On another page → navigate then scroll
-    else {
+    } else {
+      setPendingScrollTarget('search-form');
       navigate('/', {
-        state: { scrollTo: 'our-homes' },
+        state: { scrollTo: 'search-form' },
       });
     }
 

@@ -11,15 +11,36 @@ import FooterCtaStrip from "../../components/home/FooterCtaStrip";
 import {
     enableFooterMiniCtaAboveFooter,
 } from "../../config/homepageUxFlags";
+import { useBooking } from "../../contexts/BookingContext";
+import { useLocation } from "react-router-dom";
 
 const Home = () => {
+    const { pendingScrollTarget, setPendingScrollTarget } = useBooking();
+    const location = useLocation();
+
     useEffect(() => {
         console.log('Home component mounted');
         console.log('propertyData:', propertyData);
         console.log('propertyImages:', propertyImages);
         trackEvent('home_view', { surface: 'home', listings: propertyData.length });
     }, []);
-    
+
+    useEffect(() => {
+        const target = pendingScrollTarget || (location.state as { scrollTo?: string } | null)?.scrollTo;
+        if (target !== 'search-form') return;
+
+        const scrollToForm = () => {
+            const form = document.getElementById('search-form');
+            if (form) {
+                form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+            setPendingScrollTarget(null);
+        };
+
+        const timer = window.setTimeout(scrollToForm, 120);
+        return () => window.clearTimeout(timer);
+    }, [location.state, pendingScrollTarget, setPendingScrollTarget]);
+
     return (
         <section className="relative font-roboto select-none">
             <div className="w-full h-fit relative ">
