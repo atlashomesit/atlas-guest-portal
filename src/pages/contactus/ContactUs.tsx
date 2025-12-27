@@ -1,18 +1,16 @@
 import CommonBanner from "../../components/commonComponents/banner/CommonBanner";
 import { resolveOptimizedAsset } from "../../utils/resolveOptimizedAsset";
-import React, { useEffect, useState } from "react";
-import emailjs from "@emailjs/browser";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { formatDisplayNumber, getTelLink, getWhatsAppLink } from "../../config/contact";
 import { ctaNav } from "../../config/navigation";
-import { emailJsConfig, getMissingEmailJsEnvKeys, isEmailJsConfigured } from "../../utils/emailjsConfig";
 import { Card } from "../../components/ui/Card";
 import { Typography } from "../../components/ui/Typography";
 import { Input } from "../../components/ui/Input";
 import { Button } from "../../components/ui/Button";
 import ErrorBoundary from "../../components/ErrorBoundary";
 import { toast } from "react-toastify";
-import { logUserAction, reportError, reportMessage } from "../../lib/monitoring";
+import { logUserAction, reportError } from "../../lib/monitoring";
 
 type StatusMessage = {
     type: "info" | "success" | "error";
@@ -30,61 +28,37 @@ const ContactUs = () => {
     });
 
     const [statusMessage, setStatusMessage] = useState<StatusMessage | null>(null);
-    const emailUnavailable = !isEmailJsConfigured();
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
-    useEffect(() => {
-        if (emailUnavailable) {
-            const missingKeys = getMissingEmailJsEnvKeys().join(", ");
-            reportMessage("emailjs_config_missing", "warning", {
-                missingKeys,
-                feature: "contact-form",
-            });
-            toast.info("Email delivery is temporarily unavailable. Please reach us via phone or WhatsApp.");
-            setStatusMessage({
-                type: "info",
-                text: "Email delivery is temporarily unavailable. Call or WhatsApp us for the quickest reply while we restore our inbox integration.",
-            });
-        }
-    }, [emailUnavailable]);
-
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-
-        if (emailUnavailable) {
-            const missingKeys = getMissingEmailJsEnvKeys().join(", ");
-            reportError(new Error("EmailJS configuration missing"), {
-                feature: "contact-form",
-                missingKeys,
-            });
-            toast.error("Email is down right now. Please reach out by phone or WhatsApp.");
-            setStatusMessage({
-                type: "error",
-                text: "We couldn't send your message because our email service is offline. Please reach us by phone or WhatsApp.",
-            });
-            return;
-        }
 
         setStatusMessage({ type: "info", text: "Sending your message..." });
 
         try {
-            const response = await emailjs.send(
-                emailJsConfig.serviceId!,
-                emailJsConfig.templateId!,
-                {
-                    user_name: formData.name,
-                    user_email: formData.email,
-                    user_contactnumber: formData.contactnumber,
-                    destination: formData.destination,
-                    message: formData.description,
-                    to_email: emailJsConfig.ownerEmail,
-                },
-                emailJsConfig.publicKey!,
-            );
-            logUserAction("contact_form_submitted", { status: response.status, feature: "contact-form" });
+            const response = await fetch("/api/contact", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(formData),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                const message = data?.message || "We couldn't send your message right now.";
+                toast.error(message);
+                setStatusMessage({
+                    type: "error",
+                    text: `${message}${data?.queued ? " We've queued your request and will retry." : ""} Please try again or contact us through phone or WhatsApp.`,
+                });
+                logUserAction("contact_form_submitted", { status: "failed", feature: "contact-form" });
+                return;
+            }
+
+            logUserAction("contact_form_submitted", { status: "success", feature: "contact-form" });
             toast.success("Message sent! We'll be in touch soon.");
             setStatusMessage({ type: "success", text: "Message sent successfully!" });
             setFormData({ name: "", email: "", contactnumber: "", destination: "", description: "" });
@@ -246,7 +220,7 @@ const ContactUs = () => {
                                 rows={5}
                             />
                         </div>
-                        <Button type="submit" fullWidth disabled={emailUnavailable}>
+                        <Button type="submit" fullWidth disabled={statusMessage?.type === "info"}>
                             Send message
                         </Button>
                     </form>
