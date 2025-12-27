@@ -21,6 +21,7 @@ import BlogCategory from "./pages/blog/BlogCategory"
 import BlogPostPage from "./pages/blog/BlogPostPage"
 import ShortLinkRedirect from "./components/ShortLinkRedirect"
 import SupportWidget from "./components/support/SupportWidget"
+import ErrorBoundary from "./components/ErrorBoundary"
 
 function AppWrapper() {
   const location = useLocation();
@@ -35,28 +36,30 @@ function AppWrapper() {
     <>
       {!shouldHideNavbar && <Navbar />}
       <ScrollToTop />
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/contact" element={<ContactUs />} />
-        <Route path="/apartments" element={<Navigate to="/#our-homes" replace />} />
-        <Route path="/amenities" element={<Amenities />} />
-        <Route path="/location" element={<LocationPage />} />
-        <Route path="/gallery" element={<GalleryPage />} />
-        <Route path="/offers" element={<OffersPage />} />
-        <Route path="/about" element={<AboutPage />} />
-        <Route path="/faq" element={<FaqPage />} />
-        <Route path="/blog" element={<BlogHome />} />
-        <Route path="/blog/:category" element={<BlogCategory />} />
-        <Route path="/blog/:category/:slug" element={<BlogPostPage />} />
-        <Route path="/blog/:slug" element={<BlogPostPage />} />
-        <Route path="/policies" element={<Policies />} />
-        <Route path="/terms" element={<Terms />} />
-        <Route path="/terms-and-conditions" element={<Terms />} />
-        <Route path="/property_details/:id" element={<Homepage_PropertyDetails />} />
-        <Route path="/property_LocationDetails/:id" element={<Homepage_LocationDetails />} />
-        <Route path="/:shortCode" element={<ShortLinkRedirect />} />
-        <Route path="/*" element={<PageNotFound />} />
-      </Routes>
+      <ErrorBoundary name="router">
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/contact" element={<ContactUs />} />
+          <Route path="/apartments" element={<Navigate to="/#our-homes" replace />} />
+          <Route path="/amenities" element={<Amenities />} />
+          <Route path="/location" element={<LocationPage />} />
+          <Route path="/gallery" element={<GalleryPage />} />
+          <Route path="/offers" element={<OffersPage />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/faq" element={<FaqPage />} />
+          <Route path="/blog" element={<BlogHome />} />
+          <Route path="/blog/:category" element={<BlogCategory />} />
+          <Route path="/blog/:category/:slug" element={<BlogPostPage />} />
+          <Route path="/blog/:slug" element={<BlogPostPage />} />
+          <Route path="/policies" element={<Policies />} />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/terms-and-conditions" element={<Terms />} />
+          <Route path="/property_details/:id" element={<Homepage_PropertyDetails />} />
+          <Route path="/property_LocationDetails/:id" element={<Homepage_LocationDetails />} />
+          <Route path="/:shortCode" element={<ShortLinkRedirect />} />
+          <Route path="/*" element={<PageNotFound />} />
+        </Routes>
+      </ErrorBoundary>
       <SupportWidget />
       <Footer />
     </>

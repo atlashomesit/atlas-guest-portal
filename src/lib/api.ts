@@ -1,4 +1,5 @@
 import { API_BASE_URL } from "@/config/api";
+import { isAtlasApiRequest, logApiError, monitoredFetch } from "./monitoring";
 
 type ApiResponse<T> = {
   data: T;
@@ -9,31 +10,48 @@ type ApiResponse<T> = {
 
 async function request<T>(path: string, init?: RequestInit): Promise<ApiResponse<T>> {
   const url = `${API_BASE_URL ?? ""}${path}`;
-  const response = await fetch(url, {
-    ...init,
-    method: init?.method ?? "GET",
-    headers: {
-      Accept: "application/json",
-      ...(init?.headers ?? {}),
-    },
-    credentials: init?.credentials ?? "include",
-  });
+  try {
+    const response = await monitoredFetch(url, {
+      ...init,
+      method: init?.method ?? "GET",
+      headers: {
+        Accept: "application/json",
+        ...(init?.headers ?? {}),
+      },
+      credentials: init?.credentials ?? "include",
+      requestName: path,
+    });
 
-  const ct = response.headers.get("content-type") ?? "";
-  const preview = await response.text();
+    const ct = response.headers.get("content-type") ?? "";
+    const preview = await response.text();
 
-  if (!ct.includes("application/json")) {
-    // eslint-disable-next-line no-console
-    console.error("Non-JSON response from API", { url: response.url, ct, preview: preview.slice(0, 120) });
+    if (!ct.includes("application/json")) {
+      logApiError(new Error("Non-JSON response from API"), {
+        url: response.url,
+        method: init?.method ?? "GET",
+        responseSnippet: preview.slice(0, 120),
+        category: "http",
+        tags: { atlasApi: String(isAtlasApiRequest(response.url)) },
+      });
+    }
+
+    const data = ct.includes("application/json") ? (JSON.parse(preview) as T) : (preview as unknown as T);
+
+    if (!response.ok) {
+      throw new Error("We were unable to load data. Please try again in a few moments.");
+    }
+
+    return { data, status: response.status, headers: response.headers, url: response.url };
+  } catch (error) {
+    logApiError(error, {
+      url,
+      method: init?.method ?? "GET",
+      requestName: path,
+      category: "network",
+      tags: { atlasApi: String(isAtlasApiRequest(url)) },
+    });
+    throw error instanceof Error ? error : new Error("Unexpected error while reaching the API.");
   }
-
-  const data = ct.includes("application/json") ? (JSON.parse(preview) as T) : (preview as unknown as T);
-
-  if (!response.ok) {
-    throw new Error(`Request failed with status ${response.status}`);
-  }
-
-  return { data, status: response.status, headers: response.headers, url: response.url };
 }
 
 export const api = {

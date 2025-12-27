@@ -1,8 +1,10 @@
 import { Component, ReactNode } from 'react';
 import { Button } from './ui/Button';
+import { reportError, logUserAction } from '../lib/monitoring';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
+  name?: string;
 }
 
 interface ErrorBoundaryState {
@@ -21,9 +23,9 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   }
 
   componentDidCatch(error: Error, errorInfo: unknown) {
-    if (import.meta.env.DEV) {
-      console.error('Application error caught by boundary', error, errorInfo);
-    }
+    const boundaryName = this.props.name ?? 'app';
+    logUserAction('error_boundary_triggered', { boundary: boundaryName });
+    reportError(error, { boundaryName, errorInfo, tags: { boundary: boundaryName } });
   }
 
   handleReload = () => {
