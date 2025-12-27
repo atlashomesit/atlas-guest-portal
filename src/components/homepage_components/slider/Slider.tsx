@@ -635,14 +635,57 @@ const Slider = () => {
                                 key: 'selection',
                               },
                             ]}
-                            dayContentRenderer={(day) => (
-                              <div
-                                data-testid={`hero-date-${format(day, 'yyyy-MM-dd')}`}
-                                className={`${startOfDay(day) < today ? 'opacity-60 line-through' : ''}`}
-                              >
-                                {format(day, 'd')}
-                              </div>
-                            )}
+                            dayContentRenderer={(day) => {
+                              const dayStart = startOfDay(day);
+                              const selectionStart = dateRange.startDate
+                                ? startOfDay(dateRange.startDate).getTime()
+                                : null;
+                              const selectionEnd = dateRange.endDate
+                                ? startOfDay(dateRange.endDate).getTime()
+                                : null;
+                              const isRangeStart = selectionStart !== null && dayStart.getTime() === selectionStart;
+                              const isRangeEnd = selectionEnd !== null && dayStart.getTime() === selectionEnd;
+                              const rangeStart = selectionStart !== null && selectionEnd !== null ? Math.min(selectionStart, selectionEnd) : null;
+                              const rangeEnd = selectionStart !== null && selectionEnd !== null ? Math.max(selectionStart, selectionEnd) : null;
+                              const isInRange =
+                                rangeStart !== null && rangeEnd !== null
+                                  ? dayStart.getTime() >= rangeStart && dayStart.getTime() <= rangeEnd
+                                  : false;
+                              const isDisabled = dayStart < today;
+
+                              const selectionTreatment =
+                                isRangeStart || isRangeEnd
+                                  ? 'bg-cta-primary text-[var(--text-contrast)] border-cta-primary shadow-sm ring-2 ring-[color:color-mix(in_srgb,var(--cta-secondary)_60%,transparent)]'
+                                  : 'border-transparent bg-transparent';
+
+                              return (
+                                <div className="relative flex h-full w-full items-center justify-center">
+                                  {isInRange && (
+                                    <span
+                                      className={`absolute inset-0 bg-[color:color-mix(in_srgb,var(--cta-primary)_18%,transparent)] ${
+                                        isRangeStart && isRangeEnd
+                                          ? 'rounded-full'
+                                          : isRangeStart
+                                          ? 'rounded-l-full'
+                                          : isRangeEnd
+                                          ? 'rounded-r-full'
+                                          : 'rounded-none'
+                                      }`}
+                                      aria-hidden
+                                    />
+                                  )}
+                                  <span
+                                    data-testid={`hero-date-${format(day, 'yyyy-MM-dd')}`}
+                                    className={`relative z-10 flex h-10 w-10 items-center justify-center rounded-full border text-sm font-semibold transition ${selectionTreatment} ${
+                                      isDisabled ? 'text-text-muted opacity-60 line-through cursor-not-allowed' : 'text-text-primary'
+                                    }`}
+                                    style={{ minHeight: 40, minWidth: 40 }}
+                                  >
+                                    {format(day, 'd')}
+                                  </span>
+                                </div>
+                              );
+                            }}
                           />
                         ) : (
                           <div className="grid grid-cols-7 gap-2">

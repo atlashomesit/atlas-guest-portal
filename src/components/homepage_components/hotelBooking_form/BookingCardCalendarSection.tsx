@@ -441,11 +441,22 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
                     ? 'Unavailable: beyond booking window'
                     : 'Available date';
 
+                  const selectionTreatment =
+                    isRangeStart || isRangeEnd
+                      ? 'bg-cta-primary text-[var(--text-contrast)] border-cta-primary shadow-sm ring-2 ring-[color:color-mix(in_srgb,var(--cta-secondary)_60%,transparent)]'
+                      : isToday
+                      ? 'border-cta-primary/70 bg-[color:color-mix(in_srgb,var(--cta-primary)_10%,transparent)]'
+                      : 'border-transparent bg-transparent';
+
+                  const availabilityTreatment = isAvailable
+                    ? 'text-text-primary'
+                    : 'text-text-muted cursor-not-allowed';
+
                   return (
                     <div className="relative w-full h-full flex items-center justify-center">
                       {isInRange && (
                         <div
-                          className={`absolute inset-0 bg-[color:color-mix(in_srgb,var(--cta-primary)_14%,transparent)] ${
+                          className={`absolute inset-0 bg-[color:color-mix(in_srgb,var(--cta-primary)_18%,transparent)] ${
                             isRangeStart && isRangeEnd
                               ? 'rounded-full'
                               : isRangeStart
@@ -460,23 +471,14 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
 
                       <span
                         title={isPastDate ? 'Past dates cannot be selected' : dayStatus}
-                        className={`relative z-20 flex h-10 w-10 items-center justify-center rounded-full border text-sm font-semibold transition ${
-                          isRangeStart || isRangeEnd
-                            ? 'bg-cta-primary text-[var(--text-contrast)] border-cta-primary/60 shadow-sm'
-                            : isToday
-                            ? 'border-cta-primary/60 bg-[color:color-mix(in_srgb,var(--cta-primary)_6%,transparent)]'
-                            : 'border-transparent'
-                        } ${
-                          isBooked
-                            ? 'text-red-700 dark:text-red-300 line-through'
-                            : isAvailable
-                            ? 'text-green-800 dark:text-green-300'
-                            : 'text-gray-500 dark:text-gray-400 opacity-70 cursor-not-allowed'
+                        className={`relative z-20 flex h-10 w-10 items-center justify-center rounded-full border text-sm font-semibold transition ${selectionTreatment} ${availabilityTreatment} ${
+                          isBooked ? 'line-through' : ''
                         } ${
                           isPastDate
-                            ? 'opacity-30 text-gray-400 line-through cursor-not-allowed pointer-events-none'
+                            ? 'opacity-30 line-through pointer-events-none'
                             : ''
-                        } ${isBeyondWindow ? 'opacity-40 cursor-not-allowed pointer-events-none' : ''}`}
+                        } ${isBeyondWindow ? 'opacity-40 pointer-events-none' : ''}`}
+                        style={{ minHeight: 40, minWidth: 40 }}
                       >
                         {date.getDate()}
                       </span>
