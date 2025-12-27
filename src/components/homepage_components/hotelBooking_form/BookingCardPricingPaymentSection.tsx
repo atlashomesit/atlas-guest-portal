@@ -2,6 +2,7 @@
 import React from 'react';
 import { format } from 'date-fns';
 import { inlinePolicySnippets } from '../../../content/terms';
+import { logApiError } from '../../../lib/monitoring';
 import { FaUserFriends, FaCreditCard, FaCcVisa, FaCcMastercard } from 'react-icons/fa';
 import { SiGooglepay, SiRazorpay } from 'react-icons/si';
 
@@ -325,7 +326,29 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            initiatePayment();
+            if (!termsAccepted) {
+              setPaymentStatus({
+                state: 'failure',
+                reason: 'Please accept the Terms & Conditions to continue.',
+              });
+              return;
+            }
+
+            try {
+              initiatePayment();
+            } catch (error) {
+              console.error('[BookingCardPricingPaymentSection] Failed to initiate checkout', error);
+              logApiError(error, {
+                url: '/api/payment',
+                method: 'POST',
+                category: 'payment',
+                tags: { provider: 'razorpay', surface: 'booking_form' },
+              });
+              setPaymentStatus({
+                state: 'failure',
+                reason: 'Could not start checkout. Please try again.',
+              });
+            }
           }}
           disabled={buttonIsBusy || !termsAccepted || !userEmail || !userPhone}
           className="bg-cta-primary hover:bg-cta-secondary text-[var(--text-contrast)] w-full rounded-full py-4 text-lg font-semibold transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center shadow-level1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"

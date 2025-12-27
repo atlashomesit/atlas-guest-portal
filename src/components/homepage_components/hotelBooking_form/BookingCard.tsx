@@ -283,6 +283,11 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
       script.onerror = () => {
         console.error('Failed to load Razorpay script');
         setIsRazorpayReady(false);
+        setPaymentStatus({
+          state: 'failure',
+          reason: 'Payment setup unavailable. Please refresh to retry.',
+        });
+        setCtaConfirmation('Payment setup unavailable. Please refresh to retry.');
         logApiError(new Error('Failed to load Razorpay script'), {
           url: script.src,
           method: 'GET',
@@ -786,6 +791,14 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
   };
 
   const startPayment = (autoEmail: string, autoPhone: string) => {
+    if (!termsAccepted) {
+      setPaymentStatus({ state: 'failure', reason: 'Please accept the Terms & Conditions to continue.' });
+      setFormErrors((current) => ({ ...current, terms: 'Please confirm the Terms & Conditions.' }));
+      setCtaConfirmation('Please confirm the Terms & Conditions.');
+      setIsLoading(false);
+      return;
+    }
+
     markEngagement();
     logUserAction('booking_form_submitted', {
       propertyId,
@@ -851,6 +864,8 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         tags: { provider: 'razorpay', surface: 'booking_form' },
       });
       alert('Payment system is loading. Please try again in a moment.');
+      setPaymentStatus({ state: 'failure', reason: 'Payment setup unavailable. Please retry shortly.' });
+      setCtaConfirmation('Payment setup unavailable. Please retry shortly.');
       setIsLoading(false);
       return;
     }
@@ -891,9 +906,27 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
       console.warn('Unable to store booking details', error);
     }
 
-    // Razorpay Key ID - Get from environment variable or use default
-    // You need to set VITE_RAZORPAY_KEY_ID in your .env file
-    const razorpayKeyId = import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_1DP5mmOlF5G5ag'; // Replace with your actual key
+    // Razorpay Key ID - Get from environment variable and ensure we are using a test key in non-production builds
+    const razorpayKeyId = import.meta.env.VITE_RAZORPAY_KEY_ID?.trim();
+    const isTestKey = razorpayKeyId?.startsWith('rzp_test_');
+
+    if (!razorpayKeyId || !isTestKey) {
+      const reason = !razorpayKeyId
+        ? 'Payment configuration missing. Please contact support.'
+        : 'Invalid Razorpay test key. Please use a key starting with rzp_test_.';
+
+      setPaymentStatus({ state: 'failure', reason });
+      setCtaConfirmation(reason);
+      logApiError(new Error('Missing or invalid Razorpay key'), {
+        url: 'https://checkout.razorpay.com/v1/checkout.js',
+        method: 'GET',
+        category: 'config',
+        tags: { provider: 'razorpay', surface: 'booking_form' },
+      });
+      alert(reason);
+      setIsLoading(false);
+      return;
+    }
 
     // Initialize Razorpay Checkout
     const razorpayOptions = {
@@ -955,14 +988,36 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     };
 
     try {
+      logUserAction('payment_gateway_initializing_checkout', {
+        provider: 'razorpay',
+        bookingId,
+        total: totalPrice,
+        nights,
+      });
+
       const razorpay = new window.Razorpay(razorpayOptions);
+      razorpay.on('payment.failed', (response: any) => {
+        console.error('[Razorpay] Payment failed:', response);
+        setPaymentStatus({
+          state: 'failure',
+          reason: response?.error?.description || 'Payment failed. Please try again.',
+        });
+        setIsLoading(false);
+        logApiError(new Error(response?.error?.description || 'Razorpay payment failed'), {
+          url: 'https://checkout.razorpay.com/v1/checkout.js',
+          method: 'POST',
+          category: 'payment',
+          tags: { provider: 'razorpay', surface: 'booking_form' },
+        });
+      });
+
+      razorpay.open();
       logUserAction('payment_gateway_initialized', {
         provider: 'razorpay',
         bookingId,
         total: totalPrice,
         nights,
       });
-      razorpay.open();
       console.log('[Razorpay] Checkout opened');
     } catch (error) {
       console.error('[Razorpay] Error opening checkout:', error);
@@ -988,6 +1043,13 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     setCtaConfirmation(null);
     setAvailabilityStatus('idle');
     setFormErrors({});
+
+    if (!termsAccepted) {
+      setFormErrors((current) => ({ ...current, terms: 'Please confirm the Terms & Conditions.' }));
+      setPaymentStatus({ state: 'failure', reason: 'Please accept the Terms & Conditions to continue.' });
+      setCtaConfirmation('Please confirm the Terms & Conditions.');
+      return;
+    }
 
     if (!validateForm(autoEmail, autoPhone)) {
       setCtaConfirmation('Please fix the highlighted fields.');
