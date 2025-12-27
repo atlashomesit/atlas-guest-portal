@@ -37,11 +37,13 @@ vi.mock("react-date-range", () => ({
             key={format(day, "yyyy-MM-dd")}
             data-testid={`hero-date-${format(day, "yyyy-MM-dd")}`}
             type="button"
-            onClick={() =>
+            onClick={(event: React.MouseEvent<HTMLButtonElement>) => {
+              const useSameDay = event.shiftKey;
+
               onChange({
-                selection: { startDate: day, endDate: addDays(day, 1) },
-              })
-            }
+                selection: { startDate: day, endDate: useSameDay ? day : addDays(day, 1) },
+              });
+            }}
           >
             {format(day, "d")}
           </button>
@@ -212,6 +214,36 @@ describe("Slider hero search", () => {
     expect(screen.getByRole("status")).toHaveTextContent(/hero form ready/i);
     expect(screen.getByRole("button", { name: /select check-in date/i })).not.toHaveTextContent(defaultStartLabel);
     expect(screen.getByRole("button", { name: /select check-out date/i })).not.toHaveTextContent(defaultEndLabel);
+  it("shows minimum-stay error when selecting identical check-in and check-out dates", () => {
+    renderSlider();
+
+    const startDate = addDays(new Date(), 3);
+    const endDate = addDays(startDate, 1);
+
+    fireEvent.click(screen.getByTestId("hero-date-toggle"));
+    const startCell = screen.getAllByTestId(`hero-date-${format(startDate, "yyyy-MM-dd")}`)[0].closest("button");
+    const endCell = screen.getAllByTestId(`hero-date-${format(endDate, "yyyy-MM-dd")}`)[0].closest("button");
+    expect(startCell).toBeTruthy();
+    expect(endCell).toBeTruthy();
+
+    fireEvent.click(startCell!);
+    fireEvent.click(endCell!);
+
+    const checkInLabel = format(startDate, "dd MMM yyyy");
+    const checkOutLabel = format(endDate, "dd MMM yyyy");
+
+    expect(screen.getByText(checkInLabel)).toBeInTheDocument();
+    expect(screen.getByText(checkOutLabel)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("hero-date-toggle"));
+    const sameDayCell = screen.getAllByTestId(`hero-date-${format(startDate, "yyyy-MM-dd")}`)[0].closest("button");
+    expect(sameDayCell).toBeTruthy();
+
+    fireEvent.click(sameDayCell!, { shiftKey: true });
+
+    expect(screen.getByText("Minimum stay is 1 night after check-in.")).toBeInTheDocument();
+    expect(screen.getByText(checkInLabel)).toBeInTheDocument();
+    expect(screen.getByText(checkOutLabel)).toBeInTheDocument();
   });
 
   it("shows exactly three high-signal trust badges", () => {
