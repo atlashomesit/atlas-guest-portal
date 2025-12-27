@@ -11,16 +11,20 @@ vi.mock("../../utils/analytics", async () => {
 });
 
 import Home from "./Home";
+import { BookingProvider } from "../../contexts/BookingContext";
 
 describe("Homepage layout", () => {
   it("exposes the Our Homes anchor for in-page navigation", () => {
     render(
       <MemoryRouter>
-        <Home />
+        <BookingProvider>
+          <Home />
+        </BookingProvider>
       </MemoryRouter>,
     );
 
     const ourHomesSection = screen.getByRole("heading", { name: /our homes/i }).closest("section");
     expect(ourHomesSection).toHaveAttribute("id", "our-homes");
+    expect(screen.getByTestId("hero-widget")).toHaveAttribute("id", "search-form");
   });
 });
