@@ -1516,10 +1516,8 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         openCalendar={openCalendar}
         calendarRef={calendarRef}
         triggerRowRef={triggerRowRef}
-        triggerRowBottom={triggerRowBottom}
         isBookedDatesLoading={isBookedDatesLoading}
         bookedDates={bookedDates}
-        DateRangeComponent={undefined as never}
         handleDateChange={handleDateChange}
         calendarVisibleMonth={calendarVisibleMonth}
         calendarRenderVersion={calendarRenderVersion}
