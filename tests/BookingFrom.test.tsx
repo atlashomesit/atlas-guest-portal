@@ -81,7 +81,8 @@ describe("BookingFrom", () => {
     const checkOutValue = formatDate(addDays(baseDate, 17));
 
     fireEvent.change(screen.getByPlaceholderText(/Name/i), { target: { value: "John Doe" } });
-    fireEvent.change(screen.getByPlaceholderText(/Contact Number/i), { target: { value: "1234567890" } });
+    fireEvent.change(screen.getByLabelText(/Country code/i), { target: { value: "+91" } });
+    fireEvent.change(screen.getByPlaceholderText(/Contact Number/i), { target: { value: "9876543210" } });
     fireEvent.change(screen.getByPlaceholderText(/Email/i), { target: { value: "guest@example.com" } });
 
     fireEvent.change(checkInInput, { target: { value: checkInValue } });
@@ -110,33 +111,29 @@ describe("BookingFrom", () => {
     const [checkInInput, checkOutInput] = container.querySelectorAll('input[type="date"]');
     const baseDate = new Date();
     const checkInValue = formatDate(addDays(baseDate, 10));
-    const checkOutValue = formatDate(addDays(baseDate, 11));
 
+    fireEvent.change(screen.getByPlaceholderText(/Email/i), { target: { value: "invalid" } });
+    fireEvent.blur(screen.getByPlaceholderText(/Email/i));
+
+    expect(screen.getByText(/Enter a valid email address./i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /reserve/i })).toBeDisabled();
+
+    fireEvent.change(screen.getByPlaceholderText(/Name/i), { target: { value: "Jane" } });
+    fireEvent.change(screen.getByLabelText(/Country code/i), { target: { value: "+91" } });
+    fireEvent.change(screen.getByPlaceholderText(/Contact Number/i), { target: { value: "9876543210" } });
+    fireEvent.change(screen.getByPlaceholderText(/Email/i), { target: { value: "valid@example.com" } });
     fireEvent.change(checkInInput, { target: { value: checkInValue } });
-    fireEvent.change(checkOutInput, { target: { value: checkOutValue } });
+    fireEvent.change(checkOutInput, { target: { value: checkInValue } });
 
     fireEvent.click(screen.getByRole("checkbox", { name: /i have read and agree/i }));
 
-    fireEvent.click(screen.getByRole("button", { name: /reserve/i }));
-    expect(toast.warning).toHaveBeenCalledWith("Please enter your name.");
-    expect(sendMock).not.toHaveBeenCalled();
+    const reserveButton = screen.getByRole("button", { name: /reserve/i });
+    expect(reserveButton).not.toBeDisabled();
 
-    fireEvent.change(screen.getByPlaceholderText(/Name/i), { target: { value: "Jane" } });
-    fireEvent.change(screen.getByPlaceholderText(/Contact Number/i), { target: { value: "555" } });
-    fireEvent.change(screen.getByPlaceholderText(/Email/i), { target: { value: "invalid" } });
-    fireEvent.click(screen.getByRole("button", { name: /reserve/i }));
-    expect(toast.warning).toHaveBeenCalledWith("Please enter a valid email address.");
-
-    fireEvent.change(screen.getByPlaceholderText(/Email/i), { target: { value: "valid@example.com" } });
-    mockIsEmailJsConfigured.mockReturnValue(false);
-    mockGetMissingEmailJsEnvKeys.mockReturnValue(["VITE_EMAILJS_SERVICE_ID"]);
-    fireEvent.click(screen.getByRole("button", { name: /reserve/i }));
+    fireEvent.click(reserveButton);
 
     await waitFor(() => expect(toast.error).toHaveBeenCalled());
-    expect(mockReportError).toHaveBeenCalledWith(
-      expect.any(Error),
-      expect.objectContaining({ feature: "booking-form", missingKeys: "VITE_EMAILJS_SERVICE_ID" }),
-    );
+    expect(screen.getByText(/Checkout must be after check-in./i)).toBeInTheDocument();
     expect(sendMock).not.toHaveBeenCalled();
   });
 });
