@@ -424,6 +424,20 @@ const Slider = () => {
     const normalizedStart = selection.startDate ? startOfDay(selection.startDate) : null;
     const normalizedEnd = selection.endDate ? startOfDay(selection.endDate) : null;
     markHeroInteraction();
+
+    if (normalizedStart && normalizedEnd && normalizedStart.getTime() === normalizedEnd.getTime()) {
+      const errorMessage = 'Minimum stay is 1 night after check-in.';
+      setStatusMessage(errorMessage);
+      setDateError(errorMessage);
+      setError(errorMessage);
+      trackEvent('hero_dates_changed', {
+        surface: 'hero_form',
+        checkIn: normalizedStart.toISOString(),
+        checkOut: normalizedEnd.toISOString(),
+      });
+      return;
+    }
+
     const nextRange = clampRange(normalizedStart, normalizedEnd);
     setStatusMessage(nextRange.error ?? 'Updated dates.');
     setDateError(nextRange.error);
@@ -437,6 +451,15 @@ const Slider = () => {
     if (selection.startDate && selection.endDate) {
       setIsCalendarOpen(false);
     }
+  };
+
+  const handleClearDates = () => {
+    markHeroInteraction();
+    setDateRange({ startDate: null, endDate: null });
+    setDateError(null);
+    setError(null);
+    setStatusMessage('');
+    setIsCalendarOpen(false);
   };
 
   const checkInLabel = dateRange.startDate ? format(dateRange.startDate, 'dd MMM yyyy') : 'Check-in';
@@ -627,6 +650,17 @@ const Slider = () => {
                 </span>
                 <span className={helperTextClass}>Check-out must be at least 1 night after check-in.</span>
               </button>
+
+              <div className="md:col-span-2 flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleClearDates}
+                  className="mt-2 inline-flex items-center justify-center rounded-full px-3 py-2 text-sm font-semibold text-text-muted underline-offset-4 transition hover:text-cta-secondary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
+                  data-testid="hero-date-clear"
+                >
+                  Clear dates
+                </button>
+              </div>
 
               <div
                 className={`${fieldShellClass} text-left md:-ml-[1px]`}
