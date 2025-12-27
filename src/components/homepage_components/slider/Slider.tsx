@@ -56,6 +56,7 @@ const Slider = () => {
     defaultRange,
   );
   const [guests, setGuests] = React.useState(2);
+  const [dateError, setDateError] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -67,6 +68,7 @@ const Slider = () => {
   const hasInteractedRef = React.useRef(false);
   const latestWidgetStateRef = React.useRef({ hasSelection: false, guests });
   const calendarWrapperRef = React.useRef<HTMLDivElement | null>(null);
+  const dateErrorId = React.useId();
   const monthsToShow = React.useMemo(
     () => (typeof window !== 'undefined' && window.innerWidth < 768 ? 1 : 2),
     [],
@@ -80,10 +82,15 @@ const Slider = () => {
 
   const clampRange = (startDate: Date | null, endDate: Date | null) => {
     const normalizedStart = startDate && startDate < today ? today : startDate;
-    if (normalizedStart && endDate && endDate <= normalizedStart) {
-      return { startDate: normalizedStart, endDate: addDays(normalizedStart, 1) };
+    let normalizedEnd = endDate ?? null;
+    let errorMessage: string | null = startDate && startDate < today ? 'Check-in cannot be in the past.' : null;
+
+    if (normalizedStart && normalizedEnd && normalizedEnd <= normalizedStart) {
+      normalizedEnd = addDays(normalizedStart, 1);
+      errorMessage = 'Check-out must be at least 1 night after check-in.';
     }
-    return { startDate: normalizedStart ?? null, endDate: endDate ?? null };
+
+    return { startDate: normalizedStart ?? null, endDate: normalizedEnd, error: errorMessage };
   };
 
   const hydrateFromStorage = () => {
@@ -114,7 +121,8 @@ const Slider = () => {
 
     const nextRange = clampRange(startDate, endDate);
 
-    setDateRange(nextRange);
+    setDateRange({ startDate: nextRange.startDate, endDate: nextRange.endDate });
+    setDateError(null);
     if (paramRange.guests && paramRange.guests > 0) {
       setGuests(paramRange.guests);
     } else if (stored?.guests) {
@@ -192,7 +200,9 @@ const Slider = () => {
     setStatusMessage('');
     markHeroInteraction();
 
-    const { startDate, endDate } = dateRange;
+    const { startDate, endDate, error: rangeError } = clampRange(dateRange.startDate, dateRange.endDate);
+    setDateRange({ startDate, endDate });
+    setDateError(rangeError);
 
     if (!startDate || !endDate) {
       setError('Please select your check-in and check-out dates.');
@@ -200,17 +210,11 @@ const Slider = () => {
       return;
     }
 
-    if (endDate <= startDate) {
-      setError('Check-out must be after check-in.');
-      setStatusMessage('Check-out must be after check-in.');
-      return;
-    }
-
-    if (startDate < today) {
-      setDateRange(clampRange(today, endDate));
-      setError('Check-in cannot be in the past.');
-      setStatusMessage('Check-in adjusted to the next available date.');
-      return;
+    if (rangeError) {
+      setError(rangeError);
+      setStatusMessage(rangeError);
+    } else {
+      setError(null);
     }
 
     if (guests < 1) {
@@ -270,9 +274,11 @@ const Slider = () => {
     const normalizedStart = selection.startDate ? startOfDay(selection.startDate) : null;
     const normalizedEnd = selection.endDate ? startOfDay(selection.endDate) : null;
     markHeroInteraction();
-    setStatusMessage('Updated dates.');
-    setDateRange(clampRange(normalizedStart, normalizedEnd));
-    setError(null);
+    const nextRange = clampRange(normalizedStart, normalizedEnd);
+    setStatusMessage(nextRange.error ?? 'Updated dates.');
+    setDateError(nextRange.error);
+    setDateRange({ startDate: nextRange.startDate, endDate: nextRange.endDate });
+    setError(nextRange.error);
     trackEvent('hero_dates_changed', {
       surface: 'hero_form',
       checkIn: normalizedStart?.toISOString(),
@@ -314,6 +320,7 @@ const Slider = () => {
 
   const fieldShellClass =
     'flex h-full min-h-[112px] flex-col justify-between rounded-2xl border border-[color:color-mix(in_srgb,var(--border-subtle)_80%,transparent)] bg-[color:color-mix(in_srgb,var(--bg-muted)_92%,var(--bg-surface))] px-4 py-4 sm:px-5 sm:py-5 shadow-[0_12px_36px_rgba(6,8,15,0.32)]';
+  const dateFieldShellClass = `${fieldShellClass} ${dateError ? 'border-support-error shadow-[0_0_0_1px_var(--support-error)]' : ''}`;
   const labelClass =
     'flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-[color-mix(in_srgb,var(--text-primary)_80%,transparent)] whitespace-nowrap';
   const helperTextClass = 'mt-2 text-sm leading-snug text-[color-mix(in_srgb,var(--text-primary)_78%,transparent)]';
@@ -367,9 +374,11 @@ const Slider = () => {
               <div className="relative">
                 <button
                   type="button"
-                  className={`${fieldShellClass} text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary`}
+                  className={`${dateFieldShellClass} text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary`}
                   aria-label="Select check-in date"
                   aria-expanded={isCalendarOpen}
+                  aria-describedby={dateError ? dateErrorId : undefined}
+                  aria-invalid={Boolean(dateError)}
                   onClick={() => setIsCalendarOpen((open) => !open)}
                   data-testid="hero-date-toggle"
                 >
@@ -382,6 +391,11 @@ const Slider = () => {
                     <ChevronDown className={`h-4 w-4 shrink-0 text-text-muted transition ${isCalendarOpen ? 'rotate-180' : ''}`} aria-hidden />
                   </span>
                   <span className={helperTextClass}>Earliest available date shown.</span>
+                  {dateError && (
+                    <span className="mt-2 text-sm font-semibold text-support-error" id={dateErrorId} role="alert">
+                      {dateError}
+                    </span>
+                  )}
                 </button>
 
                 {isCalendarOpen && (
@@ -392,7 +406,7 @@ const Slider = () => {
                         months={monthsToShow}
                         direction="horizontal"
                         showDateDisplay={false}
-                        rangeColors={['var(--cta-primary)']}
+                        rangeColors={[dateError ? 'var(--support-error, #ef4444)' : 'var(--cta-primary)']}
                         minDate={today}
                         ranges={[
                           {
@@ -421,9 +435,11 @@ const Slider = () => {
 
               <button
                 type="button"
-                className={`${fieldShellClass} text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary md:-ml-[1px]`}
+                className={`${dateFieldShellClass} text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary md:-ml-[1px]`}
                 aria-label="Select check-out date"
                 aria-expanded={isCalendarOpen}
+                aria-describedby={dateError ? dateErrorId : undefined}
+                aria-invalid={Boolean(dateError)}
                 onClick={() => setIsCalendarOpen((open) => !open)}
               >
                 <span className={labelClass}>

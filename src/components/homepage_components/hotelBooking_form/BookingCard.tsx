@@ -223,6 +223,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
   const [termsAcceptedAt, setTermsAcceptedAt] = useState<string | null>(null);
   const [hasInteractedWithDates, setHasInteractedWithDates] = useState(false);
   const [inlineStatus, setInlineStatus] = useState('');
+  const [dateError, setDateError] = useState<string | null>(null);
   const [ctaConfirmation, setCtaConfirmation] = useState<string | null>(null);
   const [isInlineChecking, setIsInlineChecking] = useState(false);
   const [availabilityStatus, setAvailabilityStatus] = useState<'idle' | 'checking' | 'available'>('idle');
@@ -298,23 +299,32 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     markEngagement();
     const { startDate, endDate } = ranges.selection;
     setHasInteractedWithDates(true);
-    setInlineStatus('Dates updated for your stay.');
     const normalizedStart = startDate ? startOfDay(startDate) : defaultStartDate;
     const normalizedEnd = endDate ? startOfDay(endDate) : defaultEndDate;
-    // Allow today to be selected (normalizedStart >= today)
-    const effectiveStartDate = normalizedStart < today ? today : normalizedStart;
-    let resolvedEndDate = normalizedEnd <= effectiveStartDate ? addDays(effectiveStartDate, 1) : normalizedEnd;
+
+    let effectiveStartDate = normalizedStart;
+    let resolvedEndDate = normalizedEnd;
+    let errorMessage: string | null = null;
+
+    if (normalizedStart < today) {
+      effectiveStartDate = today;
+      errorMessage = 'Check-in cannot be in the past.';
+    }
+
+    if (normalizedEnd <= effectiveStartDate) {
+      resolvedEndDate = addDays(effectiveStartDate, 1);
+      errorMessage = 'Check-out must be at least 1 night after check-in.';
+    }
 
     if (startDate && endDate) {
-      if (effectiveStartDate.getTime() === normalizedEnd.getTime()) {
-        resolvedEndDate = addDays(effectiveStartDate, 1);
-      }
-
       setDates({
         startDate: effectiveStartDate,
         endDate: resolvedEndDate,
         key: 'selection',
       });
+
+      setDateError(errorMessage);
+      setInlineStatus(errorMessage ?? 'Dates updated for your stay.');
 
       trackEvent(
         'booking_dates_changed',
@@ -621,13 +631,15 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
   const guestNeedsAdult = guests.adults < 1;
   const containerPaddingBottom = supportPadding ? 'pb-40' : 'pb-28';
   const validationMessageId = useId();
+  const dateErrorId = useId();
   const checkOutErrorId = useId();
   const guestErrorId = useId();
   const validationMessage = useMemo(() => {
-    if (isCheckoutInvalid) return 'Check-out must be after check-in.';
+    if (dateError) return dateError;
+    if (isCheckoutInvalid) return 'Check-out must be at least 1 night after check-in.';
     if (guestNeedsAdult) return 'Add at least one adult.';
     return '';
-  }, [guestNeedsAdult, isCheckoutInvalid]);
+  }, [dateError, guestNeedsAdult, isCheckoutInvalid]);
   const inlineCtaDisabled = !hasSelection || isCheckoutInvalid;
   const liveRegionMessage =
     validationMessage ||
@@ -996,10 +1008,12 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         trackEvent={trackEvent}
         propertyId={propertyId}
         dates={dates}
+        dateError={dateError}
         validationMessage={validationMessage}
         validationMessageId={validationMessageId}
         setHasInteractedWithDates={setHasInteractedWithDates}
         isCheckoutInvalid={isCheckoutInvalid}
+        dateErrorId={dateErrorId}
         checkOutErrorId={checkOutErrorId}
         hasInteractedWithDates={hasInteractedWithDates}
         guestNeedsAdult={guestNeedsAdult}
