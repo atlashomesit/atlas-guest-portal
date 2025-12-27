@@ -373,7 +373,16 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
                 const dateToCheck = new Date(date);
                 dateToCheck.setHours(0, 0, 0, 0);
                 const dateToCheckTime = dateToCheck.getTime();
-                
+
+                const selectionStart = startOfDay(dates.startDate).getTime();
+                const selectionEnd = startOfDay(dates.endDate).getTime();
+                const rangeStart = Math.min(selectionStart, selectionEnd);
+                const rangeEnd = Math.max(selectionStart, selectionEnd);
+
+                const isRangeStart = dateToCheckTime === selectionStart;
+                const isRangeEnd = dateToCheckTime === selectionEnd;
+                const isInRange = dateToCheckTime >= rangeStart && dateToCheckTime <= rangeEnd;
+
                 // Check if this date is in the blocked dates array
                 // bookedDates is an array of Date objects representing blocked dates
                 const isBooked = bookedDates.some((bookedDate) => {
@@ -385,8 +394,6 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
                 // Check if date is in the past (before today)
                 // Today should be available if not booked
                 const isPastDate = dateToCheck < todayStart;
-                // Today is available if it's not booked; future dates are available if not booked
-                const isAvailable = !isBooked && !isPastDate;
 
                 const dayStatus = isBooked
                   ? 'Unavailable: already booked'
@@ -396,40 +403,33 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
 
                 return (
                   <div className="relative w-full h-full flex items-center justify-center">
-                    {/* Background color: red for blocked, green for available, gray for past */}
-                    <div
-                      className={`absolute inset-0 rounded ${
-                        isBooked
-                          ? 'bg-red-200 dark:bg-red-900/40 border border-red-400'
-                          : isAvailable
-                          ? 'bg-green-200 dark:bg-green-900/40 border border-green-400'
-                          : 'bg-gray-100 dark:bg-gray-800/30'
-                      }`}
-                    />
-                    
-                    {/* Red strike-through for booked dates */}
-                    {isBooked && (
-                      <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-                        <div className="h-1 w-full bg-red-600 dark:bg-red-500 transform rotate-45 opacity-80"></div>
-                      </div>
+                    {isInRange && (
+                      <div
+                        className={`absolute inset-0 bg-[color:color-mix(in_srgb,var(--cta-primary)_14%,transparent)] ${
+                          isRangeStart && isRangeEnd
+                            ? 'rounded-full'
+                            : isRangeStart
+                            ? 'rounded-l-full'
+                            : isRangeEnd
+                            ? 'rounded-r-full'
+                            : 'rounded-none'
+                        }`}
+                        aria-hidden
+                      />
                     )}
-                    
-                    {/* Green indicator dot for available dates */}
-                    {isAvailable && !isBooked && (
-                      <div className="absolute top-1 right-1 z-10 pointer-events-none">
-                        <div className="w-2 h-2 bg-green-600 dark:bg-green-400 rounded-full shadow-sm"></div>
-                      </div>
-                    )}
-                    
-                    {/* Date number */}
+
                     <span
                       title={dayStatus}
-                      className={`relative z-20 font-medium ${
+                      className={`relative z-20 flex h-10 w-10 items-center justify-center rounded-full border text-sm font-semibold transition ${
+                        isRangeStart || isRangeEnd
+                          ? 'bg-cta-primary text-[var(--text-contrast)] border-cta-primary/60 shadow-sm'
+                          : 'border-transparent'
+                      } ${
                         isBooked
                           ? 'text-red-700 dark:text-red-300 line-through'
-                          : isAvailable
-                          ? 'text-green-800 dark:text-green-300'
-                          : 'text-gray-500 dark:text-gray-400'
+                          : isPastDate
+                          ? 'text-gray-500 dark:text-gray-400'
+                          : 'text-text-primary'
                       }`}
                     >
                       {date.getDate()}
