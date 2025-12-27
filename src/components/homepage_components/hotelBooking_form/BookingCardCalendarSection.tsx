@@ -1,7 +1,7 @@
 // BookingCardCalendarSection.tsx
 import { Link } from 'react-router-dom';
 import { DateRange } from 'react-date-range';
-import { format } from 'date-fns';
+import { format, startOfDay } from 'date-fns';
 import { getIstStartOfDay } from '@/utils/date';
 import { inlinePolicySnippets } from '../../../content/terms';
 import { priceDisplayConfig } from '../../../config/priceDisplay.config';
@@ -401,6 +401,8 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
                 // Check if date is in the past (before today)
                 // Today should be available if not booked
                 const isPastDate = dateToCheck < todayStart;
+
+                const isAvailable = !isBooked && !isPastDate;
 
                 const dayStatus = isBooked
                   ? 'Unavailable: already booked'
