@@ -16,27 +16,25 @@ interface Property {
 }
 
 const BookingForm = ({ propertyData }: { propertyData: Property }) => {
-  // Format date to yyyy-mm-dd for input[type=date]
-  const formatDateForInput = (date: Date) => {
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = date.getFullYear();
-    return `${year}-${month}-${day}`;
+  const addDays = (date: Date, days: number) => {
+    const nextDate = new Date(date);
+    nextDate.setDate(nextDate.getDate() + days);
+    return nextDate;
   };
 
-  // Format date to dd-mm-yyyy for display
-  const formatDateForDisplay = (dateStr: string) => {
-    const [year, month, day] = dateStr.split('-').map(Number);
-    return `${String(day).padStart(2, '0')}-${String(month).padStart(2, '0')}-${year}`;
-  };
+  const today = useMemo(() => {
+    const current = new Date();
+    current.setHours(0, 0, 0, 0);
+    return current;
+  }, []);
 
-  // Set default dates
-  const today = new Date();
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
+  const maxBookingDate = useMemo(() => addDays(today, 180), [today]);
 
-  const [checkIn, setCheckIn] = useState(formatDateForInput(today));
-  const [checkOut, setCheckOut] = useState(formatDateForInput(tomorrow));
+  const defaultCheckIn = formatDateForInput(today);
+  const defaultCheckOut = formatDateForInput(addDays(today, 1));
+
+  const [checkIn, setCheckIn] = useState(defaultCheckIn);
+  const [checkOut, setCheckOut] = useState(defaultCheckOut);
   const [name, setName] = useState('');
   const [contactNumber, setContactNumber] = useState('');
   const [email, setEmail] = useState('');
@@ -49,8 +47,82 @@ const BookingForm = ({ propertyData }: { propertyData: Property }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [termsAcceptedAt, setTermsAcceptedAt] = useState<string | null>(null);
+  const [dateError, setDateError] = useState<string | null>(null);
   const unitType = inferUnitType({ property_name: propertyData?.property_name });
   const totalGuests = adults + children + infants;
+
+  const minCheckoutDate = useMemo(() => {
+    const parsedCheckIn = parseDate(checkIn);
+    const fallback = addDays(today, 1);
+    const computedMin = parsedCheckIn ? addDays(parsedCheckIn, 1) : fallback;
+    return computedMin > maxBookingDate ? maxBookingDate : computedMin;
+  }, [checkIn, maxBookingDate, today]);
+
+  const validateDateSelection = (
+    nextCheckInValue: string,
+    nextCheckOutValue: string,
+  ): { valid: boolean; message?: string } => {
+    const parsedCheckIn = parseDate(nextCheckInValue);
+    const parsedCheckOut = parseDate(nextCheckOutValue);
+
+    if (!parsedCheckIn || !parsedCheckOut) {
+      const message = 'Please select valid check-in and checkout dates.';
+      setDateError(message);
+      return { valid: false, message };
+    }
+
+    if (parsedCheckIn < today) {
+      const message = 'Check-in cannot be in the past.';
+      setDateError(message);
+      return { valid: false, message };
+    }
+
+    if (parsedCheckIn > maxBookingDate) {
+      const message = `Bookings are available up to ${formatDateForDisplay(maxBookingDate)}.`;
+      setDateError(message);
+      return { valid: false, message };
+    }
+
+    if (parsedCheckOut > maxBookingDate) {
+      const message = `Checkout must be on or before ${formatDateForDisplay(maxBookingDate)}.`;
+      setDateError(message);
+      return { valid: false, message };
+    }
+
+    if (parsedCheckOut <= parsedCheckIn) {
+      const message = 'Checkout must be after check-in.';
+      setDateError(message);
+      return { valid: false, message };
+    }
+
+    setDateError(null);
+    return { valid: true };
+  };
+
+  const handleCheckInChange = (value: string) => {
+    let nextCheckout = checkOut;
+    const parsedCheckIn = parseDate(value);
+
+    if (parsedCheckIn) {
+      const minimumCheckout = addDays(parsedCheckIn, 1);
+      const normalizedMinCheckout =
+        minimumCheckout > maxBookingDate ? maxBookingDate : minimumCheckout;
+      const parsedCheckout = parseDate(checkOut);
+
+      if (!parsedCheckout || parsedCheckout <= parsedCheckIn) {
+        nextCheckout = formatDateForInput(normalizedMinCheckout);
+        setCheckOut(nextCheckout);
+      }
+    }
+
+    setCheckIn(value);
+    validateDateSelection(value, nextCheckout);
+  };
+
+  const handleCheckOutChange = (value: string) => {
+    setCheckOut(value);
+    validateDateSelection(checkIn, value);
+  };
 
   const stayDates = useMemo(() => {
     const start = parseDate(checkIn);
@@ -92,6 +164,13 @@ const BookingForm = ({ propertyData }: { propertyData: Property }) => {
     return re.test(email);
   };
   const handleSubmit = async () => {
+    const dateValidation = validateDateSelection(checkIn, checkOut);
+
+    if (!dateValidation.valid) {
+      toast.error(dateValidation.message || 'Please select valid booking dates.');
+      return;
+    }
+
     if (!name.trim()) {
       toast.warning('Please enter your name.');
       return;
@@ -160,10 +239,8 @@ ${policyMessage}`
       setName('');
       setContactNumber('');
       setEmail('');
-      setCheckIn(formatDateForInput(new Date()));
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      setCheckOut(formatDateForInput(tomorrow));
+      setCheckIn(defaultCheckIn);
+      setCheckOut(defaultCheckOut);
       setAdults(1);
       setChildren(0);
       setInfants(0);
@@ -223,9 +300,10 @@ ${policyMessage}`
               <Input
                 type="date"
                 value={checkIn}
-                onChange={(e) => setCheckIn(e.target.value)}
+                onChange={(e) => handleCheckInChange(e.target.value)}
                 className="w-full"
-                min={formatDateForInput(new Date())}
+                min={formatDateForInput(today)}
+                max={formatDateForInput(maxBookingDate)}
               />
               <div className="text-xs text-text-muted mt-1">
                 {formatDateForDisplay(checkIn)}
@@ -236,14 +314,24 @@ ${policyMessage}`
               <Input
                 type="date"
                 value={checkOut}
-                onChange={(e) => setCheckOut(e.target.value)}
+                onChange={(e) => handleCheckOutChange(e.target.value)}
                 className="w-full"
-                min={checkIn}
+                min={formatDateForInput(minCheckoutDate)}
+                max={formatDateForInput(maxBookingDate)}
               />
               <div className="text-xs text-text-muted mt-1">
                 {formatDateForDisplay(checkOut)}
               </div>
             </div>
+          </div>
+          <div className="px-3 pb-3">
+            {dateError ? (
+              <div className="text-xs text-destructive">{dateError}</div>
+            ) : (
+              <div className="text-xs text-text-muted">
+                You can book stays through {formatDateForDisplay(maxBookingDate)}.
+              </div>
+            )}
           </div>
         </div>
 
