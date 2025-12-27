@@ -91,7 +91,9 @@ const createListingModel = (
 
   try {
     price = calculateNightlyPrice({
-      unitType: inferUnitType(property ?? { id: listing.id, name: listing.title }),
+      unitType: inferUnitType(
+        property ?? { id: listing.id, name: listing.title, unitType: listing.unitType }
+      ),
       checkInDate: checkInDate ?? new Date(),
       guests: guests ?? undefined,
     });

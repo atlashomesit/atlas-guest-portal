@@ -12,9 +12,14 @@ import getApiBaseUrl from "../utils/apiBaseUrl";
 import { trackEvent } from "../utils/analytics";
 import { calculateNightlyPrice, inferUnitType, type NightlyPriceBreakdown } from "../utils/pricing";
 import { isAtlasApiRequest, logApiError, monitoredFetch } from "../lib/monitoring";
+import type { UnitType } from "../config/pricing.config";
 
 type PropertyRecord = {
   id: number | string;
+  unitType?: UnitType;
+  unit_type?: UnitType;
+  metadata?: { unitType?: UnitType; unit_type?: UnitType };
+  property_metadata?: { unitType?: UnitType; unit_type?: UnitType };
   property_name?: string;
   property_location?: string;
   property_neighborhoods?: string[];
@@ -116,10 +121,20 @@ const sanitizeListings = (listingsInput: unknown): Listing[] => {
     }
 
     return listingsInput
-      .map((listing) => ({
-        ...listing,
-        id: String((listing as Listing | { id?: string }).id || ""),
-      }))
+      .map((listing) => {
+        const unitType = inferUnitType({
+          ...listing,
+          name: (listing as Listing).title ?? (listing as { name?: string }).name,
+          unitType: (listing as Listing).unitType ?? (listing as { unit_type?: UnitType }).unit_type,
+          metadata: (listing as { metadata?: { unitType?: UnitType; unit_type?: UnitType } }).metadata,
+        });
+
+        return {
+          ...listing,
+          unitType,
+          id: String((listing as Listing | { id?: string }).id || ""),
+        } satisfies Listing;
+      })
       .filter((listing) => Boolean(listing.id));
   } catch (error) {
     console.error("Error processing LISTINGS:", error);
@@ -145,38 +160,38 @@ const sanitizeProperties = (propertiesInput: unknown): PropertyRecord[] => {
     }
 
     return propertiesInput.map((property) => {
-      const safeProperty = {
-        id: String((property as PropertyRecord).id || ""),
-        property_name: (property as PropertyRecord)?.property_name || `Property ${(property as PropertyRecord)?.id || ""}`,
-        property_location: (property as PropertyRecord)?.property_location || "Hyderabad",
-        property_neighborhoods: Array.isArray((property as PropertyRecord)?.property_neighborhoods)
-          ? (property as PropertyRecord).property_neighborhoods
+      const baseProperty = property as PropertyRecord;
+      const safeProperty: PropertyRecord = {
+        id: String(baseProperty.id || ""),
+        property_name: baseProperty?.property_name || `Property ${baseProperty?.id || ""}`,
+        property_location: baseProperty?.property_location || "Hyderabad",
+        property_neighborhoods: Array.isArray(baseProperty?.property_neighborhoods)
+          ? baseProperty.property_neighborhoods
           : [],
-        property_description:
-          (property as PropertyRecord)?.property_description || "A comfortable place to stay",
-        property_price:
-          typeof (property as PropertyRecord)?.property_price === "number"
-            ? (property as PropertyRecord).property_price
-            : 0,
-        property_rating:
-          typeof (property as PropertyRecord)?.property_rating === "number"
-            ? (property as PropertyRecord).property_rating
-            : 0,
-        property_reviews:
-          typeof (property as PropertyRecord)?.property_reviews === "number"
-            ? (property as PropertyRecord).property_reviews
-            : 0,
-        property_img: Array.isArray((property as PropertyRecord)?.property_img)
-          ? (property as PropertyRecord).property_img
-          : [],
-        property_amenities: Array.isArray((property as PropertyRecord)?.property_amenities)
-          ? (property as PropertyRecord).property_amenities
-          : [],
-        property_policy_details: Array.isArray((property as PropertyRecord)?.property_policy_details)
-          ? (property as PropertyRecord).property_policy_details
+        property_description: baseProperty?.property_description || "A comfortable place to stay",
+        property_price: typeof baseProperty?.property_price === "number" ? baseProperty.property_price : 0,
+        property_rating: typeof baseProperty?.property_rating === "number" ? baseProperty.property_rating : 0,
+        property_reviews: typeof baseProperty?.property_reviews === "number" ? baseProperty.property_reviews : 0,
+        property_img: Array.isArray(baseProperty?.property_img) ? baseProperty.property_img : [],
+        property_amenities: Array.isArray(baseProperty?.property_amenities) ? baseProperty.property_amenities : [],
+        property_policy_details: Array.isArray(baseProperty?.property_policy_details)
+          ? baseProperty.property_policy_details
           : [],
         ...property,
       } satisfies PropertyRecord;
+
+      const metadataUnitType =
+        baseProperty?.unitType ??
+        baseProperty?.unit_type ??
+        baseProperty?.metadata?.unitType ??
+        baseProperty?.metadata?.unit_type ??
+        baseProperty?.property_metadata?.unitType ??
+        baseProperty?.property_metadata?.unit_type;
+
+      safeProperty.unitType =
+        typeof metadataUnitType === "string" && metadataUnitType.trim()
+          ? metadataUnitType
+          : inferUnitType(safeProperty);
 
       if (!safeProperty.property_img || safeProperty.property_img.length === 0) {
         safeProperty.property_img = [LOGO_URL];

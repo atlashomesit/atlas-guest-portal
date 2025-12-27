@@ -99,11 +99,31 @@ const getExtraGuestFee = (unitType: UnitType): number => {
   return pricingConfig.extraGuestFeeByUnitType?.[unitType] ?? 0;
 };
 
-export const inferUnitType = (property: { id?: string | number; property_name?: string; name?: string }): UnitType => {
+export const inferUnitType = (property: {
+  id?: string | number;
+  property_name?: string;
+  name?: string;
+  unitType?: UnitType;
+  unit_type?: UnitType;
+  metadata?: { unitType?: UnitType; unit_type?: UnitType };
+  property_metadata?: { unitType?: UnitType; unit_type?: UnitType };
+}): UnitType => {
+  const unitTypeFromMetadata =
+    property.metadata?.unitType ??
+    property.metadata?.unit_type ??
+    property.property_metadata?.unitType ??
+    property.property_metadata?.unit_type ??
+    property.unitType ??
+    property.unit_type;
+
+  if (typeof unitTypeFromMetadata === "string" && unitTypeFromMetadata.trim()) {
+    return unitTypeFromMetadata.toLowerCase() as UnitType;
+  }
+
   const derivedName = property.property_name || property.name || "";
   const normalized = derivedName.toLowerCase();
 
-  if (String(property.id) === "501" || normalized.includes("penthouse")) {
+  if (normalized.includes("penthouse")) {
     return "penthouse";
   }
 
