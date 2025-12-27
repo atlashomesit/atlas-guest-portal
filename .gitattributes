@@ -31,3 +31,6 @@
 *.zip binary
 *.tar.gz binary
 
+# Allow diffs for the static map illustration so reviewers can inspect the SVG markup.
+public/images/atlas-homestays-static-map.svg -binary text eol=lf
+
