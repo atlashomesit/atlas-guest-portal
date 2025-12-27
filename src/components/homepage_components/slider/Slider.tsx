@@ -192,6 +192,62 @@ const Slider = () => {
   ]);
 
   React.useEffect(() => {
+    if (!isCalendarOpen || typeof window === 'undefined') return;
+
+    const shouldLockBody = isMobileViewport;
+    const previousOverflow = document.body.style.overflow;
+
+    if (shouldLockBody) {
+      document.body.style.overflow = 'hidden';
+    }
+
+    const updateDropdownPosition = () => {
+      if (!calendarWrapperRef.current) return;
+      const rect = calendarWrapperRef.current.getBoundingClientRect();
+      const spacing = 12;
+      const viewportWidth = window.innerWidth;
+      const desiredWidth = Math.min(Math.max(rect.width, 360), viewportWidth - spacing * 2);
+      const left = Math.min(Math.max(rect.left, spacing), viewportWidth - desiredWidth - spacing) + window.scrollX;
+      const top = rect.bottom + window.scrollY + 8;
+      setCalendarPosition({ top, left, width: desiredWidth });
+    };
+
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (
+        calendarDropdownRef.current &&
+        !calendarDropdownRef.current.contains(target) &&
+        calendarWrapperRef.current &&
+        !calendarWrapperRef.current.contains(target)
+      ) {
+        setIsCalendarOpen(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsCalendarOpen(false);
+      }
+    };
+
+    updateDropdownPosition();
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+    window.addEventListener('resize', updateDropdownPosition);
+    window.addEventListener('scroll', updateDropdownPosition, true);
+
+    return () => {
+      if (shouldLockBody) {
+        document.body.style.overflow = previousOverflow;
+      }
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+      window.removeEventListener('resize', updateDropdownPosition);
+      window.removeEventListener('scroll', updateDropdownPosition, true);
+    };
+  }, [isCalendarOpen, isMobileViewport]);
+
+  React.useEffect(() => {
     if (!isCalendarOpen || isTestEnvironment) return;
     const timer = window.setTimeout(() => setCalendarReady(true), 140);
     return () => {
