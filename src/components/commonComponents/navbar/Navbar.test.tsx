@@ -12,7 +12,7 @@ vi.mock("../../../utils/analytics", async () => {
 
 import Navbar from "./Navbar";
 import { trackEvent } from "../../../utils/analytics";
-import { rooms } from "../../../content/rooms";
+import { homes } from "../../../content/homes";
 
 const renderNavbar = () =>
   render(
@@ -62,8 +62,8 @@ describe("Navbar CTA", () => {
     const trigger = screen.getByRole("button", { name: /our homes/i });
     fireEvent.click(trigger);
 
-    for (const room of rooms) {
-      expect(await screen.findByRole("menuitem", { name: room.title })).toBeInTheDocument();
+    for (const home of homes) {
+      expect(await screen.findByRole("menuitem", { name: home.title })).toBeInTheDocument();
     }
   });
 });

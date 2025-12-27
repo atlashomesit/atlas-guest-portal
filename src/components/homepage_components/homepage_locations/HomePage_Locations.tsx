@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { Link } from "react-router-dom";
 
 import Heading from "../../commonComponents/heading/Heading";
-import { rooms, defaultRoomHighlights } from "../../../content/rooms";
+import { homes, defaultHomeHighlights } from "../../../content/homes";
 import { trackEvent } from "../../../utils/analytics";
 
 import "./homepage_location.css";
@@ -14,7 +14,7 @@ const HomePage_Locations = () => {
     trackEvent(
       "listings_browse",
       {
-        total: rooms.length,
+        total: homes.length,
         surface: "home_locations",
       },
       { route: "/" },
@@ -27,18 +27,18 @@ const HomePage_Locations = () => {
         <Heading title="Our Homes" id="our-homes" />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
-          {rooms.map((room) => {
-            const highlights = room.highlights?.length ? room.highlights : defaultRoomHighlights;
+          {homes.map((home) => {
+            const highlights = home.highlights?.length ? home.highlights : defaultHomeHighlights;
 
             return (
               <div
-                key={room.roomNo}
+                key={home.roomNo}
                 className="rounded-2xl shadow-level1 bg-white overflow-hidden border border-border-subtle flex flex-col"
               >
-                <Link to={room.route} className="block">
+                <Link to={home.href} className="block">
                   <img
-                    src={room.imageSrc ?? fallbackImage}
-                    alt={room.title}
+                    src={home.imageSrc ?? fallbackImage}
+                    alt={home.title}
                     className="w-full h-52 object-cover"
                     loading="lazy"
                     onError={(event) => {
@@ -53,9 +53,9 @@ const HomePage_Locations = () => {
                 <div className="p-4 flex flex-col gap-3 flex-1">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">Atlas Homes</p>
-                    <h3 className="text-xl font-semibold text-text-primary">{room.title}</h3>
-                    {room.tagline && (
-                      <p className="text-sm text-text-secondary mt-1">{room.tagline}</p>
+                    <h3 className="text-xl font-semibold text-text-primary">{home.title}</h3>
+                    {home.tagline && (
+                      <p className="text-sm text-text-secondary mt-1">{home.tagline}</p>
                     )}
                   </div>
 
@@ -67,13 +67,13 @@ const HomePage_Locations = () => {
 
                   <div className="flex gap-3 flex-wrap">
                     <Link
-                      to={room.route}
+                      to={home.href}
                       className="inline-flex items-center justify-center rounded-full bg-[color:var(--cta-primary)] px-4 py-2 text-sm font-semibold text-white shadow-level1 transition hover:-translate-y-0.5"
                     >
                       View details
                     </Link>
                     <Link
-                      to={room.route}
+                      to={home.href}
                       className="inline-flex items-center justify-center rounded-full border border-border-subtle px-4 py-2 text-sm font-semibold text-text-primary transition hover:border-[color:var(--cta-primary)] hover:text-[color:var(--cta-primary)]"
                     >
                       Book

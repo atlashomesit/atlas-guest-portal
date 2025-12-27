@@ -1,12 +1,12 @@
 import { Link, useParams } from "react-router-dom";
 
-import { rooms, defaultRoomHighlights } from "../../content/rooms";
+import { homes, defaultHomeHighlights } from "../../content/homes";
 
 const HomeDetails = () => {
   const { roomNo } = useParams<{ roomNo: string }>();
-  const room = rooms.find((item) => item.roomNo === roomNo);
+  const room = homes.find((item) => item.roomNo === roomNo);
 
-  const highlights = room?.highlights?.length ? room.highlights : defaultRoomHighlights;
+  const highlights = room?.highlights?.length ? room.highlights : defaultHomeHighlights;
 
   if (!room) {
     return (
