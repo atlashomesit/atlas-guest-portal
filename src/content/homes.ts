@@ -1,3 +1,5 @@
+import { propertyImages } from "../data";
+
 export type Home = {
   roomNo: string;
   title: string;
@@ -5,7 +7,7 @@ export type Home = {
   href: string;
   tagline?: string;
   highlights?: string[];
-  imageSrc?: string;
+  images: string[];
 };
 
 const placeholderImage = "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80";
@@ -32,7 +34,7 @@ export const homes: Home[] = [
       "Washer + dryer",
       "Balcony seating",
     ],
-    imageSrc: placeholderImage,
+    images: propertyImages["101"] ?? [placeholderImage],
   },
   {
     roomNo: "102",
@@ -40,7 +42,7 @@ export const homes: Home[] = [
     slug: "atlas-homes-room-102",
     href: "/property_details/atlas-homes-room-102",
     tagline: "Cozy corner suite for work trips",
-    imageSrc: placeholderImage,
+    images: propertyImages["102"] ?? [placeholderImage],
   },
   {
     roomNo: "201",
@@ -48,7 +50,7 @@ export const homes: Home[] = [
     slug: "atlas-homes-room-201",
     href: "/property_details/atlas-homes-room-201",
     tagline: "Family-friendly stay with study nook",
-    imageSrc: placeholderImage,
+    images: propertyImages["201"] ?? [placeholderImage],
   },
   {
     roomNo: "202",
@@ -56,7 +58,7 @@ export const homes: Home[] = [
     slug: "atlas-homes-room-202",
     href: "/property_details/atlas-homes-room-202",
     tagline: "Open-plan flat with private patio",
-    imageSrc: placeholderImage,
+    images: propertyImages["202"] ?? [placeholderImage],
   },
   {
     roomNo: "301",
@@ -64,7 +66,7 @@ export const homes: Home[] = [
     slug: "atlas-homes-room-301",
     href: "/property_details/atlas-homes-room-301",
     tagline: "Sunlit duplex with lounge seating",
-    imageSrc: placeholderImage,
+    images: propertyImages["301"] ?? [placeholderImage],
   },
   {
     roomNo: "302",
@@ -72,7 +74,7 @@ export const homes: Home[] = [
     slug: "atlas-homes-room-302",
     href: "/property_details/atlas-homes-room-302",
     tagline: "Minimal, airy suite for long stays",
-    imageSrc: placeholderImage,
+    images: propertyImages["302"] ?? [placeholderImage],
   },
   {
     roomNo: "501",
@@ -80,6 +82,6 @@ export const homes: Home[] = [
     slug: "atlas-homes-room-501",
     href: "/property_details/atlas-homes-room-501",
     tagline: "Penthouse retreat with rooftop deck",
-    imageSrc: placeholderImage,
+    images: propertyImages["501"] ?? [placeholderImage],
   },
 ];
