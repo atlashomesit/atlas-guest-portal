@@ -335,6 +335,8 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
             <DateRange
               editableDateInputs={true}
               onChange={handleDateChange}
+              retainEndDateOnFirstSelection={true}
+              dragSelectionEnabled={false}
               moveRangeOnFirstSelection={false}
               ranges={[
                 {

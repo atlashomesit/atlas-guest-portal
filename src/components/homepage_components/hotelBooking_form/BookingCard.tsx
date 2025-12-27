@@ -335,70 +335,88 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     }
   };
 
+  const [awaitingCheckout, setAwaitingCheckout] = useState(false);
+
   const handleDateChange = (ranges: any) => {
     markEngagement();
     const { startDate, endDate } = ranges.selection;
     setHasInteractedWithDates(true);
-    const normalizedStart = startDate ? startOfDay(startDate) : defaultStartDate;
-    const normalizedEnd = endDate ? startOfDay(endDate) : defaultEndDate;
 
-    let effectiveStartDate = normalizedStart;
+    const normalizedStart = startDate ? startOfDay(startDate) : startOfDay(dates.startDate);
+    const normalizedEnd = endDate ? startOfDay(endDate) : startOfDay(dates.endDate);
+    const isSingleClick = normalizedStart.getTime() === normalizedEnd.getTime();
+
+    const restartSelection = !awaitingCheckout || isSingleClick;
+    if (restartSelection) {
+      const newStart = normalizedStart < today ? today : normalizedStart;
+      setAwaitingCheckout(true);
+      setDates({
+        startDate: newStart,
+        endDate: normalizedEnd,
+        key: 'selection',
+      });
+
+      const restartMessage = newStart < today ? 'Check-in cannot be in the past.' : 'Choose a check-out date.';
+      setDateError(newStart < today ? restartMessage : null);
+      setInlineStatus(restartMessage);
+      return;
+    }
+
+    const effectiveStartDate = startOfDay(dates.startDate);
     let resolvedEndDate = normalizedEnd;
     let errorMessage: string | null = null;
 
-    if (normalizedStart < today) {
-      effectiveStartDate = today;
+    if (effectiveStartDate < today) {
       errorMessage = 'Check-in cannot be in the past.';
     }
 
-    if (normalizedEnd <= effectiveStartDate) {
+    if (resolvedEndDate <= effectiveStartDate) {
       resolvedEndDate = addDays(effectiveStartDate, 1);
       errorMessage = 'Check-out must be at least 1 night after check-in.';
     }
 
-    if (startDate && endDate) {
-      setDates({
-        startDate: effectiveStartDate,
-        endDate: resolvedEndDate,
-        key: 'selection',
-      });
+    setAwaitingCheckout(false);
+    setDates({
+      startDate: effectiveStartDate,
+      endDate: resolvedEndDate,
+      key: 'selection',
+    });
 
-      setDateError(errorMessage);
-      setInlineStatus(errorMessage ?? 'Dates updated for your stay.');
+    setDateError(errorMessage);
+    setInlineStatus(errorMessage ?? 'Dates updated for your stay.');
 
-      trackEvent(
-        'booking_dates_changed',
-        {
-          surface: 'booking_form',
-          startDate: effectiveStartDate.toISOString(),
-          endDate: resolvedEndDate.toISOString(),
-        },
-        { propertyId, listingId: propertyId, unitCode: propertyId },
-      );
-
-      logUserAction('booking_dates_selected', {
-        propertyId,
+    trackEvent(
+      'booking_dates_changed',
+      {
+        surface: 'booking_form',
         startDate: effectiveStartDate.toISOString(),
         endDate: resolvedEndDate.toISOString(),
-        nights: Math.max(1, Math.round(Math.abs((resolvedEndDate.getTime() - effectiveStartDate.getTime()) / oneDay))),
-      });
+      },
+      { propertyId, listingId: propertyId, unitCode: propertyId },
+    );
 
-      const selectedNights = Math.max(
-        1,
-        Math.round(Math.abs((resolvedEndDate.getTime() - effectiveStartDate.getTime()) / oneDay)),
-      );
-      trackEvent(
-        'dates_selected',
-        {
-          surface: 'booking_form',
-          startDate: effectiveStartDate.toISOString(),
-          endDate: resolvedEndDate.toISOString(),
-          nights: selectedNights,
-          guests: totalPeople,
-        },
-        { propertyId, listingId: propertyId, unitCode: propertyId },
-      );
-    }
+    logUserAction('booking_dates_selected', {
+      propertyId,
+      startDate: effectiveStartDate.toISOString(),
+      endDate: resolvedEndDate.toISOString(),
+      nights: Math.max(1, Math.round(Math.abs((resolvedEndDate.getTime() - effectiveStartDate.getTime()) / oneDay))),
+    });
+
+    const selectedNights = Math.max(
+      1,
+      Math.round(Math.abs((resolvedEndDate.getTime() - effectiveStartDate.getTime()) / oneDay)),
+    );
+    trackEvent(
+      'dates_selected',
+      {
+        surface: 'booking_form',
+        startDate: effectiveStartDate.toISOString(),
+        endDate: resolvedEndDate.toISOString(),
+        nights: selectedNights,
+        guests: totalPeople,
+      },
+      { propertyId, listingId: propertyId, unitCode: propertyId },
+    );
   };
 
   const unitPolicy = getUnitPolicy(propertyId);
