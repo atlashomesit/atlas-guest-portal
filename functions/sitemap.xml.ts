@@ -1,4 +1,6 @@
-export const SITEMAP_PATHS = [
+import { rooms } from "../src/content/rooms";
+
+const CORE_PATHS = [
   "/",
   "/amenities",
   "/location",
@@ -9,7 +11,14 @@ export const SITEMAP_PATHS = [
   "/blog/hospitality-tech",
   "/policies",
   "/contact",
+  "/about",
+  "/faq",
+  "/terms",
 ];
+
+const ROOM_PATHS = rooms.map((room) => room.route);
+
+export const SITEMAP_PATHS = Array.from(new Set([...CORE_PATHS, ...ROOM_PATHS]));
 
 export function buildSitemapXml(baseUrl: string, paths: string[]): string {
   const normalizedBase = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
