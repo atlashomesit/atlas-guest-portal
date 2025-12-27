@@ -258,6 +258,42 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
   const [isLoading, setIsLoading] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [termsAcceptedAt, setTermsAcceptedAt] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+
+    const guestParam = params.get('guests');
+    const checkInParam = params.get('checkIn');
+    const checkOutParam = params.get('checkOut');
+
+    const minGuestCount = Math.max(1, propertyGuestLimits.adults.min ?? 0);
+    const maxGuestCount = propertyGuestLimits.adults.max ?? propertyMaxCapacity;
+
+    const parsedGuests = Number(guestParam);
+    const validGuests =
+      Number.isInteger(parsedGuests) && parsedGuests >= minGuestCount && parsedGuests <= maxGuestCount
+        ? parsedGuests
+        : null;
+
+    const parsedCheckIn = checkInParam ? startOfDay(new Date(checkInParam)) : null;
+    const parsedCheckOut = checkOutParam ? startOfDay(new Date(checkOutParam)) : null;
+
+    const hasValidDates =
+      parsedCheckIn instanceof Date &&
+      parsedCheckOut instanceof Date &&
+      !Number.isNaN(parsedCheckIn.getTime()) &&
+      !Number.isNaN(parsedCheckOut.getTime()) &&
+      parsedCheckIn >= todayIstBoundary &&
+      parsedCheckOut > parsedCheckIn;
+
+    if (validGuests !== null) {
+      setGuests((prev) => ({ ...prev, adults: validGuests, children: 0, infants: 0, pets: 0, childrenAges: [] }));
+    }
+
+    if (hasValidDates && parsedCheckIn && parsedCheckOut) {
+      setDates((prev) => ({ ...prev, startDate: parsedCheckIn, endDate: parsedCheckOut }));
+    }
+  }, [location.search, propertyGuestLimits, propertyMaxCapacity, todayIstBoundary]);
   const [hasInteractedWithDates, setHasInteractedWithDates] = useState(false);
   const [inlineStatus, setInlineStatus] = useState('');
   const [dateError, setDateError] = useState<string | null>(null);
