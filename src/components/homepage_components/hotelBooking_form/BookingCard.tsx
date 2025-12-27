@@ -97,11 +97,44 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
   const [userEmail, setUserEmail] = useState<string>('');
   const [userPhone, setUserPhone] = useState<string>('');
 
+  const isTestContactValue = (value: string) => {
+    const trimmed = value.trim();
+    return trimmed === 'test@example.com' || trimmed === '9999999999';
+  };
+
+  const sanitizeStoredContact = (
+    value: string | null,
+    key: 'atlas_user_email' | 'atlas_user_phone',
+  ) => {
+    if (!value) return '';
+    const trimmed = value.trim();
+
+    if (!trimmed || isTestContactValue(trimmed)) {
+      try {
+        localStorage.removeItem(key);
+      } catch (error) {
+        console.warn('Unable to clear invalid stored contact info', error);
+      }
+      return '';
+    }
+
+    return trimmed;
+  };
+
   // Load saved email and phone from localStorage on mount
   useEffect(() => {
     try {
-      const savedEmail = localStorage.getItem('atlas_user_email');
-      const savedPhone = localStorage.getItem('atlas_user_phone');
+      const sessionInitialized = sessionStorage.getItem('atlas_contact_session_initialized');
+      if (!sessionInitialized) {
+        sessionStorage.setItem('atlas_contact_session_initialized', 'true');
+        localStorage.removeItem('atlas_user_email');
+        localStorage.removeItem('atlas_user_phone');
+        return;
+      }
+
+      const savedEmail = sanitizeStoredContact(localStorage.getItem('atlas_user_email'), 'atlas_user_email');
+      const savedPhone = sanitizeStoredContact(localStorage.getItem('atlas_user_phone'), 'atlas_user_phone');
+
       if (savedEmail) setUserEmail(savedEmail);
       if (savedPhone) setUserPhone(savedPhone);
     } catch (error) {
@@ -795,8 +828,11 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         
         // Also save email and phone to localStorage for future bookings
         try {
-          if (autoEmail) localStorage.setItem('atlas_user_email', autoEmail);
-          if (autoPhone) localStorage.setItem('atlas_user_phone', autoPhone);
+          const safeEmail = autoEmail && !isTestContactValue(autoEmail) ? autoEmail : '';
+          const safePhone = autoPhone && !isTestContactValue(autoPhone) ? autoPhone : '';
+
+          if (safeEmail) localStorage.setItem('atlas_user_email', safeEmail.trim());
+          if (safePhone) localStorage.setItem('atlas_user_phone', safePhone.trim());
         } catch (error) {
           console.warn('Unable to save user contact info', error);
         }
