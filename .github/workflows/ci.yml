@@ -24,5 +24,8 @@ jobs:
       - name: Validate legal content
         run: npm run validate:legal
 
+      - name: Run booking form tests
+        run: CI=1 node node_modules/vitest/vitest.mjs run tests/BookingFrom.test.tsx --runInBand --bail=1
+
       - name: Build
         run: npm run build
