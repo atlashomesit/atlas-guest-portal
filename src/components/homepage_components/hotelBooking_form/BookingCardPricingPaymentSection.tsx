@@ -33,6 +33,7 @@ interface BookingCardPricingPaymentSectionProps {
   termsAcceptedAt: string | null;
   setTermsAcceptedAt: React.Dispatch<React.SetStateAction<string | null>>;
   initiatePayment: () => void;
+  onProceedToCheckout: () => void;
   primaryCtaLabel: string;
   availabilityStatus: 'idle' | 'checking' | 'available';
   ctaConfirmation: string | null;
@@ -94,6 +95,7 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
   termsAcceptedAt,
   setTermsAcceptedAt,
   initiatePayment,
+  onProceedToCheckout,
   primaryCtaLabel,
   availabilityStatus,
   ctaConfirmation,
@@ -336,7 +338,7 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
             }
 
             try {
-              initiatePayment();
+              onProceedToCheckout();
             } catch (error) {
               logApiError(error, {
                 url: '/api/payment',
@@ -511,7 +513,7 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
             type="button"
             onClick={(event) => {
               event.preventDefault();
-              initiatePayment();
+              onProceedToCheckout();
             }}
             disabled={buttonIsBusy || !termsAccepted}
             className="mt-1 bg-cta-primary hover:bg-cta-secondary text-[var(--text-contrast)] rounded-full px-4 py-2 text-sm font-semibold transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed shadow-level1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"

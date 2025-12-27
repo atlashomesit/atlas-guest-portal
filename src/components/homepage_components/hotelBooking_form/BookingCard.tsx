@@ -1,5 +1,6 @@
 // BookingCard.tsx
 import { useState, useRef, useEffect, useMemo, useId } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { format, addDays, startOfDay } from 'date-fns';
 import { api, asArray } from '@/lib/api';
 import { propertyData } from '../../../data';
@@ -14,6 +15,7 @@ import { FaUserFriends, FaCreditCard, FaCcVisa, FaCcMastercard } from 'react-ico
 import { SiGooglepay, SiRazorpay } from 'react-icons/si';
 import { toast } from 'react-toastify';
 import { logApiError, logUserAction, reportError } from '../../../lib/monitoring';
+import { useBooking } from '../../../contexts/BookingContext';
 
 import 'react-date-range/dist/styles.css';
 import 'react-date-range/dist/theme/default.css';
@@ -55,6 +57,9 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
   const defaultStartDate = today; // Allow booking from today
   const defaultEndDate = addDays(today, 1);
   const isLayoutExperimentEnabled = bookingWidgetLayoutFlag();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { updateBooking } = useBooking();
 
   const [openCalendar, setOpenCalendar] = useState(false);
   const [openGuests, setOpenGuests] = useState(false);
@@ -770,6 +775,33 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     return Object.keys(errors).length === 0;
   };
 
+  const prefillBookingContext = () => {
+    updateBooking({
+      propertyId,
+      checkIn: dates.startDate.toISOString(),
+      checkOut: dates.endDate.toISOString(),
+      guests: totalGuests,
+    });
+  };
+
+  const handleCheckoutNavigation = () => {
+    const isValid = validateForm(userEmail, userPhone);
+    if (!isValid) {
+      setCtaConfirmation('Update the highlighted fields before continuing to checkout.');
+      return;
+    }
+
+    prefillBookingContext();
+
+    const proceed = window.confirm('Proceed to checkout to reserve this stay?');
+    if (!proceed) {
+      setCtaConfirmation('Checkout cancelled. You can adjust your details and try again.');
+      return;
+    }
+
+    navigate('/reserve', { state: { from: location.pathname } });
+  };
+
   const performAvailabilityCheck = async () => {
     setAvailabilityStatus('checking');
     setCtaConfirmation('Checking availability...');
@@ -1186,6 +1218,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         termsAcceptedAt={termsAcceptedAt}
         setTermsAcceptedAt={setTermsAcceptedAt}
         initiatePayment={initiatePayment}
+        onProceedToCheckout={handleCheckoutNavigation}
         primaryCtaLabel={primaryCtaLabel}
         availabilityStatus={availabilityStatus}
         ctaConfirmation={ctaConfirmation}
