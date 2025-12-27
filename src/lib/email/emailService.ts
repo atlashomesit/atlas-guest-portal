@@ -13,6 +13,12 @@ export type EmailProviderHealth = {
   isConnected: boolean;
 };
 
+export type EmailSendResult = {
+  provider: string;
+  simulated: boolean;
+  providerHealth: EmailProviderHealth[];
+};
+
 interface EmailProvider {
   name: string;
   validateCredentials: () => string[];
@@ -69,11 +75,6 @@ const emailJsProvider: EmailProvider = {
     }
   },
   send: async (payload) => {
-    const missing = getMissingEmailJsEnvKeys();
-    if (missing.length) {
-      throw new Error(`Missing EmailJS credentials: ${missing.join(', ')}`);
-    }
-
     await emailjs.send(
       emailJsConfig.serviceId as string,
       emailJsConfig.templateId as string,
@@ -94,23 +95,39 @@ const consoleProvider: EmailProvider = {
 
 const providers: EmailProvider[] = [emailJsProvider, consoleProvider];
 
-export const sendEmail = async (payload: EmailPayload) => {
-  for (const provider of providers) {
-    const missingCredentials = provider.validateCredentials();
-    if (missingCredentials.length) {
-      logStructuredError(`Missing credentials: ${missingCredentials.join(',')}`, provider.name, 'credential-validation');
-      continue;
-    }
+export const sendEmail = async (payload: EmailPayload): Promise<EmailSendResult> => {
+  const providerHealth = await getEmailHealthSnapshot();
+  const healthyProviders = providerHealth.filter((snapshot) => snapshot.healthy);
 
-    const isConnected = await provider.checkConnectivity();
-    if (!isConnected) {
-      logStructuredError('Provider connectivity check failed', provider.name, 'connectivity-check');
+  if (!healthyProviders.length) {
+    const missingPrimary = providerHealth.find((snapshot) => snapshot.missingCredentials.length);
+    if (missingPrimary) {
+      logStructuredError(
+        `Missing credentials: ${missingPrimary.missingCredentials.join(',')}`,
+        missingPrimary.provider,
+        'credential-validation'
+      );
+    }
+  }
+
+  for (const provider of providers) {
+    const snapshot = providerHealth.find((item) => item.provider === provider.name);
+    if (!snapshot?.healthy) {
+      if (snapshot?.missingCredentials.length) {
+        logStructuredError(
+          `Missing credentials: ${snapshot.missingCredentials.join(',')}`,
+          provider.name,
+          'credential-validation'
+        );
+      } else {
+        logStructuredError('Provider connectivity check failed', provider.name, 'connectivity-check');
+      }
       continue;
     }
 
     try {
       await attemptWithRetry(() => provider.send(payload), provider.name, 'send');
-      return { provider: provider.name };
+      return { provider: provider.name, simulated: provider.name === consoleProvider.name, providerHealth };
     } catch (error) {
       logStructuredError(error, provider.name, 'send-final');
     }
