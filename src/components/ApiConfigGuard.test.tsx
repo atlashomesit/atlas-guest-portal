@@ -1,0 +1,42 @@
+import { fireEvent, render, screen } from '@testing-library/react';
+import { vi } from 'vitest';
+
+vi.mock('@/config/api', () => ({
+  API_BASE_URL: '',
+  IS_API_BASE_CONFIGURED: false,
+}));
+
+import ApiConfigGuard from './ApiConfigGuard';
+
+describe('ApiConfigGuard', () => {
+  const originalLocation = window.location;
+
+  beforeEach(() => {
+    const reloadSpy = vi.fn();
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { ...originalLocation, reload: reloadSpy },
+    });
+  });
+
+  afterEach(() => {
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: originalLocation,
+    });
+  });
+
+  it('renders the shared error layout when the API base URL is missing', () => {
+    render(
+      <ApiConfigGuard>
+        <div>child</div>
+      </ApiConfigGuard>
+    );
+
+    expect(screen.getByTestId('error-layout')).toBeInTheDocument();
+    expect(screen.getByText(/we couldn’t load this page/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /try again/i }));
+    expect(window.location.reload).toHaveBeenCalled();
+  });
+});
