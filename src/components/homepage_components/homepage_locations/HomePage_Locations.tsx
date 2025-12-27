@@ -8,6 +8,7 @@ import priceDisplayConfig from "../../../config/priceDisplay.config";
 import { calculateNightlyPrice, inferUnitType } from "../../../utils/pricing";
 import { sanitizeItems, getItemKey } from "../../../utils/sanitizeItems";
 import { trackEvent } from "../../../utils/analytics";
+import { buildHomeUnitPath, getPropertySlug, getUnitSlug } from "../../../utils/navigation";
 import OptimizedImage from "../../ui/OptimizedImage";
 
 import "./homepage_location.css";
@@ -33,13 +34,6 @@ const formatAmenityName = (value?: string) =>
     .replace(/[-_]/g, " ")
     .replace(/\b\w/g, (char) => char.toUpperCase())
     .trim();
-
-const buildSlug = (value: string) =>
-  value
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .trim()
-    .replace(/\s+/g, "-");
 
 const useSearchSelections = (search: string) => {
   return React.useMemo(() => {
@@ -111,6 +105,20 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
   const { checkIn, checkOut, guests, searchString } = useSearchSelections(location.search);
   const [activeImageIndex, setActiveImageIndex] = React.useState<Record<string, number>>({});
 
+  const getListingNavigation = React.useCallback(
+    (model: ListingModel | null) => {
+      if (!model) return null;
+
+      const propertyName = model.property?.property_name ?? model.listing.title;
+      const propertySlug = getPropertySlug(model.property ?? { property_name: propertyName });
+      const unitSlug = getUnitSlug(model.property ?? { property_name: propertyName, id: model.listing.id });
+      const path = buildHomeUnitPath(propertySlug, unitSlug);
+
+      return { path, propertySlug, unitSlug };
+    },
+    [],
+  );
+
   const propertyLookup = React.useMemo(
     () =>
       propertyData.reduce<Record<string, PropertyRecord>>((acc, property) => {
@@ -162,31 +170,32 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
 
   const handleNavigate = React.useCallback(
     (model: ListingModel | null) => {
-      if (!model) return;
-
-      const propertyName = model.property?.property_name ?? model.listing.title;
-      const slug = buildSlug(propertyName);
-      const path = `/properties/${slug}`;
+      const navigation = getListingNavigation(model);
+      if (!navigation) return;
       const nextSearch = searchString ? `?${searchString}` : "";
 
       trackEvent(
         "listing_selected",
         {
           surface: "home_locations",
-          listingName: propertyName,
+          listingName: model.property?.property_name ?? model.listing.title,
           checkIn,
           checkOut,
           guests,
         },
-        { listingId: model.property?.id ?? model.listing.id, unitCode: model.listing.id, route: `${path}${nextSearch}` },
+        {
+          listingId: model.property?.id ?? model.listing.id,
+          unitCode: navigation.unitSlug,
+          route: `${navigation.path}${nextSearch}`,
+        },
       );
 
       navigate(
-        { pathname: path, search: nextSearch },
+        { pathname: navigation.path, search: nextSearch },
         { state: { property: model.property ?? undefined } },
       );
     },
-    [checkIn, checkOut, guests, navigate, searchString],
+    [checkIn, checkOut, getListingNavigation, guests, navigate, searchString],
   );
 
   const handleSlideChange = (id: string, direction: "next" | "prev", imagesLength: number) => {
@@ -340,6 +349,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {listingModels.map((model, index) => {
+              const navigation = getListingNavigation(model);
               const activeIndex = activeImageIndex[model.listing.id] ?? 0;
               const imageSrc = model.images[activeIndex] ?? FALLBACK_IMAGE;
 
@@ -407,7 +417,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
                         Book now
                       </button>
                       <Link
-                        to={{ pathname: `/properties/${buildSlug(model.listing.title)}`, search: searchString ? `?${searchString}` : "" }}
+                        to={{ pathname: navigation?.path ?? "#", search: searchString ? `?${searchString}` : "" }}
                         onClick={(event) => {
                           event.preventDefault();
                           handleNavigate(model);

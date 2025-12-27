@@ -10,7 +10,7 @@ import { LISTINGS, type Listing } from "../data/listings";
 import { propertyData, propertyImages } from "../data/propertyData";
 import getApiBaseUrl from "../utils/apiBaseUrl";
 import { trackEvent } from "../utils/analytics";
-import { buildHomeUnitPath, navigateToHomeUnit } from "../utils/navigation";
+import { buildHomeUnitPath, getPropertySlug, getUnitSlug, navigateToHomeUnit } from "../utils/navigation";
 import { calculateNightlyPrice, inferUnitType, type NightlyPriceBreakdown } from "../utils/pricing";
 import { isAtlasApiRequest, logApiError, monitoredFetch } from "../lib/monitoring";
 import type { UnitType } from "../config/pricing.config";
@@ -467,36 +467,13 @@ export const Apartments = () => {
   }, [guests, listings, maxPrice, minPrice, petFriendlyOnly, propertyType, sortBy]);
 
   const handleNavigate = (property: PropertyRecord) => {
-    const propertySlugInput =
-      property.property_slug ||
-      property.slug ||
-      property.property_name ||
-      property.property_metadata?.property_slug ||
-      property.property_metadata?.property_name ||
-      property.metadata?.property_slug ||
-      property.metadata?.property_name ||
-      property.metadata?.slug ||
-      property.property_metadata?.slug ||
-      property.metadata?.name ||
-      property.property_metadata?.name ||
-      String(property.id ?? "");
-
-    let propertySlug = String(propertySlugInput || "")
-      .trim()
-      .toLowerCase()
-      .replace(/\s+/g, "-");
-
-    if (!propertySlug) {
-      console.warn("Missing property slug for property; defaulting to 'atlashomes'", property);
-      propertySlug = "atlashomes";
-    }
-
-    const unitSlug = String(property.id ?? propertySlug ?? "unit").trim() || "unit";
+    const propertySlug = getPropertySlug(property);
+    const unitSlug = getUnitSlug(property);
     const canonicalPath = buildHomeUnitPath(propertySlug, unitSlug);
 
     trackEvent(
       "listing_selected",
-      { surface: "apartments", listingName: propertySlugInput },
+      { surface: "apartments", listingName: property.property_name ?? propertySlug },
       { listingId: property.id, unitCode: unitSlug, route: canonicalPath },
     );
 

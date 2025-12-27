@@ -3,8 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 
 import { propertyData } from "../data";
 import { formatCurrency, parseDate } from "../utils/formatting";
-
-const buildSlug = (value: string): string => value.toLowerCase().replace(/\s+/g, "-");
+import { buildHomeUnitPath, getPropertySlug, getUnitSlug } from "../utils/navigation";
 
 const SearchPage = () => {
   const [searchParams] = useSearchParams();
@@ -18,15 +17,19 @@ const SearchPage = () => {
   const listings = useMemo(
     () =>
       propertyData.map((property) => {
-        const slug = buildSlug(property.property_name);
+        const propertySlug = getPropertySlug(property);
+        const unitSlug = getUnitSlug(property);
+        const canonicalPath = buildHomeUnitPath(propertySlug, unitSlug);
+
         return {
-          id: slug,
+          id: `${propertySlug}-${unitSlug}`,
           title: property.property_name,
           location: property.property_location ?? "Hyderabad",
           pricePerNight: property.property_price ?? 0,
           maxGuests: property.maxCapacity ?? 4,
           imageUrl: property.property_img?.[0] ?? "/hero_images/slider_bg.png",
           amenities: property.property_amenities?.slice(0, 3) ?? [],
+          canonicalPath,
         };
       }),
     [],
@@ -112,7 +115,7 @@ const SearchPage = () => {
                       ))}
                     </div>
                     <Link
-                      to={`/properties/${unit.id}${queryString ? `?${queryString}` : ""}`}
+                      to={`${unit.canonicalPath}${queryString ? `?${queryString}` : ""}`}
                       className="inline-flex items-center justify-center rounded-xl bg-cta-primary px-4 py-2 text-sm font-semibold text-[var(--text-contrast)] shadow hover:bg-cta-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
                     >
                       View details
