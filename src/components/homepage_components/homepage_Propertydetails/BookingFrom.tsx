@@ -10,6 +10,7 @@ import { Button } from '../../ui/Button';
 import { calculateNightlyPrice, inferUnitType } from '../../../utils/pricing';
 import { toast } from 'react-toastify';
 import { logUserAction, reportError } from '../../../lib/monitoring';
+import { formatDateForDisplay, formatDateForInput, parseDate } from '../../../utils/formatting';
 interface Property {
   property_name: string;
 }
@@ -52,9 +53,9 @@ const BookingForm = ({ propertyData }: { propertyData: Property }) => {
   const totalGuests = adults + children + infants;
 
   const stayDates = useMemo(() => {
-    const start = new Date(checkIn);
-    const end = new Date(checkOut);
-    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return [];
+    const start = parseDate(checkIn);
+    const end = parseDate(checkOut);
+    if (!start || !end) return [];
 
     const nights: Date[] = [];
     const cursor = new Date(start);

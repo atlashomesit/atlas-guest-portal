@@ -2,12 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { useBooking } from '../contexts/BookingContext';
 import { Button } from '../components/ui/Button';
 import Subheading from '../components/commonComponents/subheading/Subheading';
-
-const formatDate = (value: string | null) => {
-  if (!value) return 'Not selected';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? 'Not selected' : date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-};
+import { formatHumanDate } from '../utils/formatting';
 
 const Reserve = () => {
   const { booking } = useBooking();
@@ -39,11 +34,11 @@ const Reserve = () => {
           </div>
           <div>
             <p className="text-sm text-text-muted">Check-in</p>
-            <p className="text-lg font-semibold text-text-primary">{formatDate(booking.checkIn)}</p>
+            <p className="text-lg font-semibold text-text-primary">{formatHumanDate(booking.checkIn)}</p>
           </div>
           <div>
             <p className="text-sm text-text-muted">Check-out</p>
-            <p className="text-lg font-semibold text-text-primary">{formatDate(booking.checkOut)}</p>
+            <p className="text-lg font-semibold text-text-primary">{formatHumanDate(booking.checkOut)}</p>
           </div>
         </div>
 

@@ -2,15 +2,7 @@ import { useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { propertyData } from "../data";
-
-const parseDate = (value: string | null): Date | null => {
-  if (!value) return null;
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-};
-
-const formatCurrency = (amount: number): string =>
-  new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(amount);
+import { formatCurrency, parseDate } from "../utils/formatting";
 
 const buildSlug = (value: string): string => value.toLowerCase().replace(/\s+/g, "-");
 
