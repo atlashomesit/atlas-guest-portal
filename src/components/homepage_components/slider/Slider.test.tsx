@@ -1,6 +1,6 @@
 import React from "react";
 import { addDays, format } from "date-fns";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 
@@ -25,29 +25,46 @@ vi.mock("react-router-dom", () => {
 });
 
 vi.mock("react-date-range", () => ({
-  DateRange: ({ onChange, ranges }: { onChange: (payload: unknown) => void; ranges?: Array<{ startDate: Date; endDate: Date }> }) => {
+  DateRange: ({
+    onChange,
+    ranges,
+    disabledDay,
+  }: {
+    onChange: (payload: unknown) => void;
+    ranges?: Array<{ startDate: Date; endDate: Date }>;
+    disabledDay?: (date: Date) => boolean;
+  }) => {
     const base = ranges?.[0]?.startDate ?? new Date();
     const next = ranges?.[0]?.endDate ?? addDays(base, 1);
-    const days = [base, next, addDays(base, 3), addDays(base, 4)];
+    const days = [addDays(base, -1), base, next, addDays(base, 3), addDays(base, 4)];
 
     return (
-      <div>
-        {days.map((day) => (
-          <button
-            key={format(day, "yyyy-MM-dd")}
-            data-testid={`hero-date-${format(day, "yyyy-MM-dd")}`}
-            type="button"
-            onClick={(event: React.MouseEvent<HTMLButtonElement>) => {
-              const useSameDay = event.shiftKey;
+      <div role="grid">
+        {days.map((day) => {
+          const isDisabled = disabledDay?.(day) ?? false;
 
-              onChange({
-                selection: { startDate: day, endDate: useSameDay ? day : addDays(day, 1) },
-              });
-            }}
-          >
-            {format(day, "d")}
-          </button>
-        ))}
+          return (
+            <button
+              key={format(day, "yyyy-MM-dd")}
+              data-testid={`hero-date-${format(day, "yyyy-MM-dd")}`}
+              type="button"
+              aria-disabled={isDisabled}
+              disabled={isDisabled}
+              className={isDisabled ? "disabled-day" : ""}
+              onClick={(event: React.MouseEvent<HTMLButtonElement>) => {
+                if (isDisabled) return;
+
+                const useSameDay = event.shiftKey;
+
+                onChange({
+                  selection: { startDate: day, endDate: useSameDay ? day : addDays(day, 1) },
+                });
+              }}
+            >
+              {format(day, "d")}
+            </button>
+          );
+        })}
       </div>
     );
   },
@@ -89,7 +106,7 @@ describe("Slider hero search", () => {
     navigateMock.mockReset();
     fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => ({}) });
     vi.stubGlobal("fetch", fetchMock);
-    vi.useFakeTimers();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(new Date("2025-12-22T00:00:00.000Z"));
   });
 
@@ -214,6 +231,8 @@ describe("Slider hero search", () => {
     expect(screen.getByRole("status")).toHaveTextContent(/hero form ready/i);
     expect(screen.getByRole("button", { name: /select check-in date/i })).not.toHaveTextContent(defaultStartLabel);
     expect(screen.getByRole("button", { name: /select check-out date/i })).not.toHaveTextContent(defaultEndLabel);
+  });
+
   it("shows minimum-stay error when selecting identical check-in and check-out dates", () => {
     renderSlider();
 
@@ -244,6 +263,75 @@ describe("Slider hero search", () => {
     expect(screen.getByText("Minimum stay is 1 night after check-in.")).toBeInTheDocument();
     expect(screen.getByText(checkInLabel)).toBeInTheDocument();
     expect(screen.getByText(checkOutLabel)).toBeInTheDocument();
+  });
+
+  it("anchors the desktop calendar popover and restores focus after dismissal", async () => {
+    const rectSpy = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect");
+    rectSpy.mockReturnValue({
+      left: 50,
+      top: 100,
+      bottom: 150,
+      width: 320,
+      height: 40,
+      right: 370,
+      x: 50,
+      y: 100,
+      toJSON: () => {},
+    } as DOMRect);
+
+    vi.useRealTimers();
+
+    renderSlider();
+
+    const toggle = screen.getByTestId("hero-date-toggle");
+    toggle.focus();
+    fireEvent.click(toggle);
+
+    const dropdown = await waitFor(() => document.querySelector(".hero-date-dropdown"));
+    expect(dropdown).toBeTruthy();
+    expect((dropdown as HTMLElement).style.width).toBe("360px");
+    expect((dropdown as HTMLElement).style.left).toBe("50px");
+    expect((dropdown as HTMLElement).style.top).toBe("158px");
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => expect(document.querySelector(".hero-date-dropdown")).toBeNull());
+    expect(toggle).toHaveFocus();
+
+    fireEvent.click(toggle);
+    await waitFor(() => expect(document.querySelector(".hero-date-dropdown")).not.toBeNull());
+    const overlay = document.querySelector(".hero-date-overlay") as HTMLElement;
+    fireEvent.click(overlay);
+    await waitFor(() => expect(document.querySelector(".hero-date-dropdown")).toBeNull());
+    expect(toggle).toHaveFocus();
+
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2025-12-22T00:00:00.000Z"));
+    rectSpy.mockRestore();
+  });
+
+  it("surfaces the date picker as a modal dialog on mobile widths", () => {
+    const viewportSpy = vi.spyOn(window, "innerWidth", "get");
+    viewportSpy.mockReturnValue(375);
+
+    renderSlider();
+    fireEvent.click(screen.getByTestId("hero-date-toggle"));
+
+    expect(screen.getByRole("dialog", { name: /choose your stay dates/i })).toBeInTheDocument();
+
+    viewportSpy.mockRestore();
+  });
+
+  it("blocks past dates from being selected", () => {
+    renderSlider();
+    fireEvent.click(screen.getByTestId("hero-date-toggle"));
+
+    const yesterdayTestId = `hero-date-${format(addDays(new Date(), -1), "yyyy-MM-dd")}`;
+    const pastDateButton = screen.getByTestId(yesterdayTestId) as HTMLButtonElement;
+
+    expect(pastDateButton).toBeDisabled();
+    fireEvent.click(pastDateButton);
+
+    expect(screen.getByRole("status")).toHaveTextContent(/hero form ready/i);
   });
 
   it("shows exactly three high-signal trust badges", () => {
