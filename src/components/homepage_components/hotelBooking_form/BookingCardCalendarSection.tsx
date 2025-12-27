@@ -106,8 +106,9 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
   defaultStartDate,
   ctaPrimaryColor,
 }) => {
-  // Normalize defaultStartDate to start of day (allows booking today)
+  const todayStart = startOfDay(new Date());
   const normalizedStartDate = startOfDay(defaultStartDate);
+  const minSelectableDate = normalizedStartDate < todayStart ? todayStart : normalizedStartDate;
   const hasDateIssue = Boolean(dateError) || isCheckoutInvalid;
   const dateFieldButtonClass = `${fieldButtonClass} ${hasDateIssue ? 'border-support-error ring-1 ring-support-error/40 focus-visible:outline-support-error' : ''}`;
 
@@ -342,7 +343,7 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
                   key: 'selection',
                 },
               ]}
-             minDate={normalizedStartDate}
+              minDate={minSelectableDate}
               rangeColors={[dateError ? 'var(--support-error, #ef4444)' : ctaPrimaryColor]}
               showDateDisplay={false}
               showPreview={false}
@@ -355,11 +356,13 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
               dayDisplayFormat="d"
               disabledDates={bookedDates}
               disabledDay={(date: Date) => {
-                // Disable dates that are in the bookedDates array
+                // Disable dates that are in the bookedDates array or in the past
                 const dateToCheck = startOfDay(date);
                 const dateTime = dateToCheck.getTime();
+                if (dateToCheck < todayStart) return true;
+
                 return bookedDates.some((bookedDate) => {
-                  const normalizedBooked = startOfDay(bookedDate);
+                  const normalizedBooked = startOfDay(new Date(bookedDate));
                   return normalizedBooked.getTime() === dateTime;
                 });
               }}
@@ -379,10 +382,15 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
 
                 // Check if date is in the past (before today)
                 // Today should be available if not booked
-                const todayDate = startOfDay(new Date());
-                const isPastDate = dateToCheck < todayDate;
+                const isPastDate = dateToCheck < todayStart;
                 // Today is available if it's not booked; future dates are available if not booked
                 const isAvailable = !isBooked && !isPastDate;
+
+                const dayStatus = isBooked
+                  ? 'Unavailable: already booked'
+                  : isPastDate
+                  ? 'Unavailable: date has passed'
+                  : 'Available date';
 
                 return (
                   <div className="relative w-full h-full flex items-center justify-center">
@@ -413,6 +421,7 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
                     
                     {/* Date number */}
                     <span
+                      title={dayStatus}
                       className={`relative z-20 font-medium ${
                         isBooked
                           ? 'text-red-700 dark:text-red-300 line-through'
