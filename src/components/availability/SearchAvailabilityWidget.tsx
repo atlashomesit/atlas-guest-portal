@@ -1,5 +1,5 @@
 import React from 'react';
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { addDays, format, startOfDay } from 'date-fns';
 import { CalendarRange, ChevronDown, ShieldCheck, Users } from 'lucide-react';
 import { heroWidgetLayoutFlag } from '../../config/abFlags';
@@ -722,7 +722,7 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
           )}
         </div>
 
-        <div className={`${fieldShellClass} md:-ml-[1px] lg:min-h-[112px] lg:items-stretch lg:justify-center`}>
+        <div className={`${fieldShellClass} md:-ml-[1px] lg:min-h-[112px] lg:items-stretch lg:justify-center lg:flex-col`}>
           <button
             type="submit"
             disabled={isSubmitDisabled || isSubmitting}
@@ -732,6 +732,12 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
           >
             {isSubmitting ? 'Checking...' : 'Check availability'}
           </button>
+          <Link
+            to="/#our-homes"
+            className="inline-flex items-center justify-center text-sm font-semibold text-text-muted underline-offset-4 transition hover:text-cta-secondary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary whitespace-nowrap mt-2"
+          >
+            Browse all apartments
+          </Link>
         </div>
       </div>
 

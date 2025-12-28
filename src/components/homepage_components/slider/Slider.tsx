@@ -1,7 +1,5 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
 import { BadgePercent, CheckCircle2, ShieldCheck } from 'lucide-react';
-import { LOGO_URL } from '../../../config/branding';
 import { HERO_IMAGE_URL } from '../../../config/hero';
 import { heroWidgetLayoutFlag } from '../../../config/abFlags';
 import { TrustBadge } from '../../ui/TrustBadge';
@@ -47,11 +45,6 @@ const Slider = () => {
           style={overlayStyle}
         />
         <div className="relative z-10 flex max-w-4xl flex-col items-center gap-7 px-4 pb-12 text-center sm:px-6 md:pt-3">
-          <Link to="/" className="flex items-center gap-3">
-            <img src={LOGO_URL} alt="Atlas Homestays" className="h-14 w-auto rounded-md bg-[color:color-mix(in_srgb,var(--bg-surface)_88%,transparent)] p-2 shadow-level2" />
-            <span className="text-xl font-semibold text-[var(--text-contrast)] tracking-wide">Atlas Homestays</span>
-          </Link>
-
           <div className="space-y-4 max-w-3xl">
             <h1
               className="text-4xl md:text-6xl font-bold leading-tight text-[var(--text-on-hero)] drop-shadow-lg text-pretty"
