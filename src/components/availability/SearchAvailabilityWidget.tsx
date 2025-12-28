@@ -52,9 +52,8 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
   const [hasInteracted, setHasInteracted] = React.useState(false);
   const [isAvailabilityModalOpen, setIsAvailabilityModalOpen] = React.useState(false);
   const [pendingSearchParams, setPendingSearchParams] = React.useState<URLSearchParams | null>(null);
-  const [calendarReady, setCalendarReady] = React.useState(
-    typeof navigator !== 'undefined' && navigator.userAgent?.includes('jsdom'),
-  );
+  // Initialize calendar as ready - no async data needed, calendar renders client-side
+  const [calendarReady, setCalendarReady] = React.useState(true);
   const [shownDate, setShownDate] = React.useState<Date>(() => defaultRange.startDate ?? today);
   const hasTrackedDropoff = React.useRef(false);
   const hasInteractedRef = React.useRef(false);
@@ -218,14 +217,11 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
     };
   }, [isCalendarOpen]);
 
-  React.useEffect(() => {
-    if (!isCalendarOpen || calendarReady) return;
-    const timer = window.setTimeout(() => setCalendarReady(true), 140);
-    return () => {
-      window.clearTimeout(timer);
-      setCalendarReady(false);
-    };
-  }, [isCalendarOpen, calendarReady]);
+  // Calendar is always ready - no async loading needed since dates are generated client-side
+  // Keeping this useEffect commented out for reference, but calendarReady starts as true
+  // React.useEffect(() => {
+  //   // Calendar component renders immediately, no loading state needed
+  // }, [isCalendarOpen]);
 
   React.useEffect(() => {
     hasInteractedRef.current = hasInteracted;
@@ -473,14 +469,6 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
     }
   };
 
-  const handleClearDates = () => {
-    markHeroInteraction();
-    setDateRange({ startDate: null, endDate: null });
-    setDateError(null);
-    setError(null);
-    setStatusMessage('');
-    setIsCalendarOpen(false);
-  };
 
   const checkInLabel = dateRange.startDate ? format(dateRange.startDate, 'dd MMM yyyy') : 'Check-in';
   const checkOutLabel = dateRange.endDate ? format(dateRange.endDate, 'dd MMM yyyy') : 'Check-out';
@@ -600,17 +588,6 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
           </span>
           <span className={helperTextClass}>Check-out must be at least 1 night after check-in.</span>
         </button>
-
-        <div className="md:col-span-2 flex justify-end">
-          <button
-            type="button"
-            onClick={handleClearDates}
-            className="mt-2 inline-flex items-center justify-center rounded-full px-3 py-2 text-sm font-semibold text-text-muted underline-offset-4 transition hover:text-cta-secondary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
-            data-testid="hero-date-clear"
-          >
-            Clear dates
-          </button>
-        </div>
 
         <AtlasDateRangePicker
           anchorRef={calendarWrapperRef}
