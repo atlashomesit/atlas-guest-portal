@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { addDays, format, startOfDay } from 'date-fns';
+import { addDays, format, startOfDay, startOfMonth } from 'date-fns';
 import { CalendarRange, ChevronDown, ShieldCheck, Users, Minus, Plus } from 'lucide-react';
 import { heroWidgetLayoutFlag } from '../../config/abFlags';
 import getApiBaseUrl from '../../utils/apiBaseUrl';
@@ -226,11 +226,16 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
 
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
+      // Check if click is inside the calendar popover (rendered via portal)
+      const popoverElement = document.querySelector('.booking-calendar-popover');
+      const isInsidePopover = popoverElement && (popoverElement.contains(target) || popoverElement === target);
+      
       if (
         calendarWrapperRef.current &&
         !calendarWrapperRef.current.contains(target) &&
         toggleButtonRef.current &&
-        !toggleButtonRef.current.contains(target)
+        !toggleButtonRef.current.contains(target) &&
+        !isInsidePopover
       ) {
         setIsCalendarOpen(false);
       }
@@ -242,14 +247,16 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+    // Use 'click' event (bubble phase) - AtlasDateRangePicker uses capture phase
+    // This ensures we check after AtlasDateRangePicker's handler
+    document.addEventListener('click', handleClickOutside);
     document.addEventListener('keydown', handleEscape);
 
     return () => {
       if (shouldLockBody) {
         document.body.style.overflow = previousOverflow;
       }
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('click', handleClickOutside);
       document.removeEventListener('keydown', handleEscape);
     };
   }, [isCalendarOpen]);
@@ -657,8 +664,7 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
           months={monthsToShow}
           shownDate={shownDate}
           onShownDateChange={(date) => {
-            console.log('🏠 [SearchAvailabilityWidget] Updating shownDate to:', date);
-            setShownDate(startOfDay(date));
+            setShownDate(startOfMonth(date));
           }}
           rangeColors={[dateError ? 'var(--support-error)' : 'var(--cta-primary)']}
           loading={!calendarReady}

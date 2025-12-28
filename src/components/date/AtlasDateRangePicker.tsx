@@ -1,8 +1,13 @@
-import React, { useEffect, useId, useRef } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { addDays } from 'date-fns';
 import { DateRange, type RangeKeyDict } from 'react-date-range';
 
 import { DateRangePickerPopover } from '../homepage_components/hotelBooking_form/DateRangePickerPopover';
+
+// Helper to normalize date to start of month (avoids timezone issues with date-fns startOfMonth)
+const normalizeToStartOfMonth = (date: Date): Date => {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+};
 
 export interface AtlasDateRangePickerValue {
   startDate: Date | null;
@@ -64,6 +69,11 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
   const fallbackContentId = useId();
   const fallbackCalendarRef = useRef<HTMLDivElement | null>(null);
   const popoverRef = calendarRef ?? fallbackCalendarRef;
+
+  const [internalShownDate, setInternalShownDate] = useState<Date>(() => {
+    const initial = shownDate ?? value.startDate ?? minDate ?? new Date();
+    return normalizeToStartOfMonth(initial);
+  });
 
   const handleRangeChange = (ranges: RangeKeyDict) => {
     const selection = ranges.selection ?? { startDate: null, endDate: null };
@@ -157,17 +167,8 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
     const handleClickOutside = (event: Event) => {
       const target = event.target as HTMLElement;
       
-      console.log('🔍 [AtlasDateRangePicker] Click detected:', {
-        targetElement: target.tagName,
-        targetClasses: target.className,
-        isNavButton: target.closest('.rdrNextPrevButton') !== null,
-        isInPopoverRef: popoverRef.current?.contains(target),
-        popoverRefExists: !!popoverRef.current,
-      });
-      
       // If click is on anchor element, don't close
       if (anchorRef.current?.contains(target)) {
-        console.log('✅ Click on anchor - not closing');
         return;
       }
       
@@ -175,12 +176,10 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
       // Check both the popover ref and any element with the booking-calendar-popover class
       const popoverElement = popoverRef.current || document.querySelector('.booking-calendar-popover');
       if (popoverElement && (popoverElement.contains(target) || popoverElement === target)) {
-        console.log('✅ Click inside popover - not closing');
         return; // Don't close for ANY clicks inside the popover
       }
       
       // Click is outside popover and anchor - close it
-      console.log('❌ Click outside - CLOSING picker');
       onClose();
     };
 
@@ -201,10 +200,32 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
     };
   }, [anchorRef, onClose, open, popoverRef]);
 
+  // Sync shownDate prop only when calendar first opens (false -> true transition)
+  const prevOpenRef = useRef(open);
+  useEffect(() => {
+    const wasOpen = prevOpenRef.current;
+    prevOpenRef.current = open;
+    if (!open || wasOpen) {
+      return; // Closing or already was open - don't sync
+    }
+    // Calendar just opened (false -> true)
+    const next = normalizeToStartOfMonth(shownDate ?? value.startDate ?? minDate ?? new Date());
+    setInternalShownDate(next);
+  }, [open, shownDate, value.startDate, minDate]);
+
   const composedDisabledDay = (date: Date) => {
     if (minDate && date < minDate) return true;
     if (maxDate && date > maxDate) return true;
     return disabledDay ? disabledDay(date) : false;
+  };
+
+
+  const handleShownDateChange = (date: Date) => {
+    const normalized = normalizeToStartOfMonth(date);
+    setInternalShownDate(normalized);
+    if (onShownDateChange) {
+      onShownDateChange(normalized);
+    }
   };
 
   return (
@@ -230,6 +251,7 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
       ) : (
         <div className="relative">
           <DateRange
+            key={`date-range-${internalShownDate.getFullYear()}-${internalShownDate.getMonth()}`}
             ranges={[
               {
                 startDate: normalizedStart,
@@ -251,13 +273,8 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
             showPreview={false}
             showSelectionPreview
             dayContentRenderer={dayContentRenderer}
-            shownDate={shownDate}
-            onShownDateChange={(date) => {
-              console.log('📅 [AtlasDateRangePicker] onShownDateChange called with:', date);
-              if (onShownDateChange) {
-                onShownDateChange(date);
-              }
-            }}
+            shownDate={normalizeToStartOfMonth(internalShownDate)}
+            onShownDateChange={handleShownDateChange}
             rangeColors={rangeColors}
             {...dateRangeProps}
             onChange={handleRangeChange}

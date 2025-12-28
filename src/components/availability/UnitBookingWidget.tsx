@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { addDays, format, startOfDay } from 'date-fns';
+import { addDays, format, startOfDay, startOfMonth } from 'date-fns';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 import { Button } from '@/components/ui/Button';
@@ -150,8 +150,10 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId }) => {
     navigate('/reserve', { state: { from: location.pathname, listingId } });
   };
 
+
   return (
     <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6 space-y-5">
+
       <div className="space-y-1">
         <p className="text-sm uppercase tracking-[0.12em] text-text-muted font-semibold">Reserve</p>
         <h3 className="text-xl sm:text-2xl font-semibold text-text-primary">Book this home</h3>
@@ -202,8 +204,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId }) => {
               months={2}
               shownDate={shownDate}
               onShownDateChange={(date) => {
-                console.log('🏘️ [UnitBookingWidget] Updating shownDate to:', date);
-                setShownDate(startOfDay(date));
+                setShownDate(startOfMonth(date));
               }}
               loadingLabel="Loading availability"
               rangeColors={['#475569']}
