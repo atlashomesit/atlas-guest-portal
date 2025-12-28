@@ -14,7 +14,7 @@ import { propertyData, propertyImages } from '../../../data.ts';
 import { getUnitPolicy } from '../../../config/policyConfig';
 import { inlinePolicySnippets } from '../../../content/terms';
 import Subheading from '../../commonComponents/subheading/Subheading';
-import HotelBooking_Form from '../hotelBooking_form/BookingCard.tsx';
+import UnitBookingWidget from '../../availability/UnitBookingWidget';
 import { trackEvent } from '../../../utils/analytics';
 import { Button } from '../../ui/Button';
 import { calculateNightlyPrice, inferUnitType } from '../../../utils/pricing';
@@ -484,10 +484,10 @@ const PropertyDetails = () => {
                     {/* right div  */}
                     <div className="w-full sm:w-1/3">
                         <div className='hidden lg:block sticky top-16'>
-                            <HotelBooking_Form propertyId={data.id} supportPadding />
+                            <UnitBookingWidget listingId={data.id} />
                         </div>
                         <div className="lg:hidden">
-                            <HotelBooking_Form propertyId={data.id} supportPadding />
+                            <UnitBookingWidget listingId={data.id} />
                         </div>
                     </div>
                 </div>
