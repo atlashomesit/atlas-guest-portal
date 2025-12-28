@@ -1,40 +1,57 @@
 :root[data-theme="valentine"] {
-  /* Surfaces */
-  --bg-primary: #fff1f4;
-  --bg-surface: #ffffff;
-  --bg-muted: #ffe6ed;
-
-  /* Text */
-  --text-primary: #291520;
-  --text-muted: #6b4a5c;
-
-  /* Accent + CTA */
-  --accent-primary: #e05686;
-  --accent-soft: #ffe2ec;
-  --romance-soft: #ffe2ec;
-  --accent-primary-rgb: 224 86 134;
-  --accent-soft-rgb: 255 226 236;
-  --cta-primary: #c2185b;
-  --cta-primary-hover: #a51852;
-  --cta-secondary: #8e2b5c;
-  --cta-primary-rgb: 194 24 91;
-  --cta-primary-hover-rgb: 165 24 82;
-  --cta-secondary-rgb: 142 43 92;
-
+  /* Surfaces - Soft Rose with Platinum Touch */
+  --bg-primary: #FFF5F7;         /* Softer pink canvas */
+  --bg-surface: #FFFFFF;         /* Pure white cards */
+  --bg-muted: #FFE4E9;          /* Delicate rose mist */
+  
+  /* Text - Romantic but Readable */
+  --text-primary: #1E293B;       /* Keep platinum-800 for readability */
+  --text-muted: #64748B;         /* Platinum-500 */
+  --text-body: #334155;          /* Platinum-700 */
+  --text-on-hero: #FFFFFF;
+  
+  /* Accent - Elegant Rose */
+  --accent-primary: #EC4899;     /* Pink-500 - vibrant but refined */
+  --accent-soft: #FCE7F3;        /* Pink-100 */
+  --romance-soft: #FDF2F8;       /* Pink-50 */
+  --accent-primary-rgb: 236 72 153;
+  --accent-soft-rgb: 252 231 243;
+  
+  /* CTA - Romantic Deep Rose */
+  --cta-primary: #BE185D;        /* Pink-700 */
+  --cta-primary-hover: #9F1239;  /* Pink-800 */
+  --cta-secondary: #DB2777;      /* Pink-600 */
+  --cta-primary-rgb: 190 24 93;
+  --cta-primary-hover-rgb: 159 18 57;
+  --cta-secondary-rgb: 219 39 119;
+  
+  /* Brand - Rose Gold Touch */
+  --brand: #BE185D;
+  --brand-ink: #9F1239;
+  --brand-contrast: #FFF5F7;
+  --brand-soft: #FCE7F3;
+  
   /* Borders */
-  --border-subtle: #f4cfdc;
-  --border-strong: #e39ab9;
-
+  --border-subtle: #FCE7F3;      /* Pink-100 */
+  --border-strong: #F9A8D4;      /* Pink-300 */
+  
   /* Status */
-  --support-success: #2d8a5d;
-  --support-danger: #b5473d;
-
+  --support-success: #10B981;
+  --support-danger: #EF4444;
+  --support-error: #EF4444;
+  
   /* Footer */
-  --footer-bg: #2b1621;
-
-  /* Shadows */
-  --shadow-level-1: 0 10px 30px rgba(41, 21, 32, 0.08);
-  --shadow-level-2: 0 20px 40px rgba(41, 21, 32, 0.12);
+  --footer-bg: #831843;          /* Pink-900 */
+  --footer-text: #FDF2F8;
+  --footer-heading: #FFFFFF;
+  --footer-link: #F9A8D4;
+  --footer-link-hover: #FFFFFF;
+  
+  /* Shadows - Romantic Glow */
+  --shadow-level-1: 0 2px 8px rgba(190, 24, 93, 0.08), 0 1px 3px rgba(190, 24, 93, 0.04);
+  --shadow-level-2: 0 8px 24px rgba(190, 24, 93, 0.12), 0 4px 12px rgba(190, 24, 93, 0.06);
+  --shadow-level-3: 0 24px 72px rgba(190, 24, 93, 0.15), 0 12px 32px rgba(190, 24, 93, 0.08);
   --shadow-1: var(--shadow-level-1);
   --shadow-2: var(--shadow-level-2);
+  --shadow-3: var(--shadow-level-3);
 }

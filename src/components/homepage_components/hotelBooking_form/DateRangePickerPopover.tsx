@@ -145,7 +145,7 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
     <>
       <div
         className={`fixed inset-0 ${
-          isMobile ? 'bg-black/50 backdrop-blur-[1px]' : 'pointer-events-none bg-transparent'
+          isMobile ? 'bg-black/50 backdrop-blur-[8px]' : 'pointer-events-none bg-transparent'
         } z-[90]`}
         onClick={isMobile ? onClose : undefined}
         aria-hidden
@@ -159,39 +159,43 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
         tabIndex={-1}
         className={`booking-calendar-popover ${
           isMobile
-            ? 'fixed inset-x-0 bottom-0 z-[95] max-h-[80vh] rounded-t-3xl border border-border-subtle bg-bg-surface shadow-level3'
-            : 'absolute z-[95] rounded-xl border border-border-subtle bg-bg-surface shadow-level2'
+            ? 'fixed inset-x-0 bottom-0 z-[95] max-h-[80vh] rounded-t-[32px] border border-[var(--border-subtle)] bg-[var(--bg-surface)] shadow-[0_32px_96px_rgba(15,23,42,0.12),0_16px_48px_rgba(15,23,42,0.08)]'
+            : 'absolute z-[95] rounded-[20px] border border-[var(--border-subtle)] bg-[var(--bg-surface)] shadow-[0_32px_96px_rgba(15,23,42,0.12),0_16px_48px_rgba(15,23,42,0.08)]'
         }`}
         style={desktopStyles}
         onClick={(event) => event.stopPropagation()}
       >
         {!isMobile && (
           <div
-            className="pointer-events-none absolute -top-2 h-4 w-4 rotate-45 border border-border-subtle border-b-transparent border-r-transparent bg-bg-surface"
+            className="pointer-events-none absolute -top-2 h-4 w-4 rotate-45 border border-[var(--border-subtle)] border-b-transparent border-r-transparent bg-[var(--bg-surface)]"
             style={{ left: position.caretLeft - 8 }}
             aria-hidden
           />
         )}
 
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle bg-bg-muted/60">
-          <p id={labelId} className="text-sm font-semibold text-text-primary">
-            {heading}
+        {isMobile && (
+          <div className="flex justify-center pt-3 pb-2">
+            <div className="w-12 h-1 rounded-full bg-[var(--border-strong)]" aria-hidden />
+          </div>
+        )}
+
+        <div className="flex items-center justify-between px-6 py-5 border-b border-[var(--bg-muted)] bg-[var(--bg-surface)]">
+          <p id={labelId} className="text-[17px] font-semibold text-[var(--text-primary)]">
+            Select your dates
           </p>
-          {isMobile ? (
+          {isMobile && (
             <button
               type="button"
               onClick={onClose}
               aria-label="Close date picker"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border-subtle bg-bg-surface text-lg font-semibold text-text-primary shadow-sm"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-lg font-semibold text-[var(--text-primary)] shadow-sm"
             >
               ×
             </button>
-          ) : (
-            <span className="text-xs text-text-muted">Press Escape to close</span>
           )}
         </div>
 
-        <div className="max-h-[70vh] overflow-y-auto p-3 sm:p-4">
+        <div className="max-h-[70vh] overflow-y-auto p-5">
           {children}
           <p className="sr-only" aria-live="polite">
             {loadingLabel}

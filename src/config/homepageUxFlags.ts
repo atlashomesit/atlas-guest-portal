@@ -4,7 +4,7 @@ export const enableSecondaryBannerRemoved = false;
 export const enableSecondaryBannerValueBlock = false;
 export const enableSecondaryBannerImprovedOverlay = false;
 
-export const enableServicesConcreteCopy = false;
+export const enableServicesConcreteCopy = true;
 export const enableServicesIconography = false;
 export const enableServicesOneLineDescriptions = false;
 export const enableServicesAlternatingBackgrounds = false;

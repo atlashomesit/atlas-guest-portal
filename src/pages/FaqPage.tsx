@@ -61,11 +61,11 @@ const FaqPage = () => {
   return (
     <LegalLayout
       current="faq"
-      title="FAQs | Atlas Guest Portal"
+      title="Frequently Asked Questions"
       description="Quick answers that link directly to the underlying policy and terms sections."
     >
       <SEO
-        title="FAQs | Atlas Guest Portal"
+        title="FAQs | Atlas Homestays"
         description="Common questions about bookings, payments, check-in, guests, amenities, and deposits."
         url="/faq"
         jsonLd={faqStructuredData}
@@ -80,7 +80,6 @@ const FaqPage = () => {
               <LegalSearch value={search} onChange={setSearch} placeholder="Search FAQs" />
               <div className="bg-[color:color-mix(in_srgb,var(--accent-soft)_65%,var(--bg-surface))] text-text-primary border border-border-subtle rounded-xl p-4 text-sm">
                 <p className="font-semibold">If anything here conflicts with Terms, the Terms apply.</p>
-                <p>Each answer links to the source policy or terms section.</p>
               </div>
             </div>
           </div>

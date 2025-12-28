@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { addDays, format } from 'date-fns';
+import { addDays, format, startOfDay } from 'date-fns';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 import { API_BASE_URL, IS_API_BASE_CONFIGURED } from '@/config/api';
@@ -177,22 +177,65 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId }) => {
               <span className="text-xs text-text-muted">{isLoading ? 'Loading…' : `${bookedDates.length} dates blocked`}</span>
             </div>
           </button>
-          <AtlasDateRangePicker
-            anchorRef={calendarButtonRef}
-            open={openCalendar}
-            onClose={() => setOpenCalendar(false)}
-            value={dateRange}
-            onChange={(next) => setDateRange(next)}
-            loading={isLoading}
-            minDate={today}
-            maxDate={maxBookingDate}
-            disabledDay={disabledDay}
-            months={2}
-            shownDate={dateRange.startDate ?? today}
-            onShownDateChange={() => {}}
-            loadingLabel="Loading availability"
-            rangeColors={[`var(--cta-primary)`]}
-          />
+          <div className="unit-datepicker-wrapper">
+            <AtlasDateRangePicker
+              anchorRef={calendarButtonRef}
+              open={openCalendar}
+              onClose={() => setOpenCalendar(false)}
+              value={dateRange}
+              onChange={(next) => setDateRange(next)}
+              loading={isLoading}
+              minDate={today}
+              maxDate={maxBookingDate}
+              disabledDay={disabledDay}
+              months={2}
+              shownDate={dateRange.startDate ?? today}
+              onShownDateChange={() => {}}
+              loadingLabel="Loading availability"
+              rangeColors={['#475569']}
+              dayContentRenderer={(day) => {
+                const dayStart = startOfDay(day);
+                const selectionStart = dateRange.startDate ? startOfDay(dateRange.startDate).getTime() : null;
+                const selectionEnd = dateRange.endDate ? startOfDay(dateRange.endDate).getTime() : null;
+                const isRangeStart = selectionStart !== null && dayStart.getTime() === selectionStart;
+                const isRangeEnd = selectionEnd !== null && dayStart.getTime() === selectionEnd;
+                const rangeStart = selectionStart !== null && selectionEnd !== null ? Math.min(selectionStart, selectionEnd) : null;
+                const rangeEnd = selectionStart !== null && selectionEnd !== null ? Math.max(selectionStart, selectionEnd) : null;
+                const isInRange =
+                  rangeStart !== null && rangeEnd !== null
+                    ? dayStart.getTime() >= rangeStart && dayStart.getTime() <= rangeEnd
+                    : false;
+                const isDisabled = disabledDay(day);
+                const isToday = dayStart.getTime() === today.getTime();
+
+                return (
+                  <div className="relative flex h-full w-full items-center justify-center">
+                    {isInRange && !isRangeStart && !isRangeEnd && (
+                      <span
+                        className="absolute inset-0 bg-[var(--bg-primary)]"
+                        aria-hidden
+                      />
+                    )}
+                    <span
+                      className={`relative z-10 flex items-center justify-center text-sm font-medium transition ${
+                        isRangeStart || isRangeEnd
+                          ? 'bg-[var(--cta-primary)] text-white rounded-xl px-3 py-2 shadow-sm'
+                          : isDisabled
+                          ? 'text-[var(--border-strong)] cursor-not-allowed opacity-50'
+                          : 'text-[var(--brand)]'
+                      }`}
+                      style={{ minHeight: 38, minWidth: 38 }}
+                    >
+                      {format(day, 'd')}
+                      {isToday && !isRangeStart && !isRangeEnd && (
+                        <span className="absolute bottom-1 left-1/2 transform -translate-x-1/2 w-4 h-0.5 bg-[#94A3B8] rounded-full" />
+                      )}
+                    </span>
+                  </div>
+                );
+              }}
+            />
+          </div>
         </div>
 
         <div className="space-y-2">

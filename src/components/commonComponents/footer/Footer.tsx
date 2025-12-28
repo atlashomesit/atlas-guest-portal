@@ -113,7 +113,7 @@ const Footer = () => {
             </div>
 
             <div className='text-base text-center mt-10 text-[color:var(--footer-link)]'>
-                © 2025 The Atlas Homes All rights reserved | <Link to="/policies" className='hover:text-[color:var(--footer-link-hover)] transition-colors'>Policies</Link> | <Link to="/terms" className='hover:text-[color:var(--footer-link-hover)] transition-colors'>Terms</Link> | <Link to="/contact" className='hover:text-[color:var(--footer-link-hover)] transition-colors'>Contact</Link>
+                © 2025 Atlas Homes | <Link to="/policies" className='hover:text-[color:var(--footer-link-hover)] transition-colors'>Policies</Link> | <Link to="/terms" className='hover:text-[color:var(--footer-link-hover)] transition-colors'>Terms</Link> | <Link to="/contact" className='hover:text-[color:var(--footer-link-hover)] transition-colors'>Contact</Link>
             </div>
 
         </div>

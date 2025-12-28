@@ -53,7 +53,7 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
   const [isAvailabilityModalOpen, setIsAvailabilityModalOpen] = React.useState(false);
   const [pendingSearchParams, setPendingSearchParams] = React.useState<URLSearchParams | null>(null);
   // Initialize calendar as ready - no async data needed, calendar renders client-side
-  const [calendarReady, setCalendarReady] = React.useState(true);
+  const [calendarReady] = React.useState(true);
   const [shownDate, setShownDate] = React.useState<Date>(() => defaultRange.startDate ?? today);
   const hasTrackedDropoff = React.useRef(false);
   const hasInteractedRef = React.useRef(false);
@@ -61,6 +61,7 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
   const calendarWrapperRef = React.useRef<HTMLDivElement | null>(null);
   const toggleButtonRef = React.useRef<HTMLButtonElement | null>(null);
   const lastFocusedTriggerRef = React.useRef<HTMLElement | null>(null);
+  const hasHydratedRef = React.useRef(false);
   const calendarContentId = React.useId();
   const calendarLabelId = React.useId();
   const dateErrorId = React.useId();
@@ -130,6 +131,7 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
   }, [location.state]);
 
   React.useEffect(() => {
+    if (hasHydratedRef.current) return;
     const stored = hydrateFromContext();
     const paramRange = {
       startDate: parseDate(searchParams.get('checkIn')),
@@ -168,6 +170,7 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
       guests: nextGuests,
       propertyId: nextPropertyId,
     });
+    hasHydratedRef.current = true;
   }, [
     bookingPrefill,
     defaultRange.endDate,
@@ -435,7 +438,7 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
       (attemptedEnd && attemptedEnd < today);
 
     if (hasPastAttempt) {
-      const errorMessage = 'Check-in cannot be in the past; minimum 1-night stay applies.';
+      const errorMessage = 'Check-in cannot be in the past.';
       setStatusMessage(errorMessage);
       setDateError(errorMessage);
       setError(errorMessage);
@@ -514,27 +517,29 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
   }, [isAvailabilityModalOpen]);
 
   const formContainerClass = enableWidgetExperiment
-    ? 'hero-form w-full max-w-5xl rounded-3xl bg-[color:color-mix(in_srgb,var(--bg-surface)_96%,rgba(3,6,14,0.45))] shadow-[0_20px_60px_rgba(0,0,0,0.45)] backdrop-blur-md border border-[color:color-mix(in_srgb,var(--bg-surface)_60%,transparent)] p-4 sm:p-5 md:p-6 flex flex-col gap-4 sm:gap-5'
-    : 'hero-form w-full max-w-5xl rounded-3xl bg-[color:color-mix(in_srgb,var(--bg-surface)_94%,rgba(0,0,0,0.18))] shadow-level3 backdrop-blur border border-[color:color-mix(in_srgb,var(--bg-surface)_55%,transparent)] p-4 sm:p-5 md:p-6 flex flex-col gap-4 sm:gap-5';
+    ? 'hero-form w-full max-w-5xl rounded-[24px] bg-[var(--bg-surface)] shadow-[var(--shadow-level-3)] backdrop-blur-sm border border-[var(--border-subtle)] p-8 flex flex-col gap-6'
+    : 'hero-form w-full max-w-5xl rounded-[24px] bg-[var(--bg-surface)] shadow-[var(--shadow-level-3)] backdrop-blur-sm border border-[var(--border-subtle)] p-8 flex flex-col gap-6';
 
   const formGridClass = enableWidgetExperiment
-    ? 'hero-form-grid grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 md:auto-rows-fr lg:grid-cols-4 lg:gap-5'
-    : 'hero-form-grid grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 md:auto-rows-fr lg:grid-cols-4 lg:gap-5';
+    ? 'hero-form-grid grid grid-cols-1 gap-6 md:grid-cols-2 md:auto-rows-fr lg:grid-cols-4'
+    : 'hero-form-grid grid grid-cols-1 gap-6 md:grid-cols-2 md:auto-rows-fr lg:grid-cols-4';
 
   const fieldShellClass =
-    'flex h-full min-h-[112px] flex-col justify-between rounded-2xl border border-[color:color-mix(in_srgb,var(--border-subtle)_80%,transparent)] bg-[color:color-mix(in_srgb,var(--bg-muted)_92%,var(--bg-surface))] px-4 py-4 sm:px-5 sm:py-5 shadow-[0_12px_36px_rgba(6,8,15,0.32)]';
+    'field-card flex h-full min-h-[120px] flex-col justify-between rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-7 py-7 shadow-[var(--shadow-level-1)] hover:shadow-[var(--shadow-level-2)] hover:scale-[1.01]';
   const dateFieldShellClass = `${fieldShellClass}${
-    dateError ? ' border-support-error shadow-[0_0_0_1px_var(--support-error)]' : ''
+    dateError ? ' border-[var(--support-error)] shadow-[0_0_0_1px_var(--support-error)] error-shake' : ''
   }`;
   const labelClass =
-    'flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-[color-mix(in_srgb,var(--text-primary)_80%,transparent)] whitespace-nowrap';
-  const helperTextClass = 'mt-2 text-sm leading-snug text-[color:color-mix(in_srgb,var(--text-primary)_78%,transparent)]';
+    'flex items-center gap-2.5 text-[10px] font-bold uppercase tracking-[0.10em] text-[var(--text-muted)] whitespace-nowrap';
+  const helperTextClass = 'mt-3 text-[12px] leading-relaxed text-[var(--text-muted)]';
 
   return (
     <form onSubmit={handleSubmit} className={formContainerClass} data-testid="hero-widget" id="search-form">
-      <div className="sr-only" role="status" aria-live="polite">
-        {statusMessage || error || 'Hero form ready'}
-      </div>
+      {(statusMessage || error) && (
+        <div className="sr-only" role="status" aria-live="polite">
+          {statusMessage || error}
+        </div>
+      )}
       <div className={formGridClass} ref={calendarWrapperRef}>
         <div className="relative">
           <button
@@ -550,15 +555,12 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
             aria-controls={calendarContentId}
           >
             <span className={labelClass}>
-              <CalendarRange className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <CalendarRange className="h-[18px] w-[18px] shrink-0 text-[var(--text-muted)]" aria-hidden="true" />
               <span className="truncate">Check-in</span>
             </span>
-            <span className="mt-3 flex items-center justify-between gap-2 text-lg font-semibold text-text-primary leading-tight">
+            <span className="date-value mt-4 flex items-center justify-between gap-2 text-[22px] font-medium text-[var(--text-primary)] leading-tight">
               {checkInLabel}
-              <ChevronDown className={`h-4 w-4 shrink-0 text-text-muted transition ${isCalendarOpen ? 'rotate-180' : ''}`} aria-hidden />
-            </span>
-            <span className={helperTextClass}>
-              Check-in cannot be in the past; minimum 1-night stay applies.
+              <ChevronDown className={`h-[18px] w-[18px] shrink-0 text-[var(--text-muted)] transition-transform duration-200 ${isCalendarOpen ? 'rotate-180' : ''}`} aria-hidden />
             </span>
             {dateError && (
               <span className="mt-2 text-sm font-semibold text-support-error" id={dateErrorId} role="alert">
@@ -579,14 +581,13 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
           aria-controls={calendarContentId}
         >
           <span className={labelClass}>
-            <CalendarRange className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <CalendarRange className="h-[18px] w-[18px] shrink-0 text-[var(--text-muted)]" aria-hidden="true" />
             <span className="truncate">Check-out</span>
           </span>
-          <span className="mt-3 flex items-center justify-between gap-2 text-lg font-semibold text-text-primary leading-tight">
+          <span className="date-value mt-4 flex items-center justify-between gap-2 text-[22px] font-medium text-[var(--text-primary)] leading-tight">
             {checkOutLabel}
-            <ChevronDown className={`h-4 w-4 shrink-0 text-text-muted transition ${isCalendarOpen ? 'rotate-180' : ''}`} aria-hidden />
+            <ChevronDown className={`h-[18px] w-[18px] shrink-0 text-[var(--text-muted)] transition-transform duration-200 ${isCalendarOpen ? 'rotate-180' : ''}`} aria-hidden />
           </span>
-          <span className={helperTextClass}>Check-out must be at least 1 night after check-in.</span>
         </button>
 
         <AtlasDateRangePicker
@@ -604,7 +605,7 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
           months={monthsToShow}
           shownDate={shownDate}
           onShownDateChange={(date) => setShownDate(startOfDay(date))}
-          rangeColors={[dateError ? 'var(--support-error, #ef4444)' : 'var(--cta-primary)']}
+          rangeColors={[dateError ? 'var(--support-error)' : 'var(--cta-primary)']}
           loading={!calendarReady}
           dayContentRenderer={(day) => {
             const dayStart = startOfDay(day);
@@ -619,36 +620,31 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
                 ? dayStart.getTime() >= rangeStart && dayStart.getTime() <= rangeEnd
                 : false;
             const isDisabled = dayStart < today;
-
-            const selectionTreatment =
-              isRangeStart || isRangeEnd
-                ? 'bg-cta-primary text-[var(--text-contrast)] border-cta-primary shadow-sm ring-2 ring-[color:color-mix(in_srgb,var(--cta-secondary)_60%,transparent)]'
-                : 'border-transparent bg-transparent';
+            const isToday = dayStart.getTime() === today.getTime();
 
             return (
               <div className="relative flex h-full w-full items-center justify-center">
-                {isInRange && (
+                {isInRange && !isRangeStart && !isRangeEnd && (
                   <span
-                    className={`absolute inset-0 bg-[color:color-mix(in_srgb,var(--cta-primary)_18%,transparent)] ${
-                      isRangeStart && isRangeEnd
-                        ? 'rounded-full'
-                        : isRangeStart
-                        ? 'rounded-l-full'
-                        : isRangeEnd
-                        ? 'rounded-r-full'
-                        : 'rounded-none'
-                    }`}
+                    className="absolute inset-0 bg-[var(--bg-primary)]"
                     aria-hidden
                   />
                 )}
                 <span
                   data-testid={`hero-date-${format(day, 'yyyy-MM-dd')}`}
-                  className={`relative z-10 flex h-10 w-10 items-center justify-center rounded-full border text-sm font-semibold transition ${selectionTreatment} ${
-                    isDisabled ? 'text-text-muted opacity-60 line-through cursor-not-allowed' : 'text-text-primary'
+                  className={`relative z-10 flex items-center justify-center text-sm font-medium transition ${
+                    isRangeStart || isRangeEnd
+                      ? 'bg-[var(--cta-primary)] text-white rounded-xl px-3 py-2 shadow-sm'
+                      : isDisabled
+                      ? 'text-[var(--border-strong)] cursor-not-allowed opacity-50'
+                      : 'text-[var(--brand)]'
                   }`}
                   style={{ minHeight: 40, minWidth: 40 }}
                 >
                   {format(day, 'd')}
+                  {isToday && !isRangeStart && !isRangeEnd && (
+                    <span className="absolute bottom-1 left-1/2 transform -translate-x-1/2 w-4 h-0.5 bg-[#94A3B8] rounded-full" />
+                  )}
                 </span>
               </div>
             );
@@ -663,26 +659,26 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
           aria-invalid={guestError ? true : undefined}
         >
           <span className={labelClass} id={guestsLabelId}>
-            <Users className="h-4 w-4 shrink-0" aria-hidden />
+            <Users className="h-[18px] w-[18px] shrink-0 text-[var(--text-muted)]" aria-hidden />
             <span className="truncate">Guests</span>
           </span>
-          <div className="mt-3 flex items-center justify-between gap-3">
+          <div className="mt-4 flex items-center justify-between gap-4">
             <button
               type="button"
-              className="inline-flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-full border border-border-subtle text-lg font-semibold text-text-primary transition hover:border-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary disabled:opacity-40 disabled:hover:border-border-subtle"
+              className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-[var(--border-subtle)] text-lg font-semibold text-[var(--text-primary)] transition hover:border-[#475569] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#475569] disabled:opacity-40 disabled:hover:border-[var(--border-subtle)]"
               onClick={() => handleGuestChange(-1)}
               disabled={guests <= 1}
               aria-label="Decrease guests"
             >
               −
             </button>
-            <div className="flex flex-col items-center">
-              <span className="text-lg font-semibold text-text-primary">{guests}</span>
-              <span className="text-xs font-medium text-text-muted">guest{guests === 1 ? '' : 's'}</span>
+            <div className="guest-value flex flex-col items-center">
+              <span className="text-[22px] font-medium text-[var(--text-primary)]">{guests}</span>
+              <span className="text-xs font-medium text-[var(--text-muted)]">guest{guests === 1 ? '' : 's'}</span>
             </div>
             <button
               type="button"
-              className="inline-flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-full border border-border-subtle text-lg font-semibold text-text-primary transition hover:border-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
+              className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-[var(--border-subtle)] text-lg font-semibold text-[var(--text-primary)] transition hover:border-[#475569] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#475569]"
               onClick={() => handleGuestChange(1)}
               aria-label="Increase guests"
             >
@@ -690,7 +686,7 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
             </button>
           </div>
           <span className={helperTextClass} id={guestsHelperId}>
-            Up to {MAX_GUESTS} guests per booking. Defaulting to 2 guests; adjust anytime.
+            Maximum {MAX_GUESTS} guests
           </span>
           {guestError && (
             <span className="mt-2 text-sm font-semibold text-support-error" id={guestsErrorId} role="alert">
@@ -699,11 +695,11 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
           )}
         </div>
 
-        <div className={`${fieldShellClass} md:-ml-[1px] lg:min-h-[112px] lg:items-stretch lg:justify-center lg:flex-col`}>
+        <div className={`${fieldShellClass} md:-ml-[1px] lg:min-h-[120px] lg:items-stretch lg:justify-center lg:flex-col`}>
           <button
             type="submit"
             disabled={isSubmitDisabled || isSubmitting}
-            className="inline-flex h-14 min-h-[56px] w-full items-center justify-center rounded-xl bg-cta-primary px-6 text-base font-semibold text-[var(--text-contrast)] shadow-[0_16px_38px_rgba(12,86,255,0.32)] transition hover:bg-cta-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary disabled:cursor-not-allowed disabled:bg-[color:color-mix(in_srgb,var(--cta-primary)_70%,var(--bg-muted))] disabled:text-[color-mix(in_srgb,var(--text-contrast)_82%,transparent)] disabled:shadow-none aria-busy:cursor-progress aria-busy:opacity-90 whitespace-nowrap"
+            className="inline-flex h-[60px] w-full items-center justify-center rounded-[14px] bg-gradient-to-br from-[var(--cta-primary)] to-[var(--cta-primary-hover)] px-6 text-base font-semibold tracking-[0.02em] text-white shadow-[var(--shadow-level-2)] transition-all hover:scale-[1.02] hover:shadow-[var(--shadow-level-3)] active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cta-primary)] disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none disabled:hover:scale-100 aria-busy:cursor-progress aria-busy:opacity-90 whitespace-nowrap"
             onClick={() => setStatusMessage('Checking availability...')}
             aria-busy={isSubmitting}
           >
@@ -711,9 +707,10 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
           </button>
           <Link
             to="/#our-homes"
-            className="inline-flex items-center justify-center text-sm font-semibold text-text-muted underline-offset-4 transition hover:text-cta-secondary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary whitespace-nowrap mt-2"
+            className="group inline-flex items-center justify-center gap-1 text-[14px] font-medium text-[var(--cta-primary)] transition-all hover:text-[var(--text-body)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#475569] whitespace-nowrap mt-3"
           >
             Browse all apartments
+            <span className="inline-block transition-transform group-hover:translate-x-1">→</span>
           </Link>
         </div>
       </div>
@@ -729,13 +726,13 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
         </p>
       )}
 
-      <div className="flex flex-col gap-2 rounded-2xl bg-[color:color-mix(in_srgb,var(--bg-surface)_94%,transparent)] px-4 py-4 text-left shadow-inner md:flex-row md:items-center md:gap-4">
-        <div className="flex items-center gap-2 text-sm font-semibold text-text-primary">
-          <ShieldCheck className="h-4 w-4 text-cta-secondary" aria-hidden="true" />
+      <div className="flex flex-col gap-3 rounded-2xl bg-[var(--bg-surface)] border border-[var(--bg-muted)] px-6 py-5 text-left md:flex-row md:items-center md:gap-4">
+        <div className="flex items-center gap-2 text-[15px] font-bold text-[var(--text-body)]">
+          <ShieldCheck className="h-4 w-4 text-[var(--cta-primary)]" aria-hidden="true" />
           <span>Book with confidence</span>
         </div>
-        <p className="text-sm text-[color-mix(in_srgb,var(--text-primary)_78%,transparent)] md:border-l md:border-[color:color-mix(in_srgb,var(--text-muted)_60%,transparent)] md:pl-4">
-          Instant confirmation • Secure payments • No hidden charges
+        <p className="text-[13px] text-[var(--cta-primary)] md:border-l md:border-[var(--border-subtle)] md:pl-4">
+          Instant confirmation • Secure payment • Flexible cancellation
         </p>
       </div>
 

@@ -1,50 +1,58 @@
 :root,
 :root[data-theme="default"] {
-  /* Surfaces */
-  --bg-primary: #ede7c7;
-  --bg-surface: #fdfbf6;
-  --bg-muted: #e7dfc4;
-
-  /* Text */
-  --text-primary: #1b2533;
-  --text-muted: #3f4a5a;
-  --text-body: #243041;
-
-  /* Accent + CTA */
-  --accent-primary: #a2bffe;
-  --accent-soft: #f6e7de;
-  --romance-soft: #f6e7de;
-  --accent-primary-rgb: 162 191 254;
-  --accent-soft-rgb: 246 231 222;
-  --cta-primary: #4f6f9f;
-  --cta-primary-hover: #3f5d88;
-  --cta-secondary: #6f8bbd;
-  --cta-primary-rgb: 79 111 159;
-  --cta-primary-hover-rgb: 63 93 136;
-  --cta-secondary-rgb: 111 139 189;
-  --brand: #2f4b86;
-  --brand-ink: #1f2f52;
-  --brand-contrast: #eef3ff;
-  --brand-soft: #e2e9fb;
-
-  /* Borders */
-  --border-subtle: #dcd3b3;
-  --border-strong: #c3b693;
-
-  /* Status */
-  --support-success: #2d8a5d;
-  --support-danger: #b5473d;
-
-  /* Footer */
-  --footer-bg: #162030;
-  --footer-text: #d8e1ed;
-  --footer-heading: #f3f6fb;
-  --footer-link: #c8d2de;
-  --footer-link-hover: #ffffff;
-
-  /* Shadows */
-  --shadow-level-1: 0 12px 32px rgba(30, 39, 51, 0.1);
-  --shadow-level-2: 0 20px 48px rgba(30, 39, 51, 0.16);
+  /* Surfaces - Premium Platinum */
+  --bg-primary: #F8FAFB;        /* Platinum-50 - lightest canvas */
+  --bg-surface: #FFFFFF;         /* Pure white cards/panels */
+  --bg-muted: #F1F5F9;          /* Platinum-100 - subtle bands */
+  
+  /* Text - Clear Hierarchy */
+  --text-primary: #0F172A;       /* Platinum-900 - body text */
+  --text-muted: #64748B;         /* Platinum-500 - supporting copy */
+  --text-body: #1E293B;          /* Platinum-800 - paragraphs */
+  --text-on-hero: #FFFFFF;       /* High contrast for hero overlays */
+  
+  /* Accent - Refined Blue */
+  --accent-primary: #8B9DC3;     /* Soft blue for links/highlights */
+  --accent-soft: #E2E8F0;        /* Platinum-200 - subtle highlights */
+  --romance-soft: #F8F9FA;       /* Platinum-pearl for chips */
+  --accent-primary-rgb: 139 157 195;
+  --accent-soft-rgb: 226 232 240;
+  
+  /* CTA - Premium Gradient Ready */
+  --cta-primary: #475569;        /* Platinum-600 - primary actions */
+  --cta-primary-hover: #334155;  /* Platinum-700 - hover state */
+  --cta-secondary: #64748B;      /* Platinum-500 - secondary */
+  --cta-primary-rgb: 71 85 105;
+  --cta-primary-hover-rgb: 51 65 85;
+  --cta-secondary-rgb: 100 116 139;
+  
+  /* Brand - Sophisticated Navy */
+  --brand: #334155;              /* Platinum-700 */
+  --brand-ink: #1E293B;          /* Platinum-800 */
+  --brand-contrast: #F8FAFB;     /* Platinum-50 */
+  --brand-soft: #E2E8F0;         /* Platinum-200 */
+  
+  /* Borders - Subtle & Strong */
+  --border-subtle: #E2E8F0;      /* Platinum-200 */
+  --border-strong: #CBD5E1;      /* Platinum-300 */
+  
+  /* Status - Keep Accessible */
+  --support-success: #10B981;    /* Emerald-500 */
+  --support-danger: #EF4444;     /* Red-500 */
+  --support-error: #EF4444;      /* Alias for danger */
+  
+  /* Footer - Deep Platinum */
+  --footer-bg: #0F172A;          /* Platinum-900 */
+  --footer-text: #CBD5E1;        /* Platinum-300 */
+  --footer-heading: #F8FAFB;     /* Platinum-50 */
+  --footer-link: #94A3B8;        /* Platinum-400 */
+  --footer-link-hover: #FFFFFF;  /* Pure white */
+  
+  /* Shadows - Premium Depth */
+  --shadow-level-1: 0 2px 8px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.02);
+  --shadow-level-2: 0 8px 24px rgba(15, 23, 42, 0.08), 0 4px 12px rgba(15, 23, 42, 0.04);
+  --shadow-level-3: 0 24px 72px rgba(15, 23, 42, 0.10), 0 12px 32px rgba(15, 23, 42, 0.06);
   --shadow-1: var(--shadow-level-1);
   --shadow-2: var(--shadow-level-2);
+  --shadow-3: var(--shadow-level-3);
 }

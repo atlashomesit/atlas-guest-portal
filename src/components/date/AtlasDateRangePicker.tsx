@@ -121,7 +121,7 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
           {Array.from({ length: 14 }).map((_, index) => (
             <div
               key={index}
-              className="h-10 rounded-lg bg-[color:color-mix(in_srgb,var(--bg-muted)_75%,var(--bg-surface))] animate-pulse"
+              className="h-10 rounded-lg bg-[#F1F5F9] animate-pulse"
             />
           ))}
         </div>

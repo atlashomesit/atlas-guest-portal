@@ -1,8 +1,20 @@
 export const themeRegistry = {
-  default: { label: "Default" },
-  valentine: { label: "Valentine" },
-  christmas: { label: "Christmas" },
-  newYear: { label: "New Year" },
+  default: { 
+    label: "Premium Platinum",
+    description: "Refined platinum palette for everyday elegance"
+  },
+  valentine: { 
+    label: "Romantic Rose",
+    description: "Soft rose tones for Valentine's Day"
+  },
+  christmas: { 
+    label: "Festive Evergreen",
+    description: "Classic red and green for the holidays"
+  },
+  newYear: { 
+    label: "Celebration Gold",
+    description: "Midnight blue and champagne gold for New Year"
+  },
 } as const;
 
 export type ThemeName = keyof typeof themeRegistry;
