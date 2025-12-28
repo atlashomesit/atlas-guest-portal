@@ -43,6 +43,17 @@
    PREMIUM DATEPICKER STYLING - PLATINUM THEME
    ============================================ */
 
+/* Booking calendar popover constraints */
+.booking-calendar-popover {
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+.booking-calendar-popover * {
+  box-sizing: border-box;
+}
+
 /* Base calendar wrapper - premium card feel */
 .rdrCalendarWrapper {
   background: #FFFFFF;
@@ -51,6 +62,8 @@
   box-shadow: 0 20px 60px rgba(15, 23, 42, 0.08), 0 8px 24px rgba(15, 23, 42, 0.04);
   overflow: hidden;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  max-width: 100%;
+  width: 100%;
 }
 
 /* Month and year headers */
@@ -101,6 +114,8 @@
 /* Day cells */
 .rdrDays {
   padding: 0 20px 20px 20px;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .rdrDay {
@@ -161,44 +176,70 @@
   color: var(--platinum-300);
 }
 
-/* Navigation arrows */
+/* Navigation arrows - Base styles */
 .rdrNextPrevButton {
-  background: white;
-  border: 1px solid var(--platinum-200);
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  background: white !important;
+  border: 1px solid var(--platinum-200) !important;
+  width: 36px !important;
+  height: 36px !important;
+  border-radius: 50% !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
   cursor: pointer !important;
   pointer-events: auto !important;
   position: relative !important;
   z-index: 50 !important;
-  padding: 8px;
-  min-width: 40px;
-  min-height: 40px;
+  padding: 0 !important;
+  margin: 0 6px !important;
 }
 
 .rdrNextPrevButton:hover {
-  background: var(--platinum-100);
-  border-color: var(--platinum-300);
-  transform: scale(1.05);
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+  background: var(--platinum-100) !important;
+  border-color: var(--platinum-300) !important;
+  transform: scale(1.05) !important;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08) !important;
+}
+
+.rdrNextPrevButton:active {
+  background: #06B6D4 !important;
+  border-color: #06B6D4 !important;
+  transform: scale(0.98) !important;
 }
 
 .rdrNextPrevButton i {
-  border-color: var(--platinum-600);
-  border-width: 2px 2px 0 0;
-  width: 6px;
-  height: 6px;
-  transition: border-color 0.2s ease;
+  display: block !important;
+  width: 8px !important;
+  height: 8px !important;
+  border-style: solid !important;
+  border-color: var(--platinum-600) !important;
+  border-width: 0 2px 2px 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  transition: border-color 0.2s ease !important;
+  background: transparent !important;
 }
 
 .rdrNextPrevButton:hover i {
-  border-color: var(--platinum-700);
+  border-color: var(--platinum-700) !important;
+}
+
+.rdrNextPrevButton:active i {
+  border-color: white !important;
+}
+
+/* Previous button (left arrow) */
+.rdrPprevButton i {
+  transform: rotate(135deg) !important;
+  margin-left: 2px !important;
+}
+
+/* Next button (right arrow) */
+.rdrNextButton i {
+  transform: rotate(-45deg) !important;
+  margin-right: 2px !important;
 }
 
 /* Months container */
@@ -206,10 +247,28 @@
   display: flex;
   flex-direction: row;
   flex-wrap: nowrap;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .rdrMonth {
   padding: 0;
+  flex: 1 1 0%;
+  min-width: 0;
+  max-width: 50%;
+}
+
+/* Date range wrapper constraints */
+.rdrDateRangeWrapper {
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.rdrDateDisplayWrapper,
+.rdrMonthsVertical,
+.rdrMonthsHorizontal {
+  max-width: 100%;
+  overflow: hidden;
 }
 
 /* Remove all default react-date-range backgrounds */
@@ -226,10 +285,48 @@
   border: none !important;
 }
 
-/* Responsive - hide second month on mobile */
+/* Responsive breakpoints for calendar */
+
+/* Tablet and below - reduce cell sizes */
+@media (max-width: 1024px) {
+  .rdrDay {
+    height: 40px !important;
+  }
+  
+  .rdrDayNumber span {
+    font-size: 14px !important;
+  }
+  
+  .rdrMonthAndYearWrapper {
+    padding: 16px !important;
+  }
+  
+  .rdrWeekDay {
+    font-size: 10px !important;
+  }
+}
+
+/* Small tablets - stack months vertically */
+@media (max-width: 900px) {
+  .rdrMonths {
+    flex-direction: column !important;
+    gap: 16px;
+  }
+  
+  .rdrMonth {
+    max-width: 100% !important;
+    width: 100%;
+  }
+}
+
+/* Mobile - hide second month */
 @media (max-width: 767px) {
   .rdrMonth:nth-child(2) {
-    display: none;
+    display: none !important;
+  }
+  
+  .rdrMonth {
+    max-width: 100% !important;
   }
 }
 
@@ -291,6 +388,164 @@
 }
 
 /* ============================================
+   OPTIMIZED COMPACT DATE PICKER - REDUCED CLUNKINESS
+   ============================================ */
+
+/* Compact title */
+.booking-calendar-popover [id*="label"] {
+  font-size: 16px !important;
+  font-weight: 600 !important;
+}
+
+/* Month labels - reduced to 12px */
+.rdrMonthAndYearPickers,
+.rdrMonthPicker select,
+.rdrYearPicker select {
+  font-size: 12px !important;
+  font-weight: 600 !important;
+}
+
+/* Day headers - reduced to 10px */
+.rdrWeekDay {
+  font-size: 10px !important;
+  font-weight: 500 !important;
+  padding: 4px 0 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Compact weekday container */
+.rdrWeekDays {
+  padding: 8px 16px 4px 16px !important;
+}
+
+/* Date cells - 32px × 32px with 4px gaps */
+.rdrDay {
+  height: 32px !important;
+  width: 32px !important;
+}
+
+.rdrDayNumber {
+  width: 32px !important;
+  height: 32px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.rdrDayNumber span {
+  font-size: 13px !important;
+  font-weight: 400 !important;
+  line-height: 1 !important;
+}
+
+/* Compact days grid with 4px gaps */
+.rdrDays {
+  padding: 0 16px 16px 16px !important;
+  gap: 4px !important;
+  display: grid !important;
+  grid-template-columns: repeat(7, 32px) !important;
+  grid-gap: 4px !important;
+}
+
+/* Months container with 16px gap */
+.rdrMonths {
+  gap: 16px !important;
+}
+
+/* Each month takes up minimal space */
+.rdrMonth {
+  padding: 0 !important;
+  min-width: 0 !important;
+}
+
+/* Compact navigation arrows */
+.rdrNextPrevButton {
+  width: 32px !important;
+  height: 32px !important;
+  margin: 0 4px !important;
+  background: white !important;
+  border: 1px solid var(--platinum-200) !important;
+  border-radius: 50% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  position: relative !important;
+  z-index: 50 !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04) !important;
+}
+
+.rdrNextPrevButton:hover {
+  background: var(--platinum-100) !important;
+  border-color: var(--platinum-300) !important;
+  transform: scale(1.05) !important;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08) !important;
+}
+
+.rdrNextPrevButton:active {
+  background: #06B6D4 !important;
+  border-color: #06B6D4 !important;
+  transform: scale(0.98) !important;
+}
+
+.rdrNextPrevButton i {
+  display: block !important;
+  width: 8px !important;
+  height: 8px !important;
+  border-style: solid !important;
+  border-color: var(--platinum-600) !important;
+  border-width: 0 2px 2px 0 !important;
+  transform: rotate(-45deg) !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.rdrNextPrevButton:hover i {
+  border-color: var(--platinum-700) !important;
+}
+
+.rdrNextPrevButton:active i {
+  border-color: white !important;
+}
+
+/* Previous button - rotate arrow left */
+.rdrPprevButton i {
+  transform: rotate(135deg) !important;
+  margin-left: 2px !important;
+}
+
+/* Next button - rotate arrow right */
+.rdrNextButton i {
+  transform: rotate(-45deg) !important;
+  margin-right: 2px !important;
+}
+
+/* Reduced header padding */
+.rdrMonthAndYearWrapper {
+  padding: 12px 16px 8px 16px !important;
+}
+
+/* Compact calendar wrapper */
+.rdrCalendarWrapper {
+  padding: 12px !important;
+}
+
+/* Reduced dialog content padding */
+.booking-calendar-popover > div:last-child {
+  padding: 12px !important;
+}
+
+/* Desktop: Allow dialog to extend left over content */
+@media (min-width: 1024px) {
+  .booking-calendar-popover {
+    max-width: 540px !important;
+  }
+}
+
+/* ============================================
    INDIVIDUAL LISTING DATEPICKER - COMPACT 2-MONTH NO SCROLL
    ============================================ */
 
@@ -298,12 +553,13 @@
 .unit-datepicker-wrapper .rdrCalendarWrapper {
   max-width: 100% !important;
   width: auto !important;
-  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.10), 0 8px 24px rgba(15, 23, 42, 0.06) !important;
-  border-radius: 20px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12) !important;
+  border-radius: 12px !important;
   overflow: hidden !important;
   position: relative !important;
   background: #FFFFFF !important;
   border: 0.5px solid var(--platinum-200) !important;
+  padding: 12px !important;
 }
 
 /* Compact horizontal layout - NO SCROLLING */
@@ -337,13 +593,14 @@
 }
 
 .unit-datepicker-wrapper .rdrMonthAndYearPickers {
-  font-size: 12px !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
 }
 
 .unit-datepicker-wrapper .rdrMonthAndYearPickers select {
-  font-size: 11px !important;
-  padding: 2px 6px !important;
-  min-width: 60px !important;
+  font-size: 10px !important;
+  padding: 2px 4px !important;
+  min-width: 55px !important;
 }
 
 /* Compact weekday headers */
@@ -362,36 +619,83 @@
   font-size: 9px !important;
 }
 
-/* Ultra-compact day cells */
+/* Ultra-compact day cells - 28px for sidebar */
 .unit-datepicker-wrapper .rdrDay {
-  height: 32px !important;
-  line-height: 32px !important;
+  height: 28px !important;
+  width: 28px !important;
+  line-height: 28px !important;
 }
 
 .unit-datepicker-wrapper .rdrDayNumber {
-  font-size: 12px !important;
-  font-weight: 500 !important;
+  font-size: 11px !important;
+  font-weight: 400 !important;
+  width: 28px !important;
+  height: 28px !important;
 }
 
 .unit-datepicker-wrapper .rdrDayNumber span {
-  padding: 2px !important;
-  min-width: 28px !important;
-  min-height: 28px !important;
+  padding: 0 !important;
+  width: 28px !important;
+  height: 28px !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
 }
 
-/* Navigation arrows - compact */
+/* Navigation arrows - compact for sidebar */
 .unit-datepicker-wrapper .rdrNextPrevButton {
   width: 24px !important;
   height: 24px !important;
+  background: white !important;
+  border: 1px solid var(--platinum-200) !important;
+  border-radius: 50% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  z-index: 50 !important;
+  margin: 0 2px !important;
+}
+
+.unit-datepicker-wrapper .rdrNextPrevButton:hover {
+  background: var(--platinum-100) !important;
+  border-color: var(--platinum-300) !important;
+}
+
+.unit-datepicker-wrapper .rdrNextPrevButton:active {
+  background: #06B6D4 !important;
+  border-color: #06B6D4 !important;
 }
 
 .unit-datepicker-wrapper .rdrNextPrevButton i {
-  width: 4px !important;
-  height: 4px !important;
-  border-width: 1.5px 1.5px 0 0 !important;
+  display: block !important;
+  width: 6px !important;
+  height: 6px !important;
+  border-style: solid !important;
+  border-color: var(--platinum-600) !important;
+  border-width: 0 1.5px 1.5px 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  background: transparent !important;
+}
+
+.unit-datepicker-wrapper .rdrNextPrevButton:hover i {
+  border-color: var(--platinum-700) !important;
+}
+
+.unit-datepicker-wrapper .rdrNextPrevButton:active i {
+  border-color: white !important;
+}
+
+.unit-datepicker-wrapper .rdrPprevButton i {
+  transform: rotate(135deg) !important;
+  margin-left: 1px !important;
+}
+
+.unit-datepicker-wrapper .rdrNextButton i {
+  transform: rotate(-45deg) !important;
+  margin-right: 1px !important;
 }
 
 /* Prevent any overflow */
@@ -404,9 +708,13 @@
   overflow: hidden !important;
 }
 
-/* Days grid compact */
+/* Days grid compact - 28px cells with 2px gaps */
 .unit-datepicker-wrapper .rdrDays {
-  gap: 0 !important;
+  gap: 2px !important;
+  padding: 0 6px 6px 6px !important;
+  display: grid !important;
+  grid-template-columns: repeat(7, 28px) !important;
+  grid-gap: 2px !important;
 }
 
 /* Remove horizontal scroll track/progress bar and any navigation indicators */

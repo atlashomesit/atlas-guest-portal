@@ -2,13 +2,15 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { addDays, format, startOfDay } from 'date-fns';
 import { useLocation, useNavigate } from 'react-router-dom';
 
-import { API_BASE_URL, IS_API_BASE_CONFIGURED } from '@/config/api';
 import { Button } from '@/components/ui/Button';
 import { AtlasDateRangePicker, type AtlasDateRangePickerValue } from '@/components/date/AtlasDateRangePicker';
-import { asArray, api } from '@/lib/api';
 import { useBooking } from '@/contexts/BookingContext';
-import { getIstStartOfDay } from '@/utils/date';
 import { logApiError, logUserAction } from '@/lib/monitoring';
+import { getBookingsForListing } from '@/services/bookingService';
+import { getIstStartOfDay } from '@/utils/date';
+import { calculateNights, formatNightCount } from '@/utils/dateHelpers';
+import { doesRangeIntersectBlocked, expandBookingsToBlockedSet, parseISODate, toISODate } from '@/utils/dateRange';
+import { type BookingDTO } from '@/types/booking';
 
 interface UnitBookingWidgetProps {
   listingId: string | number;
@@ -38,80 +40,48 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId }) => {
     endDate: addDays(today, 1),
   });
   const [openCalendar, setOpenCalendar] = useState(false);
+  const [shownDate, setShownDate] = useState<Date>(today);
   const [guests, setGuests] = useState(2);
   const [bookedDates, setBookedDates] = useState<Date[]>([]);
+  const [blockedSet, setBlockedSet] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [dateError, setDateError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchBookedDates = async () => {
       if (!listingId) {
         setBookedDates([]);
+        setBlockedSet(new Set());
         setIsLoading(false);
         return;
       }
 
       setIsLoading(true);
-      const requestUrl = `${API_BASE_URL ?? ''}/bookings`;
-      const envMode = (import.meta as any)?.env?.MODE ?? 'unknown';
       const normalizedTarget = normalizeListingId(listingId);
 
       logUserAction('unit_booking_availability_fetch_start', {
-        requestUrl,
-        envMode,
         listingId: normalizedTarget,
-        apiConfigured: IS_API_BASE_CONFIGURED,
+        source: 'mock',
       });
 
       try {
-        if (!IS_API_BASE_CONFIGURED) {
-          setStatusMessage('Showing demo availability. Configure the API base URL to see live bookings.');
-          setBookedDates([]);
-          return;
-        }
-
-        const response = await api.get('/bookings');
-        const bookings = asArray(response.data, 'bookings');
-
-        const targetNumber = normalizedTarget.match(/(\d+)/)?.[1];
-        const matchedBookings = bookings.filter((booking: any) => {
-          const normalizedListing = normalizeListingId(booking?.listing ?? booking?.listingId ?? booking?.propertyId);
-          const bookingNumber = normalizedListing.match(/(\d+)/)?.[1];
-
-          return normalizedListing === normalizedTarget || (!!targetNumber && bookingNumber === targetNumber);
-        });
-
-        const todayStart = getIstStartOfDay();
-        const blockedDates: Date[] = [];
-
-        matchedBookings.forEach((booking: any) => {
-          const checkinDate = getIstStartOfDay(new Date(booking.checkinDate));
-          const checkoutDate = getIstStartOfDay(new Date(booking.checkoutDate));
-
-          if (Number.isNaN(checkinDate.getTime()) || Number.isNaN(checkoutDate.getTime())) return;
-
-          let cursor = new Date(checkinDate);
-          while (cursor < checkoutDate) {
-            const day = getIstStartOfDay(cursor);
-            if (day >= todayStart) {
-              blockedDates.push(day);
-            }
-            cursor = addDays(cursor, 1);
-          }
-        });
-
-        const uniqueBlockedDates = Array.from(new Set(blockedDates.map((date) => date.getTime())))
-          .map((time) => new Date(time))
+        const bookings: BookingDTO[] = await getBookingsForListing(normalizedTarget);
+        const blocked = expandBookingsToBlockedSet(bookings);
+        const blockedDates = Array.from(blocked)
+          .map((iso) => parseISODate(iso))
           .sort((a, b) => a.getTime() - b.getTime());
 
-        setBookedDates(uniqueBlockedDates);
-        setStatusMessage('Availability refreshed for this home.');
+        setBlockedSet(blocked);
+        setBookedDates(blockedDates);
+        setStatusMessage('Some dates are unavailable due to existing bookings.');
       } catch (error) {
         setStatusMessage('We could not refresh availability. Try again in a moment.');
         setBookedDates([]);
+        setBlockedSet(new Set());
         logApiError(error, {
-          url: requestUrl,
+          url: 'mock://bookings',
           method: 'GET',
           category: 'network',
           tags: { listingId: normalizedTarget },
@@ -128,8 +98,35 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId }) => {
   const disabledDay = (date: Date) => {
     const normalized = getIstStartOfDay(date);
     if (normalized < today) return true;
+    const iso = toISODate(normalized);
+    return blockedSet.has(iso);
+  };
 
-    return bookedDates.some((booked) => getIstStartOfDay(booked).getTime() === normalized.getTime());
+  const handleRangeChange = (next: AtlasDateRangePickerValue) => {
+    setDateError(null);
+    const { startDate, endDate } = next;
+    if (!startDate) {
+      setDateRange(next);
+      return;
+    }
+
+    const startISO = toISODate(startOfDay(startDate));
+    if (blockedSet.has(startISO)) {
+      setDateError('These dates overlap an existing booking. Please choose different dates.');
+      setDateRange({ startDate: null, endDate: null });
+      return;
+    }
+
+    if (endDate) {
+      const endISO = toISODate(startOfDay(endDate));
+      if (doesRangeIntersectBlocked(startISO, endISO, blockedSet)) {
+        setDateError('These dates overlap an existing booking. Please choose different dates.');
+        setDateRange({ startDate, endDate: null });
+        return;
+      }
+    }
+
+    setDateRange(next);
   };
 
   const formattedDateLabel = dateRange.startDate && dateRange.endDate
@@ -166,16 +163,30 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId }) => {
           <label className="text-sm font-medium text-text-primary" htmlFor="unit-booking-dates">
             Dates
           </label>
+          <p className="text-xs text-text-secondary">Some dates are unavailable due to existing bookings.</p>
           <button
             id="unit-booking-dates"
             ref={calendarButtonRef}
             className="w-full rounded-xl border border-border-strong bg-bg-muted px-4 py-3 text-left text-text-primary hover:border-cta-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary"
-            onClick={() => setOpenCalendar(true)}
+            onClick={() => {
+              // Update shown date to the selected start date when opening calendar
+              if (dateRange.startDate) {
+                setShownDate(startOfDay(dateRange.startDate));
+              }
+              setOpenCalendar(true);
+            }}
           >
             <div className="flex items-center justify-between gap-3">
               <span className="text-sm sm:text-base">{formattedDateLabel}</span>
               <span className="text-xs text-text-muted">{isLoading ? 'Loading…' : `${bookedDates.length} dates blocked`}</span>
             </div>
+            {dateRange.startDate && dateRange.endDate && calculateNights(dateRange.startDate, dateRange.endDate) > 0 && (
+              <div className="mt-2 flex items-center justify-center">
+                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--accent-primary)] bg-[var(--bg-surface)] px-2.5 py-1 rounded-lg border border-[var(--border-subtle)]">
+                  {formatNightCount(calculateNights(dateRange.startDate, dateRange.endDate))}
+                </span>
+              </div>
+            )}
           </button>
           <div className="unit-datepicker-wrapper">
             <AtlasDateRangePicker
@@ -183,14 +194,17 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId }) => {
               open={openCalendar}
               onClose={() => setOpenCalendar(false)}
               value={dateRange}
-              onChange={(next) => setDateRange(next)}
+              onChange={handleRangeChange}
               loading={isLoading}
               minDate={today}
               maxDate={maxBookingDate}
               disabledDay={disabledDay}
               months={2}
-              shownDate={dateRange.startDate ?? today}
-              onShownDateChange={() => {}}
+              shownDate={shownDate}
+              onShownDateChange={(date) => {
+                console.log('🏘️ [UnitBookingWidget] Updating shownDate to:', date);
+                setShownDate(startOfDay(date));
+              }}
               loadingLabel="Loading availability"
               rangeColors={['#475569']}
               dayContentRenderer={(day) => {
@@ -270,6 +284,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId }) => {
         </div>
       </div>
 
+      {dateError && <p className="text-sm text-support-error">{dateError}</p>}
       {statusMessage && <p className="text-sm text-text-secondary">{statusMessage}</p>}
       {formError && <p className="text-sm text-support-error">{formError}</p>}
 

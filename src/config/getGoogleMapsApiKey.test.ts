@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 
 declare global {
-  // eslint-disable-next-line vars-on-top, no-var
+  // eslint-disable-next-line no-var
   var __ATLAS_RUNTIME_CONFIG__: { googleMapsApiKey?: string } | undefined;
 }
 

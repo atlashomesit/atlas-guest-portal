@@ -72,7 +72,6 @@ describe('seasonalTheme', () => {
 
   describe('getAutoTheme', () => {
     it('should return "default" when no seasonal theme is active', () => {
-      const mar15 = new Date(2025, 2, 15); // Mar 15
       // Mock getSeasonalTheme to return null
       const result = getAutoTheme();
       // Since we can't easily mock the current date in this test,

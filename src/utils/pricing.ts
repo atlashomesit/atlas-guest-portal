@@ -21,13 +21,25 @@ export type NightlyPriceBreakdown = {
   isNewYearsEve: boolean;
 };
 
+interface ImportMetaEnv {
+  [key: string]: unknown;
+}
+
+interface ProcessEnv {
+  [key: string]: string | undefined;
+}
+
 const getEnvValue = (key: string): string | undefined => {
-  if (typeof import.meta !== "undefined" && (import.meta as any).env && (import.meta as any).env[key] !== undefined) {
-    return (import.meta as any).env[key];
+  if (typeof import.meta !== "undefined") {
+    const env = (import.meta as { env?: ImportMetaEnv }).env;
+    const value = env?.[key];
+    if (typeof value === "string") return value;
   }
 
-  if (typeof process !== "undefined" && (process as any).env && (process as any).env[key] !== undefined) {
-    return (process as any).env[key];
+  if (typeof process !== "undefined") {
+    const env = (process as { env?: ProcessEnv }).env;
+    const value = env?.[key];
+    if (typeof value === "string") return value;
   }
 
   return undefined;

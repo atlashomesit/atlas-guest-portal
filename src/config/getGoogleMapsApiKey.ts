@@ -7,9 +7,21 @@ declare global {
   }
 }
 
+interface ImportMetaEnv {
+  [key: string]: unknown;
+}
+
+interface ProcessEnv {
+  [key: string]: string | undefined;
+}
+
 const readEnv = (key: string): string | undefined => {
-  const metaEnv = typeof import.meta !== "undefined" ? (import.meta as any).env ?? {} : {};
-  const nodeEnv = typeof process !== "undefined" ? (process as any).env ?? {} : {};
+  const metaEnv = typeof import.meta !== "undefined" 
+    ? (import.meta as { env?: ImportMetaEnv }).env ?? {} 
+    : {};
+  const nodeEnv = typeof process !== "undefined" 
+    ? (process as { env?: ProcessEnv }).env ?? {} 
+    : {};
   const nodeValue = nodeEnv?.[key];
   const metaValue = metaEnv?.[key];
   if (typeof nodeValue === "string") return nodeValue;
@@ -19,7 +31,7 @@ const readEnv = (key: string): string | undefined => {
 
 const getRuntimeGoogleMapsApiKey = (): string | undefined => {
   if (typeof window === "undefined") return undefined;
-  const runtimeConfig = (window as any).__ATLAS_RUNTIME_CONFIG__;
+  const runtimeConfig = window.__ATLAS_RUNTIME_CONFIG__;
   const value = runtimeConfig?.googleMapsApiKey;
   return typeof value === "string" ? value.trim() : undefined;
 };

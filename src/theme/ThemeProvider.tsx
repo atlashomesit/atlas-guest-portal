@@ -43,8 +43,9 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
       setThemeState(stored);
       applyTheme(stored);
     } else {
-      localStorage.setItem(DEV_LOCAL_STORAGE_KEY, theme);
+      localStorage.setItem(DEV_LOCAL_STORAGE_KEY, initialTheme);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const setTheme = (next: ThemeName) => {

@@ -1,12 +1,14 @@
 import React from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { addDays, format, startOfDay } from 'date-fns';
-import { CalendarRange, ChevronDown, ShieldCheck, Users } from 'lucide-react';
+import { CalendarRange, ChevronDown, ShieldCheck, Users, Minus, Plus } from 'lucide-react';
 import { heroWidgetLayoutFlag } from '../../config/abFlags';
 import getApiBaseUrl from '../../utils/apiBaseUrl';
 import { trackEvent } from '../../utils/analytics';
 import { useBooking } from '../../contexts/BookingContext';
 import { AtlasDateRangePicker, type AtlasDateRangePickerValue } from '../date/AtlasDateRangePicker';
+import { calculateNights, formatNightCount } from '../../utils/dateHelpers';
+import { GuestTypeSelector, type GuestCounts } from '../ui/GuestTypeSelector';
 
 type AvailabilityMode = 'search' | 'listing';
 
@@ -42,11 +44,18 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
   const [dateRange, setDateRange] = React.useState<{ startDate: Date | null; endDate: Date | null }>(
     defaultRange,
   );
-  const [guests, setGuests] = React.useState(2);
+  const [guestCounts, setGuestCounts] = React.useState<GuestCounts>({
+    adults: 2,
+    children: 0,
+    infants: 0,
+    pets: 0,
+  });
   const [dateError, setDateError] = React.useState<string | null>(null);
   const [guestError, setGuestError] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
+  const [isGuestsOpen, setIsGuestsOpen] = React.useState(false);
+  const [activeField, setActiveField] = React.useState<'checkin' | 'checkout' | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [statusMessage, setStatusMessage] = React.useState<string>('');
   const [hasInteracted, setHasInteracted] = React.useState(false);
@@ -57,7 +66,7 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
   const [shownDate, setShownDate] = React.useState<Date>(() => defaultRange.startDate ?? today);
   const hasTrackedDropoff = React.useRef(false);
   const hasInteractedRef = React.useRef(false);
-  const latestWidgetStateRef = React.useRef({ hasSelection: false, guests });
+  const latestWidgetStateRef = React.useRef({ hasSelection: false, guests: 2, guestCounts });
   const calendarWrapperRef = React.useRef<HTMLDivElement | null>(null);
   const toggleButtonRef = React.useRef<HTMLButtonElement | null>(null);
   const lastFocusedTriggerRef = React.useRef<HTMLElement | null>(null);
@@ -110,9 +119,13 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
       startDate: parseDate(booking.checkIn),
       endDate: parseDate(booking.checkOut),
       guests: booking.guests > 0 ? booking.guests : null,
+      adults: booking.adults ?? null,
+      children: booking.children ?? null,
+      infants: booking.infants ?? null,
+      pets: booking.pets ?? null,
       propertyId: booking.propertyId ?? null,
     }),
-    [booking.checkIn, booking.checkOut, booking.guests, booking.propertyId],
+    [booking.checkIn, booking.checkOut, booking.guests, booking.adults, booking.children, booking.infants, booking.pets, booking.propertyId],
   );
 
   const bookingPrefill = React.useMemo(() => {
@@ -137,6 +150,10 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
       startDate: parseDate(searchParams.get('checkIn')),
       endDate: parseDate(searchParams.get('checkOut')),
       guests: Number(searchParams.get('guests')) || null,
+      adults: Number(searchParams.get('adults')) || null,
+      children: Number(searchParams.get('children')) || null,
+      infants: Number(searchParams.get('infants')) || null,
+      pets: Number(searchParams.get('pets')) || null,
     };
 
     const stateRange = bookingPrefill
@@ -144,6 +161,10 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
           startDate: parseDate(bookingPrefill.checkIn),
           endDate: parseDate(bookingPrefill.checkOut),
           guests: bookingPrefill.guests && bookingPrefill.guests > 0 ? bookingPrefill.guests : null,
+          adults: bookingPrefill.adults ?? null,
+          children: bookingPrefill.children ?? null,
+          infants: bookingPrefill.infants ?? null,
+          pets: bookingPrefill.pets ?? null,
           propertyId: bookingPrefill.propertyId ?? null,
         }
       : null;
@@ -155,19 +176,32 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
     const nextGuests =
       (stateRange?.guests && stateRange.guests > 0
         ? stateRange.guests
-        : null) || (paramRange.guests && paramRange.guests > 0 ? paramRange.guests : stored?.guests ?? guests);
+        : null) || (paramRange.guests && paramRange.guests > 0 ? paramRange.guests : stored?.guests ?? 2);
     const nextPropertyId = stateRange?.propertyId ?? stored?.propertyId ?? null;
-    const normalizedGuests = nextGuests ?? guests;
+    
+    // Initialize guest counts from params or stored values
+    const nextGuestCounts: GuestCounts = {
+      adults: (stateRange?.adults ?? paramRange.adults ?? stored?.adults) || Math.max(1, Math.floor(nextGuests * 0.6)),
+      children: (stateRange?.children ?? paramRange.children ?? stored?.children) || Math.max(0, Math.floor(nextGuests * 0.4)),
+      infants: (stateRange?.infants ?? paramRange.infants ?? stored?.infants) || 0,
+      pets: (stateRange?.pets ?? paramRange.pets ?? stored?.pets) || 0,
+    };
+    
+    const totalGuests = nextGuestCounts.adults + nextGuestCounts.children;
 
     setDateRange({ startDate: nextRange.startDate, endDate: nextRange.endDate });
     setDateError(null);
-    setGuestError(validateGuests(normalizedGuests));
-    setGuests(normalizedGuests);
+    setGuestError(validateGuests(totalGuests));
+    setGuestCounts(nextGuestCounts);
     setShownDate(nextRange.startDate ?? today);
     updateBooking({
       checkIn: nextRange.startDate?.toISOString() ?? null,
       checkOut: nextRange.endDate?.toISOString() ?? null,
-      guests: nextGuests,
+      guests: totalGuests,
+      adults: nextGuestCounts.adults,
+      children: nextGuestCounts.children,
+      infants: nextGuestCounts.infants,
+      pets: nextGuestCounts.pets,
       propertyId: nextPropertyId,
     });
     hasHydratedRef.current = true;
@@ -230,8 +264,9 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
     hasInteractedRef.current = hasInteracted;
   }, [hasInteracted]);
 
-  const toggleCalendar = () => {
+  const toggleCalendar = (field: 'checkin' | 'checkout' = 'checkin') => {
     lastFocusedTriggerRef.current = document.activeElement as HTMLElement | null;
+    setActiveField(field);
     setIsCalendarOpen((open) => !open);
   };
 
@@ -245,19 +280,26 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
   }, [isCalendarOpen]);
 
   React.useEffect(() => {
+    const totalGuests = guestCounts.adults + guestCounts.children;
     latestWidgetStateRef.current = {
       hasSelection: Boolean(dateRange.startDate && dateRange.endDate),
-      guests,
+      guests: totalGuests,
+      guestCounts,
     };
-  }, [dateRange.endDate, dateRange.startDate, guests]);
+  }, [dateRange.endDate, dateRange.startDate, guestCounts]);
 
   React.useEffect(() => {
+    const totalGuests = guestCounts.adults + guestCounts.children;
     updateBooking({
       checkIn: dateRange.startDate?.toISOString() ?? null,
       checkOut: dateRange.endDate?.toISOString() ?? null,
-      guests,
+      guests: totalGuests,
+      adults: guestCounts.adults,
+      children: guestCounts.children,
+      infants: guestCounts.infants,
+      pets: guestCounts.pets,
     });
-  }, [dateRange.endDate, dateRange.startDate, guests, updateBooking]);
+  }, [dateRange.endDate, dateRange.startDate, guestCounts, updateBooking]);
 
   React.useEffect(() => {
     if (dateRange.startDate) {
@@ -298,7 +340,8 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
       setError(null);
     }
 
-    const guestValidation = validateGuests(guests);
+    const totalGuests = guestCounts.adults + guestCounts.children;
+    const guestValidation = validateGuests(totalGuests);
     setGuestError(guestValidation);
     if (guestValidation) {
       setError(guestValidation);
@@ -312,7 +355,11 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
     const params = new URLSearchParams({
       checkIn: formattedCheckIn,
       checkOut: formattedCheckOut,
-      guests: guests.toString(),
+      guests: totalGuests.toString(),
+      adults: guestCounts.adults.toString(),
+      children: guestCounts.children.toString(),
+      infants: guestCounts.infants.toString(),
+      pets: guestCounts.pets.toString(),
     });
 
     return { isValid: true, searchParams: params, startDate, endDate };
@@ -335,7 +382,11 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
         surface: 'hero_form',
         checkIn: validation.startDate.toISOString(),
         checkOut: validation.endDate.toISOString(),
-        guests,
+        guests: guestCounts.adults + guestCounts.children,
+        adults: guestCounts.adults,
+        children: guestCounts.children,
+        infants: guestCounts.infants,
+        pets: guestCounts.pets,
       },
       { route: `/search?${validation.searchParams.toString()}` },
     );
@@ -365,8 +416,9 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
 
     try {
       const apiBaseUrl = getApiBaseUrl();
+      const totalGuests = guestCounts.adults + guestCounts.children;
       availabilityUrl = apiBaseUrl
-        ? `${apiBaseUrl}/availability?checkIn=${formattedCheckIn}&checkOut=${formattedCheckOut}&guests=${guests}`
+        ? `${apiBaseUrl}/availability?checkIn=${formattedCheckIn}&checkOut=${formattedCheckOut}&guests=${totalGuests}&adults=${guestCounts.adults}&children=${guestCounts.children}&infants=${guestCounts.infants}&pets=${guestCounts.pets}`
         : '';
       controller = availabilityUrl && typeof AbortController !== 'undefined' ? new AbortController() : null;
       timeoutId = controller ? window.setTimeout(() => controller.abort(), 10_000) : null;
@@ -479,19 +531,9 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
     !dateRange.startDate ||
     !dateRange.endDate ||
     dateRange.endDate <= dateRange.startDate ||
-    guests < 1 ||
+    guestCounts.adults < 1 ||
     Boolean(dateError || guestError);
 
-  const handleGuestChange = (delta: number) => {
-    markHeroInteraction();
-    setGuests((prev) => {
-      const proposed = prev + delta;
-      const next = Math.min(MAX_GUESTS, Math.max(MIN_GUESTS, proposed));
-      setGuestError(validateGuests(proposed));
-      trackEvent('hero_guests_changed', { surface: 'hero_form', guests: next });
-      return next;
-    });
-  };
 
   const markHeroInteraction = () => {
     if (!hasInteractedRef.current) {
@@ -544,12 +586,12 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
         <div className="relative">
           <button
             type="button"
-            className={`${dateFieldShellClass} text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary`}
+            className={`${dateFieldShellClass} text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary${activeField === 'checkin' && isCalendarOpen ? ' ring-2 ring-[var(--cta-primary)] ring-offset-2' : ''}`}
             aria-label="Select check-in date"
             aria-expanded={isCalendarOpen}
             aria-describedby={dateError ? dateErrorId : undefined}
             aria-invalid={dateError ? true : undefined}
-            onClick={toggleCalendar}
+            onClick={() => toggleCalendar('checkin')}
             data-testid="hero-date-toggle"
             ref={toggleButtonRef}
             aria-controls={calendarContentId}
@@ -572,12 +614,12 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
 
         <button
           type="button"
-          className={`${dateFieldShellClass} text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary md:-ml-[1px]`}
+          className={`${dateFieldShellClass} text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary md:-ml-[1px]${activeField === 'checkout' && isCalendarOpen ? ' ring-2 ring-[var(--cta-primary)] ring-offset-2' : ''}`}
           aria-label="Select check-out date"
           aria-expanded={isCalendarOpen}
           aria-describedby={dateError ? dateErrorId : undefined}
           aria-invalid={dateError ? true : undefined}
-          onClick={toggleCalendar}
+          onClick={() => toggleCalendar('checkout')}
           aria-controls={calendarContentId}
         >
           <span className={labelClass}>
@@ -588,6 +630,13 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
             {checkOutLabel}
             <ChevronDown className={`h-[18px] w-[18px] shrink-0 text-[var(--text-muted)] transition-transform duration-200 ${isCalendarOpen ? 'rotate-180' : ''}`} aria-hidden />
           </span>
+          {dateRange.startDate && dateRange.endDate && calculateNights(dateRange.startDate, dateRange.endDate) > 0 && (
+            <div className="mt-3 flex items-center justify-center">
+              <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--accent-primary)] bg-[var(--bg-muted)] px-3 py-1.5 rounded-lg">
+                {formatNightCount(calculateNights(dateRange.startDate, dateRange.endDate))}
+              </span>
+            </div>
+          )}
         </button>
 
         <AtlasDateRangePicker
@@ -597,16 +646,23 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
           heading="Choose your stay dates"
           loadingLabel="Loading calendar…"
           open={isCalendarOpen}
-          onClose={() => setIsCalendarOpen(false)}
+          onClose={() => {
+            setIsCalendarOpen(false);
+            setActiveField(null);
+          }}
           value={dateRange}
           onChange={handleRangeChange}
           minDate={today}
           disabledDay={(date) => startOfDay(date) < today}
           months={monthsToShow}
           shownDate={shownDate}
-          onShownDateChange={(date) => setShownDate(startOfDay(date))}
+          onShownDateChange={(date) => {
+            console.log('🏠 [SearchAvailabilityWidget] Updating shownDate to:', date);
+            setShownDate(startOfDay(date));
+          }}
           rangeColors={[dateError ? 'var(--support-error)' : 'var(--cta-primary)']}
           loading={!calendarReady}
+          activeField={activeField}
           dayContentRenderer={(day) => {
             const dayStart = startOfDay(day);
             const selectionStart = dateRange.startDate ? startOfDay(dateRange.startDate).getTime() : null;
@@ -651,49 +707,30 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
           }}
         />
 
-        <div
-          className={`${fieldShellClass} text-left md:-ml-[1px]`}
-          role="group"
-          aria-labelledby={guestsLabelId}
-          aria-describedby={`${guestsHelperId}${guestError ? ` ${guestsErrorId}` : ''}`}
-          aria-invalid={guestError ? true : undefined}
-        >
-          <span className={labelClass} id={guestsLabelId}>
-            <Users className="h-[18px] w-[18px] shrink-0 text-[var(--text-muted)]" aria-hidden />
-            <span className="truncate">Guests</span>
-          </span>
-          <div className="mt-4 flex items-center justify-between gap-4">
-            <button
-              type="button"
-              className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-[var(--border-subtle)] text-lg font-semibold text-[var(--text-primary)] transition hover:border-[#475569] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#475569] disabled:opacity-40 disabled:hover:border-[var(--border-subtle)]"
-              onClick={() => handleGuestChange(-1)}
-              disabled={guests <= 1}
-              aria-label="Decrease guests"
-            >
-              −
-            </button>
-            <div className="guest-value flex flex-col items-center">
-              <span className="text-[22px] font-medium text-[var(--text-primary)]">{guests}</span>
-              <span className="text-xs font-medium text-[var(--text-muted)]">guest{guests === 1 ? '' : 's'}</span>
-            </div>
-            <button
-              type="button"
-              className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-[var(--border-subtle)] text-lg font-semibold text-[var(--text-primary)] transition hover:border-[#475569] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#475569]"
-              onClick={() => handleGuestChange(1)}
-              aria-label="Increase guests"
-            >
-              +
-            </button>
-          </div>
-          <span className={helperTextClass} id={guestsHelperId}>
-            Maximum {MAX_GUESTS} guests
-          </span>
-          {guestError && (
-            <span className="mt-2 text-sm font-semibold text-support-error" id={guestsErrorId} role="alert">
-              {guestError}
-            </span>
-          )}
-        </div>
+        <GuestTypeSelector
+          value={guestCounts}
+          onChange={(counts) => {
+            markHeroInteraction();
+            setGuestCounts(counts);
+            const totalGuests = counts.adults + counts.children;
+            setGuestError(validateGuests(totalGuests));
+            trackEvent('hero_guests_changed', { 
+              surface: 'hero_form', 
+              adults: counts.adults,
+              children: counts.children,
+              infants: counts.infants,
+              pets: counts.pets,
+              totalGuests 
+            });
+          }}
+          maxCapacity={MAX_GUESTS}
+          isOpen={isGuestsOpen}
+          onToggle={() => {
+            markHeroInteraction();
+            setIsGuestsOpen(!isGuestsOpen);
+          }}
+          onClose={() => setIsGuestsOpen(false)}
+        />
 
         <div className={`${fieldShellClass} md:-ml-[1px] lg:min-h-[120px] lg:items-stretch lg:justify-center lg:flex-col`}>
           <button

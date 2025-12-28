@@ -162,7 +162,8 @@ const PropertyDetails = () => {
         if (!data?.id) return;
         setProperty(data.id);
         return () => setProperty(null);
-    }, [data?.id, setProperty]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [data?.id]);
 
     useEffect(() => {
         if (!data) return;

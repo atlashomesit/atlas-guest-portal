@@ -38,7 +38,7 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
   anchorRef,
   calendarRef,
   contentId,
-  heading,
+  heading: _heading,
   labelId,
   loadingLabel,
   onClose,
@@ -136,8 +136,9 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
     ? {
         top: position.top,
         left: position.left,
-        width: position.width,
-        maxWidth: 'min(720px, calc(100vw - 24px))',
+        width: 'auto',
+        minWidth: Math.min(520, position.width),
+        maxWidth: 'min(540px, calc(100vw - 48px))',
       }
     : undefined;
 
@@ -195,7 +196,7 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
           )}
         </div>
 
-        <div className="max-h-[70vh] overflow-y-auto p-5">
+        <div className="max-h-[70vh] overflow-y-auto overflow-x-hidden p-5">
           {children}
           <p className="sr-only" aria-live="polite">
             {loadingLabel}

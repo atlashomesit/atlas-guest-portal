@@ -665,30 +665,12 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
 
       try {
         if (!IS_API_BASE_CONFIGURED) {
-          const useMockBookings = envMode !== 'production';
-          logUserAction('booking_availability_fetch_skipped_config_missing', {
-            propertyId,
-            envMode,
-            requestUrl,
-            mockMode: useMockBookings,
-          });
-
-          if (useMockBookings) {
-            console.info('[BookingCard] Using mock bookings for development');
-            setBookedDates([]);
-            setInlineStatus('Using demo availability. Configure the API base URL to view live bookings.');
-            logUserAction('booking_availability_fetch_mock', { propertyId, envMode });
-            setIsBookedDatesLoading(false);
-            return;
-          }
-
-          setInlineStatus('Demo data shown until API is configured.');
-          setBookedDates([]);
-          setIsBookedDatesLoading(false);
-          return;
+          console.info('[BookingCard] 🎭 Using mock bookings for development');
+          setInlineStatus('🎭 Using mock data for development. Configure API base URL for live bookings.');
+          logUserAction('booking_availability_fetch_mock', { propertyId, envMode });
         }
 
-        // Fetch all bookings from API
+        // Fetch all bookings from API (or mock data if not configured)
         const response = await api.get('/bookings');
         const allBookings = asArray(response.data, 'bookings');
 
