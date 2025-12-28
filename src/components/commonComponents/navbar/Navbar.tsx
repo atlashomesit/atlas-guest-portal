@@ -9,7 +9,6 @@ import { formatDisplayNumber, getTelLink } from '../../../config/contact';
 import { trackEvent } from '../../../utils/analytics';
 import { homes } from '../../../content/homes';
 import { useBooking } from '../../../contexts/BookingContext';
-import { ThemeSwitcher } from '../../ui/ThemeSwitcher';
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -231,10 +230,6 @@ const Navbar = () => {
 
         {/* RIGHT */}
         <div className="navbar-right flex gap-3">
-          <div className="hidden lg:block">
-            <ThemeSwitcher />
-          </div>
-          
           <a href={telLink} className="phone">
             <IoIosCall />
             <span>{formatDisplayNumber()}</span>
@@ -310,10 +305,6 @@ const Navbar = () => {
 
           {/* MOBILE ACTIONS */}
           <div className="mt-2 flex flex-col gap-3">
-            <div className="py-2">
-              <ThemeSwitcher />
-            </div>
-            
             <a href={telLink} className="phone flex items-center gap-2">
               <IoIosCall />
               <span>{formatDisplayNumber()}</span>

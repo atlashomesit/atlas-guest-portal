@@ -5,6 +5,7 @@ import { footerData } from '../../../data';
 import { Link } from 'react-router-dom';
 import { helpNav, moreNav, primaryNav } from '../../../config/navigation';
 import { LOGO_URL } from '../../../config/branding';
+import { CompactThemeSwitcher } from '../../ui/CompactThemeSwitcher';
 
 const iconMap = {
     ImGithub,
@@ -112,8 +113,20 @@ const Footer = () => {
                 </div>
             </div>
 
-            <div className='text-base text-center mt-10 text-[color:var(--footer-link)]'>
-                © 2025 Atlas Homes | <Link to="/policies" className='hover:text-[color:var(--footer-link-hover)] transition-colors'>Policies</Link> | <Link to="/terms" className='hover:text-[color:var(--footer-link-hover)] transition-colors'>Terms</Link> | <Link to="/contact" className='hover:text-[color:var(--footer-link-hover)] transition-colors'>Contact</Link>
+            <div className='flex flex-col sm:flex-row items-center justify-center gap-4 text-base text-center mt-10 text-[color:var(--footer-link)]'>
+                <div className='flex items-center gap-2 flex-wrap justify-center'>
+                    <span>© 2025 Atlas Homes</span>
+                    <span className='hidden sm:inline'>|</span>
+                    <Link to="/policies" className='hover:text-[color:var(--footer-link-hover)] transition-colors'>Policies</Link>
+                    <span>|</span>
+                    <Link to="/terms" className='hover:text-[color:var(--footer-link-hover)] transition-colors'>Terms</Link>
+                    <span>|</span>
+                    <Link to="/contact" className='hover:text-[color:var(--footer-link-hover)] transition-colors'>Contact</Link>
+                </div>
+                <div className='flex items-center'>
+                    <span className='hidden sm:inline mr-2'>|</span>
+                    <CompactThemeSwitcher />
+                </div>
             </div>
 
         </div>

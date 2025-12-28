@@ -1,0 +1,63 @@
+:root[data-theme="privateIslandNoir"] {
+  /* Surfaces */
+  --bg-primary: #0b0c10;
+  --bg-surface: #0f1117;
+  --bg-muted: #161922;
+
+  /* Text */
+  --text-primary: #f5f1e8;
+  --text-muted: #c7c2b8;
+  --text-body: #e9e4d8;
+  --text-on-hero: #fdfbf7;
+
+  /* Accent */
+  --accent-primary: #d4af37;
+  --accent-soft: #2c2415;
+  --accent-primary-rgb: 212 175 55;
+  --accent-soft-rgb: 44 36 21;
+
+  /* CTA */
+  --cta-primary: #c29b2f;
+  --cta-primary-hover: #a47f1f;
+  --cta-secondary: #8f7c4a;
+  --cta-primary-rgb: 194 155 47;
+  --cta-primary-hover-rgb: 164 127 31;
+  --cta-secondary-rgb: 143 124 74;
+
+  /* Brand */
+  --brand: #0f1117;
+  --brand-ink: #f5f1e8;
+  --brand-contrast: #0b0c10;
+  --brand-soft: #161922;
+
+  /* Borders */
+  --border-subtle: #1d2130;
+  --border-strong: #2b3042;
+
+  /* Status */
+  --support-success: #34d399;
+  --support-danger: #f87171;
+  --support-error: #f87171;
+
+  /* Footer */
+  --footer-bg: #060709;
+  --footer-text: #d9d4c7;
+  --footer-heading: #fdfbf7;
+  --footer-link: #b8aa85;
+  --footer-link-hover: #fdfbf7;
+
+  /* Shadows - cinematic, diffused */
+  --shadow-level-1: 0 8px 24px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.25);
+  --shadow-level-2: 0 18px 48px rgba(0, 0, 0, 0.45), 0 8px 20px rgba(0, 0, 0, 0.35);
+  --shadow-level-3: 0 28px 72px rgba(0, 0, 0, 0.55), 0 12px 32px rgba(0, 0, 0, 0.45);
+
+  /* Typography */
+  --font-family-base: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-family-display: "Cormorant Garamond", "Georgia", serif;
+
+  /* Motion */
+  --motion-duration-fast: 120ms;
+  --motion-duration-slow: 280ms;
+  --motion-ease: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
