@@ -3,7 +3,18 @@ import react from "@vitejs/plugin-react";
 import path from "path";
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    {
+      name: "external-runtime-config",
+      resolveId(source) {
+        if (source === "/config") {
+          return { id: source, external: true } as const;
+        }
+        return null;
+      },
+    },
+  ],
   envPrefix: ["VITE_", "NEXT_PUBLIC_"],
   resolve: {
     alias: {

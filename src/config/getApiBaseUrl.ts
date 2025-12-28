@@ -14,9 +14,21 @@ const normalizeApiBaseUrl = (value: string | undefined): string => {
   return trimmed.endsWith("/") ? trimmed.slice(0, -1) : trimmed;
 };
 
+interface ImportMetaEnv {
+  [key: string]: unknown;
+}
+
+interface ProcessEnv {
+  [key: string]: string | undefined;
+}
+
 const readEnv = (key: string): string | undefined => {
-  const metaEnv = typeof import.meta !== "undefined" ? (import.meta as any).env ?? {} : {};
-  const nodeEnv = typeof process !== "undefined" ? (process as any).env ?? {} : {};
+  const metaEnv = typeof import.meta !== "undefined" 
+    ? (import.meta as { env?: ImportMetaEnv }).env ?? {} 
+    : {};
+  const nodeEnv = typeof process !== "undefined" 
+    ? (process as { env?: ProcessEnv }).env ?? {} 
+    : {};
   const nodeValue = nodeEnv?.[key];
   const metaValue = metaEnv?.[key];
   if (typeof nodeValue === "string") return nodeValue;
@@ -45,11 +57,10 @@ export const getApiBaseUrl = (): string => {
     throw new Error(missingConfigMessage);
   }
 
-  const isTrue = (val: unknown) => val === true || val === "true";
   const devSignals = [
     readEnv("DEV"),
-    typeof import.meta !== "undefined" ? (import.meta as any).env?.DEV : undefined,
-    typeof process !== "undefined" ? (process as any).env?.DEV : undefined,
+    typeof import.meta !== "undefined" ? (import.meta as { env?: ImportMetaEnv }).env?.DEV : undefined,
+    typeof process !== "undefined" ? (process as { env?: ProcessEnv }).env?.DEV : undefined,
   ];
   const isDevLike =
     devSignals.some((val) => String(val).toLowerCase() === "true") ||
@@ -57,10 +68,10 @@ export const getApiBaseUrl = (): string => {
   const prodSignals = [
     readEnv("PROD"),
     readEnv("NODE_ENV"),
-    typeof import.meta !== "undefined" ? (import.meta as any).env?.PROD : undefined,
-    typeof import.meta !== "undefined" ? (import.meta as any).env?.NODE_ENV : undefined,
-    typeof process !== "undefined" ? (process as any).env?.PROD : undefined,
-    typeof process !== "undefined" ? (process as any).env?.NODE_ENV : undefined,
+    typeof import.meta !== "undefined" ? (import.meta as { env?: ImportMetaEnv }).env?.PROD : undefined,
+    typeof import.meta !== "undefined" ? (import.meta as { env?: ImportMetaEnv }).env?.NODE_ENV : undefined,
+    typeof process !== "undefined" ? (process as { env?: ProcessEnv }).env?.PROD : undefined,
+    typeof process !== "undefined" ? (process as { env?: ProcessEnv }).env?.NODE_ENV : undefined,
   ];
   const hasExplicitProd = prodSignals.some((val) => {
     if (val === undefined) return false;

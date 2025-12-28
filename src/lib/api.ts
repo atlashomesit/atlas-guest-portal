@@ -1,5 +1,6 @@
-import { API_BASE_URL } from "@/config/api";
+import { API_BASE_URL, IS_API_BASE_CONFIGURED } from "@/config/api";
 import { isAtlasApiRequest, logApiError, monitoredFetch } from "./monitoring";
+import { mockApi } from "./mockApi";
 
 type ApiResponse<T> = {
   data: T;
@@ -9,6 +10,18 @@ type ApiResponse<T> = {
 };
 
 async function request<T>(path: string, init?: RequestInit): Promise<ApiResponse<T>> {
+  // Use mock API if backend is not configured
+  if (!IS_API_BASE_CONFIGURED) {
+    console.log('🎭 [API] Using mock data for:', path);
+    const mockResponse = await mockApi.get<T>(path);
+    return {
+      data: mockResponse.data,
+      status: mockResponse.status,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      url: `mock://${path}`,
+    };
+  }
+
   const url = `${API_BASE_URL ?? ""}${path}`;
   try {
     const response = await monitoredFetch(url, {

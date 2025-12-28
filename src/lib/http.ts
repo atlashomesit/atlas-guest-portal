@@ -20,7 +20,9 @@ export async function apiFetch(path: string, init?: RequestInit): Promise<Respon
     const res = await monitoredFetch(url, { credentials: 'include', ...(init || {}) });
     if (!res.ok) {
       let body = '';
-      try { body = await res.text(); } catch {}
+      try { body = await res.text(); } catch {
+        // Ignore error when reading response text
+      }
       logApiError(new Error(`HTTP ${res.status}`), {
         url,
         status: res.status,

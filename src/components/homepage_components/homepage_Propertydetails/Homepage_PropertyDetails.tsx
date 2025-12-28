@@ -1,4 +1,4 @@
-import { useLocation } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
 import { FaBed, FaShower, FaSwimmingPool, FaCar, FaWifi, FaTv } from "react-icons/fa";
 import { TbAirConditioning } from "react-icons/tb";
 import { PiElevatorDuotone, PiSecurityCameraDuotone } from "react-icons/pi";
@@ -14,10 +14,11 @@ import { propertyData, propertyImages } from '../../../data.ts';
 import { getUnitPolicy } from '../../../config/policyConfig';
 import { inlinePolicySnippets } from '../../../content/terms';
 import Subheading from '../../commonComponents/subheading/Subheading';
-import HotelBooking_Form from '../hotelBooking_form/BookingCard.tsx';
+import UnitBookingWidget from '../../availability/UnitBookingWidget';
 import { trackEvent } from '../../../utils/analytics';
 import { Button } from '../../ui/Button';
 import { calculateNightlyPrice, inferUnitType } from '../../../utils/pricing';
+import { buildHomeUnitPath } from '../../../utils/navigation';
 import { useBooking } from '../../../contexts/BookingContext';
 
 import { Fancybox } from "@fancyapps/ui";
@@ -52,8 +53,14 @@ interface Property {
 
 const PropertyDetails = () => {
     const location = useLocation();
-    const slug = location.pathname.split('/')[2];
+    const { propertySlug: propertySlugParam, unitSlug: unitSlugParam, id: legacyIdParam } = useParams();
+    const normalizedLegacyParts = (legacyIdParam ?? '').split('-');
+    const legacyUnitSlug = normalizedLegacyParts.pop();
+    const legacyPropertySlug = normalizedLegacyParts.join('-') || undefined;
+    const propertySlug = propertySlugParam ?? legacyPropertySlug;
+    const unitSlug = unitSlugParam ?? legacyUnitSlug ?? legacyIdParam;
     const [data, setData] = useState<Property | null>(null);
+    const [notFound, setNotFound] = useState(false);
     const [showAmenitiesModal, setShowAmenitiesModal] = useState(false);
     const [showAboutMore, setShowAboutMore] = useState(false);
     const [showNeighborhoodMore, setShowNeighborhoodMore] = useState(false);
@@ -74,18 +81,42 @@ const PropertyDetails = () => {
     }, [data, unitType]);
 
     useEffect(() => {
-        // First try to find by slug match
-        const foundBySlug = propertyData.find((item: any) => {
-            const propertySlug = item.property_name.toLowerCase().replace(/\s+/g, '-');
-            return propertySlug === slug;
+        setNotFound(false);
+        setData(null);
+
+        const normalizeSlug = (value?: string | number | null) =>
+            String(value ?? '')
+                .trim()
+                .toLowerCase()
+                .replace(/\s+/g, '-');
+
+        const stripHyphens = (value: string) => value.replace(/-/g, '');
+
+        const normalizedUnitSlug = normalizeSlug(unitSlug);
+        const normalizedPropertySlug = normalizeSlug(propertySlug);
+        const normalizedPropertySlugStripped = stripHyphens(normalizedPropertySlug);
+
+        // Prefer matching by unit slug, with optional property slug guard
+        const foundByUnitSlug = propertyData.find((item: any) => {
+            const idSlug = normalizeSlug(item.id);
+            const nameSlug = normalizeSlug(item.property_name);
+            const unitMatches = normalizedUnitSlug && (idSlug === normalizedUnitSlug || nameSlug === normalizedUnitSlug);
+            const propertySlugMatches =
+                !normalizedPropertySlug ||
+                nameSlug === normalizedPropertySlug ||
+                nameSlug.includes(normalizedPropertySlug) ||
+                stripHyphens(nameSlug) === normalizedPropertySlugStripped ||
+                stripHyphens(nameSlug).includes(normalizedPropertySlugStripped);
+
+            return unitMatches && propertySlugMatches;
         });
 
-        if (foundBySlug) {
-            const images = propertyImages[String(foundBySlug.id)] || [];
+        if (foundByUnitSlug) {
+            const images = propertyImages[String(foundByUnitSlug.id)] || [];
             setData({
-                ...foundBySlug,
-                property_neighborhoods: Array.isArray(foundBySlug.property_neighborhoods)
-                    ? foundBySlug.property_neighborhoods
+                ...foundByUnitSlug,
+                property_neighborhoods: Array.isArray(foundByUnitSlug.property_neighborhoods)
+                    ? foundByUnitSlug.property_neighborhoods
                     : [],
                 property_img: Array.isArray(images) ? images : []
             });
@@ -93,7 +124,7 @@ const PropertyDetails = () => {
         }
 
         // If not found by slug, try to find by ID
-        const propertyId = slug.split('-').pop();
+        const propertyId = normalizedUnitSlug || undefined;
         if (propertyId) {
             const foundById = propertyData.find((item: any) => String(item.id) === String(propertyId));
             if (foundById) {
@@ -123,14 +154,16 @@ const PropertyDetails = () => {
             return;
         }
 
-        console.error('No property found for slug:', slug);
-    }, [slug, location.state]);
+        console.error('No property found for slug:', unitSlug);
+        setNotFound(true);
+    }, [propertySlug, unitSlug, location.state]);
 
     useEffect(() => {
         if (!data?.id) return;
         setProperty(data.id);
         return () => setProperty(null);
-    }, [data?.id, setProperty]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [data?.id]);
 
     useEffect(() => {
         if (!data) return;
@@ -160,9 +193,9 @@ const PropertyDetails = () => {
                 propertyName: data.property_name,
                 price: nightlyPrice?.finalNightlyPrice ?? data.property_price,
             },
-            { listingId: data.id, unitCode: data.id, route: location.pathname },
+            { listingId: data.id, unitCode: data.id, route: propertySlug && unitSlug ? buildHomeUnitPath(propertySlug, unitSlug) : location.pathname },
         );
-    }, [data, location.pathname, nightlyPrice?.finalNightlyPrice]);
+    }, [data, location.pathname, nightlyPrice?.finalNightlyPrice, propertySlug, unitSlug]);
 
     const renderIcon = (iconName: string) => {
         const name = iconName.toLowerCase();
@@ -188,7 +221,7 @@ const PropertyDetails = () => {
         return name.charAt(0).toUpperCase() + name.slice(1);
     };
 
-    if (!data) {
+    if (!data && !notFound) {
         return (
             <div className="min-h-screen flex items-center justify-center">
                 <div className="text-center">
@@ -204,7 +237,30 @@ const PropertyDetails = () => {
             </div>
         );
     }
-    if (!data) return <p className='mt-40 mb-20 text-center text-3xl'>Loading...</p>;
+
+    if (!data && notFound) {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <div className="text-center max-w-xl px-4">
+                    <div className="text-2xl font-semibold text-text-primary mb-4">We couldn’t find that home.</div>
+                    <div className="text-text-muted">
+                        Please check the link and try again, or head back to our homes catalog to continue browsing.
+                    </div>
+                    <div className="mt-6 flex flex-wrap gap-3 justify-center">
+                        <Button onClick={() => window.history.back()} className="w-full sm:w-auto">
+                            Go Back
+                        </Button>
+                        <Link
+                            to="/"
+                            className="inline-flex items-center justify-center rounded-full border border-border-subtle px-5 py-3 text-sm font-semibold text-text-primary transition hover:border-[color:var(--cta-primary)] hover:text-[color:var(--cta-primary)]"
+                        >
+                            Return to homepage
+                        </Link>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     const unitPolicy = getUnitPolicy(data?.id);
 
@@ -429,10 +485,10 @@ const PropertyDetails = () => {
                     {/* right div  */}
                     <div className="w-full sm:w-1/3">
                         <div className='hidden lg:block sticky top-16'>
-                            <HotelBooking_Form propertyId={data.id} supportPadding />
+                            <UnitBookingWidget listingId={data.id} />
                         </div>
                         <div className="lg:hidden">
-                            <HotelBooking_Form propertyId={data.id} supportPadding />
+                            <UnitBookingWidget listingId={data.id} />
                         </div>
                     </div>
                 </div>

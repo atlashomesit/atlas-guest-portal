@@ -44,11 +44,11 @@ describe("booking smoke flows", () => {
 
   const navigateToPropertyFromSearch = async () => {
     act(() => {
-      window.history.pushState({}, "", "/properties/atlas-penthouse-501");
+      window.history.pushState({}, "", "/homes/atlas-penthouse-501/501");
       window.dispatchEvent(new PopStateEvent("popstate"));
     });
 
-    await waitFor(() => expect(window.location.pathname).toMatch(/\/properties\//), { timeout: 5000 });
+    await waitFor(() => expect(window.location.pathname).toMatch(/\/homes\//), { timeout: 5000 });
   };
 
   const completeReserveForm = async () => {

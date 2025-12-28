@@ -229,7 +229,7 @@ const Navbar = () => {
         </div>
 
         {/* RIGHT */}
-        <div className="navbar-right flex gap-2">
+        <div className="navbar-right flex gap-3">
           <a href={telLink} className="phone">
             <IoIosCall />
             <span>{formatDisplayNumber()}</span>
@@ -304,7 +304,7 @@ const Navbar = () => {
           ))}
 
           {/* MOBILE ACTIONS */}
-          <div className="mt-2 flex flex-col gap-2">
+          <div className="mt-2 flex flex-col gap-3">
             <a href={telLink} className="phone flex items-center gap-2">
               <IoIosCall />
               <span>{formatDisplayNumber()}</span>

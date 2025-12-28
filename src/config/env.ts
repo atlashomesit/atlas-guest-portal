@@ -1,5 +1,13 @@
 type EnvSource = Record<string, string | undefined>;
 
+interface ImportMetaEnv {
+  [key: string]: unknown;
+}
+
+interface ProcessEnv {
+  [key: string]: string | undefined;
+}
+
 const getEnv = (key: string, ...sources: EnvSource[]): string | undefined => {
   for (const source of sources) {
     const value = source?.[key];
@@ -8,8 +16,18 @@ const getEnv = (key: string, ...sources: EnvSource[]): string | undefined => {
   return undefined;
 };
 
-const metaEnv = typeof import.meta !== "undefined" ? (import.meta as any).env ?? {} : {};
-const nodeEnv = typeof process !== "undefined" ? (process as any).env ?? {} : {};
+const metaEnvRaw = typeof import.meta !== "undefined" 
+  ? (import.meta as { env?: ImportMetaEnv }).env ?? {} 
+  : {};
+const metaEnv: EnvSource = Object.keys(metaEnvRaw).reduce((acc, key) => {
+  const value = metaEnvRaw[key];
+  acc[key] = typeof value === "string" ? value : undefined;
+  return acc;
+}, {} as EnvSource);
+
+const nodeEnv: EnvSource = typeof process !== "undefined" 
+  ? (process as { env?: ProcessEnv }).env ?? {} 
+  : {};
 
 export const ENV = getEnv("MODE", metaEnv, nodeEnv) ?? getEnv("NODE_ENV", nodeEnv) ?? "development";
 

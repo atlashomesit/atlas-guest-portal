@@ -711,7 +711,7 @@ export interface SocialLink {
 // Contact Info Interface
 export interface ContactInfo {
     icon: IconKey;
-    text: any;
+    text: string | string[];
 }
 
 // Villa Links Interface

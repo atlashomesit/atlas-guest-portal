@@ -6,7 +6,6 @@ import { faqHighlights } from "../../content/faqHighlights";
 import { trackEvent } from "../../utils/analytics";
 import BannerSecondary from "../../components/home/BannerSecondary";
 import ServicesSection from "../../components/home/ServicesSection";
-import WhyChooseSection from "../../components/home/WhyChooseSection";
 import TestimonialsSection from "../../components/home/TestimonialsSection";
 import FooterCtaStrip from "../../components/home/FooterCtaStrip";
 import SEO from "../../components/SEO";
@@ -225,9 +224,6 @@ const Home = () => {
             </div> */}
                 <div className="">
                     <ServicesSection />
-                </div>
-                <div className="">
-                    <WhyChooseSection />
                 </div>
                 <div className="px-4 lg:px-20 py-8">
                     <FaqHighlights />

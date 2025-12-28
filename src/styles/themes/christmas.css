@@ -1,40 +1,57 @@
 :root[data-theme="christmas"] {
-  /* Surfaces */
-  --bg-primary: #f1f8f3;
-  --bg-surface: #ffffff;
-  --bg-muted: #e4f1e7;
-
-  /* Text */
-  --text-primary: #0f1f12;
-  --text-muted: #3f4f44;
-
-  /* Accent + CTA */
-  --accent-primary: #0f7a4b;
-  --accent-soft: #e5f4ec;
-  --romance-soft: #e5f4ec;
-  --accent-primary-rgb: 15 122 75;
-  --accent-soft-rgb: 229 244 236;
-  --cta-primary: #c0392b;
-  --cta-primary-hover: #9e2f23;
-  --cta-secondary: #8c1d1d;
-  --cta-primary-rgb: 192 57 43;
-  --cta-primary-hover-rgb: 158 47 35;
-  --cta-secondary-rgb: 140 29 29;
-
+  /* Surfaces - Winter White with Evergreen */
+  --bg-primary: #F0FDF4;         /* Green-50 - fresh winter */
+  --bg-surface: #FFFFFF;         /* Pure white snow */
+  --bg-muted: #DCFCE7;          /* Green-100 - subtle evergreen */
+  
+  /* Text - Clear Winter Contrast */
+  --text-primary: #1E293B;       /* Platinum-800 */
+  --text-muted: #64748B;         /* Platinum-500 */
+  --text-body: #334155;          /* Platinum-700 */
+  --text-on-hero: #FFFFFF;
+  
+  /* Accent - Festive Evergreen */
+  --accent-primary: #10B981;     /* Emerald-500 */
+  --accent-soft: #D1FAE5;        /* Emerald-100 */
+  --romance-soft: #ECFDF5;       /* Emerald-50 */
+  --accent-primary-rgb: 16 185 129;
+  --accent-soft-rgb: 209 250 229;
+  
+  /* CTA - Classic Christmas Red */
+  --cta-primary: #DC2626;        /* Red-600 */
+  --cta-primary-hover: #B91C1C;  /* Red-700 */
+  --cta-secondary: #EF4444;      /* Red-500 */
+  --cta-primary-rgb: 220 38 38;
+  --cta-primary-hover-rgb: 185 28 28;
+  --cta-secondary-rgb: 239 68 68;
+  
+  /* Brand - Festive Blend */
+  --brand: #047857;              /* Emerald-700 */
+  --brand-ink: #065F46;          /* Emerald-800 */
+  --brand-contrast: #F0FDF4;
+  --brand-soft: #D1FAE5;
+  
   /* Borders */
-  --border-subtle: #d3e2d7;
-  --border-strong: #9fb5a5;
-
+  --border-subtle: #D1FAE5;      /* Emerald-100 */
+  --border-strong: #6EE7B7;      /* Emerald-300 */
+  
   /* Status */
-  --support-success: #2d8a5d;
-  --support-danger: #b5473d;
-
+  --support-success: #10B981;
+  --support-danger: #EF4444;
+  --support-error: #EF4444;
+  
   /* Footer */
-  --footer-bg: #0c1911;
-
-  /* Shadows */
-  --shadow-level-1: 0 10px 30px rgba(15, 31, 18, 0.08);
-  --shadow-level-2: 0 20px 40px rgba(15, 31, 18, 0.12);
+  --footer-bg: #064E3B;          /* Emerald-900 */
+  --footer-text: #D1FAE5;
+  --footer-heading: #FFFFFF;
+  --footer-link: #6EE7B7;
+  --footer-link-hover: #FFFFFF;
+  
+  /* Shadows - Festive Warmth */
+  --shadow-level-1: 0 2px 8px rgba(220, 38, 38, 0.08), 0 1px 3px rgba(16, 185, 129, 0.04);
+  --shadow-level-2: 0 8px 24px rgba(220, 38, 38, 0.12), 0 4px 12px rgba(16, 185, 129, 0.06);
+  --shadow-level-3: 0 24px 72px rgba(220, 38, 38, 0.15), 0 12px 32px rgba(16, 185, 129, 0.08);
   --shadow-1: var(--shadow-level-1);
   --shadow-2: var(--shadow-level-2);
+  --shadow-3: var(--shadow-level-3);
 }

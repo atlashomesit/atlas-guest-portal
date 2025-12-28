@@ -10,16 +10,29 @@ import { LISTINGS, type Listing } from "../data/listings";
 import { propertyData, propertyImages } from "../data/propertyData";
 import getApiBaseUrl from "../utils/apiBaseUrl";
 import { trackEvent } from "../utils/analytics";
+import { buildHomeUnitPath, getPropertySlug, getUnitSlug, navigateToHomeUnit } from "../utils/navigation";
 import { calculateNightlyPrice, inferUnitType, type NightlyPriceBreakdown } from "../utils/pricing";
 import { isAtlasApiRequest, logApiError, monitoredFetch } from "../lib/monitoring";
 import type { UnitType } from "../config/pricing.config";
+import { mockApi } from "../lib/mockApi";
+
+type PropertyMetadata = {
+  unitType?: UnitType;
+  unit_type?: UnitType;
+  property_name?: string;
+  property_slug?: string;
+  slug?: string;
+  name?: string;
+};
 
 type PropertyRecord = {
   id: number | string;
   unitType?: UnitType;
   unit_type?: UnitType;
-  metadata?: { unitType?: UnitType; unit_type?: UnitType };
-  property_metadata?: { unitType?: UnitType; unit_type?: UnitType };
+  metadata?: PropertyMetadata;
+  property_metadata?: PropertyMetadata;
+  property_slug?: string;
+  slug?: string;
   property_name?: string;
   property_location?: string;
   property_neighborhoods?: string[];
@@ -236,6 +249,13 @@ export const Apartments = () => {
 
   const fetchFromApi = React.useCallback(
     async <T,>(baseUrl: string, path: string): Promise<T | null> => {
+      // Use mock API if baseUrl is 'mock'
+      if (baseUrl === 'mock') {
+        console.log('🎭 [Apartments] Using mock API for:', path);
+        const mockResponse = await mockApi.get<T>(path);
+        return mockResponse.data;
+      }
+
       const url = buildApiUrl(baseUrl, path);
       try {
         const response = await monitoredFetch(url, { requestName: path });
@@ -270,18 +290,16 @@ export const Apartments = () => {
     setApiBaseUrlUsed(resolvedBaseUrl);
 
     if (!resolvedBaseUrl) {
-      setStatusMessage(configurationMissingMessage);
-      setFetchState("error");
-      return;
+      console.info('[Apartments] 🎭 Using mock data for development');
+      setStatusMessage('🎭 Using mock data for development. Configure API base URL for live data.');
     }
 
     setFetchState("loading");
-    setStatusMessage(null);
 
     try {
       const [listingsResponse, propertiesResponse] = await Promise.all([
-        fetchFromApi<Listing[]>(resolvedBaseUrl, "/listings"),
-        fetchFromApi<PropertyRecord[]>(resolvedBaseUrl, "/properties"),
+        fetchFromApi<Listing[]>(resolvedBaseUrl || 'mock', "/listings"),
+        fetchFromApi<PropertyRecord[]>(resolvedBaseUrl || 'mock', "/properties"),
       ]);
 
       if (listingsResponse) {
@@ -293,6 +311,11 @@ export const Apartments = () => {
       }
 
       setFetchState("success");
+      if (!resolvedBaseUrl) {
+        setStatusMessage('🎭 Using mock data for development. Configure API base URL for live data.');
+      } else {
+        setStatusMessage(null);
+      }
     } catch {
       setStatusMessage("We're having trouble loading apartments right now. Please try again.");
       setFetchState("error");
@@ -455,18 +478,17 @@ export const Apartments = () => {
   }, [guests, listings, maxPrice, minPrice, petFriendlyOnly, propertyType, sortBy]);
 
   const handleNavigate = (property: PropertyRecord) => {
-    const propertyName = property.property_name || property.id;
-    if (!propertyName) return;
-
-    const slug = String(propertyName).toLowerCase().replace(/\s+/g, "-");
+    const propertySlug = getPropertySlug(property);
+    const unitSlug = getUnitSlug(property);
+    const canonicalPath = buildHomeUnitPath(propertySlug, unitSlug);
 
     trackEvent(
       "listing_selected",
-      { surface: "apartments", listingName: propertyName },
-      { listingId: property.id, unitCode: property.id, route: `/property_details/${slug}` },
+      { surface: "apartments", listingName: property.property_name ?? propertySlug },
+      { listingId: property.id, unitCode: unitSlug, route: canonicalPath },
     );
 
-    navigate(`/property_details/${slug}`, {
+    navigateToHomeUnit(navigate, propertySlug, unitSlug, {
       state: { property },
     });
   };

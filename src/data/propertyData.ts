@@ -1,4 +1,4 @@
-import { LOGO_URL } from "../config/branding";
+// import { LOGO_URL } from "../config/branding"; // Unused import
 
 const propertyImagePaths: Record<string, string[]> = {
     "101": [
@@ -109,7 +109,7 @@ export const propertyData = [
     {
         id: 101,
         unitType: "1bhk",
-        property_name: "Atlas Homes Room 101",
+        property_name: "Room 101",
         property_description: `A cozy and comfortable room with modern amenities.`,
         property_location: "Hyderabad, Telangana",
         property_neighborhoods: ["Hitech City"],
@@ -131,7 +131,7 @@ export const propertyData = [
     {
         id: 102,
         unitType: "1bhk",
-        property_name: "Atlas Homes Room 102",
+        property_name: "Room 102",
         property_description: `A spacious room with modern amenities and a beautiful view.`,
         property_location: "Hyderabad, Telangana",
         property_neighborhoods: ["Madhapur"],
@@ -153,7 +153,7 @@ export const propertyData = [
     {
         id: 201,
         unitType: "1bhk",
-        property_name: "Atlas Homes Room 201",
+        property_name: "Room 201",
         property_description: `A comfortable room with all necessary amenities for a pleasant stay.`,
         property_location: "Hyderabad, Telangana",
         property_neighborhoods: ["Gachibowli"],
@@ -175,7 +175,7 @@ export const propertyData = [
     {
         id: 202,
         unitType: "1bhk",
-        property_name: "Atlas Homes Room 202",
+        property_name: "Room 202",
         property_description: `A modern and well-equipped room for a comfortable stay.`,
         property_location: "Hyderabad, Telangana",
         property_neighborhoods: ["Financial District"],
@@ -197,7 +197,7 @@ export const propertyData = [
     {
         id: 301,
         unitType: "1bhk",
-        property_name: "Atlas Homes Room 301",
+        property_name: "Room 301",
         property_description: `A comfortable and well-appointed room for your stay.`,
         property_location: "Hyderabad, Telangana",
         property_neighborhoods: ["Kukatpally"],
@@ -219,7 +219,7 @@ export const propertyData = [
     {
         id: 302,
         unitType: "1bhk",
-        property_name: "Atlas Homes Room 302",
+        property_name: "Room 302",
         property_description: `A cozy room with all the necessary amenities for a comfortable stay.`,
         property_location: "Hyderabad, Telangana",
         property_neighborhoods: ["Hitech City"],
@@ -241,7 +241,7 @@ export const propertyData = [
     {
         id: 501,
         unitType: "penthouse",
-        property_name: "Atlas Penthouse 501",
+        property_name: "Penthouse 501",
         property_description: `A luxurious penthouse with stunning views and premium amenities.`,
         property_location: "Hyderabad, Telangana",
         property_neighborhoods: ["Hitech City"],

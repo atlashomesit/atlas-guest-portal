@@ -90,8 +90,8 @@ type MapStatus = "loading" | "ready" | "failed";
 
 const LocationPage = () => {
   const [mapStatus, setMapStatus] = useState<MapStatus>("loading");
-  const [errorDetails, setErrorDetails] = useState<string | null>(null);
-  const [mapHealth, setMapHealth] = useState<string | null>(null);
+  const [, setErrorDetails] = useState<string | null>(null);
+  const [, setMapHealth] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const hasInitializedMap = useRef(false);
@@ -147,7 +147,7 @@ const LocationPage = () => {
     if (!apiKey) {
       const message = "Google Maps API key is missing";
       logMapFailure(message);
-      setErrorDetails(message);
+      setErrorDetails(null); // Don't expose technical details to users
       setMapHealth("missing-api-key");
       setMapStatus("failed");
       return;
@@ -229,18 +229,7 @@ const LocationPage = () => {
         <Card className="p-0 overflow-hidden shadow-level2">
           <div className="relative bg-bg-surface border border-border-subtle rounded-2xl overflow-hidden">
             <div className="relative h-[280px] md:h-[420px]">
-              {mapHealth && (
-                <div className="absolute left-4 top-4 z-10 flex items-center gap-2 rounded-full border border-border-subtle bg-bg-surface/90 px-3 py-1 text-xs font-semibold text-destructive">
-                  <span className="h-2.5 w-2.5 rounded-full bg-destructive animate-pulse" aria-hidden />
-                  <span>
-                    {mapHealth === "script-failed"
-                      ? "Map script failed"
-                      : mapHealth === "missing-api-key"
-                        ? "Static map mode (no API key)"
-                        : "Map fallback active"}
-                  </span>
-                </div>
-              )}
+              {/* Map health indicator removed - no need to show technical status to guests */}
 
               <div
                 aria-busy={mapStatus === "loading"}
@@ -280,10 +269,10 @@ const LocationPage = () => {
 
                   <div className="space-y-2 max-w-xl">
                     <Typography as="p" className="text-text-primary font-semibold">
-                      Interactive map unavailable
+                      View on Google Maps
                     </Typography>
                     <Typography className="text-text-muted">
-                      {errorDetails ?? "Something went wrong while loading Google Maps. Please try again or open Google Maps directly."}
+                      Click below to open our location in Google Maps for directions and nearby landmarks.
                     </Typography>
                   </div>
 

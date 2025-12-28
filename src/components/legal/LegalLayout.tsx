@@ -22,7 +22,6 @@ const LegalLayout = ({ current, title, description, lastUpdated, children }: Leg
         <header className="bg-bg-surface shadow-level1 rounded-2xl p-6 md:p-8 border border-border-subtle space-y-4">
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
             <div className="space-y-2">
-              <p className="uppercase tracking-[0.2em] text-primary font-semibold text-xs">Atlas Guest Portal</p>
               <h1 className="text-3xl md:text-4xl font-bold text-text-primary">{title}</h1>
               <p className="text-lg text-text-muted max-w-3xl">{description}</p>
               {lastUpdated && <p className="text-sm text-text-muted">{lastUpdated}</p>}
@@ -46,15 +45,6 @@ const LegalLayout = ({ current, title, description, lastUpdated, children }: Leg
                 ))}
               </nav>
             </div>
-          </div>
-
-          <div className="bg-bg-muted border border-border-subtle rounded-xl p-4 space-y-2">
-            <p className="font-semibold text-text-primary">Which page should I read?</p>
-            <ul className="list-disc pl-5 text-text-muted space-y-1">
-              <li>Policies for practical rules, schedules, and what to expect day-to-day.</li>
-              <li>FAQs for quick answers and links to the relevant policy or terms.</li>
-              <li>Terms for the binding legal contract and definitive language.</li>
-            </ul>
           </div>
         </header>
 

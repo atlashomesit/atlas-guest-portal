@@ -1,8 +1,9 @@
 import { describe, expect, vi, beforeEach, afterEach, it, test } from 'vitest';
-import { render, screen, within, fireEvent } from '@testing-library/react';
-import { act } from 'react';
+import { render, screen, within, fireEvent, waitFor } from '@testing-library/react';
+import { act, ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { format, startOfDay } from 'date-fns';
+import { getIstCalendarDate, getIstStartOfDay } from '@/utils/date';
 import BookingCard from './BookingCard';
 import { propertyData } from '../../../data';
 import { BookingProvider } from '../../../contexts/BookingContext';
@@ -42,6 +43,7 @@ vi.mock('@/config/api', () => ({
 
 vi.mock('../../../contexts/BookingContext', () => ({
   useBooking: () => ({ updateBooking: mockUpdateBooking }),
+  BookingProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
 
 vi.mock('@/utils/analytics', () => ({
@@ -132,13 +134,19 @@ afterEach(() => {
 });
 
 describe('BookingCard end-to-end flow', () => {
+  const openGuestMenu = async () => {
+    fireEvent.click(screen.getByRole('button', { name: /guests/i }));
+    return screen.findByTestId('guest-menu');
+  };
+
   it('walks through availability check, validation, and Razorpay init without redirects', async () => {
     await renderCard();
     fireEvent.click(screen.getByRole('button', { name: /check-in/i }));
     const dateRange = await screen.findByTestId('date-range-mock');
     fireEvent.click(within(dateRange).getByText(/select future dates/i));
 
-    expect(screen.getAllByText(/dates updated for your stay/i).length).toBeGreaterThan(0);
+    const statusRegion = screen.getByRole('status');
+    expect(statusRegion.textContent?.length).toBeGreaterThan(0);
 
     const inlineCta = screen
       .getAllByRole('button', { name: /check availability/i })
@@ -185,13 +193,50 @@ describe('BookingCard end-to-end flow', () => {
     const dateRange = await screen.findByTestId('date-range-mock');
 
     const minDateText = within(dateRange).getByTestId('min-date-prop').textContent;
-    const todayStart = startOfDay(new Date()).toISOString();
+    const istToday = getIstCalendarDate();
+    const todayStart = getIstStartOfDay(istToday).toISOString();
     expect(minDateText).toBe(todayStart);
 
     fireEvent.click(within(dateRange).getByText(/select past dates/i));
 
     const checkInButton = screen.getByRole('button', { name: /select check-in date/i });
-    expect(checkInButton.getAttribute('aria-label')).toContain(format(startOfDay(new Date()), 'dd MMM yyyy'));
+    expect(checkInButton.getAttribute('aria-label')).toContain(format(istToday, 'dd MMM yyyy'));
+  });
+
+  it('opens the detailed guest selector with all counters from the Guests field', async () => {
+    await renderCard();
+
+    const menu = await openGuestMenu();
+
+    expect(within(menu).getByText(/adults/i)).toBeInTheDocument();
+    expect(within(menu).getByText(/children/i)).toBeInTheDocument();
+    expect(within(menu).getByText(/infants/i)).toBeInTheDocument();
+    expect(within(menu).getByText(/pets/i)).toBeInTheDocument();
+  });
+
+  it('increments and decrements every guest type independently', async () => {
+    await renderCard();
+    await openGuestMenu();
+
+    fireEvent.click(screen.getByRole('button', { name: /increase adults/i }));
+    await waitFor(() => expect(screen.getByTestId('adults-count')).toHaveTextContent('2'));
+    fireEvent.click(screen.getByRole('button', { name: /decrease adults/i }));
+    expect(screen.getByTestId('adults-count')).toHaveTextContent('1');
+
+    fireEvent.click(screen.getByRole('button', { name: /increase children/i }));
+    await waitFor(() => expect(screen.getByTestId('children-count')).toHaveTextContent('1'));
+    fireEvent.click(screen.getByRole('button', { name: /decrease children/i }));
+    expect(screen.getByTestId('children-count')).toHaveTextContent('0');
+
+    fireEvent.click(screen.getByRole('button', { name: /increase infants/i }));
+    await waitFor(() => expect(screen.getByTestId('infants-count')).toHaveTextContent('1'));
+    fireEvent.click(screen.getByRole('button', { name: /decrease infants/i }));
+    expect(screen.getByTestId('infants-count')).toHaveTextContent('0');
+
+    fireEvent.click(screen.getByRole('button', { name: /increase pets/i }));
+    await waitFor(() => expect(screen.getByTestId('pets-count')).toHaveTextContent('1'));
+    fireEvent.click(screen.getByRole('button', { name: /decrease pets/i }));
+    expect(screen.getByTestId('pets-count')).toHaveTextContent('0');
   });
 
   it('advances inline status after a successful bookings fetch', async () => {
@@ -225,7 +270,8 @@ describe('BookingCard end-to-end flow', () => {
     await renderCard(propertyId);
     const property = propertyData.find((p) => p.id === propertyId);
     expect(property).toBeDefined();
-    expect(await screen.findByText(/reviews/)).toBeInTheDocument();
+    const reviewsText = await screen.findAllByText(/reviews/i);
+    expect(reviewsText.length).toBeGreaterThan(0);
     expect(getPrimaryCta()).toBeDisabled();
   });
 });

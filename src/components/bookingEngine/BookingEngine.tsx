@@ -20,6 +20,12 @@ const BookingEngine: React.FC<BookingEngineProps> = ({
         link.href = "/be/static/css/main.5a8b9a96.css"; // Path to the CSS file (adjust as needed)
         document.head.appendChild(link);
 
+        // Load the generated styles from the new bundle
+        const bundleStyles = document.createElement("link");
+        bundleStyles.rel = "stylesheet";
+        bundleStyles.href = "/be/static/js/main.caa69fb1.css";
+        document.head.appendChild(bundleStyles);
+
         // Dynamically load the JS for the booking engine
         const script = document.createElement("script");
         script.src = "/be/static/js/main.caa69fb1.js"; // Path to the JS file (adjust as needed)
@@ -31,6 +37,7 @@ const BookingEngine: React.FC<BookingEngineProps> = ({
         // Cleanup: remove the dynamically added script and CSS when the component unmounts
         return () => {
             document.head.removeChild(link);
+            document.head.removeChild(bundleStyles);
             document.body.removeChild(script);
         };
     }, []);

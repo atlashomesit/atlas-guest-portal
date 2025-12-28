@@ -1,5 +1,5 @@
-import { ReactNode, useEffect } from "react"
-import { BrowserRouter as Router, Routes, Route, useLocation, matchPath, Navigate } from "react-router-dom"
+import { useEffect } from "react"
+import { BrowserRouter as Router, Routes, Route, useLocation, matchPath, Navigate, useParams } from "react-router-dom"
 import './App.css'
 import PageNotFound from "./pages/pagenotfound/PageNotFound"
 import Home from "./pages/home/Home"
@@ -48,6 +48,20 @@ function AppWrapper() {
     trackEvent('page_view', { surface: 'router' }, { route: location.pathname });
   }, [location.pathname]);
 
+  const LegacyPropertyRedirect = () => {
+    const { id } = useParams();
+
+    if (!id) {
+      return <Navigate to="/" replace />;
+    }
+
+    const normalizedId = id.toLowerCase();
+    const idParts = normalizedId.split('-').filter(Boolean);
+    const canonicalPropertySlug = idParts.length >= 2 ? idParts.slice(0, 2).join('-') : 'atlas-homes';
+
+    return <Navigate to={`/homes/${canonicalPropertySlug}/${normalizedId}`} replace />;
+  };
+
   return (
     <>
       {!shouldHideNavbar && <Navbar />}
@@ -71,8 +85,9 @@ function AppWrapper() {
           <Route path="/policies" element={withBoundary(<Policies />, "policies-route")} />
           <Route path="/terms" element={withBoundary(<Terms />, "terms-route")} />
           <Route path="/terms-and-conditions" element={withBoundary(<Terms />, "terms-legacy-route")} />
-          <Route path="/property_details/:id" element={withBoundary(<Homepage_PropertyDetails />, "property-details-route")} />
-          <Route path="/properties/:id" element={withBoundary(<Homepage_PropertyDetails />, "property-details-modern-route")} />
+          <Route path="/homes/:propertySlug/:unitSlug" element={withBoundary(<Homepage_PropertyDetails />, "property-details-home-route")} />
+          <Route path="/property_details/:id" element={withBoundary(<LegacyPropertyRedirect />, "property-details-legacy-route")} />
+          <Route path="/properties/:id" element={withBoundary(<LegacyPropertyRedirect />, "property-details-modern-redirect-route")} />
           <Route path="/reserve" element={withBoundary(<Reserve />, "reserve-route")} />
           <Route path="/property_LocationDetails/:id" element={withBoundary(<Homepage_LocationDetails />, "location-details-route")} />
           <Route path="/:shortCode" element={withBoundary(<ShortLinkRedirect />, "shortlink-route")} />

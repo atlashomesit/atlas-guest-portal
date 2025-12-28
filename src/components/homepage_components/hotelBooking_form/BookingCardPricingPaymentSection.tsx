@@ -25,6 +25,7 @@ interface BookingCardPricingPaymentSectionProps {
   totalExtraGuestCharges: number;
   feesAndTaxes: number;
   totalPrice: number;
+  nights: number;
   inlinePolicySnippets: typeof import('../../../content/terms').inlinePolicySnippets;
   isRazorpayReady: boolean;
   isLoading: boolean;
@@ -75,8 +76,11 @@ interface BookingCardPricingPaymentSectionProps {
   userPhone: string;
   setUserPhone: React.Dispatch<React.SetStateAction<string>>;
   formErrors: { email?: string; phone?: string; dates?: string; guests?: string; terms?: string };
+  onEmailBlur?: () => void;
+  onPhoneBlur?: () => void;
   averageRating?: number;
   reviewCount?: number;
+  submitButtonDisabled: boolean;
 }
 
 export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymentSectionProps> = ({
@@ -89,6 +93,7 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
   totalExtraGuestCharges,
   feesAndTaxes,
   totalPrice,
+  nights,
   inlinePolicySnippets: inlineSnippets,
   isRazorpayReady,
   isLoading,
@@ -116,14 +121,19 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
   userPhone,
   setUserPhone,
   formErrors,
+  onEmailBlur,
+  onPhoneBlur,
   averageRating,
   reviewCount,
+  submitButtonDisabled,
 }) => {
   const isCheckingAvailability = availabilityStatus === 'checking';
   const buttonIsBusy = isCheckingAvailability || isLoading;
   const ratingSnippet = averageRating
     ? `${averageRating.toFixed(2)} / 5${reviewCount ? ` · ${reviewCount} reviews` : ''}`
     : 'Guest ratings updating soon';
+  const nightLabel = nights === 1 ? '1 night' : `${nights} nights`;
+  const stayRangeLabel = `${format(dates.startDate, 'dd MMM')} - ${format(dates.endDate, 'dd MMM')}`;
 
   return (
     <>
@@ -218,8 +228,11 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
               type="email"
               value={userEmail}
               onChange={(e) => setUserEmail(e.target.value)}
+              onBlur={onEmailBlur}
               placeholder="your.email@example.com"
               required
+              pattern="^[\\w.!#$%&'*+/=?^`{|}~-]+@[A-Za-z0-9-]+(?:\\.[A-Za-z0-9-]+)+$"
+              title="Enter a valid email address"
               disabled={buttonIsBusy}
               aria-invalid={Boolean(formErrors.email)}
               className={`w-full px-4 py-2.5 rounded-lg bg-bg-surface text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed ${
@@ -241,8 +254,11 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
               type="tel"
               value={userPhone}
               onChange={(e) => setUserPhone(e.target.value)}
+              onBlur={onPhoneBlur}
               placeholder="+91 98765 43210"
               required
+              pattern="^\\+\\d{1,3}\\s?\\d{6,14}$"
+              title="Use +countrycode followed by digits"
               disabled={buttonIsBusy}
               aria-invalid={Boolean(formErrors.phone)}
               className={`w-full px-4 py-2.5 rounded-lg bg-bg-surface text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed ${
@@ -366,7 +382,7 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
               });
             }
           }}
-          disabled={buttonIsBusy || !termsAccepted || !userEmail || !userPhone}
+          disabled={submitButtonDisabled}
           className="bg-cta-primary hover:bg-cta-secondary text-[var(--text-contrast)] w-full rounded-full py-4 text-lg font-semibold transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center shadow-level1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
         >
           {buttonIsBusy ? (
@@ -499,6 +515,10 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
           <p className="text-lg font-semibold">Total Amount</p>
           <p className="text-sm text-text-muted">
             Inclusive of estimated taxes and fees
+            <span className="sr-only" aria-live="polite">
+              {' '}
+              {nightLabel} selected for {stayRangeLabel}
+            </span>
           </p>
         </div>
         <p className="text-lg font-bold">₹{totalPrice.toLocaleString('en-IN')}</p>
@@ -511,16 +531,19 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
             'calc(var(--safe-area-bottom, env(safe-area-inset-bottom, 0px)) + 0.75rem)',
         }}
       >
-          <div className="flex flex-col text-xs text-text-muted">
-            <div className="font-semibold text-text-primary text-sm">
-              {format(dates.startDate, 'dd MMM')} - {format(dates.endDate, 'dd MMM')}
-            </div>
-            <div className="flex items-center gap-1 text-text-primary text-sm">
-              <FaUserFriendsIcon className="h-4 w-4" />
-              <span>{formatGuestLabel()}</span>
-            </div>
-          <p className="text-[11px] text-text-muted">Total shown before payment; no hidden charges.</p>
+        <div className="flex flex-col text-xs text-text-muted">
+          <div className="font-semibold text-text-primary text-sm" aria-live="polite">
+            {stayRangeLabel}
+            <span className="ml-2 rounded-full bg-bg-muted px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-text-primary">
+              {nightLabel}
+            </span>
           </div>
+          <div className="flex items-center gap-1 text-text-primary text-sm">
+            <FaUserFriendsIcon className="h-4 w-4" />
+            <span>{formatGuestLabel()}</span>
+          </div>
+          <p className="text-[11px] text-text-muted">Total shown before payment; no hidden charges.</p>
+        </div>
         <div className="text-right">
           <p className="text-xs text-text-muted">Total</p>
           <p className="text-lg font-semibold">₹{totalPrice.toLocaleString('en-IN')}</p>

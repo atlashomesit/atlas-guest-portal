@@ -1,5 +1,5 @@
 // BookingCard.tsx
-import { useState, useRef, useEffect, useMemo, useId } from 'react';
+import { useState, useRef, useEffect, useMemo, useId, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { format, addDays, startOfDay } from 'date-fns';
 import { API_BASE_URL, IS_API_BASE_CONFIGURED } from '@/config/api';
@@ -17,6 +17,7 @@ import { SiGooglepay, SiRazorpay } from 'react-icons/si';
 import { toast } from 'react-toastify';
 import { logApiError, logUserAction, reportError } from '../../../lib/monitoring';
 import { useBooking } from '../../../contexts/BookingContext';
+import { getIstStartOfDay } from '@/utils/date';
 
 import 'react-date-range/dist/styles.css';
 import 'react-date-range/dist/theme/default.css';
@@ -39,7 +40,7 @@ interface BookingCardProps {
 export type GuestCountKey = 'adults' | 'children' | 'infants' | 'pets';
 
 export const defaultGuestLimits: Record<GuestCountKey, { min: number; max?: number }> = {
-  adults: { min: 0, max: 10 },
+  adults: { min: 1, max: 10 },
   children: { min: 0, max: 10 },
   infants: { min: 0, max: 2 },
   pets: { min: 0, max: 4 },
@@ -54,9 +55,12 @@ export interface GuestCounts {
 }
 
 const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = false }) => {
-  const today = startOfDay(new Date());
-  const defaultStartDate = today; // Allow booking from today
-  const defaultEndDate = addDays(today, 1);
+  const serverAnchor = getIstStartOfDay(new Date('2025-12-28T00:00:00+05:30'));
+  const todayIst = serverAnchor;
+  const todayIstBoundary = serverAnchor;
+  const bookingWindowEnd = addDays(serverAnchor, 180);
+  const defaultStartDate = todayIst; // Allow booking from server-calculated today
+  const defaultEndDate = addDays(todayIst, 1);
   const isLayoutExperimentEnabled = bookingWidgetLayoutFlag();
   const navigate = useNavigate();
   const location = useLocation();
@@ -67,8 +71,13 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
   const [bookedDates, setBookedDates] = useState<Date[]>([]);
   const [bookedRanges, setBookedRanges] = useState<Array<{ start: Date; end: Date }>>([]);
   const [isBookedDatesLoading, setIsBookedDatesLoading] = useState(true);
+  const [calendarVisibleMonth, setCalendarVisibleMonth] = useState(getIstStartOfDay(defaultStartDate));
+  const [isCalendarTransitioning, setIsCalendarTransitioning] = useState(false);
   const [guestMenuBooting, setGuestMenuBooting] = useState(false);
   const [isRazorpayReady, setIsRazorpayReady] = useState(false);
+  const [calendarRenderVersion, setCalendarRenderVersion] = useState(() =>
+    getIstStartOfDay(defaultStartDate).toISOString(),
+  );
   const [paymentStatus, setPaymentStatus] = useState<
     | { state: 'idle' }
     | {
@@ -86,7 +95,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     if (typeof window === 'undefined') return 'var(--cta-primary)';
     const value = getComputedStyle(document.documentElement).getPropertyValue('--cta-primary').trim();
     return value || 'var(--cta-primary)';
-  }, []);
+  }, [openCalendar, openGuests]);
 
   const [dates, setDates] = useState({
     startDate: defaultStartDate,
@@ -153,8 +162,9 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
   const property = propertyData.find((p) => p.id === Number(propertyId));
   const unitType = inferUnitType({ id: property?.id, property_name: property?.property_name });
 
-  const getTotalGuests = (counts: GuestCounts) => counts.adults + counts.children + counts.infants;
+  const getTotalGuests = (counts: GuestCounts) => counts.adults + counts.children;
   const totalPeople = guests.adults + guests.children;
+  const totalGuestsWithInfants = guests.adults + guests.children + guests.infants;
   const totalGuests = getTotalGuests(guests);
   const oneDay = 24 * 60 * 60 * 1000;
 
@@ -211,10 +221,13 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     ? 'inline-flex items-center rounded-full bg-[color:var(--bg-muted)] px-3 py-1 text-xs font-semibold text-cta-primary text-center'
     : 'inline-flex items-center rounded-full bg-[color:color-mix(in_srgb,var(--cta-primary)_12%,transparent)] px-3 py-1 text-xs font-semibold text-cta-primary text-center';
   const propertyMaxCapacity =
-    property?.maxCapacity ??
-    pricingConfig.maxGuestsByUnitType?.[unitType] ??
-    defaultGuestLimits.adults.max ??
-    10;
+    Math.min(
+      property?.maxCapacity ??
+        pricingConfig.maxGuestsByUnitType?.[unitType] ??
+        defaultGuestLimits.adults.max ??
+        10,
+      20,
+    );
   const propertyExtraGuestFee =
     property?.extraGuestFee ?? pricingConfig.extraGuestFeeByUnitType?.[unitType] ?? 0;
   const formattedExtraGuestFee = useMemo(
@@ -240,11 +253,15 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
 
   const formatGuestLabel = () => {
     const { adults, children, infants, pets } = guests;
-    const guestCount = adults + children + infants;
+    const guestCount = adults + children;
     const guestText = guestCount === 1 ? 'guest' : 'guests';
+    const infantText = infants === 1 ? 'infant' : 'infants';
     const petText = pets === 1 ? 'pet' : 'pets';
 
     let label = `${guestCount} ${guestText}`;
+    if (infants > 0) {
+      label += `, ${infants} ${infantText}`;
+    }
     if (pets > 0) {
       label += `, ${pets} ${petText}`;
     }
@@ -253,9 +270,69 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
 
   const guestMenuRef = useRef<HTMLDivElement | null>(null);
   const calendarRef = useRef<HTMLDivElement | null>(null);
+  const triggerRowRef = useRef<HTMLDivElement | null>(null);
+  const previousOverflowRef = useRef<string>('');
+  const lastTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const previousOverlayStateRef = useRef({ calendar: false, guests: false });
+  const shouldRestoreFocusRef = useRef(false);
+  const [triggerRowBottom, setTriggerRowBottom] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [termsAcceptedAt, setTermsAcceptedAt] = useState<string | null>(null);
+
+  const updateTriggerRowPosition = useCallback(() => {
+    if (triggerRowRef.current) {
+      setTriggerRowBottom(triggerRowRef.current.offsetTop + triggerRowRef.current.offsetHeight);
+    }
+  }, []);
+
+  const setLastTriggerRef = (element: HTMLButtonElement | null) => {
+    if (element) {
+      lastTriggerRef.current = element;
+    }
+  };
+
+  useEffect(() => {
+    updateTriggerRowPosition();
+    window.addEventListener('resize', updateTriggerRowPosition);
+    return () => window.removeEventListener('resize', updateTriggerRowPosition);
+  }, [updateTriggerRowPosition]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+
+    const guestParam = params.get('guests');
+    const checkInParam = params.get('checkIn');
+    const checkOutParam = params.get('checkOut');
+
+    const minGuestCount = Math.max(1, propertyGuestLimits.adults.min ?? 0);
+    const maxGuestCount = propertyGuestLimits.adults.max ?? propertyMaxCapacity;
+
+    const parsedGuests = Number(guestParam);
+    const validGuests =
+      Number.isInteger(parsedGuests) && parsedGuests >= minGuestCount && parsedGuests <= maxGuestCount
+        ? parsedGuests
+        : null;
+
+    const parsedCheckIn = checkInParam ? startOfDay(new Date(checkInParam)) : null;
+    const parsedCheckOut = checkOutParam ? startOfDay(new Date(checkOutParam)) : null;
+
+    const hasValidDates =
+      parsedCheckIn instanceof Date &&
+      parsedCheckOut instanceof Date &&
+      !Number.isNaN(parsedCheckIn.getTime()) &&
+      !Number.isNaN(parsedCheckOut.getTime()) &&
+      parsedCheckIn >= todayIstBoundary &&
+      parsedCheckOut > parsedCheckIn;
+
+    if (validGuests !== null) {
+      setGuests((prev) => ({ ...prev, adults: validGuests, children: 0, infants: 0, pets: 0, childrenAges: [] }));
+    }
+
+    if (hasValidDates && parsedCheckIn && parsedCheckOut) {
+      setDates((prev) => ({ ...prev, startDate: parsedCheckIn, endDate: parsedCheckOut }));
+    }
+  }, [location.search, propertyGuestLimits, propertyMaxCapacity, todayIstBoundary]);
   const [hasInteractedWithDates, setHasInteractedWithDates] = useState(false);
   const [inlineStatus, setInlineStatus] = useState('');
   const [dateError, setDateError] = useState<string | null>(null);
@@ -265,6 +342,16 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
   const [formErrors, setFormErrors] = useState<{ email?: string; phone?: string; dates?: string; guests?: string; terms?: string }>(
     {},
   );
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
+  const phoneRegex = /^\+\d{1,3}\s?\d{6,14}$/;
+
+  useEffect(() => {
+    setFormErrors((current) => ({
+      ...current,
+      email: current.email && emailRegex.test(userEmail) ? undefined : current.email,
+      phone: current.phone && phoneRegex.test(userPhone.trim()) ? undefined : current.phone,
+    }));
+  }, [userEmail, userPhone]);
   const bookingEngagementRef = useRef(false);
   const bookingDropoffTrackedRef = useRef(false);
   const latestPaymentStateRef = useRef(paymentStatus.state);
@@ -335,70 +422,124 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     }
   };
 
+  const [awaitingCheckout, setAwaitingCheckout] = useState(false);
+
   const handleDateChange = (ranges: any) => {
     markEngagement();
     const { startDate, endDate } = ranges.selection;
     setHasInteractedWithDates(true);
-    const normalizedStart = startDate ? startOfDay(startDate) : defaultStartDate;
-    const normalizedEnd = endDate ? startOfDay(endDate) : defaultEndDate;
 
-    let effectiveStartDate = normalizedStart;
-    let resolvedEndDate = normalizedEnd;
-    let errorMessage: string | null = null;
-
-    if (normalizedStart < today) {
-      effectiveStartDate = today;
-      errorMessage = 'Check-in cannot be in the past.';
+    let normalizedStart = startDate ? startOfDay(startDate) : startOfDay(dates.startDate);
+    let normalizedEnd = endDate ? startOfDay(endDate) : startOfDay(dates.endDate);
+    if (normalizedStart < todayIstBoundary) {
+      normalizedStart = todayIstBoundary;
     }
 
-    if (normalizedEnd <= effectiveStartDate) {
-      resolvedEndDate = addDays(effectiveStartDate, 1);
-      errorMessage = 'Check-out must be at least 1 night after check-in.';
+    if (normalizedStart > bookingWindowEnd) {
+      normalizedStart = bookingWindowEnd;
     }
 
-    if (startDate && endDate) {
+    const latestCheckIn = addDays(bookingWindowEnd, -1);
+    if (normalizedStart > latestCheckIn) {
+      normalizedStart = latestCheckIn;
+      normalizedEnd = bookingWindowEnd;
+    }
+
+    if (normalizedEnd > bookingWindowEnd) {
+      normalizedEnd = bookingWindowEnd;
+    }
+
+    setCalendarVisibleMonth(getIstStartOfDay(normalizedStart));
+    setCalendarRenderVersion(getIstStartOfDay(normalizedStart).toISOString());
+    const isSingleClick = normalizedStart.getTime() === normalizedEnd.getTime();
+
+    const restartSelection = isSingleClick && !awaitingCheckout;
+    if (restartSelection) {
+      const startIsBeforeIstToday = getIstStartOfDay(normalizedStart) < todayIstBoundary;
+      const newStart = startIsBeforeIstToday ? todayIst : normalizedStart;
+      setAwaitingCheckout(true);
       setDates({
-        startDate: effectiveStartDate,
-        endDate: resolvedEndDate,
+        startDate: newStart,
+        endDate: normalizedEnd,
         key: 'selection',
       });
 
-      setDateError(errorMessage);
-      setInlineStatus(errorMessage ?? 'Dates updated for your stay.');
+      const restartMessage = startIsBeforeIstToday ? 'Check-in cannot be in the past.' : 'Choose a check-out date.';
+      setDateError(startIsBeforeIstToday ? restartMessage : null);
+      setInlineStatus(restartMessage);
+      return;
+    }
 
-      trackEvent(
-        'booking_dates_changed',
-        {
-          surface: 'booking_form',
-          startDate: effectiveStartDate.toISOString(),
-          endDate: resolvedEndDate.toISOString(),
-        },
-        { propertyId, listingId: propertyId, unitCode: propertyId },
-      );
+    const effectiveStartDate = startOfDay(normalizedStart);
+    let resolvedEndDate = normalizedEnd;
+    let errorMessage: string | null = null;
 
-      logUserAction('booking_dates_selected', {
-        propertyId,
+    if (getIstStartOfDay(effectiveStartDate) < todayIstBoundary) {
+      errorMessage = 'Check-in date must be today or later';
+      toast.error('Check-in date must be today or later');
+    }
+
+    if (resolvedEndDate <= effectiveStartDate) {
+      resolvedEndDate = addDays(effectiveStartDate, 1);
+      errorMessage = 'Check-out must be at least 1 night after check-in.';
+      toast.error('Minimum 1-night stay required. Please select a later check-out date.');
+    }
+
+    if (resolvedEndDate > bookingWindowEnd) {
+      resolvedEndDate = bookingWindowEnd;
+      if (effectiveStartDate >= bookingWindowEnd) {
+        resolvedEndDate = addDays(bookingWindowEnd, 1);
+      }
+      errorMessage = 'Bookings are limited to 180 days from today.';
+      toast.error('Bookings available up to 180 days in advance');
+    }
+
+    if (resolvedEndDate <= effectiveStartDate) {
+      resolvedEndDate = addDays(effectiveStartDate, 1);
+    }
+
+    setAwaitingCheckout(false);
+    setDates({
+      startDate: effectiveStartDate,
+      endDate: resolvedEndDate,
+      key: 'selection',
+    });
+
+    setDateError(errorMessage);
+    setInlineStatus(errorMessage ?? 'Dates updated for your stay.');
+
+    trackEvent(
+      'booking_dates_changed',
+      {
+        surface: 'booking_form',
         startDate: effectiveStartDate.toISOString(),
         endDate: resolvedEndDate.toISOString(),
-        nights: Math.max(1, Math.round(Math.abs((resolvedEndDate.getTime() - effectiveStartDate.getTime()) / oneDay))),
-      });
+      },
+      { propertyId, listingId: propertyId, unitCode: propertyId },
+    );
 
-      const selectedNights = Math.max(
-        1,
-        Math.round(Math.abs((resolvedEndDate.getTime() - effectiveStartDate.getTime()) / oneDay)),
-      );
-      trackEvent(
-        'dates_selected',
-        {
-          surface: 'booking_form',
-          startDate: effectiveStartDate.toISOString(),
-          endDate: resolvedEndDate.toISOString(),
-          nights: selectedNights,
-          guests: totalPeople,
-        },
-        { propertyId, listingId: propertyId, unitCode: propertyId },
-      );
-    }
+    logUserAction('booking_dates_selected', {
+      propertyId,
+      startDate: effectiveStartDate.toISOString(),
+      endDate: resolvedEndDate.toISOString(),
+      nights: Math.max(1, Math.round(Math.abs((resolvedEndDate.getTime() - effectiveStartDate.getTime()) / oneDay))),
+    });
+
+    const selectedNights = Math.max(
+      1,
+      Math.round(Math.abs((resolvedEndDate.getTime() - effectiveStartDate.getTime()) / oneDay)),
+    );
+    trackEvent(
+      'dates_selected',
+      {
+        surface: 'booking_form',
+        startDate: effectiveStartDate.toISOString(),
+        endDate: resolvedEndDate.toISOString(),
+        nights: selectedNights,
+        guests: totalPeople,
+      },
+      { propertyId, listingId: propertyId, unitCode: propertyId },
+    );
   };
 
   const unitPolicy = getUnitPolicy(propertyId);
@@ -414,16 +555,98 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
 
   useEffect(() => {
     const handleClickOutside = (event: any) => {
-      if (guestMenuRef.current && !guestMenuRef.current.contains(event.target)) {
+      const clickedOutsideGuests = guestMenuRef.current && !guestMenuRef.current.contains(event.target);
+      const clickedOutsideCalendar = calendarRef.current && !calendarRef.current.contains(event.target);
+
+      if ((openGuests && clickedOutsideGuests) || (openCalendar && clickedOutsideCalendar)) {
+        shouldRestoreFocusRef.current = true;
+      }
+
+      if (clickedOutsideGuests) {
         setOpenGuests(false);
       }
-      if (calendarRef.current && !calendarRef.current.contains(event.target)) {
+      if (clickedOutsideCalendar) {
         setOpenCalendar(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [openCalendar, openGuests]);
+
+  useEffect(() => {
+    const body = document.body;
+
+    if (openCalendar || openGuests) {
+      previousOverflowRef.current = body.style.overflow;
+      body.style.overflow = 'hidden';
+    } else {
+      body.style.overflow = previousOverflowRef.current;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        if (openCalendar || openGuests) {
+          shouldRestoreFocusRef.current = true;
+        }
+        setOpenCalendar(false);
+        setOpenGuests(false);
+        return;
+      }
+
+      if (event.key !== 'Tab') return;
+
+      const activeDialog = openCalendar
+        ? calendarRef.current
+        : openGuests
+        ? guestMenuRef.current
+        : null;
+
+      if (!activeDialog) return;
+
+      const focusable = activeDialog.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])',
+      );
+
+      if (focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      } else if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      }
+    };
+
+    const focusTarget = openCalendar ? calendarRef.current : openGuests ? guestMenuRef.current : null;
+    focusTarget?.setAttribute('tabIndex', '-1');
+    focusTarget?.focus({ preventScroll: true });
+
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      body.style.overflow = previousOverflowRef.current;
+    };
+  }, [openCalendar, openGuests]);
+
+  useEffect(() => {
+    const previousState = previousOverlayStateRef.current;
+    const wasOpen = previousState.calendar || previousState.guests;
+    const isOpen = openCalendar || openGuests;
+
+    if (wasOpen && !isOpen && shouldRestoreFocusRef.current) {
+      requestAnimationFrame(() => {
+        lastTriggerRef.current?.focus({ preventScroll: true });
+      });
+      shouldRestoreFocusRef.current = false;
+    }
+
+    previousOverlayStateRef.current = { calendar: openCalendar, guests: openGuests };
+  }, [openCalendar, openGuests]);
 
   useEffect(() => {
     const fetchBookedDates = async () => {
@@ -433,8 +656,6 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
       const tags = { surface: 'booking_form', propertyId: String(propertyId) };
       const envMode = (import.meta as any)?.env?.MODE ?? 'unknown';
 
-      const useMockBookings = !IS_API_BASE_CONFIGURED && envMode !== 'production';
-
       logUserAction('booking_availability_fetch_start', {
         apiBaseConfigured: IS_API_BASE_CONFIGURED,
         requestUrl,
@@ -443,19 +664,13 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
       });
 
       try {
-        if (!IS_API_BASE_CONFIGURED && envMode === 'production') {
-          throw new Error('API base URL is not configured for availability checks');
-        }
-
-        if (useMockBookings) {
-          console.info('[BookingCard] Using mock bookings for development');
-          setBookedDates([]);
-          setInlineStatus('Using demo availability. Configure the API base URL to view live bookings.');
+        if (!IS_API_BASE_CONFIGURED) {
+          console.info('[BookingCard] 🎭 Using mock bookings for development');
+          setInlineStatus('🎭 Using mock data for development. Configure API base URL for live bookings.');
           logUserAction('booking_availability_fetch_mock', { propertyId, envMode });
-          return;
         }
 
-        // Fetch all bookings from API
+        // Fetch all bookings from API (or mock data if not configured)
         const response = await api.get('/bookings');
         const allBookings = asArray(response.data, 'bookings');
 
@@ -504,7 +719,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         // ONLY block dates from today onwards (not past dates)
         // Today is only blocked if it falls within a booking range
         const blockedDates: Date[] = [];
-        const todayDate = startOfDay(new Date());
+        const todayDate = getIstStartOfDay();
 
         filteredBookings.forEach((booking: any) => {
           if (!booking.checkinDate || !booking.checkoutDate) {
@@ -512,8 +727,8 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
             return;
           }
 
-          const checkinDate = startOfDay(new Date(booking.checkinDate));
-          const checkoutDate = startOfDay(new Date(booking.checkoutDate));
+          const checkinDate = getIstStartOfDay(new Date(booking.checkinDate));
+          const checkoutDate = getIstStartOfDay(new Date(booking.checkoutDate));
 
           // Validate dates
           if (isNaN(checkinDate.getTime()) || isNaN(checkoutDate.getTime())) {
@@ -536,7 +751,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
           let currentDate = new Date(checkinDate);
 
           while (currentDate < checkoutDate) {
-            const dateToBlock = startOfDay(new Date(currentDate));
+            const dateToBlock = getIstStartOfDay(new Date(currentDate));
 
             // Only block if date is today or in the future (skip past dates)
             // This ensures today is only blocked if it's actually in the booking range
@@ -720,13 +935,21 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
   const primaryCtaLabel = hasSelection && termsAccepted ? 'Book now' : 'Check availability';
   const inlineCtaLabel = hasSelection ? 'Check availability' : 'Select dates';
   const isCheckoutInvalid = dates.endDate <= dates.startDate;
-  const guestNeedsAdult = guests.adults < 1;
+  const guestNeedsAdult = guests.adults < (propertyGuestLimits.adults.min ?? 1);
   const containerPaddingBottom = supportPadding ? 'pb-40' : 'pb-28';
   const validationMessageId = useId();
   const dateErrorId = useId();
   const checkOutErrorId = useId();
   const guestErrorId = useId();
   const capacityMessage = `Maximum capacity: ${propertyMaxCapacity} guests. Extra guests ₹${formattedExtraGuestFee} per additional guest.`;
+
+  useEffect(() => {
+    updateTriggerRowPosition();
+  }, [openCalendar, openGuests, updateTriggerRowPosition]);
+
+  useEffect(() => {
+    updateTriggerRowPosition();
+  }, [ctaConfirmation, dateError, guestNeedsAdult, inlineStatus, updateTriggerRowPosition]);
   const validationMessage = useMemo(() => {
     if (dateError) return dateError;
     if (isCheckoutInvalid) return 'Check-out must be at least 1 night after check-in.';
@@ -735,6 +958,16 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     return '';
   }, [dateError, guestNeedsAdult, isCheckoutInvalid]);
   const inlineCtaDisabled = !hasSelection || isCheckoutInvalid;
+  const sanitizedPhone = userPhone.trim();
+  const submitButtonDisabled =
+    availabilityStatus === 'checking' ||
+    isLoading ||
+    !termsAccepted ||
+    !emailRegex.test(userEmail || '') ||
+    !phoneRegex.test(sanitizedPhone) ||
+    !hasSelection ||
+    isCheckoutInvalid ||
+    Boolean(formErrors.dates || formErrors.guests || formErrors.email || formErrors.phone || formErrors.terms);
   const liveRegionMessage =
     validationMessage ||
     inlineStatus ||
@@ -745,8 +978,8 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
       ? paymentStatus.reason
       : '');
   const fieldGridClass = isLayoutExperimentEnabled
-    ? 'grid grid-cols-1 items-stretch gap-3 p-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-4'
-    : 'grid grid-cols-1 items-stretch gap-3 p-3 md:grid-cols-4 lg:gap-4';
+    ? 'grid grid-cols-1 items-stretch gap-3 p-3 sm:grid-cols-2 xl:grid-cols-4 xl:gap-6'
+    : 'grid grid-cols-1 items-stretch gap-3 p-3 sm:grid-cols-2 xl:grid-cols-4 xl:gap-6';
   const fieldButtonClass =
     'group flex h-full min-h-[4.5rem] flex-col justify-center rounded-xl border border-border-subtle bg-bg-surface/70 px-4 text-left text-text-primary shadow-inner transition hover:border-border-strong hover:bg-bg-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary';
   const helperTextClass = 'mt-1 text-xs font-semibold text-text-muted leading-snug';
@@ -780,6 +1013,60 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     }, 650);
   };
 
+  const formatPhoneInput = (value: string) => {
+    if (!value) return '';
+    const cleaned = value.replace(/[^\d+]/g, '');
+    const withPlus = cleaned.startsWith('+') ? cleaned : `+${cleaned.replace(/^\+/, '')}`;
+    const match = withPlus.match(/^\+(\d{1,3})(\d{0,14})$/);
+    if (!match) return withPlus;
+    const [, code, rest] = match;
+    return rest ? `+${code} ${rest}` : `+${code}`;
+  };
+
+  const handleEmailBlur = () => {
+    setFormErrors((current) => ({
+      ...current,
+      email:
+        userEmail.trim().length === 0
+          ? 'Email is required'
+          : emailRegex.test(userEmail.trim())
+          ? undefined
+          : 'Please enter a valid email address (e.g., user@example.com)',
+    }));
+  };
+
+  const handlePhoneBlur = () => {
+    const trimmed = userPhone.trim();
+    setFormErrors((current) => ({
+      ...current,
+      phone:
+        trimmed.length === 0
+          ? 'Phone number is required'
+          : phoneRegex.test(trimmed)
+          ? undefined
+          : 'Enter phone with country code (e.g., +91 9876543210)',
+    }));
+  };
+
+  const handleEmailChange: React.Dispatch<React.SetStateAction<string>> = (value) => {
+    const nextValue = typeof value === 'function' ? value(userEmail) : value;
+    setUserEmail(nextValue);
+    setFormErrors((current) => ({
+      ...current,
+      email: current.email && emailRegex.test(nextValue.trim()) ? undefined : current.email,
+    }));
+  };
+
+  const handlePhoneChange: React.Dispatch<React.SetStateAction<string>> = (value) => {
+    const nextValue = typeof value === 'function' ? value(userPhone) : value;
+    const formatted = formatPhoneInput(nextValue);
+    setUserPhone(formatted);
+    setFormErrors((current) => ({
+      ...current,
+      phone: current.phone && phoneRegex.test(formatted.trim()) ? undefined : current.phone,
+    }));
+  };
+
   const validateForm = (autoEmail: string, autoPhone: string) => {
     const errors: typeof formErrors = {};
 
@@ -795,12 +1082,12 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
       errors.guests = capacityMessage;
     }
 
-    if (!autoEmail || !autoEmail.includes('@')) {
-      errors.email = 'Enter a valid email address.';
+    if (!autoEmail || !emailRegex.test(autoEmail)) {
+      errors.email = 'Please enter a valid email address (e.g., user@example.com)';
     }
 
-    if (!autoPhone || autoPhone.trim().length < 10) {
-      errors.phone = 'Enter a valid phone number (at least 10 digits).';
+    if (!autoPhone || !phoneRegex.test(autoPhone.trim())) {
+      errors.phone = 'Enter phone with country code (e.g., +91 9876543210)';
     }
 
     if (!termsAccepted) {
@@ -816,7 +1103,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
       propertyId,
       checkIn: dates.startDate.toISOString(),
       checkOut: dates.endDate.toISOString(),
-      guests: totalGuests,
+      guests: totalGuestsWithInfants,
     });
   };
 
@@ -847,16 +1134,16 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
       const allBookings = asArray(response.data, 'bookings');
       const targetNumber = String(propertyId);
 
-      const selectionStart = startOfDay(new Date(dates.startDate));
-      const selectionEnd = startOfDay(new Date(dates.endDate));
+      const selectionStart = getIstStartOfDay(new Date(dates.startDate));
+      const selectionEnd = getIstStartOfDay(new Date(dates.endDate));
 
       const hasConflict = allBookings.some((booking: any) => {
         const bookingListing = String(booking.listing).trim();
         const numberMatch = bookingListing.match(/(\d+)/);
         if (!numberMatch || numberMatch[1] !== targetNumber) return false;
 
-        const checkinDate = startOfDay(new Date(booking.checkin_date || booking.checkinDate));
-        const checkoutDate = startOfDay(new Date(booking.checkout_date || booking.checkoutDate));
+        const checkinDate = getIstStartOfDay(new Date(booking.checkin_date || booking.checkinDate));
+        const checkoutDate = getIstStartOfDay(new Date(booking.checkout_date || booking.checkoutDate));
 
         return selectionStart < checkoutDate && selectionEnd > checkinDate;
       });
@@ -1163,7 +1450,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
   return (
     <div
       id="booking-form"
-      className={`max-w-md mx-auto p-6 bg-bg-surface shadow-level2 rounded-2xl relative ${containerPaddingBottom} lg:pb-0 lg:sticky lg:top-20`}
+      className={`mx-auto w-full max-w-6xl p-6 bg-bg-surface shadow-level2 rounded-2xl relative ${containerPaddingBottom}`}
     >
       <div className="sr-only" role="status" aria-live="polite">
         <span id={validationMessageId}>{liveRegionMessage || 'Booking form ready'}</span>
@@ -1210,13 +1497,26 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         ctaConfirmation={ctaConfirmation}
         openCalendar={openCalendar}
         calendarRef={calendarRef}
+        triggerRowRef={triggerRowRef}
         isBookedDatesLoading={isBookedDatesLoading}
         bookedDates={bookedDates}
-        DateRangeComponent={undefined as never}
         handleDateChange={handleDateChange}
-        defaultStartDate={defaultStartDate}
-        ctaPrimaryColor={ctaPrimaryColor}
-      />
+        calendarVisibleMonth={calendarVisibleMonth}
+        calendarRenderVersion={calendarRenderVersion}
+        onMonthYearChange={(date) => {
+          const nextMonth = getIstStartOfDay(date);
+          setCalendarVisibleMonth(nextMonth);
+          setCalendarRenderVersion(nextMonth.toISOString());
+          setIsCalendarTransitioning(true);
+          window.setTimeout(() => setIsCalendarTransitioning(false), 200);
+        }}
+        isCalendarTransitioning={isCalendarTransitioning}
+          maxBookingDate={bookingWindowEnd}
+          minBookingDate={todayIstBoundary}
+          ctaPrimaryColor={ctaPrimaryColor}
+          setLastTriggerRef={setLastTriggerRef}
+          nights={nights}
+        />
 
       <BookingCardGuestsSection
         openGuests={openGuests}
@@ -1234,6 +1534,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         updateChildAge={updateChildAge}
         markEngagement={markEngagement}
         setOpenGuests={setOpenGuests}
+        triggerRowBottom={triggerRowBottom}
       />
 
       <BookingCardPricingPaymentSection
@@ -1246,6 +1547,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         totalExtraGuestCharges={totalExtraGuestCharges}
         feesAndTaxes={feesAndTaxes}
         totalPrice={totalPrice}
+        nights={nights}
         inlinePolicySnippets={inlinePolicySnippets}
         isRazorpayReady={isRazorpayReady}
         isLoading={isLoading}
@@ -1269,12 +1571,15 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
         FaCcVisaIcon={FaCcVisa}
         FaCcMastercardIcon={FaCcMastercard}
         userEmail={userEmail}
-        setUserEmail={setUserEmail}
+        setUserEmail={handleEmailChange}
+        onEmailBlur={handleEmailBlur}
         userPhone={userPhone}
-        setUserPhone={setUserPhone}
+        setUserPhone={handlePhoneChange}
+        onPhoneBlur={handlePhoneBlur}
         formErrors={formErrors}
         averageRating={property?.property_rating}
         reviewCount={property?.property_reviews}
+        submitButtonDisabled={submitButtonDisabled}
       />
     </div>
   );

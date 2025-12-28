@@ -18,6 +18,11 @@ No structured flags or placeholders exist for banner, services, why-choose, test
 - Home page imports the new wrappers and respects flag guards.
 - Footer mini CTA renders only when explicitly enabled.
 
+## Guest portal booking behaviors
+- **Homepage uses search mode**: past dates are disabled, booked dates are not blocked, and the **Check availability** CTA opens the availability modal instead of a unit-specific booking flow.
+- **Listing pages use unit mode**: booked dates are disabled per listing calendar and the only CTA is **Book this home**.
+- New components: use `SearchAvailabilityWidget` for homepage availability checks and `UnitBookingWidget` for listing-level booking/availability flows.
+
 ## "Do not break" constraints
 - Avoid visual regressions when flags are off.
 - Do not change existing copy, imagery, or layout for default paths.

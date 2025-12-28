@@ -15,31 +15,45 @@ interface Property {
   property_name: string;
 }
 
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const indiaPhoneRegex = /^\+91[6-9]\d{9}$/;
+const internationalPhoneRegex = /^\+[1-9]\d{6,14}$/;
+const countryOptions = [
+  { code: '+91', label: 'India (+91)' },
+  { code: '+1', label: 'United States (+1)' },
+  { code: '+44', label: 'United Kingdom (+44)' },
+  { code: '+971', label: 'United Arab Emirates (+971)' },
+];
+
 const BookingForm = ({ propertyData }: { propertyData: Property }) => {
-  // Format date to yyyy-mm-dd for input[type=date]
-  const formatDateForInput = (date: Date) => {
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = date.getFullYear();
-    return `${year}-${month}-${day}`;
+  const addDays = (date: Date, days: number) => {
+    const nextDate = new Date(date);
+    nextDate.setDate(nextDate.getDate() + days);
+    return nextDate;
   };
 
-  // Format date to dd-mm-yyyy for display
-  const formatDateForDisplay = (dateStr: string) => {
-    const [year, month, day] = dateStr.split('-').map(Number);
-    return `${String(day).padStart(2, '0')}-${String(month).padStart(2, '0')}-${year}`;
-  };
+  const today = useMemo(() => {
+    const current = new Date();
+    current.setHours(0, 0, 0, 0);
+    return current;
+  }, []);
 
-  // Set default dates
-  const today = new Date();
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
+  const maxBookingDate = useMemo(() => addDays(today, 180), [today]);
 
-  const [checkIn, setCheckIn] = useState(formatDateForInput(today));
-  const [checkOut, setCheckOut] = useState(formatDateForInput(tomorrow));
+  const defaultCheckIn = formatDateForInput(today);
+  const defaultCheckOut = formatDateForInput(addDays(today, 1));
+
+  const [checkIn, setCheckIn] = useState(defaultCheckIn);
+  const [checkOut, setCheckOut] = useState(defaultCheckOut);
   const [name, setName] = useState('');
+  const [phoneCountryCode, setPhoneCountryCode] = useState('+91');
+  const [phoneLocalNumber, setPhoneLocalNumber] = useState('');
   const [contactNumber, setContactNumber] = useState('');
   const [email, setEmail] = useState('');
+  const [emailTouched, setEmailTouched] = useState(false);
+  const [phoneTouched, setPhoneTouched] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
   const [showGuestDetails, setShowGuestDetails] = useState(false);
   const [adults, setAdults] = useState(1);
   const [children, setChildren] = useState(0);
@@ -49,8 +63,82 @@ const BookingForm = ({ propertyData }: { propertyData: Property }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [termsAcceptedAt, setTermsAcceptedAt] = useState<string | null>(null);
+  const [dateError, setDateError] = useState<string | null>(null);
   const unitType = inferUnitType({ property_name: propertyData?.property_name });
   const totalGuests = adults + children + infants;
+
+  const minCheckoutDate = useMemo(() => {
+    const parsedCheckIn = parseDate(checkIn);
+    const fallback = addDays(today, 1);
+    const computedMin = parsedCheckIn ? addDays(parsedCheckIn, 1) : fallback;
+    return computedMin > maxBookingDate ? maxBookingDate : computedMin;
+  }, [checkIn, maxBookingDate, today]);
+
+  const validateDateSelection = (
+    nextCheckInValue: string,
+    nextCheckOutValue: string,
+  ): { valid: boolean; message?: string } => {
+    const parsedCheckIn = parseDate(nextCheckInValue);
+    const parsedCheckOut = parseDate(nextCheckOutValue);
+
+    if (!parsedCheckIn || !parsedCheckOut) {
+      const message = 'Please select valid check-in and checkout dates.';
+      setDateError(message);
+      return { valid: false, message };
+    }
+
+    if (parsedCheckIn < today) {
+      const message = 'Check-in cannot be in the past.';
+      setDateError(message);
+      return { valid: false, message };
+    }
+
+    if (parsedCheckIn > maxBookingDate) {
+      const message = `Bookings are available up to ${formatDateForDisplay(maxBookingDate)}.`;
+      setDateError(message);
+      return { valid: false, message };
+    }
+
+    if (parsedCheckOut > maxBookingDate) {
+      const message = `Checkout must be on or before ${formatDateForDisplay(maxBookingDate)}.`;
+      setDateError(message);
+      return { valid: false, message };
+    }
+
+    if (parsedCheckOut <= parsedCheckIn) {
+      const message = 'Checkout must be after check-in.';
+      setDateError(message);
+      return { valid: false, message };
+    }
+
+    setDateError(null);
+    return { valid: true };
+  };
+
+  const handleCheckInChange = (value: string) => {
+    let nextCheckout = checkOut;
+    const parsedCheckIn = parseDate(value);
+
+    if (parsedCheckIn) {
+      const minimumCheckout = addDays(parsedCheckIn, 1);
+      const normalizedMinCheckout =
+        minimumCheckout > maxBookingDate ? maxBookingDate : minimumCheckout;
+      const parsedCheckout = parseDate(checkOut);
+
+      if (!parsedCheckout || parsedCheckout <= parsedCheckIn) {
+        nextCheckout = formatDateForInput(normalizedMinCheckout);
+        setCheckOut(nextCheckout);
+      }
+    }
+
+    setCheckIn(value);
+    validateDateSelection(value, nextCheckout);
+  };
+
+  const handleCheckOutChange = (value: string) => {
+    setCheckOut(value);
+    validateDateSelection(checkIn, value);
+  };
 
   const stayDates = useMemo(() => {
     const start = parseDate(checkIn);
@@ -86,24 +174,92 @@ const BookingForm = ({ propertyData }: { propertyData: Property }) => {
   const nights = nightlyBreakdown.length;
   const totalPrice = nightlyBreakdown.reduce((sum, breakdown) => sum + breakdown.finalNightlyPrice, 0);
 
-  const validateEmail = (email: string) => {
-    // Simple email regex validation
-    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return re.test(email);
+  const sanitizeInput = (value: string) =>
+    value
+      .replace(/<[^>]*>/g, '') // strip HTML tags
+      .replace(/[\u0000-\u001F\u007F]+/g, ' ') // remove control characters
+      .replace(/\s+/g, ' ') // normalize whitespace
+      .trim();
+  const normalizeEmail = (value: string) => value.trim().toLowerCase();
+
+  const validateEmail = (nextEmail: string) => emailRegex.test(nextEmail);
+
+  const validatePhone = (phone: string) =>
+    indiaPhoneRegex.test(phone) || internationalPhoneRegex.test(phone);
+
+  const handleEmailChange = (value: string, touched?: boolean) => {
+    const normalizedEmail = normalizeEmail(value);
+    setEmail(normalizedEmail);
+
+    if (emailTouched || touched) {
+      if (!normalizedEmail) {
+        setEmailError('Email is required.');
+      } else if (!validateEmail(normalizedEmail)) {
+        setEmailError('Enter a valid email address.');
+      } else {
+        setEmailError(null);
+      }
+    }
   };
+
+  const updatePhoneNumber = (countryCode: string, rawNumber: string, touched?: boolean) => {
+    const sanitizedLocalNumber = rawNumber.replace(/\D/g, '');
+    const combined = sanitizedLocalNumber ? `${countryCode}${sanitizedLocalNumber}` : '';
+
+    setPhoneCountryCode(countryCode);
+    setPhoneLocalNumber(sanitizedLocalNumber);
+    setContactNumber(combined);
+
+    if (phoneTouched || touched) {
+      if (!combined) {
+        setPhoneError('Contact number is required.');
+      } else if (!validatePhone(combined)) {
+        setPhoneError('Enter a valid contact number with country code.');
+      } else {
+        setPhoneError(null);
+      }
+    }
+  };
+
+  const isEmailValid = !!email && validateEmail(email);
+  const isPhoneValid = !!contactNumber && validatePhone(contactNumber);
+  const isNameValid = !!name.trim();
+  const emailHelperText = emailError || 'Booking details and confirmations will be sent to this email.';
+  const phoneHelperText =
+    phoneError || 'Include your country code, e.g., +91 followed by a 10-digit mobile number.';
+  const canSubmit = isNameValid && isEmailValid && isPhoneValid && termsAccepted && !isLoading;
   const handleSubmit = async () => {
+    const dateValidation = validateDateSelection(checkIn, checkOut);
+
+    if (!dateValidation.valid) {
+      toast.error(dateValidation.message || 'Please select valid booking dates.');
+      return;
+    }
+
+    setEmailTouched(true);
+    setPhoneTouched(true);
+    handleEmailChange(email, true);
+    updatePhoneNumber(phoneCountryCode, phoneLocalNumber, true);
+
+    const normalizedEmail = normalizeEmail(email);
+    const isValidEmail = !!normalizedEmail && validateEmail(normalizedEmail);
+    const isValidPhoneNumber = !!contactNumber && validatePhone(contactNumber);
+
     if (!name.trim()) {
       toast.warning('Please enter your name.');
       return;
     }
-    if (!contactNumber.trim()) {
-      toast.warning('Please enter your contact number.');
-      return;
-    }
-    if (!email.trim() || !validateEmail(email)) {
+
+    if (!isValidEmail) {
       toast.warning('Please enter a valid email address.');
       return;
     }
+
+    if (!isValidPhoneNumber) {
+      toast.warning('Please enter a valid contact number with country code.');
+      return;
+    }
+
     if (!termsAccepted) {
       toast.info('Please review and accept the Terms & Conditions before reserving.');
       return;
@@ -119,16 +275,23 @@ const BookingForm = ({ propertyData }: { propertyData: Property }) => {
     }
 
     setIsLoading(true);
+    const sanitizedName = sanitizeInput(name);
+    const sanitizedContactNumber = sanitizeInput(contactNumber);
+    const sanitizedEmail = sanitizeInput(normalizedEmail);
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
     const policyMessage =
       `Policies: ${origin}/policies | Cancel: ${origin}/policies#cancellation-refund-policy | Reschedule: ${origin}/policies#reschedule-date-change-policy | Terms: ${origin}/terms`;
 
+    const sanitizedMessage = sanitizeInput(
+      `New booking request for ${nights} nights from ${checkIn} to ${checkOut}. Guests: ${adults} adults, ${children} children, ${infants} infants, ${pets} pets. Total Price: ₹${totalPrice.toLocaleString()} ${policyMessage}`,
+    );
+
     const templateParams = {
       to_email: emailJsConfig.ownerEmail,
       to_name: 'Property Owner',
-      from_name: name,
-      contact_number: contactNumber,
-      from_email: email,
+      from_name: sanitizedName,
+      contact_number: sanitizedContactNumber,
+      from_email: sanitizedEmail,
       check_in: checkIn,
       check_out: checkOut,
       nights,
@@ -142,10 +305,7 @@ const BookingForm = ({ propertyData }: { propertyData: Property }) => {
       termsAcceptedAt: termsAcceptedAt || new Date().toISOString(),
       // total_price: `₹${totalPrice.toLocaleString()}`,
       property_name: propertyData?.property_name || 'Property',
-      message: `New booking request for ${nights} nights from ${checkIn} to ${checkOut}.
-Guests: ${adults} adults, ${children} children, ${infants} infants, ${pets} pets.
-Total Price: ₹${totalPrice.toLocaleString()}
-${policyMessage}`
+      message: sanitizedMessage,
     };
     try {
       await emailjs.send(
@@ -158,12 +318,16 @@ ${policyMessage}`
       toast.success('Booking request sent successfully! We will confirm details shortly.');
       // Optionally clear the form or keep data as is
       setName('');
+      setPhoneCountryCode('+91');
+      setPhoneLocalNumber('');
       setContactNumber('');
       setEmail('');
-      setCheckIn(formatDateForInput(new Date()));
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      setCheckOut(formatDateForInput(tomorrow));
+      setEmailTouched(false);
+      setPhoneTouched(false);
+      setEmailError(null);
+      setPhoneError(null);
+      setCheckIn(defaultCheckIn);
+      setCheckOut(defaultCheckOut);
       setAdults(1);
       setChildren(0);
       setInfants(0);
@@ -191,24 +355,62 @@ ${policyMessage}`
           <p>{inlinePolicySnippets.cancellation} <a className="underline" href="/terms#cancellations">Cancellation terms</a></p>
         </div>
         {/* Input Fields for Name, Contact Number, and Email */}
-        <Input
-          type="text"
-          placeholder="Name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-        <Input
-          type="text"
-          placeholder="Contact Number"
-          value={contactNumber}
-          onChange={(e) => setContactNumber(e.target.value)}
-        />
-        <Input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
+        <div className="space-y-2">
+          <Input
+            type="text"
+            placeholder="Name"
+            value={name}
+            aria-required={true}
+            aria-invalid={!isNameValid && !!name.trim()}
+            onChange={(e) => setName(e.target.value)}
+          />
+          <div className="space-y-1">
+            <div className="flex gap-2">
+              <Input
+                as="select"
+                value={phoneCountryCode}
+                fullWidth={false}
+                className="w-32"
+                aria-label="Country code"
+                onChange={(event) => updatePhoneNumber(event.target.value, phoneLocalNumber, phoneTouched)}
+              >
+                {countryOptions.map((country) => (
+                  <option key={country.code} value={country.code}>
+                    {country.label}
+                  </option>
+                ))}
+              </Input>
+              <Input
+                type="tel"
+                placeholder="Contact Number"
+                value={phoneLocalNumber}
+                aria-required={true}
+                aria-invalid={!!phoneError}
+                onChange={(e) => updatePhoneNumber(phoneCountryCode, e.target.value)}
+                onBlur={(e) => {
+                  setPhoneTouched(true);
+                  updatePhoneNumber(phoneCountryCode, e.target.value, true);
+                }}
+              />
+            </div>
+            <p className={`text-xs ${phoneError ? 'text-destructive' : 'text-text-muted'}`}>{phoneHelperText}</p>
+          </div>
+          <div className="space-y-1">
+            <Input
+              type="email"
+              placeholder="Email"
+              value={email}
+              aria-required={true}
+              aria-invalid={!!emailError}
+              onChange={(e) => handleEmailChange(e.target.value)}
+              onBlur={(e) => {
+                setEmailTouched(true);
+                handleEmailChange(e.target.value, true);
+              }}
+            />
+            <p className={`text-xs ${emailError ? 'text-destructive' : 'text-text-muted'}`}>{emailHelperText}</p>
+          </div>
+        </div>
 
         {/* Price Display */}
         {/* <div className="text-2xl font-semibold text-text-primary">
@@ -223,9 +425,10 @@ ${policyMessage}`
               <Input
                 type="date"
                 value={checkIn}
-                onChange={(e) => setCheckIn(e.target.value)}
+                onChange={(e) => handleCheckInChange(e.target.value)}
                 className="w-full"
-                min={formatDateForInput(new Date())}
+                min={formatDateForInput(today)}
+                max={formatDateForInput(maxBookingDate)}
               />
               <div className="text-xs text-text-muted mt-1">
                 {formatDateForDisplay(checkIn)}
@@ -236,14 +439,24 @@ ${policyMessage}`
               <Input
                 type="date"
                 value={checkOut}
-                onChange={(e) => setCheckOut(e.target.value)}
+                onChange={(e) => handleCheckOutChange(e.target.value)}
                 className="w-full"
-                min={checkIn}
+                min={formatDateForInput(minCheckoutDate)}
+                max={formatDateForInput(maxBookingDate)}
               />
               <div className="text-xs text-text-muted mt-1">
                 {formatDateForDisplay(checkOut)}
               </div>
             </div>
+          </div>
+          <div className="px-3 pb-3">
+            {dateError ? (
+              <div className="text-xs text-destructive">{dateError}</div>
+            ) : (
+              <div className="text-xs text-text-muted">
+                You can book stays through {formatDateForDisplay(maxBookingDate)}.
+              </div>
+            )}
           </div>
         </div>
 
@@ -421,7 +634,8 @@ ${policyMessage}`
         <Button
           type="button"
           onClick={handleSubmit}
-          disabled={isLoading || !termsAccepted}
+          disabled={!canSubmit}
+          aria-disabled={!canSubmit}
           fullWidth
         >
           {isLoading ? 'Sending...' : 'Reserve'}

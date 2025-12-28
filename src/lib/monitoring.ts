@@ -253,8 +253,10 @@ export const monitoredFetch = async (url: string, init?: MonitoredRequestInit): 
   const controller = new AbortController();
   const timeoutMs = init?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const signals = [init?.signal, controller.signal].filter(Boolean) as AbortSignal[];
-  const signal = signals.length > 1 && typeof (AbortSignal as any).any === 'function'
-    ? (AbortSignal as any).any(signals)
+  // AbortSignal.any() is not yet in all TypeScript definitions
+  const AbortSignalAny = AbortSignal as typeof AbortSignal & { any?: (signals: AbortSignal[]) => AbortSignal };
+  const signal = signals.length > 1 && typeof AbortSignalAny.any === 'function'
+    ? AbortSignalAny.any(signals)
     : signals[0];
   const timer = typeof setTimeout !== 'undefined'
     ? setTimeout(() => controller.abort(), timeoutMs)

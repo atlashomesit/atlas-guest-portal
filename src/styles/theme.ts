@@ -1,8 +1,46 @@
 export const themeRegistry = {
-  default: { label: "Default" },
-  valentine: { label: "Valentine" },
-  christmas: { label: "Christmas" },
-  newYear: { label: "New Year" },
+  default: { 
+    label: "Premium Platinum",
+    description: "Refined platinum palette for everyday elegance"
+  },
+  privateIslandNoir: {
+    label: "Private Island Noir",
+    description: "Nocturnal island luxe with gold accents and candlelit mood"
+  },
+  jetsetPearl: {
+    label: "Jetset Pearl",
+    description: "Pearl white with rose-gold sunrise accents"
+  },
+  ultraYachtAzure: {
+    label: "Ultra Yacht Azure",
+    description: "Superyacht Monaco elegance with sapphire sea and silver accents"
+  },
+  loversRetreatBlush: {
+    label: "Lovers Retreat Blush",
+    description: "Honeymoon suite warmth with champagne gold and blush rose"
+  },
+  emeraldDynasty: {
+    label: "Emerald Dynasty",
+    description: "Royal dark emerald palace with elite gold accents",
+    category: "Premium"
+  },
+  auroraChampagne: {
+    label: "Aurora Champagne",
+    description: "Dreamy champagne penthouse sunrise with glassy glow",
+    category: "Premium"
+  },
+  valentine: { 
+    label: "Romantic Rose",
+    description: "Soft rose tones for Valentine's Day"
+  },
+  christmas: { 
+    label: "Festive Evergreen",
+    description: "Classic red and green for the holidays"
+  },
+  newYear: { 
+    label: "Celebration Gold",
+    description: "Midnight blue and champagne gold for New Year"
+  },
 } as const;
 
 export type ThemeName = keyof typeof themeRegistry;
