@@ -161,14 +161,25 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
         return;
       }
 
-      if (startDate <= existingCheckIn) {
+      // If we have a valid range (endDate provided and > startDate), complete it
+      if (endDate && startDate && endDate > startDate) {
+        if (applySelection(startDate, endDate)) {
+          setSelectionState('RANGE_SELECTED');
+        }
+        return;
+      }
+
+      // User clicked a date before check-in - reset with new check-in
+      if (startDate < existingCheckIn) {
         if (applySelection(startDate, null)) {
           setSelectionState('CHECK_IN_SELECTED');
         }
         return;
       }
 
-      if (applySelection(existingCheckIn, startDate)) {
+      // User clicked same date or a date after check-in - treat as checkout
+      const checkoutDate = endDate && endDate > existingCheckIn ? endDate : startDate;
+      if (checkoutDate > existingCheckIn && applySelection(existingCheckIn, checkoutDate)) {
         setSelectionState('RANGE_SELECTED');
       }
       return;
@@ -181,7 +192,7 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
   };
 
   const normalizedStart = normalizeDate(value.startDate) ?? normalizeDate(minDate ?? null) ?? startOfDay(new Date());
-  const normalizedEnd = normalizeDate(value.endDate) ?? addDays(normalizedStart, 1);
+  const normalizedEnd = normalizeDate(value.endDate) ?? normalizedStart;
 
   useEffect(() => {
     if (!open || typeof document === 'undefined') return;
@@ -241,8 +252,14 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
   }, [open, shownDate, value.startDate, minDate]);
 
   const composedDisabledDay = (date: Date) => {
-    if (minDate && date < minDate) return true;
-    if (maxDate && date > maxDate) return true;
+    const normalized = normalizeDate(date);
+    const checkIn = normalizeDate(value.startDate);
+    if (minDate && normalized && normalized < normalizeDate(minDate)!) return true;
+    if (maxDate && normalized && normalized > normalizeDate(maxDate)!) return true;
+    // When selecting checkout, disable same-day or earlier than check-in to enforce 1-night minimum
+    if (selectionState === 'CHECK_IN_SELECTED' && checkIn && normalized && normalized <= checkIn) {
+      return true;
+    }
     return disabledDay ? disabledDay(date) : false;
   };
 
@@ -320,10 +337,10 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
                 key: 'selection',
               },
             ]}
-            retainEndDateOnFirstSelection
+            retainEndDateOnFirstSelection={true}
             dragSelectionEnabled={false}
             moveRangeOnFirstSelection={false}
-            editableDateInputs
+            editableDateInputs={false}
             minDate={minDate}
             maxDate={maxDate}
             disabledDates={disabledDates}

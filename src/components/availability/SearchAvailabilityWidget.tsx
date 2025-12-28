@@ -95,7 +95,7 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
     let errorMessage: string | null = startDate && startDate < today ? 'Check-in cannot be in the past.' : null;
 
     if (normalizedStart && normalizedEnd && normalizedEnd <= normalizedStart) {
-      normalizedEnd = addDays(normalizedStart, 1);
+      normalizedEnd = null;
       errorMessage = 'Minimum stay is 1 night after check-in.';
     }
 
@@ -505,21 +505,10 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
     }
 
     const nextRange = clampRange(normalizedStart, normalizedEnd);
-    const isSingleDaySelection = Boolean(
-      normalizedStart && normalizedEnd && normalizedStart.getTime() === normalizedEnd.getTime(),
-    );
-
-    if (isSingleDaySelection) {
-      setStatusMessage('Choose a check-out date.');
-      setDateError(null);
-      setDateRange({ startDate: normalizedStart, endDate: null });
-      setError(null);
-    } else {
-      setStatusMessage(nextRange.error ?? 'Updated dates.');
-      setDateError(nextRange.error);
-      setDateRange({ startDate: nextRange.startDate, endDate: nextRange.endDate });
-      setError(nextRange.error);
-    }
+    setStatusMessage(nextRange.error ?? 'Updated dates.');
+    setDateError(nextRange.error);
+    setDateRange({ startDate: nextRange.startDate, endDate: nextRange.endDate });
+    setError(nextRange.error);
 
     trackEvent('hero_dates_changed', {
       surface: 'hero_form',

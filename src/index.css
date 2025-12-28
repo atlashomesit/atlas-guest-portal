@@ -40,186 +40,327 @@
 }
 
 /* ============================================
-   PREMIUM DATEPICKER STYLING - PLATINUM THEME
+   MINIMALIST DATE PICKER - CLEAN & SIMPLE
    ============================================ */
 
-/* Booking calendar popover constraints */
+/* Calendar popover container - Fixed width to accommodate both months */
 .booking-calendar-popover {
   max-width: 100%;
-  overflow-x: hidden;
+  width: 100%;
+  overflow-x: visible;
   box-sizing: border-box;
+}
+
+/* Hide "Select your dates" heading, help icon, and instruction text */
+/* Target the header div by its border-bottom class pattern */
+.booking-calendar-popover > div[class*="border-b"][class*="px-6"] {
+  display: none !important;
+}
+
+/* Alternative: Hide any div with px-6 py-5 that's a direct child (header) */
+.booking-calendar-popover > div[class*="px-6"][class*="py-5"] {
+  display: none !important;
+}
+
+/* Hide range selected badge / status config badge with bullet point */
+/* Target the status badge by its class pattern */
+.booking-calendar-popover div[class*="mx-5"][class*="mt-4"][class*="mb-2"][class*="rounded-lg"] {
+  display: none !important;
+}
+
+/* Also target any div containing "Range selected" text or status config */
+.booking-calendar-popover > div[class*="max-h"] > div:first-child[class*="mx-5"] {
+  display: none !important;
 }
 
 .booking-calendar-popover * {
   box-sizing: border-box;
 }
 
-/* Base calendar wrapper - premium card feel */
+/* Minimal calendar wrapper - ensure no clipping */
 .rdrCalendarWrapper {
-  background: #FFFFFF;
-  border: 0.5px solid var(--platinum-200);
-  border-radius: 20px;
-  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.08), 0 8px 24px rgba(15, 23, 42, 0.04);
-  overflow: hidden;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  overflow: visible;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   max-width: 100%;
   width: 100%;
 }
 
-/* Month and year headers */
+/* Ensure month containers don't clip content */
+.rdrMonth {
+  overflow: visible !important;
+}
+
+/* Minimal month headers - reduced padding since header is removed */
 .rdrMonthAndYearWrapper {
-  padding: 20px 20px 12px 20px;
-  background: #FFFFFF;
-  border-bottom: 1px solid var(--platinum-100);
+  padding: 8px 0 4px 0 !important;
+  background: transparent !important;
+  border-bottom: none !important;
   position: relative;
   z-index: 1;
 }
 
 .rdrMonthAndYearPickers {
-  font-weight: 600;
-  color: var(--platinum-900);
+  font-weight: 500;
+  color: #111827;
   font-size: 16px;
+  letter-spacing: -0.01em;
 }
 
 .rdrMonthAndYearPickers select {
-  font-weight: 600;
-  color: var(--platinum-900);
-  padding: 6px 10px;
-  border-radius: 8px;
-  border: 1px solid var(--platinum-200);
-  background: white;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  font-weight: 500;
+  color: #111827;
+  padding: 4px 6px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  transition: border-color 0.15s ease;
+  font-size: 16px;
 }
 
 .rdrMonthAndYearPickers select:hover {
-  border-color: var(--platinum-300);
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+  border-color: transparent;
+  background: transparent;
 }
 
-/* Weekday headers */
+/* Minimal weekday headers - perfect grid alignment */
 .rdrWeekDays {
-  padding: 12px 20px 8px 20px;
-  background: var(--platinum-50);
+  padding: 4px 0 2px 0 !important;
+  background: transparent !important;
+  display: grid;
+  grid-template-columns: repeat(7, 40px);
+  grid-auto-rows: 32px;
+  gap: 0;
+  width: 100%;
+  border-bottom: none;
 }
 
 .rdrWeekDay {
-  font-size: 10px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--platinum-500);
-  padding: 4px 0;
+  letter-spacing: 0.05em;
+  color: #9ca3af;
+  padding: 8px 0;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-/* Day cells */
+/* Minimal date grid - perfect alignment, ensure all dates visible */
 .rdrDays {
-  padding: 0 20px 20px 20px;
+  padding: 0 !important;
   max-width: 100%;
-  overflow: hidden;
+  width: 100%;
+  overflow: visible;
+  display: grid;
+  grid-template-columns: repeat(7, 40px);
+  grid-auto-rows: 40px;
+  gap: 0;
+  min-width: 0;
+  margin: 0;
 }
 
-/* Day sizing + typography */
+/* Date cell container - ensure no clipping, no overlap */
 .rdrDay {
-  height: 44px !important;
-  line-height: 44px !important;
+  aspect-ratio: 1;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: visible;
+  width: 100%;
+  margin: 0;
+  padding: 0;
 }
 
 .rdrDayNumber {
-  font-weight: 500;
-  color: var(--platinum-800);
-  font-size: 16px;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 400;
+  color: #111827;
+  font-size: 15px;
   outline: none;
 }
 
 .rdrDayNumber span {
-  display: flex;
+  display: flex !important;
   align-items: center;
   justify-content: center;
-  min-width: 44px;
-  min-height: 44px;
-  border-radius: 12px;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  font-weight: 600;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  max-width: 36px;
+  max-height: 36px;
+  border-radius: 50% !important;
+  transition: background-color 0.12s ease;
+  font-weight: 400;
+  position: relative;
+  z-index: 2;
+  box-shadow: none !important;
+  background: transparent !important;
+  border: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+  flex-shrink: 0;
+  visibility: visible !important;
+  opacity: 1 !important;
+  color: #111827 !important;
 }
 
-/* Hover states */
+/* Base safeguard: all dates default to black text */
+.rdrDay .rdrDayNumber span {
+  color: #111827 !important;
+}
+
+/* Minimal hover state - just subtle background */
 .rdrDay:not(.rdrDayPassive):not(.rdrDayDisabled) .rdrDayNumber span:hover {
-  background: var(--platinum-100);
-  transform: scale(1.02);
+  background: #f9fafb;
+  color: #111827;
 }
 
-/* Today indicator */
-.rdrDayToday .rdrDayNumber span:after {
+/* Today indicator - simple dot */
+.rdrDayToday .rdrDayNumber span {
+  font-weight: 500;
+}
+
+.rdrDayToday .rdrDayNumber span::after {
   content: '';
   position: absolute;
-  bottom: 6px;
+  bottom: 4px;
   left: 50%;
   transform: translateX(-50%);
-  width: 16px;
-  height: 2px;
-  border-radius: 2px;
-  background: var(--platinum-400);
+  width: 4px;
+  height: 4px;
+  background: #111827;
+  border-radius: 50%;
 }
 
-/* Range highlighting */
+/* Ultra-minimal range - visible text and subtle fill */
 .rdrInRange {
-  background: rgba(99, 102, 241, 0.12) !important;
+  background: transparent !important;
 }
 
-.rdrStartEdge,
-.rdrEndEdge {
-  background: #4f46e5 !important;
-  color: #fff !important;
+.rdrInRange .rdrDayNumber span {
+  background: #f7f7f7 !important;
+  color: #111827 !important;
+  border: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-radius: 50% !important;
+}
+
+/* Range start - simple underline, NO background, NO overlap */
+.rdrStartEdge {
+  background: transparent !important;
+  margin: 0 !important;
+  padding: 0 !important;
 }
 
 .rdrStartEdge .rdrDayNumber span,
-.rdrEndEdge .rdrDayNumber span {
-  color: #fff !important;
-  border-radius: 12px !important;
+.rdrDay.rdrStartEdge .rdrDayNumber span {
+  background: #111827 !important;
+  color: white !important;
+  font-weight: 500 !important;
+  border: none !important;
+  border-radius: 50% !important;
+  box-shadow: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
 }
 
-.rdrStartEdge {
-  border-top-left-radius: 14px !important;
-  border-bottom-left-radius: 14px !important;
-}
-
+/* Range end - simple underline, NO background, NO overlap */
 .rdrEndEdge {
-  border-top-right-radius: 14px !important;
-  border-bottom-right-radius: 14px !important;
+  background: transparent !important;
+  margin: 0 !important;
+  padding: 0 !important;
 }
 
+.rdrEndEdge .rdrDayNumber span,
+.rdrDay.rdrEndEdge .rdrDayNumber span {
+  background: #111827 !important;
+  color: white !important;
+  font-weight: 500 !important;
+  border: none !important;
+  border-radius: 50% !important;
+  box-shadow: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Single day selected (start = end) */
+.rdrStartEdge.rdrEndEdge .rdrDayNumber span {
+  border: none !important;
+  border-radius: 50% !important;
+  background: #111827 !important;
+  color: white !important;
+}
+
+/* Fallback for any selected state */
+.rdrSelected .rdrDayNumber span,
+.rdrDaySelected .rdrDayNumber span {
+  color: white !important;
+  background: #111827 !important;
+  border: none !important;
+  font-weight: 500 !important;
+  border-radius: 50% !important;
+}
+
+/* Preview states - minimal, NO backgrounds */
 .rdrDayStartPreview,
 .rdrDayEndPreview,
 .rdrDayInPreview {
-  background: rgba(79, 70, 229, 0.08) !important;
-  border-radius: 12px !important;
+  background: transparent !important;
+  border-radius: 0 !important;
 }
 
-/* Disabled dates */
+.rdrDayStartPreview .rdrDayNumber span,
+.rdrDayEndPreview .rdrDayNumber span,
+.rdrDayInPreview .rdrDayNumber span {
+  background: transparent !important;
+  border: none !important;
+}
+
+/* Disabled dates - minimal */
 .rdrDayDisabled {
   background-color: transparent;
 }
 
 .rdrDayDisabled .rdrDayNumber span {
-  color: var(--platinum-300);
+  color: #d1d5db;
   cursor: not-allowed;
   opacity: 0.5;
 }
 
-/* Passive dates (other months) */
+/* Passive dates (other months) - muted, NO backgrounds */
 .rdrDayPassive .rdrDayNumber span {
-  color: var(--platinum-300);
+  color: #d1d5db;
+  font-weight: 400;
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
 }
 
-/* Navigation arrows - Base styles */
+/* Minimal navigation arrows */
 .rdrNextPrevButton {
-  background: white !important;
-  border: 1px solid var(--platinum-200) !important;
-  width: 36px !important;
-  height: 36px !important;
-  border-radius: 50% !important;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
-  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04) !important;
+  width: 32px !important;
+  height: 32px !important;
+  border: none !important;
+  background: transparent !important;
+  border-radius: 6px !important;
+  transition: background-color 0.15s ease !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -228,20 +369,18 @@
   position: relative !important;
   z-index: 50 !important;
   padding: 0 !important;
-  margin: 0 6px !important;
+  margin: 0 4px !important;
+  box-shadow: none !important;
+  color: #6b7280 !important;
 }
 
 .rdrNextPrevButton:hover {
-  background: var(--platinum-100) !important;
-  border-color: var(--platinum-300) !important;
-  transform: scale(1.05) !important;
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08) !important;
+  background: #f9fafb !important;
+  color: #111827 !important;
 }
 
 .rdrNextPrevButton:active {
-  background: #06B6D4 !important;
-  border-color: #06B6D4 !important;
-  transform: scale(0.98) !important;
+  background: #f3f4f6 !important;
 }
 
 .rdrNextPrevButton i {
@@ -249,20 +388,12 @@
   width: 8px !important;
   height: 8px !important;
   border-style: solid !important;
-  border-color: var(--platinum-600) !important;
+  border-color: currentColor !important;
   border-width: 0 2px 2px 0 !important;
   padding: 0 !important;
   margin: 0 !important;
-  transition: border-color 0.2s ease !important;
+  transition: border-color 0.15s ease !important;
   background: transparent !important;
-}
-
-.rdrNextPrevButton:hover i {
-  border-color: var(--platinum-700) !important;
-}
-
-.rdrNextPrevButton:active i {
-  border-color: white !important;
 }
 
 /* Previous button (left arrow) */
@@ -277,91 +408,86 @@
   margin-right: 2px !important;
 }
 
-/* Months container */
+/* Minimal two-month layout - Fixed spacing and width */
 .rdrMonths {
   display: flex;
   flex-direction: row;
   flex-wrap: nowrap;
   max-width: 100%;
-  overflow: hidden;
+  overflow: visible;
+  gap: 20px;
+  width: 100%;
 }
 
 .rdrMonth {
   padding: 0;
-  flex: 1 1 0%;
-  min-width: 0;
-  max-width: 50%;
+  flex: 1 1 50%;
+  min-width: 280px;
+  max-width: 360px;
+  width: 100%;
+  overflow: visible;
 }
 
 /* Date range wrapper constraints */
 .rdrDateRangeWrapper {
   max-width: 100%;
-  overflow: hidden;
+  overflow: visible;
+  width: 100%;
 }
 
 .rdrDateDisplayWrapper,
 .rdrMonthsVertical,
 .rdrMonthsHorizontal {
   max-width: 100%;
-  overflow: hidden;
+  overflow: visible;
+  width: 100%;
 }
 
-/* Remove all default react-date-range backgrounds */
-.rdrSelected,
-.rdrStartEdge,
-.rdrEndEdge,
-.rdrInRange,
-.rdrDayStartPreview,
-.rdrDayInPreview,
-.rdrDayEndPreview,
-.rdrDayHovered {
-  background: transparent !important;
-  color: inherit !important;
-  border: none !important;
-}
-
-/* Responsive breakpoints for calendar */
-
-/* Tablet and below - reduce cell sizes */
-@media (max-width: 1024px) {
-  .rdrDay {
-    height: 40px !important;
-  }
-  
-  .rdrDayNumber span {
-    font-size: 14px !important;
-  }
-  
-  .rdrMonthAndYearWrapper {
-    padding: 16px !important;
-  }
-  
-  .rdrWeekDay {
-    font-size: 10px !important;
-  }
-}
+/* ============================================
+   RESPONSIVE DESIGN - MINIMAL
+   ============================================ */
 
 /* Small tablets - stack months vertically */
 @media (max-width: 900px) {
   .rdrMonths {
     flex-direction: column !important;
-    gap: 16px;
+    gap: 48px !important;
   }
   
   .rdrMonth {
     max-width: 100% !important;
     width: 100%;
+    min-width: 100%;
   }
 }
 
-/* Mobile - hide second month */
+/* Mobile - single month, larger touch targets */
 @media (max-width: 767px) {
   .rdrMonth:nth-child(2) {
     display: none !important;
   }
   
+  .rdrMonths {
+    gap: 0 !important;
+  }
+  
   .rdrMonth {
     max-width: 100% !important;
+    min-width: 100%;
+  }
+  
+  .rdrDay {
+    min-height: 48px;
+  }
+  
+  .rdrDayNumber span {
+    min-width: 48px;
+    min-height: 48px;
+    font-size: 16px;
+  }
+  
+  .booking-calendar-popover {
+    padding: 20px;
   }
 }
 
@@ -423,189 +549,8 @@
 }
 
 /* ============================================
-   OPTIMIZED COMPACT DATE PICKER - REDUCED CLUNKINESS
+   RESPONSIVE DESIGN
    ============================================ */
-
-/* Compact title */
-.booking-calendar-popover [id*="label"] {
-  font-size: 16px !important;
-  font-weight: 600 !important;
-}
-
-/* Month labels - reduced to 12px */
-.rdrMonthAndYearPickers,
-.rdrMonthPicker select,
-.rdrYearPicker select {
-  font-size: 12px !important;
-  font-weight: 600 !important;
-}
-
-/* Day headers - reduced to 10px */
-.rdrWeekDay {
-  font-size: 10px !important;
-  font-weight: 500 !important;
-  padding: 4px 0 !important;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-/* Compact weekday container */
-.rdrWeekDays {
-  padding: 8px 16px 4px 16px !important;
-}
-
-/* Date cells - larger touch targets (WCAG 44px) */
-.rdrDay {
-  height: 44px !important;
-  width: 44px !important;
-  min-width: 44px !important;
-  min-height: 44px !important;
-  margin: 2px !important;
-}
-
-.rdrDayNumber {
-  width: 44px !important;
-  height: 44px !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  padding: 8px !important;
-}
-
-.rdrDayNumber span {
-  font-size: 16px !important;
-  font-weight: 500 !important;
-  line-height: 1.2 !important;
-}
-
-/* Days grid with gaps */
-.rdrDays {
-  padding: 0 16px 16px 16px !important;
-  gap: 4px !important;
-  display: grid !important;
-  grid-template-columns: repeat(7, 44px) !important;
-  grid-gap: 4px !important;
-}
-
-/* Months container with 16px gap */
-.rdrMonths {
-  gap: 16px !important;
-}
-
-/* Each month takes up minimal space */
-.rdrMonth {
-  padding: 0 !important;
-  min-width: 0 !important;
-}
-
-/* Compact navigation arrows */
-.rdrNextPrevButton {
-  width: 32px !important;
-  height: 32px !important;
-  margin: 0 4px !important;
-  background: white !important;
-  border: 1px solid var(--platinum-200) !important;
-  border-radius: 50% !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  cursor: pointer !important;
-  pointer-events: auto !important;
-  position: relative !important;
-  z-index: 50 !important;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
-  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04) !important;
-}
-
-.rdrNextPrevButton:hover {
-  background: var(--platinum-100) !important;
-  border-color: var(--platinum-300) !important;
-  transform: scale(1.05) !important;
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08) !important;
-}
-
-.rdrNextPrevButton:active {
-  background: #06B6D4 !important;
-  border-color: #06B6D4 !important;
-  transform: scale(0.98) !important;
-}
-
-.rdrNextPrevButton i {
-  display: block !important;
-  width: 8px !important;
-  height: 8px !important;
-  border-style: solid !important;
-  border-color: var(--platinum-600) !important;
-  border-width: 0 2px 2px 0 !important;
-  transform: rotate(-45deg) !important;
-  margin: 0 !important;
-  padding: 0 !important;
-}
-
-.rdrNextPrevButton:hover i {
-  border-color: var(--platinum-700) !important;
-}
-
-.rdrNextPrevButton:active i {
-  border-color: white !important;
-}
-
-/* Previous button - rotate arrow left */
-.rdrPprevButton i {
-  transform: rotate(135deg) !important;
-  margin-left: 2px !important;
-}
-
-/* Next button - rotate arrow right */
-.rdrNextButton i {
-  transform: rotate(-45deg) !important;
-  margin-right: 2px !important;
-}
-
-/* Reduced header padding */
-.rdrMonthAndYearWrapper {
-  padding: 12px 16px 8px 16px !important;
-}
-
-/* Compact calendar wrapper */
-.rdrCalendarWrapper {
-  padding: 12px !important;
-}
-
-/* Reduced dialog content padding */
-.booking-calendar-popover > div:last-child {
-  padding: 12px !important;
-}
-
-/* Desktop: Allow dialog to extend left over content */
-@media (min-width: 1024px) {
-  .booking-calendar-popover {
-    max-width: 540px !important;
-  }
-}
-
-/* Mobile: even larger touch targets for dates */
-@media (max-width: 768px) {
-  .rdrDay {
-    height: 48px !important;
-    width: 48px !important;
-    min-width: 48px !important;
-    min-height: 48px !important;
-  }
-
-  .rdrDayNumber {
-    width: 48px !important;
-    height: 48px !important;
-  }
-
-  .rdrDayNumber span {
-    font-size: 18px !important;
-  }
-
-  .rdrDays {
-    grid-template-columns: repeat(7, 48px) !important;
-  }
-}
 
 /* ============================================
    INDIVIDUAL LISTING DATEPICKER - COMPACT 2-MONTH NO SCROLL
