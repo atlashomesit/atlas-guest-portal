@@ -170,6 +170,8 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId }) => {
             id="unit-booking-dates"
             ref={calendarButtonRef}
             className="w-full rounded-xl border border-border-strong bg-bg-muted px-4 py-3 text-left text-text-primary hover:border-cta-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary"
+            aria-label="Click to select check-in date, then choose from calendar"
+            title="Click to select check-in date, then choose from calendar"
             onClick={() => {
               // Update shown date to the selected start date when opening calendar
               if (dateRange.startDate) {

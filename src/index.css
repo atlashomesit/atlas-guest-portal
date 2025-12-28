@@ -118,15 +118,16 @@
   overflow: hidden;
 }
 
+/* Day sizing + typography */
 .rdrDay {
-  height: 48px;
-  line-height: 48px;
+  height: 44px !important;
+  line-height: 44px !important;
 }
 
 .rdrDayNumber {
-  font-weight: 400;
+  font-weight: 500;
   color: var(--platinum-800);
-  font-size: 15px;
+  font-size: 16px;
   outline: none;
 }
 
@@ -134,11 +135,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 40px;
-  min-height: 40px;
+  min-width: 44px;
+  min-height: 44px;
   border-radius: 12px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  font-weight: 500;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  font-weight: 600;
 }
 
 /* Hover states */
@@ -158,6 +159,40 @@
   height: 2px;
   border-radius: 2px;
   background: var(--platinum-400);
+}
+
+/* Range highlighting */
+.rdrInRange {
+  background: rgba(99, 102, 241, 0.12) !important;
+}
+
+.rdrStartEdge,
+.rdrEndEdge {
+  background: #4f46e5 !important;
+  color: #fff !important;
+}
+
+.rdrStartEdge .rdrDayNumber span,
+.rdrEndEdge .rdrDayNumber span {
+  color: #fff !important;
+  border-radius: 12px !important;
+}
+
+.rdrStartEdge {
+  border-top-left-radius: 14px !important;
+  border-bottom-left-radius: 14px !important;
+}
+
+.rdrEndEdge {
+  border-top-right-radius: 14px !important;
+  border-bottom-right-radius: 14px !important;
+}
+
+.rdrDayStartPreview,
+.rdrDayEndPreview,
+.rdrDayInPreview {
+  background: rgba(79, 70, 229, 0.08) !important;
+  border-radius: 12px !important;
 }
 
 /* Disabled dates */
@@ -419,32 +454,36 @@
   padding: 8px 16px 4px 16px !important;
 }
 
-/* Date cells - 32px × 32px with 4px gaps */
+/* Date cells - larger touch targets (WCAG 44px) */
 .rdrDay {
-  height: 32px !important;
-  width: 32px !important;
+  height: 44px !important;
+  width: 44px !important;
+  min-width: 44px !important;
+  min-height: 44px !important;
+  margin: 2px !important;
 }
 
 .rdrDayNumber {
-  width: 32px !important;
-  height: 32px !important;
+  width: 44px !important;
+  height: 44px !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
+  padding: 8px !important;
 }
 
 .rdrDayNumber span {
-  font-size: 13px !important;
-  font-weight: 400 !important;
-  line-height: 1 !important;
+  font-size: 16px !important;
+  font-weight: 500 !important;
+  line-height: 1.2 !important;
 }
 
-/* Compact days grid with 4px gaps */
+/* Days grid with gaps */
 .rdrDays {
   padding: 0 16px 16px 16px !important;
   gap: 4px !important;
   display: grid !important;
-  grid-template-columns: repeat(7, 32px) !important;
+  grid-template-columns: repeat(7, 44px) !important;
   grid-gap: 4px !important;
 }
 
@@ -542,6 +581,29 @@
 @media (min-width: 1024px) {
   .booking-calendar-popover {
     max-width: 540px !important;
+  }
+}
+
+/* Mobile: even larger touch targets for dates */
+@media (max-width: 768px) {
+  .rdrDay {
+    height: 48px !important;
+    width: 48px !important;
+    min-width: 48px !important;
+    min-height: 48px !important;
+  }
+
+  .rdrDayNumber {
+    width: 48px !important;
+    height: 48px !important;
+  }
+
+  .rdrDayNumber span {
+    font-size: 18px !important;
+  }
+
+  .rdrDays {
+    grid-template-columns: repeat(7, 48px) !important;
   }
 }
 

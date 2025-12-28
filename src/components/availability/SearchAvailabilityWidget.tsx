@@ -594,7 +594,8 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
           <button
             type="button"
             className={`${dateFieldShellClass} text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary${activeField === 'checkin' && isCalendarOpen ? ' ring-2 ring-[var(--cta-primary)] ring-offset-2' : ''}`}
-            aria-label="Select check-in date"
+            aria-label="Click to select check-in date, then choose from calendar"
+            title="Click to select check-in date, then choose from calendar"
             aria-expanded={isCalendarOpen}
             aria-describedby={dateError ? dateErrorId : undefined}
             aria-invalid={dateError ? true : undefined}
@@ -622,7 +623,8 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
         <button
           type="button"
           className={`${dateFieldShellClass} text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary md:-ml-[1px]${activeField === 'checkout' && isCalendarOpen ? ' ring-2 ring-[var(--cta-primary)] ring-offset-2' : ''}`}
-          aria-label="Select check-out date"
+          aria-label="Click to select check-out date, then choose from calendar"
+          title="Click to select check-out date, then choose from calendar"
           aria-expanded={isCalendarOpen}
           aria-describedby={dateError ? dateErrorId : undefined}
           aria-invalid={dateError ? true : undefined}
