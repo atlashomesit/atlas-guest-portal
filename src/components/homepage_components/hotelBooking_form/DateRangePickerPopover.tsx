@@ -144,7 +144,7 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
         left: position.left,
         width: 'auto',
         minWidth: Math.min(520, position.width),
-        maxWidth: 'min(540px, calc(100vw - 48px))',
+        maxWidth: 'min(640px, calc(100vw - 48px))',
       }
     : undefined;
 
