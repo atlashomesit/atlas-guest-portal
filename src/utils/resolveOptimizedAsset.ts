@@ -2,13 +2,17 @@ import manifest from '../assets/optimized-manifest.json';
 
 const optimizedModules = import.meta.glob('../assets/**/*.{webp}', {
   eager: true,
-  as: 'url',
-});
+  query: '?url',
+  import: 'default',
+}) as Record<string, string>;
 
 const originalModules = import.meta.glob('../assets/**/*.{jpg,JPG,jpeg,JPEG,png,PNG,webp}', {
   eager: true,
-  as: 'url',
-});
+  query: '?url',
+  import: 'default',
+}) as Record<string, string>;
+
+const manifestTyped = manifest as Record<string, string>;
 
 function normalizeInputPath(input: string) {
   const trimmed = input.replace(/^\.\/?/, '');
@@ -24,7 +28,7 @@ function toModuleKey(relative: string) {
 
 export function resolveOptimizedAsset(relativePath: string) {
   const manifestKey = normalizeInputPath(relativePath);
-  const optimizedRelative = manifest[manifestKey];
+  const optimizedRelative = manifestTyped[manifestKey];
   if (optimizedRelative) {
     const optimizedModule = optimizedModules[toModuleKey(optimizedRelative)];
     if (optimizedModule) {
