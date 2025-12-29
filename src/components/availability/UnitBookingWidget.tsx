@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { addDays, format, startOfDay, startOfMonth } from 'date-fns';
+import { addDays, format, startOfMonth } from 'date-fns';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 import { Button } from '@/components/ui/Button';
@@ -68,13 +68,45 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId }) => {
 
       try {
         const bookings: BookingDTO[] = await getBookingsForListing(normalizedTarget);
+        
+        console.log('[UnitBookingWidget] Total bookings:', bookings.length);
+        console.log('[UnitBookingWidget] Today:', format(today, 'dd-MM-yyyy'));
+        bookings.forEach((booking, idx) => {
+          const checkIn = getIstStartOfDay(parseISODate(booking.checkInDate));
+          const checkOut = getIstStartOfDay(parseISODate(booking.checkOutDate));
+          const nights = Math.floor((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
+          console.log(`[UnitBookingWidget] Booking ${idx + 1}:`, {
+            checkIn: booking.checkInDate,
+            checkOut: booking.checkOutDate,
+            checkInFormatted: format(checkIn, 'dd-MM-yyyy'),
+            checkOutFormatted: format(checkOut, 'dd-MM-yyyy'),
+            nights: nights,
+            blockedDates: nights
+          });
+        });
+        
+        // Include all bookings to block dates (both past and future bookings)
         const blocked = expandBookingsToBlockedSet(bookings);
+        console.log('[UnitBookingWidget] Total blocked dates:', blocked.size);
+        
+        // Normalize dates to IST start of day for consistent comparison
         const blockedDates = Array.from(blocked)
-          .map((iso) => parseISODate(iso))
+          .map((iso) => getIstStartOfDay(parseISODate(iso)))
           .sort((a, b) => a.getTime() - b.getTime());
 
-        setBlockedSet(blocked);
+        console.log('[UnitBookingWidget] Blocked dates (all dates included):', blockedDates.length);
+        console.log('[UnitBookingWidget] Blocked dates:', blockedDates.map(d => format(d, 'dd-MM-yyyy')).join(', '));
+        console.log('[UnitBookingWidget] bookedDates.length:', blockedDates.length);
+
+        // Create blockedSet from all blocked dates
+        const blockedSet = new Set<string>();
+        blockedDates.forEach((date) => {
+          blockedSet.add(toISODate(date));
+        });
+
+        setBlockedSet(blockedSet);
         setBookedDates(blockedDates);
+              console.log('[UnitBookingWidget] Final bookedDates.length after setState:', blockedDates.length);
         setStatusMessage('Some dates are unavailable due to existing bookings.');
       } catch (error) {
         setStatusMessage('We could not refresh availability. Try again in a moment.');
@@ -97,7 +129,9 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId }) => {
 
   const disabledDay = (date: Date) => {
     const normalized = getIstStartOfDay(date);
+    // Allow today and future dates, block only past dates
     if (normalized < today) return true;
+    // Check if date is blocked by existing bookings
     const iso = toISODate(normalized);
     return blockedSet.has(iso);
   };
@@ -110,7 +144,8 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId }) => {
       return;
     }
 
-    const startISO = toISODate(startOfDay(startDate));
+    // Normalize to IST start of day for consistent comparison
+    const startISO = toISODate(getIstStartOfDay(startDate));
     if (blockedSet.has(startISO)) {
       setDateError('These dates overlap an existing booking. Please choose different dates.');
       setDateRange({ startDate: null, endDate: null });
@@ -118,7 +153,8 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId }) => {
     }
 
     if (endDate) {
-      const endISO = toISODate(startOfDay(endDate));
+      // Normalize to IST start of day for consistent comparison
+      const endISO = toISODate(getIstStartOfDay(endDate));
       if (doesRangeIntersectBlocked(startISO, endISO, blockedSet)) {
         setDateError('These dates overlap an existing booking. Please choose different dates.');
         setDateRange({ startDate, endDate: null });
@@ -175,15 +211,25 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId }) => {
             onClick={() => {
               // Update shown date to the selected start date when opening calendar
               if (dateRange.startDate) {
-                setShownDate(startOfDay(dateRange.startDate));
+                setShownDate(getIstStartOfDay(dateRange.startDate));
               }
               setOpenCalendar(true);
             }}
           >
             <div className="flex items-center justify-between gap-3">
-              <span className="text-sm sm:text-base">{formattedDateLabel}</span>
-              <span className="text-xs text-text-muted">{isLoading ? 'Loading…' : `${bookedDates.length} dates blocked`}</span>
-            </div>
+  <span className="text-sm sm:text-base">{formattedDateLabel}</span>
+  <span className="text-xs text-text-muted">
+    {isLoading
+      ? 'Loading…'
+      : dateRange.startDate && dateRange.endDate
+      ? (() => {
+          const nights = calculateNights(dateRange.startDate, dateRange.endDate);
+          return nights > 0 ? `${nights} ${nights === 1 ? 'date' : 'dates'} blocked` : 'Select dates';
+        })()
+      : 'Select dates'}
+  </span>
+</div>
+
             {dateRange.startDate && dateRange.endDate && calculateNights(dateRange.startDate, dateRange.endDate) > 0 && (
               <div className="mt-2 flex items-center justify-center">
                 <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--accent-primary)] bg-[var(--bg-surface)] px-2.5 py-1 rounded-lg border border-[var(--border-subtle)]">
@@ -200,7 +246,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId }) => {
               value={dateRange}
               onChange={handleRangeChange}
               loading={isLoading}
-              minDate={today}
+              minDate={addDays(today, -1)}
               maxDate={maxBookingDate}
               disabledDay={disabledDay}
               months={2}
@@ -211,9 +257,10 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId }) => {
               loadingLabel="Loading availability"
               rangeColors={['#475569']}
               dayContentRenderer={(day) => {
-                const dayStart = startOfDay(day);
-                const selectionStart = dateRange.startDate ? startOfDay(dateRange.startDate).getTime() : null;
-                const selectionEnd = dateRange.endDate ? startOfDay(dateRange.endDate).getTime() : null;
+                // Normalize all dates to IST start of day for consistent comparison
+                const dayStart = getIstStartOfDay(day);
+                const selectionStart = dateRange.startDate ? getIstStartOfDay(dateRange.startDate).getTime() : null;
+                const selectionEnd = dateRange.endDate ? getIstStartOfDay(dateRange.endDate).getTime() : null;
                 const isRangeStart = selectionStart !== null && dayStart.getTime() === selectionStart;
                 const isRangeEnd = selectionEnd !== null && dayStart.getTime() === selectionEnd;
                 const rangeStart = selectionStart !== null && selectionEnd !== null ? Math.min(selectionStart, selectionEnd) : null;

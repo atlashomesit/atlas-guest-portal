@@ -748,10 +748,12 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
           // Only include dates that are today or in the future (skip past dates)
           // Today is only blocked if: today >= checkinDate AND today < checkoutDate
           const datesForThisBooking: Date[] = [];
-          let currentDate = new Date(checkinDate);
+          // Start with normalized checkin date
+          let currentDate = getIstStartOfDay(checkinDate);
 
           while (currentDate < checkoutDate) {
-            const dateToBlock = getIstStartOfDay(new Date(currentDate));
+            // currentDate is already normalized, use it directly
+            const dateToBlock = currentDate;
 
             // Only block if date is today or in the future (skip past dates)
             // This ensures today is only blocked if it's actually in the booking range
@@ -760,7 +762,9 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
               blockedDates.push(dateToBlock);
             }
 
-            currentDate.setDate(currentDate.getDate() + 1);
+            // Use addDays from date-fns for reliable date incrementing across month boundaries
+            // Then normalize the result to ensure consistent date handling
+            currentDate = getIstStartOfDay(addDays(currentDate, 1));
           }
 
           console.log(`  Blocked dates (today and future only): ${datesForThisBooking.map(d => format(d, 'dd-MM-yyyy')).join(',')}`);

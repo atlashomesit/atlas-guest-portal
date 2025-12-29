@@ -216,7 +216,7 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
           )}
         </div>
 
-        <div className="max-h-[70vh] overflow-y-auto overflow-x-hidden p-5">
+        <div className="max-h-[70vh] overflow-y-auto overflow-x-hidden p-5" style={{ pointerEvents: 'auto' }}>
           {children}
           <p className="sr-only" aria-live="polite">
             {loadingLabel}

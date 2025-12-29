@@ -132,7 +132,8 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
     if (dateToCheck < minSelectableDate || dateToCheck > maxBookingDate) return true;
 
     return bookedDates.some((bookedDate) => {
-      const normalizedBooked = getIstStartOfDay(new Date(bookedDate));
+      // bookedDate is already a Date object, normalize it directly
+      const normalizedBooked = getIstStartOfDay(bookedDate instanceof Date ? bookedDate : new Date(bookedDate));
       return normalizedBooked.getTime() === dateTime;
     });
   };
@@ -148,7 +149,8 @@ export const BookingCardCalendarSection: React.FC<BookingCardCalendarSectionProp
     const isPastDate = dateToCheck < minSelectableDate;
     const isBeyondWindow = dateToCheck > maxBookingDate;
     const isBooked = bookedDates.some((bookedDate) => {
-      const normalizedBooked = getIstStartOfDay(new Date(bookedDate));
+      // bookedDate is already a Date object, normalize it directly
+      const normalizedBooked = getIstStartOfDay(bookedDate instanceof Date ? bookedDate : new Date(bookedDate));
       return normalizedBooked.getTime() === dateToCheckTime;
     });
 
