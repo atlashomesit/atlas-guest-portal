@@ -24,12 +24,14 @@ export const defaultHomeHighlights = [
 type HomeConfig = Pick<Home, "tagline" | "highlights">;
 
 const buildHome = (roomNo: string, config: HomeConfig = {}): Home => {
+  const isPenthouse = roomNo === '501';
+  const pathPrefix = isPenthouse ? 'atlas-penthouse-501' : `atlas-homes-room-${roomNo}`;
+  const href = `/homes/${pathPrefix}/${roomNo}`;
   const slug = `atlas-homes-room-${roomNo}`;
-  const href = `/property_details/${slug}`;
 
   return {
     roomNo,
-    title: `Atlas Homes ${roomNo}`,
+    title: `Atlas ${isPenthouse ? 'Penthouse' : 'Homes'} ${roomNo}`,
     slug,
     href,
     tagline: config.tagline,

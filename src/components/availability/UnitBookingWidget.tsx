@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { addDays, format, startOfMonth } from 'date-fns';
 import { useLocation, useNavigate } from 'react-router-dom';
-
 import { Button } from '@/components/ui/Button';
 import { AtlasDateRangePicker, type AtlasDateRangePickerValue } from '@/components/date/AtlasDateRangePicker';
 import { useBooking } from '@/contexts/BookingContext';
@@ -340,4 +339,3 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId,  listi
 };
 
 export default UnitBookingWidget;
-
