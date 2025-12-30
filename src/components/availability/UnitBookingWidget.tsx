@@ -165,8 +165,43 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId,  listi
     setDateRange(next);
   };
 
+  const calculatePrice = () => {
+    const isPenthouse = listingId.toString().includes('501');
+    const basePrice = isPenthouse ? 6000 : 3500;
+    const extraGuestFee = isPenthouse ? 1200 : 500;
+    const includedGuests = 2;
+    
+    // Calculate number of nights
+    const nights = dateRange.startDate && dateRange.endDate 
+      ? calculateNights(dateRange.startDate, dateRange.endDate) 
+      : 1; // Default to 1 night if no dates selected
+    
+    // Calculate extra guests fee
+    const extraGuests = Math.max(0, guests - includedGuests);
+    const extraGuestsFee = extraGuests * extraGuestFee;
+    
+    // Calculate total before discount
+    const subtotal = (basePrice + extraGuestsFee) * nights;
+    
+    // Apply 17% discount
+    const discount = Math.round((subtotal * 17) / 100);
+    const total = subtotal - discount;
+    
+    return {
+      basePrice: basePrice * nights,
+      extraGuestsFee: extraGuests > 0 ? extraGuestsFee * nights : 0,
+      subtotal,
+      discount,
+      total,
+      nights,
+      extraGuests
+    };
+  };
+
+  const priceDetails = calculatePrice();
+
   const formattedDateLabel = dateRange.startDate && dateRange.endDate
-    ? `${format(dateRange.startDate, 'EEE, dd MMM')} – ${format(dateRange.endDate, 'EEE, dd MMM')}`
+    ? `${format(dateRange.startDate, 'EEE, dd MMM')} – ${format(dateRange.endDate, 'EEE, dd MMM')} • ${priceDetails.nights} ${priceDetails.nights === 1 ? 'night' : 'nights'}`
     : 'Add your travel dates';
 
   const handleSubmit = () => {
@@ -195,6 +230,33 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId,  listi
         <p className="text-sm uppercase tracking-[0.12em] text-text-muted font-semibold">Reserve</p>
         <h3 className="text-xl sm:text-2xl font-semibold text-text-primary">Book this home</h3>
         <p className="text-text-secondary text-sm">Choose your dates to confirm availability for this apartment.</p>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-sm font-semibold rounded-full bg-[color:color-mix(in_srgb,var(--cta-primary)_18%,transparent)] px-3 py-1 text-[color:color-mix(in_srgb,var(--cta-primary)_80%,transparent)]">
+            Best price on our website
+          </span>
+          <span className="text-xs text-text-muted">Limited-time deal</span>
+        </div>
+        <div className="flex items-baseline gap-2">
+          <span className="text-2xl font-bold text-text-primary">
+            {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(priceDetails.total)}
+          </span>
+          <span className="text-sm text-text-muted line-through">
+            {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(priceDetails.subtotal)}
+          </span>
+          <span className="text-sm font-semibold text-[color:color-mix(in_srgb,var(--cta-primary)_80%,transparent)]">
+            Save 17%
+          </span>
+        </div>
+        <div className="text-sm text-text-muted space-y-1 mt-1">
+          <p>{priceDetails.nights} {priceDetails.nights === 1 ? 'night' : 'nights'} × {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(priceDetails.basePrice / priceDetails.nights)}</p>
+          {priceDetails.extraGuests > 0 && (
+            <p>{priceDetails.extraGuests} {priceDetails.extraGuests === 1 ? 'extra guest' : 'extra guests'} × {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(priceDetails.extraGuestsFee / priceDetails.nights / priceDetails.extraGuests)}/night</p>
+          )}
+          <p className="text-xs">Includes all taxes and fees</p>
+        </div>
       </div>
 
       <div className="space-y-3">
