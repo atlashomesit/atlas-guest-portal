@@ -274,31 +274,23 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId,  listi
                 const isDisabled = disabledDay(day);
                 const isToday = dayStart.getTime() === today.getTime();
 
-                return (
-                  <div className="relative flex h-full w-full items-center justify-center">
-                    {isInRange && !isRangeStart && !isRangeEnd && (
-                      <span
-                        className="absolute inset-0 bg-[var(--bg-primary)]"
-                        aria-hidden
-                      />
-                    )}
-                    <span
-                      className={`relative z-10 flex items-center justify-center text-sm font-medium transition ${
-                        isRangeStart || isRangeEnd
-                          ? 'bg-[var(--cta-primary)] text-white rounded-xl px-3 py-2 shadow-sm'
-                          : isDisabled
-                          ? 'text-[var(--border-strong)] cursor-not-allowed opacity-50'
-                          : 'text-[var(--brand)]'
-                      }`}
-                      style={{ minHeight: 38, minWidth: 38 }}
-                    >
-                      {format(day, 'd')}
-                      {isToday && !isRangeStart && !isRangeEnd && (
-                        <span className="absolute bottom-1 left-1/2 transform -translate-x-1/2 w-4 h-0.5 bg-[#94A3B8] rounded-full" />
-                      )}
-                    </span>
-                  </div>
-                );
+            return (
+  <div className="relative flex h-full w-full items-center justify-center">
+    <span
+      className={`relative z-10 flex items-center justify-center text-sm font-medium transition ${
+        isRangeStart || isRangeEnd
+          ? 'bg-[var(--cta-primary)] text-white rounded-xl px-3 py-2 shadow-sm'
+          : isDisabled
+          ? 'text-[var(--border-strong)] cursor-not-allowed opacity-50'
+          : 'text-[var(--brand)]'
+      }`}
+      style={{ minHeight: 38, minWidth: 38 }}
+    >
+      {format(day, 'd')}
+    </span>
+  </div>
+);
+
               }}
             />
           </div>

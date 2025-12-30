@@ -80,7 +80,7 @@ const Homepage_WhyChoose = () => {
                     <div className="flex-1">
                         <h2 className="text-3xl lg:text-4xl font-bold text-text-primary relative mb-4">
                             {featureData.title}
-                            <span className="absolute -bottom-2 left-0 w-1/4 h-1 bg-accent-primary rounded-full"></span>
+                       
                         </h2>
                         <p className="text-text-muted leading-relaxed mb-6">{featureData.description}</p>
 
