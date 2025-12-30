@@ -55,7 +55,8 @@ export interface GuestCounts {
 }
 
 const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = false }) => {
-  const serverAnchor = getIstStartOfDay(new Date('2025-12-28T00:00:00+05:30'));
+  // Use actual today instead of hardcoded date to allow today, tomorrow, and day after to be selectable
+  const serverAnchor = getIstStartOfDay();
   const todayIst = serverAnchor;
   const todayIstBoundary = serverAnchor;
   const bookingWindowEnd = addDays(serverAnchor, 180);

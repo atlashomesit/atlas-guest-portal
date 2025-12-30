@@ -139,7 +139,6 @@ const PropertyDetails = () => {
                 return;
             }
         }
-
         // If still not found, try to get from location state
         if (location.state?.property) {
             const prop = location.state.property;
@@ -157,13 +156,13 @@ const PropertyDetails = () => {
         console.error('No property found for slug:', unitSlug);
         setNotFound(true);
     }, [propertySlug, unitSlug, location.state]);
+useEffect(() => {
+  if (!data?.id) return;
 
-    useEffect(() => {
-        if (!data?.id) return;
-        setProperty(data.id);
-        return () => setProperty(null);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [data?.id]);
+  setProperty(data.id, data.property_name); // ✅ use property_name
+
+}, [data?.id, data?.property_name]);
+
 
     useEffect(() => {
         if (!data) return;
@@ -326,7 +325,6 @@ const PropertyDetails = () => {
       />
     </a>
   </div>
-
   {/* Thumbnails */}
   <div className="flex-1 grid grid-cols-2 grid-rows-2 gap-2 h-full">
     {(propertyImages[data.id]?.slice(1, 5) || data.property_img.slice(1, 5)).map((img: string, index: number) => (
@@ -368,8 +366,6 @@ const PropertyDetails = () => {
     ))}
   </div>
 </div>
-
-
 
                 <div className='flex flex-col gap-4 sm:flex-row '>
                     {/* Left div  */}
@@ -484,12 +480,13 @@ const PropertyDetails = () => {
                     </div>
                     {/* right div  */}
                     <div className="w-full sm:w-1/3">
-                        <div className='hidden lg:block sticky top-16'>
-                            <UnitBookingWidget listingId={data.id} />
-                        </div>
-                        <div className="lg:hidden">
-                            <UnitBookingWidget listingId={data.id} />
-                        </div>
+                       <div className='hidden lg:block sticky top-16'>
+    <UnitBookingWidget listingId={data.id} listingName={data.property_name} />
+</div>
+<div className="lg:hidden">
+    <UnitBookingWidget listingId={data.id} listingName={data.property_name} />
+</div>
+
                     </div>
                 </div>
 

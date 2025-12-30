@@ -37,7 +37,7 @@ const rangesOverlap = (a: Range, b: Range) => a.start < b.end && b.start < a.end
 export const generateMockBookings = (
   listingIds: string[],
   start: Date,
-  monthsAhead = 2,
+  monthsAhead = 0,
   blockedRatio = 0.2,
 ): BookingDTO[] => {
   const windowStart = startOfDay(start);

@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 
 type BookingState = {
   propertyId: string | number | null;
+  propertyName: string | null;
   checkIn: string | null;
   checkOut: string | null;
   guests: number;
@@ -10,7 +11,11 @@ type BookingState = {
 type BookingContextValue = {
   booking: BookingState;
   updateBooking: (updates: Partial<BookingState>) => void;
-  setProperty: (propertyId: string | number | null) => void;
+setProperty: (
+  propertyId: string | number | null,
+  propertyName?: string | null
+) => void;
+
   setDates: (checkIn: string | null, checkOut: string | null) => void;
   setGuests: (guests: number) => void;
   pendingScrollTarget: string | null;
@@ -21,10 +26,12 @@ const STORAGE_KEY = 'atlasHeroSearch';
 
 const defaultState: BookingState = {
   propertyId: null,
+  propertyName: null,
   checkIn: null,
   checkOut: null,
   guests: 2,
 };
+
 
 const BookingContext = createContext<BookingContextValue | undefined>(undefined);
 
@@ -39,6 +46,7 @@ const loadState = (): BookingState => {
 
     return {
       propertyId: parsed.propertyId ?? null,
+       propertyName: parsed.propertyName ?? null, 
       checkIn: parsed.checkIn ?? null,
       checkOut: parsed.checkOut ?? null,
       guests: typeof parsed.guests === 'number' && parsed.guests > 0 ? parsed.guests : defaultState.guests,
@@ -60,9 +68,12 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       console.warn('[BookingContext] Failed to persist booking state', error);
     }
   }, [booking]);
+  useEffect(() => {
+ 
+}, [booking]);
 
   const updateBooking = useCallback((updates: Partial<BookingState>) => {
-    setBooking((prev) => ({
+        setBooking((prev) => ({
       ...prev,
       ...updates,
       guests: typeof updates.guests === 'number' ? Math.max(1, updates.guests) : prev.guests,
@@ -74,7 +85,9 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     pendingScrollTarget,
     setPendingScrollTarget,
     updateBooking,
-    setProperty: (propertyId) => updateBooking({ propertyId }),
+setProperty: (propertyId, propertyName) =>
+  updateBooking({ propertyId, propertyName }),
+
     setDates: (checkIn, checkOut) => updateBooking({ checkIn, checkOut }),
     setGuests: (guests) => updateBooking({ guests }),
   }), [booking, pendingScrollTarget, updateBooking]);

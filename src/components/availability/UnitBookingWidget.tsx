@@ -14,6 +14,7 @@ import { type BookingDTO } from '@/types/booking';
 
 interface UnitBookingWidgetProps {
   listingId: string | number;
+    listingName?: string;
 }
 
 const normalizeListingId = (value: string | number | null | undefined) =>
@@ -21,8 +22,8 @@ const normalizeListingId = (value: string | number | null | undefined) =>
     .trim()
     .toLowerCase();
 
-const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId }) => {
-  if (import.meta.env.DEV) {
+const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId,  listingName }) => {
+     if (import.meta.env.DEV) {
     console.assert(Boolean(listingId), '[UnitBookingWidget] listingId is required for unit mode');
   }
 
@@ -178,12 +179,13 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId }) => {
     setFormError(null);
     updateBooking({
       propertyId: listingId,
+       propertyName: listingName ?? null,
       checkIn: dateRange.startDate.toISOString(),
       checkOut: dateRange.endDate.toISOString(),
       guests,
     });
 
-    navigate('/reserve', { state: { from: location.pathname, listingId } });
+     navigate('/reserve', { state: { from: location.pathname, listingId, listingName } });
   };
 
 

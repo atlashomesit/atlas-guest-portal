@@ -3,6 +3,7 @@ import { addDays, startOfDay } from 'date-fns';
 import { DateRange, type RangeKeyDict } from 'react-date-range';
 
 import { DateRangePickerPopover } from '../homepage_components/hotelBooking_form/DateRangePickerPopover';
+import { getIstStartOfDay } from '@/utils/date';
 
 // Helper to normalize date to start of month (avoids timezone issues with date-fns startOfMonth)
 const normalizeToStartOfMonth = (date: Date): Date => {
@@ -11,7 +12,8 @@ const normalizeToStartOfMonth = (date: Date): Date => {
 
 const normalizeDate = (date: Date | null): Date | null => {
   if (!date) return null;
-  return startOfDay(date);
+  // Use IST normalization to match BookingCardCalendarSection and ensure consistent comparisons
+  return getIstStartOfDay(date);
 };
 
 export interface AtlasDateRangePickerValue {
