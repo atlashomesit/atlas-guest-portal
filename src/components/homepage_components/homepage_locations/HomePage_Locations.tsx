@@ -288,23 +288,72 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
                 }}
               />
               {heroModel.images.length > 1 && (
-                <div className="absolute inset-0 flex items-center justify-between px-4">
-                  <button
-                    type="button"
-                    aria-label="Previous image"
-                    onClick={() => handleSlideChange(heroModel.listing.id, "prev", heroModel.images.length)}
-                    className="rounded-full bg-[color:color-mix(in_srgb,var(--bg-surface)_80%,transparent)] p-2 shadow"
-                  >
-                    ‹
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="Next image"
-                    onClick={() => handleSlideChange(heroModel.listing.id, "next", heroModel.images.length)}
-                    className="rounded-full bg-[color:color-mix(in_srgb,var(--bg-surface)_80%,transparent)] p-2 shadow"
-                  >
-                    ›
-                  </button>
+                <div className="absolute bottom-4 left-0 right-0">
+                  <div className="flex justify-center gap-2">
+                    {heroModel.images.length <= 5 ? (
+                      // Show all dots if 5 or fewer images
+                      heroModel.images.map((_, index) => (
+                        <button
+                          key={index}
+                          type="button"
+                          aria-label={`Go to image ${index + 1}`}
+                          onClick={() => {
+                            setActiveImageIndex(prev => ({
+                              ...prev,
+                              [heroModel.listing.id]: index
+                            }));
+                          }}
+                          className={`w-2.5 h-2.5 rounded-full transition-all ${
+                            (activeImageIndex[heroModel.listing.id] ?? 0) === index
+                              ? 'bg-white scale-125'
+                              : 'bg-white/50 hover:bg-white/70'
+                          }`}
+                        />
+                      ))
+                    ) : (
+                      // Show 5 dots with active dot in context when more than 5 images
+                      Array.from({ length: 5 }).map((_, i) => {
+                        const activeIndex = activeImageIndex[heroModel.listing.id] ?? 0;
+                        let dotIndex = i;
+                        
+                        // Adjust dot positions based on active index
+                        if (activeIndex <= 1) {
+                          // First two dots are 0 and 1
+                          dotIndex = i;
+                        } else if (activeIndex >= heroModel.images.length - 2) {
+                          // Last two dots are last two images
+                          dotIndex = heroModel.images.length - 5 + i;
+                        } else {
+                          // Middle dots center around active index
+                          dotIndex = activeIndex - 2 + i;
+                        }
+                        
+                        // Ensure dotIndex stays within bounds
+                        dotIndex = Math.min(Math.max(0, dotIndex), heroModel.images.length - 1);
+                        
+                        const isActive = activeIndex === dotIndex;
+                        
+                        return (
+                          <button
+                            key={i}
+                            type="button"
+                            aria-label={`Go to image ${dotIndex + 1}`}
+                            onClick={() => {
+                              setActiveImageIndex(prev => ({
+                                ...prev,
+                                [heroModel.listing.id]: dotIndex
+                              }));
+                            }}
+                            className={`w-2.5 h-2.5 rounded-full transition-all ${
+                              isActive
+                                ? 'bg-white scale-125'
+                                : 'bg-white/50 hover:bg-white/70'
+                            }`}
+                          />
+                        );
+                      })
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -374,23 +423,72 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
                       }}
                     />
                     {model.images.length > 1 && (
-                      <div className="absolute inset-0 flex items-center justify-between px-3">
-                        <button
-                          type="button"
-                          aria-label="Previous image"
-                          onClick={() => handleSlideChange(model.listing.id, "prev", model.images.length)}
-                          className="rounded-full bg-[color:color-mix(in_srgb,var(--bg-surface)_80%,transparent)] p-2 shadow"
-                        >
-                          ‹
-                        </button>
-                        <button
-                          type="button"
-                          aria-label="Next image"
-                          onClick={() => handleSlideChange(model.listing.id, "next", model.images.length)}
-                          className="rounded-full bg-[color:color-mix(in_srgb,var(--bg-surface)_80%,transparent)] p-2 shadow"
-                        >
-                          ›
-                        </button>
+                      <div className="absolute bottom-2 left-0 right-0">
+                        <div className="flex justify-center gap-1.5">
+                          {model.images.length <= 5 ? (
+                            // Show all dots if 5 or fewer images
+                            model.images.map((_, index) => (
+                              <button
+                                key={index}
+                                type="button"
+                                aria-label={`Go to image ${index + 1}`}
+                                onClick={() => {
+                                  setActiveImageIndex(prev => ({
+                                    ...prev,
+                                    [model.listing.id]: index
+                                  }));
+                                }}
+                                className={`w-2 h-2 rounded-full transition-all ${
+                                  (activeImageIndex[model.listing.id] ?? 0) === index
+                                    ? 'bg-white scale-125'
+                                    : 'bg-white/50 hover:bg-white/70'
+                                }`}
+                              />
+                            ))
+                          ) : (
+                            // Show 5 dots with active dot in context when more than 5 images
+                            Array.from({ length: 5 }).map((_, i) => {
+                              const activeIndex = activeImageIndex[model.listing.id] ?? 0;
+                              let dotIndex = i;
+                              
+                              // Adjust dot positions based on active index
+                              if (activeIndex <= 1) {
+                                // First two dots are 0 and 1
+                                dotIndex = i;
+                              } else if (activeIndex >= model.images.length - 2) {
+                                // Last two dots are last two images
+                                dotIndex = model.images.length - 5 + i;
+                              } else {
+                                // Middle dots center around active index
+                                dotIndex = activeIndex - 2 + i;
+                              }
+                              
+                              // Ensure dotIndex stays within bounds
+                              dotIndex = Math.min(Math.max(0, dotIndex), model.images.length - 1);
+                              
+                              const isActive = activeIndex === dotIndex;
+                              
+                              return (
+                                <button
+                                  key={i}
+                                  type="button"
+                                  aria-label={`Go to image ${dotIndex + 1}`}
+                                  onClick={() => {
+                                    setActiveImageIndex(prev => ({
+                                      ...prev,
+                                      [model.listing.id]: dotIndex
+                                    }));
+                                  }}
+                                  className={`w-2 h-2 rounded-full transition-all ${
+                                    isActive
+                                      ? 'bg-white scale-125'
+                                      : 'bg-white/50 hover:bg-white/70'
+                                  }`}
+                                />
+                              );
+                            })
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>

@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { addDays, format, startOfDay, startOfMonth } from 'date-fns';
+import { addDays, format, startOfMonth } from 'date-fns';
 import { useLocation, useNavigate } from 'react-router-dom';
-
 import { Button } from '@/components/ui/Button';
 import { AtlasDateRangePicker, type AtlasDateRangePickerValue } from '@/components/date/AtlasDateRangePicker';
 import { useBooking } from '@/contexts/BookingContext';
@@ -14,6 +13,7 @@ import { type BookingDTO } from '@/types/booking';
 
 interface UnitBookingWidgetProps {
   listingId: string | number;
+    listingName?: string;
 }
 
 const normalizeListingId = (value: string | number | null | undefined) =>
@@ -21,8 +21,8 @@ const normalizeListingId = (value: string | number | null | undefined) =>
     .trim()
     .toLowerCase();
 
-const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId }) => {
-  if (import.meta.env.DEV) {
+const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId,  listingName }) => {
+     if (import.meta.env.DEV) {
     console.assert(Boolean(listingId), '[UnitBookingWidget] listingId is required for unit mode');
   }
 
@@ -68,13 +68,45 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId }) => {
 
       try {
         const bookings: BookingDTO[] = await getBookingsForListing(normalizedTarget);
+        
+        console.log('[UnitBookingWidget] Total bookings:', bookings.length);
+        console.log('[UnitBookingWidget] Today:', format(today, 'dd-MM-yyyy'));
+        bookings.forEach((booking, idx) => {
+          const checkIn = getIstStartOfDay(parseISODate(booking.checkInDate));
+          const checkOut = getIstStartOfDay(parseISODate(booking.checkOutDate));
+          const nights = Math.floor((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
+          console.log(`[UnitBookingWidget] Booking ${idx + 1}:`, {
+            checkIn: booking.checkInDate,
+            checkOut: booking.checkOutDate,
+            checkInFormatted: format(checkIn, 'dd-MM-yyyy'),
+            checkOutFormatted: format(checkOut, 'dd-MM-yyyy'),
+            nights: nights,
+            blockedDates: nights
+          });
+        });
+        
+        // Include all bookings to block dates (both past and future bookings)
         const blocked = expandBookingsToBlockedSet(bookings);
+        console.log('[UnitBookingWidget] Total blocked dates:', blocked.size);
+        
+        // Normalize dates to IST start of day for consistent comparison
         const blockedDates = Array.from(blocked)
-          .map((iso) => parseISODate(iso))
+          .map((iso) => getIstStartOfDay(parseISODate(iso)))
           .sort((a, b) => a.getTime() - b.getTime());
 
-        setBlockedSet(blocked);
+        console.log('[UnitBookingWidget] Blocked dates (all dates included):', blockedDates.length);
+        console.log('[UnitBookingWidget] Blocked dates:', blockedDates.map(d => format(d, 'dd-MM-yyyy')).join(', '));
+        console.log('[UnitBookingWidget] bookedDates.length:', blockedDates.length);
+
+        // Create blockedSet from all blocked dates
+        const blockedSet = new Set<string>();
+        blockedDates.forEach((date) => {
+          blockedSet.add(toISODate(date));
+        });
+
+        setBlockedSet(blockedSet);
         setBookedDates(blockedDates);
+              console.log('[UnitBookingWidget] Final bookedDates.length after setState:', blockedDates.length);
         setStatusMessage('Some dates are unavailable due to existing bookings.');
       } catch (error) {
         setStatusMessage('We could not refresh availability. Try again in a moment.');
@@ -97,7 +129,9 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId }) => {
 
   const disabledDay = (date: Date) => {
     const normalized = getIstStartOfDay(date);
+    // Allow today and future dates, block only past dates
     if (normalized < today) return true;
+    // Check if date is blocked by existing bookings
     const iso = toISODate(normalized);
     return blockedSet.has(iso);
   };
@@ -110,7 +144,8 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId }) => {
       return;
     }
 
-    const startISO = toISODate(startOfDay(startDate));
+    // Normalize to IST start of day for consistent comparison
+    const startISO = toISODate(getIstStartOfDay(startDate));
     if (blockedSet.has(startISO)) {
       setDateError('These dates overlap an existing booking. Please choose different dates.');
       setDateRange({ startDate: null, endDate: null });
@@ -118,7 +153,8 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId }) => {
     }
 
     if (endDate) {
-      const endISO = toISODate(startOfDay(endDate));
+      // Normalize to IST start of day for consistent comparison
+      const endISO = toISODate(getIstStartOfDay(endDate));
       if (doesRangeIntersectBlocked(startISO, endISO, blockedSet)) {
         setDateError('These dates overlap an existing booking. Please choose different dates.');
         setDateRange({ startDate, endDate: null });
@@ -129,8 +165,60 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId }) => {
     setDateRange(next);
   };
 
+  const calculatePrice = () => {
+    const isPenthouse = listingId.toString().includes('501');
+    const basePrice = isPenthouse ? 6000 : 3500;
+    const extraGuestFee = isPenthouse ? 1200 : 500;
+    const includedGuests = 2;
+    
+    // Calculate number of nights
+    const nights = dateRange.startDate && dateRange.endDate 
+      ? calculateNights(dateRange.startDate, dateRange.endDate) 
+      : 1; // Default to 1 night if no dates selected
+    
+    // Calculate extra guests fee
+    const extraGuests = Math.max(0, guests - includedGuests);
+    const extraGuestsFee = extraGuests * extraGuestFee;
+    
+    // Calculate total before discount
+    const subtotal = (basePrice + extraGuestsFee) * nights;
+    
+    // Apply 17% discount
+    const discount = Math.round((subtotal * 17) / 100);
+    const total = subtotal - discount;
+    
+    return {
+      basePrice: basePrice * nights,
+      extraGuestsFee: extraGuests > 0 ? extraGuestsFee * nights : 0,
+      subtotal,
+      discount,
+      total,
+      nights,
+      extraGuests
+    };
+  };
+
+  const priceDetails = calculatePrice();
+  // ---------- Fee calculations ----------
+const cleaningFee = 500;
+
+// GST = 5% on discounted price
+const gstAmount = Math.round(priceDetails.total * 0.05);
+
+// Subtotal for convenience fee
+const subtotalForConvenience =
+  priceDetails.total + cleaningFee + gstAmount;
+
+// Convenience fee = 2.7%
+const convenienceFee = Math.round(subtotalForConvenience * 0.027);
+
+// Final payable amount
+const finalTotal =
+  priceDetails.total + cleaningFee + gstAmount + convenienceFee;
+
+
   const formattedDateLabel = dateRange.startDate && dateRange.endDate
-    ? `${format(dateRange.startDate, 'EEE, dd MMM')} – ${format(dateRange.endDate, 'EEE, dd MMM')}`
+    ? `${format(dateRange.startDate, 'EEE, dd MMM')} – ${format(dateRange.endDate, 'EEE, dd MMM')} • ${priceDetails.nights} ${priceDetails.nights === 1 ? 'night' : 'nights'}`
     : 'Add your travel dates';
 
   const handleSubmit = () => {
@@ -142,12 +230,13 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId }) => {
     setFormError(null);
     updateBooking({
       propertyId: listingId,
+       propertyName: listingName ?? null,
       checkIn: dateRange.startDate.toISOString(),
       checkOut: dateRange.endDate.toISOString(),
       guests,
     });
 
-    navigate('/reserve', { state: { from: location.pathname, listingId } });
+     navigate('/reserve', { state: { from: location.pathname, listingId, listingName } });
   };
 
 
@@ -160,6 +249,33 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId }) => {
         <p className="text-text-secondary text-sm">Choose your dates to confirm availability for this apartment.</p>
       </div>
 
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-sm font-semibold rounded-full bg-[color:color-mix(in_srgb,var(--cta-primary)_18%,transparent)] px-3 py-1 text-[color:color-mix(in_srgb,var(--cta-primary)_80%,transparent)]">
+            Best price on our website
+          </span>
+          <span className="text-xs text-text-muted">Limited-time deal</span>
+        </div>
+        <div className="flex items-baseline gap-2">
+          <span className="text-2xl font-bold text-text-primary">
+            {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(priceDetails.total)}
+          </span>
+          <span className="text-sm text-text-muted line-through">
+            {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(priceDetails.subtotal)}
+          </span>
+          <span className="text-sm font-semibold text-[color:color-mix(in_srgb,var(--cta-primary)_80%,transparent)]">
+            Save 17%
+          </span>
+        </div>
+        <div className="text-sm text-text-muted space-y-1 mt-1">
+          <p>{priceDetails.nights} {priceDetails.nights === 1 ? 'night' : 'nights'} × {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(priceDetails.basePrice / priceDetails.nights)}</p>
+          {priceDetails.extraGuests > 0 && (
+            <p>{priceDetails.extraGuests} {priceDetails.extraGuests === 1 ? 'extra guest' : 'extra guests'} × {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(priceDetails.extraGuestsFee / priceDetails.nights / priceDetails.extraGuests)}/night</p>
+          )}
+          <p className="text-xs">Includes all taxes and fees</p>
+        </div>
+      </div>
+
       <div className="space-y-3">
         <div className="space-y-2">
           <label className="text-sm font-medium text-text-primary" htmlFor="unit-booking-dates">
@@ -170,18 +286,30 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId }) => {
             id="unit-booking-dates"
             ref={calendarButtonRef}
             className="w-full rounded-xl border border-border-strong bg-bg-muted px-4 py-3 text-left text-text-primary hover:border-cta-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary"
+            aria-label="Click to select check-in date, then choose from calendar"
+            title="Click to select check-in date, then choose from calendar"
             onClick={() => {
               // Update shown date to the selected start date when opening calendar
               if (dateRange.startDate) {
-                setShownDate(startOfDay(dateRange.startDate));
+                setShownDate(getIstStartOfDay(dateRange.startDate));
               }
               setOpenCalendar(true);
             }}
           >
             <div className="flex items-center justify-between gap-3">
-              <span className="text-sm sm:text-base">{formattedDateLabel}</span>
-              <span className="text-xs text-text-muted">{isLoading ? 'Loading…' : `${bookedDates.length} dates blocked`}</span>
-            </div>
+  <span className="text-sm sm:text-base">{formattedDateLabel}</span>
+  <span className="text-xs text-text-muted">
+    {isLoading
+      ? 'Loading…'
+      : dateRange.startDate && dateRange.endDate
+      ? (() => {
+          const nights = calculateNights(dateRange.startDate, dateRange.endDate);
+          return nights > 0 ? `${nights} ${nights === 1 ? 'date' : 'dates'} blocked` : 'Select dates';
+        })()
+      : 'Select dates'}
+  </span>
+</div>
+
             {dateRange.startDate && dateRange.endDate && calculateNights(dateRange.startDate, dateRange.endDate) > 0 && (
               <div className="mt-2 flex items-center justify-center">
                 <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--accent-primary)] bg-[var(--bg-surface)] px-2.5 py-1 rounded-lg border border-[var(--border-subtle)]">
@@ -198,7 +326,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId }) => {
               value={dateRange}
               onChange={handleRangeChange}
               loading={isLoading}
-              minDate={today}
+              minDate={addDays(today, -1)}
               maxDate={maxBookingDate}
               disabledDay={disabledDay}
               months={2}
@@ -209,9 +337,10 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId }) => {
               loadingLabel="Loading availability"
               rangeColors={['#475569']}
               dayContentRenderer={(day) => {
-                const dayStart = startOfDay(day);
-                const selectionStart = dateRange.startDate ? startOfDay(dateRange.startDate).getTime() : null;
-                const selectionEnd = dateRange.endDate ? startOfDay(dateRange.endDate).getTime() : null;
+                // Normalize all dates to IST start of day for consistent comparison
+                const dayStart = getIstStartOfDay(day);
+                const selectionStart = dateRange.startDate ? getIstStartOfDay(dateRange.startDate).getTime() : null;
+                const selectionEnd = dateRange.endDate ? getIstStartOfDay(dateRange.endDate).getTime() : null;
                 const isRangeStart = selectionStart !== null && dayStart.getTime() === selectionStart;
                 const isRangeEnd = selectionEnd !== null && dayStart.getTime() === selectionEnd;
                 const rangeStart = selectionStart !== null && selectionEnd !== null ? Math.min(selectionStart, selectionEnd) : null;
@@ -223,31 +352,23 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId }) => {
                 const isDisabled = disabledDay(day);
                 const isToday = dayStart.getTime() === today.getTime();
 
-                return (
-                  <div className="relative flex h-full w-full items-center justify-center">
-                    {isInRange && !isRangeStart && !isRangeEnd && (
-                      <span
-                        className="absolute inset-0 bg-[var(--bg-primary)]"
-                        aria-hidden
-                      />
-                    )}
-                    <span
-                      className={`relative z-10 flex items-center justify-center text-sm font-medium transition ${
-                        isRangeStart || isRangeEnd
-                          ? 'bg-[var(--cta-primary)] text-white rounded-xl px-3 py-2 shadow-sm'
-                          : isDisabled
-                          ? 'text-[var(--border-strong)] cursor-not-allowed opacity-50'
-                          : 'text-[var(--brand)]'
-                      }`}
-                      style={{ minHeight: 38, minWidth: 38 }}
-                    >
-                      {format(day, 'd')}
-                      {isToday && !isRangeStart && !isRangeEnd && (
-                        <span className="absolute bottom-1 left-1/2 transform -translate-x-1/2 w-4 h-0.5 bg-[#94A3B8] rounded-full" />
-                      )}
-                    </span>
-                  </div>
-                );
+            return (
+  <div className="relative flex h-full w-full items-center justify-center">
+    <span
+      className={`relative z-10 flex items-center justify-center text-sm font-medium transition ${
+        isRangeStart || isRangeEnd
+          ? 'bg-[var(--cta-primary)] text-white rounded-xl px-3 py-2 shadow-sm'
+          : isDisabled
+          ? 'text-[var(--border-strong)] cursor-not-allowed opacity-50'
+          : 'text-[var(--brand)]'
+      }`}
+      style={{ minHeight: 38, minWidth: 38 }}
+    >
+      {format(day, 'd')}
+    </span>
+  </div>
+);
+
               }}
             />
           </div>
@@ -283,6 +404,71 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId }) => {
             </div>
           </div>
         </div>
+        {/* Price Breakdown */}
+<div className="mt-4 border-t border-border-subtle pt-4 text-sm">
+  
+  <h4 className="mb-2 text-base font-bold text-text-primary">
+    Price Breakdown
+  </h4>
+
+  <div className="space-y-1.5 text-text-secondary">
+    
+    <div className="grid grid-cols-[140px_12px_1fr]">
+      <span>Price</span>
+      <span>:</span>
+      <span className="text-right">
+        {new Intl.NumberFormat('en-IN', {
+          style: 'currency',
+          currency: 'INR',
+          maximumFractionDigits: 0,
+        }).format(priceDetails.total)}
+      </span>
+    </div>
+
+    <div className="grid grid-cols-[140px_12px_1fr]">
+      <span>Cleaning fee</span>
+      <span>:</span>
+      <span className="text-right">₹500</span>
+    </div>
+
+    <div className="grid grid-cols-[140px_12px_1fr]">
+      <span>GST (5%)</span>
+      <span>:</span>
+      <span className="text-right">
+        {new Intl.NumberFormat('en-IN', {
+          style: 'currency',
+          currency: 'INR',
+          maximumFractionDigits: 0,
+        }).format(gstAmount)}
+      </span>
+    </div>
+
+    <div className="grid grid-cols-[140px_12px_1fr]">
+      <span>Convenience fee</span>
+      <span>:</span>
+      <span className="text-right">
+        {new Intl.NumberFormat('en-IN', {
+          style: 'currency',
+          currency: 'INR',
+          maximumFractionDigits: 0,
+        }).format(convenienceFee)}
+      </span>
+    </div>
+  </div>
+
+  <div className="mt-3 border-t border-border-subtle pt-3 grid grid-cols-[140px_12px_1fr] text-base font-semibold text-text-primary">
+    <span>Total</span>
+    <span>:</span>
+    <span className="text-right">
+      {new Intl.NumberFormat('en-IN', {
+        style: 'currency',
+        currency: 'INR',
+        maximumFractionDigits: 0,
+      }).format(finalTotal)}
+    </span>
+  </div>
+</div>
+
       </div>
 
       {dateError && <p className="text-sm text-support-error">{dateError}</p>}
@@ -297,4 +483,3 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId }) => {
 };
 
 export default UnitBookingWidget;
-

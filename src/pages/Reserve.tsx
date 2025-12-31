@@ -26,8 +26,10 @@ const Reserve = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <p className="text-sm text-text-muted">Property</p>
-            <p className="text-lg font-semibold text-text-primary">{booking.propertyId ?? 'Not selected'}</p>
-          </div>
+           <p className="text-lg font-semibold text-text-primary">
+  {booking.propertyName ?? 'Not selected'}
+</p>
+ </div>
           <div>
             <p className="text-sm text-text-muted">Guests</p>
             <p className="text-lg font-semibold text-text-primary">{booking.guests}</p>

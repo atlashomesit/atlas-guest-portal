@@ -36,7 +36,7 @@ import Slider from "@/components/homepage_components/slider/Slider";
 
 const baseRect = {
   top: 120,
-  right: 540,
+  right: 640,
   bottom: 220,
   left: 120,
   width: 420,

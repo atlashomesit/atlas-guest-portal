@@ -137,53 +137,6 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
 
   return (
     <>
-      {hasSelection && hasInteractedWithDates && (
-        <div
-          id="pricing-breakdown"
-          className="mt-4 space-y-2 border border-border-subtle rounded-lg p-3 bg-bg-surface shadow-level1"
-        >
-          <div className="space-y-1.5">
-            {nightlyBreakdown.map((night) => (
-              <div className="flex justify-between text-xs" key={night.date.toISOString()}>
-                <span className="flex items-center gap-1.5">
-                  {format(night.date, 'dd MMM')}{' '}
-                  {night.breakdown.isNewYearsEve && (
-                    <span className="rounded-full bg-[color:var(--bg-muted)] px-1.5 py-0.5 text-[10px] font-semibold text-cta-primary">
-                      New Year's Eve pricing (2×)
-                    </span>
-                  )}
-                </span>
-                <span>₹{night.breakdown.finalNightlyPrice.toLocaleString('en-IN')}</span>
-              </div>
-            ))}
-          </div>
-          <div className="flex justify-between text-xs text-text-muted">
-            <span>Base price</span>
-            <span>₹{baseNightlyRate.toLocaleString('en-IN')}</span>
-          </div>
-          <div className="flex justify-between text-xs text-cta-primary">
-            <span>Discount ({discountPercentApplied}%) applied</span>
-            <span>Included</span>
-          </div>
-          {extraGuestsCount > 0 && (
-            <div className="flex justify-between text-xs text-text-primary">
-              <span>Extra guests ({extraGuestsCount})</span>
-              <span>₹{totalExtraGuestCharges.toLocaleString('en-IN')}</span>
-            </div>
-          )}
-          <div className="flex justify-between text-xs text-text-primary">
-            <span>Fees &amp; taxes (est.)</span>
-            <span>₹{feesAndTaxes.toLocaleString('en-IN')}</span>
-          </div>
-          <div className="flex justify-between text-sm font-semibold text-text-primary border-t pt-2 mt-1">
-            <span>Total</span>
-            <span>₹{totalPrice.toLocaleString('en-IN')}</span>
-          </div>
-          <p className="text-[10px] text-text-muted">
-            No hidden charges — everything is shown upfront for your dates and guest count.
-          </p>
-        </div>
-      )}
 
       <div className="mt-4 space-y-3 text-sm text-text-primary border border-border-subtle rounded-xl p-4 bg-bg-muted">
         <div>

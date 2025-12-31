@@ -41,11 +41,16 @@ const Homepage_LocationDetails = () => {
         setSelectedProperty(null);
     };
 
-    const handleNavigate = (property_name: string) => {
-        const slug = property_name.toLowerCase().replace(/\s+/g, '-');
-        navigate(`/property_details/${slug}`);
-        console.log(slug, "Slugified property name");
-    };
+   const handleNavigate = (property_name: string) => {
+    const slug = property_name
+        .trim() // ✅ removes trailing space (501 issue)
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '') // ✅ removes special chars like "-"
+        .replace(/\s+/g, '-'); // ✅ fixes double spaces
+
+    navigate(`/property_details/${slug}`);
+};
+
 
 
     // on the basis upon id 

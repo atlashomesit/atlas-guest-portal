@@ -1,12 +1,19 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
-import { addDays } from 'date-fns';
+import { addDays, startOfDay } from 'date-fns';
 import { DateRange, type RangeKeyDict } from 'react-date-range';
 
 import { DateRangePickerPopover } from '../homepage_components/hotelBooking_form/DateRangePickerPopover';
+import { getIstStartOfDay } from '@/utils/date';
 
 // Helper to normalize date to start of month (avoids timezone issues with date-fns startOfMonth)
 const normalizeToStartOfMonth = (date: Date): Date => {
   return new Date(date.getFullYear(), date.getMonth(), 1);
+};
+
+const normalizeDate = (date: Date | null): Date | null => {
+  if (!date) return null;
+  // Use IST normalization to match BookingCardCalendarSection and ensure consistent comparisons
+  return getIstStartOfDay(date);
 };
 
 export interface AtlasDateRangePickerValue {
@@ -38,6 +45,7 @@ interface AtlasDateRangePickerProps {
   dateRangeProps?: Partial<React.ComponentProps<typeof DateRange>>;
   afterCalendar?: React.ReactNode;
   activeField?: 'checkin' | 'checkout' | null;
+  instructionText?: string;
 }
 
 export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
@@ -49,6 +57,7 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
   disabledDates,
   disabledDay,
   afterCalendar,
+  instructionText = 'Select check-in date, then check-out date from the calendar',
   heading = 'Choose your stay dates',
   labelId,
   loading,
@@ -69,97 +78,123 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
   const fallbackContentId = useId();
   const fallbackCalendarRef = useRef<HTMLDivElement | null>(null);
   const popoverRef = calendarRef ?? fallbackCalendarRef;
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   const [internalShownDate, setInternalShownDate] = useState<Date>(() => {
     const initial = shownDate ?? value.startDate ?? minDate ?? new Date();
     return normalizeToStartOfMonth(initial);
   });
 
-  const handleRangeChange = (ranges: RangeKeyDict) => {
-    const selection = ranges.selection ?? { startDate: null, endDate: null };
-    const { startDate, endDate } = selection;
-    
-    // Determine current state
-    const hasStart = value.startDate !== null;
-    const hasEnd = value.endDate !== null && value.endDate.getTime() !== value.startDate?.getTime();
-    const currentState = hasStart && hasEnd ? 'rangeSelected' : hasStart ? 'checkInSelected' : 'empty';
-    
-    // If user explicitly clicked check-in field and a range exists
-    if (activeField === 'checkin' && currentState === 'rangeSelected' && startDate && value.endDate) {
-      const clickedDate = startDate;
-      const existingCheckOut = value.endDate;
-      
-      // If clicked date is before check-out, set as new check-in
-      if (clickedDate < existingCheckOut) {
-        onChange({
-          startDate: clickedDate,
-          endDate: existingCheckOut,
-        });
-        return;
-      }
-      
-      // If clicked date is after or equal to check-out, reset range and set new check-in
-      onChange({
-        startDate: clickedDate,
-        endDate: null,
-      });
-      return;
+  const [selectionState, setSelectionState] = useState<'IDLE' | 'CHECK_IN_SELECTED' | 'RANGE_SELECTED'>(() => {
+    if (value.startDate && value.endDate) return 'RANGE_SELECTED';
+    if (value.startDate) return 'CHECK_IN_SELECTED';
+    return 'IDLE';
+  });
+
+  const nights =
+    value.startDate && value.endDate
+      ? Math.max(
+          1,
+          Math.round((value.endDate.getTime() - value.startDate.getTime()) / (1000 * 60 * 60 * 24)),
+        )
+      : null;
+
+  useEffect(() => {
+    if (value.startDate && value.endDate) {
+      setSelectionState('RANGE_SELECTED');
+    } else if (value.startDate) {
+      setSelectionState('CHECK_IN_SELECTED');
+    } else {
+      setSelectionState('IDLE');
     }
-    
-    // If user explicitly clicked check-out field and a range exists
-    if (activeField === 'checkout' && currentState === 'rangeSelected' && startDate && value.startDate) {
-      const clickedDate = startDate;
-      const existingCheckIn = value.startDate;
-      
-      // If clicked date is after check-in, set as new check-out
-      if (clickedDate > existingCheckIn) {
-        onChange({
-          startDate: existingCheckIn,
-          endDate: clickedDate,
-        });
-        return;
-      }
-      
-      // If clicked date is before or equal to check-in, show validation error (handled by parent)
-      // For now, just reset the range
-      onChange({
-        startDate: clickedDate,
-        endDate: null,
-      });
-      return;
+  }, [value.startDate, value.endDate]);
+
+  const shouldShowInstruction = !value.startDate && !value.endDate;
+
+  const validateDateRange = (checkIn: Date | null, checkOut: Date | null) => {
+    if (!checkIn || !checkOut) return { valid: true, error: null };
+    const diffDays = Math.floor((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
+    if (checkOut <= checkIn) {
+      return { valid: false, error: 'Check-out date must be after check-in date' };
     }
-    
-    // If in rangeSelected state and user clicks a date (no explicit field tracking)
-    if (currentState === 'rangeSelected' && startDate && value.startDate) {
-      const clickedDate = startDate;
-      const existingCheckIn = value.startDate;
-      
-      // If clicked date is after check-in, update checkout only
-      if (clickedDate > existingCheckIn) {
-        onChange({
-          startDate: existingCheckIn,
-          endDate: clickedDate,
-        });
-        return;
-      }
-      
-      // If before check-in, clear and restart
-      onChange({
-        startDate: clickedDate,
-        endDate: null,
-      });
-      return;
+    if (diffDays < 1) {
+      return { valid: false, error: 'Minimum stay is 1 night. Check-out must be at least 1 day after check-in' };
     }
-    
-    // Normal flow for empty or checkInSelected states
-    onChange({
-      startDate,
-      endDate,
-    });
+    if (diffDays > 30) {
+      return { valid: false, error: 'Maximum stay is 30 nights. For longer stays, please contact us at +91-7032493290' };
+    }
+    return { valid: true, error: null };
   };
 
-  const normalizedStart = value.startDate ?? minDate ?? new Date();
-  const normalizedEnd = value.endDate ?? addDays(normalizedStart, 1);
+  const applySelection = (startDate: Date | null, endDate: Date | null) => {
+    const validation = validateDateRange(startDate, endDate);
+    if (!validation.valid) {
+      setValidationError(validation.error);
+      return false;
+    }
+    setValidationError(null);
+    onChange({ startDate, endDate });
+    return true;
+  };
+
+  const handleRangeChange = (ranges: RangeKeyDict) => {
+    const selection = ranges.selection ?? { startDate: null, endDate: null };
+    const startDate = normalizeDate(selection.startDate);
+    const endDate = normalizeDate(selection.endDate);
+
+    if (!startDate) {
+      applySelection(startDate, endDate);
+      return;
+    }
+
+    if (selectionState === 'IDLE') {
+      if (applySelection(startDate, null)) {
+        setSelectionState('CHECK_IN_SELECTED');
+      }
+      return;
+    }
+
+    if (selectionState === 'CHECK_IN_SELECTED') {
+      const existingCheckIn = normalizeDate(value.startDate);
+      if (!existingCheckIn) {
+        if (applySelection(startDate, null)) {
+          setSelectionState('CHECK_IN_SELECTED');
+        }
+        return;
+      }
+
+      // If we have a valid range (endDate provided and > startDate), complete it
+      if (endDate && startDate && endDate > startDate) {
+        if (applySelection(startDate, endDate)) {
+          setSelectionState('RANGE_SELECTED');
+        }
+        return;
+      }
+
+      // User clicked a date before check-in - reset with new check-in
+      if (startDate < existingCheckIn) {
+        if (applySelection(startDate, null)) {
+          setSelectionState('CHECK_IN_SELECTED');
+        }
+        return;
+      }
+
+      // User clicked same date or a date after check-in - treat as checkout
+      const checkoutDate = endDate && endDate > existingCheckIn ? endDate : startDate;
+      if (checkoutDate > existingCheckIn && applySelection(existingCheckIn, checkoutDate)) {
+        setSelectionState('RANGE_SELECTED');
+      }
+      return;
+    }
+
+    // RANGE_SELECTED: start over with new check-in
+    if (applySelection(startDate, null)) {
+      setSelectionState('CHECK_IN_SELECTED');
+    }
+  };
+
+  const normalizedStart = normalizeDate(value.startDate) ?? normalizeDate(minDate ?? null) ?? startOfDay(new Date());
+  const normalizedEnd = normalizeDate(value.endDate) ?? normalizedStart;
 
   useEffect(() => {
     if (!open || typeof document === 'undefined') return;
@@ -167,6 +202,11 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
     const handleClickOutside = (event: Event) => {
       const target = event.target as HTMLElement;
       
+    // Ignore clicks on month/year dropdowns so the picker stays open
+    if (target.closest('.rdrMonthPicker') || target.closest('.rdrYearPicker') || target.closest('.rdrMonthAndYearPickers') || (target.tagName === 'SELECT')) {
+      return;
+    }
+    
       // If click is on anchor element, don't close
       if (anchorRef.current?.contains(target)) {
         return;
@@ -214,8 +254,14 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
   }, [open, shownDate, value.startDate, minDate]);
 
   const composedDisabledDay = (date: Date) => {
-    if (minDate && date < minDate) return true;
-    if (maxDate && date > maxDate) return true;
+    const normalized = normalizeDate(date);
+    const checkIn = normalizeDate(value.startDate);
+    if (minDate && normalized && normalized < normalizeDate(minDate)!) return true;
+    if (maxDate && normalized && normalized > normalizeDate(maxDate)!) return true;
+    // When selecting checkout, disable same-day or earlier than check-in to enforce 1-night minimum
+    if (selectionState === 'CHECK_IN_SELECTED' && checkIn && normalized && normalized <= checkIn) {
+      return true;
+    }
     return disabledDay ? disabledDay(date) : false;
   };
 
@@ -228,17 +274,51 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
     }
   };
 
+  const statusConfig =
+    selectionState === 'IDLE'
+      ? {
+          label: 'Step 1: Select your check-in date',
+          bg: 'bg-cyan-50',
+          color: 'text-cyan-900',
+          dot: 'bg-cyan-500',
+        }
+      : selectionState === 'CHECK_IN_SELECTED'
+      ? {
+          label: 'Step 2: Select your check-out date',
+          bg: 'bg-emerald-50',
+          color: 'text-emerald-900',
+          dot: 'bg-emerald-500',
+        }
+      : {
+          label: nights ? `Range selected: ${nights} night${nights === 1 ? '' : 's'}` : 'Range selected',
+          bg: 'bg-slate-50',
+          color: 'text-slate-900',
+          dot: 'bg-slate-500',
+        };
+
   return (
     <DateRangePickerPopover
       anchorRef={anchorRef}
       calendarRef={popoverRef}
       contentId={contentId ?? fallbackContentId}
+      instructionText={instructionText}
+      instructionAriaLabel="Click to select check-in date, then choose from calendar"
+      showInstruction={shouldShowInstruction}
       heading={heading}
       labelId={labelId ?? fallbackLabelId}
       loadingLabel={loadingLabel}
       onClose={onClose}
       open={open}
     >
+      <div className={`mx-5 mt-4 mb-2 rounded-lg px-4 py-2 text-sm font-semibold ${statusConfig.bg} ${statusConfig.color}`} aria-live="polite">
+        <span className={`mr-2 inline-block h-2.5 w-2.5 rounded-full ${statusConfig.dot}`} aria-hidden />
+        {statusConfig.label}
+      </div>
+      {validationError && (
+        <div className="mx-5 mt-4 mb-2 rounded-lg bg-red-50 px-4 py-2 text-sm font-medium text-red-700" role="alert">
+          {validationError}
+        </div>
+      )}
       {loading ? (
         <div className="grid grid-cols-7 gap-2 p-3">
           {Array.from({ length: 14 }).map((_, index) => (
@@ -259,10 +339,10 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
                 key: 'selection',
               },
             ]}
-            retainEndDateOnFirstSelection
+            retainEndDateOnFirstSelection={true}
             dragSelectionEnabled={false}
             moveRangeOnFirstSelection={false}
-            editableDateInputs
+            editableDateInputs={false}
             minDate={minDate}
             maxDate={maxDate}
             disabledDates={disabledDates}

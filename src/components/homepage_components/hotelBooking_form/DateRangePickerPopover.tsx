@@ -6,6 +6,9 @@ interface DateRangePickerPopoverProps {
   calendarRef: React.RefObject<HTMLDivElement>;
   contentId: string;
   heading: string;
+  instructionText?: string;
+  showInstruction?: boolean;
+  instructionAriaLabel?: string;
   labelId: string;
   loadingLabel: string;
   onClose: () => void;
@@ -39,6 +42,9 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
   calendarRef,
   contentId,
   heading: _heading,
+  instructionText,
+  showInstruction,
+  instructionAriaLabel,
   labelId,
   loadingLabel,
   onClose,
@@ -138,7 +144,7 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
         left: position.left,
         width: 'auto',
         minWidth: Math.min(520, position.width),
-        maxWidth: 'min(540px, calc(100vw - 48px))',
+        maxWidth: 'min(640px, calc(100vw - 48px))',
       }
     : undefined;
 
@@ -181,9 +187,23 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
         )}
 
         <div className="flex items-center justify-between px-6 py-5 border-b border-[var(--bg-muted)] bg-[var(--bg-surface)]">
-          <p id={labelId} className="text-[17px] font-semibold text-[var(--text-primary)]">
-            Select your dates
-          </p>
+          <div className="flex items-center gap-2">
+            <p id={labelId} className="text-[17px] font-semibold text-[var(--text-primary)]">
+              Select your dates
+            </p>
+            <span
+              className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-[var(--border-subtle)] text-[11px] font-semibold text-[var(--text-muted)]"
+              title="Click a date for check-in, then a later date for check-out."
+              aria-label={instructionAriaLabel ?? 'Click a date for check-in, then a later date for check-out.'}
+            >
+              ?
+            </span>
+          </div>
+          {showInstruction && instructionText ? (
+            <p className="ml-4 text-xs text-[var(--text-muted)]" aria-live="polite">
+              {instructionText}
+            </p>
+          ) : null}
           {isMobile && (
             <button
               type="button"
@@ -196,7 +216,7 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
           )}
         </div>
 
-        <div className="max-h-[70vh] overflow-y-auto overflow-x-hidden p-5">
+        <div className="max-h-[70vh] overflow-y-auto overflow-x-hidden p-5" style={{ pointerEvents: 'auto' }}>
           {children}
           <p className="sr-only" aria-live="polite">
             {loadingLabel}

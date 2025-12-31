@@ -95,7 +95,7 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
     let errorMessage: string | null = startDate && startDate < today ? 'Check-in cannot be in the past.' : null;
 
     if (normalizedStart && normalizedEnd && normalizedEnd <= normalizedStart) {
-      normalizedEnd = addDays(normalizedStart, 1);
+      normalizedEnd = null;
       errorMessage = 'Minimum stay is 1 night after check-in.';
     }
 
@@ -505,21 +505,10 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
     }
 
     const nextRange = clampRange(normalizedStart, normalizedEnd);
-    const isSingleDaySelection = Boolean(
-      normalizedStart && normalizedEnd && normalizedStart.getTime() === normalizedEnd.getTime(),
-    );
-
-    if (isSingleDaySelection) {
-      setStatusMessage('Choose a check-out date.');
-      setDateError(null);
-      setDateRange({ startDate: normalizedStart, endDate: null });
-      setError(null);
-    } else {
-      setStatusMessage(nextRange.error ?? 'Updated dates.');
-      setDateError(nextRange.error);
-      setDateRange({ startDate: nextRange.startDate, endDate: nextRange.endDate });
-      setError(nextRange.error);
-    }
+    setStatusMessage(nextRange.error ?? 'Updated dates.');
+    setDateError(nextRange.error);
+    setDateRange({ startDate: nextRange.startDate, endDate: nextRange.endDate });
+    setError(nextRange.error);
 
     trackEvent('hero_dates_changed', {
       surface: 'hero_form',
@@ -594,7 +583,8 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
           <button
             type="button"
             className={`${dateFieldShellClass} text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary${activeField === 'checkin' && isCalendarOpen ? ' ring-2 ring-[var(--cta-primary)] ring-offset-2' : ''}`}
-            aria-label="Select check-in date"
+            aria-label="Click to select check-in date, then choose from calendar"
+            title="Click to select check-in date, then choose from calendar"
             aria-expanded={isCalendarOpen}
             aria-describedby={dateError ? dateErrorId : undefined}
             aria-invalid={dateError ? true : undefined}
@@ -622,7 +612,8 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
         <button
           type="button"
           className={`${dateFieldShellClass} text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary md:-ml-[1px]${activeField === 'checkout' && isCalendarOpen ? ' ring-2 ring-[var(--cta-primary)] ring-offset-2' : ''}`}
-          aria-label="Select check-out date"
+          aria-label="Click to select check-out date, then choose from calendar"
+          title="Click to select check-out date, then choose from calendar"
           aria-expanded={isCalendarOpen}
           aria-describedby={dateError ? dateErrorId : undefined}
           aria-invalid={dateError ? true : undefined}
@@ -684,32 +675,25 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
             const isDisabled = dayStart < today;
             const isToday = dayStart.getTime() === today.getTime();
 
-            return (
-              <div className="relative flex h-full w-full items-center justify-center">
-                {isInRange && !isRangeStart && !isRangeEnd && (
-                  <span
-                    className="absolute inset-0 bg-[var(--bg-primary)]"
-                    aria-hidden
-                  />
-                )}
-                <span
-                  data-testid={`hero-date-${format(day, 'yyyy-MM-dd')}`}
-                  className={`relative z-10 flex items-center justify-center text-sm font-medium transition ${
-                    isRangeStart || isRangeEnd
-                      ? 'bg-[var(--cta-primary)] text-white rounded-xl px-3 py-2 shadow-sm'
-                      : isDisabled
-                      ? 'text-[var(--border-strong)] cursor-not-allowed opacity-50'
-                      : 'text-[var(--brand)]'
-                  }`}
-                  style={{ minHeight: 40, minWidth: 40 }}
-                >
-                  {format(day, 'd')}
-                  {isToday && !isRangeStart && !isRangeEnd && (
-                    <span className="absolute bottom-1 left-1/2 transform -translate-x-1/2 w-4 h-0.5 bg-[#94A3B8] rounded-full" />
-                  )}
-                </span>
-              </div>
-            );
+         return (
+  <div className="relative flex h-full w-full items-center justify-center">
+    <span
+      data-testid={`hero-date-${format(day, 'yyyy-MM-dd')}`}
+      className={`relative z-10 flex items-center justify-center text-sm font-medium transition ${
+        isRangeStart || isRangeEnd
+          ? 'bg-[var(--cta-primary)] text-white rounded-xl px-3 py-2 shadow-sm'
+          : isDisabled
+          ? 'text-[var(--border-strong)] cursor-not-allowed opacity-50'
+          : 'text-[var(--brand)]'
+      }`}
+      style={{ minHeight: 40, minWidth: 40 }}
+    >
+      {format(day, 'd')}
+    </span>
+  </div>
+);
+
+
           }}
         />
 
