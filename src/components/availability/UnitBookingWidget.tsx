@@ -199,6 +199,23 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId,  listi
   };
 
   const priceDetails = calculatePrice();
+  // ---------- Fee calculations ----------
+const cleaningFee = 500;
+
+// GST = 5% on discounted price
+const gstAmount = Math.round(priceDetails.total * 0.05);
+
+// Subtotal for convenience fee
+const subtotalForConvenience =
+  priceDetails.total + cleaningFee + gstAmount;
+
+// Convenience fee = 2.7%
+const convenienceFee = Math.round(subtotalForConvenience * 0.027);
+
+// Final payable amount
+const finalTotal =
+  priceDetails.total + cleaningFee + gstAmount + convenienceFee;
+
 
   const formattedDateLabel = dateRange.startDate && dateRange.endDate
     ? `${format(dateRange.startDate, 'EEE, dd MMM')} – ${format(dateRange.endDate, 'EEE, dd MMM')} • ${priceDetails.nights} ${priceDetails.nights === 1 ? 'night' : 'nights'}`
@@ -387,6 +404,71 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId,  listi
             </div>
           </div>
         </div>
+        {/* Price Breakdown */}
+<div className="mt-4 border-t border-border-subtle pt-4 text-sm">
+  
+  <h4 className="mb-2 text-base font-bold text-text-primary">
+    Price Breakdown
+  </h4>
+
+  <div className="space-y-1.5 text-text-secondary">
+    
+    <div className="grid grid-cols-[140px_12px_1fr]">
+      <span>Price</span>
+      <span>:</span>
+      <span className="text-right">
+        {new Intl.NumberFormat('en-IN', {
+          style: 'currency',
+          currency: 'INR',
+          maximumFractionDigits: 0,
+        }).format(priceDetails.total)}
+      </span>
+    </div>
+
+    <div className="grid grid-cols-[140px_12px_1fr]">
+      <span>Cleaning fee</span>
+      <span>:</span>
+      <span className="text-right">₹500</span>
+    </div>
+
+    <div className="grid grid-cols-[140px_12px_1fr]">
+      <span>GST (5%)</span>
+      <span>:</span>
+      <span className="text-right">
+        {new Intl.NumberFormat('en-IN', {
+          style: 'currency',
+          currency: 'INR',
+          maximumFractionDigits: 0,
+        }).format(gstAmount)}
+      </span>
+    </div>
+
+    <div className="grid grid-cols-[140px_12px_1fr]">
+      <span>Convenience fee</span>
+      <span>:</span>
+      <span className="text-right">
+        {new Intl.NumberFormat('en-IN', {
+          style: 'currency',
+          currency: 'INR',
+          maximumFractionDigits: 0,
+        }).format(convenienceFee)}
+      </span>
+    </div>
+  </div>
+
+  <div className="mt-3 border-t border-border-subtle pt-3 grid grid-cols-[140px_12px_1fr] text-base font-semibold text-text-primary">
+    <span>Total</span>
+    <span>:</span>
+    <span className="text-right">
+      {new Intl.NumberFormat('en-IN', {
+        style: 'currency',
+        currency: 'INR',
+        maximumFractionDigits: 0,
+      }).format(finalTotal)}
+    </span>
+  </div>
+</div>
+
       </div>
 
       {dateError && <p className="text-sm text-support-error">{dateError}</p>}
