@@ -155,8 +155,8 @@ const Navbar = () => {
     <section className="navbar-container" id="navbar_container">
       <div className="navbar-main">
 
-        {/* LEFT */}
-        <div className="navbar-left flex items-center justify-between w-full lg:w-auto">
+        {/* LEFT - Logo and Hamburger */}
+        <div className="flex items-center justify-between w-full lg:w-auto">
           <Link to="/" className="flex items-center gap-2">
             <img
               src={LOGO_URL}
@@ -166,9 +166,10 @@ const Navbar = () => {
             <span className="navbar-logo-text">Atlas Homestays</span>
           </Link>
 
+          {/* Hamburger - Only visible on mobile */}
           <button
             type="button"
-            className={`mobile-menu-button lg:hidden ${isMenuOpen ? 'open' : ''}`}
+            className={`mobile-menu-button lg:!hidden ${isMenuOpen ? 'open' : ''}`}
             onClick={() => setIsMenuOpen(!isMenuOpen)}
             aria-label="Toggle navigation"
             aria-expanded={isMenuOpen}
@@ -181,8 +182,8 @@ const Navbar = () => {
           </button>
         </div>
 
-        {/* CENTER */}
-        <div className="navbar-center hidden lg:flex gap-2">
+        {/* CENTER - Desktop Navigation */}
+        <div className="hidden lg:flex gap-2">
           {visibleNavItems.map((item) => (
             item.label === 'Our Homes' ? (
               <div
@@ -209,27 +210,14 @@ const Navbar = () => {
                       key={home.roomNo}
                       to={home.href}
                       role="menuitem"
-                      onClick={handleHomeSelect}
-                    >
-                      {home.title}
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <NavLink
-                key={item.label}
-                to={item.to}
-                className={navLinkClass}
-              >
                 {item.label}
               </NavLink>
             )
           ))}
         </div>
 
-        {/* RIGHT */}
-        <div className="navbar-right flex gap-3">
+        {/* RIGHT - Desktop Actions */}
+        <div className="hidden lg:flex items-center gap-3">
           <a href={telLink} className="phone">
             <IoIosCall />
             <span>{formatDisplayNumber()}</span>
@@ -258,9 +246,10 @@ const Navbar = () => {
         </div>
       </div>
 
-      {/* MOBILE MENU */}
-      {isMenuOpen && (
-        <div className="mobile-menu lg:hidden open" id="mobile-menu-panel">
+        {/* MOBILE MENU - Only shown on small screens when menu is open */}
+      <div className={`mobile-menu-container lg:!hidden ${isMenuOpen ? 'open' : ''}`}>
+        {isMenuOpen && (
+          <div className="mobile-menu" id="mobile-menu-panel">
           {visibleNavItems.map((item) => (
             item.label === 'Our Homes' ? (
               <div key={item.label}>
