@@ -257,6 +257,7 @@ const finalTotal =
       return;
     }
 
+    // Save booking details to context
     updateBooking({
       propertyId: listingId,
       propertyName: listingName ?? null,
@@ -270,14 +271,27 @@ const finalTotal =
       }
     });
 
-    navigate('/reserve', { 
-      state: { 
-        from: location.pathname, 
-        listingId, 
-        listingName,
-        guestInfo: { name, email, phone }
-      } 
-    });
+    // Convert amount to paise (Razorpay expects amount in smallest currency unit)
+    const amountInPaise = finalTotal ;
+    
+    // Format phone number (remove all non-digit characters except +)
+    const formattedPhone = phone.replace(/[^\d+]/g, '');
+    
+    // Build the Razorpay URL with direct parameters
+    const razorpayUrl = new URL('https://pages.razorpay.com/atlashomestays');
+    
+    // Add parameters to URL
+    razorpayUrl.searchParams.append('amount', amountInPaise.toString());
+    razorpayUrl.searchParams.append('email', email);
+    razorpayUrl.searchParams.append('phone', formattedPhone);  // Changed from 'contact' to 'phone'
+    razorpayUrl.searchParams.append('name', name);
+    razorpayUrl.searchParams.append('description', `Booking for ${listingName || 'your stay'}`);
+    
+    // For debugging
+    console.log('Redirecting to Razorpay with URL:', razorpayUrl.toString());
+    
+    // Redirect to Razorpay
+    window.location.href = razorpayUrl.toString();
   };
 
 

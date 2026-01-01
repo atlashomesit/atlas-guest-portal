@@ -209,7 +209,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
 
   const renderPrice = (model: ListingModel) => {
     if (!model.price) return null;
-
+    console.log("Rendering price for model:", model);
     const { baseNightlyPrice, finalNightlyPrice, currency, appliedDiscountPercent, hasSpecialDateMultiplier, dateKey } =
       model.price;
 
@@ -303,11 +303,10 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
                               [heroModel.listing.id]: index
                             }));
                           }}
-                          className={`w-2.5 h-2.5 rounded-full transition-all ${
-                            (activeImageIndex[heroModel.listing.id] ?? 0) === index
+                          className={`w-2.5 h-2.5 rounded-full transition-all ${(activeImageIndex[heroModel.listing.id] ?? 0) === index
                               ? 'bg-white scale-125'
                               : 'bg-white/50 hover:bg-white/70'
-                          }`}
+                            }`}
                         />
                       ))
                     ) : (
@@ -315,7 +314,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
                       Array.from({ length: 5 }).map((_, i) => {
                         const activeIndex = activeImageIndex[heroModel.listing.id] ?? 0;
                         let dotIndex = i;
-                        
+
                         // Adjust dot positions based on active index
                         if (activeIndex <= 1) {
                           // First two dots are 0 and 1
@@ -327,12 +326,12 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
                           // Middle dots center around active index
                           dotIndex = activeIndex - 2 + i;
                         }
-                        
+
                         // Ensure dotIndex stays within bounds
                         dotIndex = Math.min(Math.max(0, dotIndex), heroModel.images.length - 1);
-                        
+
                         const isActive = activeIndex === dotIndex;
-                        
+
                         return (
                           <button
                             key={i}
@@ -344,11 +343,10 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
                                 [heroModel.listing.id]: dotIndex
                               }));
                             }}
-                            className={`w-2.5 h-2.5 rounded-full transition-all ${
-                              isActive
+                            className={`w-2.5 h-2.5 rounded-full transition-all ${isActive
                                 ? 'bg-white scale-125'
                                 : 'bg-white/50 hover:bg-white/70'
-                            }`}
+                              }`}
                           />
                         );
                       })
@@ -438,11 +436,10 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
                                     [model.listing.id]: index
                                   }));
                                 }}
-                                className={`w-2 h-2 rounded-full transition-all ${
-                                  (activeImageIndex[model.listing.id] ?? 0) === index
+                                className={`w-2 h-2 rounded-full transition-all ${(activeImageIndex[model.listing.id] ?? 0) === index
                                     ? 'bg-white scale-125'
                                     : 'bg-white/50 hover:bg-white/70'
-                                }`}
+                                  }`}
                               />
                             ))
                           ) : (
@@ -450,7 +447,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
                             Array.from({ length: 5 }).map((_, i) => {
                               const activeIndex = activeImageIndex[model.listing.id] ?? 0;
                               let dotIndex = i;
-                              
+
                               // Adjust dot positions based on active index
                               if (activeIndex <= 1) {
                                 // First two dots are 0 and 1
@@ -462,12 +459,12 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
                                 // Middle dots center around active index
                                 dotIndex = activeIndex - 2 + i;
                               }
-                              
+
                               // Ensure dotIndex stays within bounds
                               dotIndex = Math.min(Math.max(0, dotIndex), model.images.length - 1);
-                              
+
                               const isActive = activeIndex === dotIndex;
-                              
+
                               return (
                                 <button
                                   key={i}
@@ -479,11 +476,10 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
                                       [model.listing.id]: dotIndex
                                     }));
                                   }}
-                                  className={`w-2 h-2 rounded-full transition-all ${
-                                    isActive
+                                  className={`w-2 h-2 rounded-full transition-all ${isActive
                                       ? 'bg-white scale-125'
                                       : 'bg-white/50 hover:bg-white/70'
-                                  }`}
+                                    }`}
                                 />
                               );
                             })
