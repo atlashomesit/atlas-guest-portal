@@ -48,6 +48,10 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId,  listi
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [dateError, setDateError] = useState<string | null>(null);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const fetchBookedDates = async () => {
@@ -221,22 +225,59 @@ const finalTotal =
     ? `${format(dateRange.startDate, 'EEE, dd MMM')} – ${format(dateRange.endDate, 'EEE, dd MMM')} • ${priceDetails.nights} ${priceDetails.nights === 1 ? 'night' : 'nights'}`
     : 'Add your travel dates';
 
-  const handleSubmit = () => {
+  const validateForm = () => {
+    const errors: Record<string, string> = {};
+    
     if (!dateRange.startDate || !dateRange.endDate) {
-      setFormError('Select your check-in and check-out dates.');
+      errors.dates = 'Please select check-in and check-out dates';
+    }
+    
+    if (!name.trim()) {
+      errors.name = 'Name is required';
+    }
+    
+    if (!email.trim()) {
+      errors.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      errors.email = 'Please enter a valid email';
+    }
+    
+    if (!phone.trim()) {
+      errors.phone = 'Phone number is required';
+    } else if (!/^\d{10}$/.test(phone.replace(/[\s-]/g, ''))) {
+      errors.phone = 'Please enter a valid 10-digit phone number';
+    }
+    
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleSubmit = () => {
+    if (!validateForm()) {
       return;
     }
 
-    setFormError(null);
     updateBooking({
       propertyId: listingId,
-       propertyName: listingName ?? null,
+      propertyName: listingName ?? null,
       checkIn: dateRange.startDate.toISOString(),
       checkOut: dateRange.endDate.toISOString(),
       guests,
+      guestInfo: {
+        name,
+        email,
+        phone
+      }
     });
 
-     navigate('/reserve', { state: { from: location.pathname, listingId, listingName } });
+    navigate('/reserve', { 
+      state: { 
+        from: location.pathname, 
+        listingId, 
+        listingName,
+        guestInfo: { name, email, phone }
+      } 
+    });
   };
 
 
@@ -472,11 +513,69 @@ const finalTotal =
       </div>
 
       {dateError && <p className="text-sm text-support-error">{dateError}</p>}
-      {statusMessage && <p className="text-sm text-text-secondary">{statusMessage}</p>}
-      {formError && <p className="text-sm text-support-error">{formError}</p>}
+      {statusMessage && <p className="text-sm text-text-secondary mb-4">{statusMessage}</p>}
+      {formError && <p className="text-sm text-support-error mb-4">{formError}</p>}
 
-      <Button fullWidth onClick={handleSubmit} disabled={isLoading}>
-        Book this home
+      <div className="space-y-4 mb-6">
+        {/* Name Field */}
+        <div>
+          <label htmlFor="name" className="block text-sm font-medium text-text-primary mb-1">
+            Full Name <span className="text-support-error">*</span>
+          </label>
+          <input
+            id="name"
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="John Doe"
+            className={`w-full px-4 py-2 rounded-lg border ${formErrors.name ? 'border-support-error' : 'border-border-subtle'} bg-bg-surface text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-cta-primary focus:border-transparent`}
+            disabled={isLoading}
+          />
+          {formErrors.name && <p className="mt-1 text-sm text-support-error">{formErrors.name}</p>}
+        </div>
+
+        {/* Email Field */}
+        <div>
+          <label htmlFor="email" className="block text-sm font-medium text-text-primary mb-1">
+            Email <span className="text-support-error">*</span>
+          </label>
+          <input
+            id="email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="your.email@example.com"
+            className={`w-full px-4 py-2 rounded-lg border ${formErrors.email ? 'border-support-error' : 'border-border-subtle'} bg-bg-surface text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-cta-primary focus:border-transparent`}
+            disabled={isLoading}
+          />
+          {formErrors.email && <p className="mt-1 text-sm text-support-error">{formErrors.email}</p>}
+        </div>
+
+        {/* Phone Field */}
+        <div>
+          <label htmlFor="phone" className="block text-sm font-medium text-text-primary mb-1">
+            Phone Number <span className="text-support-error">*</span>
+          </label>
+          <input
+            id="phone"
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value.replace(/[^\d\s-]/g, ''))}
+            placeholder="9876543210"
+            className={`w-full px-4 py-2 rounded-lg border ${formErrors.phone ? 'border-support-error' : 'border-border-subtle'} bg-bg-surface text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-cta-primary focus:border-transparent`}
+            disabled={isLoading}
+          />
+          {formErrors.phone && <p className="mt-1 text-sm text-support-error">{formErrors.phone}</p>}
+        </div>
+      </div>
+
+      <Button 
+        fullWidth 
+        onClick={handleSubmit} 
+        disabled={isLoading}
+        className="mt-2"
+      >
+        {isLoading ? 'Processing...' : 'Book this home'}
       </Button>
     </div>
   );
