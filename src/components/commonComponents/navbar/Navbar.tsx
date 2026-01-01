@@ -155,8 +155,8 @@ const Navbar = () => {
     <section className="navbar-container" id="navbar_container">
       <div className="navbar-main">
 
-        {/* LEFT */}
-        <div className="navbar-left flex items-center justify-between w-full lg:w-auto">
+        {/* LEFT - Logo and Mobile Menu Button */}
+        <div className="flex items-center justify-between w-full lg:w-auto">
           <Link to="/" className="flex items-center gap-2">
             <img
               src={LOGO_URL}
@@ -166,23 +166,27 @@ const Navbar = () => {
             <span className="navbar-logo-text">Atlas Homestays</span>
           </Link>
 
-          <button
-            type="button"
-            className={`mobile-menu-button lg:hidden ${isMenuOpen ? 'open' : ''}`}
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-            aria-label="Toggle navigation"
-            aria-expanded={isMenuOpen}
-            aria-controls="mobile-menu-panel"
-          >
-            <span className="sr-only">Toggle navigation</span>
-            <span className="hamburger-bar" aria-hidden />
-            <span className="hamburger-bar" aria-hidden />
-            <span className="hamburger-bar" aria-hidden />
-          </button>
+          {/* Mobile Menu Button - Only visible on mobile */}
+          <div className="lg:hidden">
+            <button
+              type="button"
+              className={`mobile-menu-button ${isMenuOpen ? 'open' : ''}`}
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              aria-label="Toggle navigation"
+              aria-expanded={isMenuOpen}
+              aria-controls="mobile-menu-panel"
+            >
+              <span className="sr-only">Toggle navigation</span>
+              <span className="hamburger-bar" aria-hidden />
+              <span className="hamburger-bar" aria-hidden />
+              <span className="hamburger-bar" aria-hidden />
+            </button>
+          </div>
         </div>
 
-        {/* CENTER */}
-        <div className="navbar-center hidden lg:flex gap-2">
+        {/* CENTER - Desktop Navigation */}
+        <div className="hidden lg:flex items-center">
+          <div className="navbar-center flex gap-6">
           {visibleNavItems.map((item) => (
             item.label === 'Our Homes' ? (
               <div
@@ -226,35 +230,31 @@ const Navbar = () => {
               </NavLink>
             )
           ))}
+          </div>
         </div>
 
-        {/* RIGHT */}
-        <div className="navbar-right flex gap-3">
-          <a href={telLink} className="phone">
-            <IoIosCall />
+        {/* RIGHT - Desktop Actions */}
+        <div className="hidden lg:flex items-center gap-6">
+          <a href={telLink} className="phone flex items-center gap-1">
             <span>{formatDisplayNumber()}</span>
           </a>
 
-          {/* BOOK NOW */}
-          <div className="flex flex-col items-end gap-1">
-            <button
-              type="button"
-              className="book-now"
-              onClick={handleBookNow}
-              aria-busy={ctaStatus === 'navigating'}
-              data-state={ctaStatus}
-            >
-              {ctaNav.label}
-            </button>
-            {ctaStatus !== 'idle' && (
-              <span className="book-now-status" role="status" aria-live="polite">
-                {ctaStatus === 'navigating'
-                  ? 'Opening reservation...'
-                  : 'Bringing booking form into view...'}
-              </span>
-            )}
-          </div>
-
+          <button
+            type="button"
+            className="book-now"
+            onClick={handleBookNow}
+            aria-busy={ctaStatus === 'navigating'}
+            data-state={ctaStatus}
+          >
+            {ctaNav.label}
+          </button>
+          {ctaStatus !== 'idle' && (
+            <span className="book-now-status" role="status" aria-live="polite">
+              {ctaStatus === 'navigating'
+                ? 'Opening reservation...'
+                : 'Bringing booking form into view...'}
+            </span>
+          )}
         </div>
       </div>
 
