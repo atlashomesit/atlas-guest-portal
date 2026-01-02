@@ -49,6 +49,16 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId,  listi
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [dateError, setDateError] = useState<string | null>(null);
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    phone: ''
+  });
+  const [formErrors, setFormErrors] = useState({
+    name: '',
+    email: '',
+    phone: ''
+  });
 
   useEffect(() => {
     const fetchBookedDates = async () => {
@@ -212,48 +222,91 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId,  listi
 
   const priceDetails = calculatePrice();
   // ---------- Fee calculations ----------
-const cleaningFee = 500;
-
-// GST = 5% on discounted price
-const gstAmount = Math.round(priceDetails.total * 0.05);
-
-// Subtotal for convenience fee
-const subtotalForConvenience =
-  priceDetails.total + cleaningFee + gstAmount;
-
-// Convenience fee = 2.7%
-const convenienceFee = Math.round(subtotalForConvenience * 0.027);
-
-// Final payable amount
-const finalTotal =
-  priceDetails.total + cleaningFee + gstAmount + convenienceFee;
+  
+  // GST = 5% on discounted price
+  const gstAmount = 0;
+  
+  // Convenience fee = 2.7% of (total + GST)
+  const subtotalForConvenience = priceDetails.total + gstAmount;
+  const convenienceFee = Math.round(subtotalForConvenience * 0.027);
+  
+  // Final payable amount (without cleaning fee)
+  const finalTotal = priceDetails.total + gstAmount + convenienceFee;
 
 
   const formattedDateLabel = dateRange.startDate && dateRange.endDate
     ? `${format(dateRange.startDate, 'EEE, dd MMM')} – ${format(dateRange.endDate, 'EEE, dd MMM')} • ${priceDetails.nights} ${priceDetails.nights === 1 ? 'night' : 'nights'}`
     : 'Add your travel dates';
 
-  const handleSubmit = () => {
+  const validateForm = () => {
+    const errors = {
+      name: '',
+      email: '',
+      phone: ''
+    };
+    let isValid = true;
+
+    if (!formData.name.trim()) {
+      errors.name = 'Name is required';
+      isValid = false;
+    }
+
+    if (!formData.email) {
+      errors.email = 'Email is required';
+      isValid = false;
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      errors.email = 'Email is invalid';
+      isValid = false;
+    }
+
+    if (!formData.phone) {
+      errors.phone = 'Phone number is required';
+      isValid = false;
+    } else if (!/^\d{10}$/.test(formData.phone)) {
+      errors.phone = 'Phone number must be 10 digits';
+      isValid = false;
+    }
+
+    setFormErrors(errors);
+    return isValid;
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
     if (!dateRange.startDate || !dateRange.endDate) {
       setFormError('Select your check-in and check-out dates.');
+      return;
+    }
+
+    if (!validateForm()) {
       return;
     }
 
     setFormError(null);
     updateBooking({
       propertyId: listingId,
-       propertyName: listingName ?? null,
+      propertyName: listingName ?? null,
       checkIn: dateRange.startDate.toISOString(),
       checkOut: dateRange.endDate.toISOString(),
       guests,
+      customerInfo: { ...formData }
     });
 
-     navigate('/reserve', { state: { from: location.pathname, listingId, listingName } });
+    navigate('/reserve', { state: { from: location.pathname, listingId, listingName } });
   };
 
 
   return (
-    <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6 space-y-5">
+    <form onSubmit={handleSubmit} className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6 space-y-5">
 
       <div className="space-y-1">
         <p className="text-sm uppercase tracking-[0.12em] text-text-muted font-semibold">Reserve</p>
@@ -438,12 +491,6 @@ const finalTotal =
     </div>
 
     <div className="grid grid-cols-[140px_12px_1fr]">
-      <span>Cleaning fee</span>
-      <span>:</span>
-      <span className="text-right">₹500</span>
-    </div>
-
-    <div className="grid grid-cols-[140px_12px_1fr]">
       <span>GST (5%)</span>
       <span>:</span>
       <span className="text-right">
@@ -485,12 +532,62 @@ const finalTotal =
 
       {dateError && <p className="text-sm text-support-error">{dateError}</p>}
       {statusMessage && <p className="text-sm text-text-secondary">{statusMessage}</p>}
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-text-primary" htmlFor="name">
+            Full Name *
+          </label>
+          <input
+            type="text"
+            id="name"
+            name="name"
+            value={formData.name}
+            onChange={handleInputChange}
+            className={`w-full rounded-xl border ${formErrors.name ? 'border-support-error' : 'border-border-strong'} bg-bg-muted px-4 py-3 text-text-primary focus:outline-none focus:ring-2 focus:ring-cta-primary`}
+            placeholder="Enter your full name"
+          />
+          {formErrors.name && <p className="text-sm text-support-error">{formErrors.name}</p>}
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-text-primary" htmlFor="email">
+            Email *
+          </label>
+          <input
+            type="email"
+            id="email"
+            name="email"
+            value={formData.email}
+            onChange={handleInputChange}
+            className={`w-full rounded-xl border ${formErrors.email ? 'border-support-error' : 'border-border-strong'} bg-bg-muted px-4 py-3 text-text-primary focus:outline-none focus:ring-2 focus:ring-cta-primary`}
+            placeholder="Enter your email"
+          />
+          {formErrors.email && <p className="text-sm text-support-error">{formErrors.email}</p>}
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-text-primary" htmlFor="phone">
+            Phone Number *
+          </label>
+          <input
+            type="tel"
+            id="phone"
+            name="phone"
+            value={formData.phone}
+            onChange={handleInputChange}
+            className={`w-full rounded-xl border ${formErrors.phone ? 'border-support-error' : 'border-border-strong'} bg-bg-muted px-4 py-3 text-text-primary focus:outline-none focus:ring-2 focus:ring-cta-primary`}
+            placeholder="Enter your 10-digit phone number"
+          />
+          {formErrors.phone && <p className="text-sm text-support-error">{formErrors.phone}</p>}
+        </div>
+      </div>
+
       {formError && <p className="text-sm text-support-error">{formError}</p>}
 
-      <Button fullWidth onClick={handleSubmit} disabled={isLoading}>
+      <Button type="submit" fullWidth onClick={handleSubmit} disabled={isLoading}>
         Book this home
       </Button>
-    </div>
+    </form>
   );
 };
 
