@@ -292,6 +292,8 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId,  listi
     }
 
     setFormError(null);
+    
+    // Update booking context
     updateBooking({
       propertyId: listingId,
       propertyName: listingName ?? null,
@@ -301,7 +303,34 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId,  listi
       customerInfo: { ...formData }
     });
 
-    navigate('/reserve', { state: { from: location.pathname, listingId, listingName } });
+    // Redirect to Razorpay payment page with pre-filled fields
+    const razorpayUrl = new URL('https://pages.razorpay.com/atlashomestays');
+    
+    // Format phone number (Razorpay Payment Pages expect phone number without country code)
+    let phoneNumber = formData.phone.trim();
+    // Remove any non-digit characters
+    phoneNumber = phoneNumber.replace(/\D/g, '');
+    // If it starts with 91 (India code), remove it as Razorpay expects local format
+    if (phoneNumber.startsWith('91') && phoneNumber.length > 10) {
+      phoneNumber = phoneNumber.substring(2);
+    }
+    // Ensure the phone number is not more than 10 digits
+    phoneNumber = phoneNumber.substring(0, 10);
+    
+    // Add query parameters for auto-fill
+    razorpayUrl.searchParams.append('amount', (finalTotal).toString()); // Convert to paise
+    razorpayUrl.searchParams.append('email', formData.email.trim());
+    razorpayUrl.searchParams.append('phone', phoneNumber); // Use 'phone' parameter for Razorpay Payment Pages
+    
+    // Add booking details as well (optional)
+    razorpayUrl.searchParams.append('name', formData.name.trim());
+    razorpayUrl.searchParams.append('listing_id', listingId.toString());
+    razorpayUrl.searchParams.append('check_in', dateRange.startDate.toISOString().split('T')[0]);
+    razorpayUrl.searchParams.append('check_out', dateRange.endDate.toISOString().split('T')[0]);
+    razorpayUrl.searchParams.append('guests', guests.toString());
+    
+    // Open Razorpay payment page in a new tab
+    window.open(razorpayUrl.toString(), '_blank');
   };
 
 
