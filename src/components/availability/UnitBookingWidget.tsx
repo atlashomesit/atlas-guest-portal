@@ -10,6 +10,7 @@ import { getIstStartOfDay } from '@/utils/date';
 import { calculateNights, formatNightCount } from '@/utils/dateHelpers';
 import { doesRangeIntersectBlocked, expandBookingsToBlockedSet, parseISODate, toISODate } from '@/utils/dateRange';
 import { type BookingDTO } from '@/types/booking';
+import { calculateNightlyPrice, inferUnitType } from '@/utils/pricing';
 
 interface UnitBookingWidgetProps {
   listingId: string | number;
@@ -48,10 +49,6 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId,  listi
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [dateError, setDateError] = useState<string | null>(null);
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const fetchBookedDates = async () => {
@@ -170,9 +167,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId,  listi
   };
 
   const calculatePrice = () => {
-    const isPenthouse = listingId.toString().includes('501');
-    const basePrice = isPenthouse ? 6000 : 3500;
-    const extraGuestFee = isPenthouse ? 1200 : 500;
+    const unitType = inferUnitType(listingId.toString());
     const includedGuests = 2;
     
     // Calculate number of nights
@@ -180,25 +175,38 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId,  listi
       ? calculateNights(dateRange.startDate, dateRange.endDate) 
       : 1; // Default to 1 night if no dates selected
     
-    // Calculate extra guests fee
+    // Calculate extra guests
     const extraGuests = Math.max(0, guests - includedGuests);
-    const extraGuestsFee = extraGuests * extraGuestFee;
     
-    // Calculate total before discount
-    const subtotal = (basePrice + extraGuestsFee) * nights;
+    // Calculate pricing using the utility function for a single night
+    const {
+      baseNightlyPrice,
+      finalNightlyPrice,
+      extraGuestFee,
+      appliedDiscountPercent,
+      hasSpecialDateMultiplier
+    } = calculateNightlyPrice({
+      unitType,
+      checkInDate: dateRange.startDate || new Date(),
+      guests: guests || includedGuests
+    });
     
-    // Apply 17% discount
-    const discount = Math.round((subtotal * 17) / 100);
-    const total = subtotal - discount;
+    // Calculate totals for the entire stay
+    const basePrice = baseNightlyPrice * nights;
+    const total = finalNightlyPrice * nights;
+    const extraGuestsFee = extraGuestFee * nights;
+    const subtotal = basePrice + extraGuestsFee;
+    const discount = appliedDiscountPercent > 0 ? (subtotal * appliedDiscountPercent) / 100 : 0;
     
     return {
-      basePrice: basePrice * nights,
-      extraGuestsFee: extraGuests > 0 ? extraGuestsFee * nights : 0,
+      basePrice,
+      extraGuestsFee,
       subtotal,
-      discount,
-      total,
+      discount: Math.round(discount),
+      total: Math.round(total),
       nights,
-      extraGuests
+      extraGuests,
+      hasSpecialDateMultiplier
     };
   };
 
@@ -225,73 +233,22 @@ const finalTotal =
     ? `${format(dateRange.startDate, 'EEE, dd MMM')} – ${format(dateRange.endDate, 'EEE, dd MMM')} • ${priceDetails.nights} ${priceDetails.nights === 1 ? 'night' : 'nights'}`
     : 'Add your travel dates';
 
-  const validateForm = () => {
-    const errors: Record<string, string> = {};
-    
-    if (!dateRange.startDate || !dateRange.endDate) {
-      errors.dates = 'Please select check-in and check-out dates';
-    }
-    
-    if (!name.trim()) {
-      errors.name = 'Name is required';
-    }
-    
-    if (!email.trim()) {
-      errors.email = 'Email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      errors.email = 'Please enter a valid email';
-    }
-    
-    if (!phone.trim()) {
-      errors.phone = 'Phone number is required';
-    } else if (!/^\d{10}$/.test(phone.replace(/[\s-]/g, ''))) {
-      errors.phone = 'Please enter a valid 10-digit phone number';
-    }
-    
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
   const handleSubmit = () => {
-    if (!validateForm()) {
+    if (!dateRange.startDate || !dateRange.endDate) {
+      setFormError('Select your check-in and check-out dates.');
       return;
     }
 
-    // Save booking details to context
+    setFormError(null);
     updateBooking({
       propertyId: listingId,
-      propertyName: listingName ?? null,
+       propertyName: listingName ?? null,
       checkIn: dateRange.startDate.toISOString(),
       checkOut: dateRange.endDate.toISOString(),
       guests,
-      guestInfo: {
-        name,
-        email,
-        phone
-      }
     });
 
-    // Convert amount to paise (Razorpay expects amount in smallest currency unit)
-    const amountInPaise = finalTotal ;
-    
-    // Format phone number (remove all non-digit characters except +)
-    const formattedPhone = phone.replace(/[^\d+]/g, '');
-    
-    // Build the Razorpay URL with direct parameters
-    const razorpayUrl = new URL('https://pages.razorpay.com/atlashomestays');
-    
-    // Add parameters to URL
-    razorpayUrl.searchParams.append('amount', amountInPaise.toString());
-    razorpayUrl.searchParams.append('email', email);
-    razorpayUrl.searchParams.append('phone', formattedPhone);  // Changed from 'contact' to 'phone'
-    razorpayUrl.searchParams.append('name', name);
-    razorpayUrl.searchParams.append('description', `Booking for ${listingName || 'your stay'}`);
-    
-    // For debugging
-    console.log('Redirecting to Razorpay with URL:', razorpayUrl.toString());
-    
-    // Redirect to Razorpay
-    window.location.href = razorpayUrl.toString();
+     navigate('/reserve', { state: { from: location.pathname, listingId, listingName } });
   };
 
 
@@ -527,69 +484,11 @@ const finalTotal =
       </div>
 
       {dateError && <p className="text-sm text-support-error">{dateError}</p>}
-      {statusMessage && <p className="text-sm text-text-secondary mb-4">{statusMessage}</p>}
-      {formError && <p className="text-sm text-support-error mb-4">{formError}</p>}
+      {statusMessage && <p className="text-sm text-text-secondary">{statusMessage}</p>}
+      {formError && <p className="text-sm text-support-error">{formError}</p>}
 
-      <div className="space-y-4 mb-6">
-        {/* Name Field */}
-        <div>
-          <label htmlFor="name" className="block text-sm font-medium text-text-primary mb-1">
-            Full Name <span className="text-support-error">*</span>
-          </label>
-          <input
-            id="name"
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="John Doe"
-            className={`w-full px-4 py-2 rounded-lg border ${formErrors.name ? 'border-support-error' : 'border-border-subtle'} bg-bg-surface text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-cta-primary focus:border-transparent`}
-            disabled={isLoading}
-          />
-          {formErrors.name && <p className="mt-1 text-sm text-support-error">{formErrors.name}</p>}
-        </div>
-
-        {/* Email Field */}
-        <div>
-          <label htmlFor="email" className="block text-sm font-medium text-text-primary mb-1">
-            Email <span className="text-support-error">*</span>
-          </label>
-          <input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="your.email@example.com"
-            className={`w-full px-4 py-2 rounded-lg border ${formErrors.email ? 'border-support-error' : 'border-border-subtle'} bg-bg-surface text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-cta-primary focus:border-transparent`}
-            disabled={isLoading}
-          />
-          {formErrors.email && <p className="mt-1 text-sm text-support-error">{formErrors.email}</p>}
-        </div>
-
-        {/* Phone Field */}
-        <div>
-          <label htmlFor="phone" className="block text-sm font-medium text-text-primary mb-1">
-            Phone Number <span className="text-support-error">*</span>
-          </label>
-          <input
-            id="phone"
-            type="tel"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value.replace(/[^\d\s-]/g, ''))}
-            placeholder="9876543210"
-            className={`w-full px-4 py-2 rounded-lg border ${formErrors.phone ? 'border-support-error' : 'border-border-subtle'} bg-bg-surface text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-cta-primary focus:border-transparent`}
-            disabled={isLoading}
-          />
-          {formErrors.phone && <p className="mt-1 text-sm text-support-error">{formErrors.phone}</p>}
-        </div>
-      </div>
-
-      <Button 
-        fullWidth 
-        onClick={handleSubmit} 
-        disabled={isLoading}
-        className="mt-2"
-      >
-        {isLoading ? 'Processing...' : 'Book this home'}
+      <Button fullWidth onClick={handleSubmit} disabled={isLoading}>
+        Book this home
       </Button>
     </div>
   );

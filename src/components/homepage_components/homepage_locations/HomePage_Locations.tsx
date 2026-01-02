@@ -209,7 +209,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
 
   const renderPrice = (model: ListingModel) => {
     if (!model.price) return null;
-    console.log("Rendering price for model:", model);
+    
     const { baseNightlyPrice, finalNightlyPrice, currency, appliedDiscountPercent, hasSpecialDateMultiplier, dateKey } =
       model.price;
 
