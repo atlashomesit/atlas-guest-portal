@@ -1,7 +1,7 @@
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { FaBed, FaShower, FaSwimmingPool, FaCar, FaWifi, FaTv } from "react-icons/fa";
 import { TbAirConditioning } from "react-icons/tb";
-import { PiElevatorDuotone, PiSecurityCameraDuotone } from "react-icons/pi";
+import { PiElevatorDuotone, PiCoatHangerLight } from "react-icons/pi";
 import { RiLuggageCartLine } from "react-icons/ri";
 import { TfiBrushAlt } from "react-icons/tfi";
 import { LiaNewspaper } from "react-icons/lia";
@@ -205,7 +205,7 @@ useEffect(() => {
         if (name.includes('wifi')) return <FaWifi />;
         if (name.includes('ac')) return <TbAirConditioning />;
         if (name.includes('lift') || name.includes('elevator')) return <PiElevatorDuotone />;
-        if (name.includes('security')) return <PiSecurityCameraDuotone />;
+        if (name.includes('security')) return <PiCoatHangerLight />;
         if (name.includes('tv')) return <FaTv />;
         if (name.includes('luggage')) return <RiLuggageCartLine />;
         if (name.includes('cleaning') || name.includes('housekeeping')) return <TfiBrushAlt />;
