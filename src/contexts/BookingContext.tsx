@@ -33,7 +33,7 @@ const defaultState: BookingState = {
 };
 
 
-const BookingContext = createContext<BookingContextValue | undefined>(undefined);
+export const BookingContext = createContext<BookingContextValue | undefined>(undefined);
 
 const loadState = (): BookingState => {
   if (typeof window === 'undefined') return defaultState;
@@ -104,4 +104,3 @@ export const useBooking = () => {
 
   return context;
 };
-

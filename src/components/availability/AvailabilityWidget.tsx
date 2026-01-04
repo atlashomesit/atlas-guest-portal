@@ -1,11 +1,17 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useContext, useEffect, useMemo, useState } from 'react';
+import { addDays } from 'date-fns';
 
-import { AvailabilityWidgetMode, BookingWindow, computeBlockedDates } from '@/be/availabilityCalendar';
+import { fetchAvailability, type AvailabilityNightlyRate, type AvailabilityRequestParams, type AvailabilityResponse } from '@/api/availabilityClient';
+import { AvailabilityWidgetMode } from '@/be/availabilityCalendar';
+import { BookingContext } from '@/contexts/BookingContext';
+import { getIstStartOfDay } from '@/utils/date';
+import { parseISODate, toISODate } from '@/utils/dateRange';
 
 export interface AvailabilityWidgetProps {
   mode: AvailabilityWidgetMode;
   listingId?: string | number;
-  fetchBookings?: (listingId: string) => Promise<BookingWindow[]>;
+  propertyId?: string | number;
+  fetchAvailability?: (params: AvailabilityRequestParams) => Promise<AvailabilityResponse>;
   today?: Date;
 }
 
@@ -36,44 +42,89 @@ const AvailabilityCalendarView: React.FC<AvailabilityCalendarViewProps> = ({
   );
 };
 
-const normalizeListingId = (listingId?: string | number) =>
-  listingId != null ? String(listingId) : undefined;
+const normalizeListingId = (listingId?: string | number) => {
+  if (listingId == null) return undefined;
+  const normalized = String(listingId).trim().toLowerCase();
+  return normalized.length > 0 ? normalized : undefined;
+};
+
+const resolveNightlyRates = (
+  response: AvailabilityResponse,
+  normalizedTarget: string,
+): AvailabilityNightlyRate[] => {
+  if (response.nightlyRates) {
+    return response.nightlyRates;
+  }
+
+  const listing = response.listings?.find((entry) => {
+    const candidate = entry.propertyId ?? entry.listingId ?? entry.id;
+    return normalizeListingId(candidate) === normalizedTarget;
+  });
+
+  return listing?.nightlyRates ?? [];
+};
+
+const extractBlockedDates = (nightlyRates: AvailabilityNightlyRate[]): Date[] => {
+  const blockedSet = new Map<string, Date>();
+  nightlyRates
+    .filter((rate) => !rate.isAvailable)
+    .map((rate) => getIstStartOfDay(parseISODate(rate.date)))
+    .forEach((date) => {
+      blockedSet.set(toISODate(date), date);
+    });
+
+  return Array.from(blockedSet.values()).sort((a, b) => a.getTime() - b.getTime());
+};
 
 const useBlockedDates = (
   mode: AvailabilityWidgetMode,
-  listingId: string | undefined,
-  fetchBookings: (listingId: string) => Promise<BookingWindow[]>,
+  propertyId: string | undefined,
+  guests: number,
+  fetchAvailabilityClient: (params: AvailabilityRequestParams) => Promise<AvailabilityResponse>,
   today?: Date,
 ) => {
   const [blockedDates, setBlockedDates] = useState<Date[]>([]);
   const [loading, setLoading] = useState(mode === 'unit');
   const [error, setError] = useState<string | null>(null);
+  const availabilityRange = useMemo(() => {
+    const startDate = getIstStartOfDay(today ?? new Date());
+    return { startDate, endDate: addDays(startDate, 60) };
+  }, [today]);
 
   useEffect(() => {
     if (mode === 'search') {
       setBlockedDates([]);
       setLoading(false);
+      setError(null);
       return;
     }
 
-    if (!listingId) {
-      setError('Unit availability requires a listingId.');
+    if (!propertyId) {
+      setError('Unit availability requires a propertyId.');
       setLoading(false);
       return;
     }
 
     let cancelled = false;
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
     setLoading(true);
     setError(null);
 
-    fetchBookings(listingId)
-      .then((bookings) => {
+    fetchAvailabilityClient({
+      propertyId,
+      checkIn: toISODate(availabilityRange.startDate),
+      checkOut: toISODate(availabilityRange.endDate),
+      guests,
+      signal: controller?.signal,
+    })
+      .then((response) => {
         if (cancelled) return;
-        setBlockedDates(computeBlockedDates(bookings, today));
+        const nightlyRates = resolveNightlyRates(response, propertyId);
+        setBlockedDates(extractBlockedDates(nightlyRates));
       })
       .catch((fetchError) => {
         if (cancelled) return;
-        setError(fetchError instanceof Error ? fetchError.message : 'Failed to load bookings');
+        setError(fetchError instanceof Error ? fetchError.message : 'Failed to load availability');
         setBlockedDates([]);
       })
       .finally(() => {
@@ -83,35 +134,46 @@ const useBlockedDates = (
 
     return () => {
       cancelled = true;
+      controller?.abort();
     };
-  }, [fetchBookings, listingId, mode, today]);
+  }, [availabilityRange, fetchAvailabilityClient, guests, mode, propertyId, today]);
 
   return { blockedDates, loading, error };
 };
 
-const defaultFetchBookings = async (listingId: string): Promise<BookingWindow[]> => {
-  const response = await fetch(`/api/listings/${listingId}/bookings`);
-  if (!response.ok) throw new Error('Unable to load bookings');
-  return response.json();
-};
+const defaultFetchAvailability = async (params: AvailabilityRequestParams): Promise<AvailabilityResponse> =>
+  fetchAvailability(params);
 
 export const AvailabilityWidget: React.FC<AvailabilityWidgetProps> = ({
-  fetchBookings = defaultFetchBookings,
+  fetchAvailability: fetchAvailabilityProp,
   listingId: rawListingId,
+  propertyId: rawPropertyId,
   mode,
   today,
 }) => {
-  const listingId = useMemo(() => normalizeListingId(rawListingId), [rawListingId]);
+  const bookingContext = useContext(BookingContext);
+  const guests = bookingContext?.booking?.guests ?? 1;
+  const propertyId = useMemo(
+    () => normalizeListingId(rawPropertyId ?? rawListingId),
+    [rawListingId, rawPropertyId],
+  );
+  const fetchAvailabilityClient = fetchAvailabilityProp ?? defaultFetchAvailability;
 
-  if (mode === 'search' && listingId) {
-    throw new Error('Search availability should not be provided a listingId.');
+  if (mode === 'search' && propertyId) {
+    throw new Error('Search availability should not be provided a propertyId.');
   }
 
-  if (mode === 'unit' && !listingId) {
-    throw new Error('Unit availability requires a listingId.');
+  if (mode === 'unit' && !propertyId) {
+    throw new Error('Unit availability requires a propertyId.');
   }
 
-  const { blockedDates, error, loading } = useBlockedDates(mode, listingId, fetchBookings, today);
+  const { blockedDates, error, loading } = useBlockedDates(
+    mode,
+    propertyId,
+    guests,
+    fetchAvailabilityClient,
+    today,
+  );
 
   return (
     <AvailabilityCalendarView
