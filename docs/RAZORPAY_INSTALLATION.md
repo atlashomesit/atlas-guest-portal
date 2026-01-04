@@ -156,6 +156,7 @@ Key Secret: xxxxxxxxxxxxxxxxxxxxxxxx
 VITE_RAZORPAY_KEY_ID=rzp_test_xxxxxxxxxxxxx
 
 # Other environment variables
+# If omitted, the app falls back to the production API host and logs a warning.
 VITE_API_BASE_URL=http://localhost:3000
 VITE_EMAILJS_SERVICE_ID=your_service_id
 VITE_EMAILJS_TEMPLATE_ID=your_template_id
@@ -169,6 +170,7 @@ VITE_OWNER_EMAIL=owner@example.com
 VITE_RAZORPAY_KEY_ID=rzp_live_xxxxxxxxxxxxx
 
 # Production API
+# If omitted, the app falls back to the production API host and logs a warning.
 VITE_API_BASE_URL=https://api.production.com
 ```
 
@@ -670,4 +672,3 @@ Your Razorpay integration is now set up. The implementation includes:
 4. Monitor payments in Razorpay Dashboard
 
 For issues, refer to the Troubleshooting section above.
-

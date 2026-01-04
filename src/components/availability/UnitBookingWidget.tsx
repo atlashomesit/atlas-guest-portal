@@ -6,6 +6,7 @@ import { AtlasDateRangePicker, type AtlasDateRangePickerValue } from '@/componen
 import { useBooking } from '@/contexts/BookingContext';
 import { logApiError, logUserAction } from '@/lib/monitoring';
 import { fetchAvailability, type AvailabilityNightlyRate, type AvailabilityResponse } from '@/api/availabilityClient';
+import { API_BASE_URL } from '@/config/api';
 import { getIstStartOfDay } from '@/utils/date';
 import { calculateNights, formatNightCount } from '@/utils/dateHelpers';
 import { doesRangeIntersectBlocked, parseISODate, toISODate } from '@/utils/dateRange';
@@ -130,11 +131,12 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
             : 'All dates shown are available to book.',
         );
       } catch (error) {
+        const availabilityEndpoint = `${API_BASE_URL}/availability`;
         setStatusMessage('We could not refresh availability. Try again in a moment.');
         setBookedDates([]);
         setBlockedSet(new Set());
         logApiError(error, {
-          url: 'https://atlas-homes-api-gxdqfjc2btc0atbv.centralus-01.azurewebsites.net/availability',
+          url: availabilityEndpoint,
           method: 'GET',
           category: 'network',
           tags: {

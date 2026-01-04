@@ -1,3 +1,5 @@
+import { API_BASE_URL } from '@/config/api';
+
 export type AvailabilityNightlyRate = {
   date: string;
   isAvailable: boolean;
@@ -23,8 +25,7 @@ export type AvailabilityRequestParams = {
   signal?: AbortSignal;
 };
 
-const AVAILABILITY_ENDPOINT =
-  'https://atlas-homes-api-gxdqfjc2btc0atbv.centralus-01.azurewebsites.net/availability';
+const AVAILABILITY_ENDPOINT = `${API_BASE_URL}/availability`;
 
 export const fetchAvailability = async ({
   propertyId,

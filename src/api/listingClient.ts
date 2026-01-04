@@ -1,3 +1,5 @@
+import { API_BASE_URL } from '@/config/api';
+
 export type ListingDetail = {
   id: string | number;
   propertyId?: string | number;
@@ -5,8 +7,7 @@ export type ListingDetail = {
   [key: string]: unknown;
 };
 
-const LISTING_ENDPOINT =
-  'https://atlas-homes-api-gxdqfjc2btc0atbv.centralus-01.azurewebsites.net/listings';
+const LISTING_ENDPOINT = `${API_BASE_URL}/listings`;
 
 export const fetchListingById = async (
   listingId: string | number,
