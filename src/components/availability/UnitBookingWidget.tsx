@@ -5,11 +5,10 @@ import { Button } from '@/components/ui/Button';
 import { AtlasDateRangePicker, type AtlasDateRangePickerValue } from '@/components/date/AtlasDateRangePicker';
 import { useBooking } from '@/contexts/BookingContext';
 import { logApiError, logUserAction } from '@/lib/monitoring';
-import { getBookingsForListing } from '@/services/bookingService';
+import { fetchAvailability, type AvailabilityNightlyRate, type AvailabilityResponse } from '@/api/availabilityClient';
 import { getIstStartOfDay } from '@/utils/date';
 import { calculateNights, formatNightCount } from '@/utils/dateHelpers';
-import { doesRangeIntersectBlocked, expandBookingsToBlockedSet, parseISODate, toISODate } from '@/utils/dateRange';
-import { type BookingDTO } from '@/types/booking';
+import { doesRangeIntersectBlocked, parseISODate, toISODate } from '@/utils/dateRange';
 import { calculateNightlyPrice, inferUnitType } from '@/utils/pricing';
 
 interface UnitBookingWidgetProps {
@@ -60,6 +59,29 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId,  listi
     phone: ''
   });
 
+  const availabilityRange = useMemo(() => {
+    const normalizedShownDate = getIstStartOfDay(shownDate);
+    const startDate = normalizedShownDate < today ? today : normalizedShownDate;
+    const endDate = addDays(startDate, 60);
+    return { startDate, endDate };
+  }, [shownDate, today]);
+
+  const resolveNightlyRates = (
+    response: AvailabilityResponse,
+    normalizedTarget: string,
+  ): AvailabilityNightlyRate[] => {
+    if (response.nightlyRates) {
+      return response.nightlyRates;
+    }
+
+    const listing = response.listings?.find((entry) => {
+      const candidate = entry.propertyId ?? entry.listingId ?? entry.id;
+      return normalizeListingId(candidate) === normalizedTarget;
+    });
+
+    return listing?.nightlyRates ?? [];
+  };
+
   useEffect(() => {
     const fetchBookedDates = async () => {
       if (!listingId) {
@@ -74,42 +96,24 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId,  listi
 
       logUserAction('unit_booking_availability_fetch_start', {
         listingId: normalizedTarget,
-        source: 'mock',
+        source: 'availability_api',
       });
 
       try {
-        const bookings: BookingDTO[] = await getBookingsForListing(normalizedTarget);
-        
-        console.log('[UnitBookingWidget] Total bookings:', bookings.length);
-        console.log('[UnitBookingWidget] Today:', format(today, 'dd-MM-yyyy'));
-        bookings.forEach((booking, idx) => {
-          const checkIn = getIstStartOfDay(parseISODate(booking.checkInDate));
-          const checkOut = getIstStartOfDay(parseISODate(booking.checkOutDate));
-          const nights = Math.floor((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
-          console.log(`[UnitBookingWidget] Booking ${idx + 1}:`, {
-            checkIn: booking.checkInDate,
-            checkOut: booking.checkOutDate,
-            checkInFormatted: format(checkIn, 'dd-MM-yyyy'),
-            checkOutFormatted: format(checkOut, 'dd-MM-yyyy'),
-            nights: nights,
-            blockedDates: nights
-          });
+        const response = await fetchAvailability({
+          propertyId: normalizedTarget,
+          checkIn: toISODate(availabilityRange.startDate),
+          checkOut: toISODate(availabilityRange.endDate),
+          guests,
         });
-        
-        // Include all bookings to block dates (both past and future bookings)
-        const blocked = expandBookingsToBlockedSet(bookings);
-        console.log('[UnitBookingWidget] Total blocked dates:', blocked.size);
-        
-        // Normalize dates to IST start of day for consistent comparison
-        const blockedDates = Array.from(blocked)
-          .map((iso) => getIstStartOfDay(parseISODate(iso)))
+
+        const nightlyRates = resolveNightlyRates(response, normalizedTarget);
+        const unavailableRates = nightlyRates.filter((rate) => !rate.isAvailable);
+
+        const blockedDates = unavailableRates
+          .map((rate) => getIstStartOfDay(parseISODate(rate.date)))
           .sort((a, b) => a.getTime() - b.getTime());
 
-        console.log('[UnitBookingWidget] Blocked dates (all dates included):', blockedDates.length);
-        console.log('[UnitBookingWidget] Blocked dates:', blockedDates.map(d => format(d, 'dd-MM-yyyy')).join(', '));
-        console.log('[UnitBookingWidget] bookedDates.length:', blockedDates.length);
-
-        // Create blockedSet from all blocked dates
         const blockedSet = new Set<string>();
         blockedDates.forEach((date) => {
           blockedSet.add(toISODate(date));
@@ -117,17 +121,24 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId,  listi
 
         setBlockedSet(blockedSet);
         setBookedDates(blockedDates);
-              console.log('[UnitBookingWidget] Final bookedDates.length after setState:', blockedDates.length);
-        setStatusMessage('Some dates are unavailable due to existing bookings.');
+        setStatusMessage(
+          blockedDates.length > 0
+            ? 'Some dates are unavailable due to existing bookings.'
+            : 'All dates shown are available to book.',
+        );
       } catch (error) {
         setStatusMessage('We could not refresh availability. Try again in a moment.');
         setBookedDates([]);
         setBlockedSet(new Set());
         logApiError(error, {
-          url: 'mock://bookings',
+          url: 'https://atlas-homes-api-gxdqfjc2btc0atbv.centralus-01.azurewebsites.net/availability',
           method: 'GET',
           category: 'network',
-          tags: { listingId: normalizedTarget },
+          tags: {
+            listingId: normalizedTarget,
+            checkIn: toISODate(availabilityRange.startDate),
+            checkOut: toISODate(availabilityRange.endDate),
+          },
         });
       } finally {
         setIsLoading(false);
@@ -136,7 +147,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId,  listi
     };
 
     fetchBookedDates();
-  }, [listingId]);
+  }, [availabilityRange, guests, listingId]);
 
   const disabledDay = (date: Date) => {
     const normalized = getIstStartOfDay(date);
