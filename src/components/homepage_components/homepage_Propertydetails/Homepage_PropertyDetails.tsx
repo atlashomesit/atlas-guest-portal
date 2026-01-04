@@ -20,7 +20,7 @@ import { Button } from '../../ui/Button';
 import { calculateNightlyPrice, inferUnitType } from '../../../utils/pricing';
 import { buildHomeUnitPath } from '../../../utils/navigation';
 import { useBooking } from '../../../contexts/BookingContext';
-import { fetchListingById } from '../../../api/listingClient';
+import { resolveListing } from '../../../utils/listingResolver';
 
 import { Fancybox } from "@fancyapps/ui";
 import "@fancyapps/ui/dist/fancybox/fancybox.css";
@@ -63,7 +63,9 @@ const PropertyDetails = () => {
     const [data, setData] = useState<Property | null>(null);
     const [notFound, setNotFound] = useState(false);
     const [listingPropertyId, setListingPropertyId] = useState<string | number | null>(null);
+    const [resolvedListingId, setResolvedListingId] = useState<string | number | null>(null);
     const [listingLookupError, setListingLookupError] = useState<string | null>(null);
+    const [isListingLookupPending, setIsListingLookupPending] = useState(false);
     const [showAmenitiesModal, setShowAmenitiesModal] = useState(false);
     const [showAboutMore, setShowAboutMore] = useState(false);
     const [showNeighborhoodMore, setShowNeighborhoodMore] = useState(false);
@@ -86,25 +88,38 @@ const PropertyDetails = () => {
     useEffect(() => {
         if (!unitSlug) {
             setListingPropertyId(null);
+            setResolvedListingId(null);
             setListingLookupError(null);
+            setIsListingLookupPending(false);
             return;
         }
 
         const controller = new AbortController();
         setListingPropertyId(null);
+        setResolvedListingId(null);
         setListingLookupError(null);
+        setIsListingLookupPending(true);
 
         const loadListing = async () => {
             try {
-                const listing = await fetchListingById(unitSlug, controller.signal);
-                if (!listing.propertyId) {
-                    throw new Error('Listing did not include a propertyId');
+                if (import.meta.env.DEV) {
+                    console.debug('[PropertyDetails] URL param', unitSlug);
                 }
-                setListingPropertyId(listing.propertyId);
+                const listing = await resolveListing(unitSlug, controller.signal);
+                if (!listing) {
+                    setListingLookupError('Property not available.');
+                    return;
+                }
+                setListingPropertyId(listing.propertyId ?? null);
+                setResolvedListingId(listing.id);
             } catch (error) {
                 if (controller.signal.aborted) return;
                 console.error('Unable to resolve listing details.', error);
-                setListingLookupError('Property not available.');
+                setListingLookupError('Availability temporarily unavailable.');
+            } finally {
+                if (!controller.signal.aborted) {
+                    setIsListingLookupPending(false);
+                }
             }
         };
 
@@ -298,8 +313,11 @@ useEffect(() => {
 
     const unitPolicy = getUnitPolicy(data?.id);
     const availabilityPropertyId = listingPropertyId ?? undefined;
-    const listingId = unitSlug ?? data.id;
-    const isListingLookupPending = Boolean(unitSlug) && !listingPropertyId && !listingLookupError;
+    const listingId = resolvedListingId ?? unitSlug ?? data.id;
+    const listingErrorDescription =
+        listingLookupError === 'Property not available.'
+            ? 'This home is currently unavailable. Please check back later or explore other homes.'
+            : 'We’re having trouble checking availability right now. Please refresh or try again soon.';
 
     return (
         <section className="w-full pt-28 md:pt-0 tracking-wide">
@@ -521,9 +539,9 @@ useEffect(() => {
                        <div className='hidden lg:block sticky top-16'>
     {listingLookupError ? (
         <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6">
-            <h3 className="text-lg font-semibold text-text-primary">Property not available.</h3>
+            <h3 className="text-lg font-semibold text-text-primary">{listingLookupError}</h3>
             <p className="text-sm text-text-muted mt-2">
-                This home is currently unavailable. Please check back later or explore other homes.
+                {listingErrorDescription}
             </p>
         </div>
     ) : isListingLookupPending ? (
@@ -540,9 +558,9 @@ useEffect(() => {
 <div className="lg:hidden">
     {listingLookupError ? (
         <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6">
-            <h3 className="text-lg font-semibold text-text-primary">Property not available.</h3>
+            <h3 className="text-lg font-semibold text-text-primary">{listingLookupError}</h3>
             <p className="text-sm text-text-muted mt-2">
-                This home is currently unavailable. Please check back later or explore other homes.
+                {listingErrorDescription}
             </p>
         </div>
     ) : isListingLookupPending ? (
