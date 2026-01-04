@@ -20,6 +20,7 @@ import { Button } from '../../ui/Button';
 import { calculateNightlyPrice, inferUnitType } from '../../../utils/pricing';
 import { buildHomeUnitPath } from '../../../utils/navigation';
 import { useBooking } from '../../../contexts/BookingContext';
+import { fetchListingById } from '../../../api/listingClient';
 
 import { Fancybox } from "@fancyapps/ui";
 import "@fancyapps/ui/dist/fancybox/fancybox.css";
@@ -61,6 +62,8 @@ const PropertyDetails = () => {
     const unitSlug = unitSlugParam ?? legacyUnitSlug ?? legacyIdParam;
     const [data, setData] = useState<Property | null>(null);
     const [notFound, setNotFound] = useState(false);
+    const [listingPropertyId, setListingPropertyId] = useState<string | number | null>(null);
+    const [listingLookupError, setListingLookupError] = useState<string | null>(null);
     const [showAmenitiesModal, setShowAmenitiesModal] = useState(false);
     const [showAboutMore, setShowAboutMore] = useState(false);
     const [showNeighborhoodMore, setShowNeighborhoodMore] = useState(false);
@@ -79,6 +82,38 @@ const PropertyDetails = () => {
             return null;
         }
     }, [data, unitType]);
+
+    useEffect(() => {
+        if (!unitSlug) {
+            setListingPropertyId(null);
+            setListingLookupError(null);
+            return;
+        }
+
+        const controller = new AbortController();
+        setListingPropertyId(null);
+        setListingLookupError(null);
+
+        const loadListing = async () => {
+            try {
+                const listing = await fetchListingById(unitSlug, controller.signal);
+                if (!listing.propertyId) {
+                    throw new Error('Listing did not include a propertyId');
+                }
+                setListingPropertyId(listing.propertyId);
+            } catch (error) {
+                if (controller.signal.aborted) return;
+                console.error('Unable to resolve listing details.', error);
+                setListingLookupError('Property not available.');
+            }
+        };
+
+        loadListing();
+
+        return () => {
+            controller.abort();
+        };
+    }, [unitSlug]);
 
     useEffect(() => {
         setNotFound(false);
@@ -262,6 +297,9 @@ useEffect(() => {
     }
 
     const unitPolicy = getUnitPolicy(data?.id);
+    const availabilityPropertyId = listingPropertyId ?? undefined;
+    const listingId = unitSlug ?? data.id;
+    const isListingLookupPending = Boolean(unitSlug) && !listingPropertyId && !listingLookupError;
 
     return (
         <section className="w-full pt-28 md:pt-0 tracking-wide">
@@ -481,10 +519,42 @@ useEffect(() => {
                     {/* right div  */}
                     <div className="w-full sm:w-1/3">
                        <div className='hidden lg:block sticky top-16'>
-    <UnitBookingWidget listingId={data.id} listingName={data.property_name} />
+    {listingLookupError ? (
+        <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6">
+            <h3 className="text-lg font-semibold text-text-primary">Property not available.</h3>
+            <p className="text-sm text-text-muted mt-2">
+                This home is currently unavailable. Please check back later or explore other homes.
+            </p>
+        </div>
+    ) : isListingLookupPending ? (
+        <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6">
+            <h3 className="text-lg font-semibold text-text-primary">Checking availability…</h3>
+            <p className="text-sm text-text-muted mt-2">
+                We’re fetching the latest availability for this home.
+            </p>
+        </div>
+    ) : (
+        <UnitBookingWidget listingId={listingId} propertyId={availabilityPropertyId} listingName={data.property_name} />
+    )}
 </div>
 <div className="lg:hidden">
-    <UnitBookingWidget listingId={data.id} listingName={data.property_name} />
+    {listingLookupError ? (
+        <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6">
+            <h3 className="text-lg font-semibold text-text-primary">Property not available.</h3>
+            <p className="text-sm text-text-muted mt-2">
+                This home is currently unavailable. Please check back later or explore other homes.
+            </p>
+        </div>
+    ) : isListingLookupPending ? (
+        <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6">
+            <h3 className="text-lg font-semibold text-text-primary">Checking availability…</h3>
+            <p className="text-sm text-text-muted mt-2">
+                We’re fetching the latest availability for this home.
+            </p>
+        </div>
+    ) : (
+        <UnitBookingWidget listingId={listingId} propertyId={availabilityPropertyId} listingName={data.property_name} />
+    )}
 </div>
 
                     </div>

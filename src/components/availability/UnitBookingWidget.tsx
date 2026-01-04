@@ -12,8 +12,9 @@ import { doesRangeIntersectBlocked, parseISODate, toISODate } from '@/utils/date
 import { calculateNightlyPrice, inferUnitType } from '@/utils/pricing';
 
 interface UnitBookingWidgetProps {
-  listingId: string | number;
-    listingName?: string;
+  listingId?: string | number;
+  propertyId?: string | number;
+  listingName?: string;
 }
 
 const normalizeListingId = (value: string | number | null | undefined) =>
@@ -21,9 +22,11 @@ const normalizeListingId = (value: string | number | null | undefined) =>
     .trim()
     .toLowerCase();
 
-const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId,  listingName }) => {
-     if (import.meta.env.DEV) {
-    console.assert(Boolean(listingId), '[UnitBookingWidget] listingId is required for unit mode');
+const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, propertyId, listingName }) => {
+  const availabilityId = propertyId ?? listingId;
+
+  if (import.meta.env.DEV) {
+    console.assert(Boolean(availabilityId), '[UnitBookingWidget] propertyId is required for unit mode');
   }
 
   const navigate = useNavigate();
@@ -84,7 +87,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId,  listi
 
   useEffect(() => {
     const fetchBookedDates = async () => {
-      if (!listingId) {
+      if (!availabilityId) {
         setBookedDates([]);
         setBlockedSet(new Set());
         setIsLoading(false);
@@ -92,7 +95,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId,  listi
       }
 
       setIsLoading(true);
-      const normalizedTarget = normalizeListingId(listingId);
+      const normalizedTarget = normalizeListingId(availabilityId);
 
       logUserAction('unit_booking_availability_fetch_start', {
         listingId: normalizedTarget,
@@ -147,7 +150,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId,  listi
     };
 
     fetchBookedDates();
-  }, [availabilityRange, guests, listingId]);
+  }, [availabilityRange, availabilityId, guests]);
 
   const disabledDay = (date: Date) => {
     const normalized = getIstStartOfDay(date);
@@ -188,7 +191,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId,  listi
   };
 
   const calculatePrice = () => {
-    const unitType = inferUnitType(listingId.toString());
+    const unitType = inferUnitType({ id: availabilityId, property_name: listingName });
     const includedGuests = 2;
     
     // Calculate number of nights
@@ -306,7 +309,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId,  listi
     
     // Update booking context
     updateBooking({
-      propertyId: listingId,
+      propertyId: availabilityId,
       propertyName: listingName ?? null,
       checkIn: dateRange.startDate.toISOString(),
       checkOut: dateRange.endDate.toISOString(),
@@ -335,7 +338,10 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId,  listi
     
     // Add booking details as well (optional)
     razorpayUrl.searchParams.append('name', formData.name.trim());
-    razorpayUrl.searchParams.append('listing_id', listingId.toString());
+    const listingIdentifier = listingId ?? availabilityId;
+    if (listingIdentifier) {
+      razorpayUrl.searchParams.append('listing_id', listingIdentifier.toString());
+    }
     razorpayUrl.searchParams.append('check_in', dateRange.startDate.toISOString().split('T')[0]);
     razorpayUrl.searchParams.append('check_out', dateRange.endDate.toISOString().split('T')[0]);
     razorpayUrl.searchParams.append('guests', guests.toString());
