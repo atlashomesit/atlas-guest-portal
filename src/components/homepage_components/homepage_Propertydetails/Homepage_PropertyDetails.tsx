@@ -89,7 +89,7 @@ const PropertyDetails = () => {
         if (!unitSlug) {
             setListingPropertyId(null);
             setResolvedListingId(null);
-            setListingLookupError(null);
+            setListingLookupError('Availability temporarily unavailable.');
             setIsListingLookupPending(false);
             return;
         }
@@ -110,7 +110,11 @@ const PropertyDetails = () => {
                     setListingLookupError('Property not available.');
                     return;
                 }
-                setListingPropertyId(listing.propertyId ?? null);
+                if (!listing.propertyId) {
+                    setListingLookupError('Availability temporarily unavailable.');
+                    return;
+                }
+                setListingPropertyId(listing.propertyId);
                 setResolvedListingId(listing.id);
             } catch (error) {
                 if (controller.signal.aborted) return;
@@ -313,7 +317,7 @@ useEffect(() => {
 
     const unitPolicy = getUnitPolicy(data?.id);
     const availabilityPropertyId = listingPropertyId ?? undefined;
-    const listingId = resolvedListingId ?? unitSlug ?? data.id;
+    const listingId = resolvedListingId ?? undefined;
     const listingErrorDescription =
         listingLookupError === 'Property not available.'
             ? 'This home is currently unavailable. Please check back later or explore other homes.'
