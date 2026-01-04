@@ -44,7 +44,10 @@ const getRuntimeApiBaseUrl = (): string | undefined => {
 };
 
 const missingConfigMessage =
-  "API base URL is not configured. Expected Cloudflare Pages env var VITE_API_BASE_URL (available via /config). If you just added it in Cloudflare, redeploy once or confirm the correct environment (Preview vs Production).";
+  "VITE_API_BASE_URL is not configured. Expected Cloudflare Pages env var (available via /config). If you just added it in Cloudflare, redeploy once or confirm the correct environment (Preview vs Production).";
+
+const DEFAULT_API_BASE_URL =
+  "https://atlas-homes-api-gxdqfjc2btc0atbv.centralus-01.azurewebsites.net";
 
 export const getApiBaseUrl = (): string => {
   const runtimeValue = normalizeApiBaseUrl(getRuntimeApiBaseUrl());
@@ -53,8 +56,8 @@ export const getApiBaseUrl = (): string => {
 
   if (!apiBaseUrl) {
     // eslint-disable-next-line no-console
-    console.error(missingConfigMessage);
-    throw new Error(missingConfigMessage);
+    console.warn(`${missingConfigMessage} Falling back to ${DEFAULT_API_BASE_URL}.`);
+    return normalizeApiBaseUrl(DEFAULT_API_BASE_URL);
   }
 
   const devSignals = [
