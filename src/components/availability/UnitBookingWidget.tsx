@@ -24,10 +24,8 @@ const normalizeListingId = (value: string | number | null | undefined) =>
     .toLowerCase();
 
 const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, propertyId, listingName }) => {
-  const availabilityId = propertyId ?? listingId;
-
   if (import.meta.env.DEV) {
-    console.assert(Boolean(availabilityId), '[UnitBookingWidget] propertyId is required for unit mode');
+    console.assert(Boolean(propertyId), '[UnitBookingWidget] propertyId is required for unit mode');
   }
 
   const navigate = useNavigate();
@@ -88,7 +86,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
 
   useEffect(() => {
     const fetchBookedDates = async () => {
-      if (!availabilityId) {
+      if (!propertyId) {
         setBookedDates([]);
         setBlockedSet(new Set());
         setIsLoading(false);
@@ -96,22 +94,25 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
       }
 
       setIsLoading(true);
-      const normalizedTarget = normalizeListingId(availabilityId);
+      const normalizedPropertyId = normalizeListingId(propertyId);
+      const normalizedListingTarget = listingId
+        ? normalizeListingId(listingId)
+        : normalizedPropertyId;
 
       logUserAction('unit_booking_availability_fetch_start', {
-        listingId: normalizedTarget,
+        listingId: normalizedPropertyId,
         source: 'availability_api',
       });
 
       try {
         const response = await fetchAvailability({
-          propertyId: normalizedTarget,
+          propertyId: normalizedPropertyId,
           checkIn: toISODate(availabilityRange.startDate),
           checkOut: toISODate(availabilityRange.endDate),
           guests,
         });
 
-        const nightlyRates = resolveNightlyRates(response, normalizedTarget);
+        const nightlyRates = resolveNightlyRates(response, normalizedListingTarget);
         const unavailableRates = nightlyRates.filter((rate) => !rate.isAvailable);
 
         const blockedDates = unavailableRates
@@ -131,28 +132,32 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
             : 'All dates shown are available to book.',
         );
       } catch (error) {
-        const availabilityEndpoint = `${API_BASE_URL}/availability`;
+        const availabilityUrl = new URL(`${API_BASE_URL}/availability`);
+        availabilityUrl.searchParams.set('propertyId', normalizedPropertyId);
+        availabilityUrl.searchParams.set('checkIn', toISODate(availabilityRange.startDate));
+        availabilityUrl.searchParams.set('checkOut', toISODate(availabilityRange.endDate));
+        availabilityUrl.searchParams.set('guests', guests.toString());
         setStatusMessage('We could not refresh availability. Try again in a moment.');
         setBookedDates([]);
         setBlockedSet(new Set());
         logApiError(error, {
-          url: availabilityEndpoint,
+          url: availabilityUrl.toString(),
           method: 'GET',
           category: 'network',
           tags: {
-            listingId: normalizedTarget,
+            listingId: normalizedPropertyId,
             checkIn: toISODate(availabilityRange.startDate),
             checkOut: toISODate(availabilityRange.endDate),
           },
         });
       } finally {
         setIsLoading(false);
-        logUserAction('unit_booking_availability_fetch_end', { listingId: normalizedTarget });
+        logUserAction('unit_booking_availability_fetch_end', { listingId: normalizedPropertyId });
       }
     };
 
     fetchBookedDates();
-  }, [availabilityRange, availabilityId, guests]);
+  }, [availabilityRange, guests, listingId, propertyId]);
 
   const disabledDay = (date: Date) => {
     const normalized = getIstStartOfDay(date);
@@ -193,7 +198,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
   };
 
   const calculatePrice = () => {
-    const unitType = inferUnitType({ id: availabilityId, property_name: listingName });
+    const unitType = inferUnitType({ id: propertyId, property_name: listingName });
     const includedGuests = 2;
     
     // Calculate number of nights
@@ -311,7 +316,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
     
     // Update booking context
     updateBooking({
-      propertyId: availabilityId,
+      propertyId,
       propertyName: listingName ?? null,
       checkIn: dateRange.startDate.toISOString(),
       checkOut: dateRange.endDate.toISOString(),
@@ -340,7 +345,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
     
     // Add booking details as well (optional)
     razorpayUrl.searchParams.append('name', formData.name.trim());
-    const listingIdentifier = listingId ?? availabilityId;
+    const listingIdentifier = listingId ?? propertyId;
     if (listingIdentifier) {
       razorpayUrl.searchParams.append('listing_id', listingIdentifier.toString());
     }
