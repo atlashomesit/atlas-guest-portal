@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { addDays, format, startOfMonth } from 'date-fns';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
@@ -46,8 +46,9 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
   const [guests, setGuests] = useState(2);
   const [bookedDates, setBookedDates] = useState<Date[]>([]);
   const [blockedSet, setBlockedSet] = useState<Set<string>>(new Set());
-  const [isLoading, setIsLoading] = useState(true);
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+const [isLoading, setIsLoading] = useState(false);
+const [statusMessage, setStatusMessage] = useState<string | null>(null);
+const isMounted = useRef(true);
   const [formError, setFormError] = useState<string | null>(null);
   const [dateError, setDateError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -84,118 +85,139 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
     return listing?.nightlyRates ?? [];
   };
 
+  // Fetch blocked dates when the component mounts or when the calendar is opened
   useEffect(() => {
-    const fetchBookedDates = async () => {
-      if (!propertyId) {
-        setBookedDates([]);
-        setBlockedSet(new Set());
-        setIsLoading(false);
-        return;
-      }
+    if (!openCalendar || !listingId) return;
 
+    const fetchBlockedDates = async () => {
       setIsLoading(true);
-      const normalizedPropertyId = normalizeListingId(propertyId);
-      const normalizedListingTarget = listingId
-        ? normalizeListingId(listingId)
-        : normalizedPropertyId;
-
-      logUserAction('unit_booking_availability_fetch_start', {
-        listingId: normalizedPropertyId,
-        source: 'availability_api',
-      });
-
+      setStatusMessage('Checking availability...');
+      
       try {
-        const response = await fetchAvailability({
-          propertyId: normalizedPropertyId,
-          checkIn: toISODate(availabilityRange.startDate),
-          checkOut: toISODate(availabilityRange.endDate),
-          guests,
+        // Generate dates for the next 90 days
+        const today = getIstStartOfDay();
+        const dateArray = Array.from({ length: 90 }, (_, i) => addDays(today, i));
+        
+        const results = [];
+        
+        // Fetch availability for each date
+        for (const date of dateArray) {
+          try {
+            const dateStr = toISODate(date);
+            const response = await fetch(
+              `http://localhost:5120/availability/listing-availability?listingId=${listingId}&startDate=${dateStr}`
+            );
+            
+            if (!response.ok) {
+              throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            
+            results.push({
+              listingId: data.listingId,
+              date: data.date,
+              availableRooms: data.inventory > 0 ? 1 : 0
+            });
+          } catch (error) {
+            console.error(`Failed to fetch availability for date ${date}:`, error);
+          }
+        }
+        
+        if (!isMounted.current) return;
+        
+        // Update blocked dates based on availability
+        const newBlockedDates = new Set<string>();
+        results.forEach(item => {
+          if (item.availableRooms === 0) {
+            const date = getIstStartOfDay(new Date(item.date));
+            newBlockedDates.add(toISODate(date));
+          }
         });
-
-        const nightlyRates = resolveNightlyRates(response, normalizedListingTarget);
-        const unavailableRates = nightlyRates.filter((rate) => !rate.isAvailable);
-
-        const blockedDates = unavailableRates
-          .map((rate) => getIstStartOfDay(parseISODate(rate.date)))
-          .sort((a, b) => a.getTime() - b.getTime());
-
-        const blockedSet = new Set<string>();
-        blockedDates.forEach((date) => {
-          blockedSet.add(toISODate(date));
-        });
-
-        setBlockedSet(blockedSet);
-        setBookedDates(blockedDates);
+        
+        setBlockedSet(newBlockedDates);
+        setBookedDates(Array.from(newBlockedDates).map(date => new Date(date)));
         setStatusMessage(
-          blockedDates.length > 0
+          newBlockedDates.size > 0
             ? 'Some dates are unavailable due to existing bookings.'
-            : 'All dates shown are available to book.',
+            : 'All dates shown are available to book.'
         );
       } catch (error) {
-        const availabilityUrl = new URL(`${API_BASE_URL}/availability`);
-        availabilityUrl.searchParams.set('propertyId', normalizedPropertyId);
-        availabilityUrl.searchParams.set('checkIn', toISODate(availabilityRange.startDate));
-        availabilityUrl.searchParams.set('checkOut', toISODate(availabilityRange.endDate));
-        availabilityUrl.searchParams.set('guests', guests.toString());
-        setStatusMessage('We could not refresh availability. Try again in a moment.');
-        setBookedDates([]);
-        setBlockedSet(new Set());
-        logApiError(error, {
-          url: availabilityUrl.toString(),
-          method: 'GET',
-          category: 'network',
-          tags: {
-            listingId: normalizedPropertyId,
-            checkIn: toISODate(availabilityRange.startDate),
-            checkOut: toISODate(availabilityRange.endDate),
-          },
-        });
+        console.error('Error fetching blocked dates:', error);
+        setStatusMessage('Failed to load availability. Please try again.');
       } finally {
-        setIsLoading(false);
-        logUserAction('unit_booking_availability_fetch_end', { listingId: normalizedPropertyId });
+        if (isMounted.current) {
+          setIsLoading(false);
+        }
       }
     };
 
-    fetchBookedDates();
-  }, [availabilityRange, guests, listingId, propertyId]);
+    fetchBlockedDates();
+    
+    return () => {
+      isMounted.current = false;
+    };
+  }, [openCalendar, listingId]);
 
-  const disabledDay = (date: Date) => {
+  const disabledDay = useCallback((date: Date) => {
     const normalized = getIstStartOfDay(date);
-    // Allow today and future dates, block only past dates
+    // Block past dates
     if (normalized < today) return true;
-    // Check if date is blocked by existing bookings
+    // Check if date is blocked by inventory
     const iso = toISODate(normalized);
     return blockedSet.has(iso);
-  };
+  }, [blockedSet, today]);
+const handleRangeChange = (next: AtlasDateRangePickerValue) => {
+  setDateError(null);
 
-  const handleRangeChange = (next: AtlasDateRangePickerValue) => {
-    setDateError(null);
-    const { startDate, endDate } = next;
-    if (!startDate) {
-      setDateRange(next);
-      return;
-    }
+  const { startDate, endDate } = next;
 
-    // Normalize to IST start of day for consistent comparison
-    const startISO = toISODate(getIstStartOfDay(startDate));
-    if (blockedSet.has(startISO)) {
-      setDateError('These dates overlap an existing booking. Please choose different dates.');
-      setDateRange({ startDate: null, endDate: null });
-      return;
-    }
-
-    if (endDate) {
-      // Normalize to IST start of day for consistent comparison
-      const endISO = toISODate(getIstStartOfDay(endDate));
-      if (doesRangeIntersectBlocked(startISO, endISO, blockedSet)) {
-        setDateError('These dates overlap an existing booking. Please choose different dates.');
-        setDateRange({ startDate, endDate: null });
-        return;
-      }
-    }
-
+  if (!startDate) {
     setDateRange(next);
-  };
+    return;
+  }
+
+  const startISO = toISODate(getIstStartOfDay(startDate));
+
+  // ❌ block if the selected date itself is blocked
+  if (blockedSet.has(startISO)) {
+    setDateError('This date is not available.');
+    setDateRange({ startDate: null, endDate: null });
+    return;
+  }
+
+  // First click - set start date
+  if (!endDate) {
+    // Just set the start date, don't set end date yet
+    setDateRange({ startDate, endDate: null });
+    return;
+  }
+
+  // If we have both dates, validate the range
+  const endISO = toISODate(getIstStartOfDay(endDate));
+  
+  // If it's a single date selection (same start and end date)
+  if (startDate.getTime() === endDate.getTime()) {
+    const nextDay = addDays(startDate, 1);
+    const nextDayISO = toISODate(getIstStartOfDay(nextDay));
+    
+    // Set end date to next day if it's not blocked, otherwise keep as single day
+    setDateRange({
+      startDate,
+      endDate: !blockedSet.has(nextDayISO) ? nextDay : startDate
+    });
+    return;
+  }
+
+  // For range selection, validate the range
+  if (doesRangeIntersectBlocked(startISO, endISO, blockedSet)) {
+    setDateError('These dates overlap an existing booking.');
+    setDateRange({ startDate, endDate: null });
+    return;
+  }
+  setDateRange(next);
+};
+
 
   const calculatePrice = () => {
     const unitType = inferUnitType({ id: propertyId, property_name: listingName });
@@ -300,6 +322,48 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
     }));
   };
 
+  const handleSendSelectedDates = async () => {
+    if (!listingId) {
+      console.error('No listing ID available');
+      return;
+    }
+    
+    if (!dateRange.startDate || !dateRange.endDate) {
+      setFormError('Please select both start and end dates');
+      return;
+    }
+    
+    setIsLoading(true);
+    setFormError(null);
+    
+    try {
+      const response = await fetch('http://localhost:5120/availability/blocks', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          listingId: Number(listingId),
+          startDate: toISODate(getIstStartOfDay(dateRange.startDate)),
+          endDate: toISODate(getIstStartOfDay(dateRange.endDate))
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      console.log('Dates submitted successfully:', result);
+      
+    } catch (error) {
+      console.error('Error submitting selected dates:', error);
+      setFormError('Failed to save selected dates. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -363,7 +427,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
 
       <div className="space-y-1">
         <p className="text-sm uppercase tracking-[0.12em] text-text-muted font-semibold">Reserve</p>
-        <h3 className="text-xl sm:text-2xl font-semibold text-text-primary">Book this home</h3>
+        <h3 className="text-xl sm:text-2xl font-semibold text-text-primary"></h3>
         <p className="text-text-secondary text-sm">Choose your dates to confirm availability for this apartment.</p>
       </div>
 
@@ -467,25 +531,33 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
                   rangeStart !== null && rangeEnd !== null
                     ? dayStart.getTime() >= rangeStart && dayStart.getTime() <= rangeEnd
                     : false;
+                const isBlocked = blockedSet.has(toISODate(dayStart));
                 const isDisabled = disabledDay(day);
                 const isToday = dayStart.getTime() === today.getTime();
 
-            return (
-  <div className="relative flex h-full w-full items-center justify-center">
-    <span
-      className={`relative z-10 flex items-center justify-center text-sm font-medium transition ${
-        isRangeStart || isRangeEnd
-          ? 'bg-[var(--cta-primary)] text-white rounded-xl px-3 py-2 shadow-sm'
-          : isDisabled
-          ? 'text-[var(--border-strong)] cursor-not-allowed opacity-50'
-          : 'text-[var(--brand)]'
-      }`}
-      style={{ minHeight: 38, minWidth: 38 }}
-    >
-      {format(day, 'd')}
-    </span>
-  </div>
-);
+                return (
+                  <div className="relative flex h-full w-full items-center justify-center">
+                    {isBlocked && (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="absolute w-full h-px bg-red-500 transform rotate-45 origin-center" style={{ transform: 'rotate(-45deg)' }}></div>
+                      </div>
+                    )}
+                    <span
+                      className={`relative z-10 flex items-center justify-center text-sm font-medium transition ${
+                        isRangeStart || isRangeEnd
+                          ? 'bg-[var(--cta-primary)] text-white rounded-xl px-3 py-2 shadow-sm'
+                          : isDisabled
+                          ? isBlocked
+                            ? 'text-red-500/70 cursor-not-allowed'
+                            : 'text-[var(--border-strong)] cursor-not-allowed opacity-50'
+                          : 'text-[var(--brand)]'
+                      }`}
+                      style={{ minHeight: 38, minWidth: 38 }}
+                    >
+                      {format(day, 'd')}
+                    </span>
+                  </div>
+                );
 
               }}
             />
@@ -581,6 +653,31 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
   </div>
 </div>
 
+      </div>
+
+      {/* Selected Dates Button */}
+      <div className="mt-4">
+        <button
+          type="button"
+          onClick={handleSendSelectedDates}
+          disabled={!dateRange.startDate || !dateRange.endDate || isLoading}
+          className={`w-full py-3 px-4 rounded-xl text-sm font-medium transition-colors ${
+            !dateRange.startDate || !dateRange.endDate || isLoading
+              ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+              : 'bg-blue-600 text-white hover:bg-blue-700'
+          }`}
+        >
+          {isLoading ? 'Sending...' : 'Selected'}
+        </button>
+        {dateRange.startDate && dateRange.endDate && (
+          <p className="mt-2 text-sm text-center text-text-secondary">
+            {format(dateRange.startDate, 'MMM d')} - {format(dateRange.endDate, 'MMM d, yyyy')}
+            {' • '}
+            {calculateNights(dateRange.startDate, dateRange.endDate)} {
+              calculateNights(dateRange.startDate, dateRange.endDate) === 1 ? 'night' : 'nights'
+            }
+          </p>
+        )}
       </div>
 
       {dateError && <p className="text-sm text-support-error">{dateError}</p>}
