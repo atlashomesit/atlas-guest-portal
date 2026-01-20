@@ -105,7 +105,7 @@ const isMounted = useRef(true);
           try {
             const dateStr = toISODate(date);
             const response = await fetch(
-              `http://localhost:5120/availability/listing-availability?listingId=${listingId}&startDate=${dateStr}`
+              `${API_BASE_URL}/availability/listing-availability?listingId=${listingId}&startDate=${dateStr}`
             );
             
             if (!response.ok) {
@@ -337,7 +337,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     setFormError(null);
     
     try {
-      const response = await fetch('http://localhost:5120/availability/blocks', {
+      const response = await fetch(`${API_BASE_URL}/availability/blocks`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
