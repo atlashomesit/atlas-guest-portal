@@ -159,62 +159,163 @@ const isMounted = useRef(true);
     };
   }, [openCalendar, listingId]);
 
-  const disabledDay = useCallback((date: Date) => {
+  const isCheckoutOnly = useCallback((date: Date) => {
     const normalized = getIstStartOfDay(date);
-    // Block past dates
-    if (normalized < today) return true;
-    // Check if date is blocked by inventory
-    const iso = toISODate(normalized);
-    return blockedSet.has(iso);
+    const currentDayIso = toISODate(normalized);
+    
+    // Must be a blocked date to be checkout-only
+    if (!blockedSet.has(currentDayIso)) return false;
+    
+    // Check if the previous day is available
+    const prevDay = addDays(normalized, -1);
+    const prevDayIso = toISODate(prevDay);
+    const isPrevDayAvailable = !blockedSet.has(prevDayIso) && prevDay >= today;
+    
+    // A date is checkout-only if the previous day is available
+    return isPrevDayAvailable && normalized >= today;
   }, [blockedSet, today]);
+const isSelectingCheckout = Boolean(dateRange.startDate && !dateRange.endDate);
+
+  const hasValidCheckoutAfter = useCallback(
+  (checkIn: Date) => {
+    const nextDay = addDays(getIstStartOfDay(checkIn), 1);
+    const nextISO = toISODate(nextDay);
+
+    // normal available checkout
+    if (!blockedSet.has(nextISO)) return true;
+
+    // checkout-only allowed
+    if (isCheckoutOnly(nextDay)) return true;
+
+    return false;
+  },
+  [blockedSet, isCheckoutOnly]
+);
+
+
+  const disabledDay = useCallback(
+  (date: Date) => {
+    const day = getIstStartOfDay(date);
+    const iso = toISODate(day);
+
+    // Past dates never selectable
+    if (day < today) return true;
+
+    // ------------------------
+    // CHECK-IN MODE
+    // ------------------------
+    if (!isSelectingCheckout) {
+      // Block all blocked dates
+      if (blockedSet.has(iso)) return true;
+
+      // Block checkout-only dates as check-in
+      if (isCheckoutOnly(day)) return true;
+
+      // Block check-in if no valid checkout exists
+      const nextDay = addDays(day, 1);
+      const nextISO = toISODate(nextDay);
+
+      if (blockedSet.has(nextISO) && !isCheckoutOnly(nextDay)) {
+        return true;
+      }
+
+      return false;
+    }
+
+    // ------------------------
+    // CHECK-OUT MODE
+    // ------------------------
+    const checkIn = getIstStartOfDay(dateRange.startDate!);
+
+    // Must be AFTER check-in
+    if (day <= checkIn) return true;
+
+    // Allow blocked date ONLY if immediate next day
+    if (blockedSet.has(iso)) {
+      return day.getTime() !== addDays(checkIn, 1).getTime();
+    }
+
+    // Prevent crossing blocked nights
+    let cursor = addDays(checkIn, 1);
+    while (cursor < day) {
+      if (blockedSet.has(toISODate(cursor))) return true;
+      cursor = addDays(cursor, 1);
+    }
+
+    return false;
+  },
+  [blockedSet, today, dateRange.startDate, isSelectingCheckout, isCheckoutOnly]
+);
+
 const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   setDateError(null);
-
   const { startDate, endDate } = next;
 
-  if (!startDate) {
-    setDateRange(next);
-    return;
-  }
-
-  const startISO = toISODate(getIstStartOfDay(startDate));
-
-  // ❌ block if the selected date itself is blocked
-  if (blockedSet.has(startISO)) {
-    setDateError('This date is not available.');
-    setDateRange({ startDate: null, endDate: null });
+  // Reset selection if clicking on a date before the current start date
+  if (startDate && dateRange.startDate && startDate < dateRange.startDate) {
+    setDateRange({ startDate, endDate: null });
     return;
   }
 
   // First click - set start date
-  if (!endDate) {
-    // Just set the start date, don't set end date yet
+  if (startDate && !endDate) {
+    const startISO = toISODate(getIstStartOfDay(startDate));
+    
+    // Check if start date is blocked (including checkout-only dates)
+  // Block check-in if date is blocked OR checkout-only
+if (blockedSet.has(startISO) || isCheckoutOnly(startDate)) {
+  setDateError('This date is not available for check-in.');
+  return;
+}
+
+// Block check-in if no valid checkout exists
+if (!hasValidCheckoutAfter(startDate)) {
+  setDateError('No valid checkout date available after this date.');
+  return;
+}
+
     setDateRange({ startDate, endDate: null });
     return;
   }
 
   // If we have both dates, validate the range
-  const endISO = toISODate(getIstStartOfDay(endDate));
-  
-  // If it's a single date selection (same start and end date)
-  if (startDate.getTime() === endDate.getTime()) {
-    const nextDay = addDays(startDate, 1);
-    const nextDayISO = toISODate(getIstStartOfDay(nextDay));
+  if (startDate && endDate) {
+    const startISO = toISODate(getIstStartOfDay(startDate));
+    const endISO = toISODate(getIstStartOfDay(endDate));
     
-    // Set end date to next day if it's not blocked, otherwise keep as single day
-    setDateRange({
-      startDate,
-      endDate: !blockedSet.has(nextDayISO) ? nextDay : startDate
-    });
-    return;
+    // If it's the same date, treat as 1-night stay
+    if (startDate.getTime() === endDate.getTime()) {
+      // Check if next day is available or checkout-only
+      const nextDay = addDays(startDate, 1);
+      const nextDayISO = toISODate(getIstStartOfDay(nextDay));
+      
+      if (!blockedSet.has(nextDayISO) || isCheckoutOnly(nextDay)) {
+        setDateRange({
+          startDate,
+          endDate: nextDay
+        });
+      } else {
+        setDateRange({ startDate, endDate: startDate });
+      }
+      return;
+    }
+
+    // For range selection, validate the range
+    let current = new Date(startDate);
+    current = addDays(current, 1); // Start checking from the day after start
+    
+    while (current < endDate) {
+      const currentISO = toISODate(getIstStartOfDay(current));
+      
+      // Block if any date in the range is fully blocked (not checkout-only)
+      if (blockedSet.has(currentISO) && !isCheckoutOnly(current)) {
+        setDateError('These dates include unavailable nights.');
+        return;
+      }
+      current = addDays(current, 1);
+    }
   }
 
-  // For range selection, validate the range
-  if (doesRangeIntersectBlocked(startISO, endISO, blockedSet)) {
-    setDateError('These dates overlap an existing booking.');
-    setDateRange({ startDate, endDate: null });
-    return;
-  }
   setDateRange(next);
 };
 
