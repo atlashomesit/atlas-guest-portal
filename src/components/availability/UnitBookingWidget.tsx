@@ -38,14 +38,28 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
   const calendarButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const [dateRange, setDateRange] = useState<AtlasDateRangePickerValue>({
-    startDate: today,
-    endDate: addDays(today, 1),
-  });
+  startDate: null,
+  endDate: null,
+});
+
   const [openCalendar, setOpenCalendar] = useState(false);
   const [shownDate, setShownDate] = useState<Date>(today);
   const [guests, setGuests] = useState(2);
   const [bookedDates, setBookedDates] = useState<Date[]>([]);
   const [blockedSet, setBlockedSet] = useState<Set<string>>(new Set());
+  const firstAvailableDateFromToday = useMemo(() => {
+  for (let i = 0; i <= 365; i++) {
+    const date = addDays(today, i);
+    const iso = toISODate(getIstStartOfDay(date));
+
+    // Available = not blocked
+    if (!blockedSet.has(iso)) {
+      return date;
+    }
+  }
+  return null;
+}, [blockedSet, today]);
+
 const [isLoading, setIsLoading] = useState(false);
 const [statusMessage, setStatusMessage] = useState<string | null>(null);
 const isMounted = useRef(true);
@@ -579,19 +593,26 @@ if (!hasValidCheckoutAfter(startDate)) {
               setOpenCalendar(true);
             }}
           >
-            <div className="flex items-center justify-between gap-3">
-  <span className="text-sm sm:text-base">{formattedDateLabel}</span>
+           <div className="flex items-center justify-between gap-3">
+  <span className="text-sm sm:text-base">
+    {dateRange.startDate && dateRange.endDate
+      ? formattedDateLabel
+      : firstAvailableDateFromToday
+      ? `Available from ${format(firstAvailableDateFromToday, 'dd MMM yyyy')}`
+      : 'No dates available'}
+  </span>
+
   <span className="text-xs text-text-muted">
     {isLoading
       ? 'Loading…'
       : dateRange.startDate && dateRange.endDate
-      ? (() => {
-          const nights = calculateNights(dateRange.startDate, dateRange.endDate);
-          return nights > 0 ? `${nights} ${nights === 1 ? 'date' : 'dates'} blocked` : 'Select dates';
-        })()
+      ? `${calculateNights(dateRange.startDate, dateRange.endDate)} ${
+          calculateNights(dateRange.startDate, dateRange.endDate) === 1 ? 'night' : 'nights'
+        }`
       : 'Select dates'}
   </span>
 </div>
+
 
             {dateRange.startDate && dateRange.endDate && calculateNights(dateRange.startDate, dateRange.endDate) > 0 && (
               <div className="mt-2 flex items-center justify-center">
