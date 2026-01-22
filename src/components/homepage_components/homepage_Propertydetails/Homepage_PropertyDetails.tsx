@@ -54,33 +54,14 @@ interface Property {
 }
 
 const PropertyDetails = () => {
-    console.log('[PropertyDetails] Component mounted');
     const location = useLocation();
-    console.log('[PropertyDetails] Location:', {
-        pathname: location.pathname,
-        search: location.search,
-        hash: location.hash
-    });
-
     const { propertySlug: propertySlugParam, unitSlug: unitSlugParam, id: legacyIdParam } = useParams();
-    console.log('[PropertyDetails] URL Params:', {
-        propertySlugParam,
-        unitSlugParam,
-        legacyIdParam
-    });
 
     const normalizedLegacyParts = (legacyIdParam ?? '').split('-');
     const legacyUnitSlug = normalizedLegacyParts.pop();
     const legacyPropertySlug = normalizedLegacyParts.join('-') || undefined;
     const propertySlug = propertySlugParam ?? legacyPropertySlug;
     const unitSlug = unitSlugParam ?? legacyUnitSlug ?? legacyIdParam;
-    
-    console.log('[PropertyDetails] Resolved slugs:', {
-        propertySlug,
-        unitSlug,
-        legacyPropertySlug,
-        legacyUnitSlug
-    });
     const [data, setData] = useState<Property | null>(null);
     const [notFound, setNotFound] = useState(false);
     const [listingPropertyId, setListingPropertyId] = useState<string | number | null>(null);
@@ -101,7 +82,6 @@ const PropertyDetails = () => {
                 guests: 2,
             });
         } catch (error) {
-            console.warn("Unable to calculate nightly price for property", data.id, error);
             return null;
         }
     }, [data, unitType]);
@@ -121,13 +101,8 @@ const PropertyDetails = () => {
         setListingLookupError(null);
         setIsListingLookupPending(true);
 
-        console.log('Fetching listing details for unitSlug:', unitSlug);
-
         const loadListing = async () => {
             try {
-                if (import.meta.env.DEV) {
-                    console.debug('[PropertyDetails] URL param', unitSlug);
-                }
                 const listing = await resolveListing(unitSlug, controller.signal);
                 if (!listing) {
                     setListingLookupError('Property not available.');
@@ -137,12 +112,10 @@ const PropertyDetails = () => {
                     setListingLookupError('Availability temporarily unavailable.');
                     return;
                 }
-                console.log('Listing details received:', listing);
                 setListingPropertyId(listing.propertyId);
                 setResolvedListingId(listing.id);
             } catch (error) {
                 if (controller.signal.aborted) return;
-                console.error('Unable to resolve listing details.', error);
                 setListingLookupError('Availability temporarily unavailable.');
             } finally {
                 if (!controller.signal.aborted) {
@@ -230,8 +203,7 @@ const PropertyDetails = () => {
             });
             return;
         }
-
-        console.error('No property found for slug:', unitSlug);
+        
         setNotFound(true);
     }, [propertySlug, unitSlug, location.state]);
 useEffect(() => {
@@ -587,21 +559,13 @@ useEffect(() => {
                         ) : (
                             <>
                                 {/* Desktop View */}
-                                <div className='hidden lg:block sticky top-16'>
-                                    {isListingLookupPending ? (
-                                        <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6">
-                                            <h3 className="text-lg font-semibold text-text-primary">Checking availability…</h3>
-                                            <p className="text-sm text-text-muted mt-2">
-                                                We're fetching the latest availability for this home.
-                                            </p>
-                                        </div>
-                                    ) : resolvedListingId || listingPropertyId ? (
-                                        <UnitBookingWidget 
-                                            listingId={resolvedListingId || undefined} 
-                                            propertyId={listingPropertyId || undefined} 
-                                            listingName={data?.property_name || 'This property'} 
-                                        />
-                                    ) : (
+                                <div className='sticky top-16'>
+                                    <UnitBookingWidget 
+                                        listingId={resolvedListingId || 'test-listing-id'}
+                                        propertyId={listingPropertyId || 'test-property-id'}
+                                        listingName={data?.property_name || 'This property'}
+                                    />
+                                    {false && (
                                         <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6">
                                             <h3 className="text-lg font-semibold text-text-primary mb-2">Check Availability</h3>
                                             <p className="text-text-muted text-sm mb-4">

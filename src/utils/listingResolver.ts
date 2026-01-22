@@ -1,7 +1,7 @@
 import type { ListingDetail } from '../api/listingClient';
 
 const LISTING_ENDPOINT =
-  'https://atlas-homes-api-gxdqfjc2btc0atbv.centralus-01.azurewebsites.net/listings';
+  'https://atlas-homes-api-dev-fhdtg0gkgmcmhwfd.centralindia-01.azurewebsites.net/listings';
 
 const normalizeListingPayload = (
   payload: Record<string, unknown>,

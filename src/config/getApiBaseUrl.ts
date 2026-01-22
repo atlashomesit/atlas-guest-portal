@@ -47,7 +47,7 @@ const missingConfigMessage =
   "VITE_API_BASE_URL is not configured. Expected Cloudflare Pages env var (available via /config). If you just added it in Cloudflare, redeploy once or confirm the correct environment (Preview vs Production).";
 
 const DEFAULT_API_BASE_URL =
-  "https://atlas-homes-api-gxdqfjc2btc0atbv.centralus-01.azurewebsites.net";
+  "https://atlas-homes-api-dev-fhdtg0gkgmcmhwfd.centralindia-01.azurewebsites.net";
 
 export const getApiBaseUrl = (): string => {
   // Directly return the development API URL
