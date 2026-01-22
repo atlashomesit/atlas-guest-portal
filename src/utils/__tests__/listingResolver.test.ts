@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resolveListing } from '../listingResolver';
 
 const LISTING_ENDPOINT =
-  'https://atlas-homes-api-gxdqfjc2btc0atbv.centralus-01.azurewebsites.net/listings';
+  'https://atlas-homes-api-dev-fhdtg0gkgmcmhwfd.centralindia-01.azurewebsites.net/listings';
 
 const fetchMock = vi.fn();
 

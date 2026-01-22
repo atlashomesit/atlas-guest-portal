@@ -1,3 +1,4 @@
+
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { addDays, format, startOfMonth } from 'date-fns';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -158,7 +159,6 @@ const isMounted = useRef(true);
       isMounted.current = false;
     };
   }, [openCalendar, listingId]);
-
   const isCheckInAllowed = (date: Date) => {
   const iso = toISODate(getIstStartOfDay(date));
   if (blockedSet.has(iso)) return false; // blocked dates never check-in
@@ -179,7 +179,8 @@ const isCheckOutAllowed = (date: Date) => {
   return true;
 };
 
-const disabledDay = useCallback((date: Date) => {
+
+  const disabledDay = useCallback((date: Date) => {
   const normalized = getIstStartOfDay(date);
   if (normalized < today) return true;
 
@@ -195,7 +196,6 @@ const disabledDay = useCallback((date: Date) => {
 
   return blockedSet.has(iso); // block all other blocked dates
 }, [blockedSet, today, dateRange.startDate]);
-
 
 const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   setDateError(null);
@@ -237,8 +237,6 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
   setDateRange(next);
 };
-
- 
 
 
   const calculatePrice = () => {
