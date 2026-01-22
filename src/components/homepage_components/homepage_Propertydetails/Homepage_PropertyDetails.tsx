@@ -1,3 +1,4 @@
+import React, { JSX } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { FaBed, FaShower, FaSwimmingPool, FaCar, FaWifi, FaTv } from "react-icons/fa";
 import { TbAirConditioning } from "react-icons/tb";
@@ -316,12 +317,6 @@ useEffect(() => {
     }
 
     const unitPolicy = getUnitPolicy(data?.id);
-    const availabilityPropertyId = listingPropertyId ?? undefined;
-    const listingId = resolvedListingId ?? undefined;
-    const listingErrorDescription =
-        listingLookupError === 'Property not available.'
-            ? 'This home is currently unavailable. Please check back later or explore other homes.'
-            : 'We’re having trouble checking availability right now. Please refresh or try again soon.';
 
     return (
         <section className="w-full pt-28 md:pt-0 tracking-wide">
@@ -570,20 +565,35 @@ useEffect(() => {
                             <>
                                 {/* Desktop View */}
                                 <div className='hidden lg:block sticky top-16'>
-                                    {isListingLookupPending && (
-                                        <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6 mb-4">
+                                    {isListingLookupPending ? (
+                                        <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6">
                                             <h3 className="text-lg font-semibold text-text-primary">Checking availability…</h3>
                                             <p className="text-sm text-text-muted mt-2">
                                                 We're fetching the latest availability for this home.
                                             </p>
                                         </div>
+                                    ) : resolvedListingId || listingPropertyId ? (
+                                        <UnitBookingWidget 
+                                            listingId={resolvedListingId || undefined} 
+                                            propertyId={listingPropertyId || undefined} 
+                                            listingName={data?.property_name || 'This property'} 
+                                        />
+                                    ) : (
+                                        <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6">
+                                            <h3 className="text-lg font-semibold text-text-primary mb-2">Check Availability</h3>
+                                            <p className="text-text-muted text-sm mb-4">
+                                                Availability check is currently unavailable. Please try again later.
+                                            </p>
+                                            <Button 
+                                                variant="primary" 
+                                                fullWidth 
+                                                onClick={() => window.location.reload()}
+                                                disabled={isListingLookupPending}
+                                            >
+                                                {isListingLookupPending ? 'Loading...' : 'Try Again'}
+                                            </Button>
+                                        </div>
                                     )}
-                                    
-                                    <UnitBookingWidget 
-                                        listingId={listingId} 
-                                        propertyId={availabilityPropertyId} 
-                                        listingName={data?.property_name || 'This property'} 
-                                    />
                                     
                                     {listingLookupError && (
                                         <div className="mt-4 p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded">
@@ -594,37 +604,28 @@ useEffect(() => {
                                                     </svg>
                                                 </div>
                                                 <div className="ml-3">
-                                                    <p className="text-sm text-yellow-700">
+                                                    <p className="">
                                                         {listingLookupError} You can still proceed with your booking.
                                                     </p>
                                                 </div>
                                             </div>
                                         </div>
                                     )}
-                                </div>
-
-                                {/* Mobile View */}
-                                <div className="lg:hidden">
-                                    {isListingLookupPending && (
-                                        <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6 mb-4">
-                                            <h3 className="text-lg font-semibold text-text-primary">Checking availability…</h3>
-                                        </div>
-                                    )}
-                                    
-                                    <UnitBookingWidget 
-                                        listingId={listingId} 
-                                        propertyId={availabilityPropertyId} 
-                                        listingName={data?.property_name || 'This property'} 
-                                    />
-                                    
                                     {listingLookupError && (
-                                        <div className="mt-4 p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded">
-                                            <p className="text-sm text-yellow-700">
-                                                {listingLookupError} You can still proceed with your booking.
-                                            </p>
+                                        <div className="mt-4">
+                                            <Button>
+                                                {isListingLookupPending ? 'Loading...' : 'Try Again'}
+                                            </Button>
                                         </div>
                                     )}
                                 </div>
+                                {listingLookupError && (
+                                    <div className="mt-4 p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded">
+                                        <p className="text-sm text-yellow-700">
+                                            {listingLookupError} You can still proceed with your booking.
+                                        </p>
+                                    </div>
+                                )}
                             </>
                         )}
                     </div>
