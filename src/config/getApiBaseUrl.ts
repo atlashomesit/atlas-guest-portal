@@ -50,6 +50,10 @@ const DEFAULT_API_BASE_URL =
   "https://atlas-homes-api-gxdqfjc2btc0atbv.centralus-01.azurewebsites.net";
 
 export const getApiBaseUrl = (): string => {
+  // Directly return the development API URL
+  return 'https://atlas-homes-api-dev-fhdtg0gkgmcmhwfd.centralindia-01.azurewebsites.net';
+  
+  // The code below is kept for reference but will be unreachable
   const runtimeValue = normalizeApiBaseUrl(getRuntimeApiBaseUrl());
   const envValue = normalizeApiBaseUrl(readEnv("VITE_API_BASE_URL"));
   const apiBaseUrl = runtimeValue || envValue;
@@ -58,37 +62,6 @@ export const getApiBaseUrl = (): string => {
     // eslint-disable-next-line no-console
     console.warn(`${missingConfigMessage} Falling back to ${DEFAULT_API_BASE_URL}.`);
     return normalizeApiBaseUrl(DEFAULT_API_BASE_URL);
-  }
-
-  const devSignals = [
-    readEnv("DEV"),
-    typeof import.meta !== "undefined" ? (import.meta as { env?: ImportMetaEnv }).env?.DEV : undefined,
-    typeof process !== "undefined" ? (process as { env?: ProcessEnv }).env?.DEV : undefined,
-  ];
-  const isDevLike =
-    devSignals.some((val) => String(val).toLowerCase() === "true") ||
-    (typeof window !== "undefined" && /localhost/i.test(window.location.hostname));
-  const prodSignals = [
-    readEnv("PROD"),
-    readEnv("NODE_ENV"),
-    typeof import.meta !== "undefined" ? (import.meta as { env?: ImportMetaEnv }).env?.PROD : undefined,
-    typeof import.meta !== "undefined" ? (import.meta as { env?: ImportMetaEnv }).env?.NODE_ENV : undefined,
-    typeof process !== "undefined" ? (process as { env?: ProcessEnv }).env?.PROD : undefined,
-    typeof process !== "undefined" ? (process as { env?: ProcessEnv }).env?.NODE_ENV : undefined,
-  ];
-  const hasExplicitProd = prodSignals.some((val) => {
-    if (val === undefined) return false;
-    const normalized = String(val).toLowerCase();
-    return normalized === "true" || normalized === "1" || normalized === "production" || normalized === "prod";
-  });
-  const isProductionLike = hasExplicitProd || !isDevLike;
-  const isLocalhostApi = /localhost/i.test(apiBaseUrl);
-
-  if (isProductionLike && isLocalhostApi) {
-    const localhostMessage = "VITE_API_BASE_URL cannot point to localhost in production environments";
-    // eslint-disable-next-line no-console
-    console.error(localhostMessage);
-    throw new Error(localhostMessage);
   }
 
   return apiBaseUrl;

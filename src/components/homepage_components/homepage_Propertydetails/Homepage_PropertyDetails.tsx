@@ -332,33 +332,35 @@ useEffect(() => {
             <div className="max-w-[85rem] flex flex-col gap-10 mx-auto px-4 sm:px-8 lg:px-16 py-8">
                 {/* Property Header */}
                 <div className="">
-                    <h1 className="text-2xl sm:text-3xl font-semibold mb-2 capitalize text-text-primary">{data.property_name}</h1>
+                    <h1 className="text-2xl sm:text-3xl font-semibold mb-2 capitalize text-text-primary">{data?.property_name}</h1>
                     <div className="flex items-center text-text-muted">
                         <FaLocationDot className="mr-2 text-sm" />
-                        <span className="text-sm sm:text-base">{data.property_location}</span>
+                        <span className="text-sm sm:text-base">{data?.property_location || 'Location not available'}</span>
                     </div>
-                    {data.property_neighborhoods && data.property_neighborhoods.length > 0 && (
+                    {(data?.property_neighborhoods || []).length > 0 && (
                         <div className="mt-2 flex flex-wrap gap-2">
-                            {data.property_neighborhoods.map((neighborhood) => (
-                                <span
-                                    key={neighborhood}
+                            {data?.property_neighborhoods?.map((neighborhood: string, index: number) => (
+                                <div
+                                    key={`${neighborhood}-${index}`}
                                     className="inline-flex items-center gap-2 rounded-full bg-[color:color-mix(in_srgb,var(--bg-muted)_45%,var(--bg-surface))] px-3 py-1 text-xs font-semibold text-text-primary"
+                                    role="listitem"
+                                    aria-label={`Neighborhood: ${neighborhood}`}
                                 >
-                                    <span aria-hidden>🏙️</span>
+                                    <span aria-hidden="true" role="presentation">🏙️</span>
                                     <span>{neighborhood}</span>
-                                </span>
+                                </div>
                             ))}
                         </div>
                     )}
                     <div className="mt-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3 text-sm text-text-muted">
                         <div className="flex items-center gap-2 font-semibold text-text-primary">
                             <FaStar className="text-accent-primary" />
-                            <span>{data.property_rating.toFixed(2)}</span>
-                            <span className="text-text-muted">• {data.property_reviews} reviews</span>
+                            <span>{(data?.property_rating || 0).toFixed(2)}</span>
+                            <span className="text-text-muted">• {data?.property_reviews || 0} reviews</span>
                         </div>
-                        {data.property_review_snippets?.[0] && (
+                        {data?.property_review_snippets?.[0] && (
                             <p className="sm:pl-3 sm:border-l sm:border-border-subtle sm:ml-3 text-text-muted italic">
-                                “{data.property_review_snippets[0]}”
+                                "{data.property_review_snippets?.[0] || 'No reviews available'}"
                             </p>
                         )}
                     </div>
@@ -368,30 +370,30 @@ useEffect(() => {
               {/* Image Gallery */}
 <div className="flex gap-2 h-64 md:h-96 lg:h-[450px] overflow-hidden ">
   {/* Main image */}
-      <div className="flex-1 relative h-full">
-        <a href={propertyImages[data.id]?.[0] || data.property_img[0]} data-fancybox="property-gallery">
-          <img
-            src={propertyImages[String(data.id)]?.[0] || data.property_img[0]}
-            alt="Main property"
-            loading="lazy"
-            decoding="async"
-            sizes="(min-width: 1024px) 50vw, 100vw"
-            className="w-full h-full object-cover rounded-md"
-            onError={(e) => {
-              const target = e.target as HTMLImageElement;
-              target.onerror = null;
-              target.src = data.property_img[0] || '';
+  <div className="flex-1 relative h-full">
+    <a href={(data?.id && propertyImages[data.id]?.[0]) || data?.property_img?.[0] || '#'} data-fancybox="property-gallery">
+      <img
+        src={(data?.id && propertyImages[String(data.id)]?.[0]) || data?.property_img?.[0] || ''}
+        alt="Main property"
+        loading="lazy"
+        decoding="async"
+        sizes="(min-width: 1024px) 50vw, 100vw"
+        className="w-full h-full object-cover rounded-md"
+        onError={(e) => {
+          const target = e.target as HTMLImageElement;
+          target.onerror = null;
+          target.src = data?.property_img?.[0] || '';
         }}
       />
     </a>
   </div>
   {/* Thumbnails */}
   <div className="flex-1 grid grid-cols-2 grid-rows-2 gap-2 h-full">
-    {(propertyImages[data.id]?.slice(1, 5) || data.property_img.slice(1, 5)).map((img: string, index: number) => (
+    {((data?.id && propertyImages[data.id]?.slice(1, 5)) || data?.property_img?.slice(1, 5) || []).map((img: string, index: number) => (
       <div key={index} className="relative w-full h-full">
-        <a href={img} data-fancybox="property-gallery">
+        <a href={img || '#'} data-fancybox="property-gallery">
           <img
-            src={img}
+            src={img || ''}
             alt={`Thumbnail ${index + 1}`}
             loading="lazy"
             decoding="async"
@@ -400,7 +402,7 @@ useEffect(() => {
             onError={(e) => {
               const target = e.target as HTMLImageElement;
               target.onerror = null;
-              target.src = data.property_img[index + 1] || '';
+              target.src = data?.property_img?.[index + 1] || '';
             }}
           />
         </a>
@@ -409,7 +411,7 @@ useEffect(() => {
         {index === 3 && (
           <button
             onClick={() => {
-              const images = propertyImages[String(data.id)] || data.property_img;
+              const images = (data?.id && propertyImages[String(data.id)]) || data?.property_img || [];
               Fancybox.show(
                 images.map((img: string) => ({
                   src: img,
@@ -434,9 +436,12 @@ useEffect(() => {
                         <div className="pb-8 border-b border-border-subtle">
                             <h2 className="text-xl sm:text-2xl font-semibold mb-4 text-text-primary">About this place</h2>
                             <p className="text-text-muted leading-relaxed text-justify">
-                                {showAboutMore
-                                    ? data.property_description
-                                    : `${data.property_description.slice(0, 200)}...`}
+                                {!data?.property_description ? 
+                                    'No description available' :
+                                    showAboutMore
+                                        ? data.property_description
+                                        : `${data.property_description.slice(0, 200)}${data.property_description.length > 200 ? '...' : ''}`
+                                }
                             </p>
                             <button
                                 onClick={() => setShowAboutMore(!showAboutMore)}
@@ -451,14 +456,14 @@ useEffect(() => {
                         <div className="pb-8 border-b border-border-subtle">
                             <h2 className="text-xl sm:text-2xl font-semibold mb-4 text-text-primary">About neighborhood</h2>
                             <p className="text-text-muted leading-relaxed mb-2">
-                                Location & Neighborhood Located in {data.property_location}, this property offers easy access to major attractions and landmarks in the area.
+                                Location & Neighborhood Located in {data?.property_location || 'this area'}, this property offers easy access to major attractions and landmarks in the area.
                             </p>
-                            {showNeighborhoodMore && (
+                            {showNeighborhoodMore && (data?.property_nearplaces || []).length > 0 && (
                                 <div className="text-text-muted leading-relaxed mt-3">
                                     <p className="mb-2 font-medium text-text-primary">Nearby places include:</p>
                                     <ul className="list-disc list-inside space-y-1 ml-2">
-                                        {data.property_nearplaces.slice(0, 10).map((place, idx) => (
-                                            <li key={idx}>{place}</li>
+                                        {(data?.property_nearplaces || []).slice(0, 10).map((place: string, idx: number) => (
+                                            <li key={`place-${idx}`}>{place}</li>
                                         ))}
                                     </ul>
                                 </div>
@@ -476,12 +481,20 @@ useEffect(() => {
                         <div className="pb-8 border-b border-border-subtle">
                             <h2 className="text-xl sm:text-2xl font-semibold mb-6 text-text-primary">What this place offers</h2>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-                                {data.property_amenities.slice(0, 6).map((amenity, idx) => (
-                                    <div key={idx} className="flex items-center gap-3 sm:gap-4">
-                                        <span className="text-xl sm:text-2xl text-text-primary">{renderIcon(amenity.amenities_icon)}</span>
-                                        <span className="text-text-primary text-sm sm:text-base">{formatAmenityName(amenity.amenities_icon)}</span>
-                                    </div>
-                                ))}
+                                {(data?.property_amenities || []).length > 0 ? (
+                                    (data?.property_amenities || []).slice(0, 6).map((amenity, idx) => (
+                                        <div key={idx} className="flex items-center gap-3 sm:gap-4">
+                                            <span className="text-xl sm:text-2xl text-text-primary">
+                                                {renderIcon(amenity?.amenities_icon || '')}
+                                            </span>
+                                            <span className="text-text-primary text-sm sm:text-base">
+                                                {amenity?.amenities_icon ? formatAmenityName(amenity.amenities_icon) : 'Amenity'}
+                                            </span>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <p className="text-text-muted">No amenities listed</p>
+                                )}
                             </div>
                             <Button
                                 variant="secondary"
@@ -497,37 +510,46 @@ useEffect(() => {
                             <h2 className="text-xl sm:text-2xl font-semibold mb-4 text-text-primary">Where you'll be</h2>
                             <div className="rounded-lg overflow-hidden border border-border-subtle">
                                 <iframe
-                                    src={data.property_mapSrc}
+                                    src={data?.property_mapSrc || ''}
                                     className="w-full h-64 sm:h-96"
                                     loading="lazy"
                                     allowFullScreen
                                     referrerPolicy="no-referrer-when-downgrade"
+                                    title="Property Location"
                                 ></iframe>
                             </div>
-                            <p className="mt-4 text-text-muted text-sm sm:text-base">{data.property_location}</p>
+                            <p className="mt-4 text-text-muted text-sm sm:text-base">
+                                {data?.property_location || 'Location information not available'}
+                            </p>
                         </div>
 
                         {/* Policies Section */}
-                        {data.property_policy_details && (
+                        {data?.property_policy_details && (
                             <div className="border border-border-subtle rounded-lg overflow-hidden shadow-level1 bg-bg-surface">
                                 <div className="bg-bg-surface p-6">
                                     <h2 className="text-xl sm:text-2xl font-semibold mb-6 text-text-primary">Things to know</h2>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
                                         <div className="p-4 border border-border-subtle rounded-lg bg-bg-muted">
                                             <p className="text-text-muted text-sm mb-1">Check-in / Check-out</p>
-                                            <p className="font-medium text-text-primary">Check-in {unitPolicy.checkIn} · Check-out {unitPolicy.checkOut}</p>
+                                            <p className="font-medium text-text-primary">
+                                                Check-in {unitPolicy?.checkIn || '2:00 PM'} · Check-out {unitPolicy?.checkOut || '11:00 AM'}
+                                            </p>
                                             <a className="text-sm text-accent-primary underline" href="/terms#check-in-check-out">View terms</a>
                                         </div>
                                         <div className="p-4 border border-border-subtle rounded-lg bg-bg-muted">
                                             <p className="text-text-muted text-sm mb-1">Key policies</p>
-                                            <p className="font-medium text-text-primary">{inlinePolicySnippets.cancellation}</p>
-                                            <p className="text-text-primary mt-2 text-sm">{inlinePolicySnippets.houseRules}</p>
+                                            <p className="font-medium text-text-primary">
+                                                {inlinePolicySnippets?.cancellation || 'Flexible cancellation policy'}
+                                            </p>
+                                            <p className="text-text-primary mt-2 text-sm">
+                                                {inlinePolicySnippets?.houseRules || 'Standard house rules apply'}
+                                            </p>
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                                        {data.property_policy_details
-                                            .filter(policy => !policy.type.includes('Policy') && !policy.type.includes('Detailed'))
-                                            .map((policy, idx) => (
+                                        {(data?.property_policy_details || [])
+                                            .filter((policy: PropertyDetail) => policy?.type && !policy.type.includes('Policy') && !policy.type.includes('Detailed'))
+                                            .map((policy: PropertyDetail, idx: number) => (
                                                 <div key={idx}>
                                                     <p className="text-text-muted text-sm mb-1">{policy.type}</p>
                                                     <p className="font-medium text-text-primary">{policy.value}</p>
@@ -540,45 +562,71 @@ useEffect(() => {
                     </div>
                     {/* right div  */}
                     <div className="w-full sm:w-1/3">
-                       <div className='hidden lg:block sticky top-16'>
-    {listingLookupError ? (
-        <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6">
-            <h3 className="text-lg font-semibold text-text-primary">{listingLookupError}</h3>
-            <p className="text-sm text-text-muted mt-2">
-                {listingErrorDescription}
-            </p>
-        </div>
-    ) : isListingLookupPending ? (
-        <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6">
-            <h3 className="text-lg font-semibold text-text-primary">Checking availability…</h3>
-            <p className="text-sm text-text-muted mt-2">
-                We’re fetching the latest availability for this home.
-            </p>
-        </div>
-    ) : (
-        <UnitBookingWidget listingId={listingId} propertyId={availabilityPropertyId} listingName={data.property_name} />
-    )}
-</div>
-<div className="lg:hidden">
-    {listingLookupError ? (
-        <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6">
-            <h3 className="text-lg font-semibold text-text-primary">{listingLookupError}</h3>
-            <p className="text-sm text-text-muted mt-2">
-                {listingErrorDescription}
-            </p>
-        </div>
-    ) : isListingLookupPending ? (
-        <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6">
-            <h3 className="text-lg font-semibold text-text-primary">Checking availability…</h3>
-            <p className="text-sm text-text-muted mt-2">
-                We’re fetching the latest availability for this home.
-            </p>
-        </div>
-    ) : (
-        <UnitBookingWidget listingId={listingId} propertyId={availabilityPropertyId} listingName={data.property_name} />
-    )}
-</div>
+                        {!data ? (
+                            <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6">
+                                <h3 className="text-lg font-semibold text-text-primary">Loading property details...</h3>
+                            </div>
+                        ) : (
+                            <>
+                                {/* Desktop View */}
+                                <div className='hidden lg:block sticky top-16'>
+                                    {isListingLookupPending && (
+                                        <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6 mb-4">
+                                            <h3 className="text-lg font-semibold text-text-primary">Checking availability…</h3>
+                                            <p className="text-sm text-text-muted mt-2">
+                                                We're fetching the latest availability for this home.
+                                            </p>
+                                        </div>
+                                    )}
+                                    
+                                    <UnitBookingWidget 
+                                        listingId={listingId} 
+                                        propertyId={availabilityPropertyId} 
+                                        listingName={data?.property_name || 'This property'} 
+                                    />
+                                    
+                                    {listingLookupError && (
+                                        <div className="mt-4 p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded">
+                                            <div className="flex">
+                                                <div className="flex-shrink-0">
+                                                    <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                                                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                                    </svg>
+                                                </div>
+                                                <div className="ml-3">
+                                                    <p className="text-sm text-yellow-700">
+                                                        {listingLookupError} You can still proceed with your booking.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
 
+                                {/* Mobile View */}
+                                <div className="lg:hidden">
+                                    {isListingLookupPending && (
+                                        <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6 mb-4">
+                                            <h3 className="text-lg font-semibold text-text-primary">Checking availability…</h3>
+                                        </div>
+                                    )}
+                                    
+                                    <UnitBookingWidget 
+                                        listingId={listingId} 
+                                        propertyId={availabilityPropertyId} 
+                                        listingName={data?.property_name || 'This property'} 
+                                    />
+                                    
+                                    {listingLookupError && (
+                                        <div className="mt-4 p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded">
+                                            <p className="text-sm text-yellow-700">
+                                                {listingLookupError} You can still proceed with your booking.
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
 
@@ -596,14 +644,30 @@ useEffect(() => {
                                 </button>
                             </div>
 
-                            <div className="overflow-y-auto p-6">
+                            <div className="overflow-y-auto p-6" role="region" aria-label="List of all amenities">
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-                                    {data.property_amenities.map((amenity, idx) => (
-                                        <div key={idx} className="flex items-center gap-3 sm:gap-4">
-                                            <span className="text-xl sm:text-2xl text-text-primary">{renderIcon(amenity.amenities_icon)}</span>
-                                            <span className="text-text-primary text-sm sm:text-base">{formatAmenityName(amenity.amenities_icon)}</span>
-                                        </div>
-                                    ))}
+                                    {(data?.property_amenities || []).map((amenity: PropertyAmenity, idx: number) => {
+                                        const icon = amenity?.amenities_icon || '';
+                                        const displayName = icon ? formatAmenityName(icon) : 'Amenity';
+                                        
+                                        return (
+                                            <div 
+                                                key={`amenity-${idx}-${displayName}`} 
+                                                className="flex items-center gap-3 sm:gap-4"
+                                                role="listitem"
+                                            >
+                                                <span 
+                                                    className="text-xl sm:text-2xl text-text-primary"
+                                                    aria-hidden="true"
+                                                >
+                                                    {renderIcon(icon) || '•'}
+                                                </span>
+                                                <span className="text-text-primary text-sm sm:text-base">
+                                                    {displayName}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             </div>
 
