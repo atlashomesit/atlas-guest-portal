@@ -54,13 +54,33 @@ interface Property {
 }
 
 const PropertyDetails = () => {
+    console.log('[PropertyDetails] Component mounted');
     const location = useLocation();
+    console.log('[PropertyDetails] Location:', {
+        pathname: location.pathname,
+        search: location.search,
+        hash: location.hash
+    });
+
     const { propertySlug: propertySlugParam, unitSlug: unitSlugParam, id: legacyIdParam } = useParams();
+    console.log('[PropertyDetails] URL Params:', {
+        propertySlugParam,
+        unitSlugParam,
+        legacyIdParam
+    });
+
     const normalizedLegacyParts = (legacyIdParam ?? '').split('-');
     const legacyUnitSlug = normalizedLegacyParts.pop();
     const legacyPropertySlug = normalizedLegacyParts.join('-') || undefined;
     const propertySlug = propertySlugParam ?? legacyPropertySlug;
     const unitSlug = unitSlugParam ?? legacyUnitSlug ?? legacyIdParam;
+    
+    console.log('[PropertyDetails] Resolved slugs:', {
+        propertySlug,
+        unitSlug,
+        legacyPropertySlug,
+        legacyUnitSlug
+    });
     const [data, setData] = useState<Property | null>(null);
     const [notFound, setNotFound] = useState(false);
     const [listingPropertyId, setListingPropertyId] = useState<string | number | null>(null);
@@ -101,6 +121,8 @@ const PropertyDetails = () => {
         setListingLookupError(null);
         setIsListingLookupPending(true);
 
+        console.log('Fetching listing details for unitSlug:', unitSlug);
+
         const loadListing = async () => {
             try {
                 if (import.meta.env.DEV) {
@@ -115,6 +137,7 @@ const PropertyDetails = () => {
                     setListingLookupError('Availability temporarily unavailable.');
                     return;
                 }
+                console.log('Listing details received:', listing);
                 setListingPropertyId(listing.propertyId);
                 setResolvedListingId(listing.id);
             } catch (error) {
