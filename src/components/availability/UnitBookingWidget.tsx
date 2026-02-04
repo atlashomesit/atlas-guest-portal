@@ -2,6 +2,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { addDays, format, startOfMonth } from 'date-fns';
 import { useLocation, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { Button } from '@/components/ui/Button';
 import { AtlasDateRangePicker, type AtlasDateRangePickerValue } from '@/components/date/AtlasDateRangePicker';
 import { useBooking } from '@/contexts/BookingContext';
@@ -12,6 +13,12 @@ import { getIstStartOfDay } from '@/utils/date';
 import { calculateNights, formatNightCount } from '@/utils/dateHelpers';
 import { doesRangeIntersectBlocked, parseISODate, toISODate } from '@/utils/dateRange';
 import { calculateNightlyPrice, inferUnitType } from '@/utils/pricing';
+
+declare global {
+  interface Window {
+    Razorpay: any;
+  }
+}
 
 interface UnitBookingWidgetProps {
   listingId?: string | number;
@@ -384,11 +391,78 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const loadRazorpayScript = (callback: () => void) => {
+    if (window.Razorpay) {
+      callback();
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    script.onload = () => callback();
+    script.onerror = () => {
+      setFormError('Failed to load payment processor. Please try again.');
+      setIsLoading(false);
+    };
+    document.body.appendChild(script);
+  };
+
+  const verifyPayment = async (paymentData: {
+    bookingId: string;
+    razorpay_payment_id: string;
+    razorpay_order_id: string;
+    razorpay_signature: string;
+  }) => {
+    try {
+      const requestData = {
+        bookingId: paymentData.bookingId,
+        razorpayOrderId: paymentData.razorpay_order_id,
+        razorpayPaymentId: paymentData.razorpay_payment_id,
+        razorpaySignature: paymentData.razorpay_signature
+      };
+
+      console.log('Sending payment verification request:', requestData);
+
+      const response = await axios.post(
+        `http://localhost:5120/api/Razorpay/verify`,
+        requestData,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          }
+        }
+      );
+      
+      console.log('Verification response:', response.data);
+      
+      if (response.data.success) {
+        setStatusMessage('Payment successful! Your booking is confirmed.');
+      } else {
+        throw new Error(response.data.message || 'Payment verification failed');
+      }
+    } catch (error: any) {
+      console.error('Payment verification error:', {
+        error: error.response?.data || error.message,
+        status: error.response?.status,
+        headers: error.response?.headers
+      });
+      
+      const errorMessage = error.response?.data?.message || 
+                         error.message || 
+                         'Payment verification failed';
+      
+      setFormError(`Payment verification failed: ${errorMessage}. Please contact support with payment ID: ${paymentData.razorpay_payment_id}`);
+      throw error;
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!dateRange.startDate || !dateRange.endDate) {
-      setFormError('Select your check-in and check-out dates.');
+      setFormError('Please select check-in and check-out dates.');
       return;
     }
 
@@ -396,49 +470,117 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       return;
     }
 
+    setIsLoading(true);
     setFormError(null);
-    
-    // Update booking context
-    updateBooking({
-      propertyId,
-      propertyName: listingName ?? null,
-      checkIn: dateRange.startDate.toISOString(),
-      checkOut: dateRange.endDate.toISOString(),
-      guests,
-      customerInfo: { ...formData }
-    });
+    setStatusMessage(null);
 
-    // Redirect to Razorpay payment page with pre-filled fields
-    const razorpayUrl = new URL('https://pages.razorpay.com/atlashomestays');
-    
-    // Format phone number (Razorpay Payment Pages expect phone number without country code)
-    let phoneNumber = formData.phone.trim();
-    // Remove any non-digit characters
-    phoneNumber = phoneNumber.replace(/\D/g, '');
-    // If it starts with 91 (India code), remove it as Razorpay expects local format
-    if (phoneNumber.startsWith('91') && phoneNumber.length > 10) {
-      phoneNumber = phoneNumber.substring(2);
+    try {
+      // 1. Create booking draft
+      const bookingDraft = {
+        listingId: String(listingId),
+        checkinDate: dateRange.startDate.toISOString(),
+        checkoutDate: dateRange.endDate.toISOString(),
+        guests,
+        notes: ''
+      };
+
+      // 2. Prepare order payload with the exact structure expected by the backend
+      const orderPayload = {
+        bookingDraft: {
+          listingId: bookingDraft.listingId,
+          checkinDate: bookingDraft.checkinDate,
+          checkoutDate: bookingDraft.checkoutDate,
+          guests: bookingDraft.guests,
+          notes: bookingDraft.notes || ''
+        },
+        amount: Math.round(finalTotal), // Keep amount in rupees, let backend handle conversion if needed
+        currency: 'INR',
+        guestInfo: {
+          name: formData.name.trim(),
+          email: formData.email.trim(),
+          phone: formData.phone.trim().replace(/\D/g, '').substring(0, 10)
+        }
+      };
+      
+      console.log('Sending order payload:', JSON.stringify(orderPayload, null, 2));
+
+      // 3. Create Razorpay order
+      const orderResponse = await axios.post(
+        `http://localhost:5120/api/Razorpay/order`,
+        orderPayload
+      );
+
+      const { keyId: key, orderId, bookingId } = orderResponse.data;
+
+      // 4. Load Razorpay script and open checkout
+      loadRazorpayScript(() => {
+        try {
+          const options = {
+            key,
+            amount: orderResponse.data.amount,
+            currency: orderResponse.data.currency,
+            name: 'Atlas Homestays',
+            description: `Booking for ${listingName || 'selected property'}`,
+            order_id: orderId,
+            prefill: {
+              name: formData.name.trim(),
+              email: formData.email.trim(),
+              contact: formData.phone.trim().replace(/\D/g, '').substring(0, 10)
+            },
+            theme: {
+              color: '#2563eb'
+            },
+            handler: async (response: any) => {
+              try {
+                await verifyPayment({
+                  bookingId,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_signature: response.razorpay_signature
+                });
+                
+                // Update booking context on success
+                updateBooking({
+                  propertyId: propertyId ?? undefined,
+                  propertyName: listingName ?? undefined,
+                  checkIn: dateRange.startDate?.toISOString() ?? '',
+                  checkOut: dateRange.endDate?.toISOString() ?? '',
+                  guests,
+                  customerInfo: { 
+                    name: formData.name,
+                    email: formData.email,
+                    phone: formData.phone
+                  },
+                  paymentStatus: 'completed',
+                  bookingId
+                });
+              } catch (error) {
+                console.error('Payment processing error:', error);
+                setFormError('Failed to verify payment. Please contact support.');
+              } finally {
+                setIsLoading(false);
+              }
+            }
+          };
+
+          const rzp = new window.Razorpay(options);
+          rzp.on('payment.failed', (response: any) => {
+            setFormError(`Payment failed: ${response.error.description || 'Unknown error'}`);
+            setIsLoading(false);
+          });
+
+          rzp.open();
+        } catch (error) {
+          console.error('Error initializing Razorpay:', error);
+          setFormError('Failed to initialize payment. Please try again.');
+          setIsLoading(false);
+        }
+      });
+    } catch (error) {
+      console.error('Booking error:', error);
+      setFormError('Failed to process booking. Please try again.');
+      setIsLoading(false);
     }
-    // Ensure the phone number is not more than 10 digits
-    phoneNumber = phoneNumber.substring(0, 10);
-    
-    // Add query parameters for auto-fill
-    razorpayUrl.searchParams.append('amount', (finalTotal).toString()); // Convert to paise
-    razorpayUrl.searchParams.append('email', formData.email.trim());
-    razorpayUrl.searchParams.append('phone', phoneNumber); // Use 'phone' parameter for Razorpay Payment Pages
-    
-    // Add booking details as well (optional)
-    razorpayUrl.searchParams.append('name', formData.name.trim());
-    const listingIdentifier = listingId ?? propertyId;
-    if (listingIdentifier) {
-      razorpayUrl.searchParams.append('listing_id', listingIdentifier.toString());
-    }
-    razorpayUrl.searchParams.append('check_in', dateRange.startDate.toISOString().split('T')[0]);
-    razorpayUrl.searchParams.append('check_out', dateRange.endDate.toISOString().split('T')[0]);
-    razorpayUrl.searchParams.append('guests', guests.toString());
-    
-    // Open Razorpay payment page in a new tab
-    window.open(razorpayUrl.toString(), '_blank');
   };
 
 
@@ -754,8 +896,14 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
       {formError && <p className="text-sm text-support-error">{formError}</p>}
 
-      <Button type="submit" fullWidth onClick={handleSubmit} disabled={isLoading}>
-        Book this home
+      <Button 
+        type="submit" 
+        fullWidth 
+        onClick={handleSubmit} 
+        disabled={isLoading || !dateRange.startDate || !dateRange.endDate}
+        className={isLoading ? 'opacity-75' : ''}
+      >
+        {isLoading ? 'Processing...' : 'Book this home'}
       </Button>
     </form>
   );
