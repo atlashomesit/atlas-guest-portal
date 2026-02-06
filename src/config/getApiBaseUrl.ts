@@ -14,6 +14,38 @@ const normalizeApiBaseUrl = (value: string | undefined): string => {
   return trimmed.endsWith("/") ? trimmed.slice(0, -1) : trimmed;
 };
 
+const isPrivateIpv4 = (hostname: string): boolean => {
+  if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(hostname)) return false;
+  const [a, b] = hostname.split(".").map((part) => Number(part));
+  if ([a, b].some((part) => Number.isNaN(part))) return false;
+  if (a === 10) return true;
+  if (a === 127) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 169 && b === 254) return true;
+  if (a === 100 && b >= 64 && b <= 127) return true;
+  return false;
+};
+
+const isPrivateHostname = (hostname: string): boolean => {
+  const normalized = hostname.toLowerCase();
+  if (normalized === "localhost") return true;
+  if (normalized.endsWith(".local")) return true;
+  if (normalized === "::1") return true;
+  if (normalized.startsWith("fe80:")) return true;
+  if (normalized.startsWith("fc") || normalized.startsWith("fd")) return true;
+  return isPrivateIpv4(normalized);
+};
+
+const isPrivateNetworkUrl = (value: string): boolean => {
+  try {
+    const url = new URL(value);
+    return isPrivateHostname(url.hostname);
+  } catch {
+    return false;
+  }
+};
+
 interface ImportMetaEnv {
   [key: string]: unknown;
 }
@@ -79,13 +111,14 @@ export const getApiBaseUrl = (): string => {
     return normalized === "true" || normalized === "1" || normalized === "production" || normalized === "prod";
   });
   const isProductionLike = hasExplicitProd || !isDevLike;
-  const isLocalhostApi = /localhost/i.test(apiBaseUrl);
+  const isPrivateNetworkApi = isPrivateNetworkUrl(apiBaseUrl);
 
-  if (isProductionLike && isLocalhostApi) {
-    const localhostMessage = "VITE_API_BASE_URL cannot point to localhost in production environments";
+  if (isProductionLike && isPrivateNetworkApi) {
+    const privateMessage =
+      "VITE_API_BASE_URL cannot point to localhost or private network addresses in production environments";
     // eslint-disable-next-line no-console
-    console.error(localhostMessage);
-    throw new Error(localhostMessage);
+    console.error(privateMessage);
+    throw new Error(privateMessage);
   }
 
   return apiBaseUrl;

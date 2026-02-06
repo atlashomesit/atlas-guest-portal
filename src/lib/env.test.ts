@@ -36,6 +36,20 @@ describe("API_BASE_URL", () => {
 
     const { API_BASE_URL } = await import("../config/api");
     expect(API_BASE_URL).toBe("");
-    expect(errorSpy).toHaveBeenCalledWith("VITE_API_BASE_URL cannot point to localhost in production environments");
+    expect(errorSpy).toHaveBeenCalledWith(
+      "VITE_API_BASE_URL cannot point to localhost or private network addresses in production environments",
+    );
+  });
+
+  it("logs and clears private network config in production", async () => {
+    vi.stubEnv("PROD", "true");
+    vi.stubEnv("VITE_API_BASE_URL", "http://10.0.0.8:4000/");
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const { API_BASE_URL } = await import("../config/api");
+    expect(API_BASE_URL).toBe("");
+    expect(errorSpy).toHaveBeenCalledWith(
+      "VITE_API_BASE_URL cannot point to localhost or private network addresses in production environments",
+    );
   });
 });
