@@ -1,7 +1,6 @@
 import type { ListingDetail } from '../api/listingClient';
 
-const LISTING_ENDPOINT =
-  'https://atlas-homes-api-gxdqfjc2btc0atbv.centralus-01.azurewebsites.net/listings';
+const LISTING_ENDPOINT = `${import.meta.env.VITE_API_BASE_URL}/listings`;
 
 const normalizeListingPayload = (
   payload: Record<string, unknown>,

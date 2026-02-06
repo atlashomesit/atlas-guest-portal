@@ -113,7 +113,7 @@ const isMounted = useRef(true);
           try {
             const dateStr = toISODate(date);
             const response = await fetch(
-              `http://localhost:5120/availability/listing-availability?listingId=${listingId}&startDate=${dateStr}`
+              `${import.meta.env.VITE_API_BASE_URL}/availability/listing-availability?listingId=${listingId}&startDate=${dateStr}`
             );
             
             if (!response.ok) {
@@ -364,7 +364,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     setFormError(null);
     
     try {
-      const response = await fetch('http://localhost:5120/availability/blocks', {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/availability/blocks`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -425,7 +425,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       console.log('Sending payment verification request:', requestData);
 
       const response = await axios.post(
-        `http://localhost:5120/api/Razorpay/verify`,
+        `${import.meta.env.VITE_API_BASE_URL}/api/Razorpay/verify`,
         requestData,
         {
           headers: {
@@ -506,7 +506,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
       // 3. Create Razorpay order
       const orderResponse = await axios.post(
-        `http://localhost:5120/api/Razorpay/order`,
+        `${import.meta.env.VITE_API_BASE_URL}/api/Razorpay/order`,
         orderPayload
       );
 
