@@ -4,6 +4,8 @@ import { toast } from 'react-toastify';
 import { format } from 'date-fns';
 import { inlinePolicySnippets } from '../../../content/terms';
 import { logApiError } from '../../../lib/monitoring';
+import { IS_API_BASE_CONFIGURED } from '../../../lib/env';
+import ErrorBanner from '../../ErrorBanner';
 import { FaUserFriends, FaCreditCard, FaCcVisa, FaCcMastercard } from 'react-icons/fa';
 import { SiGooglepay, SiRazorpay } from 'react-icons/si';
 
@@ -129,6 +131,9 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
 }) => {
   const isCheckingAvailability = availabilityStatus === 'checking';
   const buttonIsBusy = isCheckingAvailability || isLoading;
+  const isBookingDisabled = import.meta.env.PROD && !IS_API_BASE_CONFIGURED;
+  const isFormDisabled = buttonIsBusy || isBookingDisabled;
+  const ctaDisabled = submitButtonDisabled || isBookingDisabled;
   const ratingSnippet = averageRating
     ? `${averageRating.toFixed(2)} / 5${reviewCount ? ` · ${reviewCount} reviews` : ''}`
     : 'Guest ratings updating soon';
@@ -137,6 +142,9 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
 
   return (
     <>
+      {isBookingDisabled && (
+        <ErrorBanner message="Service temporarily unavailable. Booking will return soon." />
+      )}
 
       <div className="mt-4 space-y-3 text-sm text-text-primary border border-border-subtle rounded-xl p-4 bg-bg-muted">
         <div>
@@ -186,7 +194,7 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
               required
               pattern="^[\\w.!#$%&'*+/=?^`{|}~-]+@[A-Za-z0-9-]+(?:\\.[A-Za-z0-9-]+)+$"
               title="Enter a valid email address"
-              disabled={buttonIsBusy}
+              disabled={isFormDisabled}
               aria-invalid={Boolean(formErrors.email)}
               className={`w-full px-4 py-2.5 rounded-lg bg-bg-surface text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed ${
                 formErrors.email
@@ -212,7 +220,7 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
               required
               pattern="^\\+\\d{1,3}\\s?\\d{6,14}$"
               title="Use +countrycode followed by digits"
-              disabled={buttonIsBusy}
+              disabled={isFormDisabled}
               aria-invalid={Boolean(formErrors.phone)}
               className={`w-full px-4 py-2.5 rounded-lg bg-bg-surface text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed ${
                 formErrors.phone
@@ -232,7 +240,7 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
               name="payment-method"
               className="h-5 w-5 text-cta-primary focus:ring-cta-primary"
               defaultChecked
-              disabled={buttonIsBusy}
+              disabled={isFormDisabled}
             />
             <div className="flex items-center">
               <img src="https://cdn.razorpay.com/logo.svg" alt="Razorpay" className="h-6 mr-2" />
@@ -282,6 +290,7 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
               setTermsAccepted(event.target.checked);
               setTermsAcceptedAt(event.target.checked ? new Date().toISOString() : null);
             }}
+            disabled={isFormDisabled}
           />
           <span>
             I agree to the{' '}
@@ -311,6 +320,9 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
+            if (isBookingDisabled) {
+              return;
+            }
             if (!termsAccepted) {
               setPaymentStatus({
                 state: 'failure',
@@ -335,7 +347,7 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
               });
             }
           }}
-          disabled={submitButtonDisabled}
+          disabled={ctaDisabled}
           className="bg-cta-primary hover:bg-cta-secondary text-[var(--text-contrast)] w-full rounded-full py-4 text-lg font-semibold transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center shadow-level1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
         >
           {buttonIsBusy ? (
@@ -363,7 +375,7 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
               {isCheckingAvailability ? 'Checking availability...' : 'Processing...'}
             </>
           ) : (
-            primaryCtaLabel
+            isBookingDisabled ? 'Unavailable' : primaryCtaLabel
           )}
         </button>
 
@@ -442,7 +454,7 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
                 type="button"
                 onClick={initiatePayment}
                 className="px-3 py-2 rounded-full bg-cta-secondary text-[var(--text-contrast)]"
-                disabled={isLoading}
+                disabled={isLoading || isBookingDisabled}
               >
                 Try again
               </button>
@@ -504,12 +516,13 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
             type="button"
             onClick={(event) => {
               event.preventDefault();
+              if (isBookingDisabled) return;
               onProceedToCheckout();
             }}
-            disabled={buttonIsBusy || !termsAccepted}
+            disabled={buttonIsBusy || !termsAccepted || isBookingDisabled}
             className="mt-1 bg-cta-primary hover:bg-cta-secondary text-[var(--text-contrast)] rounded-full px-4 py-2 text-sm font-semibold transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed shadow-level1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
           >
-            {primaryCtaLabel}
+            {isBookingDisabled ? 'Unavailable' : primaryCtaLabel}
           </button>
         </div>
       </div>

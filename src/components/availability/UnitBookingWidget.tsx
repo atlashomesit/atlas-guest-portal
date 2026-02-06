@@ -6,14 +6,13 @@ import axios from 'axios';
 import { Button } from '@/components/ui/Button';
 import { AtlasDateRangePicker, type AtlasDateRangePickerValue } from '@/components/date/AtlasDateRangePicker';
 import { useBooking } from '@/contexts/BookingContext';
-import { logApiError, logUserAction } from '@/lib/monitoring';
+import { API_BASE_URL, IS_API_BASE_CONFIGURED } from '@/lib/env';
+import ErrorBanner from '@/components/ErrorBanner';
 import { fetchAvailability, type AvailabilityNightlyRate, type AvailabilityResponse } from '@/api/availabilityClient';
 import { getIstStartOfDay } from '@/utils/date';
 import { calculateNights, formatNightCount } from '@/utils/dateHelpers';
 import { doesRangeIntersectBlocked, parseISODate, toISODate } from '@/utils/dateRange';
 import { calculateNightlyPrice, inferUnitType } from '@/utils/pricing';
-import getApiBaseUrl from '@/utils/apiBaseUrl';
-import { assertNonEmpty } from '@/utils/requiredValues';
 
 declare global {
   interface Window {
@@ -40,6 +39,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
   const navigate = useNavigate();
   const location = useLocation();
   const { updateBooking } = useBooking();
+  const isBookingDisabled = import.meta.env.PROD && !IS_API_BASE_CONFIGURED;
 
   const today = getIstStartOfDay();
   const maxBookingDate = useMemo(() => addDays(today, 365), [today]);
@@ -94,12 +94,17 @@ const isMounted = useRef(true);
     return listing?.nightlyRates ?? [];
   };
 
+  useEffect(() => {
+    if (!isBookingDisabled || !openCalendar) return;
+    setOpenCalendar(false);
+  }, [isBookingDisabled, openCalendar]);
+
   // Fetch blocked dates when the component mounts or when the calendar is opened
   useEffect(() => {
-    if (!openCalendar || !listingId) return;
+    if (!openCalendar || !listingId || isBookingDisabled) return;
 
     const fetchBlockedDates = async () => {
-      const apiBaseUrl = assertNonEmpty(getApiBaseUrl(), 'VITE_API_BASE_URL');
+      const apiBaseUrl = API_BASE_URL;
 
       if (!apiBaseUrl) {
         setStatusMessage('Availability service is unavailable. Please try again later.');
@@ -358,6 +363,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   };
 
   const handleSendSelectedDates = async () => {
+    if (isBookingDisabled) {
+      setFormError('Service temporarily unavailable. Please try again later.');
+      return;
+    }
+
     if (!listingId) {
       console.error('No listing ID available');
       return;
@@ -368,7 +378,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       return;
     }
     
-    const apiBaseUrl = assertNonEmpty(getApiBaseUrl(), 'VITE_API_BASE_URL');
+    const apiBaseUrl = API_BASE_URL;
 
     if (!apiBaseUrl) {
       setFormError('Unable to save dates right now. Please try again later.');
@@ -430,7 +440,13 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     razorpay_signature: string;
   }) => {
     try {
-      const apiBaseUrl = assertNonEmpty(getApiBaseUrl(), 'VITE_API_BASE_URL');
+      if (isBookingDisabled) {
+        const message = 'Service temporarily unavailable. Please try again later.';
+        setFormError(message);
+        throw new Error(message);
+      }
+
+      const apiBaseUrl = API_BASE_URL;
 
       if (!apiBaseUrl) {
         const message = 'Payment service is unavailable. Please try again later.';
@@ -483,6 +499,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (isBookingDisabled) {
+      setFormError('Service temporarily unavailable. Please try again later.');
+      return;
+    }
     
     if (!dateRange.startDate || !dateRange.endDate) {
       setFormError('Please select check-in and check-out dates.');
@@ -493,7 +514,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       return;
     }
 
-    const apiBaseUrl = assertNonEmpty(getApiBaseUrl(), 'VITE_API_BASE_URL');
+    const apiBaseUrl = API_BASE_URL;
 
     if (!apiBaseUrl) {
       setFormError('Unable to start checkout. Please try again later.');
@@ -622,6 +643,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         <h3 className="text-xl sm:text-2xl font-semibold text-text-primary"></h3>
         <p className="text-text-secondary text-sm">Choose your dates to confirm availability for this apartment.</p>
       </div>
+      {isBookingDisabled && (
+        <ErrorBanner className="mt-2" message="Service temporarily unavailable. Booking will return soon." />
+      )}
 
       <div className="flex flex-col gap-1">
         <div className="flex items-center gap-2 flex-wrap">
@@ -662,7 +686,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             className="w-full rounded-xl border border-border-strong bg-bg-muted px-4 py-3 text-left text-text-primary hover:border-cta-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary"
             aria-label="Click to select check-in date, then choose from calendar"
             title="Click to select check-in date, then choose from calendar"
+            disabled={isBookingDisabled}
             onClick={() => {
+              if (isBookingDisabled) return;
               // Update shown date to the selected start date when opening calendar
               if (dateRange.startDate) {
                 setShownDate(getIstStartOfDay(dateRange.startDate));
@@ -852,14 +878,14 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         <button
           type="button"
           onClick={handleSendSelectedDates}
-          disabled={!dateRange.startDate || !dateRange.endDate || isLoading}
+          disabled={!dateRange.startDate || !dateRange.endDate || isLoading || isBookingDisabled}
           className={`w-full py-3 px-4 rounded-xl text-sm font-medium transition-colors ${
-            !dateRange.startDate || !dateRange.endDate || isLoading
+            !dateRange.startDate || !dateRange.endDate || isLoading || isBookingDisabled
               ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
               : 'bg-blue-600 text-white hover:bg-blue-700'
           }`}
         >
-          {isLoading ? 'Sending...' : 'Selected'}
+          {isBookingDisabled ? 'Unavailable' : isLoading ? 'Sending...' : 'Selected'}
         </button>
         {dateRange.startDate && dateRange.endDate && (
           <p className="mt-2 text-sm text-center text-text-secondary">
@@ -885,6 +911,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             name="name"
             value={formData.name}
             onChange={handleInputChange}
+            disabled={isBookingDisabled}
             className={`w-full rounded-xl border ${formErrors.name ? 'border-support-error' : 'border-border-strong'} bg-bg-muted px-4 py-3 text-text-primary focus:outline-none focus:ring-2 focus:ring-cta-primary`}
             placeholder="Enter your full name"
           />
@@ -901,6 +928,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             name="email"
             value={formData.email}
             onChange={handleInputChange}
+            disabled={isBookingDisabled}
             className={`w-full rounded-xl border ${formErrors.email ? 'border-support-error' : 'border-border-strong'} bg-bg-muted px-4 py-3 text-text-primary focus:outline-none focus:ring-2 focus:ring-cta-primary`}
             placeholder="Enter your email"
           />
@@ -917,6 +945,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             name="phone"
             value={formData.phone}
             onChange={handleInputChange}
+            disabled={isBookingDisabled}
             className={`w-full rounded-xl border ${formErrors.phone ? 'border-support-error' : 'border-border-strong'} bg-bg-muted px-4 py-3 text-text-primary focus:outline-none focus:ring-2 focus:ring-cta-primary`}
             placeholder="Enter your 10-digit phone number"
           />
@@ -930,10 +959,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         type="submit" 
         fullWidth 
         onClick={handleSubmit} 
-        disabled={isLoading || !dateRange.startDate || !dateRange.endDate}
+        disabled={isLoading || !dateRange.startDate || !dateRange.endDate || isBookingDisabled}
         className={isLoading ? 'opacity-75' : ''}
       >
-        {isLoading ? 'Processing...' : 'Book this home'}
+        {isBookingDisabled ? 'Unavailable' : isLoading ? 'Processing...' : 'Book this home'}
       </Button>
     </form>
   );

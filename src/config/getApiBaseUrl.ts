@@ -37,31 +37,36 @@ const readEnv = (key: string): string | undefined => {
 };
 
 const getRuntimeApiBaseUrl = (): string | undefined => {
-  if (typeof window === "undefined") return undefined;
-  const runtimeConfig = (window as any).__ATLAS_RUNTIME_CONFIG__;
+  const runtimeConfig =
+    typeof window !== "undefined"
+      ? (window as any).__ATLAS_RUNTIME_CONFIG__
+      : (globalThis as any).__ATLAS_RUNTIME_CONFIG__;
   const value = runtimeConfig?.apiBaseUrl;
   return typeof value === "string" ? value : undefined;
 };
 
 const missingConfigMessage =
-  "VITE_API_BASE_URL is not configured. Expected Cloudflare Pages env var (available via /config). If you just added it in Cloudflare, redeploy once or confirm the correct environment (Preview vs Production).";
-
-const DEFAULT_API_BASE_URL =
-  "https://atlas-homes-api-dev-fhdtg0gkgmcmhwfd.centralindia-01.azurewebsites.net";
+  "API base URL is not configured. Set VITE_API_BASE_URL or provide a runtime config.";
+const localhostErrorMessage =
+  "VITE_API_BASE_URL cannot point to localhost in production environments";
 
 export const getApiBaseUrl = (): string => {
-  // Directly return the development API URL
-  return 'https://atlas-homes-api-dev-fhdtg0gkgmcmhwfd.centralindia-01.azurewebsites.net';
-  
-  // The code below is kept for reference but will be unreachable
   const runtimeValue = normalizeApiBaseUrl(getRuntimeApiBaseUrl());
   const envValue = normalizeApiBaseUrl(readEnv("VITE_API_BASE_URL"));
   const apiBaseUrl = runtimeValue || envValue;
+  const prodFlag = (readEnv("PROD") ?? "").toString().toLowerCase();
+  const isProd = prodFlag === "true" || prodFlag === "1";
 
   if (!apiBaseUrl) {
     // eslint-disable-next-line no-console
-    console.warn(`${missingConfigMessage} Falling back to ${DEFAULT_API_BASE_URL}.`);
-    return normalizeApiBaseUrl(DEFAULT_API_BASE_URL);
+    console.error(missingConfigMessage);
+    throw new Error("API base URL is not configured");
+  }
+
+  if (isProd && /localhost|127\.0\.0\.1/i.test(apiBaseUrl)) {
+    // eslint-disable-next-line no-console
+    console.error(localhostErrorMessage);
+    throw new Error("API base URL cannot point to localhost in production environments");
   }
 
   return apiBaseUrl;
