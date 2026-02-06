@@ -29,3 +29,6 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Check bundle for local network access APIs
+        run: npm run check:local-network

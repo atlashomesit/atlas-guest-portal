@@ -43,7 +43,20 @@ describe("getApiBaseUrl", () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     expect(process.env.PROD).toBe("1");
     const { getApiBaseUrl } = await import("./getApiBaseUrl");
-    expect(() => getApiBaseUrl()).toThrow(/cannot point to localhost/);
-    expect(consoleSpy).toHaveBeenCalledWith("VITE_API_BASE_URL cannot point to localhost in production environments");
+    expect(() => getApiBaseUrl()).toThrow(/cannot point to localhost or private network/);
+    expect(consoleSpy).toHaveBeenCalledWith(
+      "VITE_API_BASE_URL cannot point to localhost or private network addresses in production environments",
+    );
+  });
+
+  it("blocks private network base URLs when production is set", async () => {
+    vi.stubEnv("PROD", "true");
+    vi.stubEnv("VITE_API_BASE_URL", "http://192.168.0.10:3000/");
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { getApiBaseUrl } = await import("./getApiBaseUrl");
+    expect(() => getApiBaseUrl()).toThrow(/cannot point to localhost or private network/);
+    expect(consoleSpy).toHaveBeenCalledWith(
+      "VITE_API_BASE_URL cannot point to localhost or private network addresses in production environments",
+    );
   });
 });

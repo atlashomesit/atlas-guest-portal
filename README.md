@@ -46,6 +46,10 @@ Optional tooling:
 - The repo includes `.nvmrc` and `.node-version` set to **22.12.0**; use them locally (e.g., `nvm use`) to match the Pages runtime and avoid EBADENGINE warnings.
 - `npm run validate:legal` uses Vitest with the **jsdom** environment; keep `jsdom` installed and available during builds so the validator can parse the DOM-like structures it asserts against.
 
+## Security notes (local network access)
+- **Never set `VITE_API_BASE_URL` to localhost, `.local`, or a private IP range (10/8, 172.16/12, 192.168/16, 169.254/16).** In production-like environments the app refuses these values to avoid triggering Chrome’s “Local network device access” prompt and to prevent accidental leakage to private networks.
+- **Avoid introducing browser APIs that probe local devices** (e.g., WebRTC, `navigator.bluetooth`, `navigator.usb`, `chrome.cast`). If a future feature requires them, load them only after explicit user action and ensure they are not part of the initial page bundle.
+
 ### Image optimization manifest
 - `npm run optimize-images` normalizes JPEG/PNG assets to WebP, cleans outdated variants, and writes a manifest to `src/assets/optimized-manifest.json` (creating the directory if missing) so the app can reference the optimized filenames consistently across local, CI, and Cloudflare Pages builds.
 
