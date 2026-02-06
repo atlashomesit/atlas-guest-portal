@@ -1,6 +1,6 @@
 import type { ListingDetail } from '../api/listingClient';
-
-const LISTING_ENDPOINT = `${import.meta.env.VITE_API_BASE_URL}/listings`;
+import getApiBaseUrl from './apiBaseUrl';
+import { assertNonEmpty } from './requiredValues';
 
 const normalizeListingPayload = (
   payload: Record<string, unknown>,
@@ -24,8 +24,16 @@ export const resolveListing = async (
   param: string,
   signal?: AbortSignal,
 ): Promise<ListingDetail | null> => {
+  const apiBaseUrl = assertNonEmpty(getApiBaseUrl(), "VITE_API_BASE_URL");
+
+  if (!apiBaseUrl) {
+    console.error("[resolveListing] Missing API base URL; cannot resolve listing.");
+    return null;
+  }
+
+  const listingEndpoint = `${apiBaseUrl}/listings`;
   // Try direct lookup first
-  const url = `${LISTING_ENDPOINT}/${encodeURIComponent(param)}`;
+  const url = `${listingEndpoint}/${encodeURIComponent(param)}`;
   console.log(`[resolveListing] Fetching from: ${url}`);
   
   // First try direct lookup
@@ -56,7 +64,7 @@ export const resolveListing = async (
   // Fallback to fetching all listings for client-side search
   console.log('[resolveListing] Fetching all listings...');
   try {
-    const listResponse = await fetch(LISTING_ENDPOINT, { signal });
+    const listResponse = await fetch(listingEndpoint, { signal });
 
     if (!listResponse.ok) {
       const errorText = await listResponse.text().catch(() => 'No error details');

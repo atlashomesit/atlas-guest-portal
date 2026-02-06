@@ -8,11 +8,12 @@ import { AtlasDateRangePicker, type AtlasDateRangePickerValue } from '@/componen
 import { useBooking } from '@/contexts/BookingContext';
 import { logApiError, logUserAction } from '@/lib/monitoring';
 import { fetchAvailability, type AvailabilityNightlyRate, type AvailabilityResponse } from '@/api/availabilityClient';
-import { API_BASE_URL } from '@/config/api';
 import { getIstStartOfDay } from '@/utils/date';
 import { calculateNights, formatNightCount } from '@/utils/dateHelpers';
 import { doesRangeIntersectBlocked, parseISODate, toISODate } from '@/utils/dateRange';
 import { calculateNightlyPrice, inferUnitType } from '@/utils/pricing';
+import getApiBaseUrl from '@/utils/apiBaseUrl';
+import { assertNonEmpty } from '@/utils/requiredValues';
 
 declare global {
   interface Window {
@@ -98,6 +99,13 @@ const isMounted = useRef(true);
     if (!openCalendar || !listingId) return;
 
     const fetchBlockedDates = async () => {
+      const apiBaseUrl = assertNonEmpty(getApiBaseUrl(), 'VITE_API_BASE_URL');
+
+      if (!apiBaseUrl) {
+        setStatusMessage('Availability service is unavailable. Please try again later.');
+        return;
+      }
+
       setIsLoading(true);
       setStatusMessage('Checking availability...');
       
@@ -113,7 +121,7 @@ const isMounted = useRef(true);
           try {
             const dateStr = toISODate(date);
             const response = await fetch(
-              `${import.meta.env.VITE_API_BASE_URL}/availability/listing-availability?listingId=${listingId}&startDate=${dateStr}`
+              `${apiBaseUrl}/availability/listing-availability?listingId=${listingId}&startDate=${dateStr}`
             );
             
             if (!response.ok) {
@@ -360,11 +368,18 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       return;
     }
     
+    const apiBaseUrl = assertNonEmpty(getApiBaseUrl(), 'VITE_API_BASE_URL');
+
+    if (!apiBaseUrl) {
+      setFormError('Unable to save dates right now. Please try again later.');
+      return;
+    }
+
     setIsLoading(true);
     setFormError(null);
     
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/availability/blocks`, {
+      const response = await fetch(`${apiBaseUrl}/availability/blocks`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -415,6 +430,14 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     razorpay_signature: string;
   }) => {
     try {
+      const apiBaseUrl = assertNonEmpty(getApiBaseUrl(), 'VITE_API_BASE_URL');
+
+      if (!apiBaseUrl) {
+        const message = 'Payment service is unavailable. Please try again later.';
+        setFormError(message);
+        throw new Error(message);
+      }
+
       const requestData = {
         bookingId: paymentData.bookingId,
         razorpayOrderId: paymentData.razorpay_order_id,
@@ -425,7 +448,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       console.log('Sending payment verification request:', requestData);
 
       const response = await axios.post(
-        `${import.meta.env.VITE_API_BASE_URL}/api/Razorpay/verify`,
+        `${apiBaseUrl}/api/Razorpay/verify`,
         requestData,
         {
           headers: {
@@ -470,6 +493,13 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       return;
     }
 
+    const apiBaseUrl = assertNonEmpty(getApiBaseUrl(), 'VITE_API_BASE_URL');
+
+    if (!apiBaseUrl) {
+      setFormError('Unable to start checkout. Please try again later.');
+      return;
+    }
+
     setIsLoading(true);
     setFormError(null);
     setStatusMessage(null);
@@ -506,7 +536,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
       // 3. Create Razorpay order
       const orderResponse = await axios.post(
-        `${import.meta.env.VITE_API_BASE_URL}/api/Razorpay/order`,
+        `${apiBaseUrl}/api/Razorpay/order`,
         orderPayload
       );
 
