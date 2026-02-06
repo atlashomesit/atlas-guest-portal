@@ -9,6 +9,7 @@ import { useBooking } from '@/contexts/BookingContext';
 import { API_BASE_URL, IS_API_BASE_CONFIGURED } from '@/lib/env';
 import ErrorBanner from '@/components/ErrorBanner';
 import { fetchAvailability, type AvailabilityNightlyRate, type AvailabilityResponse } from '@/api/availabilityClient';
+import { buildApiUrl } from '@/api/client';
 import { getIstStartOfDay } from '@/utils/date';
 import { calculateNights, formatNightCount } from '@/utils/dateHelpers';
 import { doesRangeIntersectBlocked, parseISODate, toISODate } from '@/utils/dateRange';
@@ -378,18 +379,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       return;
     }
     
-    const apiBaseUrl = API_BASE_URL;
-
-    if (!apiBaseUrl) {
-      setFormError('Unable to save dates right now. Please try again later.');
-      return;
-    }
-
     setIsLoading(true);
     setFormError(null);
     
     try {
-      const response = await fetch(`${apiBaseUrl}/availability/blocks`, {
+      const response = await fetch(buildApiUrl('/availability/blocks'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
