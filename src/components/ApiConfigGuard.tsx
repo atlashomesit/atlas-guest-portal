@@ -7,7 +7,13 @@ interface ApiConfigGuardProps {
 }
 
 export const ApiConfigGuard = ({ children }: ApiConfigGuardProps) => {
-  if (!API_BASE_URL)
+  const isProductionHost = (): boolean => {
+    if (typeof window === "undefined") return true;
+    const hostname = window.location?.hostname ?? "";
+    return hostname === "atlashomestays.com" || hostname === "www.atlashomestays.com";
+  };
+
+  if (!API_BASE_URL && isProductionHost())
     return (
       <ErrorLayout
         title="We couldn’t load this page"
