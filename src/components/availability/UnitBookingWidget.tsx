@@ -59,6 +59,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
   const [blockedSet, setBlockedSet] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const lastAvailabilityKeyRef = useRef<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [dateError, setDateError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -100,6 +101,12 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
     setOpenCalendar(false);
   }, [isBookingDisabled, openCalendar]);
 
+  useEffect(() => {
+    if (!openCalendar) {
+      lastAvailabilityKeyRef.current = null;
+    }
+  }, [openCalendar, listingId]);
+
   // Fetch blocked dates when the component mounts or when the calendar is opened
   useEffect(() => {
     if (!openCalendar || !listingId || isBookingDisabled) return;
@@ -107,9 +114,6 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
     let isActive = true;
 
     const fetchBlockedDates = async () => {
-      setIsLoading(true);
-      setStatusMessage('Checking availability...');
-
       let availabilityBaseUrl: string;
       try {
         availabilityBaseUrl = buildApiUrl('/availability/listing-availability');
@@ -127,7 +131,16 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
         url.searchParams.set('startDate', toISODate(getIstStartOfDay(availabilityRange.startDate)));
         url.searchParams.set('endDate', toISODate(getIstStartOfDay(availabilityRange.endDate)));
 
-        const response = await apiFetch(url.toString());
+        const availabilityKey = url.toString();
+        if (lastAvailabilityKeyRef.current === availabilityKey) {
+          return;
+        }
+        lastAvailabilityKeyRef.current = availabilityKey;
+
+        setIsLoading(true);
+        setStatusMessage('Checking availability...');
+
+        const response = await apiFetch(availabilityKey);
         const data = await response.json();
 
         const entries = Array.isArray(data?.dates)
@@ -710,7 +723,14 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               months={2}
               shownDate={shownDate}
               onShownDateChange={(date) => {
-                setShownDate(startOfMonth(date));
+                const nextShownDate = startOfMonth(date);
+                if (
+                  shownDate.getFullYear() === nextShownDate.getFullYear() &&
+                  shownDate.getMonth() === nextShownDate.getMonth()
+                ) {
+                  return;
+                }
+                setShownDate(nextShownDate);
               }}
               loadingLabel="Loading availability"
               rangeColors={['#475569']}
