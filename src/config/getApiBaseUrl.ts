@@ -3,6 +3,7 @@ declare global {
     __ATLAS_RUNTIME_CONFIG__?: {
       apiBaseUrl?: string;
       googleMapsApiKey?: string;
+      env?: string;
     };
   }
 }
@@ -46,7 +47,7 @@ const getRuntimeApiBaseUrl = (): string | undefined => {
 };
 
 const missingConfigMessage =
-  "API base URL is not configured. Set VITE_API_BASE_URL or provide a runtime config.";
+  "API base URL is not configured. Set API_BASE_URL (Pages) or VITE_API_BASE_URL, or provide runtime config at /config.json.";
 const localhostErrorMessage =
   "VITE_API_BASE_URL cannot point to localhost in production environments";
 
