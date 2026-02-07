@@ -43,7 +43,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
   const { updateBooking } = useBooking();
   const isBookingDisabled = !isApiBaseConfigured();
 
-  const today = getIstStartOfDay();
+  const today = useMemo(() => getIstStartOfDay(), []);
   const maxBookingDate = useMemo(() => addDays(today, 365), [today]);
 
   const calendarButtonRef = useRef<HTMLButtonElement | null>(null);
