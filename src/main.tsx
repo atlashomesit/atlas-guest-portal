@@ -22,9 +22,11 @@ const bootstrapApp = async () => {
   const hostname = typeof window !== 'undefined' ? window.location.hostname : 'server'
   const envLabel = runtimeConfig.env || import.meta.env.MODE || 'unknown'
 
-  console.info(
-    `[startup] host=${hostname} env=${envLabel} apiBaseUrl=${apiBaseUrl || '(missing)'}`,
-  )
+  if (import.meta.env.DEV) {
+    console.info(
+      `[startup] host=${hostname} env=${envLabel} apiBaseUrl=${apiBaseUrl || '(missing)'}`,
+    )
+  }
 
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
