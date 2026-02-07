@@ -79,17 +79,23 @@ export const getApiBaseUrl = (): string => {
   const source = runtimeValue ? "runtime" : envValue ? "env" : defaultValue ? "default" : "missing";
   const resolved = apiBaseUrl || "(empty)";
   // eslint-disable-next-line no-console
-  console.info(`[api] API base URL (${source}): ${resolved}`);
+  if (import.meta.env.DEV) {
+    console.info(`[api] API base URL (${source}): ${resolved}`);
+  }
   if (!apiBaseUrl) {
     const runtimeLog = runtimeValue || "(empty)";
     const envLog = envValue || "(empty)";
     // eslint-disable-next-line no-console
-    console.info(`[api] API base URL inputs -> runtime: ${runtimeLog}, env: ${envLog}`);
+    if (import.meta.env.DEV) {
+      console.info(`[api] API base URL inputs -> runtime: ${runtimeLog}, env: ${envLog}`);
+    }
   }
 
   if (!apiBaseUrl) {
     // eslint-disable-next-line no-console
-    console.error(missingConfigMessage);
+    if (import.meta.env.DEV) {
+      console.error(missingConfigMessage);
+    }
     return "";
   }
 

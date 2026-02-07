@@ -24,6 +24,7 @@ export const resolveListing = async (
   param: string,
   signal?: AbortSignal,
 ): Promise<ListingDetail | null> => {
+  const isDev = import.meta.env.DEV;
   const apiBaseUrl = assertNonEmpty(getApiBaseUrl(), "VITE_API_BASE_URL");
 
   if (!apiBaseUrl) {
@@ -48,15 +49,21 @@ export const resolveListing = async (
     const trimmedBaseUrl = baseUrl.replace(/\/$/, "");
     const listingEndpoint = trimmedBaseUrl ? `${trimmedBaseUrl}/listings` : "/listings";
     const url = `${listingEndpoint}/${encodeURIComponent(param)}`;
-    console.log(`[resolveListing] Fetching from: ${url}`);
+    if (isDev) {
+      console.log(`[resolveListing] Fetching from: ${url}`);
+    }
 
     try {
       const response = await fetch(url, { signal });
-      console.log(`[resolveListing] Response status: ${response.status} ${response.statusText}`);
+      if (isDev) {
+        console.log(`[resolveListing] Response status: ${response.status} ${response.statusText}`);
+      }
 
       if (response.ok) {
         const payload = (await response.json()) as Record<string, unknown>;
-        console.log('[resolveListing] Successfully retrieved listing:', payload);
+        if (isDev) {
+          console.log('[resolveListing] Successfully retrieved listing:', payload);
+        }
         return { listing: normalizeListingPayload(payload, param) };
       }
 
@@ -73,12 +80,14 @@ export const resolveListing = async (
       return { listing: null, error: error as Error };
     }
 
-    if (import.meta.env.DEV) {
+    if (isDev) {
       console.debug('[resolveListing] 404 fallback triggered for', param);
     }
 
     // Fallback to fetching all listings for client-side search
-    console.log('[resolveListing] Fetching all listings...');
+    if (isDev) {
+      console.log('[resolveListing] Fetching all listings...');
+    }
     try {
       const listResponse = await fetch(listingEndpoint, { signal });
 
@@ -131,7 +140,7 @@ export const resolveListing = async (
 
       const resolved = match ? normalizeListingPayload(match, param) : null;
 
-      if (import.meta.env.DEV) {
+      if (isDev) {
         console.debug('[resolveListing] match result', resolved);
       }
 
