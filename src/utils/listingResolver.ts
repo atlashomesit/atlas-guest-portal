@@ -20,6 +20,28 @@ const normalizeMatchValue = (value: string) =>
     .trim()
     .toLowerCase()
     .replace(/[\s_-]+/g, '');
+
+const isAbortLikeError = (error: unknown, signal?: AbortSignal) => {
+  if (signal?.aborted === true) {
+    return true;
+  }
+
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+
+  const name = (error as { name?: string }).name;
+  if (name === 'AbortError') {
+    return true;
+  }
+
+  const message = (error as { message?: string }).message;
+  if (typeof message === 'string' && message.toLowerCase().includes('aborted')) {
+    return true;
+  }
+
+  return false;
+};
 export const resolveListing = async (
   param: string,
   signal?: AbortSignal,
@@ -66,7 +88,7 @@ export const resolveListing = async (
         return { listing: null, error: new Error(`Listing request failed with status ${response.status}: ${errorText}`) };
       }
     } catch (error) {
-      if (signal?.aborted || (error instanceof DOMException && error.name === 'AbortError')) {
+      if (isAbortLikeError(error, signal)) {
         return { listing: null };
       }
       console.error('[resolveListing] Error during direct lookup:', error);
@@ -137,7 +159,7 @@ export const resolveListing = async (
 
       return { listing: resolved };
     } catch (error) {
-      if (signal?.aborted || (error instanceof DOMException && error.name === 'AbortError')) {
+      if (isAbortLikeError(error, signal)) {
         return { listing: null };
       }
       console.error('[resolveListing] Error during listing search:', error);
