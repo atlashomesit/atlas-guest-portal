@@ -50,12 +50,36 @@ const missingConfigMessage =
 const localhostErrorMessage =
   "VITE_API_BASE_URL cannot point to localhost in production environments";
 
+const isDevBranchHost = (): boolean => {
+  if (typeof window === "undefined") return false;
+  const hostname = window.location?.hostname ?? "";
+  return (
+    hostname === "localhost" ||
+    hostname.startsWith("dev.") ||
+    hostname.endsWith(".pages.dev") ||
+    hostname.includes("-dev.")
+  );
+};
+
 export const getApiBaseUrl = (): string => {
   const runtimeValue = normalizeApiBaseUrl(getRuntimeApiBaseUrl());
   const envValue = normalizeApiBaseUrl(readEnv("VITE_API_BASE_URL"));
   const apiBaseUrl = runtimeValue || envValue;
   const prodFlag = (readEnv("PROD") ?? "").toString().toLowerCase();
   const isProd = prodFlag === "true" || prodFlag === "1";
+
+  if (isDevBranchHost()) {
+    const source = runtimeValue ? "runtime" : envValue ? "env" : "missing";
+    const resolved = apiBaseUrl || "(empty)";
+    // eslint-disable-next-line no-console
+    console.info(`[api] Dev host API base URL (${source}): ${resolved}`);
+    if (!apiBaseUrl) {
+      const runtimeLog = runtimeValue || "(empty)";
+      const envLog = envValue || "(empty)";
+      // eslint-disable-next-line no-console
+      console.info(`[api] Dev host API base URL inputs -> runtime: ${runtimeLog}, env: ${envLog}`);
+    }
+  }
 
   if (!apiBaseUrl) {
     // eslint-disable-next-line no-console
