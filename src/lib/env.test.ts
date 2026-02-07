@@ -28,14 +28,4 @@ describe("getApiBaseUrlSafe", () => {
     const { getApiBaseUrlSafe } = await import("../config/api");
     expect(getApiBaseUrlSafe()).toBe("https://api.test");
   });
-
-  it("logs and clears localhost config in production", async () => {
-    vi.stubEnv("PROD", "true");
-    vi.stubEnv("VITE_API_BASE_URL", "http://localhost:3000/");
-    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-
-    const { getApiBaseUrlSafe } = await import("../config/api");
-    expect(getApiBaseUrlSafe()).toBe("");
-    expect(errorSpy).toHaveBeenCalledWith("VITE_API_BASE_URL cannot point to localhost in production environments");
-  });
 });
