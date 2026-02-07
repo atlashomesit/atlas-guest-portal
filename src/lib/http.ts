@@ -8,11 +8,14 @@ export async function apiFetch(path: string, init?: RequestInit): Promise<Respon
   if (!hasProtocol) {
     const apiBaseUrl = getApiBaseUrlSafe();
     if (!apiBaseUrl) {
-      throw new Error(
-        "API base URL is not configured. Expected Cloudflare Pages env var API_BASE_URL or VITE_API_BASE_URL (served via /config.json). If you just added it in Cloudflare, redeploy once or confirm the correct environment (Preview vs Production)."
+      // eslint-disable-next-line no-console
+      console.warn(
+        "[api] API base URL is not configured. Falling back to same-origin requests.",
       );
+      url = path;
+    } else {
+      url = IS_LOCALHOST ? path : `${apiBaseUrl}${path}`;
     }
-    url = IS_LOCALHOST ? path : `${apiBaseUrl}${path}`;
   }
   if (!IS_LOCALHOST && url.includes('localhost')) {
     throw new Error('Refusing localhost request from non-localhost host');

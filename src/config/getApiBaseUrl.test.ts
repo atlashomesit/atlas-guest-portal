@@ -9,6 +9,7 @@ describe("getApiBaseUrl", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
     vi.resetModules();
     delete (globalThis as any).__ATLAS_RUNTIME_CONFIG__;
   });
@@ -31,11 +32,20 @@ describe("getApiBaseUrl", () => {
     expect(getApiBaseUrl()).toBe("https://api.example");
   });
 
-  it("throws when missing", async () => {
+  it("returns empty string when missing", async () => {
     vi.stubEnv("VITE_API_BASE_URL", "");
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const { getApiBaseUrl } = await import("./getApiBaseUrl");
-    expect(() => getApiBaseUrl()).toThrow(/API base URL is not configured/);
+    expect(getApiBaseUrl()).toBe("");
     expect(consoleSpy).toHaveBeenCalled();
+  });
+
+  it("falls back to a default API base URL based on hostname", async () => {
+    vi.stubGlobal("window", { location: { hostname: "dev.atlashomestays.com" } });
+    vi.stubEnv("VITE_API_BASE_URL", "");
+    const { getApiBaseUrl } = await import("./getApiBaseUrl");
+    expect(getApiBaseUrl()).toBe(
+      "https://atlas-homes-api-dev-fhdtg0gkgmcmhwfd.centralindia-01.azurewebsites.net",
+    );
   });
 });
