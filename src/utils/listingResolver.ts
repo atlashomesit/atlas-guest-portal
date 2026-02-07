@@ -27,7 +27,19 @@ export const resolveListing = async (
   const apiBaseUrl = assertNonEmpty(getApiBaseUrl(), "VITE_API_BASE_URL");
 
   if (!apiBaseUrl) {
-    console.error("[resolveListing] Missing API base URL; cannot resolve listing.");
+    const runtimeValue =
+      typeof window !== "undefined"
+        ? (window as any).__ATLAS_RUNTIME_CONFIG__?.apiBaseUrl
+        : undefined;
+    const envValue =
+      typeof import.meta !== "undefined"
+        ? (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_API_BASE_URL
+        : undefined;
+    const runtimeLog = runtimeValue?.toString().trim() || "(empty)";
+    const envLog = envValue?.toString().trim() || "(empty)";
+    console.error(
+      `[resolveListing] Missing API base URL; runtime: ${runtimeLog}; env: ${envLog}.`,
+    );
     return null;
   }
 
