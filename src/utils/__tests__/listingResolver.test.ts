@@ -75,4 +75,28 @@ describe('resolveListing', () => {
 
     expect(result).toBeNull();
   });
+
+  it('falls back to same-origin when the primary request fails', async () => {
+    fetchMock
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce(makeResponse({ ok: false, status: 404 }))
+      .mockResolvedValueOnce(
+        makeResponse({
+          ok: true,
+          status: 200,
+          json: async () => [{ name: 'Atlas501', listingId: 'atlas-501', propertyId: 'P501' }],
+        }),
+      );
+
+    const result = await resolveListing('501');
+
+    expect(result).toMatchObject({
+      name: 'Atlas501',
+      id: 'atlas-501',
+      propertyId: 'P501',
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(1, `${LISTING_ENDPOINT}/501`, { signal: undefined });
+    expect(fetchMock).toHaveBeenNthCalledWith(2, '/listings/501', { signal: undefined });
+    expect(fetchMock).toHaveBeenNthCalledWith(3, '/listings', { signal: undefined });
+  });
 });
