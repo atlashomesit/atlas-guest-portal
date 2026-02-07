@@ -1,21 +1,18 @@
 import { ReactNode } from "react";
 import { getApiBaseUrlSafe } from "@/config/api";
-import ErrorLayout from "./ErrorLayout";
 
 interface ApiConfigGuardProps {
   children: ReactNode;
 }
 
 export const ApiConfigGuard = ({ children }: ApiConfigGuardProps) => {
-  if (!getApiBaseUrlSafe())
-    return (
-      <ErrorLayout
-        title="We couldn’t load this page"
-        description="We’re still connecting to the API for this environment. Refresh to try again, or head back to the home page while we sort things out."
-        primaryAction={{ label: "Try again", onClick: () => window.location.reload() }}
-        secondaryAction={{ label: "Back to home", href: "/" }}
-      />
+  const apiBaseUrl = getApiBaseUrlSafe();
+  if (!apiBaseUrl) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      "[api] API base URL is missing; proceeding with relative requests until configuration is available.",
     );
+  }
   return <>{children}</>;
 };
 
