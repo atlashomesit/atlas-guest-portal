@@ -561,8 +561,8 @@ useEffect(() => {
                                 {/* Desktop View */}
                                 <div className='sticky top-16'>
                                     <UnitBookingWidget 
-                                        listingId={resolvedListingId || 'test-listing-id'}
-                                        propertyId={listingPropertyId || 'test-property-id'}
+                                        listingId={resolvedListingId ?? undefined}
+                                        propertyId={listingPropertyId ?? undefined}
                                         listingName={data?.property_name || 'This property'}
                                     />
                                     {false && (
