@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import { API_BASE_URL } from "@/config/api";
+import { getApiBaseUrlSafe } from "@/config/api";
 import ErrorLayout from "./ErrorLayout";
 
 interface ApiConfigGuardProps {
@@ -13,7 +13,7 @@ export const ApiConfigGuard = ({ children }: ApiConfigGuardProps) => {
     return hostname === "atlashomestays.com" || hostname === "www.atlashomestays.com";
   };
 
-  if (!API_BASE_URL && isProductionHost())
+  if (!getApiBaseUrlSafe() && isProductionHost())
     return (
       <ErrorLayout
         title="We couldn’t load this page"

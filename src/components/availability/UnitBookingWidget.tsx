@@ -6,7 +6,7 @@ import axios from 'axios';
 import { Button } from '@/components/ui/Button';
 import { AtlasDateRangePicker, type AtlasDateRangePickerValue } from '@/components/date/AtlasDateRangePicker';
 import { useBooking } from '@/contexts/BookingContext';
-import { IS_API_BASE_CONFIGURED } from '@/lib/env';
+import { isApiBaseConfigured } from '@/lib/env';
 import ErrorBanner from '@/components/ErrorBanner';
 import { fetchAvailability, type AvailabilityNightlyRate, type AvailabilityResponse } from '@/api/availabilityClient';
 import { buildApiUrl } from '@/api/client';
@@ -41,7 +41,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
   const navigate = useNavigate();
   const location = useLocation();
   const { updateBooking } = useBooking();
-  const isBookingDisabled = import.meta.env.PROD && !IS_API_BASE_CONFIGURED;
+  const isBookingDisabled = import.meta.env.PROD && !isApiBaseConfigured();
 
   const today = getIstStartOfDay();
   const maxBookingDate = useMemo(() => addDays(today, 365), [today]);
@@ -438,7 +438,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         throw new Error(message);
       }
 
-      if (!IS_API_BASE_CONFIGURED) {
+      if (!isApiBaseConfigured()) {
         const message = 'Payment service is unavailable. Please try again later.';
         setFormError(message);
         throw new Error(message);

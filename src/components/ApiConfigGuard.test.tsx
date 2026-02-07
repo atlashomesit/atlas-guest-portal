@@ -2,8 +2,9 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { vi } from 'vitest';
 
 vi.mock('@/config/api', () => ({
-  API_BASE_URL: '',
-  IS_API_BASE_CONFIGURED: false,
+  getApiBaseUrl: () => '',
+  getApiBaseUrlSafe: () => '',
+  isApiBaseConfigured: () => false,
 }));
 
 import ApiConfigGuard from './ApiConfigGuard';
