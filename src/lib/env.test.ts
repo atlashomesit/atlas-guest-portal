@@ -22,11 +22,11 @@ describe("getAllowedEmails", () => {
   });
 });
 
-describe("API_BASE_URL", () => {
+describe("getApiBaseUrlSafe", () => {
   it("trims trailing slashes", async () => {
     vi.stubEnv("VITE_API_BASE_URL", "https://api.test/");
-    const { API_BASE_URL } = await import("../config/api");
-    expect(API_BASE_URL).toBe("https://api.test");
+    const { getApiBaseUrlSafe } = await import("../config/api");
+    expect(getApiBaseUrlSafe()).toBe("https://api.test");
   });
 
   it("logs and clears localhost config in production", async () => {
@@ -34,8 +34,8 @@ describe("API_BASE_URL", () => {
     vi.stubEnv("VITE_API_BASE_URL", "http://localhost:3000/");
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
-    const { API_BASE_URL } = await import("../config/api");
-    expect(API_BASE_URL).toBe("");
+    const { getApiBaseUrlSafe } = await import("../config/api");
+    expect(getApiBaseUrlSafe()).toBe("");
     expect(errorSpy).toHaveBeenCalledWith("VITE_API_BASE_URL cannot point to localhost in production environments");
   });
 });

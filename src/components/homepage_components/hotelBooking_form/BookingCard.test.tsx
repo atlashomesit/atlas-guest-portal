@@ -37,8 +37,9 @@ vi.mock('@/lib/api', () => ({
 }));
 
 vi.mock('@/config/api', () => ({
-  API_BASE_URL: 'https://api.test',
-  IS_API_BASE_CONFIGURED: true,
+  getApiBaseUrl: () => 'https://api.test',
+  getApiBaseUrlSafe: () => 'https://api.test',
+  isApiBaseConfigured: () => true,
 }));
 
 vi.mock('../../../contexts/BookingContext', () => ({

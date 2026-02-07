@@ -1,5 +1,5 @@
-import { API_BASE_URL } from "@/config/api";
+import { getApiBaseUrlSafe } from "@/config/api";
 
-export const getApiBaseUrl = (): string => API_BASE_URL;
+export const getApiBaseUrl = (): string => getApiBaseUrlSafe();
 
 export default getApiBaseUrl;
