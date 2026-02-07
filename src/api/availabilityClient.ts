@@ -1,4 +1,4 @@
-import { API_BASE_URL } from '@/config/api';
+import { buildApiUrl } from '@/api/client';
 
 export type AvailabilityNightlyRate = {
   date: string;
@@ -25,7 +25,7 @@ export type AvailabilityRequestParams = {
   signal?: AbortSignal;
 };
 
-const AVAILABILITY_ENDPOINT = `${API_BASE_URL}/availability`;
+const AVAILABILITY_ENDPOINT = '/availability';
 
 export const fetchAvailability = async ({
   propertyId,
@@ -34,7 +34,7 @@ export const fetchAvailability = async ({
   guests,
   signal,
 }: AvailabilityRequestParams): Promise<AvailabilityResponse> => {
-  const url = new URL(AVAILABILITY_ENDPOINT);
+  const url = new URL(buildApiUrl(AVAILABILITY_ENDPOINT));
   url.searchParams.set('propertyId', String(propertyId));
   url.searchParams.set('checkIn', checkIn);
   url.searchParams.set('checkOut', checkOut);

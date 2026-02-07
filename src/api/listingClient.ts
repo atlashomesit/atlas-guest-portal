@@ -1,4 +1,4 @@
-import { API_BASE_URL } from '@/config/api';
+import { buildApiUrl } from '@/api/client';
 
 export type ListingDetail = {
   id: string | number;
@@ -7,13 +7,13 @@ export type ListingDetail = {
   [key: string]: unknown;
 };
 
-const LISTING_ENDPOINT = `${API_BASE_URL}/listings`;
+const LISTING_ENDPOINT = '/listings';
 
 export const fetchListingById = async (
   listingId: string | number,
   signal?: AbortSignal,
 ): Promise<ListingDetail> => {
-  const response = await fetch(`${LISTING_ENDPOINT}/${listingId}`, { signal });
+  const response = await fetch(buildApiUrl(`${LISTING_ENDPOINT}/${listingId}`), { signal });
 
   if (!response.ok) {
     throw new Error(`Listing request failed with status ${response.status}`);
