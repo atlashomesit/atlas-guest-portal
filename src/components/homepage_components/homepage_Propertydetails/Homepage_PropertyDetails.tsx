@@ -38,6 +38,7 @@ interface PropertyDetail {
 
 interface Property {
     id: number;
+    listingId?: number | string;
     property_name: string;
     property_img: string[];
     property_location: string;
@@ -87,7 +88,9 @@ const PropertyDetails = () => {
     }, [data, unitType]);
 
     useEffect(() => {
-        if (!unitSlug) {
+        const lookupId = data?.listingId ?? location.state?.property?.listingId ?? unitSlug;
+
+        if (!lookupId) {
             setListingPropertyId(null);
             setResolvedListingId(null);
             setListingLookupError('Availability temporarily unavailable.');
@@ -103,7 +106,7 @@ const PropertyDetails = () => {
 
         const loadListing = async () => {
             try {
-                const listing = await resolveListing(unitSlug, controller.signal);
+                const listing = await resolveListing(String(lookupId), controller.signal);
                 if (!listing) {
                     setListingLookupError('Property not available.');
                     return;
@@ -129,7 +132,7 @@ const PropertyDetails = () => {
         return () => {
             controller.abort();
         };
-    }, [unitSlug]);
+    }, [data?.listingId, location.state, unitSlug]);
 
     useEffect(() => {
         setNotFound(false);
