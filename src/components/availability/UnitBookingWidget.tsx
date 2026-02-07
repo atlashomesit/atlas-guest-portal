@@ -43,7 +43,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
   const { updateBooking } = useBooking();
   const isBookingDisabled = !isApiBaseConfigured();
 
-  const today = getIstStartOfDay();
+  const today = useMemo(() => getIstStartOfDay(), []);
   const maxBookingDate = useMemo(() => addDays(today, 365), [today]);
 
   const calendarButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -59,7 +59,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
   const [blockedSet, setBlockedSet] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const isMounted = useRef(true);
+  const lastAvailabilityKeyRef = useRef<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [dateError, setDateError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -101,19 +101,24 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
     setOpenCalendar(false);
   }, [isBookingDisabled, openCalendar]);
 
+  useEffect(() => {
+    if (!openCalendar) {
+      lastAvailabilityKeyRef.current = null;
+    }
+  }, [openCalendar, listingId]);
+
   // Fetch blocked dates when the component mounts or when the calendar is opened
   useEffect(() => {
     if (!openCalendar || !listingId || isBookingDisabled) return;
 
-    const fetchBlockedDates = async () => {
-      setIsLoading(true);
-      setStatusMessage('Checking availability...');
+    let isActive = true;
 
+    const fetchBlockedDates = async () => {
       let availabilityBaseUrl: string;
       try {
         availabilityBaseUrl = buildApiUrl('/availability/listing-availability');
       } catch (error) {
-        if (isMounted.current) {
+        if (isActive) {
           setIsLoading(false);
         }
         setStatusMessage('Availability service is unavailable. Please try again later.');
@@ -126,7 +131,16 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
         url.searchParams.set('startDate', toISODate(getIstStartOfDay(availabilityRange.startDate)));
         url.searchParams.set('endDate', toISODate(getIstStartOfDay(availabilityRange.endDate)));
 
-        const response = await apiFetch(url.toString());
+        const availabilityKey = url.toString();
+        if (lastAvailabilityKeyRef.current === availabilityKey) {
+          return;
+        }
+        lastAvailabilityKeyRef.current = availabilityKey;
+
+        setIsLoading(true);
+        setStatusMessage('Checking availability...');
+
+        const response = await apiFetch(availabilityKey);
         const data = await response.json();
 
         const entries = Array.isArray(data?.dates)
@@ -135,7 +149,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
             ? data.availability
             : [];
         
-        if (!isMounted.current) return;
+        if (!isActive) return;
         
         // Update blocked dates based on availability
         const newBlockedDates = new Set<string>();
@@ -159,9 +173,11 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
         );
       } catch (error) {
         console.error('Error fetching blocked dates:', error);
-        setStatusMessage('Failed to load availability. Please try again.');
+        if (isActive) {
+          setStatusMessage('Failed to load availability. Please try again.');
+        }
       } finally {
-        if (isMounted.current) {
+        if (isActive) {
           setIsLoading(false);
         }
       }
@@ -170,7 +186,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
     fetchBlockedDates();
     
     return () => {
-      isMounted.current = false;
+      isActive = false;
     };
   }, [openCalendar, listingId, availabilityRange.endDate, availabilityRange.startDate, isBookingDisabled]);
   const isCheckInAllowed = (date: Date) => {
@@ -707,7 +723,14 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               months={2}
               shownDate={shownDate}
               onShownDateChange={(date) => {
-                setShownDate(startOfMonth(date));
+                const nextShownDate = startOfMonth(date);
+                if (
+                  shownDate.getFullYear() === nextShownDate.getFullYear() &&
+                  shownDate.getMonth() === nextShownDate.getMonth()
+                ) {
+                  return;
+                }
+                setShownDate(nextShownDate);
               }}
               loadingLabel="Loading availability"
               rangeColors={['#475569']}
