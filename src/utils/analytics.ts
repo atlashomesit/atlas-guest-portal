@@ -34,6 +34,8 @@ const getCurrentRoute = () => {
 };
 
 const defaultTransport: AnalyticsTransport = (payload) => {
+  if (getEnv() !== 'dev') return;
+
   const label = `[analytics:${payload.env}]`;
   if (typeof console !== 'undefined' && console.info) {
     console.info(label, payload);
