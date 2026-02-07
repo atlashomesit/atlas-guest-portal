@@ -66,7 +66,11 @@ export const resolveListing = async (
         return { listing: null, error: new Error(`Listing request failed with status ${response.status}: ${errorText}`) };
       }
     } catch (error) {
-      if (signal?.aborted || (error instanceof DOMException && error.name === 'AbortError')) {
+      if (
+        signal?.aborted === true ||
+        (error as Error)?.name === 'AbortError' ||
+        (error instanceof DOMException && error.name === 'AbortError')
+      ) {
         return { listing: null };
       }
       console.error('[resolveListing] Error during direct lookup:', error);
@@ -137,7 +141,11 @@ export const resolveListing = async (
 
       return { listing: resolved };
     } catch (error) {
-      if (signal?.aborted || (error instanceof DOMException && error.name === 'AbortError')) {
+      if (
+        signal?.aborted === true ||
+        (error as Error)?.name === 'AbortError' ||
+        (error instanceof DOMException && error.name === 'AbortError')
+      ) {
         return { listing: null };
       }
       console.error('[resolveListing] Error during listing search:', error);
