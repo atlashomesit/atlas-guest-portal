@@ -6,10 +6,11 @@ import axios from 'axios';
 import { Button } from '@/components/ui/Button';
 import { AtlasDateRangePicker, type AtlasDateRangePickerValue } from '@/components/date/AtlasDateRangePicker';
 import { useBooking } from '@/contexts/BookingContext';
-import { API_BASE_URL, IS_API_BASE_CONFIGURED } from '@/lib/env';
+import { IS_API_BASE_CONFIGURED } from '@/lib/env';
 import ErrorBanner from '@/components/ErrorBanner';
 import { fetchAvailability, type AvailabilityNightlyRate, type AvailabilityResponse } from '@/api/availabilityClient';
 import { buildApiUrl } from '@/api/client';
+import { apiFetch } from '@/lib/http';
 import { getIstStartOfDay } from '@/utils/date';
 import { calculateNights, formatNightCount } from '@/utils/dateHelpers';
 import { doesRangeIntersectBlocked, parseISODate, toISODate } from '@/utils/dateRange';
@@ -56,9 +57,9 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
   const [guests, setGuests] = useState(2);
   const [bookedDates, setBookedDates] = useState<Date[]>([]);
   const [blockedSet, setBlockedSet] = useState<Set<string>>(new Set());
-const [isLoading, setIsLoading] = useState(false);
-const [statusMessage, setStatusMessage] = useState<string | null>(null);
-const isMounted = useRef(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const isMounted = useRef(true);
   const [formError, setFormError] = useState<string | null>(null);
   const [dateError, setDateError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -105,15 +106,19 @@ const isMounted = useRef(true);
     if (!openCalendar || !listingId || isBookingDisabled) return;
 
     const fetchBlockedDates = async () => {
-      const apiBaseUrl = API_BASE_URL;
+      setIsLoading(true);
+      setStatusMessage('Checking availability...');
 
-      if (!apiBaseUrl) {
+      let availabilityBaseUrl: string;
+      try {
+        availabilityBaseUrl = buildApiUrl('/availability/listing-availability');
+      } catch (error) {
+        if (isMounted.current) {
+          setIsLoading(false);
+        }
         setStatusMessage('Availability service is unavailable. Please try again later.');
         return;
       }
-
-      setIsLoading(true);
-      setStatusMessage('Checking availability...');
       
       try {
         // Generate dates for the next 90 days
@@ -126,14 +131,11 @@ const isMounted = useRef(true);
         for (const date of dateArray) {
           try {
             const dateStr = toISODate(date);
-            const response = await fetch(
-              `${apiBaseUrl}/availability/listing-availability?listingId=${listingId}&startDate=${dateStr}`
-            );
-            
-            if (!response.ok) {
-              throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            
+            const url = new URL(availabilityBaseUrl);
+            url.searchParams.set('listingId', String(listingId));
+            url.searchParams.set('startDate', dateStr);
+
+            const response = await apiFetch(url.toString());
             const data = await response.json();
             
             results.push({
@@ -383,7 +385,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     setFormError(null);
     
     try {
-      const response = await fetch(buildApiUrl('/availability/blocks'), {
+      const response = await apiFetch('/availability/blocks', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -394,10 +396,6 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           endDate: toISODate(getIstStartOfDay(dateRange.endDate))
         })
       });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
       
       const result = await response.json();
       console.log('Dates submitted successfully:', result);
@@ -440,9 +438,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         throw new Error(message);
       }
 
-      const apiBaseUrl = API_BASE_URL;
-
-      if (!apiBaseUrl) {
+      if (!IS_API_BASE_CONFIGURED) {
         const message = 'Payment service is unavailable. Please try again later.';
         setFormError(message);
         throw new Error(message);
@@ -457,16 +453,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
       console.log('Sending payment verification request:', requestData);
 
-      const response = await axios.post(
-        `${apiBaseUrl}/api/Razorpay/verify`,
-        requestData,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          }
+      const response = await axios.post(buildApiUrl('/api/Razorpay/verify'), requestData, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
         }
-      );
+      });
       
       console.log('Verification response:', response.data);
       
@@ -508,9 +500,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       return;
     }
 
-    const apiBaseUrl = API_BASE_URL;
-
-    if (!apiBaseUrl) {
+    let orderUrl: string;
+    try {
+      orderUrl = buildApiUrl('/api/Razorpay/order');
+    } catch (error) {
       setFormError('Unable to start checkout. Please try again later.');
       return;
     }
@@ -550,10 +543,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       console.log('Sending order payload:', JSON.stringify(orderPayload, null, 2));
 
       // 3. Create Razorpay order
-      const orderResponse = await axios.post(
-        `${apiBaseUrl}/api/Razorpay/order`,
-        orderPayload
-      );
+      const orderResponse = await axios.post(orderUrl, orderPayload);
 
       const { keyId: key, orderId, bookingId } = orderResponse.data;
 
