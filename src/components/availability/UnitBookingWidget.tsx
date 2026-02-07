@@ -121,42 +121,33 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
       }
       
       try {
-        // Generate dates for the next 90 days
-        const today = getIstStartOfDay();
-        const dateArray = Array.from({ length: 90 }, (_, i) => addDays(today, i));
-        
-        const results = [];
-        
-        // Fetch availability for each date
-        for (const date of dateArray) {
-          try {
-            const dateStr = toISODate(date);
-            const url = new URL(availabilityBaseUrl);
-            url.searchParams.set('listingId', String(listingId));
-            url.searchParams.set('startDate', dateStr);
+        const url = new URL(availabilityBaseUrl);
+        url.searchParams.set('listingId', String(listingId));
+        url.searchParams.set('startDate', toISODate(getIstStartOfDay(availabilityRange.startDate)));
+        url.searchParams.set('endDate', toISODate(getIstStartOfDay(availabilityRange.endDate)));
 
-            const response = await apiFetch(url.toString());
-            const data = await response.json();
-            
-            results.push({
-              listingId: data.listingId,
-              date: data.date,
-              availableRooms: data.inventory > 0 ? 1 : 0
-            });
-          } catch (error) {
-            console.error(`Failed to fetch availability for date ${date}:`, error);
-          }
-        }
+        const response = await apiFetch(url.toString());
+        const data = await response.json();
+
+        const entries = Array.isArray(data?.dates)
+          ? data.dates
+          : Array.isArray(data?.availability)
+            ? data.availability
+            : [];
         
         if (!isMounted.current) return;
         
         // Update blocked dates based on availability
         const newBlockedDates = new Set<string>();
-        results.forEach(item => {
-          if (item.availableRooms === 0) {
-            const date = getIstStartOfDay(new Date(item.date));
-            newBlockedDates.add(toISODate(date));
-          }
+        entries.forEach((item: { date?: string; inventory?: number; available?: boolean; blocked?: boolean }) => {
+          if (!item?.date) return;
+          const isBlocked =
+            item.blocked === true ||
+            item.available === false ||
+            (typeof item.inventory === 'number' && item.inventory <= 0);
+          if (!isBlocked) return;
+          const date = getIstStartOfDay(new Date(item.date));
+          newBlockedDates.add(toISODate(date));
         });
         
         setBlockedSet(newBlockedDates);
@@ -181,7 +172,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
     return () => {
       isMounted.current = false;
     };
-  }, [openCalendar, listingId]);
+  }, [openCalendar, listingId, availabilityRange.endDate, availabilityRange.startDate, isBookingDisabled]);
   const isCheckInAllowed = (date: Date) => {
   const iso = toISODate(getIstStartOfDay(date));
   if (blockedSet.has(iso)) return false; // blocked dates never check-in
