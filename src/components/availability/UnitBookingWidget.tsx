@@ -59,7 +59,6 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
   const [blockedSet, setBlockedSet] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const isMounted = useRef(true);
   const [formError, setFormError] = useState<string | null>(null);
   const [dateError, setDateError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -105,6 +104,8 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
   useEffect(() => {
     if (!openCalendar || !listingId || isBookingDisabled) return;
 
+    let isActive = true;
+
     const fetchBlockedDates = async () => {
       setIsLoading(true);
       setStatusMessage('Checking availability...');
@@ -113,7 +114,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
       try {
         availabilityBaseUrl = buildApiUrl('/availability/listing-availability');
       } catch (error) {
-        if (isMounted.current) {
+        if (isActive) {
           setIsLoading(false);
         }
         setStatusMessage('Availability service is unavailable. Please try again later.');
@@ -135,7 +136,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
             ? data.availability
             : [];
         
-        if (!isMounted.current) return;
+        if (!isActive) return;
         
         // Update blocked dates based on availability
         const newBlockedDates = new Set<string>();
@@ -159,9 +160,11 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
         );
       } catch (error) {
         console.error('Error fetching blocked dates:', error);
-        setStatusMessage('Failed to load availability. Please try again.');
+        if (isActive) {
+          setStatusMessage('Failed to load availability. Please try again.');
+        }
       } finally {
-        if (isMounted.current) {
+        if (isActive) {
           setIsLoading(false);
         }
       }
@@ -170,7 +173,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
     fetchBlockedDates();
     
     return () => {
-      isMounted.current = false;
+      isActive = false;
     };
   }, [openCalendar, listingId, availabilityRange.endDate, availabilityRange.startDate, isBookingDisabled]);
   const isCheckInAllowed = (date: Date) => {
