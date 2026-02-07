@@ -1,19 +1,26 @@
-import { getApiBaseUrl } from '@/config/api';
+import { getApiBaseUrlSafe } from '@/config/api';
 
-const resolveApiBaseUrl = (): string => {
+const resolveApiBaseUrl = (): string | null => {
+  const baseUrl = getApiBaseUrlSafe();
+  if (!baseUrl) {
+    return null;
+  }
+
   try {
-    const baseUrl = getApiBaseUrl();
     const url = new URL(baseUrl);
     return url.toString().replace(/\/$/, '');
   } catch (error) {
     // eslint-disable-next-line no-console
-    console.error('[api] API base URL is invalid or missing.', error);
-    throw error;
+    console.error('[api] API base URL is invalid.', error);
+    return null;
   }
 };
 
 export const buildApiUrl = (path: string): string => {
   const baseUrl = resolveApiBaseUrl();
+  if (!baseUrl) {
+    return path;
+  }
 
   try {
     return new URL(path, baseUrl).toString();

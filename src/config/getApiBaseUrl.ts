@@ -67,7 +67,7 @@ export const getApiBaseUrl = (): string => {
   if (!apiBaseUrl) {
     // eslint-disable-next-line no-console
     console.error(missingConfigMessage);
-    throw new Error("API base URL is not configured");
+    return "";
   }
 
   return apiBaseUrl;
