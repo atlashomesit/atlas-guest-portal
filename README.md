@@ -40,6 +40,7 @@ Optional tooling:
   - **Preview:** In the same screen, add `VITE_API_BASE_URL` for the “Preview” scope to point at staging/QA APIs so preview builds load data correctly.
   - Add `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` in both scopes (Production + Preview) so the runtime `/config` endpoint can hand the key to the Location page and avoid hitting the interactive map when it is missing.
   - Runtime config: Pages Functions serve `/config` that injects `window.__ATLAS_RUNTIME_CONFIG__ = { apiBaseUrl: "...", googleMapsApiKey: "..." }`. Changes to the env vars apply immediately (no rebuild needed after this change ships); visiting `/config` should return the runtime value or an empty string with a comment if missing. `/config.js` redirects to `/config` to avoid SPA fallbacks while keeping legacy references working.
+  - Production verification: ensure `VITE_API_BASE_URL` is set in the Production environment **or** inject `window.__ATLAS_RUNTIME_CONFIG__ = { apiBaseUrl: "https://your-api.example" }` before the app bootstraps. Confirm the value is available in `src/config/getApiBaseUrl.ts` at runtime by inspecting the generated `__ATLAS_RUNTIME_CONFIG__` (from `/config`) or the deployed environment config (e.g., Cloudflare Pages env vars or the `Startup env: ...` console log).
 
 ### Cloudflare Pages settings
 - In the Pages project dashboard, set the environment variable `NODE_VERSION=22.12.0` so builds align with Vite 7's engine requirement (\`^20.19.0 || >=22.12.0\`).
