@@ -9,23 +9,34 @@ import ApiConfigGuard from './components/ApiConfigGuard'
 import { initMonitoring } from './lib/monitoring'
 import { initAnalytics } from './utils/analytics'
 import { ThemeProvider } from './theme/ThemeProvider'
-import { getApiBaseUrl } from './config/apiBaseUrl'
+import { getApiBaseUrlSafe } from './config/api'
+import { loadRuntimeConfig } from './config/runtimeConfig'
 
-applyTheme(DEFAULT_THEME)
-initMonitoring()
-initAnalytics()
-console.info(
-  `Startup env: MODE=${import.meta.env.MODE}, PROD=${import.meta.env.PROD}, VITE_API_BASE_URL=${getApiBaseUrl()}`,
-)
+const bootstrapApp = async () => {
+  applyTheme(DEFAULT_THEME)
+  initMonitoring()
+  initAnalytics()
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <ThemeProvider initialTheme={DEFAULT_THEME}>
-      <ErrorBoundary name="app-shell">
-        <ApiConfigGuard>
-          <App />
-        </ApiConfigGuard>
-      </ErrorBoundary>
-    </ThemeProvider>
-  </StrictMode>,
-)
+  const runtimeConfig = await loadRuntimeConfig()
+  const apiBaseUrl = getApiBaseUrlSafe()
+  const hostname = typeof window !== 'undefined' ? window.location.hostname : 'server'
+  const envLabel = runtimeConfig.env || import.meta.env.MODE || 'unknown'
+
+  console.info(
+    `[startup] host=${hostname} env=${envLabel} apiBaseUrl=${apiBaseUrl || '(missing)'}`,
+  )
+
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <ThemeProvider initialTheme={DEFAULT_THEME}>
+        <ErrorBoundary name="app-shell">
+          <ApiConfigGuard>
+            <App />
+          </ApiConfigGuard>
+        </ErrorBoundary>
+      </ThemeProvider>
+    </StrictMode>,
+  )
+}
+
+bootstrapApp()

@@ -3,6 +3,7 @@ declare global {
     __ATLAS_RUNTIME_CONFIG__?: {
       apiBaseUrl?: string;
       googleMapsApiKey?: string;
+      env?: string;
     };
   }
 }
@@ -43,7 +44,7 @@ const normalizeGoogleMapsApiKey = (value: string | undefined): string | undefine
 };
 
 const missingConfigMessage =
-  "Google Maps API key is not configured. Expected NEXT_PUBLIC_GOOGLE_MAPS_API_KEY (available via /config). Falling back to the static map preview.";
+  "Google Maps API key is not configured. Expected NEXT_PUBLIC_GOOGLE_MAPS_API_KEY (available via /config.json). Falling back to the static map preview.";
 
 export const getGoogleMapsApiKey = (): string | undefined => {
   const runtimeValue = normalizeGoogleMapsApiKey(getRuntimeGoogleMapsApiKey());

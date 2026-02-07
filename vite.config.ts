@@ -5,23 +5,6 @@ import path from "path";
 export default defineConfig({
   plugins: [
     react(),
-    {
-      name: "external-runtime-config",
-      resolveId(source) {
-        if (source === "/config") {
-          return { id: source, external: true } as const;
-        }
-        return null;
-      },
-      load(id) {
-        if (id === "/config") {
-          // Return empty module to prevent pre-transform errors
-          // The actual /config endpoint is served by Cloudflare Pages function
-          return "// Runtime config loaded from /config endpoint";
-        }
-        return null;
-      },
-    },
   ],
   envPrefix: ["VITE_", "NEXT_PUBLIC_"],
   resolve: {

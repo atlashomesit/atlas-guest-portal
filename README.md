@@ -34,7 +34,9 @@ Optional tooling:
 The Vite config surfaces variables prefixed with `VITE_` or `NEXT_PUBLIC_`; CRA-style `REACT_APP_*` keys are ignored at runtime. Make sure API hosts use `VITE_API_BASE_URL` rather than the legacy `REACT_APP_API_BASE_URL` name.
 
 **Required for production/preview deployments**
-- `VITE_API_BASE_URL` → Base URL for all API calls (omit trailing slash). Set the **Production** value to the production API host and the **Preview** value to the staging/QA API host. This must be correct per environment (Production vs Preview), and changing it **requires a Cloudflare Pages redeploy** to take effect in the built bundle.
+- `API_BASE_URL` → Runtime API host for Cloudflare Pages Functions (`/config.json`). Prefer this variable so dev/prod routing can change without a rebuild. Omit the trailing slash.
+- `DEPLOY_ENV` → Short environment label (for example: `dev`, `prod`). This is surfaced via `/config.json` and used for runtime logging/diagnostics.
+- `VITE_API_BASE_URL` → Build-time fallback for local development or when runtime config is unavailable. Omit the trailing slash. Changing this requires a rebuild/redeploy.
 - `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` → Google Maps JavaScript API key (required for the `/location` map). Enable the **Maps JavaScript API** for this key, restrict it to the deployed Atlas Homestays domains (dev/preview/prod), and keep billing active so the interactive map and static fallback both render correctly.
 
 **Optional (enable as needed)**
@@ -47,11 +49,11 @@ The Vite config surfaces variables prefixed with `VITE_` or `NEXT_PUBLIC_`; CRA-
 - `VITE_GLOBAL_DISCOUNT_PERCENT`, `VITE_DATE_MULTIPLIERS_JSON` → Pricing overrides for discounts and date-based multipliers.
 
 Cloudflare Pages setup:
-- **Production:** Project → Settings → Environment variables → set `VITE_API_BASE_URL` to the production API host. Save for “Production” scope.
-- **Preview:** In the same screen, add `VITE_API_BASE_URL` for the “Preview” scope to point at staging/QA APIs so preview builds load data correctly.
-- Add `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` in both scopes (Production + Preview) so the runtime `/config` endpoint can hand the key to the Location page and avoid hitting the interactive map when it is missing.
-- Runtime config: Pages **Functions** serve `/config`, and Cloudflare Pages Functions must be enabled for the project. The function injects `window.__ATLAS_RUNTIME_CONFIG__ = { apiBaseUrl: "...", googleMapsApiKey: "..." }`, and `/config.js` redirects to `/config` to avoid SPA fallbacks while keeping legacy references working.
-- Production verification: ensure `VITE_API_BASE_URL` is set in the Production environment **or** inject `window.__ATLAS_RUNTIME_CONFIG__ = { apiBaseUrl: "https://your-api.example" }` before the app bootstraps. Confirm the value is available in `src/config/getApiBaseUrl.ts` at runtime by inspecting the generated `__ATLAS_RUNTIME_CONFIG__` (from `/config`) or the deployed environment config (e.g., Cloudflare Pages env vars or the `Startup env: ...` console log).
+- **Production:** Project → Settings → Environment variables → set `API_BASE_URL` to the production API host and `DEPLOY_ENV=prod`. Save for “Production” scope.
+- **Preview:** In the same screen, add `API_BASE_URL` for the “Preview” scope to point at staging/QA APIs and set `DEPLOY_ENV=dev` (or another non-prod label).
+- Add `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` in both scopes (Production + Preview) so the runtime `/config.json` endpoint can hand the key to the Location page and avoid hitting the interactive map when it is missing.
+- Runtime config: Pages **Functions** serve `/config.json`, and Cloudflare Pages Functions must be enabled for the project. The function returns `{ apiBaseUrl, env, googleMapsApiKey }`, which the app loads before bootstrapping.
+- Production verification: ensure `API_BASE_URL` (runtime) or `VITE_API_BASE_URL` (build-time fallback) is set. Confirm the value is available in `src/config/getApiBaseUrl.ts` at runtime by inspecting the generated `__ATLAS_RUNTIME_CONFIG__` (from `/config.json`) or the deployed environment config (e.g., Cloudflare Pages env vars or the `Startup` console log).
 
 ### Cloudflare Pages settings
 - In the Pages project dashboard, set the environment variable `NODE_VERSION=22.12.0` so builds align with Vite 7's engine requirement (\`^20.19.0 || >=22.12.0\`).
