@@ -66,6 +66,9 @@ export const resolveListing = async (
         return { listing: null, error: new Error(`Listing request failed with status ${response.status}: ${errorText}`) };
       }
     } catch (error) {
+      if (signal?.aborted || (error instanceof DOMException && error.name === 'AbortError')) {
+        return { listing: null };
+      }
       console.error('[resolveListing] Error during direct lookup:', error);
       return { listing: null, error: error as Error };
     }
@@ -134,6 +137,9 @@ export const resolveListing = async (
 
       return { listing: resolved };
     } catch (error) {
+      if (signal?.aborted || (error instanceof DOMException && error.name === 'AbortError')) {
+        return { listing: null };
+      }
       console.error('[resolveListing] Error during listing search:', error);
       return { listing: null, error: error as Error };
     }
