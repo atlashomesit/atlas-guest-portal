@@ -49,11 +49,34 @@ const getRuntimeApiBaseUrl = (): string | undefined => {
 const missingConfigMessage =
   "API base URL is not configured. Set API_BASE_URL (Pages) or VITE_API_BASE_URL, or provide runtime config at /config.json.";
 
+const DEFAULT_API_BASE_URLS = {
+  production: "https://atlas-homes-api-gxdqfjc2btc0atbv.centralus-01.azurewebsites.net",
+  preview: "https://atlas-homes-api-dev-fhdtg0gkgmcmhwfd.centralindia-01.azurewebsites.net",
+};
+
+const getHostname = (): string => {
+  if (typeof window !== "undefined") {
+    return window.location?.hostname ?? "";
+  }
+  if (typeof location !== "undefined") {
+    return location.hostname ?? "";
+  }
+  return "";
+};
+
+const getDefaultApiBaseUrl = (): string => {
+  const hostname = getHostname().toLowerCase();
+  if (!hostname) return "";
+  const isPreviewHost = hostname.includes("dev.") || hostname.endsWith(".pages.dev");
+  return isPreviewHost ? DEFAULT_API_BASE_URLS.preview : DEFAULT_API_BASE_URLS.production;
+};
+
 export const getApiBaseUrl = (): string => {
   const runtimeValue = normalizeApiBaseUrl(getRuntimeApiBaseUrl());
   const envValue = normalizeApiBaseUrl(readEnv("VITE_API_BASE_URL") ?? readEnv("API_BASE_URL"));
-  const apiBaseUrl = runtimeValue || envValue;
-  const source = runtimeValue ? "runtime" : envValue ? "env" : "missing";
+  const defaultValue = normalizeApiBaseUrl(getDefaultApiBaseUrl());
+  const apiBaseUrl = runtimeValue || envValue || defaultValue;
+  const source = runtimeValue ? "runtime" : envValue ? "env" : defaultValue ? "default" : "missing";
   const resolved = apiBaseUrl || "(empty)";
   // eslint-disable-next-line no-console
   console.info(`[api] API base URL (${source}): ${resolved}`);
