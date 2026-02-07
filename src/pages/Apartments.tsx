@@ -27,6 +27,7 @@ type PropertyMetadata = {
 
 type PropertyRecord = {
   id: number | string;
+  listingId?: number | string;
   unitType?: UnitType;
   unit_type?: UnitType;
   metadata?: PropertyMetadata;
