@@ -31,16 +31,27 @@ Optional tooling:
 - Enforced override → `@jridgewell/sourcemap-codec@1.5.5`
 
 ## Environment Variables
-- The Vite config surfaces variables prefixed with `VITE_` or `NEXT_PUBLIC_`; CRA-style `REACT_APP_*` keys are ignored at runtime. Make sure API hosts use `VITE_API_BASE_URL` rather than the legacy `REACT_APP_API_BASE_URL` name.
-- `VITE_API_BASE_URL` (recommended) → Base URL for all API calls (omit trailing slash). The value is resolved at runtime via [`/config`](functions/config.js) and [`src/config/getApiBaseUrl.ts`](src/config/getApiBaseUrl.ts); if it is missing, the app logs a warning and falls back to the production API host.
-- `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` (required for `/location`) → Google Maps JavaScript API key. Enable the **Maps JavaScript API** for this key, restrict it to the deployed Atlas Homestays domains (dev/preview/prod), and keep billing active so the interactive map and static fallback both render correctly. The value is exposed through `/config` at runtime so client pages can decide whether to load the JS API or stay on the static map preview.
-- See `.env.example` for the full list of required/optional variables (EmailJS, Razorpay, callback leads, Sentry). Copy it locally and fill in the values that apply to your environment.
-- Cloudflare Pages setup:
-  - **Production:** Project → Settings → Environment variables → set `VITE_API_BASE_URL` to the production API host. Save for “Production” scope.
-  - **Preview:** In the same screen, add `VITE_API_BASE_URL` for the “Preview” scope to point at staging/QA APIs so preview builds load data correctly.
-  - Add `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` in both scopes (Production + Preview) so the runtime `/config` endpoint can hand the key to the Location page and avoid hitting the interactive map when it is missing.
-  - Runtime config: Pages Functions serve `/config` that injects `window.__ATLAS_RUNTIME_CONFIG__ = { apiBaseUrl: "...", googleMapsApiKey: "..." }`. Changes to the env vars apply immediately (no rebuild needed after this change ships); visiting `/config` should return the runtime value or an empty string with a comment if missing. `/config.js` redirects to `/config` to avoid SPA fallbacks while keeping legacy references working.
-  - Production verification: ensure `VITE_API_BASE_URL` is set in the Production environment **or** inject `window.__ATLAS_RUNTIME_CONFIG__ = { apiBaseUrl: "https://your-api.example" }` before the app bootstraps. Confirm the value is available in `src/config/getApiBaseUrl.ts` at runtime by inspecting the generated `__ATLAS_RUNTIME_CONFIG__` (from `/config`) or the deployed environment config (e.g., Cloudflare Pages env vars or the `Startup env: ...` console log).
+The Vite config surfaces variables prefixed with `VITE_` or `NEXT_PUBLIC_`; CRA-style `REACT_APP_*` keys are ignored at runtime. Make sure API hosts use `VITE_API_BASE_URL` rather than the legacy `REACT_APP_API_BASE_URL` name.
+
+**Required for production/preview deployments**
+- `VITE_API_BASE_URL` → Base URL for all API calls (omit trailing slash). Set the **Production** value to the production API host and the **Preview** value to the staging/QA API host. This must be correct per environment (Production vs Preview), and changing it **requires a Cloudflare Pages redeploy** to take effect in the built bundle.
+- `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` → Google Maps JavaScript API key (required for the `/location` map). Enable the **Maps JavaScript API** for this key, restrict it to the deployed Atlas Homestays domains (dev/preview/prod), and keep billing active so the interactive map and static fallback both render correctly.
+
+**Optional (enable as needed)**
+- `VITE_EMAILJS_SERVICE_ID`, `VITE_EMAILJS_TEMPLATE_ID`, `VITE_EMAILJS_PUBLIC_KEY`, `VITE_OWNER_EMAIL` → EmailJS booking/contact form delivery.
+- `VITE_RAZORPAY_KEY_ID` → Razorpay checkout initialization key.
+- `VITE_CALLBACK_LEADS_ENDPOINT` → Override callback leads API endpoint (defaults to `/api/leads/callback`).
+- `VITE_CHAT_API_URL`, `VITE_ATLAS_AUTH_KEY` → Support chat API endpoint + auth key.
+- `VITE_SENTRY_DSN` → Sentry error reporting.
+- `VITE_ALLOWED_EMAILS` → Comma/JSON list of emails allowed to view gated content.
+- `VITE_GLOBAL_DISCOUNT_PERCENT`, `VITE_DATE_MULTIPLIERS_JSON` → Pricing overrides for discounts and date-based multipliers.
+
+Cloudflare Pages setup:
+- **Production:** Project → Settings → Environment variables → set `VITE_API_BASE_URL` to the production API host. Save for “Production” scope.
+- **Preview:** In the same screen, add `VITE_API_BASE_URL` for the “Preview” scope to point at staging/QA APIs so preview builds load data correctly.
+- Add `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` in both scopes (Production + Preview) so the runtime `/config` endpoint can hand the key to the Location page and avoid hitting the interactive map when it is missing.
+- Runtime config: Pages **Functions** serve `/config`, and Cloudflare Pages Functions must be enabled for the project. The function injects `window.__ATLAS_RUNTIME_CONFIG__ = { apiBaseUrl: "...", googleMapsApiKey: "..." }`, and `/config.js` redirects to `/config` to avoid SPA fallbacks while keeping legacy references working.
+- Production verification: ensure `VITE_API_BASE_URL` is set in the Production environment **or** inject `window.__ATLAS_RUNTIME_CONFIG__ = { apiBaseUrl: "https://your-api.example" }` before the app bootstraps. Confirm the value is available in `src/config/getApiBaseUrl.ts` at runtime by inspecting the generated `__ATLAS_RUNTIME_CONFIG__` (from `/config`) or the deployed environment config (e.g., Cloudflare Pages env vars or the `Startup env: ...` console log).
 
 ### Cloudflare Pages settings
 - In the Pages project dashboard, set the environment variable `NODE_VERSION=22.12.0` so builds align with Vite 7's engine requirement (\`^20.19.0 || >=22.12.0\`).
