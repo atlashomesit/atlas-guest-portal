@@ -131,7 +131,7 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
 }) => {
   const isCheckingAvailability = availabilityStatus === 'checking';
   const buttonIsBusy = isCheckingAvailability || isLoading;
-  const isBookingDisabled = import.meta.env.PROD && !isApiBaseConfigured();
+  const isBookingDisabled = !isApiBaseConfigured();
   const isFormDisabled = buttonIsBusy || isBookingDisabled;
   const ctaDisabled = submitButtonDisabled || isBookingDisabled;
   const ratingSnippet = averageRating

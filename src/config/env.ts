@@ -31,7 +31,14 @@ const nodeEnv: EnvSource = typeof process !== "undefined"
 
 export const ENV = getEnv("MODE", metaEnv, nodeEnv) ?? getEnv("NODE_ENV", nodeEnv) ?? "development";
 
-export const IS_LOCALHOST = (getEnv("DEV", metaEnv, nodeEnv) ?? "").toString() === "true";
+export const IS_LOCALHOST = (() => {
+  if (typeof window !== "undefined") {
+    const hostname = window.location?.hostname ?? "";
+    return hostname === "localhost" || hostname === "127.0.0.1";
+  }
+  const devFlag = (getEnv("DEV", metaEnv, nodeEnv) ?? "").toString().toLowerCase();
+  return devFlag === "true" || devFlag === "1";
+})();
 
 export const getAllowedEmails = (): string[] => {
   const raw = getEnv("VITE_ALLOWED_EMAILS", metaEnv, nodeEnv);

@@ -11,12 +11,6 @@ import ApiConfigGuard from './ApiConfigGuard';
 
 describe('ApiConfigGuard', () => {
   const originalLocation = window.location;
-  const setHostname = (hostname: string) => {
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: { ...originalLocation, hostname },
-    });
-  };
 
   beforeEach(() => {
     const reloadSpy = vi.fn();
@@ -33,7 +27,7 @@ describe('ApiConfigGuard', () => {
     });
   });
 
-  it('renders the shared error layout when the API base URL is missing on production hosts', () => {
+  it('renders the shared error layout when the API base URL is missing', () => {
     render(
       <ApiConfigGuard>
         <div>child</div>
@@ -45,17 +39,5 @@ describe('ApiConfigGuard', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /try again/i }));
     expect(window.location.reload).toHaveBeenCalled();
-  });
-
-  it('renders children on non-production hosts when the API base URL is missing', () => {
-    setHostname('dev.atlashomestays.com');
-
-    render(
-      <ApiConfigGuard>
-        <div>child</div>
-      </ApiConfigGuard>
-    );
-
-    expect(screen.getByText('child')).toBeInTheDocument();
   });
 });
