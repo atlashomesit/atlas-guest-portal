@@ -522,12 +522,18 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     try {
       // 1. Create booking draft
       const bookingDraft = {
-        listingId: String(listingId),
+        listingId: Number(listingId),  // Ensure listingId is a number
         checkinDate: dateRange.startDate.toISOString(),
         checkoutDate: dateRange.endDate.toISOString(),
         guests,
         notes: ''
       };
+      
+      // Log the booking draft for debugging
+      console.log('Booking draft:', {
+        ...bookingDraft,
+        listingIdType: typeof bookingDraft.listingId
+      });
 
       // 2. Prepare order payload with the exact structure expected by the backend
       const orderPayload = {

@@ -50,7 +50,7 @@ const missingConfigMessage =
   "API base URL is not configured. Set API_BASE_URL (Pages) or VITE_API_BASE_URL, or provide runtime config at /config.json.";
 
 const DEFAULT_API_BASE_URLS = {
-  production: "https://atlas-homes-api-gxdqfjc2btc0atbv.centralus-01.azurewebsites.net",
+  production: "http://localhost:5120",
   preview: "https://atlas-homes-api-dev-fhdtg0gkgmcmhwfd.centralindia-01.azurewebsites.net",
 };
 
