@@ -522,7 +522,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     try {
       // 1. Create booking draft
       const bookingDraft = {
-        listingId: String(listingId),
+        listingId: Number(listingId),
         checkinDate: dateRange.startDate.toISOString(),
         checkoutDate: dateRange.endDate.toISOString(),
         guests,
