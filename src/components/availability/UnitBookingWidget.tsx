@@ -57,9 +57,11 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
   const [guests, setGuests] = useState(2);
   const [bookedDates, setBookedDates] = useState<Date[]>([]);
   const [blockedSet, setBlockedSet] = useState<Set<string>>(new Set());
+  const [dateStatusMap, setDateStatusMap] = useState<Map<string, 'Blocked' | 'Available' | 'Hold'>>(new Map());
   const [isLoading, setIsLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const lastAvailabilityKeyRef = useRef<string | null>(null);
+  const hasAutoAdjustedRef = useRef(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [dateError, setDateError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -73,12 +75,12 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
     phone: ''
   });
 
+  // Availability range always starts from today, independent of selected dates or shown date
   const availabilityRange = useMemo(() => {
-    const normalizedShownDate = getIstStartOfDay(shownDate);
-    const startDate = normalizedShownDate < today ? today : normalizedShownDate;
+    const startDate = today; // Always start from today
     const endDate = addDays(startDate, 60);
     return { startDate, endDate };
-  }, [shownDate, today]);
+  }, [today]);
 
   const resolveNightlyRates = (
     response: AvailabilityResponse,
@@ -107,9 +109,17 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
     }
   }, [openCalendar, listingId]);
 
-  // Fetch blocked dates when the component mounts or when the calendar is opened
+  // Reset auto-adjust flag when listing changes
   useEffect(() => {
-    if (!openCalendar || !listingId || isBookingDisabled) return;
+    hasAutoAdjustedRef.current = false;
+  }, [listingId]);
+
+  // Fetch availability automatically on component load and when the calendar is opened
+  // Availability always starts from today, independent of selected dates
+  useEffect(() => {
+    if (!listingId || isBookingDisabled) return;
+    
+    // Fetch on mount or when calendar opens (but availabilityRange is independent of selected dates)
 
     let isActive = true;
 
@@ -147,24 +157,60 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
           ? data.dates
           : Array.isArray(data?.availability)
             ? data.availability
-            : [];
+            : Array.isArray(data?.Availability)
+              ? data.Availability
+              : [];
         
         if (!isActive) return;
         
-        // Update blocked dates based on availability
+        // Filter out past dates and process availability with status
         const newBlockedDates = new Set<string>();
-        entries.forEach((item: { date?: string; inventory?: number; available?: boolean; blocked?: boolean }) => {
-          if (!item?.date) return;
-          const isBlocked =
+        const newDateStatusMap = new Map<string, 'Blocked' | 'Available' | 'Hold'>();
+        
+        entries.forEach((item: { 
+          date?: string; 
+          Date?: string;
+          status?: string;
+          Status?: string;
+          inventory?: number; 
+          Inventory?: number;
+          available?: boolean; 
+          blocked?: boolean 
+        }) => {
+          // Handle both date and Date fields
+          const dateStr = item?.date || item?.Date;
+          if (!dateStr) return;
+          
+          const itemDate = getIstStartOfDay(new Date(dateStr));
+          const itemISO = toISODate(itemDate);
+          
+          // Filter out past dates - only process dates from today onwards (inclusive)
+          // Use <= instead of < to ensure today is included, but we want >= today, so keep <
+          if (itemDate.getTime() < today.getTime()) return;
+          
+          // Get status from the response (handle both status and Status fields)
+          const status = (item.status || item.Status || 'Available') as 'Blocked' | 'Available' | 'Hold';
+          
+          // Store status for rendering
+          newDateStatusMap.set(itemISO, status);
+          
+          // Update blockedSet for backward compatibility with existing logic
+          // Blocked and Hold dates should be in blockedSet (both are non-selectable)
+          const isBlocked = 
+            status === 'Blocked' ||
+            status === 'Hold' ||
             item.blocked === true ||
             item.available === false ||
-            (typeof item.inventory === 'number' && item.inventory <= 0);
-          if (!isBlocked) return;
-          const date = getIstStartOfDay(new Date(item.date));
-          newBlockedDates.add(toISODate(date));
+            (typeof item.inventory === 'number' && item.inventory <= 0) ||
+            (typeof item.Inventory === 'number' && item.Inventory <= 0);
+          
+          if (isBlocked) {
+            newBlockedDates.add(itemISO);
+          }
         });
         
         setBlockedSet(newBlockedDates);
+        setDateStatusMap(newDateStatusMap);
         setBookedDates(Array.from(newBlockedDates).map(date => new Date(date)));
         setStatusMessage(
           newBlockedDates.size > 0
@@ -189,17 +235,83 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
       isActive = false;
     };
   }, [openCalendar, listingId, availabilityRange.endDate, availabilityRange.startDate, isBookingDisabled]);
+
+  // Auto-select next available date if today is blocked or hold
+  useEffect(() => {
+    // Only run once when availability data is loaded and we haven't auto-adjusted yet
+    if (dateStatusMap.size === 0 || hasAutoAdjustedRef.current) return;
+    
+    const todayISO = toISODate(today);
+    const todayStatus = dateStatusMap.get(todayISO);
+    const isTodayBlocked = todayStatus === 'Blocked' || todayStatus === 'Hold' || blockedSet.has(todayISO);
+    
+    // If today is blocked/hold, find next available date
+    if (isTodayBlocked) {
+      // Find next available date (up to 60 days ahead)
+      let nextAvailableDate: Date | null = null;
+      for (let i = 1; i <= 60; i++) {
+        const checkDate = addDays(today, i);
+        const checkISO = toISODate(checkDate);
+        const checkStatus = dateStatusMap.get(checkISO);
+        
+        // Skip if status is 'Blocked' or 'Hold' or date is in blockedSet
+        if (checkStatus === 'Blocked' || checkStatus === 'Hold' || blockedSet.has(checkISO)) {
+          continue;
+        }
+        
+        // Found an available date (status is 'Available' or not set)
+        nextAvailableDate = checkDate;
+        break;
+      }
+      
+      // Update date range to next available date if found
+      if (nextAvailableDate) {
+        hasAutoAdjustedRef.current = true;
+        setDateRange({
+          startDate: nextAvailableDate,
+          endDate: addDays(nextAvailableDate, 1),
+        });
+      }
+    } else {
+      // Today is available, mark as adjusted so we don't run again
+      hasAutoAdjustedRef.current = true;
+    }
+  }, [dateStatusMap, blockedSet, today]);
+
   const isCheckInAllowed = (date: Date) => {
   const iso = toISODate(getIstStartOfDay(date));
+  
+  // Check status from dateStatusMap (from GET API response)
+  const status = dateStatusMap.get(iso);
+  if (status === 'Blocked' || status === 'Hold') {
+    return false; // blocked/hold dates never allow check-in
+  }
+  
+  // Also check blockedSet for backward compatibility
   if (blockedSet.has(iso)) return false; // blocked dates never check-in
+  
   // Allow check-in if previous date is blocked or it's today
   const prevDayISO = toISODate(addDays(date, -1));
-  if (blockedSet.has(prevDayISO)) return true;
+  const prevStatus = dateStatusMap.get(prevDayISO);
+  if (prevStatus === 'Blocked' || prevStatus === 'Hold' || blockedSet.has(prevDayISO)) {
+    return true;
+  }
   return true; // otherwise normal
 };
 
 const isCheckOutAllowed = (date: Date) => {
   const iso = toISODate(getIstStartOfDay(date));
+  
+  // Check status from dateStatusMap (from GET API response)
+  const status = dateStatusMap.get(iso);
+  if (status === 'Blocked' || status === 'Hold') {
+    // allow check-out if previous day is selected as startDate
+    return dateRange.startDate
+      ? getIstStartOfDay(date).getTime() === addDays(dateRange.startDate, 1).getTime()
+      : false;
+  }
+  
+  // Also check blockedSet for backward compatibility
   if (blockedSet.has(iso)) {
     // allow check-out if previous day is selected as startDate
     return dateRange.startDate
@@ -212,20 +324,40 @@ const isCheckOutAllowed = (date: Date) => {
 
   const disabledDay = useCallback((date: Date) => {
   const normalized = getIstStartOfDay(date);
-  if (normalized < today) return true;
+  
+  // Disable past dates
+  if (normalized.getTime() < today.getTime()) return true;
 
   const iso = toISODate(normalized);
-
-  // Allow check-out for blocked date if it's right after startDate
-  if (dateRange.startDate) {
-    const nextDay = addDays(dateRange.startDate, 1);
-    if (normalized.getTime() === nextDay.getTime() && blockedSet.has(iso)) {
-      return false; // allow check-out
+  
+  // Get status from dateStatusMap (from GET API response)
+  const status = dateStatusMap.get(iso);
+  
+  // Disable dates with "Blocked" or "Hold" status
+  // Exception: Allow check-out for blocked/hold date if it's right after startDate
+  if (status === 'Blocked' || status === 'Hold') {
+    if (dateRange.startDate) {
+      const nextDay = addDays(dateRange.startDate, 1);
+      if (normalized.getTime() === nextDay.getTime()) {
+        return false; // allow check-out on blocked/hold date if it's right after startDate
+      }
     }
+    return true; // disable blocked and hold dates
   }
 
-  return blockedSet.has(iso); // block all other blocked dates
-}, [blockedSet, today, dateRange.startDate]);
+  // Also check blockedSet for backward compatibility
+  if (blockedSet.has(iso)) {
+    if (dateRange.startDate) {
+      const nextDay = addDays(dateRange.startDate, 1);
+      if (normalized.getTime() === nextDay.getTime()) {
+        return false; // allow check-out
+      }
+    }
+    return true; // block dates in blockedSet
+  }
+
+  return false; // all other dates are selectable
+}, [blockedSet, dateStatusMap, today, dateRange.startDate]);
 
 const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   setDateError(null);
@@ -250,18 +382,19 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   const startISO = toISODate(getIstStartOfDay(startDate));
   const endISO = toISODate(getIstStartOfDay(endDate));
 
-  // Prevent blocked ranges
+  // Prevent blocked/hold ranges
   if (doesRangeIntersectBlocked(startISO, endISO, blockedSet)) {
-    // Exception: allow single-day checkout if blocked
+    // Exception: allow single-day checkout if blocked/hold (check-out on blocked/hold date is allowed)
     const prevDay = addDays(startDate, 1);
+    const endISOForCheck = toISODate(endDate);
     if (
       endDate.getTime() === prevDay.getTime() &&
-      blockedSet.has(toISODate(endDate))
+      (blockedSet.has(endISOForCheck) || dateStatusMap.get(endISOForCheck) === 'Blocked' || dateStatusMap.get(endISOForCheck) === 'Hold')
     ) {
       setDateRange({ startDate, endDate });
       return;
     }
-    setDateError('These dates overlap an existing booking.');
+    setDateError('These dates overlap an existing booking or hold.');
     return;
   }
 
@@ -392,7 +525,17 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     setFormError(null);
     
     try {
-      const response = await apiFetch('/availability/blocks', {
+      // Build the full API URL using buildApiUrl to ensure it calls the correct endpoint
+      let blocksApiUrl: string;
+      try {
+        blocksApiUrl = buildApiUrl('/availability/blocks');
+      } catch (error) {
+        setFormError('Availability service is unavailable. Please try again later.');
+        setIsLoading(false);
+        return;
+      }
+      
+      const response = await apiFetch(blocksApiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -490,6 +633,34 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     }
   };
 
+  // Helper function to find next available date starting from a given date
+  // Returns dates that are not blocked/hold
+  const findNextAvailableDate = useCallback((startDate: Date): Date | null => {
+    // Find next available date (up to 60 days ahead)
+    for (let i = 0; i <= 60; i++) {
+      const checkDate = addDays(startDate, i);
+      const checkISO = toISODate(checkDate);
+      const checkStatus = dateStatusMap.get(checkISO);
+      
+      // Skip if status is 'Blocked' or 'Hold' or date is in blockedSet
+      if (checkStatus === 'Blocked' || checkStatus === 'Hold' || blockedSet.has(checkISO)) {
+        continue;
+      }
+      
+      // Consider date available if:
+      // 1. Status is explicitly 'Available', OR
+      // 2. Status is undefined but date is not in blockedSet (API might not return all available dates)
+      const isAvailable = checkStatus === 'Available' || (checkStatus === undefined && !blockedSet.has(checkISO));
+      
+      if (isAvailable) {
+        // Checkout date can be blocked/hold - that's allowed (you're leaving, not staying)
+        // Only check-in date needs to be available
+        return checkDate;
+      }
+    }
+    return null; // No available date found
+  }, [dateStatusMap, blockedSet]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -497,13 +668,74 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       setFormError('Service temporarily unavailable. Please try again later.');
       return;
     }
-    
-    if (!dateRange.startDate || !dateRange.endDate) {
-      setFormError('Please select check-in and check-out dates.');
+
+    if (!validateForm()) {
       return;
     }
 
-    if (!validateForm()) {
+    // Auto-generate dates if not selected
+    let checkinDate: Date;
+    let checkoutDate: Date;
+    
+    if (!dateRange.startDate || !dateRange.endDate) {
+      // Ensure availability data is loaded before auto-generating dates
+      if (dateStatusMap.size === 0) {
+        setFormError('Please wait for availability data to load, or select dates manually.');
+        return;
+      }
+      // Start from today
+      const todayISO = toISODate(today);
+      const todayStatus = dateStatusMap.get(todayISO);
+      const isTodayBlocked = todayStatus === 'Blocked' || todayStatus === 'Hold' || blockedSet.has(todayISO);
+      
+      let startFromDate: Date | null = null;
+      
+      // Use today if it's not blocked/hold
+      // Checkout date can be blocked/hold - that's allowed (you're leaving, not staying)
+      if (!isTodayBlocked) {
+        startFromDate = today;
+      }
+      
+      // If today is blocked, find next available date
+      if (!startFromDate) {
+        const nextAvailable = findNextAvailableDate(today);
+        if (!nextAvailable) {
+          setFormError('No available dates found. Please try again later.');
+          return;
+        }
+        startFromDate = nextAvailable;
+      }
+      
+      // Verify dates are within the availability range we fetched
+      if (startFromDate.getTime() < availabilityRange.startDate.getTime() || 
+          addDays(startFromDate, 1).getTime() > availabilityRange.endDate.getTime()) {
+        setFormError('Selected dates are outside the available range. Please select dates manually.');
+        return;
+      }
+      
+      checkinDate = startFromDate;
+      checkoutDate = addDays(startFromDate, 1);
+    } else {
+      checkinDate = dateRange.startDate;
+      checkoutDate = dateRange.endDate;
+    }
+
+    // Final validation: Only check-in date must be available
+    // Checkout date can be blocked/hold - that's allowed (you're leaving, not staying)
+    const checkinISO = toISODate(checkinDate);
+    const checkinStatus = dateStatusMap.get(checkinISO);
+    const isCheckinBlocked = checkinStatus === 'Blocked' || checkinStatus === 'Hold' || blockedSet.has(checkinISO);
+    
+    // Reject if check-in date is blocked or hold
+    if (isCheckinBlocked) {
+      setFormError('Check-in date is not available. Please select a different check-in date.');
+      return;
+    }
+    
+    // Verify dates are within the availability range we fetched
+    if (checkinDate.getTime() < availabilityRange.startDate.getTime() || 
+        checkoutDate.getTime() > availabilityRange.endDate.getTime()) {
+      setFormError('Selected dates are outside the available range. Please select dates manually.');
       return;
     }
 
@@ -521,10 +753,14 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
     try {
       // 1. Create booking draft
+      // Normalize dates to IST start of day and format as YYYY-MM-DD (not full ISO string)
+      const normalizedCheckin = getIstStartOfDay(checkinDate);
+      const normalizedCheckout = getIstStartOfDay(checkoutDate);
+      
       const bookingDraft = {
         listingId: Number(listingId),  // Ensure listingId is a number
-        checkinDate: dateRange.startDate.toISOString(),
-        checkoutDate: dateRange.endDate.toISOString(),
+        checkinDate: toISODate(normalizedCheckin),  // Format as YYYY-MM-DD
+        checkoutDate: toISODate(normalizedCheckout),  // Format as YYYY-MM-DD
         guests,
         notes: ''
       };
@@ -532,7 +768,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       // Log the booking draft for debugging
       console.log('Booking draft:', {
         ...bookingDraft,
-        listingIdType: typeof bookingDraft.listingId
+        listingIdType: typeof bookingDraft.listingId,
+        checkinDateFormatted: bookingDraft.checkinDate,
+        checkoutDateFormatted: bookingDraft.checkoutDate,
+        checkinDateOriginal: checkinDate,
+        checkoutDateOriginal: checkoutDate
       });
 
       // 2. Prepare order payload with the exact structure expected by the backend
@@ -591,8 +831,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                 updateBooking({
                   propertyId: propertyId ?? undefined,
                   propertyName: listingName ?? undefined,
-                  checkIn: dateRange.startDate?.toISOString() ?? '',
-                  checkOut: dateRange.endDate?.toISOString() ?? '',
+                  checkIn: checkinDate.toISOString(),
+                  checkOut: checkoutDate.toISOString(),
                   guests,
                   customerInfo: { 
                     name: formData.name,
@@ -624,9 +864,17 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           setIsLoading(false);
         }
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Booking error:', error);
-      setFormError('Failed to process booking. Please try again.');
+      
+      // Check if error is about dates not being available
+      const errorMessage = error?.response?.data?.message || error?.message || '';
+      if (errorMessage.includes('not available') || errorMessage.includes('Selected dates')) {
+        setFormError('The selected dates are no longer available. Please select different dates.');
+        // Optionally refresh availability data or reset date range
+      } else {
+        setFormError('Failed to process booking. Please try again.');
+      }
       setIsLoading(false);
     }
   };
@@ -743,6 +991,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               dayContentRenderer={(day) => {
                 // Normalize all dates to IST start of day for consistent comparison
                 const dayStart = getIstStartOfDay(day);
+                const dayISO = toISODate(dayStart);
                 const selectionStart = dateRange.startDate ? getIstStartOfDay(dateRange.startDate).getTime() : null;
                 const selectionEnd = dateRange.endDate ? getIstStartOfDay(dateRange.endDate).getTime() : null;
                 const isRangeStart = selectionStart !== null && dayStart.getTime() === selectionStart;
@@ -753,25 +1002,52 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                   rangeStart !== null && rangeEnd !== null
                     ? dayStart.getTime() >= rangeStart && dayStart.getTime() <= rangeEnd
                     : false;
-                const isBlocked = blockedSet.has(toISODate(dayStart));
+                const isBlocked = blockedSet.has(dayISO);
                 const isDisabled = disabledDay(day);
                 const isToday = dayStart.getTime() === today.getTime();
+                
+                // Get status for this date (only for dates from today onwards)
+                const status = dayStart.getTime() >= today.getTime() ? dateStatusMap.get(dayISO) : null;
+                
+                // Determine background color based on status
+                let backgroundColor = '';
+                if (status === 'Blocked') {
+                  backgroundColor = 'bg-red-500';
+                } else if (status === 'Available') {
+                  backgroundColor = 'bg-green-500';
+                } else if (status === 'Hold') {
+                  backgroundColor = 'bg-orange-500';
+                }
 
                 return (
                   <div className="relative flex h-full w-full items-center justify-center">
-                    {isBlocked && (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="absolute w-full h-px bg-red-500 transform rotate-45 origin-center" style={{ transform: 'rotate(-45deg)' }}></div>
-                      </div>
+                    {/* Background color based on status - show for all dates from today onwards */}
+                    {/* Show with lower opacity when date is selected to not interfere with selection highlight */}
+                    {status && backgroundColor && (
+                      <div 
+                        className={`absolute inset-0 rounded-lg ${backgroundColor}`}
+                        style={{ 
+                          margin: '2px', 
+                          opacity: (isRangeStart || isRangeEnd || isInRange) ? 0.15 : 0.25
+                        }}
+                      />
                     )}
                     <span
                       className={`relative z-10 flex items-center justify-center text-sm font-medium transition ${
                         isRangeStart || isRangeEnd
                           ? 'bg-[var(--cta-primary)] text-white rounded-xl px-3 py-2 shadow-sm'
+                          : isInRange
+                          ? 'bg-[var(--cta-primary)]/20 text-[var(--cta-primary)] rounded-lg'
                           : isDisabled
-                          ? isBlocked
+                          ? isBlocked || status === 'Blocked' || status === 'Hold'
                             ? 'text-red-500/70 cursor-not-allowed'
                             : 'text-[var(--border-strong)] cursor-not-allowed opacity-50'
+                          : status === 'Blocked' || (isBlocked && !status)
+                          ? 'text-red-600 font-semibold cursor-not-allowed'
+                          : status === 'Hold'
+                          ? 'text-orange-600 font-semibold cursor-not-allowed'
+                          : status === 'Available'
+                          ? 'text-green-600 font-semibold'
                           : 'text-[var(--brand)]'
                       }`}
                       style={{ minHeight: 38, minWidth: 38 }}
