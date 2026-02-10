@@ -15,6 +15,38 @@ const normalizeApiBaseUrl = (value: string | undefined): string => {
   return trimmed.endsWith("/") ? trimmed.slice(0, -1) : trimmed;
 };
 
+const isPrivateIpv4 = (hostname: string): boolean => {
+  if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(hostname)) return false;
+  const [a, b] = hostname.split(".").map((part) => Number(part));
+  if ([a, b].some((part) => Number.isNaN(part))) return false;
+  if (a === 10) return true;
+  if (a === 127) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 169 && b === 254) return true;
+  if (a === 100 && b >= 64 && b <= 127) return true;
+  return false;
+};
+
+const isPrivateHostname = (hostname: string): boolean => {
+  const normalized = hostname.toLowerCase();
+  if (normalized === "localhost") return true;
+  if (normalized.endsWith(".local")) return true;
+  if (normalized === "::1") return true;
+  if (normalized.startsWith("fe80:")) return true;
+  if (normalized.startsWith("fc") || normalized.startsWith("fd")) return true;
+  return isPrivateIpv4(normalized);
+};
+
+const isPrivateNetworkUrl = (value: string): boolean => {
+  try {
+    const url = new URL(value);
+    return isPrivateHostname(url.hostname);
+  } catch {
+    return false;
+  }
+};
+
 interface ImportMetaEnv {
   [key: string]: unknown;
 }
@@ -91,12 +123,36 @@ export const getApiBaseUrl = (): string => {
     }
   }
 
-  if (!apiBaseUrl) {
+  const devSignals = [
+    readEnv("DEV"),
+    typeof import.meta !== "undefined" ? (import.meta as { env?: ImportMetaEnv }).env?.DEV : undefined,
+    typeof process !== "undefined" ? (process as { env?: ProcessEnv }).env?.DEV : undefined,
+  ];
+  const isDevLike =
+    devSignals.some((val) => String(val).toLowerCase() === "true") ||
+    (typeof window !== "undefined" && /localhost/i.test(window.location.hostname));
+  const prodSignals = [
+    readEnv("PROD"),
+    readEnv("NODE_ENV"),
+    typeof import.meta !== "undefined" ? (import.meta as { env?: ImportMetaEnv }).env?.PROD : undefined,
+    typeof import.meta !== "undefined" ? (import.meta as { env?: ImportMetaEnv }).env?.NODE_ENV : undefined,
+    typeof process !== "undefined" ? (process as { env?: ProcessEnv }).env?.PROD : undefined,
+    typeof process !== "undefined" ? (process as { env?: ProcessEnv }).env?.NODE_ENV : undefined,
+  ];
+  const hasExplicitProd = prodSignals.some((val) => {
+    if (val === undefined) return false;
+    const normalized = String(val).toLowerCase();
+    return normalized === "true" || normalized === "1" || normalized === "production" || normalized === "prod";
+  });
+  const isProductionLike = hasExplicitProd || !isDevLike;
+  const isPrivateNetworkApi = isPrivateNetworkUrl(apiBaseUrl);
+
+  if (isProductionLike && isPrivateNetworkApi) {
+    const privateMessage =
+      "VITE_API_BASE_URL cannot point to localhost or private network addresses in production environments";
     // eslint-disable-next-line no-console
-    if (import.meta.env.DEV) {
-      console.error(missingConfigMessage);
-    }
-    return "";
+    console.error(privateMessage);
+    throw new Error(privateMessage);
   }
 
   return apiBaseUrl;

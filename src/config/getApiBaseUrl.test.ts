@@ -44,8 +44,20 @@ describe("getApiBaseUrl", () => {
     vi.stubGlobal("window", { location: { hostname: "dev.atlashomestays.com" } });
     vi.stubEnv("VITE_API_BASE_URL", "");
     const { getApiBaseUrl } = await import("./getApiBaseUrl");
-    expect(getApiBaseUrl()).toBe(
-      "https://atlas-homes-api-dev-fhdtg0gkgmcmhwfd.centralindia-01.azurewebsites.net",
+    expect(() => getApiBaseUrl()).toThrow(/cannot point to localhost or private network/);
+    expect(consoleSpy).toHaveBeenCalledWith(
+      "VITE_API_BASE_URL cannot point to localhost or private network addresses in production environments",
+    );
+  });
+
+  it("blocks private network base URLs when production is set", async () => {
+    vi.stubEnv("PROD", "true");
+    vi.stubEnv("VITE_API_BASE_URL", "http://192.168.0.10:3000/");
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { getApiBaseUrl } = await import("./getApiBaseUrl");
+    expect(() => getApiBaseUrl()).toThrow(/cannot point to localhost or private network/);
+    expect(consoleSpy).toHaveBeenCalledWith(
+      "VITE_API_BASE_URL cannot point to localhost or private network addresses in production environments",
     );
   });
 });
