@@ -19,7 +19,11 @@ const resolveApiBaseUrl = (): string | null => {
 export const buildApiUrl = (path: string): string => {
   const baseUrl = resolveApiBaseUrl();
   if (!baseUrl) {
-    return path;
+    // Never return a relative path for API calls — they must go to the configured API origin (dev/prod).
+    // Otherwise the request would hit the frontend origin and fail (dev "order not called" or wrong server).
+    throw new Error(
+      'API base URL is not configured. Set VITE_API_BASE_URL (or runtime config) and ensure the request goes to the API server.'
+    );
   }
 
   try {
