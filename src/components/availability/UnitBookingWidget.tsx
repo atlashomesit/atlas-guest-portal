@@ -109,6 +109,14 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
     }
   }, [openCalendar, listingId]);
 
+  // Reset shownDate to current month whenever calendar opens
+  // This ensures calendar always opens from current month, regardless of selected dates or previous navigation
+  useEffect(() => {
+    if (openCalendar) {
+      setShownDate(today);
+    }
+  }, [openCalendar, today]);
+
   // Reset auto-adjust flag when listing changes
   useEffect(() => {
     hasAutoAdjustedRef.current = false;
@@ -392,6 +400,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       (blockedSet.has(endISOForCheck) || dateStatusMap.get(endISOForCheck) === 'Blocked' || dateStatusMap.get(endISOForCheck) === 'Hold')
     ) {
       setDateRange({ startDate, endDate });
+      // Auto-close calendar when both dates are selected
+      setOpenCalendar(false);
       return;
     }
     setDateError('These dates overlap an existing booking or hold.');
@@ -399,6 +409,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   }
 
   setDateRange(next);
+  // Auto-close calendar when both dates are selected
+  setOpenCalendar(false);
 };
 
 
@@ -503,59 +515,6 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       ...prev,
       [name]: value
     }));
-  };
-
-  const handleSendSelectedDates = async () => {
-    if (isBookingDisabled) {
-      setFormError('Service temporarily unavailable. Please try again later.');
-      return;
-    }
-
-    if (!listingId) {
-      console.error('No listing ID available');
-      return;
-    }
-    
-    if (!dateRange.startDate || !dateRange.endDate) {
-      setFormError('Please select both start and end dates');
-      return;
-    }
-    
-    setIsLoading(true);
-    setFormError(null);
-    
-    try {
-      // Build the full API URL using buildApiUrl to ensure it calls the correct endpoint
-      let blocksApiUrl: string;
-      try {
-        blocksApiUrl = buildApiUrl('/availability/blocks');
-      } catch (error) {
-        setFormError('Availability service is unavailable. Please try again later.');
-        setIsLoading(false);
-        return;
-      }
-      
-      const response = await apiFetch(blocksApiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          listingId: Number(listingId),
-          startDate: toISODate(getIstStartOfDay(dateRange.startDate)),
-          endDate: toISODate(getIstStartOfDay(dateRange.endDate))
-        })
-      });
-      
-      const result = await response.json();
-      console.log('Dates submitted successfully:', result);
-      
-    } catch (error) {
-      console.error('Error submitting selected dates:', error);
-      setFormError('Failed to save selected dates. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   const loadRazorpayScript = (callback: () => void) => {
@@ -934,10 +893,6 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             disabled={isBookingDisabled}
             onClick={() => {
               if (isBookingDisabled) return;
-              // Update shown date to the selected start date when opening calendar
-              if (dateRange.startDate) {
-                setShownDate(getIstStartOfDay(dateRange.startDate));
-              }
               setOpenCalendar(true);
             }}
           >
@@ -988,6 +943,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               }}
               loadingLabel="Loading availability"
               rangeColors={['#475569']}
+              dateRangeProps={{ preventSnapRefocus: true }}
               dayContentRenderer={(day) => {
                 // Normalize all dates to IST start of day for consistent comparison
                 const dayStart = getIstStartOfDay(day);
@@ -1151,31 +1107,6 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   </div>
 </div>
 
-      </div>
-
-      {/* Selected Dates Button */}
-      <div className="mt-4">
-        <button
-          type="button"
-          onClick={handleSendSelectedDates}
-          disabled={!dateRange.startDate || !dateRange.endDate || isLoading || isBookingDisabled}
-          className={`w-full py-3 px-4 rounded-xl text-sm font-medium transition-colors ${
-            !dateRange.startDate || !dateRange.endDate || isLoading || isBookingDisabled
-              ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-              : 'bg-blue-600 text-white hover:bg-blue-700'
-          }`}
-        >
-          {isBookingDisabled ? 'Unavailable' : isLoading ? 'Sending...' : 'Selected'}
-        </button>
-        {dateRange.startDate && dateRange.endDate && (
-          <p className="mt-2 text-sm text-center text-text-secondary">
-            {format(dateRange.startDate, 'MMM d')} - {format(dateRange.endDate, 'MMM d, yyyy')}
-            {' • '}
-            {calculateNights(dateRange.startDate, dateRange.endDate)} {
-              calculateNights(dateRange.startDate, dateRange.endDate) === 1 ? 'night' : 'nights'
-            }
-          </p>
-        )}
       </div>
 
       {dateError && <p className="text-sm text-support-error">{dateError}</p>}
