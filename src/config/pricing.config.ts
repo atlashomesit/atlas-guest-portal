@@ -18,6 +18,22 @@ export interface PricingConfig {
   cleaningFeeByUnitType?: Record<UnitType, number>;
 }
 
+// Helper function to read environment variable with fallback
+const getEnvDiscountPercent = (): number => {
+  const envValue = typeof import.meta !== "undefined" 
+    ? (import.meta.env?.VITE_GLOBAL_DISCOUNT_PERCENT as string | undefined)
+    : undefined;
+  
+  if (envValue) {
+    const parsed = Number(envValue);
+    if (Number.isFinite(parsed) && parsed >= 0 && parsed <= 100) {
+      return parsed;
+    }
+  }
+  
+  return 17; // Default fallback value
+};
+
 export const pricingConfig: PricingConfig = {
   baseNightlyPriceByUnitType: {
     "1bhk": 3500,
@@ -28,7 +44,7 @@ export const pricingConfig: PricingConfig = {
     "1bhk": 2,
     penthouse: 2,
   },
-  globalDiscountPercent: 17,
+  globalDiscountPercent: getEnvDiscountPercent(),
   dateMultipliers: {
     "12-31": 2,
   },
