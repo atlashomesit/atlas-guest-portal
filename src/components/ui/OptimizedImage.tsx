@@ -6,7 +6,7 @@ const DEFAULT_SIZES = "(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
 
 const buildResponsiveSrcSet = (src: string, widths: number[] = RESPONSIVE_WIDTHS) => {
   try {
-    const base = typeof window !== "undefined" ? window.location.origin : "http://localhost";
+    const base = typeof window !== "undefined" ? window.location.origin : "https://example.invalid";
     const url = new URL(src, base);
 
     return widths

@@ -103,7 +103,7 @@ export async function loadRuntimeConfig(): Promise<AtlasRuntimeConfig> {
   const { config } = result;
   if (isLocalDev() && !isLocalhostUrl(config.apiBaseUrl)) {
     throw new Error(
-      "Runtime config missing/invalid: in local dev, apiBaseUrl must be a localhost URL (e.g. http://localhost:5000)",
+      "Runtime config missing/invalid: in local dev, apiBaseUrl must target a loopback host (localhost or 127.0.0.1)",
     );
   }
 
