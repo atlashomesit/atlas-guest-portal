@@ -8,13 +8,12 @@ import ListingFilters from "../components/apartments/ListingFilters";
 import { LOGO_URL } from "../config/branding";
 import { LISTINGS, type Listing } from "../data/listings";
 import { propertyData, propertyImages } from "../data/propertyData";
-import getApiBaseUrl from "../utils/apiBaseUrl";
+import { getApiBaseUrl } from "../runtime-config";
 import { trackEvent } from "../utils/analytics";
 import { buildHomeUnitPath, getPropertySlug, getUnitSlug, navigateToHomeUnit } from "../utils/navigation";
 import { calculateNightlyPrice, inferUnitType, type NightlyPriceBreakdown } from "../utils/pricing";
 import { isAtlasApiRequest, logApiError, monitoredFetch } from "../lib/monitoring";
 import type { UnitType } from "../config/pricing.config";
-import { mockApi } from "../lib/mockApi";
 
 type PropertyMetadata = {
   unitType?: UnitType;
@@ -107,9 +106,6 @@ const deriveAmenityFlag = (property: PropertyRecord, keyword: string): boolean =
       amenity.amenities_icon?.toLowerCase().includes(keyword)
     )
   );
-
-const configurationMissingMessage =
-  "Configuration missing: API base URL not set for this environment.";
 
 const buildApiUrl = (baseUrl: string, path: string): string => {
   const normalizedBase = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
@@ -250,13 +246,6 @@ export const Apartments = () => {
 
   const fetchFromApi = React.useCallback(
     async <T,>(baseUrl: string, path: string): Promise<T | null> => {
-      // Use mock API if baseUrl is 'mock'
-      if (baseUrl === 'mock') {
-        console.log('🎭 [Apartments] Using mock API for:', path);
-        const mockResponse = await mockApi.get<T>(path);
-        return mockResponse.data;
-      }
-
       const url = buildApiUrl(baseUrl, path);
       try {
         const response = await monitoredFetch(url, { requestName: path });
@@ -290,17 +279,12 @@ export const Apartments = () => {
     const resolvedBaseUrl = getApiBaseUrl();
     setApiBaseUrlUsed(resolvedBaseUrl);
 
-    if (!resolvedBaseUrl) {
-      console.info('[Apartments] 🎭 Using mock data for development');
-      setStatusMessage('🎭 Using mock data for development. Configure API base URL for live data.');
-    }
-
     setFetchState("loading");
 
     try {
       const [listingsResponse, propertiesResponse] = await Promise.all([
-        fetchFromApi<Listing[]>(resolvedBaseUrl || 'mock', "/listings"),
-        fetchFromApi<PropertyRecord[]>(resolvedBaseUrl || 'mock', "/properties"),
+        fetchFromApi<Listing[]>(resolvedBaseUrl, "/listings"),
+        fetchFromApi<PropertyRecord[]>(resolvedBaseUrl, "/properties"),
       ]);
 
       if (listingsResponse) {
@@ -312,11 +296,7 @@ export const Apartments = () => {
       }
 
       setFetchState("success");
-      if (!resolvedBaseUrl) {
-        setStatusMessage('🎭 Using mock data for development. Configure API base URL for live data.');
-      } else {
-        setStatusMessage(null);
-      }
+      setStatusMessage(null);
     } catch {
       setStatusMessage("We're having trouble loading apartments right now. Please try again.");
       setFetchState("error");

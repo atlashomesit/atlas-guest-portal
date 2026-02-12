@@ -1,5 +1,5 @@
 import type { ListingDetail } from '../api/listingClient';
-import getApiBaseUrl from './apiBaseUrl';
+import { getApiBaseUrl } from '@/runtime-config';
 import { assertNonEmpty } from './requiredValues';
 
 const normalizeListingPayload = (
@@ -160,21 +160,10 @@ export const resolveListing = async (
     }
   };
 
-  const primaryBaseUrl = apiBaseUrl ?? "";
-  const primaryResult = await attemptResolveListing(primaryBaseUrl);
-  if (!primaryResult.error) {
-    return primaryResult.listing;
-  }
-
-  if (!apiBaseUrl) {
+  const primaryResult = await attemptResolveListing(apiBaseUrl);
+  if (primaryResult.error) {
     throw primaryResult.error;
   }
 
-  console.warn('[resolveListing] Primary listing lookup failed; retrying with same-origin requests.');
-  const fallbackResult = await attemptResolveListing("");
-  if (fallbackResult.error) {
-    throw fallbackResult.error;
-  }
-
-  return fallbackResult.listing;
+  return primaryResult.listing;
 };

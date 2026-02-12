@@ -1,4 +1,4 @@
-import { getApiBaseUrlSafe } from '@/config/api';
+import { getApiBaseUrl } from '@/runtime-config';
 import { IS_LOCALHOST } from '@/config/env';
 import { logApiError, monitoredFetch } from './monitoring';
 
@@ -6,16 +6,8 @@ export async function apiFetch(path: string, init?: RequestInit): Promise<Respon
   const hasProtocol = /^https?:\/\//i.test(path);
   let url = path;
   if (!hasProtocol) {
-    const apiBaseUrl = getApiBaseUrlSafe();
-    if (!apiBaseUrl) {
-      // eslint-disable-next-line no-console
-      console.warn(
-        "[api] API base URL is not configured. Falling back to same-origin requests.",
-      );
-      url = path;
-    } else {
-      url = IS_LOCALHOST ? path : `${apiBaseUrl}${path}`;
-    }
+    const apiBaseUrl = getApiBaseUrl();
+    url = IS_LOCALHOST ? path : `${apiBaseUrl}${path}`;
   }
   if (!IS_LOCALHOST && url.includes('localhost')) {
     throw new Error('Refusing localhost request from non-localhost host');
