@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { loadRuntimeConfig } from "./loader";
+import { clearRuntimeConfig, getGlobalDiscountPercent, setRuntimeConfig } from "./index";
 
 describe("loadRuntimeConfig", () => {
   const validConfig = {
@@ -28,6 +29,7 @@ describe("loadRuntimeConfig", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+    clearRuntimeConfig();
   });
 
   it("returns config when apiBaseUrl and optional fields are valid", async () => {
@@ -84,7 +86,7 @@ describe("loadRuntimeConfig", () => {
     await expect(loadRuntimeConfig()).rejects.toThrow("Runtime config missing/invalid");
   });
 
-  it("returns config with default globalDiscountPercent 0 when omitted", async () => {
+  it("defaults globalDiscountPercent to 0 in the centralized getter when omitted", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(() =>
@@ -98,9 +100,12 @@ describe("loadRuntimeConfig", () => {
     const config = await loadRuntimeConfig();
     expect(config.apiBaseUrl).toBe("https://api.example.com");
     expect(config.globalDiscountPercent).toBeUndefined();
+
+    setRuntimeConfig(config);
+    expect(getGlobalDiscountPercent()).toBe(0);
   });
 
-  it("throws when fetch fails (e.g. 404 on both URLs)", async () => {
+  it("throws when fetch fails (e.g. 404)", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(() => Promise.resolve(new Response("", { status: 404 }))),

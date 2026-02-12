@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-do
 import { addDays, format, startOfDay, startOfMonth } from 'date-fns';
 import { CalendarRange, ChevronDown, ShieldCheck, Users, Minus, Plus } from 'lucide-react';
 import { heroWidgetLayoutFlag } from '../../config/abFlags';
-import getApiBaseUrl from '../../utils/apiBaseUrl';
+import { getApiBaseUrl } from '../../runtime-config';
 import { trackEvent } from '../../utils/analytics';
 import { useBooking } from '../../contexts/BookingContext';
 import { AtlasDateRangePicker, type AtlasDateRangePickerValue } from '../date/AtlasDateRangePicker';

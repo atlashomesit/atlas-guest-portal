@@ -22,11 +22,14 @@ vi.mock('../lib/monitoring', () => ({
   monitoredFetch: vi.fn(() => Promise.reject(new Error('network fail'))),
 }));
 
-vi.mock('../utils/apiBaseUrl', () => ({
-  __esModule: true,
-  default: () => 'https://api.example.com',
-  getApiBaseUrl: () => 'https://api.example.com',
-}));
+vi.mock('../runtime-config', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../runtime-config')>();
+  return {
+    ...actual,
+    getApiBaseUrl: () => 'https://api.example.com',
+    getGlobalDiscountPercent: () => 0,
+  };
+});
 
 import { monitoredFetch } from '../lib/monitoring';
 import { Apartments } from './Apartments';
