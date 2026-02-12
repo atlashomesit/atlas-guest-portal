@@ -211,7 +211,7 @@ Each command should return a 301/302 with a `Location` header set to `/property_
 
 ## Pricing configuration
 - Centralized in [`src/config/pricing.config.ts`](src/config/pricing.config.ts) with helpers in [`src/utils/pricing.ts`](src/utils/pricing.ts). The config tracks per-unit base rates (`1bhk: ₹3,500`, `penthouse: ₹6,000`), included guests (2 by default), a global discount (`17%`), a New Year’s Eve multiplier (`"12-31": 2`), currency/timezone, rounding rules, and optional extras (extra guest fees, max guests, cleaning fees).
-- Env overrides (ideal for Cloudflare Pages) let you adjust pricing without rebuilding:
+- Env overrides (ideal for Cloudflare Pages) let you adjust pricing at build time (requires a rebuild/redeploy to apply):
   - `VITE_GLOBAL_DISCOUNT_PERCENT` → overrides the discount (e.g., `15` for 15% off).
   - `VITE_DATE_MULTIPLIERS_JSON` → JSON map of `"MM-DD": multiplier` (e.g., `{"12-31":2,"01-01":1.25}`).
 - `calculateNightlyPrice` applies the config + overrides in this order: base rate → discount → date multiplier (per night) → extra-guest fees (if configured) → rounding. For multi-night stays, the Dec 31 multiplier is applied **only** to that night.
@@ -221,6 +221,13 @@ Each command should return a 301/302 with a `Location` header set to `/property_
   - Penthouse on normal dates: base ₹6,000 → 17% discount → **₹4,980** per night (₹9,960 on Dec 31 with the 2× multiplier).
 - To change prices safely, edit the config for permanent defaults or set env vars for temporary promos; keep the currency/timezone aligned with INR/Asia-Kolkata to avoid date-key drift for `"MM-DD"` multipliers.
 - Discount and special-day badge copy for UI surfaces is centralized in [`src/config/priceDisplay.config.ts`](src/config/priceDisplay.config.ts) to keep strike-through labels and special pricing tags API-ready.
+
+
+### Configurable pricing (`VITE_GLOBAL_DISCOUNT_PERCENT`)
+- `VITE_GLOBAL_DISCOUNT_PERCENT` is a Vite build-time environment variable.
+- Update it in Cloudflare Pages environment variables for the correct scope (Production/Preview), then trigger a new deployment.
+- A deployment retry may keep the previous environment type; push a new commit when you need a fresh Production build context.
+- Build logs now include explicit env diagnostics from `scripts/verify-pages-env.mjs`.
 
 ## Legal content model and validation
 
