@@ -24,6 +24,12 @@ const getEnvDiscountPercent = (): number => {
     ? (import.meta.env?.VITE_GLOBAL_DISCOUNT_PERCENT as string | undefined)
     : undefined;
   
+  // Build-time logging for Cloudflare Pages verification
+  if (typeof process !== "undefined" && process.env) {
+    const buildEnvValue = process.env.VITE_GLOBAL_DISCOUNT_PERCENT;
+    console.log(`[build] VITE_GLOBAL_DISCOUNT_PERCENT: ${buildEnvValue || 'NOT SET'}${buildEnvValue ? '' : ' (using default: 17)'}`);
+  }
+  
   if (envValue) {
     const parsed = Number(envValue);
     if (Number.isFinite(parsed) && parsed >= 0 && parsed <= 100) {
