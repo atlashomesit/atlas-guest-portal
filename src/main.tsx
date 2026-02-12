@@ -28,7 +28,7 @@ const bootstrapApp = async () => {
     setRuntimeConfig(config)
     const apiBaseUrl = getApiBaseUrl()
     const hostname = typeof window !== 'undefined' ? window.location.hostname : 'server'
-    const envLabel = config.environment || import.meta.env.MODE || 'unknown'
+    const envLabel = config.environment || 'unknown'
 
     if (import.meta.env.DEV) {
       console.info(

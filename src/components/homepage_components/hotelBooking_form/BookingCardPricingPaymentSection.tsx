@@ -4,7 +4,7 @@ import { toast } from 'react-toastify';
 import { format } from 'date-fns';
 import { inlinePolicySnippets } from '../../../content/terms';
 import { logApiError } from '../../../lib/monitoring';
-import { isApiBaseConfigured } from '../../../lib/env';
+import { hasRuntimeConfig } from '../../../runtime-config';
 import ErrorBanner from '../../ErrorBanner';
 import { FaUserFriends, FaCreditCard, FaCcVisa, FaCcMastercard } from 'react-icons/fa';
 import { SiGooglepay, SiRazorpay } from 'react-icons/si';
@@ -131,7 +131,7 @@ export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymen
 }) => {
   const isCheckingAvailability = availabilityStatus === 'checking';
   const buttonIsBusy = isCheckingAvailability || isLoading;
-  const isBookingDisabled = !isApiBaseConfigured();
+  const isBookingDisabled = !hasRuntimeConfig();
   const isFormDisabled = buttonIsBusy || isBookingDisabled;
   const ctaDisabled = submitButtonDisabled || isBookingDisabled;
   const ratingSnippet = averageRating
