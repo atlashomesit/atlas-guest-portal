@@ -1,11 +1,4 @@
-import { getApiBaseUrl as getApiBaseUrlStrict } from "../config/getApiBaseUrl";
+import { getApiBaseUrl } from "@/config/api";
 
-export const getApiBaseUrl = (): string => {
-  try {
-    return getApiBaseUrlStrict();
-  } catch {
-    return "";
-  }
-};
-
+export { getApiBaseUrl };
 export default getApiBaseUrl;

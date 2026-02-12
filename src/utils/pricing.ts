@@ -1,4 +1,5 @@
 import pricingConfig, { type PricingConfig, type UnitType } from "../config/pricing.config";
+import { getGlobalDiscountPercent } from "@/runtime-config";
 
 type CalculateNightlyPriceInput = {
   unitType: UnitType;
@@ -43,14 +44,6 @@ const getEnvValue = (key: string): string | undefined => {
   }
 
   return undefined;
-};
-
-const parseEnvDiscount = (config: PricingConfig): number => {
-  const envValue = getEnvValue("VITE_GLOBAL_DISCOUNT_PERCENT");
-  const resolved = envValue
-    ? (Number.isFinite(Number(envValue)) ? Number(envValue) : config.globalDiscountPercent)
-    : config.globalDiscountPercent;
-  return Number.isFinite(resolved) ? resolved : 0;
 };
 
 const parseEnvDateMultipliers = (config: PricingConfig): Record<string, number> => {
@@ -152,7 +145,7 @@ export const calculateNightlyPrice = ({
     throw new Error("Invalid check-in date supplied to calculateNightlyPrice");
   }
 
-  const discountPercent = parseEnvDiscount(pricingConfig);
+  const discountPercent = getGlobalDiscountPercent();
   const dateMultipliers = parseEnvDateMultipliers(pricingConfig);
   const baseNightlyPrice = pricingConfig.baseNightlyPriceByUnitType[unitType];
 
@@ -194,7 +187,4 @@ export const calculateNightlyPrice = ({
   };
 };
 
-export const getEffectiveDiscountPercent = (): number => {
-  const value = parseEnvDiscount(pricingConfig);
-  return Number.isFinite(value) ? value : 0;
-};
+export const getEffectiveDiscountPercent = (): number => getGlobalDiscountPercent();

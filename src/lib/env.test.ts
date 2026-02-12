@@ -1,9 +1,12 @@
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { clearRuntimeConfig, setRuntimeConfig } from "@/runtime-config";
+import { getApiBaseUrlSafe } from "./env";
 
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
   vi.resetModules();
+  clearRuntimeConfig();
 });
 
 describe("getAllowedEmails", () => {
@@ -23,33 +26,13 @@ describe("getAllowedEmails", () => {
 });
 
 describe("getApiBaseUrlSafe", () => {
-  it("trims trailing slashes", async () => {
-    vi.stubEnv("VITE_API_BASE_URL", "https://api.test/");
-    const { API_BASE_URL } = await import("../config/api");
-    expect(API_BASE_URL).toBe("https://api.test");
+  it("returns apiBaseUrl from runtime config", () => {
+    setRuntimeConfig({ apiBaseUrl: "https://api.test" });
+    expect(getApiBaseUrlSafe()).toBe("https://api.test");
   });
 
-  it("logs and clears localhost config in production", async () => {
-    vi.stubEnv("PROD", "true");
-    vi.stubEnv("VITE_API_BASE_URL", "http://localhost:3000/");
-    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-
-    const { API_BASE_URL } = await import("../config/api");
-    expect(API_BASE_URL).toBe("");
-    expect(errorSpy).toHaveBeenCalledWith(
-      "VITE_API_BASE_URL cannot point to localhost or private network addresses in production environments",
-    );
-  });
-
-  it("logs and clears private network config in production", async () => {
-    vi.stubEnv("PROD", "true");
-    vi.stubEnv("VITE_API_BASE_URL", "http://10.0.0.8:4000/");
-    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-
-    const { API_BASE_URL } = await import("../config/api");
-    expect(API_BASE_URL).toBe("");
-    expect(errorSpy).toHaveBeenCalledWith(
-      "VITE_API_BASE_URL cannot point to localhost or private network addresses in production environments",
-    );
+  it("returns empty string when runtime config is not loaded", () => {
+    clearRuntimeConfig();
+    expect(getApiBaseUrlSafe()).toBe("");
   });
 });

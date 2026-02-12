@@ -1,13 +1,13 @@
-import { getApiBaseUrl } from "./getApiBaseUrl";
+import { getApiBaseUrl as getApiBaseUrlFromRuntime } from "@/runtime-config";
+
+export const getApiBaseUrl = (): string => getApiBaseUrlFromRuntime();
 
 export const getApiBaseUrlSafe = (): string => {
   try {
-    return getApiBaseUrl();
-  } catch (error) {
-    // Errors are logged inside getApiBaseUrl; returning an empty string keeps the UI fallback intact.
+    return getApiBaseUrlFromRuntime();
+  } catch {
     return "";
   }
 };
 
 export const isApiBaseConfigured = (): boolean => Boolean(getApiBaseUrlSafe());
-export { getApiBaseUrl };

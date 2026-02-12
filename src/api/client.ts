@@ -22,7 +22,7 @@ export const buildApiUrl = (path: string): string => {
     // Never return a relative path for API calls — they must go to the configured API origin (dev/prod).
     // Otherwise the request would hit the frontend origin and fail (dev "order not called" or wrong server).
     throw new Error(
-      'API base URL is not configured. Set VITE_API_BASE_URL (or runtime config) and ensure the request goes to the API server.'
+      'API base URL is not configured. Ensure /.well-known/atlas-runtime-config.json has a valid apiBaseUrl.'
     );
   }
 

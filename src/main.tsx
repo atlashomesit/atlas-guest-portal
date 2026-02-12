@@ -9,36 +9,48 @@ import ApiConfigGuard from './components/ApiConfigGuard'
 import { initMonitoring } from './lib/monitoring'
 import { initAnalytics } from './utils/analytics'
 import { ThemeProvider } from './theme/ThemeProvider'
-import { getApiBaseUrlSafe } from './config/api'
-import { loadRuntimeConfig } from './config/runtimeConfig'
+import { loadRuntimeConfig, setRuntimeConfig, getApiBaseUrl } from './runtime-config'
+import { ConfigLoadingScreen } from './runtime-config/ConfigLoadingScreen'
+import { ConfigErrorScreen } from './runtime-config/ConfigErrorScreen'
+
+const rootEl = document.getElementById('root')!
+const root = createRoot(rootEl)
 
 const bootstrapApp = async () => {
   applyTheme(DEFAULT_THEME)
   initMonitoring()
   initAnalytics()
 
-  const runtimeConfig = await loadRuntimeConfig()
-  const apiBaseUrl = getApiBaseUrlSafe()
-  const hostname = typeof window !== 'undefined' ? window.location.hostname : 'server'
-  const envLabel = runtimeConfig.env || import.meta.env.MODE || 'unknown'
+  root.render(<ConfigLoadingScreen />)
 
-  if (import.meta.env.DEV) {
-    console.info(
-      `[startup] host=${hostname} env=${envLabel} apiBaseUrl=${apiBaseUrl || '(missing)'}`,
+  try {
+    const config = await loadRuntimeConfig()
+    setRuntimeConfig(config)
+    const apiBaseUrl = getApiBaseUrl()
+    const hostname = typeof window !== 'undefined' ? window.location.hostname : 'server'
+    const envLabel = config.environment || import.meta.env.MODE || 'unknown'
+
+    if (import.meta.env.DEV) {
+      console.info(
+        `[startup] host=${hostname} env=${envLabel} apiBaseUrl=${apiBaseUrl}`,
+      )
+    }
+
+    root.render(
+      <StrictMode>
+        <ThemeProvider initialTheme={DEFAULT_THEME}>
+          <ErrorBoundary name="app-shell">
+            <ApiConfigGuard>
+              <App />
+            </ApiConfigGuard>
+          </ErrorBoundary>
+        </ThemeProvider>
+      </StrictMode>,
     )
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Runtime config missing/invalid'
+    root.render(<ConfigErrorScreen message={message} />)
   }
-
-  createRoot(document.getElementById('root')!).render(
-    <StrictMode>
-      <ThemeProvider initialTheme={DEFAULT_THEME}>
-        <ErrorBoundary name="app-shell">
-          <ApiConfigGuard>
-            <App />
-          </ApiConfigGuard>
-        </ErrorBoundary>
-      </ThemeProvider>
-    </StrictMode>,
-  )
 }
 
 bootstrapApp()

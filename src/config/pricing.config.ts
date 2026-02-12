@@ -18,28 +18,6 @@ export interface PricingConfig {
   cleaningFeeByUnitType?: Record<UnitType, number>;
 }
 
-// Helper function to read environment variable with fallback
-const getEnvDiscountPercent = (): number => {
-  const envValue = typeof import.meta !== "undefined" 
-    ? (import.meta.env?.VITE_GLOBAL_DISCOUNT_PERCENT as string | undefined)
-    : undefined;
-  
-  // Build-time logging for Cloudflare Pages verification
-  if (typeof process !== "undefined" && process.env) {
-    const buildEnvValue = process.env.VITE_GLOBAL_DISCOUNT_PERCENT;
-    console.log(`[build] VITE_GLOBAL_DISCOUNT_PERCENT: ${buildEnvValue || 'NOT SET'}${buildEnvValue ? '' : ' (using default: 17)'}`);
-  }
-  
-  if (envValue) {
-    const parsed = Number(envValue);
-    if (Number.isFinite(parsed) && parsed >= 0 && parsed <= 100) {
-      return parsed;
-    }
-  }
-  
-  return 17; // Default fallback value
-};
-
 export const pricingConfig: PricingConfig = {
   baseNightlyPriceByUnitType: {
     "1bhk": 3500,
@@ -50,7 +28,7 @@ export const pricingConfig: PricingConfig = {
     "1bhk": 2,
     penthouse: 2,
   },
-  globalDiscountPercent: getEnvDiscountPercent(),
+  globalDiscountPercent: 0,
   dateMultipliers: {
     "12-31": 2,
   },
