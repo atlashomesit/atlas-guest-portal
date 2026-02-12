@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { toast } from "react-toastify";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import BookingForm from "../src/components/homepage_components/homepage_Propertydetails/BookingFrom";
+import { clearRuntimeConfig, setRuntimeConfig } from "../src/runtime-config";
 
 const sendMock = vi.hoisted(() => vi.fn());
 const mockLogUserAction = vi.hoisted(() => vi.fn());
@@ -52,12 +53,18 @@ describe("BookingFrom", () => {
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(new Date(2024, 11, 15, 12));
+    setRuntimeConfig({
+      apiBaseUrl: "https://api.test",
+      globalDiscountPercent: 17,
+      googleMapsApiKey: "test-google-maps-key",
+    });
     sendMock.mockResolvedValue({ status: 200 });
     mockIsEmailJsConfigured.mockReturnValue(true);
     mockGetMissingEmailJsEnvKeys.mockReturnValue([]);
   });
 
   afterEach(() => {
+    clearRuntimeConfig();
     vi.clearAllMocks();
     cleanup();
     vi.useRealTimers();
