@@ -36,10 +36,10 @@ vi.mock('@/lib/api', () => ({
   asArray: (val: unknown) => (Array.isArray(val) ? val : []),
 }));
 
-vi.mock('@/config/api', () => ({
+vi.mock('@/runtime-config', () => ({
+  hasRuntimeConfig: () => true,
   getApiBaseUrl: () => 'https://api.test',
-  getApiBaseUrlSafe: () => 'https://api.test',
-  isApiBaseConfigured: () => true,
+  getGlobalDiscountPercent: () => 0,
 }));
 
 vi.mock('../../../contexts/BookingContext', () => ({

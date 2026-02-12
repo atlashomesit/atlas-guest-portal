@@ -6,7 +6,7 @@ import axios from 'axios';
 import { Button } from '@/components/ui/Button';
 import { AtlasDateRangePicker, type AtlasDateRangePickerValue } from '@/components/date/AtlasDateRangePicker';
 import { useBooking } from '@/contexts/BookingContext';
-import { isApiBaseConfigured } from '@/lib/env';
+import { hasRuntimeConfig } from '@/runtime-config';
 import ErrorBanner from '@/components/ErrorBanner';
 import { fetchAvailability, type AvailabilityNightlyRate, type AvailabilityResponse } from '@/api/availabilityClient';
 import { buildApiUrl } from '@/api/client';
@@ -42,7 +42,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
   const navigate = useNavigate();
   const location = useLocation();
   const { updateBooking } = useBooking();
-  const isBookingDisabled = !isApiBaseConfigured();
+  const isBookingDisabled = !hasRuntimeConfig();
 
   const today = useMemo(() => getIstStartOfDay(), []);
   const maxBookingDate = useMemo(() => addDays(today, 365), [today]);
@@ -559,7 +559,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         throw new Error(message);
       }
 
-      if (!isApiBaseConfigured()) {
+      if (!hasRuntimeConfig()) {
         const message = 'Payment service is unavailable. Please try again later.';
         setFormError(message);
         throw new Error(message);
@@ -572,16 +572,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         razorpaySignature: paymentData.razorpay_signature
       };
 
-      console.log('Sending payment verification request:', requestData);
-
       const response = await axios.post(buildApiUrl('/api/Razorpay/verify'), requestData, {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         }
       });
-      
-      console.log('Verification response:', response.data);
       
       if (response.data.success) {
         setStatusMessage('Payment successful! Your booking is confirmed.');

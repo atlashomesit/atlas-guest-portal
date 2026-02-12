@@ -11,6 +11,10 @@ export function clearRuntimeConfig(): void {
   config = null;
 }
 
+export function hasRuntimeConfig(): boolean {
+  return config != null;
+}
+
 export function getRuntimeConfig(): AtlasRuntimeConfig {
   if (config == null) {
     throw new Error("Runtime config not loaded");
