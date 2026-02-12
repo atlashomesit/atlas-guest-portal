@@ -1,9 +1,13 @@
 #!/usr/bin/env node
+/**
+ * Cloudflare Pages build env diagnostics.
+ * API base URL and global discount come from runtime config (/.well-known/atlas-runtime-config.json),
+ * not from VITE_* build-time vars, so no env vars are required for the app to work.
+ */
 
 const isPages = process.env.CF_PAGES === '1' || Boolean(process.env.CF_PAGES_URL);
 const branch = process.env.CF_PAGES_BRANCH || '';
 const pagesUrl = process.env.CF_PAGES_URL || '';
-const discount = process.env.VITE_GLOBAL_DISCOUNT_PERCENT;
 
 const isLikelyProdPagesUrl = (() => {
   if (!pagesUrl) return false;
@@ -35,20 +39,5 @@ console.log(`CF_PAGES_BRANCH=${branch || '(not set)'}`);
 console.log(`CF_PAGES_URL=${pagesUrl || '(not set)'}`);
 console.log(`isPages=${isPages}`);
 console.log(`isProdDeployment=${isProdDeployment}`);
-console.log(
-  `VITE_GLOBAL_DISCOUNT_PERCENT=${discount && String(discount).trim() ? discount : 'NOT SET'}`,
-);
 console.log(`VITE_* keys (${viteKeys.length}): ${viteKeys.length ? viteKeys.join(', ') : '(none)'}`);
-
-if (isProdDeployment && (!discount || !String(discount).trim())) {
-  console.error('\nERROR: Missing required production env var: VITE_GLOBAL_DISCOUNT_PERCENT');
-  console.error('This Pages deployment looks like Production for branch "dev".');
-  console.error('Likely causes:');
-  console.error('- Env var was edited in the wrong Pages project (multiple projects/domains).');
-  console.error('- Env var was set only for Preview scope, not Production scope.');
-  console.error('Fix:');
-  console.error('- Confirm the correct Pages project serves your live domain.');
-  console.error('- Set VITE_GLOBAL_DISCOUNT_PERCENT in Production environment variables.');
-  console.error('- Trigger a fresh Production build from a new commit (do not only retry an older deployment).');
-  process.exit(1);
-}
+console.log('(apiBaseUrl and globalDiscountPercent are loaded from runtime config at app startup)');

@@ -1,24 +1,23 @@
 # Cloudflare Pages env var runbook
 
 ## Purpose
-Use this runbook when Cloudflare Pages build logs show `VITE_GLOBAL_DISCOUNT_PERCENT` as missing.
+Use this runbook when troubleshooting Cloudflare Pages builds or deployment environment.
 
-`VITE_GLOBAL_DISCOUNT_PERCENT` is a **build-time Vite variable**, so the value is embedded during build. Changing it in Cloudflare Pages requires a **new deployment** before the site reflects it.
+**Note:** API base URL and global discount are **not** build-time env vars. They are loaded at app startup from runtime config (see [runtime-config.md](./runtime-config.md)). The build does **not** require `VITE_API_BASE_URL` or `VITE_GLOBAL_DISCOUNT_PERCENT`.
 
 ## Verify deployment type (Production vs Preview)
 1. Open **Workers & Pages → your Pages project → Deployments**.
 2. Open the relevant deployment and check whether it is marked **Production** or **Preview**.
 3. In this repository, the production branch is `dev`, so deployments built from `dev` should be treated as production.
-4. In build logs, confirm the verification output from `scripts/verify-pages-env.mjs`:
+4. In build logs, confirm the diagnostic output from `scripts/verify-pages-env.mjs`:
    - `CF_PAGES`
    - `CF_PAGES_BRANCH`
    - `CF_PAGES_URL`
-   - `VITE_GLOBAL_DISCOUNT_PERCENT`
-   - all `VITE_*` keys
+   - all `VITE_*` keys (optional; none required for app to work)
 
 ## Important behavior: Retry vs new production build
 - **Retry deployment** usually re-runs the same deployment context (for example Preview remains Preview).
-- If you need the new Production-scoped variable to apply, push a **new commit** to trigger a fresh production build.
+- If you need a new Production deployment, push a **new commit** to trigger a fresh production build.
 
 ## Avoid the "two Pages projects" trap
 If multiple Pages projects or domains exist:
@@ -26,15 +25,11 @@ If multiple Pages projects or domains exist:
 2. Edit env vars in that exact project.
 3. Set variable scope for the correct environment (Production vs Preview).
 
-## Resolution checklist
-- [ ] Confirm deployment is in the expected environment (Production for branch `dev`).
-- [ ] Set `VITE_GLOBAL_DISCOUNT_PERCENT` in the correct Pages project.
-- [ ] Set it in the correct scope (Production, and Preview if desired).
-- [ ] Purge build cache (if your workflow uses cached builds).
-- [ ] Trigger a new build from a new commit.
-- [ ] Verify build log prints the expected value from `scripts/verify-pages-env.mjs`.
+## Configuring API URL and discount (production)
+See [runtime-config.md](./runtime-config.md). Values are served via `/.well-known/atlas-runtime-config.json` (e.g. via Cloudflare redirects or Workers), not via Pages build env vars.
 
 ## References
+- [Runtime config runbook](./runtime-config.md)
 - Cloudflare Pages build environment variables:
   - https://developers.cloudflare.com/pages/configuration/build-configuration/#environment-variables
 - Cloudflare Pages preview deployments:
