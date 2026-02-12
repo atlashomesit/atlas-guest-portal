@@ -53,12 +53,29 @@ Example with optional fields:
 
 ## How to update config in Cloudflare (and other hosts)
 
-The repo includes a **default config file** at `public/.well-known/atlas-runtime-config.json` with values safe for **local development only** (e.g. `apiBaseUrl: "http://localhost:5000"`, `globalDiscountPercent: 0`). Vite copies `public/` into `dist/`, so the file is served at `/.well-known/atlas-runtime-config.json` after build.
+The repo includes a **default config file** at `public/.well-known/atlas-runtime-config.json` with values safe for **local development only** (e.g. `apiBaseUrl: "http://localhost:5000"`, `globalDiscountPercent: 0`). Vite copies `public/` into `dist/`, so the file is served at `/.well-known/atlas-runtime-config.json` when no Function overrides it.
 
-For **dev, staging, or production** you must **override** this file per environment:
+### Cloudflare Pages (recommended): Pages Function
 
-- **Phase 1 (manual):** After deploy, replace the file on the host (e.g. via Cloudflare Pages custom build step or by uploading the correct JSON for that environment). Or use a deploy script that overwrites `dist/.well-known/atlas-runtime-config.json` before upload.
-- **Phase 2 (recommended):** Use CI (e.g. GitHub Actions) or a Cloudflare Pages Function to **generate** `/.well-known/atlas-runtime-config.json` at deploy time from environment-specific secrets (e.g. `API_BASE_URL`, `GLOBAL_DISCOUNT_PERCENT`). That way you change config by updating secrets and redeploying, without rebuilding the app.
+A **Pages Function** at `functions/.well-known/atlas-runtime-config.json.ts` serves `/.well-known/atlas-runtime-config.json` from environment variables. When present, it overrides the static file so dev/staging/production get the correct config.
+
+**Set these in Cloudflare Pages → your project → Settings → Environment variables** (for Production and/or Preview as needed):
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `ATLAS_API_BASE_URL` | **Yes** | API base URL for this environment (e.g. `https://atlas-homes-api-dev.azurewebsites.net` for dev, or your production API URL). |
+| `ATLAS_GLOBAL_DISCOUNT_PERCENT` | No | Number 0–100. Default: 0. |
+| `ATLAS_ENVIRONMENT` | No | String (e.g. `dev`, `production`) for logging. |
+| `ATLAS_GOOGLE_MAPS_API_KEY` | No | Google Maps API key if you use dynamic maps. |
+
+After setting variables, trigger a **new deployment** (e.g. push a commit or use “Retry deployment”). The Function runs at request time, so no rebuild is needed for config-only changes once the Function is deployed.
+
+If `ATLAS_API_BASE_URL` is not set, the Function returns HTTP 500 and the app will show “Runtime config missing/invalid”.
+
+### Other hosts
+
+- **Manual:** Replace the file on the host after deploy (e.g. overwrite `dist/.well-known/atlas-runtime-config.json` in a build step or upload the correct JSON).
+- **CI:** Generate the JSON from secrets in CI and write it into the build output before deploy.
 
 The app does **not** depend on Cloudflare (or any host) build-time env vars for `apiBaseUrl` or `globalDiscountPercent`. All such configuration is read from the runtime config file.
 

@@ -2,14 +2,18 @@
 
 ## API base URL and discount (runtime config)
 
-The app **does not** use build-time environment variables for the API base URL or global discount percentage. Those values are read at **runtime** from:
+The app reads API base URL and discount at **runtime** from **`/.well-known/atlas-runtime-config.json`**. A Pages Function in this repo serves that URL from environment variables, so you **must** set them in Cloudflare Pages for dev/production to work.
 
-**`/.well-known/atlas-runtime-config.json`**
+**Pages → your project → Settings → Environment variables** (set for Production and/or Preview):
 
-So you do **not** need to set `VITE_API_BASE_URL` or `VITE_GLOBAL_DISCOUNT_PERCENT` in Cloudflare Pages for the app to work. Instead:
+| Variable | Required | Example |
+|----------|----------|---------|
+| `ATLAS_API_BASE_URL` | **Yes** | `https://atlas-homes-api-dev.azurewebsites.net` (dev) or your production API URL |
+| `ATLAS_GLOBAL_DISCOUNT_PERCENT` | No | `17` (for 17% discount) |
+| `ATLAS_ENVIRONMENT` | No | `dev` or `production` |
+| `ATLAS_GOOGLE_MAPS_API_KEY` | No | Your Google Maps API key |
 
-1. Ensure the deployed site serves a valid `/.well-known/atlas-runtime-config.json` (see [Runtime config runbook](../runbooks/runtime-config.md)).
-2. For per-environment values (dev vs prod), **override** that file per deployment (e.g. via a build step that writes the JSON from Cloudflare env vars, or a Pages Function that serves it from env). That way you can change the API URL or discount without rebuilding the app.
+Without `ATLAS_API_BASE_URL`, the app will show “Runtime config missing/invalid” and the dev site would try to use the static fallback (localhost, 0% discount). See [Runtime config runbook](../runbooks/runtime-config.md) for details.
 
 ## Other build-time variables (unchanged)
 
