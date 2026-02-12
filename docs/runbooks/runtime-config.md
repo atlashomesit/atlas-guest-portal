@@ -2,56 +2,36 @@
 
 ## Why runtime config
 
-The app uses **runtime configuration** (loaded after the build) for API base URL, discount percentage, and optional Google Maps key. Benefits:
+Atlas Homestays is deployed as a single frontend build across environments/tenants. Runtime config keeps deployment flexible:
 
-- **Build once, configure per environment:** The same build artifact can be deployed to dev, staging, and production; only the config file changes.
-- **No rebuild for config changes:** Updating the discount or API URL does not require a new build or redeploy of the app bundle.
-- **Multi-tenant SaaS readiness:** The config shape includes an optional `tenantKey` for future per-tenant settings.
+- Build once, configure per environment/tenant.
+- No reliance on build-time `VITE_API_BASE_URL` / `VITE_GLOBAL_DISCOUNT_PERCENT` injection.
+- Config changes do not require rebuilding the frontend bundle.
 
-The app **does not** use build-time `VITE_API_BASE_URL` or `VITE_GLOBAL_DISCOUNT_PERCENT` for these values. They are read once at startup from a JSON endpoint.
+## Runtime config endpoint
 
-## Config endpoint
+The app loads config at startup from exactly:
 
-The app loads config from (in order):
+- `/.well-known/atlas-runtime-config.json`
 
-1. **`/.well-known/atlas-runtime-config.json`** (preferred)
-2. **`/config.json`** (fallback if the first returns 404 or fails)
+Required fields:
 
-The request is same-origin (e.g. `https://yoursite.com/.well-known/atlas-runtime-config.json`). The loader uses `cache: "no-store"` so the browser does not reuse an old config.
+| Field | Required | Validation |
+|---|---|---|
+| `apiBaseUrl` | Yes | Must be a valid `http`/`https` URL |
+| `globalDiscountPercent` | No | Number `0..100`; defaults to `0` in code |
 
-## Required and optional fields
-
-| Field | Required | Description |
-|-------|----------|-------------|
-| `apiBaseUrl` | **Yes** | Base URL of the API (e.g. `https://api.example.com`). Must be a valid `http` or `https` URL. Trailing slashes are stripped. |
-| `globalDiscountPercent` | No | Number between 0 and 100. Default: `0`. Used for the "Save X%" label and price calculations. |
-| `environment` | No | String (e.g. `local`, `dev`, `prod`) for logging or feature flags. |
-| `tenantKey` | No | Reserved for future multi-tenant use. |
-| `googleMapsApiKey` | No | Google Maps API key if you use dynamic maps. Omit for static map preview. |
-
-Example minimal config:
-
-```json
-{
-  "apiBaseUrl": "https://atlas-homes-api-dev.azurewebsites.net",
-  "globalDiscountPercent": 17,
-  "environment": "dev"
-}
-```
-
-Example with optional fields:
+Example:
 
 ```json
 {
   "apiBaseUrl": "https://api.example.com",
   "globalDiscountPercent": 20,
-  "environment": "production",
-  "tenantKey": "atlas",
-  "googleMapsApiKey": "AIza..."
+  "environment": "production"
 }
 ```
 
-## How to update config in Cloudflare (and other hosts)
+## Local development
 
 The repo includes a **default config file** at `public/.well-known/atlas-runtime-config.json` with values safe for **local development only** (e.g. `apiBaseUrl: "http://localhost:5000"`, `globalDiscountPercent: 0`). Vite copies `public/` into `dist/`, so the file is served at `/.well-known/atlas-runtime-config.json` when no Function overrides it.
 
@@ -77,23 +57,36 @@ If `ATLAS_API_BASE_URL` is not set, the Function returns HTTP 500 and the app wi
 - **Manual:** Replace the file on the host after deploy (e.g. overwrite `dist/.well-known/atlas-runtime-config.json` in a build step or upload the correct JSON).
 - **CI:** Generate the JSON from secrets in CI and write it into the build output before deploy.
 
-The app does **not** depend on Cloudflare (or any host) build-time env vars for `apiBaseUrl` or `globalDiscountPercent`. All such configuration is read from the runtime config file.
+## How dev/prod domains get different config
+
+Each domain serves its own `/.well-known/atlas-runtime-config.json`:
+
+- `https://dev.example.com/.well-known/atlas-runtime-config.json` → dev API URL
+- `https://app.example.com/.well-known/atlas-runtime-config.json` → prod API URL
+
+The same frontend build can be deployed to both domains; domain-specific JSON supplies the runtime values.
+
+## Browser verification
+
+1. Open DevTools → Network.
+2. Refresh the app.
+3. Confirm a request to `/.well-known/atlas-runtime-config.json` returns `200` with valid JSON.
+4. Confirm API requests target the configured `apiBaseUrl` origin.
 
 ## Failure behavior
 
-- If the config request fails (e.g. 404, network error) or the JSON is invalid, the app shows a **fatal error screen**: "Runtime config missing/invalid" and a hint to check `/.well-known/atlas-runtime-config.json`.
-- In **local dev** (localhost), the loader also requires that `apiBaseUrl` in the loaded config is a localhost URL. The committed default file satisfies this.
+If runtime config is missing or invalid:
 
-## Troubleshooting
+- app startup fails loudly,
+- the error screen is rendered,
+- there is no silent fallback to hardcoded or same-origin API URLs.
 
-1. **Open the config URL in the browser:**  
-   Visit `https://your-domain.com/.well-known/atlas-runtime-config.json`. You should see valid JSON with at least `apiBaseUrl`.
+## Troubleshooting checklist
 
-2. **Verify `apiBaseUrl`:**  
-   It must be a full `http` or `https` URL (e.g. `https://api.example.com`). No trailing slash is required (the app normalizes it).
-
-3. **Check the console:**  
-   If the app shows the error screen, the browser console may log the exact error (e.g. "invalid JSON", "apiBaseUrl is required").
-
-4. **Local dev:**  
-   Ensure `public/.well-known/atlas-runtime-config.json` exists and has `apiBaseUrl` pointing to your local API (e.g. `http://localhost:5000`). The app will reject a non-localhost URL when running on localhost.
+- Is `/.well-known/atlas-runtime-config.json` reachable on the current domain?
+- Is the JSON valid?
+- Is `apiBaseUrl` present and a valid absolute `http/https` URL?
+- If provided, is `globalDiscountPercent` within `0..100`?
+- In localhost dev, does `apiBaseUrl` point to localhost?
+- Are stale CDN/browser caches bypassed for the config response?
+- Are downstream API calls going to the same origin as `apiBaseUrl`?

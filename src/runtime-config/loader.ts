@@ -1,7 +1,6 @@
 import type { AtlasRuntimeConfig } from "./types";
 
 const PREFERRED_URL = "/.well-known/atlas-runtime-config.json";
-const FALLBACK_URL = "/config.json";
 
 function isLocalDev(): boolean {
   if (typeof window === "undefined") return false;
@@ -78,10 +77,7 @@ export async function loadRuntimeConfig(): Promise<AtlasRuntimeConfig> {
     return fetch(`${base}${url}`, { cache: "no-store" });
   };
 
-  let response = await tryUrl(PREFERRED_URL);
-  if (!response.ok) {
-    response = await tryUrl(FALLBACK_URL);
-  }
+  const response = await tryUrl(PREFERRED_URL);
   if (!response.ok) {
     const msg = "Runtime config missing/invalid";
     if (!isLocalDev()) throw new Error(msg);
