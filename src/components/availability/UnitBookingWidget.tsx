@@ -74,6 +74,16 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
     email: '',
     phone: ''
   });
+  const [paymentStatus, setPaymentStatus] = useState<'success' | 'failed' | null>(null);
+  const [bookingDetails, setBookingDetails] = useState<{
+    bookingId: string;
+    amount: number;
+    propertyName: string;
+    checkIn: Date;
+    checkOut: Date;
+    nights: number;
+    email: string;
+  } | null>(null);
 
   // Availability range always starts from today, independent of selected dates or shown date
   const availabilityRange = useMemo(() => {
@@ -762,6 +772,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       // 4. Load Razorpay script and open checkout
       loadRazorpayScript(() => {
         try {
+          let paymentCompleted = false; // Track if payment handler was called
+          
           const options = {
             key,
             amount: orderResponse.data.amount,
@@ -777,7 +789,19 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             theme: {
               color: '#2563eb'
             },
+            modal: {
+              ondismiss: () => {
+                // Handle modal close/exit (when user clicks "Yes, exit" or closes the modal)
+                // Only show failed popup if payment wasn't completed (user cancelled/exited)
+                if (!paymentCompleted) {
+                  setPaymentStatus('failed');
+                  setFormError('Payment was cancelled. Please try again to complete your booking.');
+                  setIsLoading(false);
+                }
+              }
+            },
             handler: async (response: any) => {
+              paymentCompleted = true; // Mark payment as completed
               try {
                 await verifyPayment({
                   bookingId,
@@ -785,6 +809,24 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                   razorpay_order_id: response.razorpay_order_id,
                   razorpay_signature: response.razorpay_signature
                 });
+                
+                // Store booking details for success popup
+                const nights = checkinDate && checkoutDate 
+                  ? calculateNights(checkinDate, checkoutDate) 
+                  : 1;
+                
+                setBookingDetails({
+                  bookingId,
+                  amount: finalTotal,
+                  propertyName: listingName || 'Selected Property',
+                  checkIn: checkinDate,
+                  checkOut: checkoutDate,
+                  nights,
+                  email: formData.email.trim()
+                });
+                
+                // Set payment status to success to show popup
+                setPaymentStatus('success');
                 
                 // Update booking context on success
                 updateBooking({
@@ -803,6 +845,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                 });
               } catch (error) {
                 console.error('Payment processing error:', error);
+                setPaymentStatus('failed');
                 setFormError('Failed to verify payment. Please contact support.');
               } finally {
                 setIsLoading(false);
@@ -812,6 +855,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
           const rzp = new window.Razorpay(options);
           rzp.on('payment.failed', (response: any) => {
+            paymentCompleted = true; // Payment attempt was made
+            setPaymentStatus('failed');
             setFormError(`Payment failed: ${response.error.description || 'Unknown error'}`);
             setIsLoading(false);
           });
@@ -838,9 +883,193 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     }
   };
 
+  // Payment Success Popup Component
+  const PaymentSuccessPopup = () => {
+    if (!bookingDetails) return null;
+
+    useEffect(() => {
+      const handleEscape = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+          setPaymentStatus(null);
+        }
+      };
+      document.addEventListener('keydown', handleEscape);
+      return () => document.removeEventListener('keydown', handleEscape);
+    }, []);
+
+    return (
+      <div 
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            setPaymentStatus(null);
+          }
+        }}
+      >
+        <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full mx-4 max-h-[70vh] flex flex-col animate-in zoom-in-95 duration-200">
+          <div className="p-10 overflow-y-auto flex-1">
+            {/* Header with Success Icon */}
+            <div className="flex flex-col items-center mb-6">
+              <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-4">
+                <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Payment Successful!</h2>
+            </div>
+
+            {/* Primary Message */}
+            <p className="text-center text-gray-700 mb-6">
+              Thank you for your booking. Your payment has been processed successfully.
+            </p>
+
+            {/* Booking Details Section */}
+            <div className="bg-gray-50 rounded-xl p-6 mb-6 space-y-3">
+              <h3 className="font-semibold text-gray-900 mb-4">Booking Details</h3>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-gray-600">Booking Reference:</span>
+                  <p className="font-semibold text-gray-900 mt-1">{bookingDetails.bookingId}</p>
+                </div>
+                <div>
+                  <span className="text-gray-600">Amount Paid:</span>
+                  <p className="font-semibold text-gray-900 mt-1">
+                    {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(bookingDetails.amount)}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-gray-600">Property Name:</span>
+                  <p className="font-semibold text-gray-900 mt-1">{bookingDetails.propertyName}</p>
+                </div>
+                <div>
+                  <span className="text-gray-600">Number of Nights:</span>
+                  <p className="font-semibold text-gray-900 mt-1">{bookingDetails.nights} {bookingDetails.nights === 1 ? 'night' : 'nights'}</p>
+                </div>
+                <div>
+                  <span className="text-gray-600">Check-in Date:</span>
+                  <p className="font-semibold text-gray-900 mt-1">{format(bookingDetails.checkIn, 'EEE, dd MMM yyyy')}</p>
+                </div>
+                <div>
+                  <span className="text-gray-600">Check-out Date:</span>
+                  <p className="font-semibold text-gray-900 mt-1">{format(bookingDetails.checkOut, 'EEE, dd MMM yyyy')}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Confirmation Email Message */}
+            <p className="text-center text-gray-700 mb-4">
+              A confirmation email has been sent to <span className="font-semibold">{bookingDetails.email}</span> with your booking details and house rules.
+            </p>
+
+            {/* Secondary Message */}
+            <p className="text-center text-gray-600 mb-6">
+              Your booking is confirmed. You will receive check-in instructions 24 hours before arrival.
+            </p>
+          </div>
+
+          {/* Fixed Bottom Section */}
+          <div className="px-10 pb-10 pt-4 border-t border-gray-200 bg-white rounded-b-2xl">
+            {/* Buttons */}
+            <div className="flex justify-center mb-4">
+              <Button
+                type="button"
+                onClick={() => {
+                  navigate('/');
+                  setPaymentStatus(null);
+                }}
+                className="px-10 py-3 text-lg font-semibold bg-green-600 hover:bg-green-700 text-white shadow-lg"
+              >
+                Go to Dashboard
+              </Button>
+            </div>
+
+            {/* Footer Note */}
+            <p className="text-center text-xs text-gray-500">
+              Need help? Contact us at +91-7032493290 or atlashomeskphb@gmail.com
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Payment Failed Popup Component
+  const PaymentFailedPopup = () => {
+    useEffect(() => {
+      const handleEscape = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+          setPaymentStatus(null);
+        }
+      };
+      document.addEventListener('keydown', handleEscape);
+      return () => document.removeEventListener('keydown', handleEscape);
+    }, []);
+
+    return (
+      <div 
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            setPaymentStatus(null);
+          }
+        }}
+      >
+        <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full mx-4 max-h-[70vh] overflow-hidden animate-in zoom-in-95 duration-200">
+          <div className="p-8">
+            {/* Header with Error Icon */}
+            <div className="flex flex-col items-center mb-6">
+              <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mb-4">
+                <svg className="w-10 h-10 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Payment Could Not Be Processed</h2>
+            </div>
+
+            {/* Primary Message */}
+            <p className="text-center text-gray-700 mb-6">
+              We're sorry, but your payment didn't go through. Please try again or use a different payment method.
+            </p>
+
+            {/* Possible Reasons Section */}
+            <div className="bg-gray-50 rounded-xl p-6 mb-6">
+              <h3 className="font-semibold text-gray-900 mb-3">This might happen due to:</h3>
+              <ul className="list-disc list-inside space-y-2 text-sm text-gray-700">
+                <li>Insufficient funds</li>
+                <li>Incorrect payment details</li>
+                <li>Network issue</li>
+                <li>Card declined</li>
+                <li>Payment timeout</li>
+              </ul>
+            </div>
+
+            {/* Refund Message */}
+            <p className="text-center text-gray-600 mb-4">
+              If an amount was deducted from your account, it will be refunded to your original payment method within 3-5 business days.
+            </p>
+
+            {/* Support Message */}
+            <p className="text-center text-gray-700 mb-6 font-medium">
+              Persistent issues? Our team is here to help.
+            </p>
+
+            {/* Support Contact */}
+            <div className="text-center text-xs text-gray-500 space-y-1">
+              <p>Call: +91-7032493290</p>
+              <p>Email: atlashomeskphb@gmail.com</p>
+              <p>Live Chat Available</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
-    <form onSubmit={handleSubmit} className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6 space-y-5">
+    <>
+      {paymentStatus === 'success' && <PaymentSuccessPopup />}
+      {paymentStatus === 'failed' && <PaymentFailedPopup />}
+      <form onSubmit={handleSubmit} className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6 space-y-5">
 
       <div className="space-y-1">
         <p className="text-sm uppercase tracking-[0.12em] text-text-muted font-semibold">Reserve</p>
@@ -1176,6 +1405,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         {isBookingDisabled ? 'Unavailable' : isLoading ? 'Processing...' : 'Book this home'}
       </Button>
     </form>
+    </>
   );
 };
 
