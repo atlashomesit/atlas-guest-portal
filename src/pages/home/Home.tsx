@@ -18,6 +18,7 @@ import { useBooking } from "../../contexts/BookingContext";
 import { useLocation } from "react-router-dom";
 import FaqHighlights from "../../components/faq/FaqHighlights";
 import pricingConfig from "../../config/pricing.config";
+import { getEffectiveDiscountPercent } from "../../utils/pricing";
 
 const Home = () => {
     const { pendingScrollTarget, setPendingScrollTarget } = useBooking();
@@ -25,9 +26,10 @@ const Home = () => {
     const primaryOgImage = propertyImages["101"]?.[0] ?? LOGO_URL;
     const penthouse = propertyData.find((property) => property.id === 501);
     const penthouseCover = propertyImages["501"]?.[0];
+    const effectiveDiscountPercent = getEffectiveDiscountPercent();
     const penthouseOfferPrice = Math.round(
         pricingConfig.baseNightlyPriceByUnitType.penthouse *
-            (1 - pricingConfig.globalDiscountPercent / 100),
+            (1 - effectiveDiscountPercent / 100),
     );
 
     const homepageJsonLd = [

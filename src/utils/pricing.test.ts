@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { calculateNightlyPrice, inferUnitType } from "./pricing";
+import { calculateNightlyPrice, getEffectiveDiscountPercent, inferUnitType } from "./pricing";
 
 const resetEnv = () => {
   delete (process as any).env.VITE_GLOBAL_DISCOUNT_PERCENT;
@@ -82,6 +82,48 @@ describe("calculateNightlyPrice", () => {
 
     expect(result.dateMultiplier).toBe(3);
     expect(result.finalNightlyPrice).toBe(14940);
+  });
+
+  it("falls back to config default when VITE_GLOBAL_DISCOUNT_PERCENT is invalid", () => {
+    (process as any).env.VITE_GLOBAL_DISCOUNT_PERCENT = "abc";
+
+    const result = calculateNightlyPrice({
+      unitType: "1bhk",
+      checkInDate: "2024-10-10",
+      guests: 2,
+    });
+
+    expect(result.appliedDiscountPercent).toBe(17);
+  });
+
+  it("applies 0% discount when VITE_GLOBAL_DISCOUNT_PERCENT is 0", () => {
+    (process as any).env.VITE_GLOBAL_DISCOUNT_PERCENT = "0";
+
+    const result = calculateNightlyPrice({
+      unitType: "1bhk",
+      checkInDate: "2024-10-10",
+      guests: 2,
+    });
+
+    expect(result.appliedDiscountPercent).toBe(0);
+    expect(result.discountAmount).toBe(0);
+    expect(result.finalNightlyPrice).toBe(3500);
+  });
+});
+
+describe("getEffectiveDiscountPercent", () => {
+  it("returns the same value as appliedDiscountPercent from calculateNightlyPrice", () => {
+    const result = calculateNightlyPrice({
+      unitType: "1bhk",
+      checkInDate: "2024-12-02",
+      guests: 2,
+    });
+    expect(getEffectiveDiscountPercent()).toBe(result.appliedDiscountPercent);
+  });
+
+  it("returns config default when VITE_GLOBAL_DISCOUNT_PERCENT is invalid", () => {
+    (process as any).env.VITE_GLOBAL_DISCOUNT_PERCENT = "not-a-number";
+    expect(getEffectiveDiscountPercent()).toBe(17);
   });
 });
 

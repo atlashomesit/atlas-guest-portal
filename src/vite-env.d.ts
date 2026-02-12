@@ -2,6 +2,7 @@
 
 interface ImportMetaEnv {
   readonly VITE_API_BASE_URL?: string;
+  readonly VITE_GLOBAL_DISCOUNT_PERCENT?: string;
   readonly VITE_CALLBACK_LEADS_ENDPOINT?: string;
   readonly VITE_EMAILJS_PUBLIC_KEY?: string;
   readonly VITE_EMAILJS_SERVICE_ID?: string;

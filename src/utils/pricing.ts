@@ -47,10 +47,10 @@ const getEnvValue = (key: string): string | undefined => {
 
 const parseEnvDiscount = (config: PricingConfig): number => {
   const envValue = getEnvValue("VITE_GLOBAL_DISCOUNT_PERCENT");
-  if (!envValue) return config.globalDiscountPercent;
-
-  const parsed = Number(envValue);
-  return Number.isFinite(parsed) ? parsed : config.globalDiscountPercent;
+  const resolved = envValue
+    ? (Number.isFinite(Number(envValue)) ? Number(envValue) : config.globalDiscountPercent)
+    : config.globalDiscountPercent;
+  return Number.isFinite(resolved) ? resolved : 0;
 };
 
 const parseEnvDateMultipliers = (config: PricingConfig): Record<string, number> => {
@@ -192,4 +192,9 @@ export const calculateNightlyPrice = ({
     hasSpecialDateMultiplier,
     isNewYearsEve: dateKey === "12-31" && hasSpecialDateMultiplier,
   };
+};
+
+export const getEffectiveDiscountPercent = (): number => {
+  const value = parseEnvDiscount(pricingConfig);
+  return Number.isFinite(value) ? value : 0;
 };

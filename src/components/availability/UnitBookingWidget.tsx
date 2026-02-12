@@ -15,6 +15,7 @@ import { getIstStartOfDay } from '@/utils/date';
 import { calculateNights, formatNightCount } from '@/utils/dateHelpers';
 import { doesRangeIntersectBlocked, parseISODate, toISODate } from '@/utils/dateRange';
 import { calculateNightlyPrice, inferUnitType } from '@/utils/pricing';
+import priceDisplayConfig from '@/config/priceDisplay.config';
 
 declare global {
   interface Window {
@@ -464,7 +465,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       total: Math.round(total),
       nights,
       extraGuests,
-      hasSpecialDateMultiplier
+      hasSpecialDateMultiplier,
+      appliedDiscountPercent,
     };
   };
 
@@ -1091,12 +1093,16 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           <span className="text-2xl font-bold text-text-primary">
             {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(priceDetails.total)}
           </span>
-          <span className="text-sm text-text-muted line-through">
-            {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(priceDetails.subtotal)}
-          </span>
-          <span className="text-sm font-semibold text-[color:color-mix(in_srgb,var(--cta-primary)_80%,transparent)]">
-            Save 17%
-          </span>
+          {priceDetails.appliedDiscountPercent > 0 && (
+            <span className="text-sm text-text-muted line-through">
+              {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(priceDetails.subtotal)}
+            </span>
+          )}
+          {priceDetails.appliedDiscountPercent > 0 && (
+            <span className="text-sm font-semibold text-[color:color-mix(in_srgb,var(--cta-primary)_80%,transparent)]">
+              {priceDisplayConfig.discount.savingsPrefix} {priceDetails.appliedDiscountPercent}%
+            </span>
+          )}
         </div>
         <div className="text-sm text-text-muted space-y-1 mt-1">
           <p>{priceDetails.nights} {priceDetails.nights === 1 ? 'night' : 'nights'} × {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(priceDetails.basePrice / priceDetails.nights)}</p>
