@@ -23,7 +23,7 @@ Rationale: simplify the header for faster wayfinding, surface FAQs in-place of t
 Optional tooling:
 - Access to the Cloudflare Pages project dashboard for monitoring deployments
 - ESLint-compatible editor integration for real-time lint feedback
-
+ 
 ## Build Environment
 - Node **22.12.0** (LTS)
 - npm **10.9.2**
