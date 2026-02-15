@@ -76,7 +76,14 @@ Cloudflare Pages setup:
 - Always commit the resulting `package-lock.json` so `npm ci` stays in sync locally, in CI, and during Cloudflare builds.
 
 ### CI
-- The workflow `.github/workflows/ci.yml` runs on push to `main` and on pull requests: `npm ci` → lint → build → `npm test` → check:local-network. Use the same commands locally before pushing. See `CONTRIBUTING.md` for the PR checklist.
+- The workflow `.github/workflows/ci.yml` runs on push to `main` and on pull requests: `npm ci` → lint → build → `npm test` → check:local-network. Use the same commands locally before pushing. See `CONTRIBUTING.md` for the PR checklist. Status check name for branch protection: **build**.
+
+## Documentation
+
+- **CONTRIBUTING.md** — PR checklist, branch model, CI workflow.
+- **docs/design-system.md** — Theming, tokens, CTA discipline.
+- **docs/short-links.md** — Short-link redirects and verification.
+- **AGENTS.md** — Instructions for AI assistants (CI, CONTRIBUTING).
 
 ## Quickstart
 1. **Install dependencies**

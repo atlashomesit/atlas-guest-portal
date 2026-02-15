@@ -1,3 +1,4 @@
+# Lint, build, test per DEVSECOPS-GATES-BASELINE.md. Status check name for branch protection: build
 name: CI
 
 on:
