@@ -19,16 +19,16 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm install --no-fund --no-audit
+        run: npm ci
 
-      - name: Validate legal content
-        run: npm run validate:legal
-
-      - name: Run booking form tests
-        run: CI=1 node node_modules/vitest/vitest.mjs run tests/BookingFrom.test.tsx --bail=1
+      - name: Lint
+        run: npm run lint
 
       - name: Build
         run: npm run build
+
+      - name: Test
+        run: npm test
 
       - name: Check bundle for local network access APIs
         run: npm run check:local-network
