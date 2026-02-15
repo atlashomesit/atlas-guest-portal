@@ -75,6 +75,9 @@ Cloudflare Pages setup:
 - Use Node 20.x (see `.nvmrc`) and run `npm install` to refresh dependencies.
 - Always commit the resulting `package-lock.json` so `npm ci` stays in sync locally, in CI, and during Cloudflare builds.
 
+### CI
+- The workflow `.github/workflows/ci.yml` runs on push to `main` and on pull requests: `npm ci` → lint → build → `npm test` → check:local-network. Use the same commands locally before pushing.
+
 ## Quickstart
 1. **Install dependencies**
    ```bash
