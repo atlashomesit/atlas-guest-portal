@@ -10,7 +10,6 @@ export const getGoogleMapsApiKey = (): string | undefined => {
   } catch {
     // Runtime config not loaded (e.g. tests without setRuntimeConfig)
   }
-  // eslint-disable-next-line no-console
   console.warn(missingConfigMessage);
   return undefined;
 };

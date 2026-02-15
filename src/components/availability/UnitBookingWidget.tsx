@@ -8,18 +8,18 @@ import { AtlasDateRangePicker, type AtlasDateRangePickerValue } from '@/componen
 import { useBooking } from '@/contexts/BookingContext';
 import { hasRuntimeConfig } from '@/runtime-config';
 import ErrorBanner from '@/components/ErrorBanner';
-import { fetchAvailability, type AvailabilityNightlyRate, type AvailabilityResponse } from '@/api/availabilityClient';
+import { type AvailabilityNightlyRate, type AvailabilityResponse } from '@/api/availabilityClient';
 import { buildApiUrl, getApiHeaders } from '@/api/client';
 import { apiFetch } from '@/lib/http';
 import { getIstStartOfDay } from '@/utils/date';
 import { calculateNights, formatNightCount } from '@/utils/dateHelpers';
-import { doesRangeIntersectBlocked, parseISODate, toISODate } from '@/utils/dateRange';
+import { doesRangeIntersectBlocked, toISODate } from '@/utils/dateRange';
 import { calculateNightlyPrice, inferUnitType } from '@/utils/pricing';
 import priceDisplayConfig from '@/config/priceDisplay.config';
 
 declare global {
   interface Window {
-    Razorpay: any;
+    Razorpay: new (...args: unknown[]) => { open: (options: unknown) => void };
   }
 }
 
@@ -67,7 +67,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
   }
 
   const navigate = useNavigate();
-  const location = useLocation();
+  const _location = useLocation();
   const { updateBooking } = useBooking();
   const isBookingDisabled = !hasRuntimeConfig();
 
@@ -83,7 +83,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
   const [openCalendar, setOpenCalendar] = useState(false);
   const [shownDate, setShownDate] = useState<Date>(today);
   const [guests, setGuests] = useState(2);
-  const [bookedDates, setBookedDates] = useState<Date[]>([]);
+  const [_bookedDates, setBookedDates] = useState<Date[]>([]);
   const [blockedSet, setBlockedSet] = useState<Set<string>>(new Set());
   const [dateStatusMap, setDateStatusMap] = useState<Map<string, 'Blocked' | 'Available' | 'Hold'>>(new Map());
   const [isLoading, setIsLoading] = useState(false);
@@ -120,7 +120,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
     return { startDate, endDate };
   }, [today]);
 
-  const resolveNightlyRates = (
+  const _resolveNightlyRates = (
     response: AvailabilityResponse,
     normalizedTarget: string,
   ): AvailabilityNightlyRate[] => {
@@ -173,7 +173,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
       let availabilityBaseUrl: string;
       try {
         availabilityBaseUrl = buildApiUrl('/availability/listing-availability');
-      } catch (error) {
+      } catch {
         if (isActive) {
           setIsLoading(false);
         }
@@ -346,7 +346,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
   return true; // otherwise normal
 };
 
-const isCheckOutAllowed = (date: Date) => {
+const _isCheckOutAllowed = (date: Date) => {
   const iso = toISODate(getIstStartOfDay(date));
   
   // Check status from dateStatusMap (from GET API response)
@@ -613,11 +613,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       } else {
         throw new Error(response.data.message || 'Payment verification failed');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Payment verification error:', {
-        error: error.response?.data || error.message,
-        status: error.response?.status,
-        headers: error.response?.headers
+        error: (error as { response?: { data?: unknown }; message?: string }).response?.data || (error as Error).message,
+        status: (error as { response?: { status?: number } }).response?.status,
+        headers: (error as { response?: { headers?: unknown } }).response?.headers
       });
       setFormError(getBookingErrorMessage(error, 'verify'));
       throw error;
@@ -733,7 +733,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     let orderUrl: string;
     try {
       orderUrl = buildApiUrl('/api/Razorpay/order');
-    } catch (error) {
+    } catch {
       setFormError('Unable to start checkout. Please try again later.');
       return;
     }
@@ -828,7 +828,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                 }
               }
             },
-            handler: async (response: any) => {
+            handler: async (response: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => {
               paymentCompleted = true; // Mark payment as completed
               try {
                 await verifyPayment({
@@ -882,10 +882,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           };
 
           const rzp = new window.Razorpay(options);
-          rzp.on('payment.failed', (response: any) => {
+          rzp.on('payment.failed', (response: { error?: { description?: string } }) => {
             paymentCompleted = true; // Payment attempt was made
             setPaymentStatus('failed');
-            setFormError(`Payment failed: ${response.error.description || 'Unknown error'}`);
+            setFormError(`Payment failed: ${response.error?.description || 'Unknown error'}`);
             setIsLoading(false);
           });
 
@@ -896,7 +896,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           setIsLoading(false);
         }
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Booking error:', error);
       setFormError(getBookingErrorMessage(error, 'order'));
       setIsLoading(false);
@@ -907,6 +907,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   const PaymentSuccessPopup = () => {
     if (!bookingDetails) return null;
 
+    // eslint-disable-next-line react-hooks/rules-of-hooks -- PaymentSuccessPopup only mounts when bookingDetails exists; hook runs in same order when mounted
     useEffect(() => {
       const handleEscape = (e: KeyboardEvent) => {
         if (e.key === 'Escape') {
@@ -1213,7 +1214,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                     : false;
                 const isBlocked = blockedSet.has(dayISO);
                 const isDisabled = disabledDay(day);
-                const isToday = dayStart.getTime() === today.getTime();
+                const _isToday = dayStart.getTime() === today.getTime();
                 
                 // Get status for this date (only for dates from today onwards)
                 const status = dayStart.getTime() >= today.getTime() ? dateStatusMap.get(dayISO) : null;

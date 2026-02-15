@@ -83,7 +83,7 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
   let body: ContactRequest;
   try {
     body = (await request.json()) as ContactRequest;
-  } catch (error) {
+  } catch {
     return jsonResponse(
       { success: false, code: "invalid_json", message: "Request body must be valid JSON." },
       { status: 400 },

@@ -21,7 +21,7 @@ const Homepage_LocationDetails = () => {
 
     console.log(locationViseData, "loactionViseData")
 
-    const renderIcon = (iconName: any) => {
+    const renderIcon = (iconName: string) => {
         switch (iconName) {
             case 'bed':
                 return <FaBed />;
@@ -58,8 +58,8 @@ const Homepage_LocationDetails = () => {
     //     navigate(`/property_details/${id}`);
     // };
 
-    const handleModal = (property: any) => () => {
-        console.log(property), 'abc';
+    const handleModal = (property: { id?: number; property_name?: string }) => () => {
+        console.log(property, 'abc');
 
         setSelectedProperty(property);
         setIsModalOpen(true);
@@ -211,7 +211,7 @@ const Homepage_LocationDetails = () => {
 
                     {/* our location wise properties = Right side  */}
                     <div className="flex-[3.5] w-full h-fit grid grid-cols-1 place-items-center gap-6">
-                        {locationViseData.map((data: any) => (
+                        {locationViseData.map((data: { id?: number; property_name?: string; property_img?: string[]; property_subtitle?: string; property_location?: string; property_description?: string; property_amenities?: Array<{ amenities_icon?: string; amenities_count?: number; amenities_availablity?: string; amenities_type?: string }>; property_address?: Array<{ value?: string }> }) => (
                             <div
                                 key={data.id}
                                 className="group w-full flex flex-col md:flex-row gap-4 bg-bg-surface p-4 border border-border-subtle hover:border-cta-primary rounded-md shadow-level1 transition"
@@ -274,7 +274,7 @@ const Homepage_LocationDetails = () => {
 
                                         {/* Amenities */}
                                         <div className="flex flex-wrap gap-3 mt-2 text-sm text-text-muted">
-                                            {data?.property_amenities?.slice(0, 4).map((amenity: any, index: number) => (
+                                            {data?.property_amenities?.slice(0, 4).map((amenity: { amenities_icon?: string; amenities_count?: number; amenities_availablity?: string; amenities_type?: string }, index: number) => (
                                                 <div key={index} className="flex items-center gap-1">
                                                     <span>{renderIcon(amenity.amenities_icon)}</span>
                                                     <span>
@@ -286,7 +286,7 @@ const Homepage_LocationDetails = () => {
 
                                         {/* Address Summary */}
                                         <div className="text-xs mt-2 text-text-muted opacity-75 flex flex-wrap gap-1">
-                                            {data.property_address?.slice(0, 3).map((addr: any, i: number) => (
+                                            {data.property_address?.slice(0, 3).map((addr: { value?: string }, i: number) => (
                                                 <span key={i}>
                                                     {addr.value}
                                                     {i !== 2 && ','}

@@ -64,7 +64,6 @@ export const api = {
 // Helper to ensure arrays before .map()
 export function asArray<T>(val: unknown, label: string): T[] {
   if (Array.isArray(val)) return val as T[];
-  // eslint-disable-next-line no-console
   console.error(`${label} expected array, got:`, val);
   return [];
 }

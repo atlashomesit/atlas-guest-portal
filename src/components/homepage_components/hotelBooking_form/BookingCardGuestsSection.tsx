@@ -35,8 +35,8 @@ export const BookingCardGuestsSection: React.FC<BookingCardGuestsSectionProps> =
   extraGuestFee,
   totalGuests,
   updateChildAge,
-  markEngagement,
-  setOpenGuests,
+  markEngagement: _markEngagement,
+  setOpenGuests: _setOpenGuests,
   triggerRowBottom,
 }) => {
   const dialogLabelId = useId();

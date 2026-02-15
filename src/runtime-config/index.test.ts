@@ -9,6 +9,9 @@ import {
 } from "./index";
 
 describe("runtime-config singleton", () => {
+  beforeEach(() => {
+    clearRuntimeConfig();
+  });
   afterEach(() => {
     clearRuntimeConfig();
   });

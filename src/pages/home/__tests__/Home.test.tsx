@@ -20,14 +20,14 @@ vi.mock("../../../components/home/ServicesSection", () => ({
   default: () => <div>Discover Our Exclusive Services</div>,
 }));
 
-vi.mock("../../../components/home/WhyChooseSection", () => ({
-  __esModule: true,
-  default: () => <div>Why Choose Atlas Homes?</div>,
-}));
-
 vi.mock("../../../components/home/TestimonialsSection", () => ({
   __esModule: true,
   default: () => <div>Hear What Our Happy Guests Are Saying</div>,
+}));
+
+vi.mock("../../../components/home/BannerSecondary", () => ({
+  __esModule: true,
+  default: () => <div>Atlas Homes – Where Every Stay Feels Like Home</div>,
 }));
 
 vi.mock("../../../utils/analytics", async () => {
@@ -50,7 +50,6 @@ describe("Home", () => {
 
     expect(screen.getByText(/Atlas Homes – Where Every Stay Feels Like Home/i)).toBeInTheDocument();
     expect(screen.getByText(/Discover Our Exclusive Services/i)).toBeInTheDocument();
-    expect(screen.getByText(/Why Choose Atlas Homes/i)).toBeInTheDocument();
     expect(screen.getByText(/Hear What Our Happy Guests Are Saying/i)).toBeInTheDocument();
   });
 });

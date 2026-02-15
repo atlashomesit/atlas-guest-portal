@@ -9,7 +9,7 @@ interface BookingCardProps {
 }
 
 const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = false }) => {
-  const navigate = useNavigate();
+  useNavigate();
   
   const [paymentStatus, setPaymentStatus] = useState<{
     state: 'idle' | 'success' | 'failure';
@@ -50,7 +50,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
       setUserEmail('');
       setUserPhone('');
       setTermsAccepted(false);
-    } catch (error) {
+    } catch {
       setPaymentStatus({ 
         state: 'failure', 
         reason: 'Failed to process booking. Please try again.' 
@@ -63,7 +63,8 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
 
   return (
     <div 
-      id="booking-form" 
+      id="booking-form"
+      data-property-id={propertyId}
       className={`mx-auto w-full max-w-6xl p-6 bg-white shadow-lg rounded-2xl ${supportPadding ? 'my-8' : ''}`}
     >
       <div className="space-y-6">

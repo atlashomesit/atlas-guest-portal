@@ -177,7 +177,8 @@ const BookingForm = ({ propertyData }: { propertyData: Property }) => {
   const sanitizeInput = (value: string) =>
     value
       .replace(/<[^>]*>/g, '') // strip HTML tags
-      .replace(/[\u0000-\u001F\u007F]+/g, ' ') // remove control characters
+      // eslint-disable-next-line no-control-regex -- intentional: strip control chars from input
+      .replace(/[\u0000-\u001F\u007F]+/g, ' ')
       .replace(/\s+/g, ' ') // normalize whitespace
       .trim();
   const normalizeEmail = (value: string) => value.trim().toLowerCase();

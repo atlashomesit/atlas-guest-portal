@@ -1,4 +1,4 @@
-
+import React from 'react';
 import { FaCar, FaMusic, FaTv, FaWifi } from "react-icons/fa";
 import { MdWifiCalling3 } from "react-icons/md";
 import { TbAirConditioning } from "react-icons/tb";
@@ -6,7 +6,7 @@ import { Link } from "react-router-dom";
 
 interface AmenitiesData {
     id: number,
-    icon: any,
+    icon: React.ReactNode,
     title: string,
 }
 

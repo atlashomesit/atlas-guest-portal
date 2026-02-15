@@ -198,7 +198,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
     [checkIn, checkOut, getListingNavigation, guests, navigate, searchString],
   );
 
-  const handleSlideChange = (id: string, direction: "next" | "prev", imagesLength: number) => {
+  const _handleSlideChange = (id: string, direction: "next" | "prev", imagesLength: number) => {
     setActiveImageIndex((prev) => {
       const current = prev[id] ?? 0;
       const nextIndex = direction === "next" ? current + 1 : current - 1;

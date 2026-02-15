@@ -1,4 +1,4 @@
-import React, { JSX } from 'react';
+import React from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { FaBed, FaShower, FaSwimmingPool, FaCar, FaWifi, FaTv } from "react-icons/fa";
 import { TbAirConditioning } from "react-icons/tb";
@@ -67,13 +67,14 @@ const PropertyDetails = () => {
     const [notFound, setNotFound] = useState(false);
     const [listingPropertyId, setListingPropertyId] = useState<string | number | null>(null);
     const [resolvedListingId, setResolvedListingId] = useState<string | number | null>(null);
-    const [listingLookupError, setListingLookupError] = useState<string | null>(null);
+    const [, setListingLookupError] = useState<string | null>(null);
     const [isListingLookupPending, setIsListingLookupPending] = useState(false);
     const [showAmenitiesModal, setShowAmenitiesModal] = useState(false);
     const [showAboutMore, setShowAboutMore] = useState(false);
     const [showNeighborhoodMore, setShowNeighborhoodMore] = useState(false);
     const unitType = inferUnitType({ id: data?.id, property_name: data?.property_name });
     const { setProperty } = useBooking();
+    const showAvailabilityPlaceholder = false;
     const nightlyPrice = useMemo(() => {
         if (!data) return null;
         try {
@@ -82,7 +83,7 @@ const PropertyDetails = () => {
                 checkInDate: new Date(),
                 guests: 2,
             });
-        } catch (error) {
+        } catch {
             return null;
         }
     }, [data, unitType]);
@@ -117,7 +118,7 @@ const PropertyDetails = () => {
                 }
                 setListingPropertyId(listing.propertyId);
                 setResolvedListingId(listing.id);
-            } catch (error) {
+            } catch {
                 if (controller.signal.aborted) return;
                 setListingLookupError('Availability temporarily unavailable.');
             } finally {
@@ -151,7 +152,7 @@ const PropertyDetails = () => {
         const normalizedPropertySlugStripped = stripHyphens(normalizedPropertySlug);
 
         // Prefer matching by unit slug, with optional property slug guard
-        const foundByUnitSlug = propertyData.find((item: any) => {
+        const foundByUnitSlug = propertyData.find((item: Property) => {
             const idSlug = normalizeSlug(item.id);
             const nameSlug = normalizeSlug(item.property_name);
             const unitMatches = normalizedUnitSlug && (idSlug === normalizedUnitSlug || nameSlug === normalizedUnitSlug);
@@ -180,7 +181,7 @@ const PropertyDetails = () => {
         // If not found by slug, try to find by ID
         const propertyId = normalizedUnitSlug || undefined;
         if (propertyId) {
-            const foundById = propertyData.find((item: any) => String(item.id) === String(propertyId));
+            const foundById = propertyData.find((item: Property) => String(item.id) === String(propertyId));
             if (foundById) {
                 const images = propertyImages[String(foundById.id)] || [];
                 setData({
@@ -221,7 +222,7 @@ useEffect(() => {
         if (!data) return;
 
         // Fancybox v6 syntax
-        (Fancybox as any).bind("[data-fancybox='property-gallery']", {
+        (Fancybox as { bind: (sel: string, opts: object) => void }).bind("[data-fancybox='property-gallery']", {
             Thumbs: {
                 type: "classic",
             },
@@ -568,7 +569,7 @@ useEffect(() => {
                                         propertyId={listingPropertyId ?? undefined}
                                         listingName={data?.property_name || 'This property'}
                                     />
-                                    {false && (
+                                    {showAvailabilityPlaceholder && (
                                         <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6">
                                             <h3 className="text-lg font-semibold text-text-primary mb-2">Check Availability</h3>
                                             <p className="text-text-muted text-sm mb-4">

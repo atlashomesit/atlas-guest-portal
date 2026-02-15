@@ -41,7 +41,7 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
   anchorRef,
   calendarRef,
   contentId,
-  heading: _heading,
+  heading,
   instructionText,
   showInstruction,
   instructionAriaLabel,
@@ -189,7 +189,7 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
         <div className="flex items-center justify-between px-6 py-5 border-b border-[var(--bg-muted)] bg-[var(--bg-surface)]">
           <div className="flex items-center gap-2">
             <p id={labelId} className="text-[17px] font-semibold text-[var(--text-primary)]">
-              Select your dates
+              {heading}
             </p>
             <span
               className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-[var(--border-subtle)] text-[11px] font-semibold text-[var(--text-muted)]"

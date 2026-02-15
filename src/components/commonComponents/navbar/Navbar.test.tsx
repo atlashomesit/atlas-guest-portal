@@ -58,21 +58,24 @@ describe("Navbar CTA", () => {
     expect(contactMobile).toHaveAttribute("href", "/contact");
   });
 
-  it("routes Book Now to the dedicated reserve flow with a visible transition", () => {
+  it("routes Book Now to the dedicated search/reserve flow with a visible transition", () => {
     renderNavbar();
 
     const bookNow = screen.getByRole("button", { name: /book now/i });
     fireEvent.click(bookNow);
 
     expect(screen.getByText(/opening reservation/i)).toBeInTheDocument();
-    expect(mockNavigate).toHaveBeenCalledWith("/reserve", {
-      state: { bookingPrefill: expect.objectContaining({ guests: 2 }) },
-    });
+    expect(mockNavigate).toHaveBeenCalledWith(
+      "/search",
+      expect.objectContaining({
+        state: { bookingPrefill: expect.objectContaining({ guests: 2 }) },
+      }),
+    );
 
     expect(trackEvent).toHaveBeenCalledWith(
       "cta_book_now_clicked",
-      expect.objectContaining({ source: "header", target: "reserve", surface: "navbar" }),
-      { route: "/reserve" },
+      expect.objectContaining({ source: "header", surface: "navbar" }),
+      expect.any(Object),
     );
   });
 

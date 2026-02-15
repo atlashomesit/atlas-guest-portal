@@ -2,7 +2,6 @@
 import React from 'react';
 import { toast } from 'react-toastify';
 import { format } from 'date-fns';
-import { inlinePolicySnippets } from '../../../content/terms';
 import { logApiError } from '../../../lib/monitoring';
 import { hasRuntimeConfig } from '../../../runtime-config';
 import ErrorBanner from '../../ErrorBanner';
@@ -86,18 +85,18 @@ interface BookingCardPricingPaymentSectionProps {
 }
 
 export const BookingCardPricingPaymentSection: React.FC<BookingCardPricingPaymentSectionProps> = ({
-  hasSelection,
-  hasInteractedWithDates,
-  nightlyBreakdown,
-  baseNightlyRate,
-  discountPercentApplied,
-  extraGuestsCount,
-  totalExtraGuestCharges,
-  feesAndTaxes,
+  hasSelection: _hasSelection,
+  hasInteractedWithDates: _hasInteractedWithDates,
+  nightlyBreakdown: _nightlyBreakdown,
+  baseNightlyRate: _baseNightlyRate,
+  discountPercentApplied: _discountPercentApplied,
+  extraGuestsCount: _extraGuestsCount,
+  totalExtraGuestCharges: _totalExtraGuestCharges,
+  feesAndTaxes: _feesAndTaxes,
   totalPrice,
   nights,
   inlinePolicySnippets: inlineSnippets,
-  isRazorpayReady,
+  isRazorpayReady: _isRazorpayReady,
   isLoading,
   termsAccepted,
   setTermsAccepted,

@@ -23,7 +23,7 @@ describe("GalleryPage", () => {
     fireEvent.change(selector, { target: { value: "101" } });
 
     const expectedCount = findPropertyImages(101).length;
-    const visibleImages = screen.getAllByRole("img", { name: /atlas homes room 101 photo/i });
+    const visibleImages = screen.getAllByRole("img", { name: /room 101 photo/i });
 
     expect(visibleImages).toHaveLength(expectedCount);
   });

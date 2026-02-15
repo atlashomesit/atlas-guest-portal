@@ -10,7 +10,6 @@ const warnedListings = new Set<string>();
 export const getBookingsForListing = async (listingId: string): Promise<BookingDTO[]> => {
   if (!warnedListings.has(listingId)) {
     // Warn once per listing to avoid console noise while making it clear data is mocked
-    // eslint-disable-next-line no-console
     console.warn(`🎭 [Mock API] Using mock bookings for listing ${listingId}. Configure backend to use live data.`);
     warnedListings.add(listingId);
   }

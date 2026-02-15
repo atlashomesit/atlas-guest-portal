@@ -1,10 +1,12 @@
 import React from "react";
 import { render } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { BookingProvider } from "../../../contexts/BookingContext";
 import Slider from "./Slider";
 
 vi.mock("react-router-dom", () => {
   return {
+    useLocation: () => ({ pathname: "/", search: "", hash: "", state: null, key: "default" }),
     useNavigate: () => vi.fn(),
     useSearchParams: () => [new URLSearchParams(), vi.fn()],
     Link: ({ children, to, ...props }: React.PropsWithChildren<{ to: string }>) => (
@@ -39,7 +41,9 @@ afterEach(() => {
 
 const renderSlider = () =>
   render(
-    <Slider />,
+    <BookingProvider>
+      <Slider />
+    </BookingProvider>,
   );
 
 describe("Slider VRT snapshots", () => {
@@ -50,14 +54,14 @@ describe("Slider VRT snapshots", () => {
     const form = container.querySelector("form");
     expect(form).toBeTruthy();
     expect(form?.className).toMatchInlineSnapshot(
-      `"w-full max-w-5xl rounded-3xl bg-[color:color-mix(in_srgb,var(--bg-surface)_92%,transparent)] shadow-[0_18px_55px_rgba(0,0,0,0.35)] backdrop-blur border border-[color:color-mix(in_srgb,var(--bg-surface)_55%,transparent)] p-4 sm:p-5 md:p-7 flex flex-col gap-4 sm:gap-5"`,
+      `"hero-form w-full max-w-5xl rounded-[24px] bg-[var(--bg-surface)] shadow-[var(--shadow-level-3)] backdrop-blur-sm border border-[var(--border-subtle)] p-8 flex flex-col gap-6"`,
     );
     const primaryCtas = Array.from(form?.querySelectorAll("button") ?? []).map((btn) => btn.textContent?.trim());
     expect(primaryCtas.slice(0, 4)).toMatchInlineSnapshot(`
       [
-        "Check-inEarliest available date shown.",
-        "Check-outEnsure your stay ends after check-in.",
-        "−guestsguests+Defaulting to 2 guests; adjust anytime.",
+        "Check-in22 Dec 2025",
+        "Check-out23 Dec 20251 night",
+        "Guests1 guestMaximum 20 guests",
         "Check availability",
       ]
     `);
@@ -70,7 +74,7 @@ describe("Slider VRT snapshots", () => {
     const form = container.querySelector("form");
     expect(form).toBeTruthy();
     expect(form?.className).toMatchInlineSnapshot(
-      `"w-full max-w-5xl rounded-3xl bg-[color:color-mix(in_srgb,var(--bg-surface)_92%,transparent)] shadow-[0_18px_55px_rgba(0,0,0,0.35)] backdrop-blur border border-[color:color-mix(in_srgb,var(--bg-surface)_55%,transparent)] p-4 sm:p-5 md:p-7 flex flex-col gap-4 sm:gap-5"`,
+      `"hero-form w-full max-w-5xl rounded-[24px] bg-[var(--bg-surface)] shadow-[var(--shadow-level-3)] backdrop-blur-sm border border-[var(--border-subtle)] p-8 flex flex-col gap-6"`,
     );
   });
 
@@ -81,7 +85,7 @@ describe("Slider VRT snapshots", () => {
     const form = container.querySelector("form");
     expect(form).toBeTruthy();
     expect(form?.className).toMatchInlineSnapshot(
-      `"w-full max-w-5xl rounded-3xl bg-[color:color-mix(in_srgb,var(--bg-surface)_92%,transparent)] shadow-[0_18px_55px_rgba(0,0,0,0.35)] backdrop-blur border border-[color:color-mix(in_srgb,var(--bg-surface)_55%,transparent)] p-4 sm:p-5 md:p-7 flex flex-col gap-4 sm:gap-5"`,
+      `"hero-form w-full max-w-5xl rounded-[24px] bg-[var(--bg-surface)] shadow-[var(--shadow-level-3)] backdrop-blur-sm border border-[var(--border-subtle)] p-8 flex flex-col gap-6"`,
     );
   });
 });

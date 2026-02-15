@@ -23,14 +23,28 @@ vi.mock("../src/components/commonComponents/parallax/Parallax", () => ({
   ),
 }));
 
+vi.mock("../src/config/homepageUxFlags", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/config/homepageUxFlags")>();
+  return {
+    ...actual,
+    enableServicesConcreteCopy: false,
+    enableServicesIconography: false,
+    enableServicesOneLineDescriptions: false,
+    enableServicesAlternatingBackgrounds: false,
+  };
+});
+
+import { BookingProvider } from "../src/contexts/BookingContext";
 import BannerSecondary from "../src/components/home/BannerSecondary";
 import ServicesSection from "../src/components/home/ServicesSection";
 import WhyChooseSection from "../src/components/home/WhyChooseSection";
 import TestimonialsSection from "../src/components/home/TestimonialsSection";
 
+const withBooking = (node: React.ReactElement) => <BookingProvider>{node}</BookingProvider>;
+
 describe("Homepage UX wrappers (default path)", () => {
   it("renders the default secondary banner when flags are off", () => {
-    const { asFragment } = render(<BannerSecondary />);
+    const { asFragment } = render(withBooking(<BannerSecondary />));
 
     expect(screen.getByTestId("parallax-title").textContent).toContain("Atlas Homes");
     expect(screen.queryByText(/value-block variant/i)).not.toBeInTheDocument();
@@ -38,7 +52,7 @@ describe("Homepage UX wrappers (default path)", () => {
   });
 
   it("keeps services on the production path without placeholders", () => {
-    const { asFragment } = render(<ServicesSection />);
+    const { asFragment } = render(withBooking(<ServicesSection />));
 
     expect(screen.getByTestId("exclusive-service")).toBeInTheDocument();
     expect(screen.queryByText(/placeholder/i)).not.toBeInTheDocument();
@@ -46,7 +60,7 @@ describe("Homepage UX wrappers (default path)", () => {
   });
 
   it("shows the established Why Choose experience", () => {
-    const { asFragment } = render(<WhyChooseSection />);
+    const { asFragment } = render(withBooking(<WhyChooseSection />));
 
     expect(screen.getByTestId("why-choose-default")).toBeInTheDocument();
     expect(screen.queryByText(/accordion layout/i)).not.toBeInTheDocument();
@@ -54,7 +68,7 @@ describe("Homepage UX wrappers (default path)", () => {
   });
 
   it("uses the live testimonials carousel instead of placeholders", () => {
-    const { asFragment } = render(<TestimonialsSection />);
+    const { asFragment } = render(withBooking(<TestimonialsSection />));
 
     expect(screen.getByTestId("testimonials-default")).toBeInTheDocument();
     expect(screen.queryByText(/Source pending verification/i)).not.toBeInTheDocument();

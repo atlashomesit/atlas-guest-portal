@@ -13,7 +13,7 @@ const Homepage_Properties = () => {
     const [selectedProperty, setSelectedProperty] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
 
-    const renderIcon = (iconName: any) => {
+    const renderIcon = (iconName: string) => {
         switch (iconName) {
             case 'bed':
                 return <FaBed />;
@@ -35,7 +35,7 @@ const Homepage_Properties = () => {
         setSelectedProperty(null);
     };
 
-    const handleNavigate = (property: any) => {
+    const handleNavigate = (property: { id?: number }) => {
         navigate(`/properties/${property?.id}`, { state: { property } });
     };
 

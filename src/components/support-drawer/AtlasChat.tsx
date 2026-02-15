@@ -50,8 +50,8 @@ const AUTH_KEY = import.meta.env.VITE_ATLAS_AUTH_KEY;
 
   const startSpeechToText = () => {
     const SpeechRecognition =
-      (window as any).SpeechRecognition ||
-      (window as any).webkitSpeechRecognition;
+      (window as Window & { SpeechRecognition?: typeof window.SpeechRecognition; webkitSpeechRecognition?: typeof window.SpeechRecognition }).SpeechRecognition ||
+      (window as Window & { SpeechRecognition?: typeof window.SpeechRecognition; webkitSpeechRecognition?: typeof window.SpeechRecognition }).webkitSpeechRecognition;
 
     if (!SpeechRecognition) return alert('Voice not supported');
 
@@ -61,7 +61,7 @@ const AUTH_KEY = import.meta.env.VITE_ATLAS_AUTH_KEY;
     recognition.onstart = () => setIsListening(true);
     recognition.onend = () => setIsListening(false);
 
-    recognition.onresult = (e: any) => {
+    recognition.onresult = (e: SpeechRecognitionEvent) => {
       handleSend(e.results[0][0].transcript);
     };
 

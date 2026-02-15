@@ -1,5 +1,5 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
-import { addDays, startOfDay } from 'date-fns';
+import { startOfDay } from 'date-fns';
 import { DateRange, type RangeKeyDict } from 'react-date-range';
 
 import { DateRangePickerPopover } from '../homepage_components/hotelBooking_form/DateRangePickerPopover';
@@ -74,6 +74,7 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
   value,
   activeField,
 }) => {
+  void activeField; // reserved for future focus management
   const fallbackLabelId = useId();
   const fallbackContentId = useId();
   const fallbackCalendarRef = useRef<HTMLDivElement | null>(null);

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { addDays, format, startOfDay, startOfMonth } from 'date-fns';
-import { CalendarRange, ChevronDown, ShieldCheck, Users, Minus, Plus } from 'lucide-react';
+import { CalendarRange, ChevronDown, ShieldCheck } from 'lucide-react';
 import { heroWidgetLayoutFlag } from '../../config/abFlags';
 import { getApiBaseUrl } from '../../runtime-config';
 import { trackEvent } from '../../utils/analytics';
@@ -74,9 +74,11 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
   const calendarContentId = React.useId();
   const calendarLabelId = React.useId();
   const dateErrorId = React.useId();
+  /* eslint-disable @typescript-eslint/no-unused-vars -- reserved for GuestTypeSelector a11y */
   const guestsLabelId = React.useId();
   const guestsHelperId = React.useId();
   const guestsErrorId = React.useId();
+  /* eslint-enable @typescript-eslint/no-unused-vars */
   const { booking, updateBooking } = useBooking();
   const monthsToShow = React.useMemo(
     () => (typeof window !== 'undefined' && window.innerWidth < 768 ? 1 : 2),
@@ -400,7 +402,12 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
 
     trackEvent(
       'listings_browse',
-      { surface: 'hero_form', checkIn: validation.startDate.toISOString(), checkOut: validation.endDate.toISOString(), guests },
+      {
+        surface: 'hero_form',
+        checkIn: validation.startDate.toISOString(),
+        checkOut: validation.endDate.toISOString(),
+        guests: guestCounts.adults + guestCounts.children + guestCounts.infants,
+      },
       { route: `/search?${validation.searchParams.toString()}` },
     );
 
@@ -572,15 +579,11 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
   }`;
   const labelClass =
     'flex items-center gap-2.5 text-[10px] font-bold uppercase tracking-[0.10em] text-[var(--text-muted)] whitespace-nowrap';
-  const helperTextClass = 'mt-3 text-[12px] leading-relaxed text-[var(--text-muted)]';
-
   return (
     <form onSubmit={handleSubmit} className={formContainerClass} data-testid="hero-widget" id="search-form">
-      {(statusMessage || error) && (
-        <div className="sr-only" role="status" aria-live="polite">
-          {statusMessage || error}
-        </div>
-      )}
+      <div className="sr-only" role="status" aria-live="polite">
+        {statusMessage || error || 'Hero form ready.'}
+      </div>
       <div className={formGridClass} ref={calendarWrapperRef}>
         <div className="relative">
           <button
@@ -669,14 +672,7 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
             const selectionEnd = dateRange.endDate ? startOfDay(dateRange.endDate).getTime() : null;
             const isRangeStart = selectionStart !== null && dayStart.getTime() === selectionStart;
             const isRangeEnd = selectionEnd !== null && dayStart.getTime() === selectionEnd;
-            const rangeStart = selectionStart !== null && selectionEnd !== null ? Math.min(selectionStart, selectionEnd) : null;
-            const rangeEnd = selectionStart !== null && selectionEnd !== null ? Math.max(selectionStart, selectionEnd) : null;
-            const isInRange =
-              rangeStart !== null && rangeEnd !== null
-                ? dayStart.getTime() >= rangeStart && dayStart.getTime() <= rangeEnd
-                : false;
             const isDisabled = dayStart < today;
-            const isToday = dayStart.getTime() === today.getTime();
 
          return (
   <div className="relative flex h-full w-full items-center justify-center">

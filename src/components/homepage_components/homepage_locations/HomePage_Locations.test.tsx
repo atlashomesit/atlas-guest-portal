@@ -19,7 +19,7 @@ vi.mock('react-router-dom', async () => {
     ...actual,
     useNavigate: () => navigateMock,
     useLocation: () => ({ pathname: '/', search: mockSearch, hash: '' }),
-    Link: ({ children, to, onClick }: any) => (
+    Link: ({ children, to, onClick }: { children: React.ReactNode; to: string | { pathname?: string }; onClick?: () => void }) => (
       <a href={typeof to === 'string' ? to : to.pathname} onClick={onClick}>
         {children}
       </a>
@@ -90,7 +90,7 @@ describe('HomePage_Locations', () => {
     const [navigateArgs] = navigateMock.mock.calls[0] ?? [];
     expect(navigateArgs).toEqual(
       expect.objectContaining({
-        pathname: expect.stringContaining('/property_details/'),
+        pathname: expect.stringMatching(/^\/homes\//),
       }),
     );
     expect(decodeURIComponent(navigateArgs.search)).toContain('checkIn=2025-02-01T00:00:00.000Z');

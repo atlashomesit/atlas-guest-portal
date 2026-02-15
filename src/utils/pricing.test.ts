@@ -13,7 +13,7 @@ beforeEach(() => {
 
 afterEach(() => {
   clearRuntimeConfig();
-  delete (process as any).env.VITE_DATE_MULTIPLIERS_JSON;
+  delete (process as NodeJS.Process & { env: NodeJS.Process['env'] & { VITE_DATE_MULTIPLIERS_JSON?: string } }).env.VITE_DATE_MULTIPLIERS_JSON;
 });
 
 describe("calculateNightlyPrice", () => {
@@ -77,7 +77,7 @@ describe("calculateNightlyPrice", () => {
   });
 
   it("respects environment override for date multipliers", () => {
-    (process as any).env.VITE_DATE_MULTIPLIERS_JSON = JSON.stringify({
+    (process as NodeJS.Process & { env: NodeJS.Process['env'] & { VITE_DATE_MULTIPLIERS_JSON?: string } }).env.VITE_DATE_MULTIPLIERS_JSON = JSON.stringify({
       "12-31": 3,
       "01-01": 1.5,
     });

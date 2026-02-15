@@ -10,6 +10,7 @@ describe("loadRuntimeConfig", () => {
   };
 
   beforeEach(() => {
+    clearRuntimeConfig();
     vi.stubGlobal(
       "fetch",
       vi.fn((url: string) => {

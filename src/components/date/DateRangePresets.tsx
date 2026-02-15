@@ -66,7 +66,7 @@ export const DateRangePresets: React.FC<DateRangePresetsProps> = ({
             range = preset.getRange();
             isDisabled = isRangeUnavailable(range, disabledDay);
             isActive = isCurrentRange(range, currentRange);
-          } catch (error) {
+          } catch {
             // If range calculation fails, disable the preset
             isDisabled = true;
             range = { start: new Date(), end: new Date() };
