@@ -738,6 +738,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       return;
     }
 
+    const numericListingId = listingId != null ? Number(listingId) : NaN;
+    if (!Number.isFinite(numericListingId)) {
+      setFormError('Property could not be loaded. Please refresh the page and try again.');
+      return;
+    }
+
     setIsLoading(true);
     setFormError(null);
     setStatusMessage(null);
@@ -749,7 +755,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       const normalizedCheckout = getIstStartOfDay(checkoutDate);
       
       const bookingDraft = {
-        listingId: Number(listingId),  // Ensure listingId is a number
+        listingId: numericListingId,
         checkinDate: toISODate(normalizedCheckin),  // Format as YYYY-MM-DD
         checkoutDate: toISODate(normalizedCheckout),  // Format as YYYY-MM-DD
         guests,

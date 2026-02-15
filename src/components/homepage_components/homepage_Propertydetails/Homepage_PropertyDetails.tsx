@@ -121,6 +121,11 @@ const PropertyDetails = () => {
             } catch {
                 if (controller.signal.aborted) return;
                 setListingLookupError('Availability temporarily unavailable.');
+                // Fallback so booking widget still gets a listing ID from static data (e.g. when API tenant is misconfigured)
+                const fallbackId = data?.listingId;
+                if (typeof fallbackId === 'number' && Number.isFinite(fallbackId)) {
+                    setResolvedListingId(fallbackId);
+                }
             } finally {
                 if (!controller.signal.aborted) {
                     setIsListingLookupPending(false);

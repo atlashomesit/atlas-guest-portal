@@ -15,9 +15,12 @@ const resolveApiBaseUrl = (): string | null => {
 
 /** Headers to attach to Atlas API requests when contract requires tenant (e.g. X-Tenant-Slug). */
 export const getApiHeaders = (): Record<string, string> => {
-  const slug = getTenantSlug({
-    fallbackSlug: hasRuntimeConfig() ? getRuntimeConfig().tenantKey : undefined,
-  });
+  // Prefer runtime config tenantKey so dev/staging can send "atlas" even when hostname is dev.atlashomestays.com
+  if (hasRuntimeConfig()) {
+    const configSlug = getRuntimeConfig().tenantKey?.trim();
+    if (configSlug) return { 'X-Tenant-Slug': configSlug };
+  }
+  const slug = getTenantSlug({ fallbackSlug: undefined });
   if (!slug) return {};
   return { 'X-Tenant-Slug': slug };
 };

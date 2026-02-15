@@ -7,6 +7,7 @@
  * - ATLAS_API_BASE_URL (required) e.g. https://your-dev-api.example.com
  * - ATLAS_GLOBAL_DISCOUNT_PERCENT (optional) 0–100, default 0
  * - ATLAS_ENVIRONMENT (optional) e.g. dev, production
+ * - ATLAS_TENANT_KEY (optional) tenant slug for X-Tenant-Slug header, e.g. atlas (required for API when host is dev.*)
  * - ATLAS_GOOGLE_MAPS_API_KEY (optional)
  */
 
@@ -14,6 +15,7 @@ interface Env {
   ATLAS_API_BASE_URL?: string;
   ATLAS_GLOBAL_DISCOUNT_PERCENT?: string;
   ATLAS_ENVIRONMENT?: string;
+  ATLAS_TENANT_KEY?: string;
   ATLAS_GOOGLE_MAPS_API_KEY?: string;
 }
 
@@ -42,7 +44,7 @@ export const onRequestGet = (context: { env: Env; request: Request }) => {
     );
   }
 
-  const config = {
+  const config: Record<string, unknown> = {
     apiBaseUrl: apiBaseUrl.replace(/\/+$/, ""),
     globalDiscountPercent: parseDiscount(env.ATLAS_GLOBAL_DISCOUNT_PERCENT),
     environment: (env.ATLAS_ENVIRONMENT ?? "").trim() || undefined,
@@ -50,6 +52,8 @@ export const onRequestGet = (context: { env: Env; request: Request }) => {
       ? { googleMapsApiKey: env.ATLAS_GOOGLE_MAPS_API_KEY.trim() }
       : {}),
   };
+  const tenantKey = (env.ATLAS_TENANT_KEY ?? "").trim();
+  if (tenantKey) config.tenantKey = tenantKey;
 
   return new Response(JSON.stringify(config, null, 2), {
     headers: {

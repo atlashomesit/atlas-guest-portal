@@ -20,6 +20,7 @@ Required shape:
 |---|---|---|
 | `apiBaseUrl` | Yes | Valid absolute `http`/`https` URL |
 | `globalDiscountPercent` | No | Number in `0..100` (defaults to `0` in centralized getter) |
+| `tenantKey` | No | Tenant slug for `X-Tenant-Slug` header (e.g. `atlas`). Set for dev/staging so API can resolve tenant when host is e.g. `dev.atlashomestays.com`. |
 
 Example:
 
@@ -27,7 +28,8 @@ Example:
 {
   "apiBaseUrl": "https://api.example.com",
   "globalDiscountPercent": 20,
-  "environment": "production"
+  "environment": "production",
+  "tenantKey": "atlas"
 }
 ```
 
@@ -63,3 +65,4 @@ The frontend bundle stays identical; only the served JSON changes.
 - In localhost development, does `apiBaseUrl` point to localhost?
 - Are CDN/browser caches bypassed (`Cache-Control: no-store` recommended)?
 - Do subsequent API calls use the same origin as configured `apiBaseUrl`?
+- If the API returns `400` with `"Tenant could not be resolved."`, set `tenantKey` (e.g. `atlas`) in the runtime config for this domain (e.g. in Cloudflare Pages set `ATLAS_TENANT_KEY=atlas` for Preview).

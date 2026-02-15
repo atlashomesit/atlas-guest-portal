@@ -1,5 +1,6 @@
 {
   "apiBaseUrl": "http://localhost:5000",
   "globalDiscountPercent": 0,
-  "environment": "local"
+  "environment": "local",
+  "tenantKey": "atlas"
 }
