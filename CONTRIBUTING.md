@@ -36,7 +36,8 @@ We welcome contributions that improve the Atlas Homes Frontend. Please follow th
 ## Pull Request Checklist
 - [ ] Reference related issues in the description.
 - [ ] Summarize high-level changes and screenshots when UI is impacted.
-- [ ] Ensure `npm run lint` and `npm run build` succeed locally.
+- [ ] Ensure `npm run lint`, `npm run build`, and `npm test` succeed locally.
+- [ ] The **CI** workflow (`.github/workflows/ci.yml`) runs the same on push/PR; it must pass before merge.
 - [ ] Update documentation when new configuration, commands, or data model changes occur.
 - [ ] Request review from at least one maintainer.
 
