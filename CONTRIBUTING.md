@@ -38,6 +38,7 @@ We welcome contributions that improve the Atlas Homes Frontend. Please follow th
 - [ ] Summarize high-level changes and screenshots when UI is impacted.
 - [ ] Ensure `npm run lint`, `npm run build`, and `npm test` succeed locally.
 - [ ] The **CI** workflow (`.github/workflows/ci.yml`) runs the same on push/PR; it must pass before merge.
+- [ ] **Never commit `.env` or `.env.local`** – they may contain API keys and other secrets; keep them out of version control.
 - [ ] Update documentation when new configuration, commands, or data model changes occur.
 - [ ] Request review from at least one maintainer.
 
