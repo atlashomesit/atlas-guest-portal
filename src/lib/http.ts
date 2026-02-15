@@ -1,4 +1,5 @@
 import { getApiBaseUrl } from '@/runtime-config';
+import { getApiHeaders } from '@/api/client';
 import { IS_LOCALHOST } from '@/config/env';
 import { logApiError, monitoredFetch } from './monitoring';
 
@@ -12,8 +13,10 @@ export async function apiFetch(path: string, init?: RequestInit): Promise<Respon
   if (!IS_LOCALHOST && url.includes('localhost')) {
     throw new Error('Refusing localhost request from non-localhost host');
   }
+  const tenantHeaders = getApiHeaders();
+  const mergedHeaders = { ...tenantHeaders, ...(init?.headers as Record<string, string> | undefined) };
   try {
-    const res = await monitoredFetch(url, { credentials: 'include', ...(init || {}) });
+    const res = await monitoredFetch(url, { credentials: 'include', ...init, headers: mergedHeaders });
     if (!res.ok) {
       let body = '';
       try { body = await res.text(); } catch {

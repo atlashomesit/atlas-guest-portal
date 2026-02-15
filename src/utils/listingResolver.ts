@@ -1,6 +1,5 @@
 import type { ListingDetail } from '../api/listingClient';
-import { getApiBaseUrl } from '@/runtime-config';
-import { assertNonEmpty } from './requiredValues';
+import { buildApiUrl, getApiHeaders } from '@/api/client';
 
 const normalizeListingPayload = (
   payload: Record<string, unknown>,
@@ -46,16 +45,15 @@ export const resolveListing = async (
   param: string,
   signal?: AbortSignal,
 ): Promise<ListingDetail | null> => {
-  const apiBaseUrl = assertNonEmpty(getApiBaseUrl(), "API base URL not configured");
+  const headers = getApiHeaders();
 
-  const attemptResolveListing = async (
-    baseUrl: string,
-  ): Promise<{ listing: ListingDetail | null; error?: Error }> => {
-    const trimmedBaseUrl = baseUrl.replace(/\/$/, "");
-    const listingEndpoint = trimmedBaseUrl ? `${trimmedBaseUrl}/listings` : "/listings";
-    const url = `${listingEndpoint}/${encodeURIComponent(param)}`;
+  const attemptResolveListing = async (): Promise<{
+    listing: ListingDetail | null;
+    error?: Error;
+  }> => {
+    const singleListingUrl = buildApiUrl(`/listings/${encodeURIComponent(param)}`);
     try {
-      const response = await fetch(url, { signal });
+      const response = await fetch(singleListingUrl, { signal, headers });
       if (response.ok) {
         const payload = (await response.json()) as Record<string, unknown>;
         return { listing: normalizeListingPayload(payload, param) };
@@ -74,12 +72,13 @@ export const resolveListing = async (
       return { listing: null, error: error as Error };
     }
 
+    const listEndpoint = buildApiUrl('/listings/public');
     try {
-      const listResponse = await fetch(listingEndpoint, { signal });
+      const listResponse = await fetch(listEndpoint, { signal, headers });
 
       if (!listResponse.ok) {
         const errorText = await listResponse.text().catch(() => 'No error details');
-        console.error('[resolveListing] Failed to fetch all listings:', errorText);
+        console.error('[resolveListing] Failed to fetch public listings:', errorText);
         return {
           listing: null,
           error: new Error(`Failed to fetch listings: ${listResponse.status} ${errorText}`),
@@ -136,7 +135,7 @@ export const resolveListing = async (
     }
   };
 
-  const primaryResult = await attemptResolveListing(apiBaseUrl);
+  const primaryResult = await attemptResolveListing();
   if (primaryResult.error) {
     throw primaryResult.error;
   }

@@ -1,4 +1,4 @@
-import { buildApiUrl } from '@/api/client';
+import { buildApiUrl, getApiHeaders } from '@/api/client';
 
 export type AvailabilityNightlyRate = {
   date: string;
@@ -40,7 +40,7 @@ export const fetchAvailability = async ({
   url.searchParams.set('checkOut', checkOut);
   url.searchParams.set('guests', String(guests));
 
-  const response = await fetch(url.toString(), { signal });
+  const response = await fetch(url.toString(), { signal, headers: getApiHeaders() });
 
   if (!response.ok) {
     throw new Error(`Availability request failed with status ${response.status}`);

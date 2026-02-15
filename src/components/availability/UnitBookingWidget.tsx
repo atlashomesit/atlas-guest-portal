@@ -9,7 +9,7 @@ import { useBooking } from '@/contexts/BookingContext';
 import { hasRuntimeConfig } from '@/runtime-config';
 import ErrorBanner from '@/components/ErrorBanner';
 import { fetchAvailability, type AvailabilityNightlyRate, type AvailabilityResponse } from '@/api/availabilityClient';
-import { buildApiUrl } from '@/api/client';
+import { buildApiUrl, getApiHeaders } from '@/api/client';
 import { apiFetch } from '@/lib/http';
 import { getIstStartOfDay } from '@/utils/date';
 import { calculateNights, formatNightCount } from '@/utils/dateHelpers';
@@ -33,6 +33,33 @@ const normalizeListingId = (value: string | number | null | undefined) =>
   String(value ?? '')
     .trim()
     .toLowerCase();
+
+/** Map API error to actionable guest-facing message (quote/availability/payment/duplicate). */
+function getBookingErrorMessage(error: unknown, context: 'order' | 'verify'): string {
+  const status = (error as { response?: { status?: number } })?.response?.status;
+  const data = (error as { response?: { data?: { message?: string } } })?.response?.data;
+  const message = (typeof data?.message === 'string' ? data.message : '') || (error as Error)?.message || '';
+
+  const lower = message.toLowerCase();
+  if (lower.includes('expired') || lower.includes('quote') && (lower.includes('invalid') || lower.includes('expired'))) {
+    return 'Your quote has expired. Please select dates again and complete the booking.';
+  }
+  if (lower.includes('not available') || lower.includes('no longer available') || lower.includes('sold out') || status === 409) {
+    return 'Those dates are no longer available. Please choose different dates and try again.';
+  }
+  if (context === 'verify') {
+    if (lower.includes('already') && (lower.includes('confirm') || lower.includes('verified'))) {
+      return 'This payment was already confirmed. Check your email for the booking details.';
+    }
+    return `Payment verification failed. ${message ? `${message}. ` : ''}Please contact support with your payment ID if you were charged.`;
+  }
+  if (status === 400 && (lower.includes('date') || lower.includes('availability'))) {
+    return 'The selected dates are no longer available. Please pick different dates and try again.';
+  }
+  return context === 'order'
+    ? 'We couldn\'t start checkout. Please check your dates and try again, or contact support.'
+    : 'Payment verification failed. Please contact support with your payment ID.';
+}
 
 const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, propertyId, listingName }) => {
   if (import.meta.env.DEV) {
@@ -158,7 +185,8 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
         const url = new URL(availabilityBaseUrl);
         url.searchParams.set('listingId', String(listingId));
         url.searchParams.set('startDate', toISODate(getIstStartOfDay(availabilityRange.startDate)));
-        url.searchParams.set('endDate', toISODate(getIstStartOfDay(availabilityRange.endDate)));
+        // API expects months (1–12), default 2; we show ~60 days so use 2
+        url.searchParams.set('months', '2');
 
         const availabilityKey = url.toString();
         if (lastAvailabilityKeyRef.current === availabilityKey) {
@@ -574,6 +602,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
       const response = await axios.post(buildApiUrl('/api/Razorpay/verify'), requestData, {
         headers: {
+          ...getApiHeaders(),
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         }
@@ -590,12 +619,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         status: error.response?.status,
         headers: error.response?.headers
       });
-      
-      const errorMessage = error.response?.data?.message || 
-                         error.message || 
-                         'Payment verification failed';
-      
-      setFormError(`Payment verification failed: ${errorMessage}. Please contact support with payment ID: ${paymentData.razorpay_payment_id}`);
+      setFormError(getBookingErrorMessage(error, 'verify'));
       throw error;
     }
   };
@@ -763,7 +787,13 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       console.log('Sending order payload:', JSON.stringify(orderPayload, null, 2));
 
       // 3. Create Razorpay order
-      const orderResponse = await axios.post(orderUrl, orderPayload);
+      const orderResponse = await axios.post(orderUrl, orderPayload, {
+        headers: {
+          ...getApiHeaders(),
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      });
 
       const { keyId: key, orderId, bookingId } = orderResponse.data;
 
@@ -844,7 +874,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               } catch (error) {
                 console.error('Payment processing error:', error);
                 setPaymentStatus('failed');
-                setFormError('Failed to verify payment. Please contact support.');
+                setFormError(getBookingErrorMessage(error, 'verify'));
               } finally {
                 setIsLoading(false);
               }
@@ -868,15 +898,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       });
     } catch (error: any) {
       console.error('Booking error:', error);
-      
-      // Check if error is about dates not being available
-      const errorMessage = error?.response?.data?.message || error?.message || '';
-      if (errorMessage.includes('not available') || errorMessage.includes('Selected dates')) {
-        setFormError('The selected dates are no longer available. Please select different dates.');
-        // Optionally refresh availability data or reset date range
-      } else {
-        setFormError('Failed to process booking. Please try again.');
-      }
+      setFormError(getBookingErrorMessage(error, 'order'));
       setIsLoading(false);
     }
   };

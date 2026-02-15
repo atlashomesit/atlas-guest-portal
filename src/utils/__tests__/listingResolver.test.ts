@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { clearRuntimeConfig, setRuntimeConfig } from '@/runtime-config';
 import { resolveListing } from '../listingResolver';
 
-const LISTING_ENDPOINT =
-  'https://atlas-homes-api-dev-fhdtg0gkgmcmhwfd.centralindia-01.azurewebsites.net/listings';
+const API_BASE = 'https://atlas-homes-api-dev-fhdtg0gkgmcmhwfd.centralindia-01.azurewebsites.net';
 
 const fetchMock = vi.fn();
 
@@ -16,9 +16,11 @@ describe('resolveListing', () => {
   beforeEach(() => {
     fetchMock.mockReset();
     vi.stubGlobal('fetch', fetchMock);
+    setRuntimeConfig({ apiBaseUrl: API_BASE });
   });
 
   afterEach(() => {
+    clearRuntimeConfig();
     vi.unstubAllGlobals();
   });
 
@@ -40,11 +42,19 @@ describe('resolveListing', () => {
       id: 'atlas-102',
       propertyId: 'P102',
     });
-    expect(fetchMock).toHaveBeenNthCalledWith(1, `${LISTING_ENDPOINT}/102`, { signal: undefined });
-    expect(fetchMock).toHaveBeenNthCalledWith(2, LISTING_ENDPOINT, { signal: undefined });
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      `${API_BASE}/listings/102`,
+      expect.objectContaining({ signal: undefined }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      `${API_BASE}/listings/public`,
+      expect.objectContaining({ signal: undefined }),
+    );
   });
 
-  it('returns null when suffix mismatch occurs (Atlas501_PH vs param=501)', async () => {
+  it('matches Atlas501_PH when param=501 (param is substring of name)', async () => {
     fetchMock
       .mockResolvedValueOnce(makeResponse({ ok: false, status: 404 }))
       .mockResolvedValueOnce(
@@ -57,7 +67,7 @@ describe('resolveListing', () => {
 
     const result = await resolveListing('501');
 
-    expect(result).toBeNull();
+    expect(result).toMatchObject({ name: 'Atlas501_PH', id: 'atlas-501-ph' });
   });
 
   it('returns null when param=999 is not found', async () => {
@@ -76,27 +86,16 @@ describe('resolveListing', () => {
     expect(result).toBeNull();
   });
 
-  it('falls back to same-origin when the primary request fails', async () => {
-    fetchMock
-      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
-      .mockResolvedValueOnce(makeResponse({ ok: false, status: 404 }))
-      .mockResolvedValueOnce(
-        makeResponse({
-          ok: true,
-          status: 200,
-          json: async () => [{ name: 'Atlas501', listingId: 'atlas-501', propertyId: 'P501' }],
-        }),
-      );
+  it('throws when direct lookup fails with network error', async () => {
+    fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
 
-    const result = await resolveListing('501');
+    await expect(resolveListing('501')).rejects.toThrow(TypeError);
 
-    expect(result).toMatchObject({
-      name: 'Atlas501',
-      id: 'atlas-501',
-      propertyId: 'P501',
-    });
-    expect(fetchMock).toHaveBeenNthCalledWith(1, `${LISTING_ENDPOINT}/501`, { signal: undefined });
-    expect(fetchMock).toHaveBeenNthCalledWith(2, '/listings/501', { signal: undefined });
-    expect(fetchMock).toHaveBeenNthCalledWith(3, '/listings', { signal: undefined });
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      `${API_BASE}/listings/501`,
+      expect.objectContaining({ signal: undefined }),
+    );
   });
 });

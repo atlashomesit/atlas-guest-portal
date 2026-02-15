@@ -1,4 +1,5 @@
-import { getApiBaseUrl } from '@/runtime-config';
+import { getApiBaseUrl, hasRuntimeConfig, getRuntimeConfig } from '@/runtime-config';
+import { getTenantSlug } from '@/tenant/tenantResolver';
 
 const resolveApiBaseUrl = (): string | null => {
   const baseUrl = getApiBaseUrl();
@@ -10,6 +11,15 @@ const resolveApiBaseUrl = (): string | null => {
     console.error('[api] API base URL is invalid.', error);
     return null;
   }
+};
+
+/** Headers to attach to Atlas API requests when contract requires tenant (e.g. X-Tenant-Slug). */
+export const getApiHeaders = (): Record<string, string> => {
+  const slug = getTenantSlug({
+    fallbackSlug: hasRuntimeConfig() ? getRuntimeConfig().tenantKey : undefined,
+  });
+  if (!slug) return {};
+  return { 'X-Tenant-Slug': slug };
 };
 
 export const buildApiUrl = (path: string): string => {

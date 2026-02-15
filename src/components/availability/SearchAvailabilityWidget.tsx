@@ -422,11 +422,14 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
     const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
 
     try {
+      // GET /availability requires propertyId (contract); hero has no listing selected, so skip API call and just navigate to search
       const apiBaseUrl = getApiBaseUrl();
       const totalGuests = guestCounts.adults + guestCounts.children;
-      availabilityUrl = apiBaseUrl
-        ? `${apiBaseUrl}/availability?checkIn=${formattedCheckIn}&checkOut=${formattedCheckOut}&guests=${totalGuests}&adults=${guestCounts.adults}&children=${guestCounts.children}&infants=${guestCounts.infants}&pets=${guestCounts.pets}`
-        : '';
+      const hasPropertyId = false; // Hero form does not select a property
+      availabilityUrl =
+        apiBaseUrl && hasPropertyId
+          ? `${apiBaseUrl}/availability?propertyId=${0}&checkIn=${formattedCheckIn}&checkOut=${formattedCheckOut}&guests=${totalGuests}&adults=${guestCounts.adults}&children=${guestCounts.children}&infants=${guestCounts.infants}&pets=${guestCounts.pets}`
+          : '';
       controller = availabilityUrl && typeof AbortController !== 'undefined' ? new AbortController() : null;
       timeoutId = controller ? window.setTimeout(() => controller.abort(), 10_000) : null;
     } catch (configError) {
