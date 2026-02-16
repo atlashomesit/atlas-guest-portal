@@ -10,7 +10,7 @@ The hero trust row is intentionally limited to three high-signal badges—**Veri
 - Primary (desktop & mobile): Home, Apartments, Location, FAQs, Contact
 - Header keeps the business phone visible (tel link) alongside a softer-outline Book Now CTA
 - Footer carries the destinations that were previously grouped under “More” (Gallery, About Us, Articles, Offers) plus Sitemap/Policies/Terms
-- CTA: Book Now now scrolls in-page to the **Our Homes** discovery block (`/#our-homes`) while WhatsApp sits as the secondary “Need help?” link for people who want a human handoff
+- CTA: Book Now scrolls in-page to the **Our Homes** discovery block (`/#our-homes`) while WhatsApp sits as the secondary “Need help?” link for people who want a human handoff
 - Mobile: ordered primary links with collapsible Apartments children; tapping any item closes the menu
 
 Rationale: simplify the header for faster wayfinding, surface FAQs in-place of the former Help label without changing content, and keep the full phone number prominent (especially for India users who prefer to call and negotiate) while retaining but softening the Book Now emphasis.
