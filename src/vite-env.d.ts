@@ -1,7 +1,10 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
+  readonly VITE_API_BASE_URL?: string;
   readonly VITE_CALLBACK_LEADS_ENDPOINT?: string;
+  readonly VITE_CHAT_API_URL?: string;
+  readonly VITE_ATLAS_AUTH_KEY?: string;
   readonly VITE_EMAILJS_PUBLIC_KEY?: string;
   readonly VITE_EMAILJS_SERVICE_ID?: string;
   readonly VITE_EMAILJS_TEMPLATE_ID?: string;
