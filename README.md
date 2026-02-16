@@ -83,6 +83,7 @@ Cloudflare Pages setup:
 ## Documentation
 
 - **CONTRIBUTING.md** — PR checklist, branch model, CI workflow.
+- **SECURITY.md** — Vulnerability reporting.
 - **docs/design-system.md** — Theming, tokens, CTA discipline.
 - **docs/short-links.md** — Short-link redirects and verification.
 - **AGENTS.md** — Instructions for AI assistants (CI, CONTRIBUTING).
