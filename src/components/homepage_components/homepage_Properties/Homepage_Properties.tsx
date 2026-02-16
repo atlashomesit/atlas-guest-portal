@@ -13,7 +13,7 @@ const Homepage_Properties = () => {
     const [selectedProperty, setSelectedProperty] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
 
-    const renderIcon = (iconName: string) => {
+    const _renderIcon = (iconName: string) => {
         switch (iconName) {
             case 'bed':
                 return <FaBed />;

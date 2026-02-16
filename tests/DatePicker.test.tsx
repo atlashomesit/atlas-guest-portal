@@ -58,6 +58,7 @@ const openCalendar = () => {
 
 beforeEach(() => {
   vi.useFakeTimers();
+  vi.setSystemTime(new Date("2026-02-15T12:00:00Z"));
   const fetchMock = vi.fn(async () => ({
     ok: true,
     status: 200,
