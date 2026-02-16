@@ -74,7 +74,7 @@ Cloudflare Pages setup:
 - When updating brand imagery, change `LOGO_URL` to keep every consumer in sync instead of hardcoding URLs inside components.
 
 ### Lockfile maintenance
-- Use Node 20.x (see `.nvmrc`) and run `npm install` to refresh dependencies.
+- Use Node 22.x (see `.nvmrc`; required by Vite 7) and run `npm install` to refresh dependencies.
 - Always commit the resulting `package-lock.json` so `npm ci` stays in sync locally, in CI, and during Cloudflare builds.
 
 ### CI
@@ -97,8 +97,7 @@ Cloudflare Pages setup:
    ```bash
    cp .env.example .env
    ```
-   Populate the EmailJS identifiers before attempting to send booking/contact forms. Do not commit `.env`; it may contain secrets. and set `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`
-   to a key with Maps JS API enabled + domain restrictions. Phone/WhatsApp
+   Populate the EmailJS identifiers before attempting to send booking/contact forms. Set `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` to a key with Maps JS API enabled and domain restrictions. Do not commit `.env`; it may contain secrets. Phone/WhatsApp
    numbers are centralized in [`src/config/contact.ts`](src/config/contact.ts) and default to the business line.
 3. **Run the development server**
    ```bash

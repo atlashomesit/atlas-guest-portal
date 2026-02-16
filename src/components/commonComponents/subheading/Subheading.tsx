@@ -6,7 +6,7 @@ const Subheading = () => {
         <section>
             <div className="w-full h-fit flex justify-start mt-12 px-4 bg-transparent">
                 <Link to={'/'}>
-                    <img className="w-40 h-20 object-contain bg-transparent" src={LOGO_URL} alt="LOGO" />
+                    <img className="w-40 h-20 object-contain bg-transparent" src={LOGO_URL} alt="Atlas Homestays" />
                 </Link>
             </div>
         </section>

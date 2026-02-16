@@ -20,7 +20,7 @@ export const enableTestimonialsSingleCentered = false;
 export const enableFooterMiniCtaAboveFooter = false;
 
 // Production-safe defaults for experimental variants. These keep copy and
-// icon selections centralized so that enabling a variant never shows TODO
+// icon selections centralized so that enabling a variant never shows placeholder text
 // placeholders.
 export const secondaryBannerDefaults = {
   title: "Atlas Homes – Where Every Stay Feels Like Home",

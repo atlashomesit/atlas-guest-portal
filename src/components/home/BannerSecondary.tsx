@@ -16,7 +16,7 @@ const BannerSecondary = () => {
   if (enableSecondaryBannerValueBlock) {
     return (
       <div className="m-8">
-        {/* TODO: Replace with value-block layout that highlights 2–3 proof points side-by-side */}
+        {/* Placeholder: value-block layout (2–3 proof points) pending creative */}
         <div className="rounded-2xl border border-dashed border-border-subtle bg-bg-surface p-10 text-center shadow-level1">
           <p className="text-lg font-semibold text-text-primary">Discover the Atlas Homes difference</p>
           <p className="mt-2 text-text-muted">
@@ -30,7 +30,7 @@ const BannerSecondary = () => {
   if (enableSecondaryBannerImprovedOverlay) {
     return (
       <div className="m-8">
-        {/* TODO: Swap in refined overlay values and CTA once new art direction is finalized */}
+        {/* Placeholder: refined overlay values and CTA pending art direction */}
         <Parallax
           image={parallaxImage}
           title={secondaryBannerDefaults.title}

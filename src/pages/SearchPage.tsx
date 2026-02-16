@@ -91,7 +91,7 @@ const SearchPage = () => {
                 className="flex flex-col overflow-hidden rounded-2xl border border-border-subtle bg-bg-surface shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
               >
                 <div className="h-48 w-full bg-gradient-to-br from-bg-muted to-bg-surface">
-                  <img src={unit.imageUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+                  <img src={unit.imageUrl} alt={unit.title ?? "Property listing"} className="h-full w-full object-cover" loading="lazy" />
                 </div>
                 <div className="flex flex-1 flex-col gap-3 p-5">
                   <div className="flex items-start justify-between gap-3">

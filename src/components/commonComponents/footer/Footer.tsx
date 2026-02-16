@@ -29,7 +29,7 @@ const Footer = () => {
         >
             <div className='max-w-screen-2xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-8'>
                 <div className='flex flex-col gap-7 items-center lg:items-start'>
-                    <img className='w-32 md:w-20 rounded-md' src={logoSrc} alt="paymentlogo" />
+                    <img className='w-32 md:w-20 rounded-md' src={logoSrc} alt="Payment provider" />
                     <div className='flex text-lg gap-6 text-[color:var(--footer-link)]'>
                         {socialLinks.map(({ icon, link }, index) => {
                             const IconComponent = iconMap[icon];
