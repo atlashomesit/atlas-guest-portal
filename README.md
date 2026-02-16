@@ -15,6 +15,8 @@ The hero trust row is intentionally limited to three high-signal badges—**Veri
 
 Rationale: simplify the header for faster wayfinding, surface FAQs in-place of the former Help label without changing content, and keep the full phone number prominent (especially for India users who prefer to call and negotiate) while retaining but softening the Book Now emphasis.
 
+For feature work spanning guest frontend and API, see `atlas-api/docs/ATLAS-HIGH-VALUE-BACKLOG.md` and `atlas-api/docs/ATLAS-FEATURE-EXECUTION-PROMPT.md`.
+
 ## Prerequisites
 - Node.js **22.12.0+** (required by Vite 7 and enforced in `.nvmrc`/`.node-version`)
 - npm **10.9.2+** (ships with the recommended Node releases)

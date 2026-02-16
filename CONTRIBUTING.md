@@ -2,6 +2,8 @@
 
 We welcome contributions that improve the Atlas Homes Frontend. Please follow this workflow to keep the project healthy and predictable.
 
+For feature work spanning the guest frontend and API, see `atlas-api/docs/ATLAS-HIGH-VALUE-BACKLOG.md` and `atlas-api/docs/ATLAS-FEATURE-EXECUTION-PROMPT.md`.
+
 ## Branching Model
 - Create feature branches from `main` using the convention `feature/<short-description>`.
 - Use `fix/`, `docs/`, or `chore/` prefixes for bug fixes, documentation updates, and tooling work.
