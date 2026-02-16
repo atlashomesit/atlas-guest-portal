@@ -42,8 +42,6 @@ const PropertyModal: React.FC<PropertyModalProps> = ({ property, onClose, handle
         }
     };
 
-    console.log(property.id);
-
     return (
         <section className="fixed inset-0 flex items-center justify-center w-full bg-[color:color-mix(in_srgb,var(--text-primary)_70%,transparent)] z-[var(--z-modal)]">
             <div className="relative bg-bg-surface flex flex-col md:flex-row gap-5 rounded-lg shadow-level2 p-6 h-[70vh] md:h-[70vh] w-[80%] overflow-y-auto overflow-x-hidden text-text-primary">

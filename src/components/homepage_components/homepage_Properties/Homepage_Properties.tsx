@@ -28,7 +28,6 @@ const Homepage_Properties = () => {
         }
     };
 
-    console.log(renderIcon);
 
     const closeModal = () => {
         setIsModalOpen(false);

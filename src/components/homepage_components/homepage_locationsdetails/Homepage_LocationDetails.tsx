@@ -19,7 +19,6 @@ const Homepage_LocationDetails = () => {
 
     const locationViseData = location.state?.property?.properties;
 
-    console.log(locationViseData, "loactionViseData")
 
     const renderIcon = (iconName: string) => {
         switch (iconName) {
@@ -59,8 +58,6 @@ const Homepage_LocationDetails = () => {
     // };
 
     const handleModal = (property: { id?: number; property_name?: string }) => () => {
-        console.log(property, 'abc');
-
         setSelectedProperty(property);
         setIsModalOpen(true);
     };

@@ -761,16 +761,6 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         guests,
         notes: ''
       };
-      
-      // Log the booking draft for debugging
-      console.log('Booking draft:', {
-        ...bookingDraft,
-        listingIdType: typeof bookingDraft.listingId,
-        checkinDateFormatted: bookingDraft.checkinDate,
-        checkoutDateFormatted: bookingDraft.checkoutDate,
-        checkinDateOriginal: checkinDate,
-        checkoutDateOriginal: checkoutDate
-      });
 
       // 2. Prepare order payload with the exact structure expected by the backend
       const orderPayload = {
@@ -789,8 +779,6 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           phone: formData.phone.trim().replace(/\D/g, '').substring(0, 10)
         }
       };
-      
-      console.log('Sending order payload:', JSON.stringify(orderPayload, null, 2));
 
       // 3. Create Razorpay order
       const orderResponse = await axios.post(orderUrl, orderPayload, {
