@@ -1,5 +1,6 @@
 {
   "name": "landing_page",
+  "description": "Atlas Homestays guest-facing frontend for property discovery and booking",
   "private": true,
   "version": "0.0.0",
   "type": "module",
