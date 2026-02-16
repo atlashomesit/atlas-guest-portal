@@ -38,7 +38,7 @@ For feature work spanning the guest frontend and API, see `atlas-api/docs/ATLAS-
 ## Pull Request Checklist
 - [ ] Reference related issues in the description.
 - [ ] Summarize high-level changes and screenshots when UI is impacted.
-- [ ] Ensure `npm ci`, `npm run lint`, `npm run build`, and `npm test` succeed locally.
+- [ ] Ensure `npm ci`, `npm run lint`, `npm run build`, and `npm test` succeed locally (same order as CI).
 - [ ] The **CI** workflow (`.github/workflows/ci.yml`) runs the same on push/PR; it must pass before merge.
 - [ ] **Never commit `.env` or `.env.local`** – they may contain API keys and other secrets; keep them out of version control.
 - [ ] Update documentation when new configuration, commands, or data model changes occur.
