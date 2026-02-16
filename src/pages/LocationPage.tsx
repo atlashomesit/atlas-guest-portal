@@ -188,7 +188,7 @@ const LocationPage = () => {
     };
 
     const handleError = (event: ErrorEvent | Event) => {
-      console.log("[LocationPage] Map script failed, switching to static preview");
+      if (import.meta.env.DEV) console.log("[LocationPage] Map script failed, switching to static preview");
       logMapFailure("Failed to load Google Maps script", event);
       setErrorDetails("Google Maps could not be reached right now.");
       setMapStatus("failed");

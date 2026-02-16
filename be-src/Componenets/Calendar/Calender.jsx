@@ -5,7 +5,7 @@ import "react-date-range/dist/styles.css";
 import "react-date-range/dist/theme/default.css";
 import "./Calender.css";
 import { updateCalender } from "../../Redux/UserData/action";
-import { useDispatch, useSelector } from "../../Redux/simpleStore";
+import { useDispatch } from "../../Redux/simpleStore";
 
 const Calendar = () => {
   // date state
@@ -18,7 +18,6 @@ const Calendar = () => {
   // open close
   const [open, setOpen] = useState(false);
   const dispatch = useDispatch();
-  const store = useSelector((store) => store.reducerUserData);
 
   // get the target element to toggle
   const refOne = useRef(null);
@@ -26,10 +25,7 @@ const Calendar = () => {
   useEffect(() => {
     const formattedStartDate = format(range.startDate, "yyyy-MM-dd");
     const formattedEndDate = format(range.endDate, "yyyy-MM-dd");
-    console.log(formattedStartDate, formattedEndDate);
-    console.log(range, "from effect");
     dispatch(updateCalender([formattedStartDate, formattedEndDate]));
-    console.log(store);
   }, [range]);
 
   useEffect(() => {

@@ -17,9 +17,6 @@ const AtlasChat = ({ onClose }: AtlasChatProps) => {
 
 const API_URL = import.meta.env.VITE_CHAT_API_URL;
 const AUTH_KEY = import.meta.env.VITE_ATLAS_AUTH_KEY;
-  
-  // Debug log
-  console.log('API_URL:', API_URL);
 
   const handleSend = async (overrideInput?: string) => {
     const text = overrideInput || input;

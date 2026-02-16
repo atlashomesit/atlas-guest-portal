@@ -28,13 +28,11 @@ export const getHotel =
       const res = await axios.post(API_GET_HOTEL_SNIPIT_DATA, {
         ...params,
       });
-      console.log(res);
       if (res?.data?.data?.hotel_info?.length > 0) {
         const filteredHotels = uniqByKeepLast(
           res?.data?.data?.hotel_info,
           (it) => it?.combain_name
         );
-        console.log(res);
         dispatch({
           type: GET_HOTEL_SUCCESS,
           payload: {
@@ -48,7 +46,6 @@ export const getHotel =
         });
         
       } else {
-        console.log("else dispatch");
         dispatch({
           type: GET_HOTEL_SUCCESS,
           payload: {

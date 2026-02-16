@@ -211,11 +211,11 @@ export const mockApi = {
     // Simulate network delay
     await new Promise(resolve => setTimeout(resolve, 300));
     
-    console.log('🎭 [MOCK API] GET request to:', path);
-    
+    if (import.meta.env.DEV) console.log('🎭 [MOCK API] GET request to:', path);
+
     if (path === '/bookings' || path.includes('/bookings')) {
       const bookings = generateMockBookings();
-      console.log('🎭 [MOCK API] Returning', bookings.length, 'mock bookings');
+      if (import.meta.env.DEV) console.log('🎭 [MOCK API] Returning', bookings.length, 'mock bookings');
       return {
         data: { bookings } as T,
         status: 200,
@@ -224,7 +224,7 @@ export const mockApi = {
     
     if (path === '/properties' || path.includes('/properties')) {
       const properties = generateMockProperties();
-      console.log('🎭 [MOCK API] Returning', properties.length, 'mock properties');
+      if (import.meta.env.DEV) console.log('🎭 [MOCK API] Returning', properties.length, 'mock properties');
       return {
         data: properties as T,
         status: 200,
@@ -233,14 +233,14 @@ export const mockApi = {
     
     if (path === '/listings' || path.includes('/listings')) {
       const listings = generateMockListings();
-      console.log('🎭 [MOCK API] Returning', listings.length, 'mock listings');
+      if (import.meta.env.DEV) console.log('🎭 [MOCK API] Returning', listings.length, 'mock listings');
       return {
         data: listings as T,
         status: 200,
       };
     }
     
-    console.warn('🎭 [MOCK API] Unknown endpoint:', path);
+    if (import.meta.env.DEV) console.warn('🎭 [MOCK API] Unknown endpoint:', path);
     return {
       data: {} as T,
       status: 404,
@@ -251,7 +251,7 @@ export const mockApi = {
     // Simulate network delay
     await new Promise(resolve => setTimeout(resolve, 500));
     
-    console.log('🎭 [MOCK API] POST request to:', path, 'with body:', body);
+    if (import.meta.env.DEV) console.log('🎭 [MOCK API] POST request to:', path, 'with body:', body);
     
     // Mock successful response
     return {
