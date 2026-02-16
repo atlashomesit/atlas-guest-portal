@@ -74,7 +74,7 @@ const SupportStickyBar = ({ hidden = false }: SupportStickyBarProps) => {
           <a
             href={whatsappLink}
             target="_blank"
-            rel="noreferrer"
+            rel="noopener noreferrer"
             onClick={() =>
               trackEvent(
                 "support_whatsapp",

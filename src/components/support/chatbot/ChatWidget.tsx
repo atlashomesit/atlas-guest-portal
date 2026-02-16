@@ -191,7 +191,7 @@ const ChatWidget = ({
           <a
             href={whatsappLink}
             target="_blank"
-            rel="noreferrer"
+            rel="noopener noreferrer"
             className="ml-auto inline-flex items-center justify-center rounded-full bg-success px-3 py-2 text-xs font-semibold text-[var(--text-contrast)] transition hover:bg-[color-mix(in_srgb,var(--support-success)_85%,transparent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-success"
             onClick={onEscalateWhatsapp}
           >

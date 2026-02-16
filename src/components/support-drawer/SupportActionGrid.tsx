@@ -44,7 +44,7 @@ const SupportActionGrid = ({
       <a
         href={whatsappLink}
         target="_blank"
-        rel="noreferrer"
+        rel="noopener noreferrer"
         onClick={onWhatsappClick}
         className={`${ACTION_STYLES} ${enableRecommendedWhatsAppPrimary ? "min-h-[76px]" : ""}`}
       >
