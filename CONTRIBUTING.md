@@ -18,9 +18,9 @@ For feature work spanning the guest frontend and API, see `atlas-api/docs/ATLAS-
    ```bash
    git checkout -b feature/add-property-carousel
    ```
-3. **Install dependencies** (if not already done):
+3. **Install dependencies** (`npm ci` for clean install; `npm install` to add packages):
    ```bash
-   npm install
+   npm ci
    ```
 4. **Run the dev server:**
    ```bash
@@ -38,7 +38,7 @@ For feature work spanning the guest frontend and API, see `atlas-api/docs/ATLAS-
 ## Pull Request Checklist
 - [ ] Reference related issues in the description.
 - [ ] Summarize high-level changes and screenshots when UI is impacted.
-- [ ] Ensure `npm run lint`, `npm run build`, and `npm test` succeed locally.
+- [ ] Ensure `npm ci`, `npm run lint`, `npm run build`, and `npm test` succeed locally.
 - [ ] The **CI** workflow (`.github/workflows/ci.yml`) runs the same on push/PR; it must pass before merge.
 - [ ] **Never commit `.env` or `.env.local`** – they may contain API keys and other secrets; keep them out of version control.
 - [ ] Update documentation when new configuration, commands, or data model changes occur.
