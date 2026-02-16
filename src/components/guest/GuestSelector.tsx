@@ -196,6 +196,7 @@ export const GuestSelector: React.FC<GuestSelectorProps> = ({
 };
 
 // Helper function to format guest counts for display
+// eslint-disable-next-line react-refresh/only-export-components -- shared util, co-located for convenience
 export const formatGuestCounts = (counts: GuestCounts): string => {
   const parts: string[] = [];
   
@@ -219,6 +220,7 @@ export const formatGuestCounts = (counts: GuestCounts): string => {
 };
 
 // Helper to get total guest count for simple display
+// eslint-disable-next-line react-refresh/only-export-components -- shared util, co-located for convenience
 export const getTotalGuestCount = (counts: GuestCounts): number => {
   return counts.adults + counts.children + counts.infants + counts.pets;
 };

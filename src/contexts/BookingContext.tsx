@@ -33,6 +33,7 @@ const defaultState: BookingState = {
 };
 
 
+// eslint-disable-next-line react-refresh/only-export-components -- context co-located with provider
 export const BookingContext = createContext<BookingContextValue | undefined>(undefined);
 
 const loadState = (): BookingState => {
@@ -95,6 +96,7 @@ setProperty: (propertyId, propertyName) =>
   return <BookingContext.Provider value={value}>{children}</BookingContext.Provider>;
 };
 
+// eslint-disable-next-line react-refresh/only-export-components -- hook co-located with context
 export const useBooking = () => {
   const context = useContext(BookingContext);
 

@@ -220,7 +220,7 @@ useEffect(() => {
 
   setProperty(data.id, data.property_name); // ✅ use property_name
 
-}, [data?.id, data?.property_name]);
+}, [data?.id, data?.property_name, setProperty]);
 
 
     useEffect(() => {

@@ -170,6 +170,7 @@ const SupportDrawer = ({
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components -- hook co-located with SupportDrawer
 export const useSupportDrawerView = () => {
   const context = useContext(SupportDrawerViewContext);
 

@@ -281,6 +281,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
     return () => {
       isActive = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- today stable; run on availability/params change only
   }, [openCalendar, listingId, availabilityRange.endDate, availabilityRange.startDate, isBookingDisabled]);
 
   // Auto-select next available date if today is blocked or hold

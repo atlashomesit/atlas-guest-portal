@@ -24,6 +24,7 @@ type ServiceItem = {
   oneLine?: string;
 };
 
+// eslint-disable-next-line react-refresh/only-export-components -- content config, co-located with ServicesSection
 export const SERVICES_CONTENT: {
   poeticCopy: ServiceItem[];
   concreteCopy: ServiceItem[];

@@ -160,7 +160,7 @@ const SupportWidgetContent = () => {
       if (view === "callback") {
         setIsCallbackExpanded(true);
       }
-    }, [enableRevealCallbackOnClickOnly, view]);
+    }, [view]);
 
     const handleCallbackCardClick = () => {
       if (enableRevealCallbackOnClickOnly) {
@@ -267,6 +267,7 @@ const SupportWidgetContent = () => {
 
 const SupportWidget = () => {
   const location = useLocation();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- location changes on navigate, linter flags as outer scope
   const featureFlags = useMemo(() => getFeatureFlags(), [location.search]);
 
   return (

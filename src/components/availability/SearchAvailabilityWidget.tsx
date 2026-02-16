@@ -207,6 +207,7 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
       propertyId: nextPropertyId,
     });
     hasHydratedRef.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- clampRange/today stable for hydration; adding would re-run every render
   }, [
     bookingPrefill,
     defaultRange.endDate,

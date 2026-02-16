@@ -15,6 +15,7 @@ export const SupportDrawerFlagsProvider = ({ children, flags }: SupportDrawerFla
   return <SupportDrawerFlagsContext.Provider value={memoizedFlags}>{children}</SupportDrawerFlagsContext.Provider>;
 };
 
+// eslint-disable-next-line react-refresh/only-export-components -- hook co-located with provider
 export const useSupportDrawerFlags = () => {
   const context = useContext(SupportDrawerFlagsContext);
 
