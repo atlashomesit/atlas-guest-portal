@@ -14,6 +14,7 @@ export default defineConfig({
     dedupe: ["react", "react-dom", "react-router", "react-router-dom"],
   },
   server: {
+    port: 5174,
     proxy: {
       '/bookings': {
         target: 'http://localhost:5120', // replace with your backend port
