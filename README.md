@@ -223,6 +223,7 @@ Each command should return a 301/302 with a `Location` header set to `/property_
 - **UI reuse:** booking widgets (`BookingFrom.tsx`, `hotelBooking_form/HotelBooking_Form.tsx`) and property details (`Homepage_PropertyDetails.tsx`) pull inline snippets and timing data from those sources to avoid hardcoded strings.
 
 ## Pricing configuration
+- **Never show ₹0** — when API returns 0 (e.g. listing has no ListingPricing row), the widget treats it as invalid and falls back to client-side pricing or "Price unavailable". See `docs/rca/guest-portal-zero-price.md`.
 - Centralized in [`src/config/pricing.config.ts`](src/config/pricing.config.ts) with helpers in [`src/utils/pricing.ts`](src/utils/pricing.ts). The config tracks per-unit base rates (`1bhk: ₹3,500`, `penthouse: ₹6,000`), included guests (2 by default), a global discount (`17%`), a New Year’s Eve multiplier (`"12-31": 2`), currency/timezone, rounding rules, and optional extras (extra guest fees, max guests, cleaning fees).
 - Env overrides (ideal for Cloudflare Pages) let you adjust pricing at build time (requires a rebuild/redeploy to apply):
   - `VITE_GLOBAL_DISCOUNT_PERCENT` → overrides the discount (e.g., `15` for 15% off).

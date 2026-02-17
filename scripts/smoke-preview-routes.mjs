@@ -61,6 +61,9 @@ async function main() {
       } else if (html.includes("We couldn't load this page")) {
         console.error(`[FAIL] ${path} shows error-boundary fallback`);
         failed = true;
+      } else if (html.includes("₹0") && html.includes("Best price")) {
+        console.error(`[FAIL] ${path} shows ₹0 pricing`);
+        failed = true;
       } else {
         console.log(`[OK] ${path}`);
       }
