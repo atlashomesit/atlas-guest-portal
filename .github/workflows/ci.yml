@@ -37,3 +37,6 @@ jobs:
 
       - name: Check bundle for local network access APIs
         run: npm run check:local-network
+
+      - name: Smoke test (preview routes)
+        run: npm run smoke:preview

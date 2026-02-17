@@ -224,7 +224,7 @@ const PropertyDetails = () => {
         }
         
         setNotFound(true);
-    }, [propertySlug, unitSlug, location.state]);
+    }, [propertySlug, listingIdParam, location.state]);
 useEffect(() => {
   if (!data?.id) return;
 

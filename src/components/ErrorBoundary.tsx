@@ -25,7 +25,13 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   componentDidCatch(error: Error, errorInfo: unknown) {
     const boundaryName = this.props.name ?? 'app';
     logUserAction('error_boundary_triggered', { boundary: boundaryName });
-    reportError(error, { boundaryName, errorInfo, tags: { boundary: boundaryName } });
+    reportError(error, {
+      boundaryName,
+      errorInfo,
+      routePath: typeof window !== 'undefined' ? window.location.pathname : undefined,
+      routeSearch: typeof window !== 'undefined' ? window.location.search : undefined,
+      tags: { boundary: boundaryName },
+    });
   }
 
   handleReload = () => {
