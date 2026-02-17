@@ -16,6 +16,8 @@ import { calculateNights, formatNightCount } from '@/utils/dateHelpers';
 import { doesRangeIntersectBlocked, toISODate } from '@/utils/dateRange';
 import { calculateNightlyPrice, inferUnitType } from '@/utils/pricing';
 import priceDisplayConfig from '@/config/priceDisplay.config';
+import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
+import { fetchCalendarPricing } from '@/api/pricingClient';
 
 declare global {
   interface Window {
@@ -82,6 +84,8 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
   });
   const [openCalendar, setOpenCalendar] = useState(false);
   const [shownDate, setShownDate] = useState<Date>(today);
+  const [calendarDailyPrices, setCalendarDailyPrices] = useState<Map<string, number>>(new Map());
+  const [calendarPricingLoading, setCalendarPricingLoading] = useState(false);
   const [guests, setGuests] = useState(2);
   const [_bookedDates, setBookedDates] = useState<Date[]>([]);
   const [blockedSet, setBlockedSet] = useState<Set<string>>(new Set());
@@ -326,6 +330,26 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
     }
   }, [dateStatusMap, blockedSet, today]);
 
+  // Fetch per-day calendar pricing so price updates when user selects dates.
+  // Fetch on mount and when calendar opens or month changes; do not clear when calendar closes.
+  useEffect(() => {
+    if (!listingId || String(listingId).trim() === '') return;
+    const controller = new AbortController();
+    const startDate = toISODate(startOfMonth(shownDate));
+    setCalendarPricingLoading(true);
+    fetchCalendarPricing(listingId, startDate, 2, controller.signal)
+      .then((map) => {
+        setCalendarDailyPrices(map);
+      })
+      .catch(() => {
+        setCalendarDailyPrices(new Map());
+      })
+      .finally(() => {
+        setCalendarPricingLoading(false);
+      });
+    return () => controller.abort();
+  }, [listingId, shownDate]);
+
   const isCheckInAllowed = (date: Date) => {
   const iso = toISODate(getIstStartOfDay(date));
   
@@ -500,17 +524,73 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   };
 
   const priceDetails = calculatePrice();
+  const { loading: dailyPricingLoading, error: dailyPricingError, getListingPricing } = useDailyPricingSummary();
+  const dailyPricing = useMemo(
+    () => (listingId != null && String(listingId).trim() !== '' ? getListingPricing(listingId) : null),
+    [listingId, getListingPricing],
+  );
+
+  const formatCalendarPrice = useCallback((price: number): string => {
+    if (price >= 10000) return `₹${(price / 1000).toFixed(1)}K`;
+    return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0, minimumFractionDigits: 0 }).format(price);
+  }, []);
+
+  const calendarDealThreshold = useMemo(() => {
+    const prices = Array.from(calendarDailyPrices.values()).filter((p) => p > 0);
+    if (prices.length < 4) return null;
+    const sorted = [...prices].sort((a, b) => a - b);
+    const idx = Math.floor(sorted.length * 0.25);
+    return sorted[idx] ?? null;
+  }, [calendarDailyPrices]);
+
+  /** Sum of calendar daily prices for the selected date range (same as shown in calendar). */
+  const selectedRangeTotalFromCalendar = useMemo(() => {
+    if (!dateRange.startDate || !dateRange.endDate) return null;
+    let total = 0;
+    let d = getIstStartOfDay(dateRange.startDate);
+    const end = getIstStartOfDay(dateRange.endDate);
+    while (d.getTime() < end.getTime()) {
+      const iso = toISODate(d);
+      const price = calendarDailyPrices.get(iso) ?? dailyPricing?.actualPrice ?? 0;
+      total += price;
+      d = addDays(d, 1);
+    }
+    return total > 0 ? Math.round(total) : null;
+  }, [dateRange.startDate, dateRange.endDate, calendarDailyPrices, dailyPricing?.actualPrice]);
+
   // ---------- Fee calculations ----------
-  
+
   // GST = 5% on discounted price
   const gstAmount = 0;
-  
-  // Convenience fee = 2.7% of (total + GST)
+
+  // Default: daily-summary price (today's rate). When user selects dates: calculated sum from calendar.
+  const hasSelectedRange = Boolean(dateRange.startDate && dateRange.endDate);
+  const breakdownPrice =
+    hasSelectedRange && selectedRangeTotalFromCalendar != null
+      ? selectedRangeTotalFromCalendar
+      : dailyPricing
+        ? Math.round(dailyPricing.actualPrice * (hasSelectedRange ? priceDetails.nights : 1))
+        : priceDetails.total;
   const subtotalForConvenience = priceDetails.total + gstAmount;
   const convenienceFee = Math.round(subtotalForConvenience * 0.027);
-  
-  // Final payable amount (without cleaning fee)
-  const finalTotal = priceDetails.total + gstAmount + convenienceFee;
+  const breakdownSubtotalForConvenience = breakdownPrice + gstAmount;
+  const breakdownConvenienceFee = Math.round(breakdownSubtotalForConvenience * 0.027);
+  const breakdownFinalTotal = breakdownPrice + gstAmount + breakdownConvenienceFee;
+
+  const finalTotal =
+    hasSelectedRange && selectedRangeTotalFromCalendar != null
+      ? breakdownFinalTotal
+      : dailyPricing
+        ? breakdownFinalTotal
+        : priceDetails.total + gstAmount + convenienceFee;
+
+  // Per-night: when dates selected use calculated average; default use daily-summary (today's rate).
+  const perNightForDisplay =
+    hasSelectedRange && selectedRangeTotalFromCalendar != null && priceDetails.nights > 0
+      ? Math.round(selectedRangeTotalFromCalendar / priceDetails.nights)
+      : dailyPricing
+        ? dailyPricing.actualPrice
+        : priceDetails.basePrice / priceDetails.nights;
 
 
   const formattedDateLabel = dateRange.startDate && dateRange.endDate
@@ -898,6 +978,27 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     }
   };
 
+  const closePaymentPopup = useCallback(() => {
+    setPaymentStatus(null);
+  }, []);
+
+  const goToDashboard = useCallback(() => {
+    closePaymentPopup();
+    navigate('/', { replace: true });
+  }, [navigate, closePaymentPopup]);
+
+  // Auto-close timers in parent so they are not reset by inner component re-mounts
+  useEffect(() => {
+    if (paymentStatus === 'failed') {
+      const t = window.setTimeout(() => setPaymentStatus(null), 3000);
+      return () => window.clearTimeout(t);
+    }
+    if (paymentStatus === 'success') {
+      const t = window.setTimeout(() => setPaymentStatus(null), 6000);
+      return () => window.clearTimeout(t);
+    }
+  }, [paymentStatus]);
+
   // Payment Success Popup Component
   const PaymentSuccessPopup = () => {
     if (!bookingDetails) return null;
@@ -905,24 +1006,35 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     // eslint-disable-next-line react-hooks/rules-of-hooks -- PaymentSuccessPopup only mounts when bookingDetails exists; hook runs in same order when mounted
     useEffect(() => {
       const handleEscape = (e: KeyboardEvent) => {
-        if (e.key === 'Escape') {
-          setPaymentStatus(null);
-        }
+        if (e.key === 'Escape') closePaymentPopup();
       };
       document.addEventListener('keydown', handleEscape);
       return () => document.removeEventListener('keydown', handleEscape);
-    }, []);
+    }, [closePaymentPopup]);
+
 
     return (
       <div 
         className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
         onClick={(e) => {
-          if (e.target === e.currentTarget) {
-            setPaymentStatus(null);
-          }
+          if (e.target === e.currentTarget) closePaymentPopup();
         }}
       >
-        <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full mx-4 max-h-[70vh] flex flex-col animate-in zoom-in-95 duration-200">
+        <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full mx-4 max-h-[70vh] flex flex-col animate-in zoom-in-95 duration-200 relative">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setPaymentStatus(null);
+            }}
+            className="absolute top-4 right-4 z-[60] p-1.5 rounded-full text-gray-500 hover:text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-300 transition-colors"
+            aria-label="Close"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
           <div className="p-10 overflow-y-auto flex-1">
             {/* Header with Success Icon */}
             <div className="flex flex-col items-center mb-6">
@@ -989,10 +1101,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             <div className="flex justify-center mb-4">
               <Button
                 type="button"
-                onClick={() => {
-                  navigate('/');
-                  setPaymentStatus(null);
-                }}
+                onClick={goToDashboard}
                 className="px-10 py-3 text-lg font-semibold bg-green-600 hover:bg-green-700 text-white shadow-lg"
               >
                 Go to Dashboard
@@ -1013,24 +1122,34 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   const PaymentFailedPopup = () => {
     useEffect(() => {
       const handleEscape = (e: KeyboardEvent) => {
-        if (e.key === 'Escape') {
-          setPaymentStatus(null);
-        }
+        if (e.key === 'Escape') closePaymentPopup();
       };
       document.addEventListener('keydown', handleEscape);
       return () => document.removeEventListener('keydown', handleEscape);
-    }, []);
+    }, [closePaymentPopup]);
 
     return (
       <div 
         className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
         onClick={(e) => {
-          if (e.target === e.currentTarget) {
-            setPaymentStatus(null);
-          }
+          if (e.target === e.currentTarget) closePaymentPopup();
         }}
       >
-        <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full mx-4 max-h-[70vh] overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full mx-4 max-h-[70vh] overflow-hidden animate-in zoom-in-95 duration-200 relative">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setPaymentStatus(null);
+            }}
+            className="absolute top-4 right-4 z-[60] p-1.5 rounded-full text-gray-500 hover:text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-300 transition-colors"
+            aria-label="Close"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
           <div className="p-8">
             {/* Header with Error Icon */}
             <div className="flex flex-col items-center mb-6">
@@ -1103,23 +1222,74 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           </span>
           <span className="text-xs text-text-muted">Limited-time deal</span>
         </div>
-        <div className="flex items-baseline gap-2">
-          <span className="text-2xl font-bold text-text-primary">
-            {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(priceDetails.total)}
-          </span>
-          {priceDetails.appliedDiscountPercent > 0 && (
-            <span className="text-sm text-text-muted line-through">
-              {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(priceDetails.subtotal)}
-            </span>
+        <div className="flex flex-col gap-0.5">
+          {dailyPricingLoading && (
+            <span className="text-sm text-text-muted">Loading price…</span>
           )}
-          {priceDetails.appliedDiscountPercent > 0 && (
-            <span className="text-sm font-semibold text-[color:color-mix(in_srgb,var(--cta-primary)_80%,transparent)]">
-              {priceDisplayConfig.discount.savingsPrefix} {priceDetails.appliedDiscountPercent}%
-            </span>
+          {!dailyPricingLoading && dailyPricingError && (
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl font-bold text-black">
+                {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(priceDetails.total)}
+              </span>
+              {priceDetails.appliedDiscountPercent > 0 && (
+                <>
+                  <span className="text-sm text-gray-400 line-through">
+                    {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(priceDetails.subtotal)}
+                  </span>
+                  <span className="text-sm font-semibold text-[color:color-mix(in_srgb,var(--cta-primary)_80%,transparent)]">
+                    {priceDisplayConfig.discount.savingsPrefix} {priceDetails.appliedDiscountPercent}%
+                  </span>
+                </>
+              )}
+            </div>
+          )}
+          {!dailyPricingLoading && !dailyPricingError && selectedRangeTotalFromCalendar != null && dateRange.startDate && dateRange.endDate && (
+            <div className="flex items-baseline gap-2 flex-wrap">
+              <span className="text-2xl font-bold text-black">
+                {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(selectedRangeTotalFromCalendar)}
+              </span>
+              <span className="text-sm text-gray-400">
+                {priceDetails.nights} {priceDetails.nights === 1 ? 'night' : 'nights'}
+              </span>
+            </div>
+          )}
+          {!dailyPricingLoading && !dailyPricingError && selectedRangeTotalFromCalendar == null && dailyPricing && (
+            <div className="flex items-baseline gap-2 flex-wrap">
+              <span className="text-2xl font-bold text-black">
+                {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(dailyPricing.actualPrice)}
+              </span>
+              {dailyPricing.globalDiscountPercent > 0 && (
+                <>
+                  <span className="text-sm text-gray-400">
+                    {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(dailyPricing.baseAmount)}
+                  </span>
+                  <span className="text-sm font-semibold text-[color:color-mix(in_srgb,var(--cta-primary)_80%,transparent)]">
+                    {priceDisplayConfig.discount.savingsPrefix} {Math.round(dailyPricing.globalDiscountPercent)}%
+                  </span>
+                </>
+              )}
+            </div>
+          )}
+          {!dailyPricingLoading && !dailyPricingError && selectedRangeTotalFromCalendar == null && !dailyPricing && (
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl font-bold text-black">
+                {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(priceDetails.total)}
+              </span>
+              {priceDetails.appliedDiscountPercent > 0 && (
+                <>
+                  <span className="text-sm text-gray-400 line-through">
+                    {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(priceDetails.subtotal)}
+                  </span>
+                  <span className="text-sm font-semibold text-[color:color-mix(in_srgb,var(--cta-primary)_80%,transparent)]">
+                    {priceDisplayConfig.discount.savingsPrefix} {priceDetails.appliedDiscountPercent}%
+                  </span>
+                </>
+              )}
+            </div>
           )}
         </div>
         <div className="text-sm text-text-muted space-y-1 mt-1">
-          <p>{priceDetails.nights} {priceDetails.nights === 1 ? 'night' : 'nights'} × {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(priceDetails.basePrice / priceDetails.nights)}</p>
+          <p>{priceDetails.nights} {priceDetails.nights === 1 ? 'night' : 'nights'} × {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(perNightForDisplay)}</p>
           {priceDetails.extraGuests > 0 && (
             <p>{priceDetails.extraGuests} {priceDetails.extraGuests === 1 ? 'extra guest' : 'extra guests'} × {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(priceDetails.extraGuestsFee / priceDetails.nights / priceDetails.extraGuests)}/night</p>
           )}
@@ -1194,7 +1364,6 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               rangeColors={['#475569']}
               dateRangeProps={{ preventSnapRefocus: true }}
               dayContentRenderer={(day) => {
-                // Normalize all dates to IST start of day for consistent comparison
                 const dayStart = getIstStartOfDay(day);
                 const dayISO = toISODate(dayStart);
                 const selectionStart = dateRange.startDate ? getIstStartOfDay(dateRange.startDate).getTime() : null;
@@ -1209,59 +1378,51 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                     : false;
                 const isBlocked = blockedSet.has(dayISO);
                 const isDisabled = disabledDay(day);
-                const _isToday = dayStart.getTime() === today.getTime();
-                
-                // Get status for this date (only for dates from today onwards)
                 const status = dayStart.getTime() >= today.getTime() ? dateStatusMap.get(dayISO) : null;
-                
-                // Determine background color based on status
-                let backgroundColor = '';
-                if (status === 'Blocked') {
-                  backgroundColor = 'bg-red-500';
-                } else if (status === 'Available') {
-                  backgroundColor = 'bg-green-500';
-                } else if (status === 'Hold') {
-                  backgroundColor = 'bg-orange-500';
-                }
+
+                const isPastDate = dayStart.getTime() < today.getTime();
+                const price = isPastDate ? 0 : (calendarDailyPrices.get(dayISO) ?? dailyPricing?.actualPrice ?? 0);
+                const isDeal =
+                  !isPastDate &&
+                  calendarDealThreshold != null &&
+                  price > 0 &&
+                  price <= calendarDealThreshold &&
+                  !isRangeStart &&
+                  !isRangeEnd &&
+                  !isInRange;
+                const priceText = isPastDate || calendarPricingLoading || price <= 0 ? '—' : formatCalendarPrice(price);
+
+                let statusBg = '';
+                if (status === 'Blocked') statusBg = 'bg-red-500/20';
+                else if (status === 'Hold') statusBg = 'bg-orange-500/20';
+                else if (status === 'Available') statusBg = 'bg-green-500/15';
+
+                const selectionClasses = isRangeStart || isRangeEnd
+                  ? 'bg-[var(--cta-primary)] text-white shadow-sm'
+                  : isInRange
+                    ? 'bg-[var(--cta-primary)]/20 text-[var(--cta-primary)]'
+                    : '';
+                const disabledClasses = isDisabled
+                  ? 'text-gray-400 cursor-not-allowed opacity-60'
+                  : status === 'Blocked' || (isBlocked && !status)
+                    ? 'text-red-600/90 cursor-not-allowed'
+                    : status === 'Hold'
+                      ? 'text-orange-600/90 cursor-not-allowed'
+                      : 'text-black';
 
                 return (
-                  <div className="relative flex h-full w-full items-center justify-center">
-                    {/* Background color based on status - show for all dates from today onwards */}
-                    {/* Show with lower opacity when date is selected to not interfere with selection highlight */}
-                    {status && backgroundColor && (
-                      <div 
-                        className={`absolute inset-0 rounded-lg ${backgroundColor}`}
-                        style={{ 
-                          margin: '2px', 
-                          opacity: (isRangeStart || isRangeEnd || isInRange) ? 0.15 : 0.25
-                        }}
-                      />
+                  <div className="unit-booking-day-cell grid h-full w-full min-h-0 overflow-hidden box-border p-0.5">
+                    {status && statusBg && (
+                      <div className={`absolute inset-0 rounded-lg ${statusBg}`} style={{ margin: '2px' }} aria-hidden />
                     )}
-                    <span
-                      className={`relative z-10 flex items-center justify-center text-sm font-medium transition ${
-                        isRangeStart || isRangeEnd
-                          ? 'bg-[var(--cta-primary)] text-white rounded-xl px-3 py-2 shadow-sm'
-                          : isInRange
-                          ? 'bg-[var(--cta-primary)]/20 text-[var(--cta-primary)] rounded-lg'
-                          : isDisabled
-                          ? isBlocked || status === 'Blocked' || status === 'Hold'
-                            ? 'text-red-500/70 cursor-not-allowed'
-                            : 'text-[var(--border-strong)] cursor-not-allowed opacity-50'
-                          : status === 'Blocked' || (isBlocked && !status)
-                          ? 'text-red-600 font-semibold cursor-not-allowed'
-                          : status === 'Hold'
-                          ? 'text-orange-600 font-semibold cursor-not-allowed'
-                          : status === 'Available'
-                          ? 'text-green-600 font-semibold'
-                          : 'text-[var(--brand)]'
-                      }`}
-                      style={{ minHeight: 38, minWidth: 38 }}
-                    >
-                      {format(day, 'd')}
-                    </span>
+                    <div className={`unit-booking-day-cell-inner relative z-10 grid grid-cols-1 grid-rows-2 place-items-center gap-0 min-h-0 overflow-hidden box-border ${selectionClasses || disabledClasses}`}>
+                      <span className="unit-booking-day-num text-[11px] font-bold leading-none overflow-hidden truncate">{format(day, 'd')}</span>
+                      <span className={`unit-booking-day-price text-[9px] leading-none whitespace-nowrap overflow-hidden truncate min-w-0 ${isDeal ? 'text-green-600 font-semibold' : ''}`}>
+                        {priceText}
+                      </span>
+                    </div>
                   </div>
                 );
-
               }}
             />
           </div>
@@ -1298,63 +1459,57 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           </div>
         </div>
         {/* Price Breakdown */}
-<div className="mt-4 border-t border-border-subtle pt-4 text-sm">
-  
-  <h4 className="mb-2 text-base font-bold text-text-primary">
-    Price Breakdown
-  </h4>
-
-  <div className="space-y-1.5 text-text-secondary">
-    
-    <div className="grid grid-cols-[140px_12px_1fr]">
-      <span>Price</span>
-      <span>:</span>
-      <span className="text-right">
-        {new Intl.NumberFormat('en-IN', {
-          style: 'currency',
-          currency: 'INR',
-          maximumFractionDigits: 0,
-        }).format(priceDetails.total)}
-      </span>
-    </div>
-
-    <div className="grid grid-cols-[140px_12px_1fr]">
-      <span>GST (5%)</span>
-      <span>:</span>
-      <span className="text-right">
-        {new Intl.NumberFormat('en-IN', {
-          style: 'currency',
-          currency: 'INR',
-          maximumFractionDigits: 0,
-        }).format(gstAmount)}
-      </span>
-    </div>
-
-    <div className="grid grid-cols-[140px_12px_1fr]">
-      <span>Convenience fee</span>
-      <span>:</span>
-      <span className="text-right">
-        {new Intl.NumberFormat('en-IN', {
-          style: 'currency',
-          currency: 'INR',
-          maximumFractionDigits: 0,
-        }).format(convenienceFee)}
-      </span>
-    </div>
-  </div>
-
-  <div className="mt-3 border-t border-border-subtle pt-3 grid grid-cols-[140px_12px_1fr] text-base font-semibold text-text-primary">
-    <span>Total</span>
-    <span>:</span>
-    <span className="text-right">
-      {new Intl.NumberFormat('en-IN', {
-        style: 'currency',
-        currency: 'INR',
-        maximumFractionDigits: 0,
-      }).format(finalTotal)}
-    </span>
-  </div>
-</div>
+        <div className="mt-4 border-t border-border-subtle pt-4 text-sm">
+          <h4 className="mb-2 text-base font-bold text-text-primary">
+            Price Breakdown
+          </h4>
+          <div className="space-y-1.5 text-text-secondary">
+            <div className="grid grid-cols-[140px_12px_1fr]">
+              <span>Price</span>
+              <span>:</span>
+              <span className="text-right">
+                {new Intl.NumberFormat('en-IN', {
+                  style: 'currency',
+                  currency: 'INR',
+                  maximumFractionDigits: 0,
+                }).format(breakdownPrice)}
+              </span>
+            </div>
+            <div className="grid grid-cols-[140px_12px_1fr]">
+              <span>GST (5%)</span>
+              <span>:</span>
+              <span className="text-right">
+                {new Intl.NumberFormat('en-IN', {
+                  style: 'currency',
+                  currency: 'INR',
+                  maximumFractionDigits: 0,
+                }).format(gstAmount)}
+              </span>
+            </div>
+            <div className="grid grid-cols-[140px_12px_1fr]">
+              <span>Convenience fee</span>
+              <span>:</span>
+              <span className="text-right">
+                {new Intl.NumberFormat('en-IN', {
+                  style: 'currency',
+                  currency: 'INR',
+                  maximumFractionDigits: 0,
+                }).format(dailyPricing ? breakdownConvenienceFee : convenienceFee)}
+              </span>
+            </div>
+          </div>
+          <div className="mt-3 border-t border-border-subtle pt-3 grid grid-cols-[140px_12px_1fr] text-base font-semibold text-text-primary">
+            <span>Total</span>
+            <span>:</span>
+            <span className="text-right">
+              {new Intl.NumberFormat('en-IN', {
+                style: 'currency',
+                currency: 'INR',
+                maximumFractionDigits: 0,
+              }).format(finalTotal)}
+            </span>
+          </div>
+        </div>
 
       </div>
 

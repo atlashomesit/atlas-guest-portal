@@ -10,6 +10,7 @@ import { sanitizeItems, getItemKey } from "../../../utils/sanitizeItems";
 import { trackEvent } from "../../../utils/analytics";
 import { buildHomeUnitPath, getPropertySlug, getUnitSlug } from "../../../utils/navigation";
 import OptimizedImage from "../../ui/OptimizedImage";
+import { useDailyPricingSummary } from "../../../hooks/useDailyPricingSummary";
 
 import "./homepage_location.css";
 
@@ -104,6 +105,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
   const navigate = useNavigate();
   const { checkIn, checkOut, guests, searchString } = useSearchSelections(location.search);
   const [activeImageIndex, setActiveImageIndex] = React.useState<Record<string, number>>({});
+  const { loading: dailyPricingLoading, getListingPricing } = useDailyPricingSummary();
 
   const getListingNavigation = React.useCallback(
     (model: ListingModel | null) => {
@@ -217,6 +219,8 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
     const formattedBase = formatter.format(baseNightlyPrice);
     const formattedFinal = formatter.format(finalNightlyPrice);
     const specialLabel = priceDisplayConfig.specialPricingLabels[dateKey];
+    const apiListingId = model.property?.listingId ?? model.listing.id;
+    const todayBreakdown = getListingPricing(apiListingId);
 
     return (
       <div className="flex flex-col gap-1">
@@ -226,17 +230,34 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
           </span>
           <span className="text-xs text-text-muted">{priceDisplayConfig.discount.secondaryBadgeLabel}</span>
         </div>
-        <div className="flex items-baseline gap-2">
-          <span className="text-2xl font-bold text-text-primary">{formattedFinal}</span>
-          {appliedDiscountPercent > 0 && (
-            <span className="text-sm text-text-muted line-through">{formattedBase}</span>
-          )}
-          {appliedDiscountPercent > 0 && (
-            <span className="text-sm font-semibold text-[color:color-mix(in_srgb,var(--cta-primary)_80%,transparent)]">
-              {priceDisplayConfig.discount.savingsPrefix} {appliedDiscountPercent}%
-            </span>
-          )}
-        </div>
+        {dailyPricingLoading && (
+          <span className="text-sm text-text-muted">Loading price…</span>
+        )}
+        {!dailyPricingLoading && todayBreakdown ? (
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <span className="text-2xl font-bold text-black">{formatter.format(todayBreakdown.actualPrice)}</span>
+            {todayBreakdown.globalDiscountPercent > 0 && (
+              <>
+                <span className="text-sm text-gray-400">{formatter.format(todayBreakdown.baseAmount)}</span>
+                <span className="text-sm font-semibold text-[color:color-mix(in_srgb,var(--cta-primary)_80%,transparent)]">
+                  Save {Math.round(todayBreakdown.globalDiscountPercent)}%
+                </span>
+              </>
+            )}
+          </div>
+        ) : !dailyPricingLoading && (
+          <div className="flex items-baseline gap-2">
+            <span className="text-2xl font-bold text-black">{formattedFinal}</span>
+            {appliedDiscountPercent > 0 && (
+              <>
+                <span className="text-sm text-gray-400 line-through">{formattedBase}</span>
+                <span className="text-sm font-semibold text-[color:color-mix(in_srgb,var(--cta-primary)_80%,transparent)]">
+                  {priceDisplayConfig.discount.savingsPrefix} {appliedDiscountPercent}%
+                </span>
+              </>
+            )}
+          </div>
+        )}
         {(hasSpecialDateMultiplier || specialLabel) && (
           <p className="text-xs font-medium text-[color:color-mix(in_srgb,var(--cta-primary)_85%,transparent)]">
             {specialLabel ?? priceDisplayConfig.defaultSpecialLabel}

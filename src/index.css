@@ -626,25 +626,90 @@
   font-size: 9px !important;
 }
 
-/* Ultra-compact day cells - 28px for sidebar */
+/* Day cell: grid with date row + price row; padding; smaller cell */
+.unit-datepicker-wrapper .unit-booking-day-cell {
+  min-height: 48px;
+  width: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+  padding: 3px 2px;
+}
+.unit-datepicker-wrapper .unit-booking-day-cell-inner {
+  display: grid !important;
+  grid-template-columns: 1fr;
+  grid-template-rows: auto auto;
+  row-gap: 6px;
+  place-items: center;
+  overflow: hidden;
+  max-width: 100%;
+  box-sizing: border-box;
+  min-height: 40px;
+}
+.unit-datepicker-wrapper .unit-booking-day-num {
+  line-height: 1;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+}
+.unit-datepicker-wrapper .unit-booking-day-price {
+  line-height: 1;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+  margin: 0;
+  padding: 0;
+}
+
+/* Day cells: fixed size, no overlap - fill grid cell, no margins */
 .unit-datepicker-wrapper .rdrDay {
-  height: 28px !important;
-  width: 28px !important;
-  line-height: 28px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0 !important;
+  min-height: 48px !important;
+  max-width: 100% !important;
+  line-height: 1 !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }
 
 .unit-datepicker-wrapper .rdrDayNumber {
+  margin: 0 !important;
+  padding: 0 !important;
   font-size: 11px !important;
   font-weight: 400 !important;
-  width: 28px !important;
-  height: 28px !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }
 
 .unit-datepicker-wrapper .rdrDayNumber span {
+  margin: 0 !important;
   padding: 0 !important;
-  width: 28px !important;
-  height: 28px !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+  position: relative !important;
   display: flex !important;
+  flex-direction: column !important;
   align-items: center !important;
   justify-content: center !important;
 }
@@ -715,13 +780,16 @@
   overflow: hidden !important;
 }
 
-/* Days grid compact - 28px cells with 2px gaps */
+/* Calendar grid: exactly 7 equal columns, fixed row height, gap only - no overlap */
 .unit-datepicker-wrapper .rdrDays {
-  gap: 2px !important;
-  padding: 0 6px 6px 6px !important;
   display: grid !important;
-  grid-template-columns: repeat(7, 28px) !important;
-  grid-gap: 2px !important;
+  grid-template-columns: repeat(7, minmax(28px, 1fr)) !important;
+  grid-auto-rows: 48px !important;
+  gap: 4px !important;
+  padding: 0 6px 6px 6px !important;
+  align-content: start !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
 }
 
 /* Remove horizontal scroll track/progress bar and any navigation indicators */
