@@ -8,7 +8,7 @@ import priceDisplayConfig from "../../../config/priceDisplay.config";
 import { calculateNightlyPrice, inferUnitType } from "../../../utils/pricing";
 import { sanitizeItems, getItemKey } from "../../../utils/sanitizeItems";
 import { trackEvent } from "../../../utils/analytics";
-import { buildHomeUnitPath, getPropertySlug, getUnitSlug } from "../../../utils/navigation";
+import { buildHomeUnitPath, getPropertySlug } from "../../../utils/navigation";
 import OptimizedImage from "../../ui/OptimizedImage";
 import { useDailyPricingSummary } from "../../../hooks/useDailyPricingSummary";
 
@@ -111,12 +111,15 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
     (model: ListingModel | null) => {
       if (!model) return null;
 
+      const listingId = model.property?.listingId ?? model.listing.id;
+      const id = typeof listingId === "number" ? listingId : Number(listingId);
+      if (!Number.isFinite(id) || id <= 0) return null;
+
       const propertyName = model.property?.property_name ?? model.listing.title;
       const propertySlug = getPropertySlug(model.property ?? { property_name: propertyName });
-      const unitSlug = getUnitSlug(model.property ?? { property_name: propertyName, id: model.listing.id });
-      const path = buildHomeUnitPath(propertySlug, unitSlug);
+      const path = buildHomeUnitPath(propertySlug, id);
 
-      return { path, propertySlug, unitSlug };
+      return { path, propertySlug, listingId: id };
     },
     [],
   );
@@ -186,8 +189,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
           guests,
         },
         {
-          listingId: model.property?.id ?? model.listing.id,
-          unitCode: navigation.unitSlug,
+          listingId: navigation.listingId,
           route: `${navigation.path}${nextSearch}`,
         },
       );

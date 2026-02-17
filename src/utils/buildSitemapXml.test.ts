@@ -21,8 +21,8 @@ describe("buildSitemapXml", () => {
   });
 
   it("includes core paths and each home in the sitemap using the request origin", async () => {
-    // Home paths come from src/content/homes (href format: /homes/atlas-homes-room-{no}/{no})
-    expect(SITEMAP_PATHS).toContain("/homes/atlas-homes-room-101/101");
+    // Home paths come from src/content/homes (href uses Listing.Id PK, not room number)
+    expect(SITEMAP_PATHS).toContain("/homes/atlas-homes-room-101/1");
     expect(SITEMAP_PATHS).not.toContain("/apartments");
 
     const request = new Request("https://dev.atlashomestays.com/sitemap.xml");
@@ -30,7 +30,7 @@ describe("buildSitemapXml", () => {
     const xml = await response.text();
 
     expect(xml).toContain("<loc>https://dev.atlashomestays.com/</loc>");
-    expect(xml).toContain("/homes/atlas-homes-room-101/101</loc>");
+    expect(xml).toContain("/homes/atlas-homes-room-101/1</loc>");
     expect(xml).toContain("/amenities</loc>");
     expect(xml).not.toContain("/apartments");
   });

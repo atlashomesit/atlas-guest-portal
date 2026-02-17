@@ -1,7 +1,8 @@
-import { propertyImages } from "../data";
+import { propertyData, propertyImages } from "../data";
 
 export type Home = {
   roomNo: string;
+  listingId: number;
   title: string;
   slug: string;
   href: string;
@@ -11,6 +12,10 @@ export type Home = {
 };
 
 const placeholderImage = "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80";
+
+const roomNoToListingId = Object.fromEntries(
+  propertyData.map((p) => [String(p.id), p.listingId]).filter(([, lid]) => lid != null)
+) as Record<string, number>;
 
 export const defaultHomeHighlights = [
   "Premium, hotel-grade bedding",
@@ -24,13 +29,18 @@ export const defaultHomeHighlights = [
 type HomeConfig = Pick<Home, "tagline" | "highlights">;
 
 const buildHome = (roomNo: string, config: HomeConfig = {}): Home => {
-  const isPenthouse = roomNo === '501';
-  const pathPrefix = isPenthouse ? 'atlas-penthouse-501' : `atlas-homes-room-${roomNo}`;
-  const href = `/homes/${pathPrefix}/${roomNo}`;
+  const isPenthouse = roomNo === "501";
+  const pathPrefix = isPenthouse ? "atlas-penthouse-501" : `atlas-homes-room-${roomNo}`;
+  const listingId = roomNoToListingId[roomNo];
+  if (!listingId || !Number.isFinite(listingId)) {
+    throw new Error(`Missing listingId for room ${roomNo} in propertyData`);
+  }
+  const href = `/homes/${pathPrefix}/${listingId}`;
   const slug = `atlas-homes-room-${roomNo}`;
 
   return {
     roomNo,
+    listingId,
     title: `Atlas ${isPenthouse ? 'Penthouse' : 'Homes'} ${roomNo}`,
     slug,
     href,

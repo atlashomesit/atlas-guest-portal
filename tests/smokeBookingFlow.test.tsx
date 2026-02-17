@@ -44,7 +44,7 @@ describe.skip("booking smoke flows (property page uses UnitBookingWidget; reserv
 
   const navigateToPropertyFromSearch = async () => {
     act(() => {
-      window.history.pushState({}, "", "/homes/atlas-penthouse-501/501");
+      window.history.pushState({}, "", "/homes/atlas-penthouse-501/7");
       window.dispatchEvent(new PopStateEvent("popstate"));
     });
 

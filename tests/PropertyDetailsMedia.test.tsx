@@ -71,7 +71,7 @@ import Homepage_PropertyDetails from "@/components/homepage_components/homepage_
 describe("Homepage_PropertyDetails gallery", () => {
   it.skip("lazy loads primary and thumbnail images", async () => {
     render(
-      <MemoryRouter initialEntries={["/homes/atlas-homes-room-101/101"]}>
+      <MemoryRouter initialEntries={["/homes/atlas-homes-room-101/1"]}>
         <Homepage_PropertyDetails />
       </MemoryRouter>,
     );

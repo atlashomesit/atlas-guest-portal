@@ -86,6 +86,41 @@ describe('resolveListing', () => {
     expect(result).toBeNull();
   });
 
+  it('returns listing directly when param is Listing.Id (PK)', async () => {
+    fetchMock.mockResolvedValueOnce(
+      makeResponse({
+        ok: true,
+        status: 200,
+        json: async () => ({ id: 2, name: 'Atlas102', propertyId: 1 }),
+      }),
+    );
+
+    const result = await resolveListing('2');
+
+    expect(result).toMatchObject({ id: 2, name: 'Atlas102', propertyId: 1 });
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      `${API_BASE}/listings/2`,
+      expect.anything(),
+    );
+  });
+
+  it('TRAP FIXTURE: id=2 name=Atlas102 - resolveListing(2) must call /listings/2 not /listings/102', async () => {
+    fetchMock.mockResolvedValueOnce(
+      makeResponse({
+        ok: true,
+        status: 200,
+        json: async () => ({ id: 2, name: 'Atlas102', propertyId: 1 }),
+      }),
+    );
+
+    await resolveListing('2');
+
+    expect(fetchMock).toHaveBeenNthCalledWith(1, `${API_BASE}/listings/2`, expect.anything());
+    expect(fetchMock.mock.calls[0][0]).not.toContain('/listings/102');
+  });
+
   it('throws when direct lookup fails with network error', async () => {
     fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
 

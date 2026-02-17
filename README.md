@@ -207,6 +207,7 @@ Each command should return a 301/302 with a `Location` header set to `/property_
 
 ## Listings
 - Featured listing: mark `featured: true` in [`src/data/listings.ts`](src/data/listings.ts). Images are auto-loaded from `src/assets/<unit>/`.
+- **Listing details route and API MUST use `Listing.Id` (PK from DB/API).** Do not derive IDs from listing name (e.g. Atlas102 → 102). The route `/homes/:propertySlug/:listingId` and `GET /listings/{id}` expect the primary key. Use `property.listingId` or `listing.id` from API payloads. Run `npm run check:listing-id` to enforce this guardrail.
 
 ## Blog and Policies updates
 - **Add a blog post:** edit `src/data/blogPosts.ts` and append a new object with `title`, `slug`, `category` (`guest-guides` or `hospitality-tech`), `excerpt`, `content`, and optional `featuredImage`, `metaTitle`, and `metaDescription`. The routes `/blog`, `/blog/:category`, and `/blog/:slug` automatically surface new entries.

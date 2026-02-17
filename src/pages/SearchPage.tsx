@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 
 import { propertyData } from "../data";
 import { formatCurrency, parseDate } from "../utils/formatting";
-import { buildHomeUnitPath, getPropertySlug, getUnitSlug } from "../utils/navigation";
+import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 
 const SearchPage = () => {
   const [searchParams] = useSearchParams();
@@ -16,23 +16,27 @@ const SearchPage = () => {
 
   const listings = useMemo(
     () =>
-      propertyData.map((property) => {
-        const propertySlug = getPropertySlug(property);
-        const unitSlug = getUnitSlug(property);
-        const canonicalPath = buildHomeUnitPath(propertySlug, unitSlug);
+      propertyData
+        .map((property) => {
+          const listingId = property.listingId ?? property.id;
+          const id = typeof listingId === "number" ? listingId : Number(listingId);
+          if (!Number.isFinite(id) || id <= 0) return null;
+          const propertySlug = getPropertySlug(property);
+          const canonicalPath = buildHomeUnitPath(propertySlug, id);
 
-        return {
-          id: `${propertySlug}-${unitSlug}`,
-          title: property.property_name,
-          location: property.property_location ?? "Hyderabad",
-          pricePerNight: property.property_price ?? 0,
-          maxGuests: property.maxCapacity ?? 4,
-          imageUrl: property.property_img?.[0] ?? "/hero_images/slider_bg.png",
-          amenities: property.property_amenities?.slice(0, 3) ?? [],
-          canonicalPath,
-          property,
-        };
-      }),
+          return {
+            id: `${propertySlug}-${id}`,
+            title: property.property_name,
+            location: property.property_location ?? "Hyderabad",
+            pricePerNight: property.property_price ?? 0,
+            maxGuests: property.maxCapacity ?? 4,
+            imageUrl: property.property_img?.[0] ?? "/hero_images/slider_bg.png",
+            amenities: property.property_amenities?.slice(0, 3) ?? [],
+            canonicalPath,
+            property,
+          };
+        })
+        .filter((l): l is NonNullable<typeof l> => l !== null),
     [],
   );
 

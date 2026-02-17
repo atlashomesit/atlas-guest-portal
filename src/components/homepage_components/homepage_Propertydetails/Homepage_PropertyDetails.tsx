@@ -62,7 +62,8 @@ const PropertyDetails = () => {
     const legacyUnitSlug = normalizedLegacyParts.pop();
     const legacyPropertySlug = normalizedLegacyParts.join('-') || undefined;
     const propertySlug = propertySlugParam ?? legacyPropertySlug;
-    const unitSlug = unitSlugParam ?? legacyUnitSlug ?? legacyIdParam;
+    const listingIdParam = unitSlugParam ?? legacyUnitSlug ?? legacyIdParam;
+    const listingId = listingIdParam ? Number(listingIdParam) : NaN;
     const [data, setData] = useState<Property | null>(null);
     const [notFound, setNotFound] = useState(false);
     const [listingPropertyId, setListingPropertyId] = useState<string | number | null>(null);
@@ -89,7 +90,7 @@ const PropertyDetails = () => {
     }, [data, unitType]);
 
     useEffect(() => {
-        const lookupId = data?.listingId ?? location.state?.property?.listingId ?? unitSlug;
+        const lookupId = data?.listingId ?? location.state?.property?.listingId ?? listingIdParam;
 
         if (!lookupId) {
             setListingPropertyId(null);
@@ -138,11 +139,16 @@ const PropertyDetails = () => {
         return () => {
             controller.abort();
         };
-    }, [data?.listingId, location.state, unitSlug]);
+    }, [data?.listingId, location.state, listingIdParam]);
 
     useEffect(() => {
         setNotFound(false);
         setData(null);
+
+        if (listingIdParam && !Number.isNaN(listingId) && listingId <= 0) {
+            setNotFound(true);
+            return;
+        }
 
         const normalizeSlug = (value?: string | number | null) =>
             String(value ?? '')
@@ -152,12 +158,16 @@ const PropertyDetails = () => {
 
         const stripHyphens = (value: string) => value.replace(/-/g, '');
 
-        const normalizedUnitSlug = normalizeSlug(unitSlug);
+        const normalizedUnitSlug = normalizeSlug(listingIdParam);
         const normalizedPropertySlug = normalizeSlug(propertySlug);
         const normalizedPropertySlugStripped = stripHyphens(normalizedPropertySlug);
 
-        // Prefer matching by unit slug, with optional property slug guard
-        const foundByUnitSlug = propertyData.find((item: Property) => {
+        // Prefer matching by listingId (PK), then by legacy id/name for old URLs
+        const foundByListingId = listingIdParam && Number.isFinite(listingId) && listingId > 0
+            ? propertyData.find((item: Property) => Number(item.listingId) === listingId)
+            : null;
+
+        const foundByUnitSlug = foundByListingId ?? propertyData.find((item: Property) => {
             const idSlug = normalizeSlug(item.id);
             const nameSlug = normalizeSlug(item.property_name);
             const unitMatches = normalizedUnitSlug && (idSlug === normalizedUnitSlug || nameSlug === normalizedUnitSlug);
@@ -251,9 +261,9 @@ useEffect(() => {
                 propertyName: data.property_name,
                 price: nightlyPrice?.finalNightlyPrice ?? data.property_price,
             },
-            { listingId: data.id, unitCode: data.id, route: propertySlug && unitSlug ? buildHomeUnitPath(propertySlug, unitSlug) : location.pathname },
+            { listingId: data.listingId ?? data.id, unitCode: data.id, route: propertySlug && (data.listingId ?? listingId) ? buildHomeUnitPath(propertySlug, Number(data.listingId ?? listingId)) : location.pathname },
         );
-    }, [data, location.pathname, nightlyPrice?.finalNightlyPrice, propertySlug, unitSlug]);
+    }, [data, location.pathname, nightlyPrice?.finalNightlyPrice, propertySlug, listingIdParam]);
 
     const renderIcon = (iconName: string) => {
         const name = iconName.toLowerCase();

@@ -10,7 +10,7 @@ import { LISTINGS, type Listing } from "../data/listings";
 import { propertyData, propertyImages } from "../data/propertyData";
 import { getApiBaseUrl } from "../runtime-config";
 import { trackEvent } from "../utils/analytics";
-import { buildHomeUnitPath, getPropertySlug, getUnitSlug, navigateToHomeUnit } from "../utils/navigation";
+import { buildHomeUnitPath, getPropertySlug, navigateToHomeUnit } from "../utils/navigation";
 import { calculateNightlyPrice, inferUnitType, type NightlyPriceBreakdown } from "../utils/pricing";
 import { isAtlasApiRequest, logApiError, monitoredFetch } from "../lib/monitoring";
 import type { UnitType } from "../config/pricing.config";
@@ -459,17 +459,20 @@ export const Apartments = () => {
   }, [guests, listings, maxPrice, minPrice, petFriendlyOnly, propertyType, sortBy]);
 
   const handleNavigate = (property: PropertyRecord) => {
+    const listingId = property.listingId ?? property.id;
+    const id = typeof listingId === "number" ? listingId : Number(listingId);
+    if (!Number.isFinite(id) || id <= 0) return;
+
     const propertySlug = getPropertySlug(property);
-    const unitSlug = getUnitSlug(property);
-    const canonicalPath = buildHomeUnitPath(propertySlug, unitSlug);
+    const canonicalPath = buildHomeUnitPath(propertySlug, id);
 
     trackEvent(
       "listing_selected",
       { surface: "apartments", listingName: property.property_name ?? propertySlug },
-      { listingId: property.id, unitCode: unitSlug, route: canonicalPath },
+      { listingId: id, route: canonicalPath },
     );
 
-    navigateToHomeUnit(navigate, propertySlug, unitSlug, {
+    navigateToHomeUnit(navigate, propertySlug, id, {
       state: { property },
     });
   };

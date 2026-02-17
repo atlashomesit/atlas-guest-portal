@@ -64,16 +64,22 @@ export const getUnitSlug = (property: PropertyLike): string => {
   return slug || "unit";
 };
 
-export const buildHomeUnitPath = (propertySlug: string, unitSlug: string): string =>
-  `/homes/${propertySlug}/${unitSlug}`;
+/**
+ * Returns the listingId (PK) segment for the details route.
+ * MUST be Listing.Id from DB/API - never derived from name/room code.
+ */
+export const getListingIdSegment = (listingId: number): string => String(listingId);
+
+export const buildHomeUnitPath = (propertySlug: string, listingId: number): string =>
+  `/homes/${propertySlug}/${getListingIdSegment(listingId)}`;
 
 export const navigateToHomeUnit = (
   navigate: NavigateFunction,
   propertySlug: string,
-  unitSlug: string,
+  listingId: number,
   options?: NavigateOptions,
 ): string => {
-  const path = buildHomeUnitPath(propertySlug, unitSlug);
+  const path = buildHomeUnitPath(propertySlug, listingId);
   navigate(path, options);
   return path;
 };

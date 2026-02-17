@@ -15,7 +15,8 @@
     "lint": "eslint .",
     "format": "prettier -w .",
     "preview": "vite preview",
-    "validate:legal": "cross-env CI=1 node node_modules/vitest/vitest.mjs run --config vitest.legal.config.ts --bail=1"
+    "validate:legal": "cross-env CI=1 node node_modules/vitest/vitest.mjs run --config vitest.legal.config.ts --bail=1",
+    "check:listing-id": "node scripts/check-listing-id-guardrail.mjs"
   },
   "engines": {
     "node": ">=22.12.0",
