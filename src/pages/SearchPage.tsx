@@ -84,10 +84,11 @@ const SearchPage = () => {
         )}
 
         {!showEmptyState && !hasInvalidDates && (
-          <section className="grid gap-6 sm:grid-cols-2">
+          <section className="grid gap-6 sm:grid-cols-2" data-testid="guest-search-results">
             {filteredUnits.map((unit) => (
               <article
                 key={unit.id}
+                data-testid="guest-listing-card"
                 className="flex flex-col overflow-hidden rounded-2xl border border-border-subtle bg-bg-surface shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
               >
                 <div className="h-48 w-full bg-gradient-to-br from-bg-muted to-bg-surface">
@@ -105,7 +106,7 @@ const SearchPage = () => {
                   </div>
                   <div className="flex items-center justify-between gap-4">
                     <div className="space-y-1">
-                      <p className="text-2xl font-bold text-text-primary">{formatCurrency(unit.pricePerNight)}</p>
+                      <p className="text-2xl font-bold text-text-primary" data-testid="guest-listing-nightly-price">{formatCurrency(unit.pricePerNight)}</p>
                       <p className="text-sm text-text-muted">per night</p>
                     </div>
                     <div className="flex flex-col gap-1 text-right text-xs text-text-muted">
