@@ -530,9 +530,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     [listingId, getListingPricing],
   );
 
-  /** API returns 0 when listing has no ListingPricing row. Treat as invalid — never show ₹0. */
-  const effectiveDailyPricing =
-    dailyPricing && dailyPricing.actualPrice > 0 ? dailyPricing : null;
+  /** When API has loaded, use its price (including 0). When API has not loaded or failed, we show 0. */
+  const effectiveDailyPricing = dailyPricing;
 
   const formatCalendarPrice = useCallback((price: number): string => {
     if (price >= 10000) return `₹${(price / 1000).toFixed(1)}K`;
@@ -559,7 +558,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       total += price;
       d = addDays(d, 1);
     }
-    return total > 0 ? Math.round(total) : null;
+    return Math.round(total);
   }, [dateRange.startDate, dateRange.endDate, calendarDailyPrices, effectiveDailyPricing?.actualPrice]);
 
   // ---------- Fee calculations ----------
@@ -567,14 +566,14 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   // GST = 5% on discounted price
   const gstAmount = 0;
 
-  // Default: daily-summary price (today's rate). When user selects dates: calculated sum from calendar.
+  // When API has loaded: use API price (or calendar sum). When API has not loaded: use 0.
   const hasSelectedRange = Boolean(dateRange.startDate && dateRange.endDate);
   const breakdownPrice =
     hasSelectedRange && selectedRangeTotalFromCalendar != null
       ? selectedRangeTotalFromCalendar
-      : effectiveDailyPricing
+      : effectiveDailyPricing != null
         ? Math.round(effectiveDailyPricing.actualPrice * (hasSelectedRange ? priceDetails.nights : 1))
-        : priceDetails.total;
+        : 0;
   const subtotalForConvenience = priceDetails.total + gstAmount;
   const convenienceFee = Math.round(subtotalForConvenience * 0.027);
   const breakdownSubtotalForConvenience = breakdownPrice + gstAmount;
@@ -584,23 +583,21 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   const finalTotal =
     hasSelectedRange && selectedRangeTotalFromCalendar != null
       ? breakdownFinalTotal
-      : effectiveDailyPricing
+      : effectiveDailyPricing != null
         ? breakdownFinalTotal
-        : priceDetails.total + gstAmount + convenienceFee;
+        : 0;
 
-  // Per-night: when dates selected use calculated average; default use daily-summary (today's rate).
+  // Per-night: when API has loaded use API/calendar data; when API not loaded show 0.
   const perNightForDisplay =
     hasSelectedRange && selectedRangeTotalFromCalendar != null && priceDetails.nights > 0
       ? Math.round(selectedRangeTotalFromCalendar / priceDetails.nights)
-      : effectiveDailyPricing
+      : effectiveDailyPricing != null
         ? effectiveDailyPricing.actualPrice
-        : priceDetails.basePrice / priceDetails.nights;
+        : 0;
 
-  /** Never show ₹0; treat as pricing unavailable. */
+  /** Format price; show ₹0 when 0 (e.g. when API not loaded or API returned 0). */
   const displayPrice = (n: number) =>
-    n > 0
-      ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n)
-      : 'Price unavailable';
+    new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n);
 
 
   const formattedDateLabel = dateRange.startDate && dateRange.endDate
@@ -1239,18 +1236,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           {!dailyPricingLoading && dailyPricingError && (
             <div className="flex items-baseline gap-2">
               <span className="text-2xl font-bold text-black">
-                {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(priceDetails.total)}
+                {displayPrice(0)}
               </span>
-              {priceDetails.appliedDiscountPercent > 0 && (
-                <>
-                  <span className="text-sm text-gray-400 line-through">
-                    {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(priceDetails.subtotal)}
-                  </span>
-                  <span className="text-sm font-semibold text-[color:color-mix(in_srgb,var(--cta-primary)_80%,transparent)]">
-                    {priceDisplayConfig.discount.savingsPrefix} {priceDetails.appliedDiscountPercent}%
-                  </span>
-                </>
-              )}
             </div>
           )}
           {!dailyPricingLoading && !dailyPricingError && selectedRangeTotalFromCalendar != null && dateRange.startDate && dateRange.endDate && (
@@ -1283,18 +1270,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           {!dailyPricingLoading && !dailyPricingError && selectedRangeTotalFromCalendar == null && !effectiveDailyPricing && (
             <div className="flex items-baseline gap-2">
               <span className="text-2xl font-bold text-black">
-                {displayPrice(priceDetails.total)}
+                {displayPrice(0)}
               </span>
-              {priceDetails.appliedDiscountPercent > 0 && (
-                <>
-                  <span className="text-sm text-gray-400 line-through">
-                    {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(priceDetails.subtotal)}
-                  </span>
-                  <span className="text-sm font-semibold text-[color:color-mix(in_srgb,var(--cta-primary)_80%,transparent)]">
-                    {priceDisplayConfig.discount.savingsPrefix} {priceDetails.appliedDiscountPercent}%
-                  </span>
-                </>
-              )}
             </div>
           )}
         </div>
@@ -1400,7 +1377,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                   !isRangeStart &&
                   !isRangeEnd &&
                   !isInRange;
-                const priceText = isPastDate || calendarPricingLoading || price <= 0 ? '—' : formatCalendarPrice(price);
+                const priceText = isPastDate ? '—' : (calendarPricingLoading ? '…' : formatCalendarPrice(price));
 
                 let statusBg = '';
                 if (status === 'Blocked') statusBg = 'bg-red-500/20';
@@ -1504,7 +1481,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                   style: 'currency',
                   currency: 'INR',
                   maximumFractionDigits: 0,
-                }).format(effectiveDailyPricing ? breakdownConvenienceFee : convenienceFee)}
+                }).format(breakdownConvenienceFee)}
               </span>
             </div>
           </div>
