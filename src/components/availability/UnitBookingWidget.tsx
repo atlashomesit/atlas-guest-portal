@@ -1236,11 +1236,28 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           {dailyPricingLoading && (
             <span className="text-sm text-text-muted">Loading price…</span>
           )}
-          <div className="flex items-baseline gap-2 flex-wrap">
-            <span className="text-2xl font-bold text-black">
-              {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(displayTotal)}
-            </span>
-            {displayTotal > 0 && selectedRangeTotalFromCalendar != null && dateRange.startDate && dateRange.endDate && (
+          {!dailyPricingLoading && dailyPricingError && (
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl font-bold text-black">
+                {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(priceDetails.total)}
+              </span>
+              {priceDetails.appliedDiscountPercent > 0 && (
+                <>
+                  <span className="text-sm text-gray-400 line-through">
+                    {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(priceDetails.subtotal)}
+                  </span>
+                  <span className="text-sm font-semibold text-[color:color-mix(in_srgb,var(--cta-primary)_80%,transparent)]">
+                    {priceDisplayConfig.discount.savingsPrefix} {priceDetails.appliedDiscountPercent}%
+                  </span>
+                </>
+              )}
+            </div>
+          )}
+          {!dailyPricingLoading && !dailyPricingError && selectedRangeTotalFromCalendar != null && dateRange.startDate && dateRange.endDate && (
+            <div className="flex items-baseline gap-2 flex-wrap">
+              <span className="text-2xl font-bold text-black">
+                {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(selectedRangeTotalFromCalendar)}
+              </span>
               <span className="text-sm text-gray-400">
                 {priceDetails.nights} {priceDetails.nights === 1 ? 'night' : 'nights'}
               </span>
