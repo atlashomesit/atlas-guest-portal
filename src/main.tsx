@@ -10,6 +10,7 @@ import { initMonitoring } from './lib/monitoring'
 import { initAnalytics } from './utils/analytics'
 import { ThemeProvider } from './theme/ThemeProvider'
 import { loadRuntimeConfig, setRuntimeConfig, getApiBaseUrl } from './runtime-config'
+import { getApiHeaders } from './api/client'
 import { ConfigLoadingScreen } from './runtime-config/ConfigLoadingScreen'
 import { ConfigErrorScreen } from './runtime-config/ConfigErrorScreen'
 
@@ -34,6 +35,13 @@ const bootstrapApp = async () => {
       console.info(
         `[startup] host=${hostname} env=${envLabel} apiBaseUrl=${apiBaseUrl}`,
       )
+      if (!apiBaseUrl?.trim()) {
+        console.error('[Atlas] DEV: apiBaseUrl is not set. Set apiBaseUrl in /.well-known/atlas-runtime-config.json (or runtime config).')
+      }
+      const headers = getApiHeaders()
+      if (!headers['X-Tenant-Slug']) {
+        console.warn('[Atlas] DEV: X-Tenant-Slug will not be sent (tenantKey in runtime config or hostname tenant). Tenant-scoped endpoints may return 400.')
+      }
     }
 
     root.render(
