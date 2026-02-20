@@ -85,6 +85,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
   const [openCalendar, setOpenCalendar] = useState(false);
   const [shownDate, setShownDate] = useState<Date>(today);
   const [calendarDailyPrices, setCalendarDailyPrices] = useState<Map<string, number>>(new Map());
+  const [calendarConvenienceFeePercent, setCalendarConvenienceFeePercent] = useState<number | undefined>(undefined);
   const [calendarPricingLoading, setCalendarPricingLoading] = useState(false);
   const [guests, setGuests] = useState(2);
   const [_bookedDates, setBookedDates] = useState<Date[]>([]);
@@ -338,11 +339,13 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
     const startDate = toISODate(startOfMonth(shownDate));
     setCalendarPricingLoading(true);
     fetchCalendarPricing(listingId, startDate, 2, controller.signal)
-      .then((map) => {
-        setCalendarDailyPrices(map);
+      .then((result) => {
+        setCalendarDailyPrices(result.dateToPrice);
+        setCalendarConvenienceFeePercent(result.convenienceFeePercent);
       })
       .catch(() => {
         setCalendarDailyPrices(new Map());
+        setCalendarConvenienceFeePercent(undefined);
       })
       .finally(() => {
         setCalendarPricingLoading(false);
@@ -574,10 +577,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       : effectiveDailyPricing != null
         ? Math.round(effectiveDailyPricing.actualPrice * (hasSelectedRange ? priceDetails.nights : 1))
         : 0;
+  const convenienceFeePercent = calendarConvenienceFeePercent != null ? calendarConvenienceFeePercent / 100 : 0;
   const subtotalForConvenience = priceDetails.total + gstAmount;
-  const convenienceFee = Math.round(subtotalForConvenience * 0.027);
+  const convenienceFee = Math.round(subtotalForConvenience * convenienceFeePercent);
   const breakdownSubtotalForConvenience = breakdownPrice + gstAmount;
-  const breakdownConvenienceFee = Math.round(breakdownSubtotalForConvenience * 0.027);
+  const breakdownConvenienceFee = Math.round(breakdownSubtotalForConvenience * convenienceFeePercent);
   const breakdownFinalTotal = breakdownPrice + gstAmount + breakdownConvenienceFee;
 
   const finalTotal =
@@ -1027,7 +1031,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           if (e.target === e.currentTarget) closePaymentPopup();
         }}
       >
-        <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full mx-4 max-h-[70vh] flex flex-col animate-in zoom-in-95 duration-200 relative">
+        <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full mx-4 flex flex-col animate-in zoom-in-95 duration-200 relative">
           <button
             type="button"
             onClick={(e) => {
@@ -1042,12 +1046,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
-          <div className="p-10 overflow-y-auto flex-1">
+          <div className="p-10">
             {/* Header with Success Icon */}
             <div className="flex flex-col items-center mb-6">
-              <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-4">
-                <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              <div className="w-16 h-16 rounded-full bg-green-500 flex items-center justify-center mb-4 shadow-md">
+                <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M5 13l4 4L19 7" />
                 </svg>
               </div>
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Payment Successful!</h2>
@@ -1059,34 +1063,36 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             </p>
 
             {/* Booking Details Section */}
-            <div className="bg-gray-50 rounded-xl p-6 mb-6 space-y-3">
-              <h3 className="font-semibold text-gray-900 mb-4">Booking Details</h3>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-gray-600">Booking Reference:</span>
-                  <p className="font-semibold text-gray-900 mt-1">{bookingDetails.bookingId}</p>
+            <div className="bg-gray-100 rounded-xl p-6 mb-6 space-y-4 border border-gray-200">
+              <h3 className="font-bold text-gray-900 text-lg">Booking Details</h3>
+              <div className="space-y-4">
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs uppercase tracking-wider text-gray-500 font-medium">Booking Reference</span>
+                  <p className="text-base font-semibold text-gray-900 break-all">{bookingDetails.bookingId}</p>
                 </div>
-                <div>
-                  <span className="text-gray-600">Amount Paid:</span>
-                  <p className="font-semibold text-gray-900 mt-1">
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs uppercase tracking-wider text-gray-500 font-medium">Amount Paid</span>
+                  <p className="text-lg font-bold text-gray-900">
                     {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(bookingDetails.amount)}
                   </p>
                 </div>
-                <div>
-                  <span className="text-gray-600">Property Name:</span>
-                  <p className="font-semibold text-gray-900 mt-1">{bookingDetails.propertyName}</p>
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs uppercase tracking-wider text-gray-500 font-medium">Property</span>
+                  <p className="text-base font-semibold text-gray-900">{bookingDetails.propertyName}</p>
                 </div>
-                <div>
-                  <span className="text-gray-600">Number of Nights:</span>
-                  <p className="font-semibold text-gray-900 mt-1">{bookingDetails.nights} {bookingDetails.nights === 1 ? 'night' : 'nights'}</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs uppercase tracking-wider text-gray-500 font-medium">Check-in</span>
+                    <p className="text-base font-semibold text-gray-900">{format(bookingDetails.checkIn, 'EEE, dd MMM yyyy')}</p>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs uppercase tracking-wider text-gray-500 font-medium">Check-out</span>
+                    <p className="text-base font-semibold text-gray-900">{format(bookingDetails.checkOut, 'EEE, dd MMM yyyy')}</p>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-gray-600">Check-in Date:</span>
-                  <p className="font-semibold text-gray-900 mt-1">{format(bookingDetails.checkIn, 'EEE, dd MMM yyyy')}</p>
-                </div>
-                <div>
-                  <span className="text-gray-600">Check-out Date:</span>
-                  <p className="font-semibold text-gray-900 mt-1">{format(bookingDetails.checkOut, 'EEE, dd MMM yyyy')}</p>
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs uppercase tracking-wider text-gray-500 font-medium">Duration</span>
+                  <p className="text-base font-semibold text-gray-900">{bookingDetails.nights} {bookingDetails.nights === 1 ? 'night' : 'nights'}</p>
                 </div>
               </div>
             </div>

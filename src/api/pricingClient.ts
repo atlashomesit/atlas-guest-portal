@@ -86,13 +86,19 @@ export async function fetchPricingBreakdown(
   return data as PricingBreakdown;
 }
 
-/** GET /pricing/breakdown?startDate=YYYY-MM-DD&listingId=&months= — returns per-day pricing for calendar. */
+/** Result of GET /pricing/breakdown calendar pricing: per-day prices and convenience fee percent from API (no default). */
+export type CalendarPricingResult = {
+  dateToPrice: Map<string, number>;
+  convenienceFeePercent?: number;
+};
+
+/** GET /pricing/breakdown?startDate=YYYY-MM-DD&listingId=&months= — returns per-day pricing and convenienceFeePercent from API. */
 export async function fetchCalendarPricing(
   listingId: string | number,
   startDate: string,
   months: number = 2,
   signal?: AbortSignal,
-): Promise<Map<string, number>> {
+): Promise<CalendarPricingResult> {
   const url = new URL(buildApiUrl(BREAKDOWN_ENDPOINT));
   url.searchParams.set('startDate', startDate);
   url.searchParams.set('listingId', String(listingId));
@@ -109,6 +115,7 @@ export async function fetchCalendarPricing(
   };
   const listings = raw.listings ?? raw.Listings ?? [];
   const map = new Map<string, number>();
+  let convenienceFeePercent: number | undefined;
   const targetId = Number(listingId);
 
   for (const listing of listings) {
@@ -122,10 +129,14 @@ export async function fetchCalendarPricing(
       const discount = Number(d.discountAmount ?? d.DiscountAmount ?? 0);
       const actualPrice = Math.max(0, base - discount);
       map.set(dateStr, actualPrice);
+      if (convenienceFeePercent === undefined) {
+        const pct = d.convenienceFeePercent ?? d.ConvenienceFeePercent;
+        if (pct !== undefined && pct !== null) convenienceFeePercent = Number(pct);
+      }
     }
     break;
   }
-  return map;
+  return { dateToPrice: map, convenienceFeePercent };
 }
 
 /** GET /pricing/daily-summary. Uses server's current date. Fetch once and reuse. */
