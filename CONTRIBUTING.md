@@ -2,7 +2,15 @@
 
 We welcome contributions that improve the Atlas Homes Frontend. Please follow this workflow to keep the project healthy and predictable.
 
-For feature work spanning the guest frontend and API, see `atlas-api/docs/ATLAS-HIGH-VALUE-BACKLOG.md` and `atlas-api/docs/ATLAS-FEATURE-EXECUTION-PROMPT.md`.
+For feature work spanning the guest frontend and API, see workspace root `ATLAS-HIGH-VALUE-BACKLOG.md` and `ATLAS-FEATURE-EXECUTION-PROMPT.md`.
+
+## Release Gate (run before pushing to dev)
+
+```bash
+cd atlas-e2e; npm run release-gate
+```
+
+This is the **single pre-commit gate** for all repos. It runs lint, build, unit tests, integration tests, migrations, smoke curls, and Playwright E2E across all four repos. See [atlas-e2e/docs/PROD_READINESS_CHECKLIST.md](../atlas-e2e/docs/PROD_READINESS_CHECKLIST.md) for the full 16-gate DevSecOps mapping.
 
 ## Branching Model
 - Create feature branches from `main` using the convention `feature/<short-description>`.
@@ -38,7 +46,7 @@ For feature work spanning the guest frontend and API, see `atlas-api/docs/ATLAS-
 ## Pull Request Checklist
 - [ ] Reference related issues in the description.
 - [ ] Summarize high-level changes and screenshots when UI is impacted.
-- [ ] Ensure `npm ci`, `npm run lint`, `npm run build`, and `npm test` succeed locally (same order as CI).
+- [ ] Run the **release gate** (`cd atlas-e2e; npm run release-gate`) or at minimum: `npm ci && npm run lint && npm run build && npm test`.
 - [ ] The **CI** workflow (`.github/workflows/ci.yml`) runs the same on push/PR; it must pass before merge.
 - [ ] **Never commit `.env` or `.env.local`** – they may contain API keys and other secrets; keep them out of version control.
 - [ ] Update documentation when new configuration, commands, or data model changes occur.

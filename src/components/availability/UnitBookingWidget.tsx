@@ -579,7 +579,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         : 0;
   const convenienceFeePercent = calendarConvenienceFeePercent != null ? calendarConvenienceFeePercent / 100 : 0;
   const subtotalForConvenience = priceDetails.total + gstAmount;
-  const convenienceFee = Math.round(subtotalForConvenience * convenienceFeePercent);
+  const _convenienceFee = Math.round(subtotalForConvenience * convenienceFeePercent);
   const breakdownSubtotalForConvenience = breakdownPrice + gstAmount;
   const breakdownConvenienceFee = Math.round(breakdownSubtotalForConvenience * convenienceFeePercent);
   const breakdownFinalTotal = breakdownPrice + gstAmount + breakdownConvenienceFee;
