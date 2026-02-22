@@ -5,3 +5,5 @@ dist/
 .env
 .env.*
 !.env.example
+# Wrangler Pages Functions build output
+_worker.bundle/
