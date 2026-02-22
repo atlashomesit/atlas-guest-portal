@@ -15,7 +15,7 @@ The hero trust row is intentionally limited to three high-signal badges—**Veri
 
 Rationale: simplify the header for faster wayfinding, surface FAQs in-place of the former Help label without changing content, and keep the full phone number prominent (especially for India users who prefer to call and negotiate) while retaining but softening the Book Now emphasis.
 
-For feature work spanning guest frontend and API, see workspace root `ATLAS-HIGH-VALUE-BACKLOG.md` and `ATLAS-FEATURE-EXECUTION-PROMPT.md`.
+For feature work spanning guest frontend and API, see [atlas-e2e/docs/product/ATLAS-HIGH-VALUE-BACKLOG.md](../atlas-e2e/docs/product/ATLAS-HIGH-VALUE-BACKLOG.md) and [ATLAS-FEATURE-EXECUTION-PROMPT.md](../atlas-e2e/docs/product/ATLAS-FEATURE-EXECUTION-PROMPT.md).
 
 ## Prerequisites
 - Node.js **22.12.0+** (required by Vite 7 and enforced in `.nvmrc`/`.node-version`)
@@ -81,6 +81,8 @@ Cloudflare Pages setup:
 - The workflow `.github/workflows/ci.yml` runs on push to `main` and on pull requests: `npm ci` → lint → build → `npm test` → check:local-network. Use the same commands locally before pushing. See `CONTRIBUTING.md` for the PR checklist. Status check name for branch protection: **build**.
 
 ## Documentation
+
+**System-level docs:** [atlas-e2e/docs](../atlas-e2e/docs/) — Canonical index (00–10 structure) for architecture, roadmap, local-dev setup, and cross-repo docs.
 
 - **CONTRIBUTING.md** — PR checklist, branch model, CI workflow.
 - **SECURITY.md** — Vulnerability reporting.

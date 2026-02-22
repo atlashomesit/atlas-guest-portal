@@ -1,5 +1,7 @@
 # Onboarding Guide
 
+> **For full system setup (API + admin + guest + E2E in <60 min):** see [atlas-e2e/docs/08-implementation/local-dev-setup.md](../atlas-e2e/docs/08-implementation/local-dev-setup.md). This guide covers guest-frontend–only onboarding.
+
 Welcome to the Atlas Homes Frontend project! This guide walks you through environment setup, codebase orientation, and the first validation steps to become productive quickly.
 
 ## 1. Access & Tooling
