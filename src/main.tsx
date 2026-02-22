@@ -11,6 +11,8 @@ import { initAnalytics } from './utils/analytics'
 import { ThemeProvider } from './theme/ThemeProvider'
 import { loadRuntimeConfig, setRuntimeConfig, getApiBaseUrl } from './runtime-config'
 import { getApiHeaders } from './api/client'
+import { getTenantSlug } from './tenant/tenantResolver'
+import { validateTenant } from './tenant/tenantContext'
 import { ConfigLoadingScreen } from './runtime-config/ConfigLoadingScreen'
 import { ConfigErrorScreen } from './runtime-config/ConfigErrorScreen'
 
@@ -42,6 +44,21 @@ const bootstrapApp = async () => {
       if (!headers['X-Tenant-Slug']) {
         console.warn('[Atlas] DEV: X-Tenant-Slug will not be sent (tenantKey in runtime config or hostname tenant). Tenant-scoped endpoints may return 400.')
       }
+    }
+
+    const tenantSlug = getTenantSlug({ fallbackSlug: config.tenantKey });
+    if (tenantSlug) {
+      try {
+        await validateTenant(tenantSlug);
+      } catch (e) {
+        if (import.meta.env.DEV) {
+          console.warn('[Atlas] Tenant validation failed (dev — continuing):', e);
+        } else {
+          throw e;
+        }
+      }
+    } else if (!import.meta.env.DEV) {
+      throw new Error('No tenant could be resolved from the URL. Visit <tenant>.atlashomestays.com.');
     }
 
     root.render(

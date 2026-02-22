@@ -21,9 +21,9 @@ describe('tenantResolver', () => {
   });
 
   describe('getTenantSlugFromHostname', () => {
-    it('returns "atlas" when hostname is atlashomestays.com', () => {
+    it('returns null for bare domain atlashomestays.com (marketplace/landing)', () => {
       setHostname('atlashomestays.com');
-      expect(getTenantSlugFromHostname()).toBe('atlas');
+      expect(getTenantSlugFromHostname()).toBeNull();
     });
 
     it('returns subdomain when hostname is contoso.atlashomestays.com', () => {
@@ -31,9 +31,9 @@ describe('tenantResolver', () => {
       expect(getTenantSlugFromHostname()).toBe('contoso');
     });
 
-    it('returns "atlas" when subdomain is empty (atlashomestays.com with leading dot)', () => {
-      setHostname('atlashomestays.com');
-      expect(getTenantSlugFromHostname()).toBe('atlas');
+    it('returns subdomain for sunrise.atlashomestays.com', () => {
+      setHostname('sunrise.atlashomestays.com');
+      expect(getTenantSlugFromHostname()).toBe('sunrise');
     });
 
     it('returns null when hostname is localhost', () => {
@@ -53,9 +53,14 @@ describe('tenantResolver', () => {
   });
 
   describe('getTenantSlug', () => {
-    it('uses hostname when it resolves (atlashomestays.com)', () => {
+    it('returns subdomain from hostname', () => {
+      setHostname('contoso.atlashomestays.com');
+      expect(getTenantSlug()).toBe('contoso');
+    });
+
+    it('returns null for bare domain (no default)', () => {
       setHostname('atlashomestays.com');
-      expect(getTenantSlug()).toBe('atlas');
+      expect(getTenantSlug()).toBeNull();
     });
 
     it('uses fallbackSlug when hostname does not resolve (localhost)', () => {
