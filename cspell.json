@@ -1,0 +1,22 @@
+{
+  "version": "0.2",
+  "language": "en",
+  "ignorePaths": ["**/node_modules/**", "**/dist/**", "**/build/**", "**/coverage/**", "**/public/static/**", "**/.git/**"],
+  "words": [
+    "ADR",
+    "Auth0",
+    "Cloudflare",
+    "DevSecOps",
+    "EmailJS",
+    "Idempotency",
+    "Mermaid",
+    "MSG91",
+    "OpenAPI",
+    "Playwright",
+    "Razorpay",
+    "Swashbuckle",
+    "TOGAF",
+    "Vite"
+  ]
+}
+

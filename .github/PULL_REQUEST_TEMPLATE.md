@@ -1,3 +1,10 @@
+## Checklist
+
+- [ ] **Docs impacted?** (yes/no + links)
+- [ ] **ADR needed?** (yes/no; if yes, link ADR)
+- [ ] **Runtime config changed?** (yes/no; if yes, update `docs/runbooks/runtime-config.md`)
+- [ ] **API contract changed?** (yes/no; if yes, update `atlas-api/docs/api-contract.md` + OpenAPI)
+
 ### Pull Request Summary
 
 > Briefly describe the changes in this PR.

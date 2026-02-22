@@ -2,7 +2,7 @@
 
 We welcome contributions that improve the Atlas Homes Frontend. Please follow this workflow to keep the project healthy and predictable.
 
-For feature work spanning the guest frontend and API, see workspace root `ATLAS-HIGH-VALUE-BACKLOG.md` and `ATLAS-FEATURE-EXECUTION-PROMPT.md`.
+For feature work spanning the guest frontend and API, see [atlas-e2e/docs/product/ATLAS-HIGH-VALUE-BACKLOG.md](../atlas-e2e/docs/product/ATLAS-HIGH-VALUE-BACKLOG.md) and [ATLAS-FEATURE-EXECUTION-PROMPT.md](../atlas-e2e/docs/product/ATLAS-FEATURE-EXECUTION-PROMPT.md).
 
 ## Release Gate (run before pushing to dev)
 
