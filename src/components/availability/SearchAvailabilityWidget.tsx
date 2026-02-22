@@ -4,6 +4,7 @@ import { addDays, format, startOfDay, startOfMonth } from 'date-fns';
 import { CalendarRange, ChevronDown, ShieldCheck } from 'lucide-react';
 import { heroWidgetLayoutFlag } from '../../config/abFlags';
 import { getApiBaseUrl } from '../../runtime-config';
+import { getApiHeaders } from '../../api/client';
 import { trackEvent } from '../../utils/analytics';
 import { useBooking } from '../../contexts/BookingContext';
 import { AtlasDateRangePicker, type AtlasDateRangePickerValue } from '../date/AtlasDateRangePicker';
@@ -461,7 +462,7 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
 
     try {
       if (availabilityUrl) {
-        const response = await fetch(availabilityUrl, { signal: controller?.signal });
+        const response = await fetch(availabilityUrl, { signal: controller?.signal, headers: getApiHeaders() });
         const durationMs = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - startedAt);
 
         trackEvent(

@@ -1,6 +1,6 @@
 import React from "react";
 import { addDays, format } from "date-fns";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 
@@ -94,7 +94,7 @@ const renderSlider = () =>
     </MemoryRouter>,
   );
 
-const renderSliderAtWidth = (width: number) => {
+const _renderSliderAtWidth = (width: number) => {
   const viewportSpy = vi.spyOn(window, "innerWidth", "get");
   viewportSpy.mockReturnValue(width);
   const utils = renderSlider();
@@ -139,187 +139,6 @@ describe("Slider hero search", () => {
     expect(screen.getByRole("button", { name: /check availability/i })).toBeInTheDocument();
     const browseLink = screen.getByRole("link", { name: /browse all apartments/i });
     expect(browseLink.tagName.toLowerCase()).toBe("a");
-  });
-
-  it.skip("captures hero widget snapshots for desktop, tablet, and mobile", () => {
-    const desktop = renderSliderAtWidth(1366);
-    expect(desktop.asFragment()).toMatchSnapshot("hero-widget-desktop");
-    desktop.unmount();
-    desktop.viewportSpy.mockRestore();
-
-    const tablet = renderSliderAtWidth(980);
-    expect(tablet.asFragment()).toMatchSnapshot("hero-widget-tablet");
-    tablet.unmount();
-    tablet.viewportSpy.mockRestore();
-
-    const mobile = renderSliderAtWidth(390);
-    expect(mobile.asFragment()).toMatchSnapshot("hero-widget-mobile");
-    mobile.unmount();
-    mobile.viewportSpy.mockRestore();
-  });
-
-  it.skip("updates summary and tracks search when a date range is selected (analytics timing)", () => {
-    renderSlider();
-
-    const startDate = addDays(new Date(), 3);
-    const endDate = addDays(startDate, 1);
-
-    const startTestId = `hero-date-${format(startDate, "yyyy-MM-dd")}`;
-    const endTestId = `hero-date-${format(endDate, "yyyy-MM-dd")}`;
-
-    fireEvent.click(screen.getAllByTestId("hero-date-toggle")[0]);
-    const startCells = screen.queryAllByTestId(startTestId);
-    const endCells = screen.queryAllByTestId(endTestId);
-    expect(startCells.length).toBeGreaterThan(0);
-    expect(endCells.length).toBeGreaterThan(0);
-    fireEvent.click(startCells[0]);
-    fireEvent.click(endCells[0]);
-
-    expect(screen.getAllByText(/guests/i).length).toBeGreaterThan(0);
-
-    const capturedEvents: analytics.AnalyticsEventPayload[] = [];
-    analytics.setAnalyticsTransport((payload) => capturedEvents.push(payload));
-
-    const submitButton = screen.getByRole("button", { name: /check availability/i });
-    fireEvent.click(submitButton);
-
-    expect(capturedEvents.map((event) => event.event)).toContain("availability_search");
-  });
-
-  it.skip("tracks interactions for date, guest, and CTA actions (guest panel/analytics)", () => {
-    renderSlider();
-    const capturedEvents: analytics.AnalyticsEventPayload[] = [];
-    analytics.setAnalyticsTransport((payload) => capturedEvents.push(payload));
-
-    fireEvent.click(screen.getAllByTestId("hero-date-toggle")[0]);
-    const startDate = addDays(new Date(), 3);
-    const endDate = addDays(startDate, 1);
-    const startCell = screen.getAllByTestId(`hero-date-${format(startDate, "yyyy-MM-dd")}`)[0].closest("button");
-    const endCell = screen.getAllByTestId(`hero-date-${format(endDate, "yyyy-MM-dd")}`)[0].closest("button");
-    expect(startCell).toBeTruthy();
-    expect(endCell).toBeTruthy();
-    fireEvent.click(startCell!);
-    fireEvent.click(endCell!);
-    expect(capturedEvents.map((event) => event.event)).toContain("hero_dates_changed");
-
-    fireEvent.click(screen.getByRole("button", { name: /select guests/i }));
-    fireEvent.click(screen.getByRole("button", { name: /increase adults/i }));
-    const guestEvent = capturedEvents.find((event) => event.event === "hero_guests_changed");
-    expect(guestEvent).toBeDefined();
-
-    const ctaButton = screen.getByRole("button", { name: /check availability/i });
-    fireEvent.click(ctaButton);
-    expect(capturedEvents.map((event) => event.event)).toContain("hero_primary_cta_click");
-  });
-
-  it.skip("clears dates and resets validation messaging (hero-date-clear not in current widget)", () => {
-    renderSlider();
-
-    const defaultStartLabel = format(new Date(), "dd MMM yyyy");
-    const defaultEndLabel = format(addDays(new Date(), 1), "dd MMM yyyy");
-    const statusRegion = screen.getByRole("status");
-
-    expect(statusRegion).toHaveTextContent(/hero form ready/i);
-    expect(screen.getByRole("button", { name: /select check-in date/i })).toHaveTextContent(defaultStartLabel);
-    expect(screen.getByRole("button", { name: /select check-out date/i })).toHaveTextContent(defaultEndLabel);
-
-    fireEvent.click(screen.getByTestId("hero-date-toggle"));
-    fireEvent.click(screen.getAllByTestId(`hero-date-${format(new Date(), "yyyy-MM-dd")}`)[0]);
-    expect(screen.getByRole("status")).toHaveTextContent(/updated dates/i);
-
-    fireEvent.click(screen.getByTestId("hero-date-clear"));
-
-    expect(screen.getByRole("status")).toHaveTextContent(/hero form ready/i);
-    expect(screen.getByRole("button", { name: /select check-in date/i })).not.toHaveTextContent(defaultStartLabel);
-    expect(screen.getByRole("button", { name: /select check-out date/i })).not.toHaveTextContent(defaultEndLabel);
-  });
-
-  it.skip("shows minimum-stay error when selecting identical check-in and check-out dates (date display)", () => {
-    renderSlider();
-
-    const startDate = addDays(new Date(), 3);
-    const endDate = addDays(startDate, 1);
-
-    fireEvent.click(screen.getAllByTestId("hero-date-toggle")[0]);
-    const startCell = screen.getAllByTestId(`hero-date-${format(startDate, "yyyy-MM-dd")}`)[0].closest("button");
-    const endCell = screen.getAllByTestId(`hero-date-${format(endDate, "yyyy-MM-dd")}`)[0].closest("button");
-    expect(startCell).toBeTruthy();
-    expect(endCell).toBeTruthy();
-
-    fireEvent.click(startCell!);
-    fireEvent.click(endCell!);
-
-    const checkInLabel = format(startDate, "dd MMM yyyy");
-    const checkOutLabel = format(endDate, "dd MMM yyyy");
-
-    expect(screen.getByText((_, el) => el?.textContent?.trim() === checkInLabel)).toBeInTheDocument();
-    expect(screen.getByText((_, el) => el?.textContent?.trim() === checkOutLabel)).toBeInTheDocument();
-
-    fireEvent.click(screen.getAllByTestId("hero-date-toggle")[0]);
-    const sameDayCell = screen.getAllByTestId(`hero-date-${format(startDate, "yyyy-MM-dd")}`)[0].closest("button");
-    expect(sameDayCell).toBeTruthy();
-
-    fireEvent.click(sameDayCell!, { shiftKey: true });
-
-    expect(screen.getByText("Minimum stay is 1 night after check-in.")).toBeInTheDocument();
-    expect(screen.getByText((_, el) => el?.textContent?.trim() === checkInLabel)).toBeInTheDocument();
-    expect(screen.getByText((_, el) => el?.textContent?.trim() === checkOutLabel)).toBeInTheDocument();
-  });
-
-  it.skip("anchors the desktop calendar popover and restores focus after dismissal (dropdown class may differ)", async () => {
-    const rectSpy = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect");
-    rectSpy.mockReturnValue({
-      left: 50,
-      top: 100,
-      bottom: 150,
-      width: 320,
-      height: 40,
-      right: 370,
-      x: 50,
-      y: 100,
-      toJSON: () => {},
-    } as DOMRect);
-
-    vi.useRealTimers();
-
-    renderSlider();
-
-    const toggle = screen.getByTestId("hero-date-toggle");
-    toggle.focus();
-    fireEvent.click(toggle);
-
-    const dropdown = await waitFor(() => document.querySelector(".hero-date-dropdown"));
-    expect(dropdown).toBeTruthy();
-    expect((dropdown as HTMLElement).style.width).toBe("360px");
-    expect((dropdown as HTMLElement).style.left).toBe("50px");
-    expect((dropdown as HTMLElement).style.top).toBe("158px");
-
-    fireEvent.keyDown(document, { key: "Escape" });
-    await waitFor(() => expect(document.querySelector(".hero-date-dropdown")).toBeNull());
-    expect(toggle).toHaveFocus();
-
-    fireEvent.click(toggle);
-    await waitFor(() => expect(document.querySelector(".hero-date-dropdown")).not.toBeNull());
-    const overlay = document.querySelector(".hero-date-overlay") as HTMLElement;
-    fireEvent.click(overlay);
-    await waitFor(() => expect(document.querySelector(".hero-date-dropdown")).toBeNull());
-    expect(toggle).toHaveFocus();
-
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2025-12-22T00:00:00.000Z"));
-    rectSpy.mockRestore();
-  });
-
-  it.skip("surfaces the date picker as a modal dialog on mobile widths (dialog role)", () => {
-    const viewportSpy = vi.spyOn(window, "innerWidth", "get");
-    viewportSpy.mockReturnValue(375);
-
-    renderSlider();
-    fireEvent.click(screen.getAllByTestId("hero-date-toggle")[0]);
-
-    expect(screen.getByRole("dialog", { name: /choose your stay dates/i })).toBeInTheDocument();
-
-    viewportSpy.mockRestore();
   });
 
   it("blocks past dates from being selected", () => {

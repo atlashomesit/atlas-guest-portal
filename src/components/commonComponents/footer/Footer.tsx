@@ -115,7 +115,7 @@ const Footer = () => {
 
             <div className='flex flex-col sm:flex-row items-center justify-center gap-4 text-base text-center mt-10 text-[color:var(--footer-link)]'>
                 <div className='flex items-center gap-2 flex-wrap justify-center'>
-                    <span>© 2025 Atlas Homes</span>
+                    <span>© {new Date().getFullYear()} Atlas Homes</span>
                     <span className='hidden sm:inline'>|</span>
                     <Link to="/policies" className='hover:text-[color:var(--footer-link-hover)] transition-colors'>Policies</Link>
                     <span>|</span>

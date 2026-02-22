@@ -224,7 +224,7 @@ const PropertyDetails = () => {
         }
         
         setNotFound(true);
-    }, [propertySlug, listingIdParam, location.state]);
+    }, [propertySlug, listingIdParam, listingId, location.state]);
 useEffect(() => {
   if (!data?.id) return;
 
@@ -263,7 +263,7 @@ useEffect(() => {
             },
             { listingId: data.listingId ?? data.id, unitCode: data.id, route: propertySlug && (data.listingId ?? listingId) ? buildHomeUnitPath(propertySlug, Number(data.listingId ?? listingId)) : location.pathname },
         );
-    }, [data, location.pathname, nightlyPrice?.finalNightlyPrice, propertySlug, listingIdParam]);
+    }, [data, location.pathname, nightlyPrice?.finalNightlyPrice, propertySlug, listingIdParam, listingId]);
 
     const renderIcon = (iconName: string) => {
         const name = iconName.toLowerCase();

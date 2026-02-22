@@ -27,6 +27,7 @@ import ErrorBoundary from "./components/ErrorBoundary"
 import { ToastContainer } from "react-toastify"
 import { BookingProvider } from "./contexts/BookingContext"
 import Reserve from "./pages/Reserve"
+import BecomeHost from "./pages/BecomeHost"
 import { trackEvent } from "./utils/analytics"
 
 function AppWrapper() {
@@ -89,6 +90,7 @@ function AppWrapper() {
           <Route path="/property_details/:id" element={withBoundary(<LegacyPropertyRedirect />, "property-details-legacy-route")} />
           <Route path="/properties/:id" element={withBoundary(<LegacyPropertyRedirect />, "property-details-modern-redirect-route")} />
           <Route path="/reserve" element={withBoundary(<Reserve />, "reserve-route")} />
+          <Route path="/become-a-host" element={withBoundary(<BecomeHost />, "become-host-route")} />
           <Route path="/property_LocationDetails/:id" element={withBoundary(<Homepage_LocationDetails />, "location-details-route")} />
           <Route path="/:shortCode" element={withBoundary(<ShortLinkRedirect />, "shortlink-route")} />
           <Route path="/*" element={withBoundary(<PageNotFound />, "fallback-route")} />

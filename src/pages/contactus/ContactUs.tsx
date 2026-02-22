@@ -8,6 +8,7 @@ import { Card } from "../../components/ui/Card";
 import { Typography } from "../../components/ui/Typography";
 import { Input } from "../../components/ui/Input";
 import { Button } from "../../components/ui/Button";
+import { buildApiUrl, getApiHeaders } from "../../api/client";
 import ErrorBoundary from "../../components/ErrorBoundary";
 import { toast } from "react-toastify";
 import { logUserAction, reportError } from "../../lib/monitoring";
@@ -36,12 +37,21 @@ const ContactUs = () => {
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
 
+        if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+            toast.error("Please enter a valid email address.");
+            return;
+        }
+        if (formData.contactnumber && formData.contactnumber.replace(/\D/g, '').length < 10) {
+            toast.error("Please enter a valid phone number (at least 10 digits).");
+            return;
+        }
+
         setStatusMessage({ type: "info", text: "Sending your message..." });
 
         try {
-            const response = await fetch("/api/contact", {
+            const response = await fetch(buildApiUrl("/api/contact"), {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: { "Content-Type": "application/json", ...getApiHeaders() },
                 body: JSON.stringify(formData),
             });
 

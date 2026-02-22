@@ -863,7 +863,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           guests: bookingDraft.guests,
           notes: bookingDraft.notes || ''
         },
-        amount: Math.round(finalTotal), // Keep amount in rupees, let backend handle conversion if needed
+        amount: Math.round(finalTotal), // Amount in INR (rupees). Backend converts to paise (*100) for Razorpay order.
         currency: 'INR',
         guestInfo: {
           name: formData.name.trim(),
@@ -1017,18 +1017,18 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     // eslint-disable-next-line react-hooks/rules-of-hooks -- PaymentSuccessPopup only mounts when bookingDetails exists; hook runs in same order when mounted
     useEffect(() => {
       const handleEscape = (e: KeyboardEvent) => {
-        if (e.key === 'Escape') closePaymentPopup();
+        if (e.key === 'Escape') setPaymentStatus(null);
       };
       document.addEventListener('keydown', handleEscape);
       return () => document.removeEventListener('keydown', handleEscape);
-    }, [closePaymentPopup]);
+    }, []);
 
 
     return (
       <div 
         className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
         onClick={(e) => {
-          if (e.target === e.currentTarget) closePaymentPopup();
+          if (e.target === e.currentTarget) setPaymentStatus(null);
         }}
       >
         <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full mx-4 flex flex-col animate-in zoom-in-95 duration-200 relative">
@@ -1135,17 +1135,17 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   const PaymentFailedPopup = () => {
     useEffect(() => {
       const handleEscape = (e: KeyboardEvent) => {
-        if (e.key === 'Escape') closePaymentPopup();
+        if (e.key === 'Escape') setPaymentStatus(null);
       };
       document.addEventListener('keydown', handleEscape);
       return () => document.removeEventListener('keydown', handleEscape);
-    }, [closePaymentPopup]);
+    }, []);
 
     return (
       <div 
         className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
         onClick={(e) => {
-          if (e.target === e.currentTarget) closePaymentPopup();
+          if (e.target === e.currentTarget) setPaymentStatus(null);
         }}
       >
         <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full mx-4 max-h-[70vh] overflow-hidden animate-in zoom-in-95 duration-200 relative">

@@ -25,6 +25,8 @@ function devRuntimeConfigPlugin() {
           return next();
         }
         config = { ...config, apiBaseUrl: devOrigin };
+        const mapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim();
+        if (mapsKey) config.googleMapsApiKey = mapsKey;
         res.setHeader("Content-Type", "application/json");
         res.end(JSON.stringify(config));
       });
