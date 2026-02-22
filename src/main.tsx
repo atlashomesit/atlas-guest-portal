@@ -58,7 +58,7 @@ const bootstrapApp = async () => {
         }
       }
     } else if (!import.meta.env.DEV) {
-      throw new Error('No tenant could be resolved from the URL. Visit <tenant>.atlashomestays.com.');
+      throw new Error('Tenant "tenantKey" not found. Check /.well-known/atlas-runtime-config.json and set tenantKey (or ATLAS_TENANT_KEY in Cloudflare Pages env).');
     }
 
     root.render(

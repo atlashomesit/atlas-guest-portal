@@ -31,7 +31,7 @@ export async function validateTenant(slug: string): Promise<TenantInfo> {
 
   if (!res.ok) {
     if (res.status === 404) {
-      throw new Error(`Tenant "${slug}" not found. Check the URL.`);
+      throw new Error(`Tenant "${slug}" not found. Check /.well-known/atlas-runtime-config.json and ensure tenantKey (or ATLAS_TENANT_KEY) is a valid tenant slug.`);
     }
     throw new Error(`Failed to validate tenant "${slug}" (${res.status}).`);
   }
