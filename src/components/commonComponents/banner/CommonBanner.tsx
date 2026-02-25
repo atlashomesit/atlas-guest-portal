@@ -8,7 +8,7 @@ const CommonBanner: React.FC<CommonBannerProps> = ({ image, PageName }) => {
 
     return (
         <section className=''>
-            <div className='relative h-[70vh] w-full'>
+            <div className='relative h-[40vh] md:h-[70vh] w-full bg-bg-muted'>
                 <img className='h-full w-full object-cover' src={image} alt="Banner" />
             </div>
             <div className='px-4 lg:px-20 py-8'>
