@@ -1,34 +1,44 @@
-import { useEffect } from "react"
+import React, { Suspense, useEffect } from "react"
 import { BrowserRouter as Router, Routes, Route, useLocation, matchPath, Navigate, useParams } from "react-router-dom"
 import './App.css'
-import PageNotFound from "./pages/pagenotfound/PageNotFound"
-import Home from "./pages/home/Home"
 import Navbar from "./components/commonComponents/navbar/Navbar"
 import Footer from "./components/commonComponents/footer/Footer"
-import ContactUs from "./pages/contactus/ContactUs"
-import Homepage_PropertyDetails from "./components/homepage_components/homepage_Propertydetails/Homepage_PropertyDetails"
 import ScrollToTop from "./ScrollTop"
-import Homepage_LocationDetails from "./components/homepage_components/homepage_locationsdetails/Homepage_LocationDetails"
-import Policies from "./pages/Policies"
-import Terms from "./pages/Terms"
-import Amenities from "./pages/Amenities"
-import LocationPage from "./pages/LocationPage"
-import GalleryPage from "./pages/GalleryPage"
-import OffersPage from "./pages/OffersPage"
-import AboutPage from "./pages/AboutPage"
-import FaqPage from "./pages/FaqPage"
-import BlogHome from "./pages/blog/BlogHome"
-import BlogCategory from "./pages/blog/BlogCategory"
-import BlogPostPage from "./pages/blog/BlogPostPage"
-import SearchPage from "./pages/SearchPage"
-import ShortLinkRedirect from "./components/ShortLinkRedirect"
-import SupportWidget from "./components/support/SupportWidget"
 import ErrorBoundary from "./components/ErrorBoundary"
 import { ToastContainer } from "react-toastify"
 import { BookingProvider } from "./contexts/BookingContext"
-import Reserve from "./pages/Reserve"
-import BecomeHost from "./pages/BecomeHost"
 import { trackEvent } from "./utils/analytics"
+
+const Home = React.lazy(() => import("./pages/home/Home"))
+const ContactUs = React.lazy(() => import("./pages/contactus/ContactUs"))
+const Homepage_PropertyDetails = React.lazy(() => import("./components/homepage_components/homepage_Propertydetails/Homepage_PropertyDetails"))
+const Homepage_LocationDetails = React.lazy(() => import("./components/homepage_components/homepage_locationsdetails/Homepage_LocationDetails"))
+const Policies = React.lazy(() => import("./pages/Policies"))
+const Terms = React.lazy(() => import("./pages/Terms"))
+const Amenities = React.lazy(() => import("./pages/Amenities"))
+const LocationPage = React.lazy(() => import("./pages/LocationPage"))
+const GalleryPage = React.lazy(() => import("./pages/GalleryPage"))
+const OffersPage = React.lazy(() => import("./pages/OffersPage"))
+const AboutPage = React.lazy(() => import("./pages/AboutPage"))
+const FaqPage = React.lazy(() => import("./pages/FaqPage"))
+const BlogHome = React.lazy(() => import("./pages/blog/BlogHome"))
+const BlogCategory = React.lazy(() => import("./pages/blog/BlogCategory"))
+const BlogPostPage = React.lazy(() => import("./pages/blog/BlogPostPage"))
+const SearchPage = React.lazy(() => import("./pages/SearchPage"))
+const ShortLinkRedirect = React.lazy(() => import("./components/ShortLinkRedirect"))
+const SupportWidget = React.lazy(() => import("./components/support/SupportWidget"))
+const Reserve = React.lazy(() => import("./pages/Reserve"))
+const BecomeHost = React.lazy(() => import("./pages/BecomeHost"))
+const PageNotFound = React.lazy(() => import("./pages/pagenotfound/PageNotFound"))
+
+function LazyFallback() {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '40vh' }}>
+      <div style={{ width: 32, height: 32, border: '3px solid #e5e7eb', borderTopColor: '#ea580c', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  )
+}
 
 function AppWrapper() {
   const location = useLocation();
@@ -68,6 +78,7 @@ function AppWrapper() {
       {!shouldHideNavbar && <Navbar />}
       <ScrollToTop />
       <ErrorBoundary name="router">
+        <Suspense fallback={<LazyFallback />}>
         <Routes>
           <Route path="/" element={withBoundary(<Home />, "home-route")} />
           <Route path="/contact" element={withBoundary(<ContactUs />, "contact-route")} />
@@ -95,8 +106,9 @@ function AppWrapper() {
           <Route path="/:shortCode" element={withBoundary(<ShortLinkRedirect />, "shortlink-route")} />
           <Route path="/*" element={withBoundary(<PageNotFound />, "fallback-route")} />
         </Routes>
+        </Suspense>
       </ErrorBoundary>
-      <SupportWidget />
+      <Suspense fallback={null}><SupportWidget /></Suspense>
       <Footer />
       <ToastContainer position="top-right" newestOnTop pauseOnFocusLoss={false} />
     </>
