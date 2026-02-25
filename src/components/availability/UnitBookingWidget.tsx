@@ -576,9 +576,6 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
   // ---------- Fee calculations ----------
 
-  // GST = 5% on discounted price
-  const gstAmount = 0;
-
   // When API has loaded: use API price (or calendar sum). When API has not loaded: use 0.
   const hasSelectedRange = Boolean(dateRange.startDate && dateRange.endDate);
   const breakdownPrice =
@@ -587,6 +584,14 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       : effectiveDailyPricing != null
         ? Math.round(effectiveDailyPricing.actualPrice * (hasSelectedRange ? priceDetails.nights : 1))
         : 0;
+
+  // GST: 5% for tariff <= 7500/night, 12% above (India accommodation slab)
+  const GST_RATE_LOW = 0.05;
+  const GST_RATE_HIGH = 0.12;
+  const GST_THRESHOLD = 7500;
+  const effectiveGstRate = perNightForDisplay > GST_THRESHOLD ? GST_RATE_HIGH : GST_RATE_LOW;
+  const gstAmount = Math.round(breakdownPrice * effectiveGstRate);
+
   const convenienceFeePercent = calendarConvenienceFeePercent != null ? calendarConvenienceFeePercent / 100 : 0;
   const subtotalForConvenience = priceDetails.total + gstAmount;
   const _convenienceFee = Math.round(subtotalForConvenience * convenienceFeePercent);
@@ -1493,7 +1498,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               </span>
             </div>
             <div className="grid grid-cols-[140px_12px_1fr]">
-              <span>GST (5%)</span>
+              <span>GST ({Math.round(effectiveGstRate * 100)}%)</span>
               <span>:</span>
               <span className="text-right">
                 {new Intl.NumberFormat('en-IN', {
@@ -1589,6 +1594,21 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       </div>
 
       {formError && paymentStatus !== 'cancelled' && <p className="text-sm text-support-error">{formError}</p>}
+
+      <div className="space-y-2 text-xs text-text-muted" data-testid="trust-policy-section">
+        <p className="flex items-center gap-1.5">
+          <svg className="h-3.5 w-3.5 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+          <span>Secure payment via <strong>Razorpay</strong> (UPI, Cards, Net Banking)</span>
+        </p>
+        <p>No refunds for cancellations within 7 days of check-in.{' '}
+          <a href="/terms#cancellations" className="underline hover:text-text-primary" target="_blank" rel="noopener noreferrer">Cancellation policy</a>
+        </p>
+        <p>
+          By booking you agree to our{' '}
+          <a href="/terms" className="underline hover:text-text-primary" target="_blank" rel="noopener noreferrer">Terms</a>{' & '}
+          <a href="/policies" className="underline hover:text-text-primary" target="_blank" rel="noopener noreferrer">Privacy Policy</a>.
+        </p>
+      </div>
 
       <Button 
         type="submit" 
