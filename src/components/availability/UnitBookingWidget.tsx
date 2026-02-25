@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { addDays, format, startOfMonth } from 'date-fns';
 import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { toast } from 'react-toastify';
 import { Button } from '@/components/ui/Button';
 import { AtlasDateRangePicker, type AtlasDateRangePickerValue } from '@/components/date/AtlasDateRangePicker';
 import { useBooking } from '@/contexts/BookingContext';
@@ -95,6 +96,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const lastAvailabilityKeyRef = useRef<string | null>(null);
   const hasAutoAdjustedRef = useRef(false);
+  const submittingRef = useRef(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [dateError, setDateError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -702,6 +704,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       
       if (response.data.success) {
         setStatusMessage('Payment successful! Your booking is confirmed.');
+        toast.success('Booking confirmed! You will receive confirmation details via SMS/WhatsApp/Email shortly.', { autoClose: 8000 });
       } else {
         throw new Error(response.data.message || 'Payment verification failed');
       }
@@ -712,6 +715,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         headers: (error as { response?: { headers?: unknown } }).response?.headers
       });
       setFormError(getBookingErrorMessage(error, 'verify'));
+      toast.error('Payment verification failed. Please contact support if the amount was deducted.');
       throw error;
     }
   };
@@ -747,12 +751,17 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (submittingRef.current || isConfirmed) return;
+    submittingRef.current = true;
+
     if (isBookingDisabled) {
+      submittingRef.current = false;
       setFormError('Service temporarily unavailable. Please try again later.');
       return;
     }
 
     if (!validateForm()) {
+      submittingRef.current = false;
       return;
     }
 
@@ -761,8 +770,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     let checkoutDate: Date;
     
     if (!dateRange.startDate || !dateRange.endDate) {
-      // Ensure availability data is loaded before auto-generating dates
       if (dateStatusMap.size === 0) {
+        submittingRef.current = false;
         setFormError('Please wait for availability data to load, or select dates manually.');
         return;
       }
@@ -783,6 +792,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       if (!startFromDate) {
         const nextAvailable = findNextAvailableDate(today);
         if (!nextAvailable) {
+          submittingRef.current = false;
           setFormError('No available dates found. Please try again later.');
           return;
         }
@@ -792,6 +802,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       // Verify dates are within the availability range we fetched
       if (startFromDate.getTime() < availabilityRange.startDate.getTime() || 
           addDays(startFromDate, 1).getTime() > availabilityRange.endDate.getTime()) {
+        submittingRef.current = false;
         setFormError('Selected dates are outside the available range. Please select dates manually.');
         return;
       }
@@ -811,13 +822,14 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     
     // Reject if check-in date is blocked or hold
     if (isCheckinBlocked) {
+      submittingRef.current = false;
       setFormError('Check-in date is not available. Please select a different check-in date.');
       return;
     }
     
-    // Verify dates are within the availability range we fetched
     if (checkinDate.getTime() < availabilityRange.startDate.getTime() || 
         checkoutDate.getTime() > availabilityRange.endDate.getTime()) {
+      submittingRef.current = false;
       setFormError('Selected dates are outside the available range. Please select dates manually.');
       return;
     }
@@ -826,12 +838,14 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     try {
       orderUrl = buildApiUrl('/api/Razorpay/order');
     } catch {
+      submittingRef.current = false;
       setFormError('Unable to start checkout. Please try again later.');
       return;
     }
 
     const numericListingId = listingId != null ? Number(listingId) : NaN;
     if (!Number.isFinite(numericListingId)) {
+      submittingRef.current = false;
       setFormError('Property could not be loaded. Please refresh the page and try again.');
       return;
     }
@@ -905,9 +919,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             },
             modal: {
               ondismiss: () => {
-                // Handle modal close/exit (when user clicks "Yes, exit" or closes the modal)
-                // Only show failed popup if payment wasn't completed (user cancelled/exited)
                 if (!paymentCompleted) {
+                  submittingRef.current = false;
                   setPaymentStatus('failed');
                   setFormError('Payment was cancelled. Please try again to complete your booking.');
                   setIsLoading(false);
@@ -959,6 +972,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                 });
               } catch (error) {
                 console.error('Payment processing error:', error);
+                submittingRef.current = false;
                 setPaymentStatus('failed');
                 setFormError(getBookingErrorMessage(error, 'verify'));
               } finally {
@@ -969,7 +983,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
           const rzp = new window.Razorpay(options);
           rzp.on('payment.failed', (response: { error?: { description?: string } }) => {
-            paymentCompleted = true; // Payment attempt was made
+            paymentCompleted = true;
+            submittingRef.current = false;
             setPaymentStatus('failed');
             setFormError(`Payment failed: ${response.error?.description || 'Unknown error'}`);
             setIsLoading(false);
@@ -978,12 +993,14 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           rzp.open();
         } catch (error) {
           console.error('Error initializing Razorpay:', error);
+          submittingRef.current = false;
           setFormError('Failed to initialize payment. Please try again.');
           setIsLoading(false);
         }
       });
     } catch (error: unknown) {
       console.error('Booking error:', error);
+      submittingRef.current = false;
       setFormError(getBookingErrorMessage(error, 'order'));
       setIsLoading(false);
     }
@@ -998,138 +1015,15 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     navigate('/', { replace: true });
   }, [navigate, closePaymentPopup]);
 
-  // Auto-close timers in parent so they are not reset by inner component re-mounts
+  // Auto-close failure popup after 3s; success state is permanent for the session.
   useEffect(() => {
     if (paymentStatus === 'failed') {
       const t = window.setTimeout(() => setPaymentStatus(null), 3000);
       return () => window.clearTimeout(t);
     }
-    if (paymentStatus === 'success') {
-      const t = window.setTimeout(() => setPaymentStatus(null), 6000);
-      return () => window.clearTimeout(t);
-    }
   }, [paymentStatus]);
 
-  // Payment Success Popup Component
-  const PaymentSuccessPopup = () => {
-    if (!bookingDetails) return null;
-
-    // eslint-disable-next-line react-hooks/rules-of-hooks -- PaymentSuccessPopup only mounts when bookingDetails exists; hook runs in same order when mounted
-    useEffect(() => {
-      const handleEscape = (e: KeyboardEvent) => {
-        if (e.key === 'Escape') setPaymentStatus(null);
-      };
-      document.addEventListener('keydown', handleEscape);
-      return () => document.removeEventListener('keydown', handleEscape);
-    }, []);
-
-
-    return (
-      <div 
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
-        onClick={(e) => {
-          if (e.target === e.currentTarget) setPaymentStatus(null);
-        }}
-      >
-        <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full mx-4 flex flex-col animate-in zoom-in-95 duration-200 relative">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setPaymentStatus(null);
-            }}
-            className="absolute top-4 right-4 z-[60] p-1.5 rounded-full text-gray-500 hover:text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-300 transition-colors"
-            aria-label="Close"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-          <div className="p-10">
-            {/* Header with Success Icon */}
-            <div className="flex flex-col items-center mb-6">
-              <div className="w-16 h-16 rounded-full bg-green-500 flex items-center justify-center mb-4 shadow-md">
-                <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Payment Successful!</h2>
-            </div>
-
-            {/* Primary Message */}
-            <p className="text-center text-gray-700 mb-6">
-              Thank you for your booking. Your payment has been processed successfully.
-            </p>
-
-            {/* Booking Details Section */}
-            <div className="bg-gray-100 rounded-xl p-6 mb-6 space-y-4 border border-gray-200">
-              <h3 className="font-bold text-gray-900 text-lg">Booking Details</h3>
-              <div className="space-y-4">
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs uppercase tracking-wider text-gray-500 font-medium">Booking Reference</span>
-                  <p className="text-base font-semibold text-gray-900 break-all">{bookingDetails.bookingId}</p>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs uppercase tracking-wider text-gray-500 font-medium">Amount Paid</span>
-                  <p className="text-lg font-bold text-gray-900">
-                    {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(bookingDetails.amount)}
-                  </p>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs uppercase tracking-wider text-gray-500 font-medium">Property</span>
-                  <p className="text-base font-semibold text-gray-900">{bookingDetails.propertyName}</p>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex flex-col gap-1">
-                    <span className="text-xs uppercase tracking-wider text-gray-500 font-medium">Check-in</span>
-                    <p className="text-base font-semibold text-gray-900">{format(bookingDetails.checkIn, 'EEE, dd MMM yyyy')}</p>
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <span className="text-xs uppercase tracking-wider text-gray-500 font-medium">Check-out</span>
-                    <p className="text-base font-semibold text-gray-900">{format(bookingDetails.checkOut, 'EEE, dd MMM yyyy')}</p>
-                  </div>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs uppercase tracking-wider text-gray-500 font-medium">Duration</span>
-                  <p className="text-base font-semibold text-gray-900">{bookingDetails.nights} {bookingDetails.nights === 1 ? 'night' : 'nights'}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Confirmation Email Message */}
-            <p className="text-center text-gray-700 mb-4">
-              A confirmation email has been sent to <span className="font-semibold">{bookingDetails.email}</span> with your booking details and house rules.
-            </p>
-
-            {/* Secondary Message */}
-            <p className="text-center text-gray-600 mb-6">
-              Your booking is confirmed. You will receive check-in instructions 24 hours before arrival.
-            </p>
-          </div>
-
-          {/* Fixed Bottom Section */}
-          <div className="px-10 pb-10 pt-4 border-t border-gray-200 bg-white rounded-b-2xl">
-            {/* Buttons */}
-            <div className="flex justify-center mb-4">
-              <Button
-                type="button"
-                onClick={goToDashboard}
-                className="px-10 py-3 text-lg font-semibold bg-green-600 hover:bg-green-700 text-white shadow-lg"
-              >
-                Go to Dashboard
-              </Button>
-            </div>
-
-            {/* Footer Note */}
-            <p className="text-center text-xs text-gray-500">
-              Need help? Contact us at +91-7032493290 or atlashomeskphb@gmail.com
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  };
+  const isConfirmed = paymentStatus === 'success' && bookingDetails != null;
 
   // Payment Failed Popup Component
   const PaymentFailedPopup = () => {
@@ -1213,11 +1107,59 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     );
   };
 
+  if (isConfirmed && bookingDetails) {
+    return (
+      <div data-testid="booking-confirmation-card" className="rounded-2xl border border-green-200 bg-green-50 shadow-level1 p-6 space-y-5">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center">
+            <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h3 className="text-xl font-bold text-gray-900">Booking Confirmed</h3>
+        </div>
+
+        <div className="bg-white rounded-xl p-5 space-y-3 border border-gray-200 text-sm">
+          <div className="flex justify-between">
+            <span className="text-gray-500">Booking ID</span>
+            <span className="font-semibold text-gray-900" data-testid="booking-id">{bookingDetails.bookingId}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-500">Check-in</span>
+            <span className="font-semibold text-gray-900">{format(bookingDetails.checkIn, 'EEE, dd MMM yyyy')}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-500">Check-out</span>
+            <span className="font-semibold text-gray-900">{format(bookingDetails.checkOut, 'EEE, dd MMM yyyy')}</span>
+          </div>
+          <div className="border-t border-gray-100 pt-3 flex justify-between">
+            <span className="text-gray-500">Amount Paid</span>
+            <span className="font-bold text-gray-900">
+              {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(bookingDetails.amount)}
+            </span>
+          </div>
+        </div>
+
+        <p className="text-center text-sm text-gray-600">
+          Confirmation sent to <span className="font-semibold">{bookingDetails.email}</span>
+        </p>
+
+        <Button
+          type="button"
+          fullWidth
+          onClick={goToDashboard}
+          className="bg-green-600 hover:bg-green-700 text-white"
+        >
+          Back to Home
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <>
-      {paymentStatus === 'success' && <PaymentSuccessPopup />}
       {paymentStatus === 'failed' && <PaymentFailedPopup />}
-      <form onSubmit={handleSubmit} className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6 space-y-5">
+      <form onSubmit={handleSubmit} data-testid="guest-booking-form" className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6 space-y-5">
 
       <div className="space-y-1">
         <p className="text-sm uppercase tracking-[0.12em] text-text-muted font-semibold">Reserve</p>
@@ -1517,6 +1459,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             type="text"
             id="name"
             name="name"
+            data-testid="guest-booking-name"
             value={formData.name}
             onChange={handleInputChange}
             disabled={isBookingDisabled}
@@ -1534,6 +1477,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             type="email"
             id="email"
             name="email"
+            data-testid="guest-booking-email"
             value={formData.email}
             onChange={handleInputChange}
             disabled={isBookingDisabled}
@@ -1551,6 +1495,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             type="tel"
             id="phone"
             name="phone"
+            data-testid="guest-booking-phone"
             value={formData.phone}
             onChange={handleInputChange}
             disabled={isBookingDisabled}
@@ -1567,8 +1512,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         type="submit" 
         fullWidth 
         onClick={handleSubmit} 
-        disabled={isLoading || !dateRange.startDate || !dateRange.endDate || isBookingDisabled}
+        disabled={isLoading || isConfirmed || !dateRange.startDate || !dateRange.endDate || isBookingDisabled}
         className={isLoading ? 'opacity-75' : ''}
+        data-testid="booking-submit-button"
       >
         {isBookingDisabled ? 'Unavailable' : isLoading ? 'Processing...' : 'Book this home'}
       </Button>
