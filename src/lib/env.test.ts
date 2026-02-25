@@ -1,23 +1,18 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { getAllowedEmails } from "./env";
 
 afterEach(() => {
-  vi.restoreAllMocks();
   vi.unstubAllEnvs();
-  vi.resetModules();
 });
 
 describe("getAllowedEmails", () => {
-  it("parses JSON array", async () => {
+  it("parses JSON array", () => {
     vi.stubEnv("VITE_ALLOWED_EMAILS", '["a@example.com","b@example.com"]');
-    vi.resetModules();
-    const { getAllowedEmails } = await import("./env");
     expect(getAllowedEmails()).toEqual(["a@example.com", "b@example.com"]);
   });
 
-  it("parses CSV list", async () => {
+  it("parses CSV list", () => {
     vi.stubEnv("VITE_ALLOWED_EMAILS", "a@example.com,b@example.com");
-    vi.resetModules();
-    const { getAllowedEmails } = await import("./env");
     expect(getAllowedEmails()).toEqual(["a@example.com", "b@example.com"]);
   });
 });
