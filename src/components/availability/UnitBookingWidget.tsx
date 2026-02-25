@@ -97,6 +97,8 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
   const lastAvailabilityKeyRef = useRef<string | null>(null);
   const hasAutoAdjustedRef = useRef(false);
   const submittingRef = useRef(false);
+  const razorpayRef = useRef<{ open: (o?: unknown) => void } | null>(null);
+  const razorpayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [dateError, setDateError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -109,7 +111,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
     email: '',
     phone: ''
   });
-  const [paymentStatus, setPaymentStatus] = useState<'success' | 'failed' | null>(null);
+  const [paymentStatus, setPaymentStatus] = useState<'success' | 'failed' | 'cancelled' | null>(null);
   const [bookingDetails, setBookingDetails] = useState<{
     bookingId: string;
     amount: number;
@@ -119,6 +121,12 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
     nights: number;
     email: string;
   } | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (razorpayTimeoutRef.current) clearTimeout(razorpayTimeoutRef.current);
+    };
+  }, []);
 
   // Availability range always starts from today, independent of selected dates or shown date
   const availabilityRange = useMemo(() => {
@@ -601,6 +609,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         ? effectiveDailyPricing.actualPrice
         : 0;
 
+  const MAX_SANE_NIGHTLY_PRICE = 500_000;
+  const isPriceSane = (n: number) => Number.isFinite(n) && n >= 0 && n <= MAX_SANE_NIGHTLY_PRICE;
+
   /** Format price; show ₹0 when 0 (e.g. when API not loaded or API returned 0). */
   const displayPrice = (n: number) =>
     new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n);
@@ -751,8 +762,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (submittingRef.current || isConfirmed) return;
+    if (submittingRef.current || isConfirmed) {
+      if (submittingRef.current) setFormError('Your booking is being processed. Please wait.');
+      return;
+    }
     submittingRef.current = true;
+    setFormError(null);
 
     if (isBookingDisabled) {
       submittingRef.current = false;
@@ -919,16 +934,26 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             },
             modal: {
               ondismiss: () => {
+                if (razorpayTimeoutRef.current) {
+                  clearTimeout(razorpayTimeoutRef.current);
+                  razorpayTimeoutRef.current = null;
+                }
+                razorpayRef.current = null;
                 if (!paymentCompleted) {
                   submittingRef.current = false;
-                  setPaymentStatus('failed');
-                  setFormError('Payment was cancelled. Please try again to complete your booking.');
+                  setPaymentStatus('cancelled');
+                  setFormError('Payment was cancelled. You can try again when ready.');
                   setIsLoading(false);
                 }
               }
             },
             handler: async (response: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => {
-              paymentCompleted = true; // Mark payment as completed
+              paymentCompleted = true;
+              if (razorpayTimeoutRef.current) {
+                clearTimeout(razorpayTimeoutRef.current);
+                razorpayTimeoutRef.current = null;
+              }
+              razorpayRef.current = null;
               try {
                 await verifyPayment({
                   bookingId,
@@ -982,13 +1007,30 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           };
 
           const rzp = new window.Razorpay(options);
+          razorpayRef.current = rzp;
+
           rzp.on('payment.failed', (response: { error?: { description?: string } }) => {
+            if (razorpayTimeoutRef.current) {
+              clearTimeout(razorpayTimeoutRef.current);
+              razorpayTimeoutRef.current = null;
+            }
+            razorpayRef.current = null;
             paymentCompleted = true;
             submittingRef.current = false;
             setPaymentStatus('failed');
             setFormError(`Payment failed: ${response.error?.description || 'Unknown error'}`);
             setIsLoading(false);
           });
+
+          razorpayTimeoutRef.current = setTimeout(() => {
+            if (!paymentCompleted && submittingRef.current) {
+              razorpayRef.current = null;
+              submittingRef.current = false;
+              setPaymentStatus('failed');
+              setFormError('Payment gateway timed out. Please close the payment window and try again.');
+              setIsLoading(false);
+            }
+          }, 120_000);
 
           rzp.open();
         } catch (error) {
@@ -1015,10 +1057,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     navigate('/', { replace: true });
   }, [navigate, closePaymentPopup]);
 
-  // Auto-close failure popup after 3s; success state is permanent for the session.
+  // Auto-close failure/cancelled popup after 3s; success state is permanent for the session.
   useEffect(() => {
-    if (paymentStatus === 'failed') {
-      const t = window.setTimeout(() => setPaymentStatus(null), 3000);
+    if (paymentStatus === 'failed' || paymentStatus === 'cancelled') {
+      const t = window.setTimeout(() => { setPaymentStatus(null); setFormError(null); }, 4000);
       return () => window.clearTimeout(t);
     }
   }, [paymentStatus]);
@@ -1159,6 +1201,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   return (
     <>
       {paymentStatus === 'failed' && <PaymentFailedPopup />}
+      {paymentStatus === 'cancelled' && formError && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 mb-3">
+          {formError}
+          <button type="button" onClick={() => { setPaymentStatus(null); setFormError(null); }} className="ml-3 font-semibold underline">Dismiss</button>
+        </div>
+      )}
       <form onSubmit={handleSubmit} data-testid="guest-booking-form" className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6 space-y-5">
 
       <div className="space-y-1">
@@ -1189,31 +1237,43 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             </div>
           )}
           {!dailyPricingLoading && !dailyPricingError && selectedRangeTotalFromCalendar != null && dateRange.startDate && dateRange.endDate && (
-            <div className="flex items-baseline gap-2 flex-wrap">
-              <span className="text-2xl font-bold text-black">
-                {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(selectedRangeTotalFromCalendar)}
-              </span>
-              <span className="text-sm text-gray-400">
-                {priceDetails.nights} {priceDetails.nights === 1 ? 'night' : 'nights'}
-              </span>
-            </div>
+            isPriceSane(perNightForDisplay) ? (
+              <div className="flex items-baseline gap-2 flex-wrap">
+                <span className="text-2xl font-bold text-black">
+                  {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(selectedRangeTotalFromCalendar)}
+                </span>
+                <span className="text-sm text-gray-400">
+                  {priceDetails.nights} {priceDetails.nights === 1 ? 'night' : 'nights'}
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-baseline gap-2">
+                <span className="text-lg font-semibold text-amber-700">Price unavailable for selected dates</span>
+              </div>
+            )
           )}
           {!dailyPricingLoading && !dailyPricingError && selectedRangeTotalFromCalendar == null && effectiveDailyPricing && (
-            <div className="flex items-baseline gap-2 flex-wrap">
-              <span className="text-2xl font-bold text-black">
-                {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(effectiveDailyPricing.actualPrice)}
-              </span>
-              {effectiveDailyPricing.globalDiscountPercent > 0 && (
-                <>
-                  <span className="text-sm text-gray-400">
-                    {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(effectiveDailyPricing.baseAmount)}
-                  </span>
-                  <span className="text-sm font-semibold text-[color:color-mix(in_srgb,var(--cta-primary)_80%,transparent)]">
-                    {priceDisplayConfig.discount.savingsPrefix} {Math.round(effectiveDailyPricing.globalDiscountPercent)}%
-                  </span>
-                </>
-              )}
-            </div>
+            isPriceSane(effectiveDailyPricing.actualPrice) ? (
+              <div className="flex items-baseline gap-2 flex-wrap">
+                <span className="text-2xl font-bold text-black">
+                  {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(effectiveDailyPricing.actualPrice)}
+                </span>
+                {effectiveDailyPricing.globalDiscountPercent > 0 && (
+                  <>
+                    <span className="text-sm text-gray-400">
+                      {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(effectiveDailyPricing.baseAmount)}
+                    </span>
+                    <span className="text-sm font-semibold text-[color:color-mix(in_srgb,var(--cta-primary)_80%,transparent)]">
+                      {priceDisplayConfig.discount.savingsPrefix} {Math.round(effectiveDailyPricing.globalDiscountPercent)}%
+                    </span>
+                  </>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-baseline gap-2">
+                <span className="text-lg font-semibold text-amber-700">Price unavailable</span>
+              </div>
+            )
           )}
           {!dailyPricingLoading && !dailyPricingError && selectedRangeTotalFromCalendar == null && !effectiveDailyPricing && (
             <div className="flex items-baseline gap-2">
@@ -1507,17 +1567,17 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         </div>
       </div>
 
-      {formError && <p className="text-sm text-support-error">{formError}</p>}
+      {formError && paymentStatus !== 'cancelled' && <p className="text-sm text-support-error">{formError}</p>}
 
       <Button 
         type="submit" 
         fullWidth 
         onClick={handleSubmit} 
-        disabled={isLoading || isConfirmed || !dateRange.startDate || !dateRange.endDate || isBookingDisabled}
+        disabled={isLoading || isConfirmed || !dateRange.startDate || !dateRange.endDate || isBookingDisabled || !isPriceSane(perNightForDisplay)}
         className={isLoading ? 'opacity-75' : ''}
         data-testid="booking-submit-button"
       >
-        {isBookingDisabled ? 'Unavailable' : isLoading ? 'Processing...' : 'Book this home'}
+        {isBookingDisabled ? 'Unavailable' : !isPriceSane(perNightForDisplay) ? 'Price unavailable' : isLoading ? 'Processing...' : 'Book this home'}
       </Button>
     </form>
     </>
