@@ -444,6 +444,9 @@ const _isCheckOutAllowed = (date: Date) => {
   return false; // all other dates are selectable
 }, [blockedSet, dateStatusMap, today, dateRange.startDate]);
 
+const SAME_DAY_CUTOFF_HOUR_IST = 18;
+const MIN_NIGHTS = 1;
+
 const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   setDateError(null);
   const { startDate, endDate } = next;
@@ -453,14 +456,28 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     return;
   }
 
+  // Same-day booking cutoff: reject today as check-in after 6 PM IST
+  const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+  const startIST = getIstStartOfDay(startDate);
+  if (startIST.getTime() === today.getTime() && nowIST.getHours() >= SAME_DAY_CUTOFF_HOUR_IST) {
+    setDateError('Same-day bookings are accepted until 6 PM IST. Please choose tomorrow or later.');
+    return;
+  }
+
   // First click → start date
   if (!endDate) {
-    // Prevent selecting blocked date as check-in
     if (!isCheckInAllowed(startDate)) {
-      setDateError('This date cannot be a check-in.');
+      setDateError('This date is not available for check-in.');
       return;
     }
     setDateRange({ startDate, endDate: null });
+    return;
+  }
+
+  // Enforce minimum nights
+  const selectedNights = calculateNights(startDate, endDate);
+  if (selectedNights < MIN_NIGHTS) {
+    setDateError(`Minimum stay is ${MIN_NIGHTS} night${MIN_NIGHTS > 1 ? 's' : ''}.`);
     return;
   }
 
@@ -1479,6 +1496,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               </Button>
             </div>
           </div>
+          {guests > 2 && (
+            <p className="text-xs text-text-muted">Base stay covers 2 guests. Extra guest charges apply beyond that.</p>
+          )}
+          {guests >= 16 && (
+            <p className="text-xs text-amber-600">Maximum capacity reached (16 guests).</p>
+          )}
         </div>
         {/* Price Breakdown */}
         <div className="mt-4 border-t border-border-subtle pt-4 text-sm" data-testid="price-breakdown">
