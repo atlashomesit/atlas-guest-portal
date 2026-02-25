@@ -22,6 +22,7 @@ import { calculateNightlyPrice, inferUnitType } from '../../../utils/pricing';
 import { buildHomeUnitPath } from '../../../utils/navigation';
 import { useBooking } from '../../../contexts/BookingContext';
 import { resolveListing } from '../../../utils/listingResolver';
+import SEO from '../../SEO';
 
 import { Fancybox } from "@fancyapps/ui";
 import "@fancyapps/ui/dist/fancybox/fancybox.css";
@@ -332,7 +333,50 @@ useEffect(() => {
 
     const unitPolicy = getUnitPolicy(data?.id);
 
+    const pageUrl = typeof window !== 'undefined' ? window.location.href : '';
+    const primaryImage = (data?.id && propertyImages[String(data.id)]?.[0]) || data?.property_img?.[0];
+
+    const propertyJsonLd = data ? {
+        "@context": "https://schema.org",
+        "@type": "LodgingBusiness",
+        name: data.property_name,
+        description: data.property_description?.slice(0, 300),
+        image: primaryImage,
+        url: pageUrl,
+        address: {
+            "@type": "PostalAddress",
+            addressLocality: data.property_location || "Hyderabad",
+            addressRegion: "Telangana",
+            addressCountry: "IN",
+        },
+        aggregateRating: data.property_rating ? {
+            "@type": "AggregateRating",
+            ratingValue: data.property_rating,
+            reviewCount: data.property_reviews || 0,
+        } : undefined,
+        ...(nightlyPrice?.finalNightlyPrice ? {
+            priceRange: `INR ${nightlyPrice.finalNightlyPrice}/night`,
+            makesOffer: {
+                "@type": "Offer",
+                priceCurrency: "INR",
+                price: nightlyPrice.finalNightlyPrice,
+                availability: "https://schema.org/InStock",
+            },
+        } : {}),
+    } : undefined;
+
     return (
+        <>
+        {data && (
+            <SEO
+                title={`${data.property_name} | Atlas Homestays`}
+                description={data.property_description?.slice(0, 160) || `Book ${data.property_name} in ${data.property_location || 'Hyderabad'} on Atlas Homestays.`}
+                image={primaryImage}
+                url={pageUrl}
+                type="lodgingBusiness"
+                jsonLd={propertyJsonLd}
+            />
+        )}
         <section className="w-full pt-28 md:pt-0 tracking-wide">
             <div className='pt-10 pl-32'>
                 <Subheading />
@@ -662,6 +706,7 @@ useEffect(() => {
                 )}
             </div>
         </section>
+        </>
     );
 };
 

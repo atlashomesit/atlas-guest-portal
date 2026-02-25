@@ -238,6 +238,7 @@ const Navbar = () => {
           <Link
             to="/become-a-host"
             className="nav-link"
+            data-testid="navbar-list-property"
             style={{ fontWeight: 600, whiteSpace: 'nowrap' }}
           >
             List your property
@@ -253,6 +254,7 @@ const Navbar = () => {
             onClick={handleBookNow}
             aria-busy={ctaStatus === 'navigating'}
             data-state={ctaStatus}
+            data-testid="navbar-book-now"
           >
             {ctaNav.label}
           </button>
