@@ -138,10 +138,30 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
     return true;
   };
 
+  const composedDisabledDay = (date: Date) => {
+    const normalized = normalizeDate(date);
+    const checkIn = normalizeDate(value.startDate);
+    if (minDate && normalized && normalized < normalizeDate(minDate)!) return true;
+    if (maxDate && normalized && normalized > normalizeDate(maxDate)!) return true;
+    // When selecting checkout, disable same-day or earlier than check-in to enforce 1-night minimum
+    if (selectionState === 'CHECK_IN_SELECTED' && checkIn && normalized && normalized <= checkIn) {
+      return true;
+    }
+    return disabledDay ? disabledDay(date) : false;
+  };
+
   const handleRangeChange = (ranges: RangeKeyDict) => {
     const selection = ranges.selection ?? { startDate: null, endDate: null };
     const startDate = normalizeDate(selection.startDate);
     const endDate = normalizeDate(selection.endDate);
+
+    // Reject clicks on disabled dates - ensure visual disabled state matches functional behavior
+    if (startDate && composedDisabledDay(startDate)) {
+      return; // Ignore selection - date is disabled (e.g. past date)
+    }
+    if (endDate && composedDisabledDay(endDate)) {
+      return;
+    }
 
     if (!startDate) {
       applySelection(startDate, endDate);
@@ -253,19 +273,6 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
     const next = normalizeToStartOfMonth(shownDate ?? value.startDate ?? minDate ?? new Date());
     setInternalShownDate(next);
   }, [open, shownDate, value.startDate, minDate]);
-
-  const composedDisabledDay = (date: Date) => {
-    const normalized = normalizeDate(date);
-    const checkIn = normalizeDate(value.startDate);
-    if (minDate && normalized && normalized < normalizeDate(minDate)!) return true;
-    if (maxDate && normalized && normalized > normalizeDate(maxDate)!) return true;
-    // When selecting checkout, disable same-day or earlier than check-in to enforce 1-night minimum
-    if (selectionState === 'CHECK_IN_SELECTED' && checkIn && normalized && normalized <= checkIn) {
-      return true;
-    }
-    return disabledDay ? disabledDay(date) : false;
-  };
-
 
   const handleShownDateChange = (date: Date) => {
     const normalized = normalizeToStartOfMonth(date);

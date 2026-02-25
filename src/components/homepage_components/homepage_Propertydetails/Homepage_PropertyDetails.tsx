@@ -22,6 +22,7 @@ import { calculateNightlyPrice, inferUnitType } from '../../../utils/pricing';
 import { buildHomeUnitPath } from '../../../utils/navigation';
 import { useBooking } from '../../../contexts/BookingContext';
 import { resolveListing } from '../../../utils/listingResolver';
+import type { ListingDetail } from '../../../api/listingClient';
 import SEO from '../../SEO';
 
 import { Fancybox } from "@fancyapps/ui";
@@ -179,11 +180,17 @@ const PropertyDetails = () => {
         const normalizedPropertySlug = normalizeSlug(propertySlug);
         const normalizedPropertySlugStripped = stripHyphens(normalizedPropertySlug);
 
-        // Prefer matching by listingId (PK), then by legacy id/name for old URLs
+        // 1) Match by listingId (PK from DB/API) — IDs 1–7 etc.
         const foundByListingId = listingIdParam && Number.isFinite(listingId) && listingId > 0
             ? propertyData.find((item: Property) => Number(item.listingId) === listingId)
             : null;
 
+        if (import.meta.env.DEV && listingIdParam) {
+            // eslint-disable-next-line no-console
+            console.debug('[PropertyDetails] route params:', { propertySlug, unitSlug: listingIdParam, listingId }, 'foundByListingId:', !!foundByListingId);
+        }
+
+        // 2) Match by unit slug / property name (legacy URLs)
         const foundByUnitSlug = foundByListingId ?? propertyData.find((item: Property) => {
             const idSlug = normalizeSlug(item.id);
             const nameSlug = normalizeSlug(item.property_name);
@@ -210,7 +217,7 @@ const PropertyDetails = () => {
             return;
         }
 
-        // If not found by slug, try to find by ID
+        // If not found by slug, try to find by ID (e.g. unitSlug "7" matches item.id 501)
         const propertyId = normalizedUnitSlug || undefined;
         if (propertyId) {
             const foundById = propertyData.find((item: Property) => String(item.id) === String(propertyId));
@@ -239,7 +246,54 @@ const PropertyDetails = () => {
             });
             return;
         }
-        
+
+        // API fallback: fetch from API when not in static data (handles DB IDs not in propertyData)
+        if (listingIdParam && (Number.isFinite(listingId) ? listingId > 0 : true)) {
+            if (import.meta.env.DEV) {
+                // eslint-disable-next-line no-console
+                console.debug('[PropertyDetails] API fallback for listingIdParam:', listingIdParam);
+            }
+            const controller = new AbortController();
+            let cancelled = false;
+            resolveListing(String(listingIdParam), controller.signal)
+                .then((apiListing: ListingDetail | null) => {
+                    if (cancelled || !apiListing) {
+                        if (import.meta.env.DEV && !cancelled) {
+                            // eslint-disable-next-line no-console
+                            console.debug('[PropertyDetails] API returned no listing for:', listingIdParam);
+                        }
+                        if (!cancelled) setNotFound(true);
+                        return;
+                    }
+                    const mapped: Property = {
+                        id: Number(apiListing.id) || listingId,
+                        listingId: Number(apiListing.id) || listingId,
+                        property_name: (apiListing.name as string) ?? `Listing ${apiListing.id}`,
+                        property_img: [],
+                        property_location: (apiListing as Record<string, unknown>).property_location as string ?? 'Location not specified',
+                        property_neighborhoods: (apiListing as Record<string, unknown>).property_neighborhoods as string[] ?? [],
+                        property_amenities: (apiListing as Record<string, unknown>).property_amenities as PropertyAmenity[] ?? [],
+                        property_description: (apiListing as Record<string, unknown>).property_description as string ?? '',
+                        property_nearplaces: (apiListing as Record<string, unknown>).property_nearplaces as string[] ?? [],
+                        property_mapSrc: (apiListing as Record<string, unknown>).property_mapSrc as string ?? '',
+                        property_policy_details: (apiListing as Record<string, unknown>).property_policy_details as PropertyDetail[] ?? [],
+                        property_rating: Number((apiListing as Record<string, unknown>).property_rating) || 0,
+                        property_reviews: Number((apiListing as Record<string, unknown>).property_reviews) || 0,
+                        property_review_snippets: (apiListing as Record<string, unknown>).property_review_snippets as string[] ?? [],
+                        property_price: Number((apiListing as Record<string, unknown>).property_price) || 0,
+                    };
+                    const images = propertyImages[String(mapped.id)] ?? propertyImages[String(apiListing.id)] ?? [];
+                    setData({ ...mapped, property_img: Array.isArray(images) ? images : mapped.property_img });
+                })
+                .catch(() => {
+                    if (!cancelled) setNotFound(true);
+                });
+            return () => {
+                cancelled = true;
+                controller.abort();
+            };
+        }
+
         setNotFound(true);
     }, [propertySlug, listingIdParam, listingId, location.state]);
 useEffect(() => {
