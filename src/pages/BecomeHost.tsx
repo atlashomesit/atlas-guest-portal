@@ -21,6 +21,41 @@ const PROPERTY_TYPES = [
 
 const TOTAL_STEPS = 3;
 
+const HOST_TESTIMONIALS = [
+  {
+    quote:
+      "Atlas handles all my bookings and guest communication. My occupancy went from 40% to 85% in three months.",
+    name: "Priya Sharma",
+    detail: "Villa owner, Lonavala",
+  },
+  {
+    quote:
+      "I used to spend hours every day managing listings across platforms. Now I just check the dashboard once a week.",
+    name: "Rajesh Kumar",
+    detail: "Homestay owner, Coorg",
+  },
+  {
+    quote:
+      "The pricing optimization alone paid for itself. My revenue increased 60% in the first quarter.",
+    name: "Ananya Patel",
+    detail: "Apartment host, Goa",
+  },
+];
+
+const COMPARISON_FEATURES = [
+  { feature: "Channel distribution", self: "1–2 platforms", atlas: "Airbnb, Booking.com, MMT & more" },
+  { feature: "Pricing optimization", self: "Manual guesswork", atlas: "Dynamic AI pricing" },
+  { feature: "Guest communication", self: "You handle 24/7", atlas: "Dedicated support team" },
+  { feature: "Payment collection", self: "Per-platform payouts", atlas: "Unified monthly payouts" },
+  { feature: "Reviews management", self: "Manual follow-ups", atlas: "Automated & optimized" },
+  { feature: "Professional photography", self: "DIY", atlas: "Included free" },
+  { feature: "Listing optimization", self: "Trial & error", atlas: "Data-driven SEO" },
+];
+
+function formatINR(amount: number): string {
+  return amount.toLocaleString("en-IN");
+}
+
 interface ContactInfo {
   displayName: string;
   email: string;
@@ -212,6 +247,8 @@ const BecomeHost = () => {
     loading: false,
   });
 
+  const [estimatorRooms, setEstimatorRooms] = useState(2);
+
   const updateContact = (e: React.ChangeEvent<HTMLInputElement>) => {
     setContact((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
@@ -384,11 +421,247 @@ const BecomeHost = () => {
 
   return (
     <section style={styles.page} data-testid="become-host-page">
-      <div style={styles.container}>
+      {/* ── Hero Section ── */}
+      <div className="max-w-3xl mx-auto px-4 text-center mb-10">
+        <h1
+          className="text-4xl sm:text-5xl font-extrabold tracking-tight leading-tight"
+          style={{ color: "var(--text-primary, #1e293b)" }}
+        >
+          Turn Your Property Into a{" "}
+          <span style={{ color: "var(--cta-primary, #2563eb)" }}>Thriving Homestay</span>
+        </h1>
+        <p
+          className="mt-4 text-lg"
+          style={{ color: "#64748b", maxWidth: 560, margin: "16px auto 0" }}
+        >
+          Atlas Homestays handles everything — from guest bookings to checkout —
+          so you earn more while doing less.
+        </p>
+        <a
+          href="#host-signup-form"
+          className="inline-block mt-6 px-8 py-3 rounded-xl text-white font-semibold text-lg shadow-lg hover:shadow-xl transition-all"
+          style={{ background: "var(--cta-primary, #2563eb)" }}
+        >
+          List Your Property — It's Free
+        </a>
+        <div className="mt-10 grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {[
+            { icon: "🌐", label: "Multi-platform listing" },
+            { icon: "📈", label: "Dynamic pricing" },
+            { icon: "💬", label: "24/7 guest support" },
+            { icon: "₹0", label: "Zero setup fee" },
+          ].map((b) => (
+            <div
+              key={b.label}
+              className="flex flex-col items-center gap-1 p-3 rounded-xl"
+              style={{ background: "rgba(255,255,255,0.7)" }}
+            >
+              <span className="text-2xl">{b.icon}</span>
+              <span
+                className="text-sm font-medium"
+                style={{ color: "var(--text-primary, #1e293b)" }}
+              >
+                {b.label}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Earnings Estimator ── */}
+      <div className="max-w-2xl mx-auto px-4 mb-12">
+        <div
+          className="rounded-2xl p-6 sm:p-8 text-center"
+          style={{
+            background: "rgba(255,255,255,0.85)",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+          }}
+        >
+          <h2
+            className="text-2xl font-bold mb-1"
+            style={{ color: "var(--text-primary, #1e293b)" }}
+          >
+            How much could you earn?
+          </h2>
+          <p className="text-sm mb-6" style={{ color: "#64748b" }}>
+            Properties in your area earn{" "}
+            <strong style={{ color: "var(--cta-primary, #2563eb)" }}>
+              ₹45,000 – ₹1,20,000/month
+            </strong>
+          </p>
+          <label
+            className="block text-sm font-medium mb-2"
+            style={{ color: "#475569" }}
+          >
+            Number of rooms: <strong>{estimatorRooms}</strong>
+          </label>
+          <input
+            type="range"
+            min={1}
+            max={10}
+            value={estimatorRooms}
+            onChange={(e) => setEstimatorRooms(Number(e.target.value))}
+            className="w-full accent-blue-600"
+          />
+          <div
+            className="flex justify-between text-xs mt-1 mb-4"
+            style={{ color: "#94a3b8" }}
+          >
+            <span>1 room</span>
+            <span>10 rooms</span>
+          </div>
+          <div
+            className="rounded-xl p-4"
+            style={{
+              background: "linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)",
+            }}
+          >
+            <p className="text-sm" style={{ color: "#475569" }}>
+              Estimated monthly earnings
+            </p>
+            <p
+              className="text-3xl font-extrabold mt-1"
+              style={{ color: "var(--cta-primary, #2563eb)" }}
+            >
+              ₹{formatINR(estimatorRooms * 15000)} – ₹{formatINR(estimatorRooms * 40000)}
+            </p>
+            <p className="text-xs mt-2" style={{ color: "#94a3b8" }}>
+              Based on average occupancy for Atlas-managed properties
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Comparison Table: Self-managed vs Atlas Managed ── */}
+      <div className="max-w-2xl mx-auto px-4 mb-12">
+        <div
+          className="rounded-2xl overflow-hidden"
+          style={{
+            background: "rgba(255,255,255,0.85)",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+          }}
+        >
+          <div className="p-6 pb-2 text-center">
+            <h2
+              className="text-2xl font-bold"
+              style={{ color: "var(--text-primary, #1e293b)" }}
+            >
+              Self-Managed vs Atlas Managed
+            </h2>
+            <p className="text-sm mt-1" style={{ color: "#64748b" }}>
+              See what you get when Atlas handles your property
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr style={{ borderBottom: "2px solid #e2e8f0" }}>
+                  <th
+                    className="text-left p-3 pl-6 font-semibold"
+                    style={{ color: "#475569" }}
+                  >
+                    Feature
+                  </th>
+                  <th
+                    className="p-3 text-center font-semibold"
+                    style={{ color: "#94a3b8" }}
+                  >
+                    Self-managed
+                  </th>
+                  <th
+                    className="p-3 pr-6 text-center font-semibold"
+                    style={{ color: "var(--cta-primary, #2563eb)" }}
+                  >
+                    Atlas Managed
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {COMPARISON_FEATURES.map((row, i) => (
+                  <tr
+                    key={row.feature}
+                    style={{
+                      borderBottom:
+                        i < COMPARISON_FEATURES.length - 1
+                          ? "1px solid #f1f5f9"
+                          : "none",
+                    }}
+                  >
+                    <td
+                      className="p-3 pl-6 font-medium"
+                      style={{ color: "var(--text-primary, #1e293b)" }}
+                    >
+                      {row.feature}
+                    </td>
+                    <td
+                      className="p-3 text-center"
+                      style={{ color: "#94a3b8" }}
+                    >
+                      {row.self}
+                    </td>
+                    <td
+                      className="p-3 pr-6 text-center font-semibold"
+                      style={{ color: "#16a34a" }}
+                    >
+                      ✓ {row.atlas}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Host Testimonials ── */}
+      <div className="max-w-3xl mx-auto px-4 mb-16">
+        <h2
+          className="text-2xl font-bold text-center mb-6"
+          style={{ color: "var(--text-primary, #1e293b)" }}
+        >
+          Hear from our hosts
+        </h2>
+        <div className="grid sm:grid-cols-3 gap-4">
+          {HOST_TESTIMONIALS.map((t) => (
+            <div
+              key={t.name}
+              className="rounded-2xl p-5 flex flex-col"
+              style={{
+                background: "rgba(255,255,255,0.9)",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+              }}
+            >
+              <p
+                className="text-sm leading-relaxed flex-1"
+                style={{ color: "#475569" }}
+              >
+                &ldquo;{t.quote}&rdquo;
+              </p>
+              <div
+                className="mt-4 pt-3"
+                style={{ borderTop: "1px solid #f1f5f9" }}
+              >
+                <p
+                  className="font-semibold text-sm"
+                  style={{ color: "var(--text-primary, #1e293b)" }}
+                >
+                  {t.name}
+                </p>
+                <p className="text-xs" style={{ color: "#94a3b8" }}>
+                  {t.detail}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Registration Form ── */}
+      <div style={styles.container} id="host-signup-form">
         <div style={styles.header}>
-          <Typography variant="h1">Become a Host</Typography>
+          <Typography variant="h2">Get started in under 5 minutes</Typography>
           <Typography variant="subtitle" className="mt-2">
-            List your property on Atlas Homestays in under 5 minutes.
+            Fill in your details and we'll have your property listed within 24 hours.
           </Typography>
         </div>
 

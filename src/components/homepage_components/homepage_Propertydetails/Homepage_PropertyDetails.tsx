@@ -9,7 +9,7 @@ import { LiaNewspaper } from "react-icons/lia";
 import { MdOutlineEmojiFoodBeverage, MdOutlineLocalLaundryService, MdOutlineDone } from "react-icons/md";
 import { FaCcMastercard, FaLocationDot } from "react-icons/fa6";
 import { FaStar } from "react-icons/fa";
-import { X, ChevronRight } from 'lucide-react';
+import { X, ChevronRight, Clock, KeyRound } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { propertyData, propertyImages } from '../../../data.ts';
 import { getUnitPolicy } from '../../../config/policyConfig';
@@ -501,6 +501,102 @@ useEffect(() => {
                 <div className='flex flex-col gap-4 sm:flex-row '>
                     {/* Left div  */}
                     <div className="w-full sm:w-2/3">
+                        {/* What this place offers */}
+                        <div className="pb-8 border-b border-border-subtle">
+                            <h2 className="text-xl sm:text-2xl font-semibold mb-6 text-text-primary">What this place offers</h2>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                {(data?.property_amenities || []).length > 0 ? (
+                                    (data?.property_amenities || []).slice(0, 9).map((amenity, idx) => (
+                                        <div key={idx} className="flex flex-col items-center gap-2 p-3 rounded-xl bg-bg-muted border border-border-subtle text-center">
+                                            <span className="text-2xl text-accent-primary">
+                                                {renderIcon(amenity?.amenities_icon || '')}
+                                            </span>
+                                            <span className="text-xs font-medium text-text-primary">
+                                                {amenity?.amenities_icon ? formatAmenityName(amenity.amenities_icon) : 'Amenity'}
+                                            </span>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <p className="text-text-muted">No amenities listed</p>
+                                )}
+                            </div>
+                            <Button
+                                variant="secondary"
+                                onClick={() => setShowAmenitiesModal(true)}
+                                className="mt-6"
+                            >
+                                Show All Amenities
+                            </Button>
+                        </div>
+
+                        {/* Policies Section */}
+                        {data?.property_policy_details && (
+                            <div className="border border-border-subtle rounded-lg overflow-hidden shadow-level1 bg-bg-surface">
+                                <div className="bg-bg-surface p-6">
+                                    <h2 className="text-xl sm:text-2xl font-semibold mb-6 text-text-primary">Things to know</h2>
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
+                                        <div className="p-4 border border-border-subtle rounded-lg bg-bg-muted">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <Clock className="w-4 h-4 text-accent-primary" />
+                                                <p className="text-text-muted text-sm">Check-in / Check-out</p>
+                                            </div>
+                                            <p className="font-medium text-text-primary">
+                                                Check-in {unitPolicy?.checkIn || '2:00 PM'} · Check-out {unitPolicy?.checkOut || '11:00 AM'}
+                                            </p>
+                                            <a className="text-sm text-accent-primary underline" href="/terms#check-in-check-out">View terms</a>
+                                        </div>
+                                        <div className="p-4 border border-border-subtle rounded-lg bg-bg-muted">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <KeyRound className="w-4 h-4 text-accent-primary" />
+                                                <p className="text-text-muted text-sm">Key policies</p>
+                                            </div>
+                                            <p className="font-medium text-text-primary">
+                                                {inlinePolicySnippets?.cancellation || 'Flexible cancellation policy'}
+                                            </p>
+                                            <p className="text-text-primary mt-2 text-sm">
+                                                {inlinePolicySnippets?.houseRules || 'Standard house rules apply'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
+                                        {(data?.property_policy_details || [])
+                                            .filter((policy: PropertyDetail) => policy?.type && !policy.type.includes('Policy') && !policy.type.includes('Detailed'))
+                                            .map((policy: PropertyDetail, idx: number) => (
+                                                <div key={idx}>
+                                                    <p className="text-text-muted text-sm mb-1">{policy.type}</p>
+                                                    <p className="font-medium text-text-primary">{policy.value}</p>
+                                                </div>
+                                            ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Guest Reviews Summary */}
+                        {data?.property_reviews > 0 && (
+                            <div className="pb-8 border-b border-border-subtle">
+                                <h2 className="text-xl sm:text-2xl font-semibold mb-4 text-text-primary">Guest Reviews</h2>
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="flex items-center gap-1 text-accent-primary">
+                                        {Array.from({ length: 5 }).map((_, i) => (
+                                            <FaStar key={i} className={i < Math.round(data.property_rating) ? 'text-accent-primary' : 'text-border-subtle'} />
+                                        ))}
+                                    </div>
+                                    <span className="font-semibold text-text-primary">{data.property_rating.toFixed(1)}</span>
+                                    <span className="text-text-muted text-sm">({data.property_reviews} reviews)</span>
+                                </div>
+                                {data.property_review_snippets && data.property_review_snippets.length > 0 && (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        {data.property_review_snippets.slice(0, 4).map((snippet: string, idx: number) => (
+                                            <div key={idx} className="p-4 rounded-xl bg-bg-muted border border-border-subtle">
+                                                <p className="text-sm text-text-muted italic">"{snippet}"</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         {/* About this place */}
                         <div className="pb-8 border-b border-border-subtle">
                             <h2 className="text-xl sm:text-2xl font-semibold mb-4 text-text-primary">About this place</h2>
@@ -519,6 +615,24 @@ useEffect(() => {
                                 Show {showAboutMore ? 'Less' : 'More'}
                                 <ChevronRight className={`ml-1 w-4 h-4 transition-transform ${showAboutMore ? 'rotate-90' : ''}`} />
                             </button>
+                        </div>
+
+                        {/* Location Map */}
+                        <div className="">
+                            <h2 className="text-xl sm:text-2xl font-semibold mb-4 text-text-primary">Where you'll be</h2>
+                            <div className="rounded-lg overflow-hidden border border-border-subtle">
+                                <iframe
+                                    src={data?.property_mapSrc || ''}
+                                    className="w-full h-64 sm:h-96"
+                                    loading="lazy"
+                                    allowFullScreen
+                                    referrerPolicy="no-referrer-when-downgrade"
+                                    title="Property Location"
+                                ></iframe>
+                            </div>
+                            <p className="mt-4 text-text-muted text-sm sm:text-base">
+                                {data?.property_location || 'Location information not available'}
+                            </p>
                         </div>
 
                         {/* About neighborhood */}
@@ -545,89 +659,6 @@ useEffect(() => {
                                 <ChevronRight className={`ml-1 w-4 h-4 transition-transform ${showNeighborhoodMore ? 'rotate-90' : ''}`} />
                             </button>
                         </div>
-
-                        {/* What this place offers */}
-                        <div className="pb-8 border-b border-border-subtle">
-                            <h2 className="text-xl sm:text-2xl font-semibold mb-6 text-text-primary">What this place offers</h2>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-                                {(data?.property_amenities || []).length > 0 ? (
-                                    (data?.property_amenities || []).slice(0, 6).map((amenity, idx) => (
-                                        <div key={idx} className="flex items-center gap-3 sm:gap-4">
-                                            <span className="text-xl sm:text-2xl text-text-primary">
-                                                {renderIcon(amenity?.amenities_icon || '')}
-                                            </span>
-                                            <span className="text-text-primary text-sm sm:text-base">
-                                                {amenity?.amenities_icon ? formatAmenityName(amenity.amenities_icon) : 'Amenity'}
-                                            </span>
-                                        </div>
-                                    ))
-                                ) : (
-                                    <p className="text-text-muted">No amenities listed</p>
-                                )}
-                            </div>
-                            <Button
-                                variant="secondary"
-                                onClick={() => setShowAmenitiesModal(true)}
-                                className="mt-6"
-                            >
-                                Show All Amenities
-                            </Button>
-                        </div>
-
-                        {/* Location Map */}
-                        <div className="">
-                            <h2 className="text-xl sm:text-2xl font-semibold mb-4 text-text-primary">Where you'll be</h2>
-                            <div className="rounded-lg overflow-hidden border border-border-subtle">
-                                <iframe
-                                    src={data?.property_mapSrc || ''}
-                                    className="w-full h-64 sm:h-96"
-                                    loading="lazy"
-                                    allowFullScreen
-                                    referrerPolicy="no-referrer-when-downgrade"
-                                    title="Property Location"
-                                ></iframe>
-                            </div>
-                            <p className="mt-4 text-text-muted text-sm sm:text-base">
-                                {data?.property_location || 'Location information not available'}
-                            </p>
-                        </div>
-
-                        {/* Policies Section */}
-                        {data?.property_policy_details && (
-                            <div className="border border-border-subtle rounded-lg overflow-hidden shadow-level1 bg-bg-surface">
-                                <div className="bg-bg-surface p-6">
-                                    <h2 className="text-xl sm:text-2xl font-semibold mb-6 text-text-primary">Things to know</h2>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-                                        <div className="p-4 border border-border-subtle rounded-lg bg-bg-muted">
-                                            <p className="text-text-muted text-sm mb-1">Check-in / Check-out</p>
-                                            <p className="font-medium text-text-primary">
-                                                Check-in {unitPolicy?.checkIn || '2:00 PM'} · Check-out {unitPolicy?.checkOut || '11:00 AM'}
-                                            </p>
-                                            <a className="text-sm text-accent-primary underline" href="/terms#check-in-check-out">View terms</a>
-                                        </div>
-                                        <div className="p-4 border border-border-subtle rounded-lg bg-bg-muted">
-                                            <p className="text-text-muted text-sm mb-1">Key policies</p>
-                                            <p className="font-medium text-text-primary">
-                                                {inlinePolicySnippets?.cancellation || 'Flexible cancellation policy'}
-                                            </p>
-                                            <p className="text-text-primary mt-2 text-sm">
-                                                {inlinePolicySnippets?.houseRules || 'Standard house rules apply'}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                                        {(data?.property_policy_details || [])
-                                            .filter((policy: PropertyDetail) => policy?.type && !policy.type.includes('Policy') && !policy.type.includes('Detailed'))
-                                            .map((policy: PropertyDetail, idx: number) => (
-                                                <div key={idx}>
-                                                    <p className="text-text-muted text-sm mb-1">{policy.type}</p>
-                                                    <p className="font-medium text-text-primary">{policy.value}</p>
-                                                </div>
-                                            ))}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
                     </div>
                     {/* right div  */}
                     <div className="w-full sm:w-1/3">
