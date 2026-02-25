@@ -4,7 +4,6 @@ import { Card } from "../components/ui/Card";
 import { Typography } from "../components/ui/Typography";
 import { Input } from "../components/ui/Input";
 import { Button } from "../components/ui/Button";
-import ErrorBoundary from "../components/ErrorBoundary";
 import { toast } from "react-toastify";
 import { buildApiUrl, getApiHeaders } from "../api/client";
 import { logUserAction, reportError } from "../lib/monitoring";
@@ -75,7 +74,7 @@ const styles = {
     alignItems: "center",
     gap: 6,
   }),
-  dot: (_active: boolean, _completed: boolean): React.CSSProperties => ({
+  dot: (active: boolean, completed: boolean): React.CSSProperties => ({
     width: 32,
     height: 32,
     borderRadius: "50%",
@@ -346,7 +345,7 @@ const BecomeHost = () => {
 
   if (submitStatus === "success") {
     return (
-      <section style={styles.page}>
+      <section style={styles.page} data-testid="become-host-page">
         <div style={styles.container}>
           <Card>
             <div style={styles.successBox}>
@@ -384,7 +383,7 @@ const BecomeHost = () => {
   }
 
   return (
-    <section style={styles.page}>
+    <section style={styles.page} data-testid="become-host-page">
       <div style={styles.container}>
         <div style={styles.header}>
           <Typography variant="h1">Become a Host</Typography>
@@ -413,6 +412,7 @@ const BecomeHost = () => {
                   onChange={updateContact}
                   required
                   autoFocus
+                  data-testid="host-onboard-name"
                 />
               </div>
               <div style={styles.fieldGroup}>
@@ -427,6 +427,7 @@ const BecomeHost = () => {
                   value={contact.email}
                   onChange={updateContact}
                   required
+                  data-testid="host-onboard-email"
                 />
               </div>
               <div style={styles.fieldGroup}>
@@ -441,6 +442,7 @@ const BecomeHost = () => {
                   value={contact.phone}
                   onChange={updateContact}
                   required
+                  data-testid="host-onboard-phone"
                 />
               </div>
               <div style={styles.fieldGroup}>
@@ -456,6 +458,7 @@ const BecomeHost = () => {
                   onChange={updateContact}
                   required
                   minLength={8}
+                  data-testid="host-onboard-password"
                 />
                 <p style={styles.hint}>
                   You'll use this to log in to the admin portal.
@@ -702,11 +705,12 @@ const BecomeHost = () => {
             )}
             <div style={{ flex: 1 }} />
             {step < TOTAL_STEPS - 1 ? (
-              <Button onClick={goNext}>Continue</Button>
+              <Button onClick={goNext} data-testid="host-onboard-continue">Continue</Button>
             ) : (
               <Button
                 onClick={handleSubmit}
                 disabled={submitStatus === "submitting"}
+                data-testid="host-onboard-submit"
               >
                 {submitStatus === "submitting"
                   ? "Submitting..."
@@ -737,10 +741,53 @@ const BecomeHost = () => {
   );
 };
 
+class BecomeHostErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error?: Error }
+> {
+  state = { hasError: false, error: undefined as Error | undefined };
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error("[BecomeHost] render crash:", error, info);
+    (window as any).__atlasErrorLog = true;
+    reportError(error, { boundary: "become-host-page", componentStack: info.componentStack });
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <section style={styles.page} data-testid="become-host-page">
+          <div style={styles.container}>
+            <Card>
+              <div style={{ textAlign: "center", padding: "40px 20px" }}>
+                <Typography variant="h2">Something went wrong</Typography>
+                <Typography variant="subtitle" className="mt-2">
+                  We hit an unexpected error loading host onboarding.
+                </Typography>
+                <div style={{ marginTop: 24, display: "flex", gap: 12, justifyContent: "center" }}>
+                  <Button onClick={() => window.location.reload()}>Try again</Button>
+                  <Button variant="ghost" onClick={() => (window.location.href = "/")}>
+                    Back to home
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          </div>
+        </section>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 const BecomeHostWithErrorBoundary = () => (
-  <ErrorBoundary name="become-host-page">
+  <BecomeHostErrorBoundary>
     <BecomeHost />
-  </ErrorBoundary>
+  </BecomeHostErrorBoundary>
 );
 
 export default BecomeHostWithErrorBoundary;
