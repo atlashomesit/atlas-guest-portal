@@ -57,6 +57,17 @@ export default defineConfig({
       "/pricing": { target: BACKEND_TARGET, changeOrigin: true, secure: false },
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ["react", "react-dom", "react-router-dom"],
+          razorpay: ["axios"],
+          ui: ["lucide-react", "react-toastify", "date-fns"],
+        },
+      },
+    },
+  },
   test: {
     environment: "jsdom",
     setupFiles: "./src/test/setup.ts",
