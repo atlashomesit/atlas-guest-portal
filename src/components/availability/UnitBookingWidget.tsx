@@ -111,6 +111,8 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
     email: '',
     phone: ''
   });
+  const [selectedAddOnIds, setSelectedAddOnIds] = useState<number[]>([]);
+  const [availableAddOns, setAvailableAddOns] = useState<{ id: number; name: string; description: string; price: number; priceType: string }[]>([]);
   const [paymentStatus, setPaymentStatus] = useState<'success' | 'failed' | 'cancelled' | null>(null);
   const [bookingDetails, setBookingDetails] = useState<{
     bookingId: string;
@@ -173,6 +175,24 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
   // Reset auto-adjust flag when listing changes
   useEffect(() => {
     hasAutoAdjustedRef.current = false;
+  }, [listingId]);
+
+  // Fetch available add-ons for this listing
+  useEffect(() => {
+    if (!listingId || String(listingId).trim() === '') {
+      setAvailableAddOns([]);
+      return;
+    }
+    let cancelled = false;
+    apiFetch(buildApiUrl(`/api/listings/${listingId}/add-ons`))
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelled) {
+          setAvailableAddOns(Array.isArray(data) ? data : data?.items ?? []);
+        }
+      })
+      .catch(() => { /* add-ons are optional — silently ignore */ });
+    return () => { cancelled = true; };
   }, [listingId]);
 
   // Fetch availability automatically on component load and when the calendar is opened
@@ -616,12 +636,23 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   const breakdownConvenienceFee = Math.round(breakdownSubtotalForConvenience * convenienceFeePercent);
   const breakdownFinalTotal = breakdownPrice + gstAmount + breakdownConvenienceFee;
 
+  const addOnsTotal = useMemo(() => {
+    if (selectedAddOnIds.length === 0) return 0;
+    return availableAddOns
+      .filter((a) => selectedAddOnIds.includes(a.id))
+      .reduce((sum, a) => {
+        if (a.priceType === 'per_night') return sum + a.price * priceDetails.nights;
+        if (a.priceType === 'per_guest') return sum + a.price * guests;
+        return sum + a.price;
+      }, 0);
+  }, [selectedAddOnIds, availableAddOns, priceDetails.nights, guests]);
+
   const finalTotal =
-    hasSelectedRange && selectedRangeTotalFromCalendar != null
+    (hasSelectedRange && selectedRangeTotalFromCalendar != null
       ? breakdownFinalTotal
       : effectiveDailyPricing != null
         ? breakdownFinalTotal
-        : 0;
+        : 0) + addOnsTotal;
 
   // Per-night: when API has loaded use API/calendar data; when API not loaded show 0.
   const perNightForDisplay =
@@ -911,10 +942,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       
       const bookingDraft = {
         listingId: numericListingId,
-        checkinDate: toISODate(normalizedCheckin),  // Format as YYYY-MM-DD
-        checkoutDate: toISODate(normalizedCheckout),  // Format as YYYY-MM-DD
+        checkinDate: toISODate(normalizedCheckin),
+        checkoutDate: toISODate(normalizedCheckout),
         guests,
-        notes: ''
+        notes: '',
+        addOnServiceIds: selectedAddOnIds.length > 0 ? selectedAddOnIds : undefined,
       };
 
       // 2. Prepare order payload with the exact structure expected by the backend
@@ -1522,6 +1554,36 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           </div>
         </div>
 
+        {/* Add-ons */}
+        {availableAddOns.length > 0 && (
+          <div className="mt-3" data-testid="add-ons-section">
+            <h4 className="mb-2 text-sm font-semibold text-text-primary">Add-ons</h4>
+            <div className="space-y-1.5">
+              {availableAddOns.map((addon) => {
+                const priceSuffix = addon.priceType === 'per_night' ? '/night' : addon.priceType === 'per_guest' ? '/guest' : '/booking';
+                return (
+                  <label key={addon.id} className="flex items-start gap-2 cursor-pointer text-sm text-text-secondary">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 accent-[var(--cta-primary)]"
+                      checked={selectedAddOnIds.includes(addon.id)}
+                      onChange={() =>
+                        setSelectedAddOnIds((prev) =>
+                          prev.includes(addon.id) ? prev.filter((id) => id !== addon.id) : [...prev, addon.id]
+                        )
+                      }
+                    />
+                    <span>
+                      {addon.name} — ₹{addon.price.toLocaleString('en-IN')}{priceSuffix}
+                      {addon.description && <span className="block text-xs text-text-muted">{addon.description}</span>}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Price Breakdown */}
         <div className="mt-4 border-t border-border-subtle pt-4 text-sm" data-testid="price-breakdown">
           <h4 className="mb-2 text-base font-bold text-text-primary">
@@ -1561,6 +1623,19 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                 }).format(breakdownConvenienceFee)}
               </span>
             </div>
+            {addOnsTotal > 0 && (
+              <div className="grid grid-cols-[140px_12px_1fr]">
+                <span>Add-ons</span>
+                <span>:</span>
+                <span className="text-right">
+                  {new Intl.NumberFormat('en-IN', {
+                    style: 'currency',
+                    currency: 'INR',
+                    maximumFractionDigits: 0,
+                  }).format(addOnsTotal)}
+                </span>
+              </div>
+            )}
           </div>
           <div className="mt-3 border-t border-border-subtle pt-3 grid grid-cols-[140px_12px_1fr] text-base font-semibold text-text-primary">
             <span>Total</span>
