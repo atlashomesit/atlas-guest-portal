@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, useLocation, useParams } from 'react-router-dom';
+import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { FaBed, FaShower, FaSwimmingPool, FaCar, FaWifi, FaTv } from "react-icons/fa";
 import { TbAirConditioning } from "react-icons/tb";
 import { PiElevatorDuotone, PiCoatHangerLight } from "react-icons/pi";
@@ -75,8 +75,24 @@ const PropertyDetails = () => {
     const [showAboutMore, setShowAboutMore] = useState(false);
     const [showNeighborhoodMore, setShowNeighborhoodMore] = useState(false);
     const unitType = inferUnitType({ id: data?.id, property_name: data?.property_name });
-    const { setProperty } = useBooking();
+    const { setProperty, updateBooking } = useBooking();
+    const [searchParams] = useSearchParams();
     const showAvailabilityPlaceholder = false;
+
+    // Hydrate booking context from URL search params (passed from SearchPage)
+    useEffect(() => {
+        const checkIn = searchParams.get('checkIn');
+        const checkOut = searchParams.get('checkOut');
+        const guests = Number(searchParams.get('guests')) || null;
+        if (checkIn || checkOut || guests) {
+            updateBooking({
+                ...(checkIn ? { checkIn: new Date(checkIn).toISOString() } : {}),
+                ...(checkOut ? { checkOut: new Date(checkOut).toISOString() } : {}),
+                ...(guests ? { guests } : {}),
+            });
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
     const nightlyPrice = useMemo(() => {
         if (!data) return null;
         try {
@@ -706,6 +722,31 @@ useEffect(() => {
                 )}
             </div>
         </section>
+
+        {/* Mobile fixed Reserve CTA - visible only below md breakpoint */}
+        {data && (
+          <div
+            className="fixed bottom-0 inset-x-0 z-30 flex items-center justify-between border-t border-border-subtle bg-bg-surface px-4 py-3 shadow-level2 md:hidden"
+            data-testid="mobile-reserve-bar"
+          >
+            <div>
+              <span className="text-base font-bold text-text-primary">
+                {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(nightlyPrice.finalNightlyPrice)}
+              </span>
+              <span className="text-xs text-text-muted"> / night</span>
+            </div>
+            <button
+              type="button"
+              className="rounded-xl bg-cta-primary px-6 py-2.5 text-sm font-semibold text-white shadow-sm"
+              onClick={() => {
+                const widget = document.querySelector('[data-testid="booking-name"]');
+                widget?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }}
+            >
+              Reserve
+            </button>
+          </div>
+        )}
         </>
     );
 };
