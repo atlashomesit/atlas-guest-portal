@@ -1503,6 +1503,25 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             <p className="text-xs text-amber-600">Maximum capacity reached (16 guests).</p>
           )}
         </div>
+        {/* Promo Code */}
+        <div className="mt-3">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              data-testid="promo-code-input"
+              placeholder="Promo code"
+              className="flex-1 rounded-lg border border-border-strong bg-bg-muted px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-cta-primary"
+              maxLength={20}
+            />
+            <button
+              type="button"
+              className="rounded-lg border border-cta-primary px-3 py-2 text-sm font-semibold text-cta-primary hover:bg-cta-primary hover:text-white transition"
+            >
+              Apply
+            </button>
+          </div>
+        </div>
+
         {/* Price Breakdown */}
         <div className="mt-4 border-t border-border-subtle pt-4 text-sm" data-testid="price-breakdown">
           <h4 className="mb-2 text-base font-bold text-text-primary">
