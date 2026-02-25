@@ -1241,6 +1241,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           <button
             id="unit-booking-dates"
             ref={calendarButtonRef}
+            data-testid="date-picker"
             className="w-full rounded-xl border border-border-strong bg-bg-muted px-4 py-3 text-left text-text-primary hover:border-cta-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary"
             aria-label="Click to select check-in date, then choose from calendar"
             title="Click to select check-in date, then choose from calendar"
@@ -1394,7 +1395,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           </div>
         </div>
         {/* Price Breakdown */}
-        <div className="mt-4 border-t border-border-subtle pt-4 text-sm">
+        <div className="mt-4 border-t border-border-subtle pt-4 text-sm" data-testid="price-breakdown">
           <h4 className="mb-2 text-base font-bold text-text-primary">
             Price Breakdown
           </h4>
@@ -1459,7 +1460,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             type="text"
             id="name"
             name="name"
-            data-testid="guest-booking-name"
+            data-testid="booking-name"
             value={formData.name}
             onChange={handleInputChange}
             disabled={isBookingDisabled}
@@ -1477,7 +1478,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             type="email"
             id="email"
             name="email"
-            data-testid="guest-booking-email"
+            data-testid="booking-email"
             value={formData.email}
             onChange={handleInputChange}
             disabled={isBookingDisabled}
@@ -1495,7 +1496,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             type="tel"
             id="phone"
             name="phone"
-            data-testid="guest-booking-phone"
+            data-testid="booking-phone"
             value={formData.phone}
             onChange={handleInputChange}
             disabled={isBookingDisabled}
