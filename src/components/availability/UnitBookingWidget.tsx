@@ -663,8 +663,19 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   };
 
   const loadRazorpayScript = (callback: () => void) => {
-    if (window.Razorpay) {
+    if (window.Razorpay && typeof window.Razorpay === 'function') {
       callback();
+      return;
+    }
+
+    const existing = document.querySelector<HTMLScriptElement>('script[src*="checkout.razorpay.com"]');
+    if (existing) {
+      existing.addEventListener('load', () => callback(), { once: true });
+      existing.addEventListener('error', () => {
+        setFormError('Failed to load payment processor. Please refresh and try again.');
+        setIsLoading(false);
+        submittingRef.current = false;
+      }, { once: true });
       return;
     }
 
@@ -675,6 +686,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     script.onerror = () => {
       setFormError('Failed to load payment processor. Please try again.');
       setIsLoading(false);
+      submittingRef.current = false;
     };
     document.body.appendChild(script);
   };
@@ -1006,7 +1018,16 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             }
           };
 
-          const rzp = new window.Razorpay(options);
+          let rzp: { open: (o?: unknown) => void; on: (event: string, handler: (...args: unknown[]) => void) => void };
+          try {
+            rzp = new window.Razorpay(options);
+          } catch (initError) {
+            console.error('Razorpay constructor failed:', initError);
+            submittingRef.current = false;
+            setFormError('Payment gateway failed to initialize. Please refresh the page and try again.');
+            setIsLoading(false);
+            return;
+          }
           razorpayRef.current = rzp;
 
           rzp.on('payment.failed', (response: { error?: { description?: string } }) => {
