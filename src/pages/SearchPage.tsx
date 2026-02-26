@@ -1,12 +1,23 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { propertyData } from "../data";
 import { formatCurrency, parseDate } from "../utils/formatting";
 import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
+import SkeletonCard from "../components/apartments/SkeletonCard";
+
+const ITEMS_PER_PAGE = 12;
 
 const SearchPage = () => {
   const [searchParams] = useSearchParams();
+  const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Brief initial load for perceived performance (skeleton display)
+  useEffect(() => {
+    const t = setTimeout(() => setIsLoading(false), 200);
+    return () => clearTimeout(t);
+  }, []);
 
   const checkIn = parseDate(searchParams.get("checkIn"));
   const checkOut = parseDate(searchParams.get("checkOut"));
@@ -49,6 +60,13 @@ const SearchPage = () => {
     });
   }, [guests, hasInvalidDates, listings]);
 
+  // Reset pagination when filters change
+  useEffect(() => {
+    setVisibleCount(ITEMS_PER_PAGE);
+  }, [guests, hasInvalidDates]);
+
+  const visibleUnits = filteredUnits.slice(0, visibleCount);
+  const hasMore = visibleCount < filteredUnits.length;
   const showEmptyState = !hasInvalidDates && filteredUnits.length === 0;
   const queryString = searchParams.toString();
 
@@ -87,16 +105,24 @@ const SearchPage = () => {
           </div>
         )}
 
-        {!showEmptyState && !hasInvalidDates && (
+        {isLoading && (
+          <section className="grid gap-6 sm:grid-cols-2" data-testid="search-skeleton">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <SkeletonCard key={i} />
+            ))}
+          </section>
+        )}
+
+        {!isLoading && !showEmptyState && !hasInvalidDates && (
           <section className="grid gap-6 sm:grid-cols-2" data-testid="guest-search-results">
-            {filteredUnits.map((unit) => (
+            {visibleUnits.map((unit) => (
               <article
                 key={unit.id}
                 data-testid="listing-card"
                 className="flex flex-col overflow-hidden rounded-2xl border border-border-subtle bg-bg-surface shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
               >
                 <div className="h-48 w-full bg-gradient-to-br from-bg-muted to-bg-surface">
-                  <img src={unit.imageUrl} alt={unit.title ?? "Property listing"} className="h-full w-full object-cover" loading="lazy" />
+                  <img src={unit.imageUrl} alt={unit.title ?? "Property listing"} className="h-full w-full object-cover" loading="lazy" decoding="async" />
                 </div>
                 <div className="flex flex-1 flex-col gap-3 p-5">
                   <div className="flex items-start justify-between gap-3">
@@ -123,7 +149,7 @@ const SearchPage = () => {
                     <Link
                       to={`${unit.canonicalPath}${queryString ? `?${queryString}` : ""}`}
                       state={{ property: unit.property }}
-                      className="inline-flex items-center justify-center rounded-xl bg-cta-primary px-4 py-2 text-sm font-semibold text-[var(--text-contrast)] shadow hover:bg-cta-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
+                      className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl bg-cta-primary px-4 py-2 text-sm font-semibold text-[var(--text-contrast)] shadow hover:bg-cta-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
                     >
                       View details
                     </Link>
@@ -131,6 +157,17 @@ const SearchPage = () => {
                 </div>
               </article>
             ))}
+            {hasMore && (
+              <div className="col-span-full flex justify-center pt-4">
+                <button
+                  type="button"
+                  onClick={() => setVisibleCount((prev) => prev + ITEMS_PER_PAGE)}
+                  className="min-h-[44px] w-full max-w-sm rounded-xl bg-cta-primary px-6 py-3 text-base font-semibold text-[var(--text-contrast)] shadow hover:bg-cta-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary sm:w-auto"
+                >
+                  Load more
+                </button>
+              </div>
+            )}
           </section>
         )}
       </div>
