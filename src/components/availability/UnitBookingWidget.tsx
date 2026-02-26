@@ -39,8 +39,25 @@ const normalizeListingId = (value: string | number | null | undefined) =>
     .trim()
     .toLowerCase();
 
-/** Map API error to actionable guest-facing message (quote/availability/payment/duplicate). */
+const NETWORK_ERROR_MESSAGE = 'Network error. Please check your connection and try again.';
+
+/** Detect network/connection failures (timeout, offline, ECONNREFUSED, etc.). */
+function isNetworkError(error: unknown): boolean {
+  const err = error as { code?: string; message?: string; response?: { status?: number } };
+  const msg = (err?.message ?? '').toLowerCase();
+  const code = (err?.code ?? '').toLowerCase();
+  if (err?.response?.status === 0 || err?.response === undefined) {
+    if (msg.includes('network') || msg.includes('timeout') || msg.includes('failed to fetch')) return true;
+  }
+  if (code === 'econnrefused' || code === 'etimedout' || code === 'err_network' || code === 'econnreset') return true;
+  if (msg.includes('econnrefused') || msg.includes('etimedout') || msg.includes('network error')) return true;
+  if (err?.response?.status === 502 || err?.response?.status === 503 || err?.response?.status === 504) return true;
+  return false;
+}
+
+/** Map API error to actionable guest-facing message (quote/availability/payment/duplicate/network). */
 function getBookingErrorMessage(error: unknown, context: 'order' | 'verify'): string {
+  if (isNetworkError(error)) return NETWORK_ERROR_MESSAGE;
   const status = (error as { response?: { status?: number } })?.response?.status;
   const data = (error as { response?: { data?: { message?: string } } })?.response?.data;
   const message = (typeof data?.message === 'string' ? data.message : '') || (error as Error)?.message || '';
@@ -102,6 +119,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
   const lastAvailabilityKeyRef = useRef<string | null>(null);
   const hasAutoAdjustedRef = useRef(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [paymentAttemptCount, setPaymentAttemptCount] = useState(0);
   const [formError, setFormError] = useState<string | null>(null);
   const [dateError, setDateError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -677,9 +695,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     script.onload = () => callback();
     script.onerror = () => {
       localStorage.removeItem(PENDING_PAYMENT_KEY);
-      setFormError('Failed to load payment processor. Please try again.');
+      setFormError('Unable to connect to payment service. Please check your internet connection and try again.');
       setIsSubmitting(false);
       setIsLoading(false);
+      toast.error('Unable to connect to payment service. Please try again.');
     };
     document.body.appendChild(script);
   };
@@ -715,7 +734,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           ...getApiHeaders(),
           'Content-Type': 'application/json',
           'Accept': 'application/json'
-        }
+        },
+        timeout: 15000
       });
       
       if (response.data.success) {
@@ -860,6 +880,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     setIsLoading(true);
     setFormError(null);
     setStatusMessage(null);
+    setPaymentAttemptCount((c) => c + 1);
 
     try {
       // 1. Create booking draft
@@ -901,7 +922,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
           'Idempotency-Key': idempotencyKey
-        }
+        },
+        timeout: 15000
       });
 
       const { keyId: key, orderId, bookingId } = orderResponse.data;
@@ -991,6 +1013,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                 console.error('Payment processing error:', error);
                 setPaymentStatus('failed');
                 setFormError(getBookingErrorMessage(error, 'verify'));
+                if (isNetworkError(error)) toast.error(NETWORK_ERROR_MESSAGE);
               } finally {
                 setIsSubmitting(false);
                 setIsLoading(false);
@@ -1014,17 +1037,22 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         } catch (error) {
           console.error('Error initializing Razorpay:', error);
           localStorage.removeItem(PENDING_PAYMENT_KEY);
-          setFormError('Failed to initialize payment. Please try again.');
+          setFormError('Unable to connect to payment service. Please try again.');
           setIsSubmitting(false);
           setIsLoading(false);
+          toast.error('Unable to connect to payment service. Please try again.');
         }
       });
     } catch (error: unknown) {
       console.error('Booking error:', error);
       localStorage.removeItem(PENDING_PAYMENT_KEY);
-      setFormError(getBookingErrorMessage(error, 'order'));
+      const msg = getBookingErrorMessage(error, 'order');
+      setFormError(msg);
       setIsSubmitting(false);
       setIsLoading(false);
+      if (isNetworkError(error)) {
+        toast.error(NETWORK_ERROR_MESSAGE);
+      }
     }
   };
 
@@ -1038,6 +1066,15 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     setIsSubmitting(false);
     setIsLoading(false);
   }, []);
+
+  // Reset attempt count on successful payment
+  const prevPaymentStatus = useRef<'success' | 'failed' | null>(null);
+  useEffect(() => {
+    if (prevPaymentStatus.current !== 'success' && paymentStatus === 'success') {
+      setPaymentAttemptCount(0);
+    }
+    prevPaymentStatus.current = paymentStatus;
+  }, [paymentStatus]);
 
   const goToDashboard = useCallback(() => {
     closePaymentPopup();
@@ -1622,7 +1659,14 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         </div>
       </div>
 
-      {formError && <p className="text-sm text-support-error">{formError}</p>}
+      {formError && (
+        <div className="space-y-1">
+          <p className="text-sm text-support-error">{formError}</p>
+          {paymentAttemptCount > 0 && (formError.includes('Network') || formError.includes('connection') || formError.includes('Unable to connect')) && (
+            <p className="text-xs text-text-muted">Attempt {Math.min(paymentAttemptCount, 3)} of 3 — Click &quot;Book this home&quot; to retry</p>
+          )}
+        </div>
+      )}
 
       <Button 
         type="submit" 
