@@ -1,0 +1,85 @@
+:root[data-theme="auroraChampagne"] {
+  /* Surfaces - Ivory + Champagne Sunrise */
+  --bg-primary: #fffdf9;
+  --bg-surface: #ffffff;
+  --bg-muted: #fbf5ee;
+
+  /* Text - Dreamy Warmth */
+  --text-primary: #3d342f;
+  --text-muted: #8c7e75;
+  --text-body: #5c524b;
+  --text-on-hero: #3d342f;
+
+  /* Accent - Champagne + Blush */
+  --accent-primary: #e6b9a6;
+  --accent-soft: #fdf1ec;
+  --romance-soft: #fff7f2;
+  --accent-primary-rgb: 230 185 166;
+  --accent-soft-rgb: 253 241 236;
+
+  /* CTA - Champagne Rose Glow */
+  --cta-primary: #d49a85;
+  --cta-primary-hover: #c48a75;
+  --cta-secondary: #e6b9a6;
+  --cta-primary-rgb: 212 154 133;
+  --cta-primary-hover-rgb: 196 138 117;
+  --cta-secondary-rgb: 230 185 166;
+
+  /* Brand - Penthouse Morning */
+  --brand: #d49a85;
+  --brand-ink: #3d342f;
+  --brand-contrast: #fffdf9;
+  --brand-soft: #fdf1ec;
+
+  /* Borders - Soft Champagne */
+  --border-subtle: #f0e6e1;
+  --border-strong: #e5d8d2;
+
+  /* Status */
+  --support-success: #10b981;
+  --support-danger: #ef4444;
+  --support-error: #ef4444;
+
+  /* Footer - Soft Pearl */
+  --footer-bg: #f8f1eb;
+  --footer-text: #7a6d65;
+  --footer-heading: #3d342f;
+  --footer-link: #9e8d85;
+  --footer-link-hover: #d49a85;
+
+  /* Shadows - Light, Airy, Dreaming */
+  --shadow-level-1: 0 4px 16px rgba(212, 154, 133, 0.08), 0 1px 3px rgba(61, 52, 47, 0.04);
+  --shadow-level-2: 0 12px 32px rgba(212, 154, 133, 0.12), 0 6px 16px rgba(61, 52, 47, 0.06);
+  --shadow-level-3: 0 24px 64px rgba(212, 154, 133, 0.15), 0 12px 32px rgba(61, 52, 47, 0.08);
+  --shadow-1: var(--shadow-level-1);
+  --shadow-2: var(--shadow-level-2);
+  --shadow-3: var(--shadow-level-3);
+
+  /* Radius */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+
+  /* Glass Effects */
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(230, 185, 166, 0.3);
+  --glass-blur: 10px;
+
+  /* Typography */
+  --font-family-display: "Plus Jakarta Sans", sans-serif;
+  --font-family-base: "Plus Jakarta Sans", sans-serif;
+}
+
+/* Glassy Cards for Aurora Champagne */
+[data-theme="auroraChampagne"] .glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+}
+
+/* Primary CTA Faint Glow */
+[data-theme="auroraChampagne"] .book-now,
+[data-theme="auroraChampagne"] button[type="submit"] {
+  box-shadow: 0 0 20px rgba(212, 154, 133, 0.25), var(--shadow-level-1);
+}
+

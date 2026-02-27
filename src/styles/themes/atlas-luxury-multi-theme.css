@@ -1,0 +1,273 @@
+/* Atlas Homestays — multi-theme luxury palette
+   Each theme maps the design brief variables onto the existing design tokens. */
+
+/* GOD'S WEBSITE — global default + theme */
+:root[data-theme="godsWebsite"] {
+  /* Backgrounds */
+  --bg-base:        #FFFBF0;
+  --bg-section-alt: #FFF3D0;
+  --bg-card:        #FFFFFF;
+  --bg-blob-1:      rgba(255, 200, 50, 0.12);
+  --bg-blob-2:      rgba(255, 140, 0, 0.08);
+
+  /* Map to existing tokens */
+  --bg-primary:   var(--bg-base);
+  --bg-secondary: var(--bg-section-alt);
+  --bg-surface:   #FFFFFF;
+  --bg-muted:     var(--bg-section-alt);
+
+  /* Brand + accents */
+  --brand-primary: #F59E0B;
+  --brand-accent:  #EF4444;
+  --brand-soft:    #FEF3C7;
+  --accent-primary: #EF4444;
+  --accent-soft:    #FEE2E2;
+  --accent-primary-rgb: 239 68 68;
+  --accent-soft-rgb:    254 226 226;
+
+  /* CTA / primary buttons use the fire gradient */
+  --cta-primary:        #F59E0B;
+  --cta-primary-hover:  #D97706;
+  --cta-secondary:      #EC4899;
+  --cta-primary-rgb:        245 158 11;
+  --cta-primary-hover-rgb:  217 119 6;
+  --cta-secondary-rgb:      236 72 153;
+
+  /* Text */
+  --text-heading:  #1C1100;
+  --text-body:     #44310A;
+  --text-primary:  #1C1100;
+  --text-secondary:#7C5F1A;
+  --text-muted:    #A68A3A;
+  --text-on-hero:  #1C1100;
+
+  /* Borders & status */
+  --border:         rgba(245, 158, 11, 0.2);
+  --border-subtle:  rgba(245, 158, 11, 0.16);
+  --border-strong:  rgba(245, 158, 11, 0.36);
+  --support-success:#16A34A;
+  --support-danger: #DC2626;
+  --support-error:  #DC2626;
+
+  /* Gradients / glows */
+  --gradient-hero:   linear-gradient(135deg, #FFFBF0 0%, #FFF3C4 35%, #FFE4A0 65%, #FFD580 100%);
+  --gradient-cta:    linear-gradient(135deg, #F59E0B 0%, #EF4444 50%, #EC4899 100%);
+  --gradient-card:   linear-gradient(180deg, rgba(245, 158, 11, 0.04) 0%, transparent 100%);
+  --glow-brand:      0 8px 32px rgba(245, 158, 11, 0.35);
+  --glow-accent:     0 8px 32px rgba(239, 68, 68, 0.25);
+
+  /* Footer aligned with theme, no dark navy */
+  --footer-bg:        var(--bg-section-alt);
+  --footer-text:      #85601A;
+  --footer-heading:   #1C1100;
+  --footer-link:      rgba(124, 95, 26, 0.9);
+  --footer-link-hover:#1C1100;
+
+  /* Navbar frosted background base RGB */
+  --bg-base-rgb: 255, 251, 240;
+}
+
+/* THEME 1: Sunrise Coral */
+:root[data-theme="sunriseCoral"] {
+  --bg-base:        #FFF8F3;
+  --bg-section-alt: #FFF0E6;
+  --bg-card:        #FFFFFF;
+
+  --bg-primary:   var(--bg-base);
+  --bg-secondary: var(--bg-section-alt);
+  --bg-surface:   #FFFFFF;
+  --bg-muted:     var(--bg-section-alt);
+
+  --brand-primary: #FF5733;
+  --brand-accent:  #FF8C42;
+  --brand-soft:    #FFE8E0;
+  --accent-primary: #FF8C42;
+  --accent-soft:    #FFE8E0;
+  --accent-primary-rgb: 255 140 66;
+  --accent-soft-rgb:    255 232 224;
+
+  --cta-primary:       #FF5733;
+  --cta-primary-hover: #E14929;
+  --cta-secondary:     #FF8C42;
+  --cta-primary-rgb:       255 87 51;
+  --cta-primary-hover-rgb: 225 73 41;
+  --cta-secondary-rgb:     255 140 66;
+
+  --text-heading:  #1C0A00;
+  --text-body:     #5C3D2E;
+  --text-primary:  #1C0A00;
+  --text-secondary:#7A4F35;
+  --text-muted:    #B18A6A;
+  --text-on-hero:  #1C0A00;
+
+  --border:        rgba(255, 140, 66, 0.22);
+  --border-subtle: rgba(255, 140, 66, 0.16);
+  --border-strong: rgba(255, 87, 51, 0.3);
+
+  --gradient-hero: linear-gradient(135deg, #FFF8F3 0%, #FFE8D6 40%, #FFDCC2 100%);
+  --gradient-cta:  linear-gradient(135deg, #FF5733, #FF8C42);
+  --gradient-card: linear-gradient(180deg, rgba(255, 87, 51, 0.04) 0%, transparent 100%);
+  --glow-brand:    0 8px 32px rgba(255, 87, 51, 0.25);
+
+  --footer-bg:        var(--bg-section-alt);
+  --footer-text:      #74452F;
+  --footer-heading:   #1C0A00;
+  --footer-link:      rgba(122, 79, 53, 0.9);
+  --footer-link-hover:#1C0A00;
+
+  --bg-base-rgb: 255, 248, 243;
+}
+
+/* THEME 2: Ocean Luxury */
+:root[data-theme="oceanLuxury"] {
+  --bg-base:        #F0F9FF;
+  --bg-section-alt: #E0F4FF;
+  --bg-card:        #FFFFFF;
+
+  --bg-primary:   var(--bg-base);
+  --bg-secondary: var(--bg-section-alt);
+  --bg-surface:   #FFFFFF;
+  --bg-muted:     var(--bg-section-alt);
+
+  --brand-primary: #0077B6;
+  --brand-accent:  #00B4D8;
+  --brand-soft:    #CAE9FF;
+  --accent-primary: #00B4D8;
+  --accent-soft:    #CAE9FF;
+  --accent-primary-rgb: 0 180 216;
+  --accent-soft-rgb:    202 233 255;
+
+  --cta-primary:       #0077B6;
+  --cta-primary-hover: #005A87;
+  --cta-secondary:     #00B4D8;
+  --cta-primary-rgb:       0 119 182;
+  --cta-primary-hover-rgb: 0 90 135;
+  --cta-secondary-rgb:     0 180 216;
+
+  --text-heading:  #03045E;
+  --text-body:     #023E8A;
+  --text-primary:  #03045E;
+  --text-secondary:#0369A1;
+  --text-muted:    #64748B;
+  --text-on-hero:  #03045E;
+
+  --border:        rgba(0, 119, 182, 0.22);
+  --border-subtle: rgba(0, 119, 182, 0.16);
+  --border-strong: rgba(0, 119, 182, 0.32);
+
+  --gradient-hero: linear-gradient(135deg, #F0F9FF 0%, #CAF0F8 50%, #ADE8F4 100%);
+  --gradient-cta:  linear-gradient(135deg, #0077B6, #00B4D8);
+  --gradient-card: linear-gradient(180deg, rgba(0, 119, 182, 0.04) 0%, transparent 100%);
+  --glow-brand:    0 8px 32px rgba(0, 119, 182, 0.25);
+
+  --footer-bg:        var(--bg-section-alt);
+  --footer-text:      #02416F;
+  --footer-heading:   #03045E;
+  --footer-link:      rgba(3, 70, 119, 0.9);
+  --footer-link-hover:#03045E;
+
+  --bg-base-rgb: 240, 249, 255;
+}
+
+/* THEME 3: Royal Violet */
+:root[data-theme="royalViolet"] {
+  --bg-base:        #FAF7FF;
+  --bg-section-alt: #F0E6FF;
+  --bg-card:        #FFFFFF;
+
+  --bg-primary:   var(--bg-base);
+  --bg-secondary: var(--bg-section-alt);
+  --bg-surface:   #FFFFFF;
+  --bg-muted:     var(--bg-section-alt);
+
+  --brand-primary: #7B2FBE;
+  --brand-accent:  #A855F7;
+  --brand-soft:    #E9D5FF;
+  --accent-primary: #A855F7;
+  --accent-soft:    #E9D5FF;
+  --accent-primary-rgb: 168 85 247;
+  --accent-soft-rgb:    233 213 255;
+
+  --cta-primary:       #7B2FBE;
+  --cta-primary-hover: #5B21A3;
+  --cta-secondary:     #A855F7;
+  --cta-primary-rgb:       123 47 190;
+  --cta-primary-hover-rgb: 91 33 163;
+  --cta-secondary-rgb:     168 85 247;
+
+  --text-heading:  #1E003D;
+  --text-body:     #4C1D95;
+  --text-primary:  #1E003D;
+  --text-secondary:#5B21A3;
+  --text-muted:    #7C3AED;
+  --text-on-hero:  #1E003D;
+
+  --border:        rgba(123, 47, 190, 0.22);
+  --border-subtle: rgba(123, 47, 190, 0.16);
+  --border-strong: rgba(123, 47, 190, 0.32);
+
+  --gradient-hero: linear-gradient(135deg, #FAF7FF 0%, #EDE9FE 50%, #DDD6FE 100%);
+  --gradient-cta:  linear-gradient(135deg, #7B2FBE, #A855F7);
+  --gradient-card: linear-gradient(180deg, rgba(123, 47, 190, 0.05) 0%, transparent 100%);
+  --glow-brand:    0 8px 32px rgba(123, 47, 190, 0.25);
+
+  --footer-bg:        var(--bg-section-alt);
+  --footer-text:      #4C1D95;
+  --footer-heading:   #1E003D;
+  --footer-link:      rgba(76, 29, 149, 0.9);
+  --footer-link-hover:#1E003D;
+
+  --bg-base-rgb: 250, 247, 255;
+}
+
+/* THEME 4: Emerald Oasis */
+:root[data-theme="emeraldOasis"] {
+  --bg-base:        #F0FDF4;
+  --bg-section-alt: #DCFCE7;
+  --bg-card:        #FFFFFF;
+
+  --bg-primary:   var(--bg-base);
+  --bg-secondary: var(--bg-section-alt);
+  --bg-surface:   #FFFFFF;
+  --bg-muted:     var(--bg-section-alt);
+
+  --brand-primary: #059669;
+  --brand-accent:  #10B981;
+  --brand-soft:    #A7F3D0;
+  --accent-primary: #10B981;
+  --accent-soft:    #A7F3D0;
+  --accent-primary-rgb: 16 185 129;
+  --accent-soft-rgb:    167 243 208;
+
+  --cta-primary:       #059669;
+  --cta-primary-hover: #047857;
+  --cta-secondary:     #10B981;
+  --cta-primary-rgb:       5 150 105;
+  --cta-primary-hover-rgb: 4 120 87;
+  --cta-secondary-rgb:     16 185 129;
+
+  --text-heading:  #022C22;
+  --text-body:     #065F46;
+  --text-primary:  #022C22;
+  --text-secondary:#047857;
+  --text-muted:    #16A34A;
+  --text-on-hero:  #022C22;
+
+  --border:        rgba(5, 150, 105, 0.22);
+  --border-subtle: rgba(5, 150, 105, 0.16);
+  --border-strong: rgba(5, 150, 105, 0.32);
+
+  --gradient-hero: linear-gradient(135deg, #F0FDF4 0%, #D1FAE5 50%, #A7F3D0 100%);
+  --gradient-cta:  linear-gradient(135deg, #059669, #10B981);
+  --gradient-card: linear-gradient(180deg, rgba(5, 150, 105, 0.05) 0%, transparent 100%);
+  --glow-brand:    0 8px 32px rgba(5, 150, 105, 0.25);
+
+  --footer-bg:        var(--bg-section-alt);
+  --footer-text:      #065F46;
+  --footer-heading:   #022C22;
+  --footer-link:      rgba(6, 95, 70, 0.9);
+  --footer-link-hover:#022C22;
+
+  --bg-base-rgb: 240, 253, 244;
+}
+

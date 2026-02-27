@@ -1,0 +1,9 @@
+**/*-originals/**
+**/*.psd
+**/*.ai
+**/*.sketch
+**/*.xcf
+**/*.tif
+**/*.tiff
+**/*.psb
+**/*.raw

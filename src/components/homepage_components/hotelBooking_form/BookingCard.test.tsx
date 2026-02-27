@@ -1,0 +1,298 @@
+import { describe, expect, vi, beforeEach, afterEach, it, test } from 'vitest';
+import { render, screen, within, fireEvent, waitFor } from '@testing-library/react';
+import { act, ReactNode } from 'react';
+import { MemoryRouter } from 'react-router-dom';
+import { format, startOfDay } from 'date-fns';
+import { getIstCalendarDate, getIstStartOfDay } from '@/utils/date';
+import BookingCard from './BookingCard';
+import { propertyData } from '../../../data';
+import { BookingProvider } from '../../../contexts/BookingContext';
+
+const getPrimaryCta = () =>
+  screen
+    .getAllByRole('button', { name: /check availability/i })
+    .find((button) => button.hasAttribute('disabled')) ??
+  screen.getByRole('button', { name: /check availability/i });
+
+const scrollIntoViewSpy = vi.fn();
+
+const mockTrackEvent = vi.fn();
+const mockLogUserAction = vi.fn();
+const mockLogApiError = vi.fn();
+const mockUpdateBooking = vi.fn();
+const mockApiGet = vi.fn(async () => ({
+  data: { bookings: [] },
+  status: 200,
+  headers: new Headers(),
+  url: '/bookings',
+}));
+
+const razorpayOpen = vi.fn();
+
+vi.mock('@/lib/api', () => ({
+  api: {
+    get: (...args: unknown[]) => mockApiGet(...args),
+  },
+  asArray: (val: unknown) => (Array.isArray(val) ? val : []),
+}));
+
+vi.mock('@/runtime-config', () => ({
+  hasRuntimeConfig: () => true,
+  getApiBaseUrl: () => 'https://api.test',
+  getGlobalDiscountPercent: () => 0,
+}));
+
+vi.mock('../../../contexts/BookingContext', () => ({
+  useBooking: () => ({ updateBooking: mockUpdateBooking }),
+  BookingProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
+}));
+
+vi.mock('@/utils/analytics', () => ({
+  trackEvent: (...args: unknown[]) => mockTrackEvent(...args),
+}));
+
+vi.mock('@/lib/monitoring', () => ({
+  logUserAction: (...args: unknown[]) => mockLogUserAction(...args),
+  logApiError: (...args: unknown[]) => mockLogApiError(...args),
+  monitoredFetch: vi.fn(),
+  isAtlasApiRequest: vi.fn(),
+}));
+
+vi.mock('react-date-range', () => {
+  const DateRange = (props: { onChange: (arg: { selection: { startDate: Date; endDate: Date } }) => void }) => {
+    return (
+      <div data-testid="date-range-mock">
+        <button
+          type="button"
+          onClick={() =>
+            props.onChange({
+              selection: {
+                startDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
+                endDate: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000),
+              },
+            })
+          }
+        >
+          Select future dates
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            props.onChange({
+              selection: {
+                startDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+                endDate: new Date(Date.now() - 24 * 60 * 60 * 1000),
+              },
+            })
+          }
+        >
+          Select past dates
+        </button>
+        <span data-testid="min-date-prop">{props.minDate?.toISOString()}</span>
+      </div>
+    );
+  };
+
+  return { DateRange };
+});
+
+const renderCard = async (propertyId = 101) => {
+  let utils: ReturnType<typeof render> | undefined;
+  await act(async () => {
+    utils = render(
+      <MemoryRouter>
+        <BookingProvider>
+          <BookingCard propertyId={propertyId} />
+        </BookingProvider>
+      </MemoryRouter>,
+    );
+  });
+  return utils!;
+};
+
+beforeEach(() => {
+  mockTrackEvent.mockClear();
+  mockLogApiError.mockClear();
+  mockLogUserAction.mockClear();
+  mockApiGet.mockClear();
+  razorpayOpen.mockClear();
+  scrollIntoViewSpy.mockClear();
+  const RazorpayMock = vi.fn(function RazorpayMock() {
+    return { open: razorpayOpen };
+  });
+  vi.stubGlobal('Razorpay', RazorpayMock);
+  vi.stubGlobal('alert', vi.fn());
+  vi.stubGlobal('confirm', vi.fn(() => true));
+  // jsdom doesn't implement scrollIntoView
+  Object.defineProperty(Element.prototype, 'scrollIntoView', {
+    writable: true,
+    value: scrollIntoViewSpy,
+  });
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+describe('BookingCard (current simple form)', () => {
+  it('renders Book Your Stay form with email, phone, terms and Book Now', async () => {
+    await renderCard();
+    expect(screen.getByRole('heading', { name: /book your stay/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/email address/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/phone number/i)).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: /I agree to the terms/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /book now/i })).toBeInTheDocument();
+  });
+
+  it('enables Book Now when email, phone and terms are filled', async () => {
+    await renderCard();
+    fireEvent.change(screen.getByLabelText(/email address/i), { target: { value: 'guest@example.com' } });
+    fireEvent.change(screen.getByLabelText(/phone number/i), { target: { value: '9999999999' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: /I agree to the terms/i }));
+    const bookNow = screen.getByRole('button', { name: /book now/i });
+    expect(bookNow).toBeEnabled();
+  });
+});
+
+describe.skip('BookingCard end-to-end flow (legacy date/guests UI)', () => {
+  const openGuestMenu = async () => {
+    fireEvent.click(screen.getByRole('button', { name: /guests/i }));
+    return screen.findByTestId('guest-menu');
+  };
+
+  it('walks through availability check, validation, and Razorpay init without redirects', async () => {
+    await renderCard();
+    fireEvent.click(screen.getByRole('button', { name: /check-in/i }));
+    const dateRange = await screen.findByTestId('date-range-mock');
+    fireEvent.click(within(dateRange).getByText(/select future dates/i));
+
+    const statusRegion = screen.getByRole('status');
+    expect(statusRegion.textContent?.length).toBeGreaterThan(0);
+
+    const inlineCta = screen
+      .getAllByRole('button', { name: /check availability/i })
+      .find((button) => !button.hasAttribute('disabled'))!;
+    fireEvent.click(inlineCta);
+
+    expect(document.getElementById('pricing-breakdown')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'guest@example.com' } });
+    fireEvent.change(screen.getByLabelText(/phone number/i), { target: { value: '9999999999' } });
+    fireEvent.click(screen.getByLabelText(/i agree to the/i));
+
+    const primaryCta = screen
+      .getAllByRole('button', { name: /book now/i })
+      .find((button) => !button.hasAttribute('disabled'))!;
+    fireEvent.click(primaryCta);
+
+    expect(mockTrackEvent).toHaveBeenCalled();
+
+    expect(window.location.pathname).toBe('/');
+  });
+
+  it('enforces form and terms validation states', async () => {
+    await renderCard();
+
+    const primaryCta = getPrimaryCta();
+    expect(primaryCta).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'guest@example.com' } });
+    expect(primaryCta).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText(/phone number/i), { target: { value: '9999999999' } });
+    expect(primaryCta).toBeDisabled();
+
+    fireEvent.click(screen.getByLabelText(/i agree to the/i));
+    const bookNowButtons = screen.getAllByRole('button', { name: /book now/i });
+    expect(bookNowButtons.some((button) => !button.hasAttribute('disabled'))).toBe(true);
+  });
+
+  it('prevents past date selection and keeps start date at or after today', async () => {
+    await renderCard();
+
+    fireEvent.click(screen.getByRole('button', { name: /check-in/i }));
+    const dateRange = await screen.findByTestId('date-range-mock');
+
+    const minDateText = within(dateRange).getByTestId('min-date-prop').textContent;
+    const istToday = getIstCalendarDate();
+    const todayStart = getIstStartOfDay(istToday).toISOString();
+    expect(minDateText).toBe(todayStart);
+
+    fireEvent.click(within(dateRange).getByText(/select past dates/i));
+
+    const checkInButton = screen.getByRole('button', { name: /select check-in date/i });
+    expect(checkInButton.getAttribute('aria-label')).toContain(format(istToday, 'dd MMM yyyy'));
+  });
+
+  it('opens the detailed guest selector with all counters from the Guests field', async () => {
+    await renderCard();
+
+    const menu = await openGuestMenu();
+
+    expect(within(menu).getByText(/adults/i)).toBeInTheDocument();
+    expect(within(menu).getByText(/children/i)).toBeInTheDocument();
+    expect(within(menu).getByText(/infants/i)).toBeInTheDocument();
+    expect(within(menu).getByText(/pets/i)).toBeInTheDocument();
+  });
+
+  it('increments and decrements every guest type independently', async () => {
+    await renderCard();
+    await openGuestMenu();
+
+    fireEvent.click(screen.getByRole('button', { name: /increase adults/i }));
+    await waitFor(() => expect(screen.getByTestId('adults-count')).toHaveTextContent('2'));
+    fireEvent.click(screen.getByRole('button', { name: /decrease adults/i }));
+    expect(screen.getByTestId('adults-count')).toHaveTextContent('1');
+
+    fireEvent.click(screen.getByRole('button', { name: /increase children/i }));
+    await waitFor(() => expect(screen.getByTestId('children-count')).toHaveTextContent('1'));
+    fireEvent.click(screen.getByRole('button', { name: /decrease children/i }));
+    expect(screen.getByTestId('children-count')).toHaveTextContent('0');
+
+    fireEvent.click(screen.getByRole('button', { name: /increase infants/i }));
+    await waitFor(() => expect(screen.getByTestId('infants-count')).toHaveTextContent('1'));
+    fireEvent.click(screen.getByRole('button', { name: /decrease infants/i }));
+    expect(screen.getByTestId('infants-count')).toHaveTextContent('0');
+
+    fireEvent.click(screen.getByRole('button', { name: /increase pets/i }));
+    await waitFor(() => expect(screen.getByTestId('pets-count')).toHaveTextContent('1'));
+    fireEvent.click(screen.getByRole('button', { name: /decrease pets/i }));
+    expect(screen.getByTestId('pets-count')).toHaveTextContent('0');
+  });
+
+  it('advances inline status after a successful bookings fetch', async () => {
+    const checkinDate = startOfDay(new Date(Date.now() + 2 * 24 * 60 * 60 * 1000));
+    const checkoutDate = startOfDay(new Date(Date.now() + 5 * 24 * 60 * 60 * 1000));
+
+    mockApiGet.mockImplementationOnce(async () => ({
+      data: {
+        bookings: [
+          {
+            id: 'booking-123',
+            listing: 'Atlas101',
+            checkinDate: checkinDate.toISOString(),
+            checkoutDate: checkoutDate.toISOString(),
+          },
+        ],
+      },
+      status: 200,
+      headers: new Headers(),
+      url: 'https://api.test/bookings',
+    }));
+
+    await renderCard(101);
+
+    const refreshedMessages = await screen.findAllByText(/availability refreshed/i);
+    expect(refreshedMessages.length).toBeGreaterThan(0);
+    expect(mockApiGet).toHaveBeenCalledWith('/bookings');
+  });
+
+  test.each([101, 102, 201])('renders booking widget consistently for listing %s', async (propertyId) => {
+    await renderCard(propertyId);
+    const property = propertyData.find((p) => p.id === propertyId);
+    expect(property).toBeDefined();
+    const reviewsText = await screen.findAllByText(/reviews/i);
+    expect(reviewsText.length).toBeGreaterThan(0);
+    expect(getPrimaryCta()).toBeDisabled();
+  });
+});

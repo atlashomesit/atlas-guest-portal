@@ -1,0 +1,29 @@
+.listingsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-auto-rows: 220px; /* baseline height for normal cards */
+  gap: 16px;
+}
+.card {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-level-1);
+  background: var(--bg-surface);
+  display: flex;
+  flex-direction: column;
+}
+.card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+/* Featured Penthouse: larger footprint */
+.featured {
+  grid-column: span 2;
+  grid-row: span 2;
+}
+/* Responsive fallback (when only 1 column) */
+@media (max-width: 640px) {
+  .featured { grid-column: span 1; grid-row: span 1; }
+}

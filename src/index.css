@@ -1,0 +1,845 @@
+@import "./styles/themes/index.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================
+   PREMIUM PLATINUM COLOR PALETTE
+   ============================================ */
+:root {
+  --platinum-50: #F8FAFB;
+  --platinum-100: #F1F5F9;
+  --platinum-200: #E2E8F0;
+  --platinum-300: #CBD5E1;
+  --platinum-400: #94A3B8;
+  --platinum-500: #64748B;
+  --platinum-600: #475569;
+  --platinum-700: #334155;
+  --platinum-800: #1E293B;
+  --platinum-900: #0F172A;
+  
+  --accent-platinum: #8B9DC3;
+  --accent-silver: #C0C8D4;
+  --accent-pearl: #F8F9FA;
+}
+
+.btn-chip {
+  @apply inline-flex items-center gap-2 px-4 py-2 rounded-full bg-bg-surface border border-border-subtle text-text-primary font-semibold shadow-level1 transition;
+  box-shadow: var(--shadow-level-1);
+}
+
+.btn-chip:hover {
+  border-color: var(--cta-primary);
+  color: var(--cta-primary);
+  box-shadow: var(--shadow-level-2);
+}
+
+.btn-chip--active {
+  @apply border-cta-primary text-cta-primary;
+}
+
+/* ============================================
+   MINIMALIST DATE PICKER - CLEAN & SIMPLE
+   ============================================ */
+
+/* Calendar popover container - Fixed width to accommodate both months */
+.booking-calendar-popover {
+  max-width: 100%;
+  width: 100%;
+  overflow-x: visible;
+  box-sizing: border-box;
+}
+
+/* Hide "Select your dates" heading, help icon, and instruction text */
+/* Target the header div by its border-bottom class pattern */
+.booking-calendar-popover > div[class*="border-b"][class*="px-6"] {
+  display: none !important;
+}
+
+/* Alternative: Hide any div with px-6 py-5 that's a direct child (header) */
+.booking-calendar-popover > div[class*="px-6"][class*="py-5"] {
+  display: none !important;
+}
+
+/* Hide range selected badge / status config badge with bullet point */
+/* Target the status badge by its class pattern */
+.booking-calendar-popover div[class*="mx-5"][class*="mt-4"][class*="mb-2"][class*="rounded-lg"] {
+  display: none !important;
+}
+
+/* Also target any div containing "Range selected" text or status config */
+.booking-calendar-popover > div[class*="max-h"] > div:first-child[class*="mx-5"] {
+  display: none !important;
+}
+
+.booking-calendar-popover * {
+  box-sizing: border-box;
+}
+
+/* Minimal calendar wrapper - ensure no clipping */
+.rdrCalendarWrapper {
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  overflow: visible;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  max-width: 100%;
+  width: 100%;
+}
+
+/* Ensure month containers don't clip content */
+.rdrMonth {
+  overflow: visible !important;
+}
+
+/* Minimal month headers - reduced padding since header is removed */
+.rdrMonthAndYearWrapper {
+  padding: 8px 0 4px 0 !important;
+  background: transparent !important;
+  border-bottom: none !important;
+  position: relative;
+  z-index: 1;
+}
+
+.rdrMonthAndYearPickers {
+  font-weight: 500;
+  color: #111827;
+  font-size: 16px;
+  letter-spacing: -0.01em;
+}
+
+.rdrMonthAndYearPickers select {
+  font-weight: 500;
+  color: #111827;
+  padding: 4px 6px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  transition: border-color 0.15s ease;
+  font-size: 16px;
+}
+
+.rdrMonthAndYearPickers select:hover {
+  border-color: transparent;
+  background: transparent;
+}
+
+/* Minimal weekday headers - perfect grid alignment */
+.rdrWeekDays {
+  padding: 4px 0 2px 0 !important;
+  background: transparent !important;
+  display: grid;
+  grid-template-columns: repeat(7, 40px);
+  grid-auto-rows: 32px;
+  gap: 0;
+  width: 100%;
+  border-bottom: none;
+}
+
+.rdrWeekDay {
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #9ca3af;
+  padding: 8px 0;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Minimal date grid - perfect alignment, ensure all dates visible */
+.rdrDays {
+  padding: 0 !important;
+  max-width: 100%;
+  width: 100%;
+  overflow: visible;
+  display: grid;
+  grid-template-columns: repeat(7, 40px);
+  grid-auto-rows: 40px;
+  gap: 0;
+  min-width: 0;
+  margin: 0;
+}
+
+/* Date cell container - ensure no clipping, no overlap */
+.rdrDay {
+  aspect-ratio: 1;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: visible;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+.rdrDayNumber {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 400;
+  color: #111827;
+  font-size: 15px;
+  outline: none;
+}
+
+.rdrDayNumber span {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  max-width: 36px;
+  max-height: 36px;
+  border-radius: 50% !important;
+  transition: background-color 0.12s ease;
+  font-weight: 400;
+  position: relative;
+  z-index: 2;
+  box-shadow: none !important;
+  background: transparent !important;
+  border: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+  flex-shrink: 0;
+  visibility: visible !important;
+  opacity: 1 !important;
+  color: #111827 !important;
+}
+
+/* Base safeguard: all dates default to black text */
+.rdrDay .rdrDayNumber span {
+  color: #111827 !important;
+}
+
+/* Minimal hover state - just subtle background */
+.rdrDay:not(.rdrDayPassive):not(.rdrDayDisabled) .rdrDayNumber span:hover {
+  background: #f9fafb;
+  color: #111827;
+}
+
+/* Today indicator - simple dot */
+.rdrDayToday .rdrDayNumber span {
+  font-weight: 500;
+}
+
+.rdrDayToday .rdrDayNumber span::after {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  background: #111827;
+  border-radius: 50%;
+}
+
+/* Ultra-minimal range - visible text and subtle fill */
+.rdrInRange {
+  background: transparent !important;
+}
+
+.rdrInRange .rdrDayNumber span {
+  background: #f7f7f7 !important;
+  color: #111827 !important;
+  border: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-radius: 50% !important;
+}
+
+/* Range start - simple underline, NO background, NO overlap */
+.rdrStartEdge {
+  background: transparent !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.rdrStartEdge .rdrDayNumber span,
+.rdrDay.rdrStartEdge .rdrDayNumber span {
+  background: #111827 !important;
+  color: white !important;
+  font-weight: 500 !important;
+  border: none !important;
+  border-radius: 50% !important;
+  box-shadow: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Range end - simple underline, NO background, NO overlap */
+.rdrEndEdge {
+  background: transparent !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.rdrEndEdge .rdrDayNumber span,
+.rdrDay.rdrEndEdge .rdrDayNumber span {
+  background: #111827 !important;
+  color: white !important;
+  font-weight: 500 !important;
+  border: none !important;
+  border-radius: 50% !important;
+  box-shadow: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Single day selected (start = end) */
+.rdrStartEdge.rdrEndEdge .rdrDayNumber span {
+  border: none !important;
+  border-radius: 50% !important;
+  background: #111827 !important;
+  color: white !important;
+}
+
+/* Fallback for any selected state */
+.rdrSelected .rdrDayNumber span,
+.rdrDaySelected .rdrDayNumber span {
+  color: white !important;
+  background: #111827 !important;
+  border: none !important;
+  font-weight: 500 !important;
+  border-radius: 50% !important;
+}
+
+/* Preview states - minimal, NO backgrounds */
+.rdrDayStartPreview,
+.rdrDayEndPreview,
+.rdrDayInPreview {
+  background: transparent !important;
+  border-radius: 0 !important;
+}
+
+.rdrDayStartPreview .rdrDayNumber span,
+.rdrDayEndPreview .rdrDayNumber span,
+.rdrDayInPreview .rdrDayNumber span {
+  background: transparent !important;
+  border: none !important;
+}
+
+/* Disabled dates - minimal */
+.rdrDayDisabled {
+  background-color: transparent;
+}
+
+.rdrDayDisabled .rdrDayNumber span {
+  color: #d1d5db;
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Passive dates (other months) - muted, NO backgrounds */
+.rdrDayPassive .rdrDayNumber span {
+  color: #d1d5db;
+  font-weight: 400;
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+}
+
+/* Minimal navigation arrows */
+.rdrNextPrevButton {
+  width: 32px !important;
+  height: 32px !important;
+  border: none !important;
+  background: transparent !important;
+  border-radius: 6px !important;
+  transition: background-color 0.15s ease !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  position: relative !important;
+  z-index: 50 !important;
+  padding: 0 !important;
+  margin: 0 4px !important;
+  box-shadow: none !important;
+  color: #6b7280 !important;
+}
+
+.rdrNextPrevButton:hover {
+  background: #f9fafb !important;
+  color: #111827 !important;
+}
+
+.rdrNextPrevButton:active {
+  background: #f3f4f6 !important;
+}
+
+.rdrNextPrevButton i {
+  display: block !important;
+  width: 8px !important;
+  height: 8px !important;
+  border-style: solid !important;
+  border-color: currentColor !important;
+  border-width: 0 2px 2px 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  transition: border-color 0.15s ease !important;
+  background: transparent !important;
+}
+
+/* Previous button (left arrow) */
+.rdrPprevButton i {
+  transform: rotate(135deg) !important;
+  margin-left: 2px !important;
+}
+
+/* Next button (right arrow) */
+.rdrNextButton i {
+  transform: rotate(-45deg) !important;
+  margin-right: 2px !important;
+}
+
+/* Minimal two-month layout - Fixed spacing and width */
+.rdrMonths {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  max-width: 100%;
+  overflow: visible;
+  gap: 20px;
+  width: 100%;
+}
+
+.rdrMonth {
+  padding: 0;
+  flex: 1 1 50%;
+  min-width: 280px;
+  max-width: 360px;
+  width: 100%;
+  overflow: visible;
+}
+
+/* Date range wrapper constraints */
+.rdrDateRangeWrapper {
+  max-width: 100%;
+  overflow: visible;
+  width: 100%;
+}
+
+.rdrDateDisplayWrapper,
+.rdrMonthsVertical,
+.rdrMonthsHorizontal {
+  max-width: 100%;
+  overflow: visible;
+  width: 100%;
+}
+
+/* ============================================
+   RESPONSIVE DESIGN - MINIMAL
+   ============================================ */
+
+/* Small tablets - stack months vertically */
+@media (max-width: 900px) {
+  .rdrMonths {
+    flex-direction: column !important;
+    gap: 48px !important;
+  }
+  
+  .rdrMonth {
+    max-width: 100% !important;
+    width: 100%;
+    min-width: 100%;
+  }
+}
+
+/* Mobile - single month, larger touch targets */
+@media (max-width: 767px) {
+  .rdrMonth:nth-child(2) {
+    display: none !important;
+  }
+  
+  .rdrMonths {
+    gap: 0 !important;
+  }
+  
+  .rdrMonth {
+    max-width: 100% !important;
+    min-width: 100%;
+  }
+  
+  .rdrDay {
+    min-height: 48px;
+  }
+  
+  .rdrDayNumber span {
+    min-width: 48px;
+    min-height: 48px;
+    font-size: 16px;
+  }
+  
+  .booking-calendar-popover {
+    padding: 20px;
+  }
+}
+
+/* ============================================
+   MICRO-INTERACTIONS & ANIMATIONS
+   ============================================ */
+
+/* Smooth transitions for all interactive elements */
+.rdrDay:not(.rdrDayPassive):not(.rdrDayDisabled) {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hero-form button,
+.hero-form input {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Field card hover lift effect */
+.field-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.field-card:hover {
+  transform: translateY(-2px);
+}
+
+.field-card:focus-within {
+  border-color: var(--platinum-300);
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08), 0 0 0 3px rgba(71, 85, 105, 0.08);
+  transform: translateY(-2px);
+}
+
+/* Value change animation */
+@keyframes fadeInValue {
+  from { 
+    opacity: 0; 
+    transform: translateY(4px); 
+  }
+  to { 
+    opacity: 1; 
+    transform: translateY(0); 
+  }
+}
+
+.date-value,
+.guest-value {
+  animation: fadeInValue 0.3s ease;
+}
+
+/* Error shake animation */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+
+.error-shake {
+  animation: shake 0.3s ease;
+}
+
+/* ============================================
+   RESPONSIVE DESIGN
+   ============================================ */
+
+/* ============================================
+   INDIVIDUAL LISTING DATEPICKER - COMPACT 2-MONTH NO SCROLL
+   ============================================ */
+
+/* Ultra-compact calendar - fits 2 months in narrow sidebar */
+.unit-datepicker-wrapper .rdrCalendarWrapper {
+  max-width: 100% !important;
+  width: auto !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12) !important;
+  border-radius: 12px !important;
+  overflow: hidden !important;
+  position: relative !important;
+  background: #FFFFFF !important;
+  border: 0.5px solid var(--platinum-200) !important;
+  padding: 12px !important;
+}
+
+/* Compact horizontal layout - NO SCROLLING */
+.unit-datepicker-wrapper .rdrMonths {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  gap: 4px !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  overflow-x: hidden !important;
+  overflow-y: hidden !important;
+  touch-action: none !important;
+  pointer-events: auto !important;
+  user-select: none !important;
+  -webkit-overflow-scrolling: auto !important;
+}
+
+.unit-datepicker-wrapper .rdrMonth {
+  flex: 1 1 0% !important;
+  min-width: 0 !important;
+  max-width: 50% !important;
+  padding: 8px 6px !important;
+}
+
+/* Ultra-compact month/year headers */
+.unit-datepicker-wrapper .rdrMonthAndYearWrapper {
+  padding: 8px 6px 4px 6px !important;
+  min-height: auto !important;
+}
+
+.unit-datepicker-wrapper .rdrMonthAndYearPickers {
+  font-size: 11px !important;
+  font-weight: 600 !important;
+}
+
+.unit-datepicker-wrapper .rdrMonthAndYearPickers select {
+  font-size: 10px !important;
+  padding: 2px 4px !important;
+  min-width: 55px !important;
+}
+
+/* Compact weekday headers */
+.unit-datepicker-wrapper .rdrWeekDays {
+  padding: 4px 6px !important;
+  font-size: 9px !important;
+  letter-spacing: 0.02em !important;
+  background: var(--platinum-50) !important;
+}
+
+.unit-datepicker-wrapper .rdrWeekDay {
+  padding: 2px 0 !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  color: var(--platinum-500) !important;
+  font-size: 9px !important;
+}
+
+/* Day cell: grid with date row + price row; padding; smaller cell */
+.unit-datepicker-wrapper .unit-booking-day-cell {
+  min-height: 48px;
+  width: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+  padding: 3px 2px;
+}
+.unit-datepicker-wrapper .unit-booking-day-cell-inner {
+  display: grid !important;
+  grid-template-columns: 1fr;
+  grid-template-rows: auto auto;
+  row-gap: 6px;
+  place-items: center;
+  overflow: hidden;
+  max-width: 100%;
+  box-sizing: border-box;
+  min-height: 40px;
+}
+.unit-datepicker-wrapper .unit-booking-day-num {
+  line-height: 1;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+}
+.unit-datepicker-wrapper .unit-booking-day-price {
+  line-height: 1;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+  margin: 0;
+  padding: 0;
+}
+
+/* Day cells: fixed size, no overlap - fill grid cell, no margins */
+.unit-datepicker-wrapper .rdrDay {
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0 !important;
+  min-height: 48px !important;
+  max-width: 100% !important;
+  line-height: 1 !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.unit-datepicker-wrapper .rdrDayNumber {
+  margin: 0 !important;
+  padding: 0 !important;
+  font-size: 11px !important;
+  font-weight: 400 !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.unit-datepicker-wrapper .rdrDayNumber span {
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+  position: relative !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Navigation arrows - compact for sidebar */
+.unit-datepicker-wrapper .rdrNextPrevButton {
+  width: 24px !important;
+  height: 24px !important;
+  background: white !important;
+  border: 1px solid var(--platinum-200) !important;
+  border-radius: 50% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  z-index: 50 !important;
+  margin: 0 2px !important;
+}
+
+.unit-datepicker-wrapper .rdrNextPrevButton:hover {
+  background: var(--platinum-100) !important;
+  border-color: var(--platinum-300) !important;
+}
+
+.unit-datepicker-wrapper .rdrNextPrevButton:active {
+  background: #06B6D4 !important;
+  border-color: #06B6D4 !important;
+}
+
+.unit-datepicker-wrapper .rdrNextPrevButton i {
+  display: block !important;
+  width: 6px !important;
+  height: 6px !important;
+  border-style: solid !important;
+  border-color: var(--platinum-600) !important;
+  border-width: 0 1.5px 1.5px 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  background: transparent !important;
+}
+
+.unit-datepicker-wrapper .rdrNextPrevButton:hover i {
+  border-color: var(--platinum-700) !important;
+}
+
+.unit-datepicker-wrapper .rdrNextPrevButton:active i {
+  border-color: white !important;
+}
+
+.unit-datepicker-wrapper .rdrPprevButton i {
+  transform: rotate(135deg) !important;
+  margin-left: 1px !important;
+}
+
+.unit-datepicker-wrapper .rdrNextButton i {
+  transform: rotate(-45deg) !important;
+  margin-right: 1px !important;
+}
+
+/* Prevent any overflow */
+.unit-datepicker-wrapper .rdrDateRangeWrapper {
+  max-width: 100% !important;
+  overflow: hidden !important;
+}
+
+.unit-datepicker-wrapper .rdrMonthsHorizontal {
+  overflow: hidden !important;
+}
+
+/* Calendar grid: exactly 7 equal columns, fixed row height, gap only - no overlap */
+.unit-datepicker-wrapper .rdrDays {
+  display: grid !important;
+  grid-template-columns: repeat(7, minmax(28px, 1fr)) !important;
+  grid-auto-rows: 48px !important;
+  gap: 4px !important;
+  padding: 0 6px 6px 6px !important;
+  align-content: start !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* Remove horizontal scroll track/progress bar and any navigation indicators */
+.unit-datepicker-wrapper .rdrMonthPicker,
+.unit-datepicker-wrapper .rdrMonthsVertical,
+.unit-datepicker-wrapper .rdrInfiniteMonths,
+.unit-datepicker-wrapper .rdrMonthAndYearWrapper + div[class*="track"],
+.unit-datepicker-wrapper .rdrMonthAndYearWrapper + div[class*="slider"],
+.unit-datepicker-wrapper .rdrMonthAndYearWrapper + div[class*="progress"],
+.unit-datepicker-wrapper [class*="monthTrack"],
+.unit-datepicker-wrapper [class*="monthSlider"],
+.unit-datepicker-wrapper [class*="scrollTrack"] {
+  display: none !important;
+  visibility: hidden !important;
+  height: 0 !important;
+  opacity: 0 !important;
+}
+
+/* Hide any scroll indicators or tracks */
+.unit-datepicker-wrapper .rdrCalendarWrapper::-webkit-scrollbar,
+.unit-datepicker-wrapper .rdrMonths::-webkit-scrollbar,
+.unit-datepicker-wrapper .rdrDateRangeWrapper::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Disable scrollbar for Firefox */
+.unit-datepicker-wrapper .rdrCalendarWrapper,
+.unit-datepicker-wrapper .rdrMonths,
+.unit-datepicker-wrapper .rdrDateRangeWrapper {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+/* Force static positioning for months - no sliding */
+.unit-datepicker-wrapper .rdrMonths {
+  position: relative !important;
+  transform: none !important;
+  transition: none !important;
+}
+
+/* Mobile fallback - single month */
+@media (max-width: 768px) {
+  .unit-datepicker-wrapper .rdrMonth:nth-child(2) {
+    display: none !important;
+  }
+  
+  .unit-datepicker-wrapper .rdrMonth {
+    max-width: 100% !important;
+    padding: 12px !important;
+  }
+}
