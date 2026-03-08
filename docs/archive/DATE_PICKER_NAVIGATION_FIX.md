@@ -32,7 +32,7 @@ The left ("<") and right (">") chevron navigation buttons in the date picker wer
 
 ### **Root Cause #1: Event Propagation Blocked in AtlasDateRangePicker**
 
-**Location**: `RatebotaiRepo/src/components/date/AtlasDateRangePicker.tsx` (lines 221-238)
+**Location**: `atlas-guest-portal/src/components/date/AtlasDateRangePicker.tsx` (lines 221-238)
 
 **Problem**: 
 The wrapper `div` around the `DateRange` component had `onClick` and `onMouseDown` handlers that called `e.stopPropagation()` on **ALL** events, including navigation button clicks. This prevented the `react-date-range` library from receiving the click events it needed to handle month navigation.
@@ -79,7 +79,7 @@ The wrapper `div` around the `DateRange` component had `onClick` and `onMouseDow
 
 ### **Root Cause #2: Empty onShownDateChange Handler in UnitBookingWidget**
 
-**Location**: `RatebotaiRepo/src/components/availability/UnitBookingWidget.tsx` (line 201)
+**Location**: `atlas-guest-portal/src/components/availability/UnitBookingWidget.tsx` (line 201)
 
 **Problem**: 
 The `onShownDateChange` prop was set to an empty function `() => {}`, which meant that even if the navigation buttons triggered the change event, there was no state update to actually change the displayed month.
@@ -112,7 +112,7 @@ const [shownDate, setShownDate] = useState<Date>(today);
 
 ### **Files Modified**
 
-#### 1. **`RatebotaiRepo/src/components/date/AtlasDateRangePicker.tsx`**
+#### 1. **`atlas-guest-portal/src/components/date/AtlasDateRangePicker.tsx`**
 
 **Changes:**
 - Modified `onClick` handler to selectively stop propagation
@@ -124,7 +124,7 @@ const [shownDate, setShownDate] = useState<Date>(today);
 **Why This Works:**
 The `react-date-range` library attaches its own event handlers to navigation buttons. By allowing these events to propagate, the library can now handle them properly and trigger month changes.
 
-#### 2. **`RatebotaiRepo/src/components/availability/UnitBookingWidget.tsx`**
+#### 2. **`atlas-guest-portal/src/components/availability/UnitBookingWidget.tsx`**
 
 **Changes:**
 - Added `shownDate` state variable: `const [shownDate, setShownDate] = useState<Date>(today);`
@@ -135,7 +135,7 @@ The `react-date-range` library attaches its own event handlers to navigation but
 **Why This Works:**
 When the navigation buttons are clicked, `react-date-range` calls `onShownDateChange` with the new month. By updating the `shownDate` state, the calendar re-renders with the new month displayed.
 
-#### 3. **`RatebotaiRepo/src/components/date/AtlasDateRangePicker.test.tsx`** (NEW)
+#### 3. **`atlas-guest-portal/src/components/date/AtlasDateRangePicker.test.tsx`** (NEW)
 
 **Created comprehensive test suite** with 12 test cases covering:
 
@@ -323,11 +323,11 @@ When modifying the date picker in the future, ensure:
 
 ## 📝 Related Files
 
-- `RatebotaiRepo/src/components/date/AtlasDateRangePicker.tsx` - Core date picker component
-- `RatebotaiRepo/src/components/date/AtlasDateRangePicker.test.tsx` - Test suite
-- `RatebotaiRepo/src/components/availability/UnitBookingWidget.tsx` - Listing page booking widget
-- `RatebotaiRepo/src/components/availability/SearchAvailabilityWidget.tsx` - Homepage search widget
-- `RatebotaiRepo/src/index.css` - Navigation button styling
+- `atlas-guest-portal/src/components/date/AtlasDateRangePicker.tsx` - Core date picker component
+- `atlas-guest-portal/src/components/date/AtlasDateRangePicker.test.tsx` - Test suite
+- `atlas-guest-portal/src/components/availability/UnitBookingWidget.tsx` - Listing page booking widget
+- `atlas-guest-portal/src/components/availability/SearchAvailabilityWidget.tsx` - Homepage search widget
+- `atlas-guest-portal/src/index.css` - Navigation button styling
 
 ---
 

@@ -46,7 +46,7 @@
 
 ## Step 2 — API alignment checklist
 
-| # | Operation | Current (RatebotaiRepo) | Contract (api-contract.md) | Action |
+| # | Operation | Current (atlas-guest-portal) | Contract (api-contract.md) | Action |
 |---|-----------|-------------------------|----------------------------|--------|
 | 1 | Listings list | GET /listings (listingResolver, listingClient) | GET /listings/public returns PublicListingDto (safe) | Use GET /listings/public for discovery; keep GET /listings/{id} for single or use public if API supports by-id from public. |
 | 2 | Listing by id | GET /listings/{id} | GET /listings/{id} or public | Keep; ensure tenant header so tenant-scoped 404 is correct. |

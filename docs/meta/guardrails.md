@@ -1,4 +1,4 @@
-# Docs Guardrails (atlas-guest-portal / RatebotaiRepo)
+# Docs Guardrails (atlas-guest-portal / atlas-guest-portal)
 
 **Purpose:** Prevent guest portal documentation (booking funnel, RCAs, runbooks) from drifting away from the codebase.
 

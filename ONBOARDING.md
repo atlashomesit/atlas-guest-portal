@@ -9,7 +9,7 @@ Welcome to the Atlas Homes Frontend project! This guide walks you through enviro
 2. Clone the repository and install dependencies:
    ```bash
    git clone <repo-url>
-   cd RatebotaiRepo
+   cd atlas-guest-portal
    npm install
    ```
 3. Copy environment variables and add EmailJS credentials:

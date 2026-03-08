@@ -1,4 +1,4 @@
-# Agent instructions (RatebotaiRepo — Atlas guest frontend)
+# Agent instructions (atlas-guest-portal — Atlas guest frontend)
 
 For AI assistants (Cursor, Codex, etc.) working in this repo:
 

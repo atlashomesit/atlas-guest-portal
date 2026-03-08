@@ -1,4 +1,4 @@
-# Docs Guardrails — Progress Ledger (RatebotaiRepo)
+# Docs Guardrails — Progress Ledger (atlas-guest-portal)
 
 **Purpose:** Track docs-as-code guardrails and how to run them locally.
 
@@ -19,7 +19,7 @@
 
 ## How to run locally
 
-From `RatebotaiRepo/`:
+From `atlas-guest-portal/`:
 
 ```bash
 node ./scripts/docs/guardrails.mjs
