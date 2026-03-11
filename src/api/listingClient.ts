@@ -7,7 +7,40 @@ export type ListingDetail = {
   [key: string]: unknown;
 };
 
+export type PublicListing = {
+  id: number;
+  propertyId: number;
+  propertyName: string;
+  propertyAddress?: string;
+  name: string;
+  floor: number;
+  type: string;
+  checkInTime?: string;
+  checkOutTime?: string;
+  status: string;
+  maxGuests: number;
+  baseNightlyRate?: number;
+  currency: string;
+  coverPhotoUrl?: string;
+  photoUrls: string[];
+};
+
 const LISTING_ENDPOINT = '/listings';
+
+export const fetchPublicListings = async (
+  signal?: AbortSignal,
+): Promise<PublicListing[]> => {
+  const response = await fetch(buildApiUrl(`${LISTING_ENDPOINT}/public`), {
+    signal,
+    headers: getApiHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Public listings request failed with status ${response.status}`);
+  }
+
+  return (await response.json()) as PublicListing[];
+};
 
 export const fetchListingById = async (
   listingId: string | number,

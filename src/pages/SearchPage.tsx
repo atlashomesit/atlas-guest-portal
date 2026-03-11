@@ -1,23 +1,98 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { propertyData } from "../data";
+import { fetchPublicListings, type PublicListing } from "../api/listingClient";
 import { formatCurrency, parseDate } from "../utils/formatting";
 import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 import SkeletonCard from "../components/apartments/SkeletonCard";
 
 const ITEMS_PER_PAGE = 12;
 
+type NormalizedListing = {
+  id: string;
+  numericId: number;
+  title: string;
+  location: string;
+  pricePerNight: number;
+  maxGuests: number;
+  imageUrl: string;
+  amenities: { amenities_icon?: string }[];
+  canonicalPath: string;
+  property?: unknown;
+};
+
+function buildStaticListings(): NormalizedListing[] {
+  return propertyData
+    .map((property) => {
+      const listingId = property.listingId ?? property.id;
+      const id = typeof listingId === "number" ? listingId : Number(listingId);
+      if (!Number.isFinite(id) || id <= 0) return null;
+      const propertySlug = getPropertySlug(property);
+      const canonicalPath = buildHomeUnitPath(propertySlug, id);
+
+      return {
+        id: `${propertySlug}-${id}`,
+        numericId: id,
+        title: property.property_name,
+        location: property.property_location ?? "Hyderabad",
+        pricePerNight: property.property_price ?? 0,
+        maxGuests: property.maxCapacity ?? 4,
+        imageUrl: property.property_img?.[0] ?? "/hero_images/slider_bg.png",
+        amenities: property.property_amenities?.slice(0, 3) ?? [],
+        canonicalPath,
+        property,
+      };
+    })
+    .filter((l): l is NonNullable<typeof l> => l !== null);
+}
+
+function apiToNormalized(listings: PublicListing[]): NormalizedListing[] {
+  return listings
+    .map((l) => {
+      const propertySlug = getPropertySlug({ name: l.propertyName || l.name });
+      const canonicalPath = buildHomeUnitPath(propertySlug, l.id);
+
+      return {
+        id: `api-${l.id}`,
+        numericId: l.id,
+        title: l.name || l.propertyName,
+        location: l.propertyAddress ?? "Hyderabad",
+        pricePerNight: l.baseNightlyRate ?? 0,
+        maxGuests: l.maxGuests,
+        imageUrl: l.coverPhotoUrl ?? "/hero_images/slider_bg.png",
+        amenities: [],
+        canonicalPath,
+      };
+    })
+    .filter((l) => l.numericId > 0);
+}
+
 const SearchPage = () => {
   const [searchParams] = useSearchParams();
   const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
   const [isLoading, setIsLoading] = useState(true);
+  const [apiListings, setApiListings] = useState<NormalizedListing[] | null>(null);
 
-  // Brief initial load for perceived performance (skeleton display)
-  useEffect(() => {
-    const t = setTimeout(() => setIsLoading(false), 200);
-    return () => clearTimeout(t);
+  const loadFromApi = useCallback(async (signal: AbortSignal) => {
+    try {
+      const data = await fetchPublicListings(signal);
+      if (data.length > 0) {
+        setApiListings(apiToNormalized(data));
+      }
+    } catch {
+      // API failed — static fallback is used automatically
+    }
   }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setIsLoading(true);
+
+    loadFromApi(controller.signal).finally(() => setIsLoading(false));
+
+    return () => controller.abort();
+  }, [loadFromApi]);
 
   const checkIn = parseDate(searchParams.get("checkIn"));
   const checkOut = parseDate(searchParams.get("checkOut"));
@@ -26,29 +101,8 @@ const SearchPage = () => {
   const hasInvalidDates = Boolean(checkIn && checkOut && checkOut <= checkIn);
 
   const listings = useMemo(
-    () =>
-      propertyData
-        .map((property) => {
-          const listingId = property.listingId ?? property.id;
-          const id = typeof listingId === "number" ? listingId : Number(listingId);
-          if (!Number.isFinite(id) || id <= 0) return null;
-          const propertySlug = getPropertySlug(property);
-          const canonicalPath = buildHomeUnitPath(propertySlug, id);
-
-          return {
-            id: `${propertySlug}-${id}`,
-            title: property.property_name,
-            location: property.property_location ?? "Hyderabad",
-            pricePerNight: property.property_price ?? 0,
-            maxGuests: property.maxCapacity ?? 4,
-            imageUrl: property.property_img?.[0] ?? "/hero_images/slider_bg.png",
-            amenities: property.property_amenities?.slice(0, 3) ?? [],
-            canonicalPath,
-            property,
-          };
-        })
-        .filter((l): l is NonNullable<typeof l> => l !== null),
-    [],
+    () => apiListings ?? buildStaticListings(),
+    [apiListings],
   );
 
   const filteredUnits = useMemo(() => {
@@ -60,14 +114,13 @@ const SearchPage = () => {
     });
   }, [guests, hasInvalidDates, listings]);
 
-  // Reset pagination when filters change
   useEffect(() => {
     setVisibleCount(ITEMS_PER_PAGE);
   }, [guests, hasInvalidDates]);
 
   const visibleUnits = filteredUnits.slice(0, visibleCount);
   const hasMore = visibleCount < filteredUnits.length;
-  const showEmptyState = !hasInvalidDates && filteredUnits.length === 0;
+  const showEmptyState = !isLoading && !hasInvalidDates && filteredUnits.length === 0;
   const queryString = searchParams.toString();
 
   return (
@@ -148,7 +201,6 @@ const SearchPage = () => {
                     </div>
                     <Link
                       to={`${unit.canonicalPath}${queryString ? `?${queryString}` : ""}`}
-                      state={{ property: unit.property }}
                       className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl bg-cta-primary px-4 py-2 text-sm font-semibold text-[var(--text-contrast)] shadow hover:bg-cta-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
                     >
                       View details
