@@ -23,6 +23,7 @@ export type PublicListing = {
   currency: string;
   coverPhotoUrl?: string;
   photoUrls: string[];
+  timezoneId?: string;
 };
 
 const LISTING_ENDPOINT = '/listings';

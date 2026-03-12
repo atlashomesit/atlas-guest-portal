@@ -54,6 +54,8 @@ interface Property {
     property_reviews: number;
     property_review_snippets: string[];
     property_price: number;
+    timezoneId?: string;
+    photoCount?: number;
 }
 
 const PropertyDetails = () => {
@@ -265,11 +267,13 @@ const PropertyDetails = () => {
                         if (!cancelled) setNotFound(true);
                         return;
                     }
+                    const coverUrl = (apiListing as Record<string, unknown>).coverPhotoUrl as string | undefined;
+                    const photoCount = Number((apiListing as Record<string, unknown>).photoCount) || 0;
                     const mapped: Property = {
                         id: Number(apiListing.id) || listingId,
                         listingId: Number(apiListing.id) || listingId,
                         property_name: (apiListing.name as string) ?? `Listing ${apiListing.id}`,
-                        property_img: [],
+                        property_img: coverUrl ? [coverUrl] : [],
                         property_location: (apiListing as Record<string, unknown>).property_location as string ?? 'Location not specified',
                         property_neighborhoods: (apiListing as Record<string, unknown>).property_neighborhoods as string[] ?? [],
                         property_amenities: (apiListing as Record<string, unknown>).property_amenities as PropertyAmenity[] ?? [],
@@ -281,8 +285,10 @@ const PropertyDetails = () => {
                         property_reviews: Number((apiListing as Record<string, unknown>).property_reviews) || 0,
                         property_review_snippets: (apiListing as Record<string, unknown>).property_review_snippets as string[] ?? [],
                         property_price: Number((apiListing as Record<string, unknown>).property_price) || 0,
+                        timezoneId: (apiListing as Record<string, unknown>).timezoneId as string | undefined,
+                        photoCount: photoCount || (coverUrl ? 1 : 0),
                     };
-                    const images = propertyImages[String(mapped.id)] ?? propertyImages[String(apiListing.id)] ?? [];
+                    const images = propertyImages[String(mapped.id)] ?? propertyImages[String(apiListing.id)] ?? mapped.property_img;
                     setData({ ...mapped, property_img: Array.isArray(images) ? images : mapped.property_img });
                 })
                 .catch(() => {
@@ -724,10 +730,14 @@ useEffect(() => {
                             <>
                                 {/* Desktop View */}
                                 <div className='sticky top-16'>
+                                    {data?.photoCount != null && data.photoCount > 0 && (
+                                        <p className="text-sm text-text-muted mb-2" aria-label="Photo count">{data.photoCount} photo{data.photoCount !== 1 ? 's' : ''}</p>
+                                    )}
                                     <UnitBookingWidget 
                                         listingId={resolvedListingId ?? undefined}
                                         propertyId={listingPropertyId ?? undefined}
                                         listingName={data?.property_name || 'This property'}
+                                        timezoneId={data?.timezoneId}
                                     />
                                     {showAvailabilityPlaceholder && (
                                         <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6">
