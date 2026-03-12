@@ -135,6 +135,12 @@ const SearchPage = () => {
           </p>
         </header>
 
+        {!isLoading && apiListings === null && listings.length > 0 && (
+          <div className="rounded-xl border border-support-warning/40 bg-support-warning/10 px-4 py-3 text-support-warning">
+            Limited results — showing cached data. Search may be temporarily unavailable.
+          </div>
+        )}
+
         {hasInvalidDates && (
           <div className="rounded-xl border border-support-error/40 bg-support-error/10 px-4 py-3 text-support-error">
             Check-out date must be after check-in. Please update your search to continue.

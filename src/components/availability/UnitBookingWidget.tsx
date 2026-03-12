@@ -13,7 +13,7 @@ import { type AvailabilityNightlyRate, type AvailabilityResponse } from '@/api/a
 import { buildApiUrl, getApiHeaders } from '@/api/client';
 import { apiFetch } from '@/lib/http';
 import { getIstStartOfDay } from '@/utils/date';
-import { calculateNights, formatNightCount } from '@/utils/dateHelpers';
+import { calculateNights, formatNightCount, formatDateInTimezone } from '@/utils/dateHelpers';
 import { doesRangeIntersectBlocked, toISODate } from '@/utils/dateRange';
 import { calculateNightlyPrice, inferUnitType } from '@/utils/pricing';
 import priceDisplayConfig from '@/config/priceDisplay.config';
@@ -30,6 +30,8 @@ interface UnitBookingWidgetProps {
   listingId?: string | number;
   propertyId?: string | number;
   listingName?: string;
+  /** IANA timezone for date display (e.g. Asia/Kolkata). From listing/property. */
+  timezoneId?: string;
 }
 
 const PENDING_PAYMENT_KEY = 'atlas_pending_razorpay_order';
@@ -86,7 +88,7 @@ function getBookingErrorMessage(error: unknown, context: 'order' | 'verify'): st
     : 'Payment verification failed. Please contact support with your payment ID.';
 }
 
-const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, propertyId, listingName }) => {
+const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, propertyId, listingName, timezoneId }) => {
   if (import.meta.env.DEV) {
     console.assert(Boolean(propertyId), '[UnitBookingWidget] propertyId is required for unit mode');
   }
@@ -639,7 +641,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
 
   const formattedDateLabel = dateRange.startDate && dateRange.endDate
-    ? `${format(dateRange.startDate, 'EEE, dd MMM')} – ${format(dateRange.endDate, 'EEE, dd MMM')} • ${priceDetails.nights} ${priceDetails.nights === 1 ? 'night' : 'nights'}`
+    ? `${timezoneId ? formatDateInTimezone(dateRange.startDate, timezoneId) : format(dateRange.startDate, 'EEE, dd MMM')} – ${timezoneId ? formatDateInTimezone(dateRange.endDate, timezoneId) : format(dateRange.endDate, 'EEE, dd MMM')} • ${priceDetails.nights} ${priceDetails.nights === 1 ? 'night' : 'nights'}`
     : 'Add your travel dates';
 
   const validateForm = () => {
@@ -1315,7 +1317,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     <>
       {paymentStatus === 'success' && <PaymentSuccessPopup />}
       {paymentStatus === 'failed' && <PaymentFailedPopup />}
-      <form onSubmit={handleSubmit} className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6 space-y-5">
+      <form onSubmit={handleSubmit} className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6 space-y-5" role="region" aria-label="Booking and availability">
 
       <div className="space-y-1">
         <p className="text-sm uppercase tracking-[0.12em] text-text-muted font-semibold">Reserve</p>
