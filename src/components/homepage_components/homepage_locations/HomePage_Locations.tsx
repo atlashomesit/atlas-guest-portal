@@ -110,12 +110,24 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
   const getListingNavigation = React.useCallback(
     (model: ListingModel | null) => {
       if (!model) return null;
+<<<<<<< HEAD
       const listingId = model.property?.listingId ?? model.listing.id;
       const id = typeof listingId === "number" ? listingId : Number(listingId);
       if (!Number.isFinite(id) || id <= 0) return null;
       const propertyName = model.property?.property_name ?? model.listing.title;
       const propertySlug = getPropertySlug(model.property ?? { property_name: propertyName });
       const path = buildHomeUnitPath(propertySlug, id);
+=======
+
+      const listingId = model.property?.listingId ?? model.listing.id;
+      const id = typeof listingId === "number" ? listingId : Number(listingId);
+      if (!Number.isFinite(id) || id <= 0) return null;
+
+      const propertyName = model.property?.property_name ?? model.listing.title;
+      const propertySlug = getPropertySlug(model.property ?? { property_name: propertyName });
+      const path = buildHomeUnitPath(propertySlug, id);
+
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
       return { path, propertySlug, listingId: id };
     },
     [],
@@ -136,6 +148,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
   );
 
   const sortedListings = React.useMemo(
+<<<<<<< HEAD
     () => {
       const sorted = [...safeListings].sort((a, b) => Number(b.featured) - Number(a.featured));
       // Move penthouse to the top
@@ -159,6 +172,23 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
 
   const listingModels = React.useMemo(
     () => otherListings.map((item) => createListingModel(item, propertyLookup, checkIn, guests)),
+=======
+    () => [...safeListings].sort((a, b) => Number(b.featured) - Number(a.featured)),
+    [safeListings],
+  );
+
+  const heroListing = sortedListings.find((item) => item.featured) ?? sortedListings[0];
+  const otherListings = sortedListings.filter((item) => item !== heroListing);
+
+  const heroModel = React.useMemo(
+    () => (heroListing ? createListingModel(heroListing, propertyLookup, checkIn, guests) : null),
+    [checkIn, guests, heroListing, propertyLookup],
+  );
+
+  const listingModels = React.useMemo(
+    () =>
+      otherListings.map((item) => createListingModel(item, propertyLookup, checkIn, guests)),
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
     [checkIn, guests, otherListings, propertyLookup],
   );
 
@@ -180,7 +210,10 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
 
   const handleNavigate = React.useCallback(
     (model: ListingModel | null) => {
+<<<<<<< HEAD
       if (!model) return;
+=======
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
       const navigation = getListingNavigation(model);
       if (!navigation) return;
       const nextSearch = searchString ? `?${searchString}` : "";
@@ -208,6 +241,18 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
     [checkIn, checkOut, getListingNavigation, guests, navigate, searchString],
   );
 
+<<<<<<< HEAD
+=======
+  const _handleSlideChange = (id: string, direction: "next" | "prev", imagesLength: number) => {
+    setActiveImageIndex((prev) => {
+      const current = prev[id] ?? 0;
+      const nextIndex = direction === "next" ? current + 1 : current - 1;
+      const normalized = (nextIndex + imagesLength) % imagesLength;
+      return { ...prev, [id]: normalized };
+    });
+  };
+
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
   const renderPrice = (model: ListingModel) => {
     if (!model.price) return null;
     
@@ -224,7 +269,11 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
     return (
       <div className="flex flex-col gap-1">
         <div className="flex items-center gap-2 flex-wrap">
+<<<<<<< HEAD
           <span className="text-sm font-semibold rounded-full bg-[var(--brand-soft)] px-3 py-1 text-[var(--brand-primary)]">
+=======
+          <span className="text-sm font-semibold rounded-full bg-[color:color-mix(in_srgb,var(--cta-primary)_18%,transparent)] px-3 py-1 text-[color:color-mix(in_srgb,var(--cta-primary)_80%,transparent)]">
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
             {priceDisplayConfig.discount.primaryBadgeLabel}
           </span>
           <span className="text-xs text-text-muted">{priceDisplayConfig.discount.secondaryBadgeLabel}</span>
@@ -234,12 +283,20 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
         )}
         {!dailyPricingLoading && todayBreakdown ? (
           <div className="flex items-baseline gap-2 flex-wrap">
+<<<<<<< HEAD
             <span className="text-2xl font-bold text-[var(--brand-primary)]">{formatter.format(todayBreakdown.actualPrice)}</span>
             <span className="text-sm text-[var(--text-muted)]">/night</span>
             {todayBreakdown.globalDiscountPercent > 0 && (
               <>
                 <span className="text-sm text-[var(--text-muted)]">{formatter.format(todayBreakdown.baseAmount)}</span>
                 <span className="text-sm font-semibold text-[var(--brand-primary)]">
+=======
+            <span className="text-2xl font-bold text-black">{formatter.format(todayBreakdown.actualPrice)}</span>
+            {todayBreakdown.globalDiscountPercent > 0 && (
+              <>
+                <span className="text-sm text-gray-400">{formatter.format(todayBreakdown.baseAmount)}</span>
+                <span className="text-sm font-semibold text-[color:color-mix(in_srgb,var(--cta-primary)_80%,transparent)]">
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
                   Save {Math.round(todayBreakdown.globalDiscountPercent)}%
                 </span>
               </>
@@ -247,6 +304,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
           </div>
         ) : !dailyPricingLoading && (
           <div className="flex items-baseline gap-2">
+<<<<<<< HEAD
             <span className="text-2xl font-bold text-[var(--brand-primary)]">{formattedFinal}</span>
             <span className="text-sm text-[var(--text-muted)]">/night</span>
             {appliedDiscountPercent > 0 && (
@@ -254,15 +312,29 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
                 <span className="text-sm text-[var(--text-muted)] line-through">{formattedBase}</span>
                 <span className="text-sm font-semibold text-[var(--brand-primary)]">
                   Save {Math.round(appliedDiscountPercent)}%
+=======
+            <span className="text-2xl font-bold text-black">{formattedFinal}</span>
+            {appliedDiscountPercent > 0 && (
+              <>
+                <span className="text-sm text-gray-400 line-through">{formattedBase}</span>
+                <span className="text-sm font-semibold text-[color:color-mix(in_srgb,var(--cta-primary)_80%,transparent)]">
+                  {priceDisplayConfig.discount.savingsPrefix} {appliedDiscountPercent}%
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
                 </span>
               </>
             )}
           </div>
         )}
         {(hasSpecialDateMultiplier || specialLabel) && (
+<<<<<<< HEAD
           <div className="text-xs text-[var(--brand-primary)] font-medium">
             {specialLabel || "Special pricing"}
           </div>
+=======
+          <p className="text-xs font-medium text-[color:color-mix(in_srgb,var(--cta-primary)_85%,transparent)]">
+            {specialLabel ?? priceDisplayConfig.defaultSpecialLabel}
+          </p>
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
         )}
       </div>
     );
@@ -283,6 +355,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
     );
   };
 
+<<<<<<< HEAD
   if (listingModels.length === 0 && !penthouseModel) {
     return null;
   }
@@ -448,6 +521,273 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8 max-w-[1400px] mx-auto px-4">
           {listingModels.map((model, index) => renderCard(model, index + 1))}
+=======
+  if (!heroModel) {
+    return null;
+  }
+
+  return (
+    <section className="py-12 px-4 sm:px-6 lg:px-8 bg-bg-surface scroll-mt-28" id="our-homes">
+      <div className="max-w-7xl mx-auto flex flex-col gap-8">
+        <Heading title="Our Homes" id="our-homes" />
+
+        <div className="grid gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch rounded-3xl overflow-hidden shadow-level2 bg-white border border-border-subtle property-card">
+            <div className="relative h-full">
+              <OptimizedImage
+                key={`${heroModel.listing.id}-${activeImageIndex[heroModel.listing.id] ?? 0}`}
+                src={heroModel.images[activeImageIndex[heroModel.listing.id] ?? 0] ?? FALLBACK_IMAGE}
+                alt={heroModel.listing.title}
+                className="w-full h-full object-cover min-h-[280px]"
+                wrapperClassName="h-full"
+                sizes="(max-width: 1023px) 100vw, 50vw"
+                onError={(event) => {
+                  const target = event.currentTarget;
+                  if (target.src !== FALLBACK_IMAGE) {
+                    target.src = FALLBACK_IMAGE;
+                  }
+                }}
+              />
+              {heroModel.images.length > 1 && (
+                <div className="absolute bottom-4 left-0 right-0">
+                  <div className="flex justify-center gap-2">
+                    {heroModel.images.length <= 5 ? (
+                      // Show all dots if 5 or fewer images
+                      heroModel.images.map((_, index) => (
+                        <button
+                          key={index}
+                          type="button"
+                          aria-label={`Go to image ${index + 1}`}
+                          onClick={() => {
+                            setActiveImageIndex(prev => ({
+                              ...prev,
+                              [heroModel.listing.id]: index
+                            }));
+                          }}
+                          className={`w-2.5 h-2.5 rounded-full transition-all ${(activeImageIndex[heroModel.listing.id] ?? 0) === index
+                              ? 'bg-white scale-125'
+                              : 'bg-white/50 hover:bg-white/70'
+                            }`}
+                        />
+                      ))
+                    ) : (
+                      // Show 5 dots with active dot in context when more than 5 images
+                      Array.from({ length: 5 }).map((_, i) => {
+                        const activeIndex = activeImageIndex[heroModel.listing.id] ?? 0;
+                        let dotIndex = i;
+
+                        // Adjust dot positions based on active index
+                        if (activeIndex <= 1) {
+                          // First two dots are 0 and 1
+                          dotIndex = i;
+                        } else if (activeIndex >= heroModel.images.length - 2) {
+                          // Last two dots are last two images
+                          dotIndex = heroModel.images.length - 5 + i;
+                        } else {
+                          // Middle dots center around active index
+                          dotIndex = activeIndex - 2 + i;
+                        }
+
+                        // Ensure dotIndex stays within bounds
+                        dotIndex = Math.min(Math.max(0, dotIndex), heroModel.images.length - 1);
+
+                        const isActive = activeIndex === dotIndex;
+
+                        return (
+                          <button
+                            key={i}
+                            type="button"
+                            aria-label={`Go to image ${dotIndex + 1}`}
+                            onClick={() => {
+                              setActiveImageIndex(prev => ({
+                                ...prev,
+                                [heroModel.listing.id]: dotIndex
+                              }));
+                            }}
+                            className={`w-2.5 h-2.5 rounded-full transition-all ${isActive
+                                ? 'bg-white scale-125'
+                                : 'bg-white/50 hover:bg-white/70'
+                              }`}
+                          />
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="p-6 flex flex-col gap-4">
+              <div className="flex items-center gap-2">
+                <span className="rounded-full bg-[color:color-mix(in_srgb,var(--cta-primary)_12%,transparent)] px-3 py-1 text-xs font-semibold text-[color:color-mix(in_srgb,var(--cta-primary)_80%,transparent)]">
+                  Featured
+                </span>
+                <span className="text-xs uppercase tracking-[0.08em] font-semibold text-text-muted">Penthouse</span>
+              </div>
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-wide text-text-muted">Atlas Homes</p>
+                <h3 className="text-3xl font-bold text-text-primary">{heroModel.listing.title}</h3>
+                {heroModel.listing.subtitle && (
+                  <p className="text-base text-text-secondary mt-1">{heroModel.listing.subtitle}</p>
+                )}
+              </div>
+
+              {renderPrice(heroModel)}
+
+              {renderAmenities(heroModel.property)}
+
+              <div className="property-card__actions flex gap-3 flex-wrap mt-auto">
+                <button
+                  type="button"
+                  onClick={() => handleNavigate(heroModel)}
+                  className="property-card__button inline-flex items-center justify-center rounded-full bg-[color:var(--cta-primary)] px-5 py-3 text-sm font-semibold text-white shadow-level2 transition hover:-translate-y-0.5"
+                >
+                  Check availability
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleNavigate(heroModel)}
+                  className="property-card__button inline-flex items-center justify-center rounded-full border border-border-subtle px-5 py-3 text-sm font-semibold text-text-primary transition hover:border-[color:var(--cta-primary)] hover:text-[color:var(--cta-primary)]"
+                >
+                  View details
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {listingModels.map((model, index) => {
+              const navigation = getListingNavigation(model);
+              const activeIndex = activeImageIndex[model.listing.id] ?? 0;
+              const imageSrc = model.images[activeIndex] ?? FALLBACK_IMAGE;
+
+              return (
+                <div
+                  key={getItemKey(model.listing, index)}
+                  className="property-card rounded-2xl shadow-level1 bg-white overflow-hidden border border-border-subtle flex flex-col"
+                >
+                  <div className="relative h-56">
+                    <OptimizedImage
+                      key={`${model.listing.id}-${activeIndex}`}
+                      src={imageSrc}
+                      alt={model.listing.title}
+                      className="w-full h-full object-cover"
+                      wrapperClassName="h-full"
+                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                      onError={(event) => {
+                        const target = event.currentTarget;
+                        if (target.src !== FALLBACK_IMAGE) {
+                          target.src = FALLBACK_IMAGE;
+                        }
+                      }}
+                    />
+                    {model.images.length > 1 && (
+                      <div className="absolute bottom-2 left-0 right-0">
+                        <div className="flex justify-center gap-1.5">
+                          {model.images.length <= 5 ? (
+                            // Show all dots if 5 or fewer images
+                            model.images.map((_, index) => (
+                              <button
+                                key={index}
+                                type="button"
+                                aria-label={`Go to image ${index + 1}`}
+                                onClick={() => {
+                                  setActiveImageIndex(prev => ({
+                                    ...prev,
+                                    [model.listing.id]: index
+                                  }));
+                                }}
+                                className={`w-2 h-2 rounded-full transition-all ${(activeImageIndex[model.listing.id] ?? 0) === index
+                                    ? 'bg-white scale-125'
+                                    : 'bg-white/50 hover:bg-white/70'
+                                  }`}
+                              />
+                            ))
+                          ) : (
+                            // Show 5 dots with active dot in context when more than 5 images
+                            Array.from({ length: 5 }).map((_, i) => {
+                              const activeIndex = activeImageIndex[model.listing.id] ?? 0;
+                              let dotIndex = i;
+
+                              // Adjust dot positions based on active index
+                              if (activeIndex <= 1) {
+                                // First two dots are 0 and 1
+                                dotIndex = i;
+                              } else if (activeIndex >= model.images.length - 2) {
+                                // Last two dots are last two images
+                                dotIndex = model.images.length - 5 + i;
+                              } else {
+                                // Middle dots center around active index
+                                dotIndex = activeIndex - 2 + i;
+                              }
+
+                              // Ensure dotIndex stays within bounds
+                              dotIndex = Math.min(Math.max(0, dotIndex), model.images.length - 1);
+
+                              const isActive = activeIndex === dotIndex;
+
+                              return (
+                                <button
+                                  key={i}
+                                  type="button"
+                                  aria-label={`Go to image ${dotIndex + 1}`}
+                                  onClick={() => {
+                                    setActiveImageIndex(prev => ({
+                                      ...prev,
+                                      [model.listing.id]: dotIndex
+                                    }));
+                                  }}
+                                  className={`w-2 h-2 rounded-full transition-all ${isActive
+                                      ? 'bg-white scale-125'
+                                      : 'bg-white/50 hover:bg-white/70'
+                                    }`}
+                                />
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="p-4 flex flex-col gap-3 flex-1">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">Atlas Homes</p>
+                      <h3 className="text-lg font-semibold text-text-primary">{model.listing.title}</h3>
+                      {model.listing.subtitle && (
+                        <p className="text-sm text-text-secondary mt-1">{model.listing.subtitle}</p>
+                      )}
+                    </div>
+
+                    {renderPrice(model)}
+
+                    {renderAmenities(model.property)}
+
+                    <div className="property-card__actions flex gap-3 flex-wrap mt-auto">
+                      <button
+                        type="button"
+                        onClick={() => handleNavigate(model)}
+                        className="property-card__button inline-flex items-center justify-center rounded-full bg-[color:var(--cta-primary)] px-5 py-3 text-sm font-semibold text-white shadow-level1 transition hover:-translate-y-0.5"
+                      >
+                        Book now
+                      </button>
+                      <Link
+                        to={{ pathname: navigation?.path ?? "#", search: searchString ? `?${searchString}` : "" }}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          handleNavigate(model);
+                        }}
+                        className="property-card__button inline-flex items-center justify-center rounded-full border border-border-subtle px-5 py-3 text-sm font-semibold text-text-primary transition hover:border-[color:var(--cta-primary)] hover:text-[color:var(--cta-primary)]"
+                      >
+                        View details
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
         </div>
       </div>
     </section>

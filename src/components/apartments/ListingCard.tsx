@@ -130,6 +130,10 @@ const ListingCard: React.FC<ListingCardProps> = ({
           alt={name}
           className="h-full w-full object-cover transition duration-200 md:group-hover:scale-105"
           loading="lazy"
+<<<<<<< HEAD
+=======
+          decoding="async"
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
         />
         <span className="absolute left-3 top-3 rounded-full bg-[color:color-mix(in_srgb,var(--bg-surface)_90%,transparent)] px-3 py-1 text-xs font-semibold text-text-primary shadow-level1">
           {propertyType}

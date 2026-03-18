@@ -163,7 +163,11 @@ const Navbar = () => {
               alt="Atlas Homestays"
               className="navbar-logo"
             />
+<<<<<<< HEAD
             <span className="navbar-logo-text"><span style={{ color: 'var(--brand-primary)' }}>A</span>tlas Homestays</span>
+=======
+            <span className="navbar-logo-text">Atlas Homestays</span>
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
           </Link>
 
           {/* Mobile Menu Button - Only visible on mobile */}
@@ -235,6 +239,18 @@ const Navbar = () => {
 
         {/* RIGHT - Desktop Actions */}
         <div className="hidden lg:flex items-center gap-6">
+<<<<<<< HEAD
+=======
+          <Link
+            to="/become-a-host"
+            className="nav-link"
+            data-testid="navbar-list-property"
+            style={{ fontWeight: 600, whiteSpace: 'nowrap' }}
+          >
+            List your property
+          </Link>
+
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
           <a href={telLink} className="phone flex items-center gap-1">
             <span>{formatDisplayNumber()}</span>
           </a>
@@ -245,6 +261,10 @@ const Navbar = () => {
             onClick={handleBookNow}
             aria-busy={ctaStatus === 'navigating'}
             data-state={ctaStatus}
+<<<<<<< HEAD
+=======
+            data-testid="navbar-book-now"
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
           >
             {ctaNav.label}
           </button>
@@ -305,6 +325,18 @@ const Navbar = () => {
 
           {/* MOBILE ACTIONS */}
           <div className="mt-2 flex flex-col gap-3">
+<<<<<<< HEAD
+=======
+            <Link
+              to="/become-a-host"
+              onClick={closeMobile}
+              className="block py-2 font-semibold"
+              style={{ color: 'var(--cta-primary, #2563eb)' }}
+            >
+              List your property
+            </Link>
+
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
             <a href={telLink} className="phone flex items-center gap-2">
               <IoIosCall />
               <span>{formatDisplayNumber()}</span>

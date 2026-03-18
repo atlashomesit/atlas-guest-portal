@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { describe, expect, vi, beforeEach, afterEach, it, test } from 'vitest';
 import { render, screen, within, fireEvent, waitFor } from '@testing-library/react';
 import { act, ReactNode } from 'react';
@@ -9,6 +10,16 @@ import { propertyData } from '../../../data';
 import { BookingProvider } from '../../../contexts/BookingContext';
 
 const getPrimaryCta = () =>
+=======
+import { describe, expect, vi, beforeEach, afterEach, it } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { act, ReactNode } from 'react';
+import { MemoryRouter } from 'react-router-dom';
+import BookingCard from './BookingCard';
+import { BookingProvider } from '../../../contexts/BookingContext';
+
+const _getPrimaryCta = () =>
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
   screen
     .getAllByRole('button', { name: /check availability/i })
     .find((button) => button.hasAttribute('disabled')) ??
@@ -153,6 +164,7 @@ describe('BookingCard (current simple form)', () => {
     expect(bookNow).toBeEnabled();
   });
 });
+<<<<<<< HEAD
 
 describe.skip('BookingCard end-to-end flow (legacy date/guests UI)', () => {
   const openGuestMenu = async () => {
@@ -296,3 +308,5 @@ describe.skip('BookingCard end-to-end flow (legacy date/guests UI)', () => {
     expect(getPrimaryCta()).toBeDisabled();
   });
 });
+=======
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c

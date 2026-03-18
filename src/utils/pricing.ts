@@ -31,14 +31,24 @@ interface ProcessEnv {
 }
 
 const getEnvValue = (key: string): string | undefined => {
+<<<<<<< HEAD
   if (typeof import.meta !== "undefined") {
     const env = (import.meta as { env?: ImportMetaEnv }).env;
+=======
+  if (typeof process !== "undefined") {
+    const env = (process as { env?: ProcessEnv }).env;
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
     const value = env?.[key];
     if (typeof value === "string") return value;
   }
 
+<<<<<<< HEAD
   if (typeof process !== "undefined") {
     const env = (process as { env?: ProcessEnv }).env;
+=======
+  if (typeof import.meta !== "undefined") {
+    const env = (import.meta as { env?: ImportMetaEnv }).env;
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
     const value = env?.[key];
     if (typeof value === "string") return value;
   }

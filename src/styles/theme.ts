@@ -3,6 +3,7 @@ export const themeRegistry = {
     label: "Premium Platinum",
     description: "Refined platinum palette for everyday elegance"
   },
+<<<<<<< HEAD
   sunriseCoral: {
     label: "Sunrise Coral",
     description: "Soft sunrise ivory with coral and amber highlights",
@@ -24,6 +25,8 @@ export const themeRegistry = {
     description: "Golden-hour luxury with blazing gradient CTAs",
     category: "Signature",
   },
+=======
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
   privateIslandNoir: {
     label: "Private Island Noir",
     description: "Nocturnal island luxe with gold accents and candlelit mood"

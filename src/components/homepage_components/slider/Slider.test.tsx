@@ -1,6 +1,10 @@
 import React from "react";
 import { addDays, format } from "date-fns";
+<<<<<<< HEAD
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+=======
+import { fireEvent, render, screen } from "@testing-library/react";
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 import { vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 
@@ -94,7 +98,11 @@ const renderSlider = () =>
     </MemoryRouter>,
   );
 
+<<<<<<< HEAD
 const renderSliderAtWidth = (width: number) => {
+=======
+const _renderSliderAtWidth = (width: number) => {
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
   const viewportSpy = vi.spyOn(window, "innerWidth", "get");
   viewportSpy.mockReturnValue(width);
   const utils = renderSlider();
@@ -141,6 +149,7 @@ describe("Slider hero search", () => {
     expect(browseLink.tagName.toLowerCase()).toBe("a");
   });
 
+<<<<<<< HEAD
   it.skip("captures hero widget snapshots for desktop, tablet, and mobile", () => {
     const desktop = renderSliderAtWidth(1366);
     expect(desktop.asFragment()).toMatchSnapshot("hero-widget-desktop");
@@ -322,6 +331,8 @@ describe("Slider hero search", () => {
     viewportSpy.mockRestore();
   });
 
+=======
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
   it("blocks past dates from being selected", () => {
     renderSlider();
     fireEvent.click(screen.getAllByTestId("hero-date-toggle")[0]);

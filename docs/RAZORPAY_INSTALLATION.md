@@ -136,7 +136,11 @@ Key Secret: xxxxxxxxxxxxxxxxxxxxxxxx
 
 1. **Create `.env` file** in project root:
    ```bash
+<<<<<<< HEAD
    cd RatebotaiRepo
+=======
+   cd atlas-guest-portal
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
    touch .env
    ```
 
@@ -316,7 +320,11 @@ npm install --save-dev @types/razorpay
 ### Step 1: Start Development Server
 
 ```bash
+<<<<<<< HEAD
 cd RatebotaiRepo
+=======
+cd atlas-guest-portal
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 npm install
 npm run dev
 ```

@@ -138,11 +138,37 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
     return true;
   };
 
+<<<<<<< HEAD
+=======
+  const composedDisabledDay = (date: Date) => {
+    const normalized = normalizeDate(date);
+    const checkIn = normalizeDate(value.startDate);
+    if (minDate && normalized && normalized < normalizeDate(minDate)!) return true;
+    if (maxDate && normalized && normalized > normalizeDate(maxDate)!) return true;
+    // When selecting checkout, disable same-day or earlier than check-in to enforce 1-night minimum
+    if (selectionState === 'CHECK_IN_SELECTED' && checkIn && normalized && normalized <= checkIn) {
+      return true;
+    }
+    return disabledDay ? disabledDay(date) : false;
+  };
+
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
   const handleRangeChange = (ranges: RangeKeyDict) => {
     const selection = ranges.selection ?? { startDate: null, endDate: null };
     const startDate = normalizeDate(selection.startDate);
     const endDate = normalizeDate(selection.endDate);
 
+<<<<<<< HEAD
+=======
+    // Reject clicks on disabled dates - ensure visual disabled state matches functional behavior
+    if (startDate && composedDisabledDay(startDate)) {
+      return; // Ignore selection - date is disabled (e.g. past date)
+    }
+    if (endDate && composedDisabledDay(endDate)) {
+      return;
+    }
+
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
     if (!startDate) {
       applySelection(startDate, endDate);
       return;
@@ -254,6 +280,7 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
     setInternalShownDate(next);
   }, [open, shownDate, value.startDate, minDate]);
 
+<<<<<<< HEAD
   const composedDisabledDay = (date: Date) => {
     const normalized = normalizeDate(date);
     const checkIn = normalizeDate(value.startDate);
@@ -267,6 +294,8 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
   };
 
 
+=======
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
   const handleShownDateChange = (date: Date) => {
     const normalized = normalizeToStartOfMonth(date);
     setInternalShownDate(normalized);

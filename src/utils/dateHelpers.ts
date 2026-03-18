@@ -21,3 +21,25 @@ export const formatNightCount = (nights: number): string => {
   return `${nights} night${nights === 1 ? '' : 's'}`;
 };
 
+<<<<<<< HEAD
+=======
+/**
+ * Format a date in the given IANA timezone (e.g. Asia/Kolkata) for display.
+ * Falls back to local/intl if timezone is missing or invalid.
+ */
+export const formatDateInTimezone = (date: Date, timezoneId?: string): string => {
+  const tz = timezoneId || 'Asia/Kolkata';
+  try {
+    return new Date(date).toLocaleDateString('en-IN', {
+      timeZone: tz,
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+  } catch {
+    return date.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+  }
+};
+
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c

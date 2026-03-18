@@ -4,6 +4,10 @@ import { addDays, format, startOfDay, startOfMonth } from 'date-fns';
 import { CalendarRange, ChevronDown, ShieldCheck } from 'lucide-react';
 import { heroWidgetLayoutFlag } from '../../config/abFlags';
 import { getApiBaseUrl } from '../../runtime-config';
+<<<<<<< HEAD
+=======
+import { getApiHeaders } from '../../api/client';
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 import { trackEvent } from '../../utils/analytics';
 import { useBooking } from '../../contexts/BookingContext';
 import { AtlasDateRangePicker, type AtlasDateRangePickerValue } from '../date/AtlasDateRangePicker';
@@ -461,7 +465,11 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
 
     try {
       if (availabilityUrl) {
+<<<<<<< HEAD
         const response = await fetch(availabilityUrl, { signal: controller?.signal });
+=======
+        const response = await fetch(availabilityUrl, { signal: controller?.signal, headers: getApiHeaders() });
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
         const durationMs = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - startedAt);
 
         trackEvent(
@@ -581,7 +589,11 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
   const labelClass =
     'flex items-center gap-2.5 text-[10px] font-bold uppercase tracking-[0.10em] text-[var(--text-muted)] whitespace-nowrap';
   return (
+<<<<<<< HEAD
     <form onSubmit={handleSubmit} className={formContainerClass} data-testid="hero-widget" id="search-form">
+=======
+    <form onSubmit={handleSubmit} className={formContainerClass} data-testid="search-input" id="search-form">
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
       <div className="sr-only" role="status" aria-live="polite">
         {statusMessage || error || 'Hero form ready.'}
       </div>
@@ -726,6 +738,10 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
           <button
             type="submit"
             disabled={isSubmitDisabled || isSubmitting}
+<<<<<<< HEAD
+=======
+            data-testid="hero-search-submit"
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
             className="inline-flex h-[60px] w-full items-center justify-center rounded-[14px] bg-gradient-to-br from-[var(--cta-primary)] to-[var(--cta-primary-hover)] px-6 text-base font-semibold tracking-[0.02em] text-white shadow-[var(--shadow-level-2)] transition-all hover:scale-[1.02] hover:shadow-[var(--shadow-level-3)] active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cta-primary)] disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none disabled:hover:scale-100 aria-busy:cursor-progress aria-busy:opacity-90 whitespace-nowrap"
             onClick={() => setStatusMessage('Checking availability...')}
             aria-busy={isSubmitting}

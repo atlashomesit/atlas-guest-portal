@@ -1,5 +1,5 @@
 {
-  "name": "landing_page",
+  "name": "atlas-guest-portal",
   "description": "Atlas Homestays guest-facing frontend for property discovery and booking",
   "keywords": [
     "atlas",
@@ -15,6 +15,7 @@
     "dev": "vite --host",
     "prebuild": "npm run validate:legal && node tools/optimize-images.mjs",
     "build": "node scripts/verify-pages-env.mjs && vite build",
+    "build:functions": "wrangler pages functions build",
     "check:local-network": "node tools/check-local-network-apis.mjs",
     "test": "node node_modules/vitest/vitest.mjs run",
     "pretest": "npm run validate:legal",
@@ -32,7 +33,8 @@
   "packageManager": "npm@10.9.2",
   "overrides": {
     "@jridgewell/sourcemap-codec": "1.5.5",
-    "dom-accessibility-api": "^0.6.3"
+    "dom-accessibility-api": "^0.6.3",
+    "minimatch": ">=10.2.1"
   },
   "dependencies": {
     "@chakra-ui/react": "^2.8.0",
@@ -46,7 +48,6 @@
     "framer-motion": "^10.12.0",
     "lucide-react": "^0.484.0",
     "luxon": "^3.5.0",
-    "ngrok": "^5.0.0-beta.2",
     "react": "^18.3.1",
     "react-calendar": "^5.1.0",
     "react-date-range": "^2.0.1",
@@ -58,10 +59,11 @@
     "react-slick": "^0.31.0",
     "react-toastify": "^11.0.3",
     "slick-carousel": "^1.8.1",
-    "swiper": "^11.2.0"
+    "swiper": "^12.1.2"
   },
   "devDependencies": {
-    "@eslint/js": "^9.13.0",
+    "@eslint/js": "^9.15.0",
+    "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.0.1",
     "@types/luxon": "^3.4.2",
@@ -70,10 +72,10 @@
     "@vitejs/plugin-react": "^4.3.3",
     "autoprefixer": "^10.4.20",
     "cross-env": "^10.1.0",
-    "eslint": "^9.13.0",
+    "eslint": "^9.15.0",
     "eslint-plugin-react-hooks": "^5.0.0",
     "eslint-plugin-react-refresh": "^0.4.14",
-    "glob": "^10.4.5",
+    "glob": "^13.0.6",
     "globals": "^15.11.0",
     "jsdom": "^20.0.3",
     "postcss": "^8.4.49",
@@ -81,9 +83,10 @@
     "sharp": "^0.33.5",
     "tailwindcss": "^3.4.15",
     "typescript": "~5.6.2",
-    "typescript-eslint": "^8.11.0",
+    "typescript-eslint": "^8.56.0",
     "vite": "^7.2.4",
-    "vitest": "^4.0.14"
+    "vitest": "^4.0.14",
+    "wrangler": "^3.101.0"
   },
   "main": "eslint.config.js",
   "author": "",

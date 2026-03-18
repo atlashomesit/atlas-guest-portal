@@ -1,5 +1,8 @@
 import type { ThemeName } from '../styles/theme';
+<<<<<<< HEAD
 import { DEFAULT_THEME } from '../styles/theme';
+=======
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 
 interface SeasonalPeriod {
   theme: ThemeName;
@@ -75,6 +78,10 @@ export function getSeasonalTheme(date: Date = new Date()): ThemeName | null {
 }
 
 export function getAutoTheme(): ThemeName {
+<<<<<<< HEAD
   return getSeasonalTheme() || DEFAULT_THEME;
+=======
+  return getSeasonalTheme() || 'default';
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 }
 

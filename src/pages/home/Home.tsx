@@ -19,7 +19,10 @@ import { useLocation } from "react-router-dom";
 import FaqHighlights from "../../components/faq/FaqHighlights";
 import pricingConfig from "../../config/pricing.config";
 import { getEffectiveDiscountPercent } from "../../utils/pricing";
+<<<<<<< HEAD
 import { ScrollReveal } from "../../components/ui/ScrollReveal";
+=======
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 
 const Home = () => {
     const { pendingScrollTarget, setPendingScrollTarget } = useBooking();
@@ -204,6 +207,7 @@ const Home = () => {
                 twitterSite="@atlashomeskphb"
                 jsonLd={homepageJsonLd}
             />
+<<<<<<< HEAD
             <section className="relative font-sans select-none bg-bg-primary">
                 <div className="w-full h-fit relative">
                     <Slider />
@@ -219,6 +223,38 @@ const Home = () => {
                     <FaqHighlights />
                 </ScrollReveal>
                 <ScrollReveal><TestimonialsSection /></ScrollReveal>
+=======
+            <section className="relative font-roboto select-none">
+                <div className="w-full h-fit relative ">
+                    <Slider />
+                </div>
+                <div>
+                    {/* <Homepage_Properties /> */}
+                </div>
+                <div>
+                    <HomePage_Locations />
+                </div>
+                <BannerSecondary />
+
+                {/* <div className=" px-4 lg:px-20 ">
+                <Amenities />
+            </div> */}
+                {/* <div className=" px-4 lg:px-20 ">
+                <CounterUp />
+            </div> */}
+                {/* <div className="">
+                <Homepage_LetUsGuide />
+            </div> */}
+                <div className="">
+                    <ServicesSection />
+                </div>
+                <div className="px-4 lg:px-20 py-8">
+                    <FaqHighlights />
+                </div>
+                <div className="">
+                    <TestimonialsSection />
+                </div>
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
                 {enableFooterMiniCtaAboveFooter && (
                     <FooterCtaStrip />
                 )}

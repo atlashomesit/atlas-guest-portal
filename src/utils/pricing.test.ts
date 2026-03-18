@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+=======
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 import { clearRuntimeConfig, setRuntimeConfig } from "@/runtime-config";
 import { calculateNightlyPrice, getEffectiveDiscountPercent, inferUnitType } from "./pricing";
 
@@ -13,7 +17,11 @@ beforeEach(() => {
 
 afterEach(() => {
   clearRuntimeConfig();
+<<<<<<< HEAD
   delete (process as NodeJS.Process & { env: NodeJS.Process['env'] & { VITE_DATE_MULTIPLIERS_JSON?: string } }).env.VITE_DATE_MULTIPLIERS_JSON;
+=======
+  vi.unstubAllEnvs();
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 });
 
 describe("calculateNightlyPrice", () => {
@@ -77,10 +85,17 @@ describe("calculateNightlyPrice", () => {
   });
 
   it("respects environment override for date multipliers", () => {
+<<<<<<< HEAD
     (process as NodeJS.Process & { env: NodeJS.Process['env'] & { VITE_DATE_MULTIPLIERS_JSON?: string } }).env.VITE_DATE_MULTIPLIERS_JSON = JSON.stringify({
       "12-31": 3,
       "01-01": 1.5,
     });
+=======
+    vi.stubEnv("VITE_DATE_MULTIPLIERS_JSON", JSON.stringify({
+      "12-31": 3,
+      "01-01": 1.5,
+    }));
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 
     const result = calculateNightlyPrice({
       unitType: "penthouse",

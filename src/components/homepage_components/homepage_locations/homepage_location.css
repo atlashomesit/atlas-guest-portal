@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 /* --- Our Homes Custom Grid Layout --- */
 .our-homes-grid {
   width: 100%;
@@ -49,6 +50,8 @@
     gap: 1rem;
   }
 }
+=======
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 .custom-swiper .swiper-scrollbar {
     background: color-mix(in srgb, var(--text-contrast) 30%, transparent);
     height: 4px;
@@ -89,6 +92,7 @@
 #text{
     font-size: 20px;
 }
+<<<<<<< HEAD
 
 .font-display-family {
   font-family: var(--font-family-display);
@@ -98,6 +102,8 @@
   background: var(--gradient-cta);
   box-shadow: var(--shadow-level-2);
 }
+=======
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 .slider-wrapper {
   position: relative; /* already added */
 }

@@ -1,5 +1,9 @@
 import React from 'react';
+<<<<<<< HEAD
 import { Link, useLocation, useParams } from 'react-router-dom';
+=======
+import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 import { FaBed, FaShower, FaSwimmingPool, FaCar, FaWifi, FaTv } from "react-icons/fa";
 import { TbAirConditioning } from "react-icons/tb";
 import { PiElevatorDuotone, PiCoatHangerLight } from "react-icons/pi";
@@ -9,7 +13,11 @@ import { LiaNewspaper } from "react-icons/lia";
 import { MdOutlineEmojiFoodBeverage, MdOutlineLocalLaundryService, MdOutlineDone } from "react-icons/md";
 import { FaCcMastercard, FaLocationDot } from "react-icons/fa6";
 import { FaStar } from "react-icons/fa";
+<<<<<<< HEAD
 import { X, ChevronRight } from 'lucide-react';
+=======
+import { X, ChevronRight, Clock, KeyRound } from 'lucide-react';
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 import { useEffect, useMemo, useState } from 'react';
 import { propertyData, propertyImages } from '../../../data.ts';
 import { getUnitPolicy } from '../../../config/policyConfig';
@@ -22,6 +30,11 @@ import { calculateNightlyPrice, inferUnitType } from '../../../utils/pricing';
 import { buildHomeUnitPath } from '../../../utils/navigation';
 import { useBooking } from '../../../contexts/BookingContext';
 import { resolveListing } from '../../../utils/listingResolver';
+<<<<<<< HEAD
+=======
+import type { ListingDetail } from '../../../api/listingClient';
+import SEO from '../../SEO';
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 
 import { Fancybox } from "@fancyapps/ui";
 import "@fancyapps/ui/dist/fancybox/fancybox.css";
@@ -52,6 +65,11 @@ interface Property {
     property_reviews: number;
     property_review_snippets: string[];
     property_price: number;
+<<<<<<< HEAD
+=======
+    timezoneId?: string;
+    photoCount?: number;
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 }
 
 const PropertyDetails = () => {
@@ -74,8 +92,29 @@ const PropertyDetails = () => {
     const [showAboutMore, setShowAboutMore] = useState(false);
     const [showNeighborhoodMore, setShowNeighborhoodMore] = useState(false);
     const unitType = inferUnitType({ id: data?.id, property_name: data?.property_name });
+<<<<<<< HEAD
     const { setProperty } = useBooking();
     const showAvailabilityPlaceholder = false;
+=======
+    const { setProperty, updateBooking } = useBooking();
+    const [searchParams] = useSearchParams();
+    const showAvailabilityPlaceholder = false;
+
+    // Hydrate booking context from URL search params (passed from SearchPage)
+    useEffect(() => {
+        const checkIn = searchParams.get('checkIn');
+        const checkOut = searchParams.get('checkOut');
+        const guests = Number(searchParams.get('guests')) || null;
+        if (checkIn || checkOut || guests) {
+            updateBooking({
+                ...(checkIn ? { checkIn: new Date(checkIn).toISOString() } : {}),
+                ...(checkOut ? { checkOut: new Date(checkOut).toISOString() } : {}),
+                ...(guests ? { guests } : {}),
+            });
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
     const nightlyPrice = useMemo(() => {
         if (!data) return null;
         try {
@@ -162,11 +201,24 @@ const PropertyDetails = () => {
         const normalizedPropertySlug = normalizeSlug(propertySlug);
         const normalizedPropertySlugStripped = stripHyphens(normalizedPropertySlug);
 
+<<<<<<< HEAD
         // Prefer matching by listingId (PK), then by legacy id/name for old URLs
+=======
+        // 1) Match by listingId (PK from DB/API) — IDs 1–7 etc.
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
         const foundByListingId = listingIdParam && Number.isFinite(listingId) && listingId > 0
             ? propertyData.find((item: Property) => Number(item.listingId) === listingId)
             : null;
 
+<<<<<<< HEAD
+=======
+        if (import.meta.env.DEV && listingIdParam) {
+            // eslint-disable-next-line no-console
+            console.debug('[PropertyDetails] route params:', { propertySlug, unitSlug: listingIdParam, listingId }, 'foundByListingId:', !!foundByListingId);
+        }
+
+        // 2) Match by unit slug / property name (legacy URLs)
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
         const foundByUnitSlug = foundByListingId ?? propertyData.find((item: Property) => {
             const idSlug = normalizeSlug(item.id);
             const nameSlug = normalizeSlug(item.property_name);
@@ -193,7 +245,11 @@ const PropertyDetails = () => {
             return;
         }
 
+<<<<<<< HEAD
         // If not found by slug, try to find by ID
+=======
+        // If not found by slug, try to find by ID (e.g. unitSlug "7" matches item.id 501)
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
         const propertyId = normalizedUnitSlug || undefined;
         if (propertyId) {
             const foundById = propertyData.find((item: Property) => String(item.id) === String(propertyId));
@@ -222,9 +278,66 @@ const PropertyDetails = () => {
             });
             return;
         }
+<<<<<<< HEAD
         
         setNotFound(true);
     }, [propertySlug, listingIdParam, location.state]);
+=======
+
+        // API fallback: fetch from API when not in static data (handles DB IDs not in propertyData)
+        if (listingIdParam && (Number.isFinite(listingId) ? listingId > 0 : true)) {
+            if (import.meta.env.DEV) {
+                // eslint-disable-next-line no-console
+                console.debug('[PropertyDetails] API fallback for listingIdParam:', listingIdParam);
+            }
+            const controller = new AbortController();
+            let cancelled = false;
+            resolveListing(String(listingIdParam), controller.signal)
+                .then((apiListing: ListingDetail | null) => {
+                    if (cancelled || !apiListing) {
+                        if (import.meta.env.DEV && !cancelled) {
+                            // eslint-disable-next-line no-console
+                            console.debug('[PropertyDetails] API returned no listing for:', listingIdParam);
+                        }
+                        if (!cancelled) setNotFound(true);
+                        return;
+                    }
+                    const coverUrl = (apiListing as Record<string, unknown>).coverPhotoUrl as string | undefined;
+                    const photoCount = Number((apiListing as Record<string, unknown>).photoCount) || 0;
+                    const mapped: Property = {
+                        id: Number(apiListing.id) || listingId,
+                        listingId: Number(apiListing.id) || listingId,
+                        property_name: (apiListing.name as string) ?? `Listing ${apiListing.id}`,
+                        property_img: coverUrl ? [coverUrl] : [],
+                        property_location: (apiListing as Record<string, unknown>).property_location as string ?? 'Location not specified',
+                        property_neighborhoods: (apiListing as Record<string, unknown>).property_neighborhoods as string[] ?? [],
+                        property_amenities: (apiListing as Record<string, unknown>).property_amenities as PropertyAmenity[] ?? [],
+                        property_description: (apiListing as Record<string, unknown>).property_description as string ?? '',
+                        property_nearplaces: (apiListing as Record<string, unknown>).property_nearplaces as string[] ?? [],
+                        property_mapSrc: (apiListing as Record<string, unknown>).property_mapSrc as string ?? '',
+                        property_policy_details: (apiListing as Record<string, unknown>).property_policy_details as PropertyDetail[] ?? [],
+                        property_rating: Number((apiListing as Record<string, unknown>).property_rating) || 0,
+                        property_reviews: Number((apiListing as Record<string, unknown>).property_reviews) || 0,
+                        property_review_snippets: (apiListing as Record<string, unknown>).property_review_snippets as string[] ?? [],
+                        property_price: Number((apiListing as Record<string, unknown>).property_price) || 0,
+                        timezoneId: (apiListing as Record<string, unknown>).timezoneId as string | undefined,
+                        photoCount: photoCount || (coverUrl ? 1 : 0),
+                    };
+                    const images = propertyImages[String(mapped.id)] ?? propertyImages[String(apiListing.id)] ?? mapped.property_img;
+                    setData({ ...mapped, property_img: Array.isArray(images) ? images : mapped.property_img });
+                })
+                .catch(() => {
+                    if (!cancelled) setNotFound(true);
+                });
+            return () => {
+                cancelled = true;
+                controller.abort();
+            };
+        }
+
+        setNotFound(true);
+    }, [propertySlug, listingIdParam, listingId, location.state]);
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 useEffect(() => {
   if (!data?.id) return;
 
@@ -263,7 +376,11 @@ useEffect(() => {
             },
             { listingId: data.listingId ?? data.id, unitCode: data.id, route: propertySlug && (data.listingId ?? listingId) ? buildHomeUnitPath(propertySlug, Number(data.listingId ?? listingId)) : location.pathname },
         );
+<<<<<<< HEAD
     }, [data, location.pathname, nightlyPrice?.finalNightlyPrice, propertySlug, listingIdParam]);
+=======
+    }, [data, location.pathname, nightlyPrice?.finalNightlyPrice, propertySlug, listingIdParam, listingId]);
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 
     const renderIcon = (iconName: string) => {
         const name = iconName.toLowerCase();
@@ -332,7 +449,54 @@ useEffect(() => {
 
     const unitPolicy = getUnitPolicy(data?.id);
 
+<<<<<<< HEAD
     return (
+=======
+    const pageUrl = typeof window !== 'undefined' ? window.location.href : '';
+    const primaryImage = (data?.id && propertyImages[String(data.id)]?.[0]) || data?.property_img?.[0];
+
+    const propertyJsonLd = data ? {
+        "@context": "https://schema.org",
+        "@type": "LodgingBusiness",
+        name: data.property_name,
+        description: data.property_description?.slice(0, 300),
+        image: primaryImage,
+        url: pageUrl,
+        address: {
+            "@type": "PostalAddress",
+            addressLocality: data.property_location || "Hyderabad",
+            addressRegion: "Telangana",
+            addressCountry: "IN",
+        },
+        aggregateRating: data.property_rating ? {
+            "@type": "AggregateRating",
+            ratingValue: data.property_rating,
+            reviewCount: data.property_reviews || 0,
+        } : undefined,
+        ...(nightlyPrice?.finalNightlyPrice ? {
+            priceRange: `INR ${nightlyPrice.finalNightlyPrice}/night`,
+            makesOffer: {
+                "@type": "Offer",
+                priceCurrency: "INR",
+                price: nightlyPrice.finalNightlyPrice,
+                availability: "https://schema.org/InStock",
+            },
+        } : {}),
+    } : undefined;
+
+    return (
+        <>
+        {data && (
+            <SEO
+                title={`${data.property_name} | Atlas Homestays`}
+                description={data.property_description?.slice(0, 160) || `Book ${data.property_name} in ${data.property_location || 'Hyderabad'} on Atlas Homestays.`}
+                image={primaryImage}
+                url={pageUrl}
+                type="lodgingBusiness"
+                jsonLd={propertyJsonLd}
+            />
+        )}
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
         <section className="w-full pt-28 md:pt-0 tracking-wide">
             <div className='pt-10 pl-32'>
                 <Subheading />
@@ -441,6 +605,105 @@ useEffect(() => {
                 <div className='flex flex-col gap-4 sm:flex-row '>
                     {/* Left div  */}
                     <div className="w-full sm:w-2/3">
+<<<<<<< HEAD
+=======
+                        {/* What this place offers */}
+                        <div className="pb-8 border-b border-border-subtle">
+                            <h2 className="text-xl sm:text-2xl font-semibold mb-6 text-text-primary">What this place offers</h2>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                {(data?.property_amenities || []).length > 0 ? (
+                                    (data?.property_amenities || []).slice(0, 9).map((amenity, idx) => (
+                                        <div key={idx} className="flex flex-col items-center gap-2 p-3 rounded-xl bg-bg-muted border border-border-subtle text-center">
+                                            <span className="text-2xl text-accent-primary">
+                                                {renderIcon(amenity?.amenities_icon || '')}
+                                            </span>
+                                            <span className="text-xs font-medium text-text-primary">
+                                                {amenity?.amenities_icon ? formatAmenityName(amenity.amenities_icon) : 'Amenity'}
+                                            </span>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <p className="text-text-muted">No amenities listed</p>
+                                )}
+                            </div>
+                            <Button
+                                variant="secondary"
+                                onClick={() => setShowAmenitiesModal(true)}
+                                className="mt-6"
+                            >
+                                Show All Amenities
+                            </Button>
+                        </div>
+
+                        {/* Policies Section */}
+                        {data?.property_policy_details && (
+                            <div className="border border-border-subtle rounded-lg overflow-hidden shadow-level1 bg-bg-surface">
+                                <div className="bg-bg-surface p-6">
+                                    <h2 className="text-xl sm:text-2xl font-semibold mb-6 text-text-primary">Things to know</h2>
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
+                                        <div className="p-4 border border-border-subtle rounded-lg bg-bg-muted">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <Clock className="w-4 h-4 text-accent-primary" />
+                                                <p className="text-text-muted text-sm">Check-in / Check-out</p>
+                                            </div>
+                                            <p className="font-medium text-text-primary">
+                                                Check-in {unitPolicy?.checkIn || '2:00 PM'} · Check-out {unitPolicy?.checkOut || '11:00 AM'}
+                                            </p>
+                                            <a className="text-sm text-accent-primary underline" href="/terms#check-in-check-out">View terms</a>
+                                        </div>
+                                        <div className="p-4 border border-border-subtle rounded-lg bg-bg-muted">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <KeyRound className="w-4 h-4 text-accent-primary" />
+                                                <p className="text-text-muted text-sm">Key policies</p>
+                                            </div>
+                                            <p className="font-medium text-text-primary">
+                                                {inlinePolicySnippets?.cancellation || 'Flexible cancellation policy'}
+                                            </p>
+                                            <p className="text-text-primary mt-2 text-sm">
+                                                {inlinePolicySnippets?.houseRules || 'Standard house rules apply'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
+                                        {(data?.property_policy_details || [])
+                                            .filter((policy: PropertyDetail) => policy?.type && !policy.type.includes('Policy') && !policy.type.includes('Detailed'))
+                                            .map((policy: PropertyDetail, idx: number) => (
+                                                <div key={idx}>
+                                                    <p className="text-text-muted text-sm mb-1">{policy.type}</p>
+                                                    <p className="font-medium text-text-primary">{policy.value}</p>
+                                                </div>
+                                            ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Guest Reviews Summary */}
+                        {data?.property_reviews > 0 && (
+                            <div className="pb-8 border-b border-border-subtle">
+                                <h2 className="text-xl sm:text-2xl font-semibold mb-4 text-text-primary">Guest Reviews</h2>
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="flex items-center gap-1 text-accent-primary">
+                                        {Array.from({ length: 5 }).map((_, i) => (
+                                            <FaStar key={i} className={i < Math.round(data.property_rating) ? 'text-accent-primary' : 'text-border-subtle'} />
+                                        ))}
+                                    </div>
+                                    <span className="font-semibold text-text-primary">{data.property_rating.toFixed(1)}</span>
+                                    <span className="text-text-muted text-sm">({data.property_reviews} reviews)</span>
+                                </div>
+                                {data.property_review_snippets && data.property_review_snippets.length > 0 && (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        {data.property_review_snippets.slice(0, 4).map((snippet: string, idx: number) => (
+                                            <div key={idx} className="p-4 rounded-xl bg-bg-muted border border-border-subtle">
+                                                <p className="text-sm text-text-muted italic">"{snippet}"</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
                         {/* About this place */}
                         <div className="pb-8 border-b border-border-subtle">
                             <h2 className="text-xl sm:text-2xl font-semibold mb-4 text-text-primary">About this place</h2>
@@ -461,6 +724,27 @@ useEffect(() => {
                             </button>
                         </div>
 
+<<<<<<< HEAD
+=======
+                        {/* Location Map */}
+                        <div className="">
+                            <h2 className="text-xl sm:text-2xl font-semibold mb-4 text-text-primary">Where you'll be</h2>
+                            <div className="rounded-lg overflow-hidden border border-border-subtle">
+                                <iframe
+                                    src={data?.property_mapSrc || ''}
+                                    className="w-full h-64 sm:h-96"
+                                    loading="lazy"
+                                    allowFullScreen
+                                    referrerPolicy="no-referrer-when-downgrade"
+                                    title="Property Location"
+                                ></iframe>
+                            </div>
+                            <p className="mt-4 text-text-muted text-sm sm:text-base">
+                                {data?.property_location || 'Location information not available'}
+                            </p>
+                        </div>
+
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
                         {/* About neighborhood */}
                         <div className="pb-8 border-b border-border-subtle">
                             <h2 className="text-xl sm:text-2xl font-semibold mb-4 text-text-primary">About neighborhood</h2>
@@ -485,6 +769,7 @@ useEffect(() => {
                                 <ChevronRight className={`ml-1 w-4 h-4 transition-transform ${showNeighborhoodMore ? 'rotate-90' : ''}`} />
                             </button>
                         </div>
+<<<<<<< HEAD
 
                         {/* What this place offers */}
                         <div className="pb-8 border-b border-border-subtle">
@@ -568,6 +853,8 @@ useEffect(() => {
                                 </div>
                             </div>
                         )}
+=======
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
                     </div>
                     {/* right div  */}
                     <div className="w-full sm:w-1/3">
@@ -579,10 +866,20 @@ useEffect(() => {
                             <>
                                 {/* Desktop View */}
                                 <div className='sticky top-16'>
+<<<<<<< HEAD
+=======
+                                    {data?.photoCount != null && data.photoCount > 0 && (
+                                        <p className="text-sm text-text-muted mb-2" aria-label="Photo count">{data.photoCount} photo{data.photoCount !== 1 ? 's' : ''}</p>
+                                    )}
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
                                     <UnitBookingWidget 
                                         listingId={resolvedListingId ?? undefined}
                                         propertyId={listingPropertyId ?? undefined}
                                         listingName={data?.property_name || 'This property'}
+<<<<<<< HEAD
+=======
+                                        timezoneId={data?.timezoneId}
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
                                     />
                                     {showAvailabilityPlaceholder && (
                                         <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6">
@@ -662,6 +959,35 @@ useEffect(() => {
                 )}
             </div>
         </section>
+<<<<<<< HEAD
+=======
+
+        {/* Mobile fixed Reserve CTA - visible only below md breakpoint */}
+        {data && (
+          <div
+            className="fixed bottom-0 inset-x-0 z-30 flex items-center justify-between border-t border-border-subtle bg-bg-surface px-4 py-3 shadow-level2 md:hidden"
+            data-testid="mobile-reserve-bar"
+          >
+            <div>
+              <span className="text-base font-bold text-text-primary">
+                {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(nightlyPrice.finalNightlyPrice)}
+              </span>
+              <span className="text-xs text-text-muted"> / night</span>
+            </div>
+            <button
+              type="button"
+              className="rounded-xl bg-cta-primary px-6 py-2.5 text-sm font-semibold text-white shadow-sm"
+              onClick={() => {
+                const widget = document.querySelector('[data-testid="booking-name"]');
+                widget?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }}
+            >
+              Reserve
+            </button>
+          </div>
+        )}
+        </>
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
     );
 };
 

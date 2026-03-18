@@ -1,5 +1,8 @@
+<<<<<<< HEAD
 /* Luxury navbar: transparent on load → frosted glass on scroll. Cormorant + DM Sans. */
 
+=======
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 .sr-only {
   position: absolute;
   width: 1px;
@@ -12,15 +15,25 @@
   border: 0;
 }
 
+<<<<<<< HEAD
+=======
+/* Navbar container */
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 .navbar-container {
   width: 100%;
   position: fixed;
   top: 0;
   z-index: var(--z-sticky);
+<<<<<<< HEAD
   background-color: transparent;
   transition: background-color 0.25s cubic-bezier(0.4, 0, 0.2, 1),
     box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1),
     border-color 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+=======
+  box-shadow: var(--shadow-level-1);
+  background-color: var(--bg-surface);
+  transition: all 0.3s ease;
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
@@ -28,6 +41,7 @@
   padding-top: var(--safe-area-top);
 }
 
+<<<<<<< HEAD
 /* Frosted glass on scroll — warm ivory tint */
 .navbar-container.backdrop-blur {
   -webkit-backdrop-filter: blur(20px);
@@ -39,12 +53,58 @@
 
 .navbar-main {
   width: min(1240px, calc(100% - 5% * 2));
+=======
+.navbar-container.backdrop-blur {
+  backdrop-filter: blur(12px);
+  box-shadow: var(--shadow-level-2);
+  background-color: color-mix(in srgb, var(--bg-surface) 88%, rgba(15, 23, 42, 0.05));
+  border-bottom: 1px solid color-mix(in srgb, var(--border-strong) 62%, transparent);
+}
+
+.navbar-top-strip {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 0.35rem 0.75rem;
+  background-color: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  color: color-mix(in srgb, var(--text-contrast) 90%, transparent);
+  font-size: 0.8rem;
+  letter-spacing: 0.01em;
+  flex-wrap: wrap;
+  border-bottom: 1px solid color-mix(in srgb, var(--text-contrast) 12%, transparent);
+}
+
+.top-strip-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: inherit;
+  text-decoration: none;
+  opacity: 0.9;
+  transition: opacity 0.2s ease, color 0.2s ease;
+}
+
+.top-strip-link:hover {
+  opacity: 1;
+  color: white;
+}
+
+.navbar-main {
+  width: min(1260px, calc(100% - 2rem));
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
   margin: 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
+<<<<<<< HEAD
   padding: 0.5rem 0;
   gap: 1rem;
+=======
+  padding: 0.35rem 0.5rem;
+  gap: 0.75rem;
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
   flex-wrap: wrap;
   position: relative;
 }
@@ -57,18 +117,45 @@
   gap: 0.75rem;
 }
 
+<<<<<<< HEAD
 .navbar-center {
   flex: 1;
   justify-content: center;
   gap: 2.5rem; /* 40px between nav links */
+=======
+.navbar-left {
+  flex-shrink: 0;
+}
+
+.navbar-center {
+  flex: 1;
+  justify-content: center;
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 }
 
 .navbar-right {
   margin-left: 1rem;
+<<<<<<< HEAD
   flex-shrink: 0;
 }
 
 /* Logo — Cormorant Garamond, one letter in coral */
+=======
+  margin-right: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  flex-shrink: 0;
+  text-align: right;
+}
+
+@media(min-width: 1024px) {
+  .navbar-main {
+    flex-wrap: nowrap;
+  }
+}
+
+/* Logo */
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 .navbar-logo {
   width: 4rem;
   height: 3rem;
@@ -76,6 +163,7 @@
   border-radius: 0.25rem;
 }
 
+<<<<<<< HEAD
 .navbar-logo-text {
   font-family: var(--font-family-display);
   font-weight: 600;
@@ -85,11 +173,23 @@
 }
 
 @media (min-width: 640px) {
+=======
+/* Logo text */
+.navbar-logo-text {
+  font-weight: 700;
+  font-size: 1.125rem;
+  color: var(--brand-ink);
+  display: none;
+}
+
+@media(min-width: 640px) {
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
   .navbar-logo-text {
     display: block;
   }
 }
 
+<<<<<<< HEAD
 /* Nav links — DM Sans 400, active = coral 2px underline */
 .navbar-center .nav-link {
   padding: 0.5rem 0 0.35rem;
@@ -122,12 +222,33 @@
 .navbar-center .nav-link.text-white::after,
 .navbar-center .nav-link:hover::after {
   transform: scaleX(1);
+=======
+/* NavLinks */
+.navbar-center .nav-link {
+  padding: 0.5rem 0.75rem 0 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  border-radius: 0.5rem;
+  transition: color 0.3s, box-shadow 0.2s ease, background-color 0.2s ease;
+  text-decoration: none;
+}
+
+.navbar-center .nav-link:hover {
+  color: var(--cta-primary);
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 }
 
 .navbar-center .nav-link:focus-visible {
   outline: none;
+<<<<<<< HEAD
   color: var(--brand-primary);
   box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.35);
+=======
+  color: var(--cta-primary);
+  background-color: color-mix(in srgb, var(--cta-primary) 10%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--cta-primary) 35%, transparent);
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 }
 
 /* Dropdown */
@@ -136,20 +257,42 @@
 }
 
 .dropdown-button {
+<<<<<<< HEAD
   padding: 0.5rem 0 0.35rem;
   font-family: var(--font-family-base);
   font-size: 0.9375rem;
   font-weight: 400;
+=======
+  padding: 0.5rem 0.75rem 0 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
   color: var(--text-primary);
   background: none;
   border: none;
   cursor: pointer;
+<<<<<<< HEAD
   position: relative;
   transition: color 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .dropdown-button:hover {
   color: var(--brand-primary);
+=======
+  border-radius: 0.5rem;
+  transition: color 0.3s, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.dropdown-button:hover {
+  color: var(--cta-primary);
+}
+
+.dropdown-button:focus-visible {
+  outline: none;
+  color: var(--cta-primary);
+  background-color: color-mix(in srgb, var(--cta-primary) 10%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--cta-primary) 35%, transparent);
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 }
 
 .dropdown-menu {
@@ -157,18 +300,36 @@
   top: 100%;
   left: 0;
   margin-top: 0.5rem;
+<<<<<<< HEAD
   background-color: var(--bg-card);
   border: 1px solid var(--border-subtle);
   border-radius: 0.75rem;
   min-width: 220px;
   box-shadow: var(--shadow-level-2);
+=======
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 0.5rem;
+  min-width: 220px;
+  box-shadow: var(--shadow-level-1);
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
   opacity: 0;
   visibility: hidden;
   transition: all 0.2s;
   z-index: var(--z-dropdown);
 }
 
+<<<<<<< HEAD
 .dropdown:hover .dropdown-menu,
+=======
+/* Desktop hover */
+.dropdown:hover .dropdown-menu {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Mobile click open */
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 .dropdown.open .dropdown-menu {
   opacity: 1;
   visibility: visible;
@@ -176,6 +337,7 @@
 
 .dropdown-menu a {
   display: block;
+<<<<<<< HEAD
   padding: 0.6rem 1rem;
   font-size: 0.875rem;
   color: var(--text-primary);
@@ -189,18 +351,50 @@
 }
 
 /* Phone link */
+=======
+  padding: 0.5rem 1rem 0 1rem;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  text-decoration: none;
+  border-radius: 0.35rem;
+  transition: all 0.2s ease;
+}
+
+.dropdown-menu a:hover {
+  color: var(--text-primary);
+  background-color: var(--bg-muted);
+}
+
+.dropdown-menu a:focus-visible {
+  outline: none;
+  color: var(--text-primary);
+  background-color: color-mix(in srgb, var(--cta-primary) 12%, var(--bg-surface));
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--cta-primary) 35%, transparent);
+}
+
+/* Right section: phone + book now */
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 .navbar-right .phone {
   display: flex;
   align-items: center;
   gap: 0.25rem;
+<<<<<<< HEAD
   font-weight: 500;
   color: var(--text-primary);
   text-decoration: none;
   transition: color 0.25s;
+=======
+  font-weight: 600;
+  color: var(--text-primary);
+  border-radius: 0.75rem;
+  transition: color 0.3s, box-shadow 0.2s ease, background-color 0.2s ease;
+  text-decoration: none;
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
   min-height: 44px;
 }
 
 .navbar-right .phone:hover {
+<<<<<<< HEAD
   color: var(--brand-primary);
 }
 
@@ -218,25 +412,75 @@
   cursor: pointer;
   transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
     box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+=======
+  color: var(--cta-primary);
+}
+
+.navbar-right .phone:focus-visible {
+  outline: none;
+  color: var(--cta-primary);
+  background-color: color-mix(in srgb, var(--cta-primary) 10%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--cta-primary) 35%, transparent);
+}
+
+.navbar-right .book-now {
+  padding: 0.45rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background-color: transparent;
+  color: var(--cta-primary);
+  border: 1px solid color-mix(in srgb, var(--cta-primary) 70%, var(--text-primary));
+  border-radius: 9999px;
+  box-shadow: none;
+  transition: all 0.2s;
+  text-decoration: none;
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
   min-height: 44px;
 }
 
 .navbar-right .book-now:hover {
+<<<<<<< HEAD
   transform: scale(1.03);
   box-shadow: 0 0 24px rgba(255, 107, 53, 0.25);
+=======
+  background-color: color-mix(in srgb, var(--cta-primary) 10%, transparent);
+  color: var(--cta-primary);
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 }
 
 .navbar-right .book-now:focus-visible {
   outline: none;
+<<<<<<< HEAD
   box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.5);
+=======
+  background-color: color-mix(in srgb, var(--cta-primary) 10%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--cta-primary) 35%, transparent);
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 }
 
 .book-now-status {
   font-size: 0.75rem;
+<<<<<<< HEAD
   color: var(--brand-primary);
   line-height: 1.1;
 }
 
+=======
+  color: var(--cta-primary);
+  line-height: 1.1;
+}
+
+@media(max-width: 1023px) {
+  .navbar-right .phone span {
+    font-size: 0.9rem;
+  }
+
+  .navbar-right .book-now {
+    font-size: 0.75rem;
+  }
+}
+
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 /* Mobile menu button */
 .mobile-menu-button {
   position: relative;
@@ -246,6 +490,7 @@
   gap: 0.3rem;
   width: 3rem;
   height: 3rem;
+<<<<<<< HEAD
   padding: 0.35rem;
   color: var(--text-primary);
   background: none;
@@ -253,12 +498,33 @@
   border-radius: 0.75rem;
   cursor: pointer;
   transition: border-color 0.2s, background-color 0.2s;
+=======
+  padding: 0.35rem 0.5rem;
+  color: var(--text-primary);
+  background: none;
+  border: 1px solid color-mix(in srgb, var(--border-subtle) 70%, transparent);
+  border-radius: 0.75rem;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
   min-height: 44px;
 }
 
 .mobile-menu-button:hover {
+<<<<<<< HEAD
   border-color: var(--brand-primary);
   background-color: var(--brand-soft);
+=======
+  border-color: color-mix(in srgb, var(--cta-primary) 65%, var(--border-subtle));
+  background-color: color-mix(in srgb, var(--cta-primary) 10%, transparent);
+}
+
+.mobile-menu-button:focus-visible {
+  outline: none;
+  border-color: color-mix(in srgb, var(--cta-primary) 80%, var(--border-subtle));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--cta-primary) 35%, transparent);
+  background-color: color-mix(in srgb, var(--cta-primary) 12%, transparent);
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 }
 
 .hamburger-bar {
@@ -282,6 +548,7 @@
   transform: translateY(-6px) rotate(-45deg);
 }
 
+<<<<<<< HEAD
 /* Mobile menu — full-screen overlay feel, large links */
 .mobile-menu {
   padding: 1.5rem;
@@ -297,11 +564,44 @@
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+=======
+/* Mobile menu container */
+.mobile-menu-container {
+  width: 100%;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+  background-color: var(--bg-surface);
+  box-shadow: var(--shadow-level-1);
+}
+
+/* Mobile menu */
+.mobile-menu {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  border-top: 1px solid var(--border-strong);
+}
+
+/* Show mobile menu when container has 'open' class */
+.mobile-menu-container.open {
+  max-height: 1000px; /* large enough to show content */
+  border-top: 1px solid var(--border-strong);
+}
+
+.mobile-submenu {
+  padding-left: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 }
 
 .mobile-menu a,
 .mobile-menu button {
   display: block;
+<<<<<<< HEAD
   padding: 0.5rem 0;
   font-family: var(--font-family-base);
   color: var(--text-primary);
@@ -312,10 +612,19 @@
   text-align: left;
   cursor: pointer;
   transition: color 0.25s;
+=======
+  padding: 0.25rem 0;
+  color: var(--text-primary);
+  font-weight: 600;
+  text-decoration: none;
+  border-radius: 0.5rem;
+  transition: color 0.3s, background-color 0.2s ease, box-shadow 0.2s ease;
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 }
 
 .mobile-menu a:hover,
 .mobile-menu button:hover {
+<<<<<<< HEAD
   color: var(--brand-primary);
 }
 
@@ -330,18 +639,52 @@
 }
 
 @media (max-width: 1023px) {
+=======
+  color: var(--cta-primary);
+}
+
+.mobile-menu a:focus-visible,
+.mobile-menu button:focus-visible {
+  outline: none;
+  color: var(--cta-primary);
+  background-color: color-mix(in srgb, var(--cta-primary) 10%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--cta-primary) 35%, transparent);
+}
+
+@media(max-width: 1023px) {
+  .navbar-top-strip {
+    justify-content: space-between;
+    row-gap: 0.25rem;
+  }
+
+  .top-strip-link {
+    flex: 1 1 140px;
+    justify-content: center;
+  }
+  
+  /* Hide desktop navigation on mobile */
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
   .navbar-center,
   .navbar-right {
     display: none !important;
   }
 }
 
+<<<<<<< HEAD
 @media (min-width: 1024px) {
+=======
+/* Show desktop navigation on large screens */
+@media(min-width: 1024px) {
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
   .mobile-menu-container,
   .mobile-menu {
     display: none !important;
   }
+<<<<<<< HEAD
 
+=======
+  
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
   .navbar-center,
   .navbar-right {
     display: flex !important;

@@ -3,6 +3,10 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { addDays, format, startOfMonth } from 'date-fns';
 import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+<<<<<<< HEAD
+=======
+import { toast } from 'react-toastify';
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 import { Button } from '@/components/ui/Button';
 import { AtlasDateRangePicker, type AtlasDateRangePickerValue } from '@/components/date/AtlasDateRangePicker';
 import { useBooking } from '@/contexts/BookingContext';
@@ -12,7 +16,11 @@ import { type AvailabilityNightlyRate, type AvailabilityResponse } from '@/api/a
 import { buildApiUrl, getApiHeaders } from '@/api/client';
 import { apiFetch } from '@/lib/http';
 import { getIstStartOfDay } from '@/utils/date';
+<<<<<<< HEAD
 import { calculateNights, formatNightCount } from '@/utils/dateHelpers';
+=======
+import { calculateNights, formatNightCount, formatDateInTimezone } from '@/utils/dateHelpers';
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 import { doesRangeIntersectBlocked, toISODate } from '@/utils/dateRange';
 import { calculateNightlyPrice, inferUnitType } from '@/utils/pricing';
 import priceDisplayConfig from '@/config/priceDisplay.config';
@@ -29,15 +37,46 @@ interface UnitBookingWidgetProps {
   listingId?: string | number;
   propertyId?: string | number;
   listingName?: string;
+<<<<<<< HEAD
 }
 
+=======
+  /** IANA timezone for date display (e.g. Asia/Kolkata). From listing/property. */
+  timezoneId?: string;
+}
+
+const PENDING_PAYMENT_KEY = 'atlas_pending_razorpay_order';
+
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 const normalizeListingId = (value: string | number | null | undefined) =>
   String(value ?? '')
     .trim()
     .toLowerCase();
 
+<<<<<<< HEAD
 /** Map API error to actionable guest-facing message (quote/availability/payment/duplicate). */
 function getBookingErrorMessage(error: unknown, context: 'order' | 'verify'): string {
+=======
+const NETWORK_ERROR_MESSAGE = 'Network error. Please check your connection and try again.';
+
+/** Detect network/connection failures (timeout, offline, ECONNREFUSED, etc.). */
+function isNetworkError(error: unknown): boolean {
+  const err = error as { code?: string; message?: string; response?: { status?: number } };
+  const msg = (err?.message ?? '').toLowerCase();
+  const code = (err?.code ?? '').toLowerCase();
+  if (err?.response?.status === 0 || err?.response === undefined) {
+    if (msg.includes('network') || msg.includes('timeout') || msg.includes('failed to fetch')) return true;
+  }
+  if (code === 'econnrefused' || code === 'etimedout' || code === 'err_network' || code === 'econnreset') return true;
+  if (msg.includes('econnrefused') || msg.includes('etimedout') || msg.includes('network error')) return true;
+  if (err?.response?.status === 502 || err?.response?.status === 503 || err?.response?.status === 504) return true;
+  return false;
+}
+
+/** Map API error to actionable guest-facing message (quote/availability/payment/duplicate/network). */
+function getBookingErrorMessage(error: unknown, context: 'order' | 'verify'): string {
+  if (isNetworkError(error)) return NETWORK_ERROR_MESSAGE;
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
   const status = (error as { response?: { status?: number } })?.response?.status;
   const data = (error as { response?: { data?: { message?: string } } })?.response?.data;
   const message = (typeof data?.message === 'string' ? data.message : '') || (error as Error)?.message || '';
@@ -46,6 +85,12 @@ function getBookingErrorMessage(error: unknown, context: 'order' | 'verify'): st
   if (lower.includes('expired') || lower.includes('quote') && (lower.includes('invalid') || lower.includes('expired'))) {
     return 'Your quote has expired. Please select dates again and complete the booking.';
   }
+<<<<<<< HEAD
+=======
+  if (status === 409 && (lower.includes('confirmed booking') || lower.includes('already exists'))) {
+    return 'A confirmed booking already exists for these dates. Check your email for the booking confirmation.';
+  }
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
   if (lower.includes('not available') || lower.includes('no longer available') || lower.includes('sold out') || status === 409) {
     return 'Those dates are no longer available. Please choose different dates and try again.';
   }
@@ -63,7 +108,11 @@ function getBookingErrorMessage(error: unknown, context: 'order' | 'verify'): st
     : 'Payment verification failed. Please contact support with your payment ID.';
 }
 
+<<<<<<< HEAD
 const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, propertyId, listingName }) => {
+=======
+const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, propertyId, listingName, timezoneId }) => {
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
   if (import.meta.env.DEV) {
     console.assert(Boolean(propertyId), '[UnitBookingWidget] propertyId is required for unit mode');
   }
@@ -95,6 +144,11 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const lastAvailabilityKeyRef = useRef<string | null>(null);
   const hasAutoAdjustedRef = useRef(false);
+<<<<<<< HEAD
+=======
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [paymentAttemptCount, setPaymentAttemptCount] = useState(0);
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
   const [formError, setFormError] = useState<string | null>(null);
   const [dateError, setDateError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -165,6 +219,18 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
     hasAutoAdjustedRef.current = false;
   }, [listingId]);
 
+<<<<<<< HEAD
+=======
+  // On mount: clear any stale pending payment (e.g. user refreshed during Razorpay modal)
+  useEffect(() => {
+    const pending = localStorage.getItem(PENDING_PAYMENT_KEY);
+    if (pending) {
+      localStorage.removeItem(PENDING_PAYMENT_KEY);
+      toast.info('Your previous payment session was interrupted. You can try booking again.');
+    }
+  }, []);
+
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
   // Fetch availability automatically on component load and when the calendar is opened
   // Availability always starts from today, independent of selected dates
   useEffect(() => {
@@ -605,7 +671,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
 
   const formattedDateLabel = dateRange.startDate && dateRange.endDate
+<<<<<<< HEAD
     ? `${format(dateRange.startDate, 'EEE, dd MMM')} – ${format(dateRange.endDate, 'EEE, dd MMM')} • ${priceDetails.nights} ${priceDetails.nights === 1 ? 'night' : 'nights'}`
+=======
+    ? `${timezoneId ? formatDateInTimezone(dateRange.startDate, timezoneId) : format(dateRange.startDate, 'EEE, dd MMM')} – ${timezoneId ? formatDateInTimezone(dateRange.endDate, timezoneId) : format(dateRange.endDate, 'EEE, dd MMM')} • ${priceDetails.nights} ${priceDetails.nights === 1 ? 'night' : 'nights'}`
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
     : 'Add your travel dates';
 
   const validateForm = () => {
@@ -660,8 +730,16 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     script.async = true;
     script.onload = () => callback();
     script.onerror = () => {
+<<<<<<< HEAD
       setFormError('Failed to load payment processor. Please try again.');
       setIsLoading(false);
+=======
+      localStorage.removeItem(PENDING_PAYMENT_KEY);
+      setFormError('Unable to connect to payment service. Please check your internet connection and try again.');
+      setIsSubmitting(false);
+      setIsLoading(false);
+      toast.error('Unable to connect to payment service. Please try again.');
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
     };
     document.body.appendChild(script);
   };
@@ -697,7 +775,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           ...getApiHeaders(),
           'Content-Type': 'application/json',
           'Accept': 'application/json'
+<<<<<<< HEAD
         }
+=======
+        },
+        timeout: 15000
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
       });
       
       if (response.data.success) {
@@ -747,6 +830,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+<<<<<<< HEAD
+=======
+    if (isSubmitting) return;
+
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
     if (isBookingDisabled) {
       setFormError('Service temporarily unavailable. Please try again later.');
       return;
@@ -836,9 +924,17 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       return;
     }
 
+<<<<<<< HEAD
     setIsLoading(true);
     setFormError(null);
     setStatusMessage(null);
+=======
+    setIsSubmitting(true);
+    setIsLoading(true);
+    setFormError(null);
+    setStatusMessage(null);
+    setPaymentAttemptCount((c) => c + 1);
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 
     try {
       // 1. Create booking draft
@@ -872,22 +968,55 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         }
       };
 
+<<<<<<< HEAD
       // 3. Create Razorpay order
+=======
+      // 3. Create Razorpay order (idempotency key helps backend detect duplicate submissions)
+      const idempotencyKey = crypto.randomUUID();
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
       const orderResponse = await axios.post(orderUrl, orderPayload, {
         headers: {
           ...getApiHeaders(),
           'Content-Type': 'application/json',
+<<<<<<< HEAD
           'Accept': 'application/json'
         }
+=======
+          'Accept': 'application/json',
+          'Idempotency-Key': idempotencyKey
+        },
+        timeout: 15000
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
       });
 
       const { keyId: key, orderId, bookingId } = orderResponse.data;
 
+<<<<<<< HEAD
+=======
+      // Store pending payment for recovery if user refreshes during modal
+      localStorage.setItem(PENDING_PAYMENT_KEY, orderId);
+
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
       // 4. Load Razorpay script and open checkout
       loadRazorpayScript(() => {
         try {
           let paymentCompleted = false; // Track if payment handler was called
+<<<<<<< HEAD
           
+=======
+
+          const handleRazorpayClose = () => {
+            if (paymentCompleted) return;
+            paymentCompleted = true; // Prevent double-reset from ondismiss + close event
+            localStorage.removeItem(PENDING_PAYMENT_KEY);
+            setIsSubmitting(false);
+            setIsLoading(false);
+            setPaymentStatus(null);
+            setFormError('Payment was cancelled. You can try booking again.');
+            toast.info('Payment cancelled. You can try booking again.');
+          };
+
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
           const options = {
             key,
             amount: orderResponse.data.amount,
@@ -904,6 +1033,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               color: '#2563eb'
             },
             modal: {
+<<<<<<< HEAD
               ondismiss: () => {
                 // Handle modal close/exit (when user clicks "Yes, exit" or closes the modal)
                 // Only show failed popup if payment wasn't completed (user cancelled/exited)
@@ -916,6 +1046,13 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             },
             handler: async (response: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => {
               paymentCompleted = true; // Mark payment as completed
+=======
+              ondismiss: handleRazorpayClose
+            },
+            handler: async (response: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => {
+              paymentCompleted = true; // Mark payment as completed
+              localStorage.removeItem(PENDING_PAYMENT_KEY);
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
               try {
                 await verifyPayment({
                   bookingId,
@@ -961,7 +1098,13 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                 console.error('Payment processing error:', error);
                 setPaymentStatus('failed');
                 setFormError(getBookingErrorMessage(error, 'verify'));
+<<<<<<< HEAD
               } finally {
+=======
+                if (isNetworkError(error)) toast.error(NETWORK_ERROR_MESSAGE);
+              } finally {
+                setIsSubmitting(false);
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
                 setIsLoading(false);
               }
             }
@@ -970,22 +1113,52 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           const rzp = new window.Razorpay(options);
           rzp.on('payment.failed', (response: { error?: { description?: string } }) => {
             paymentCompleted = true; // Payment attempt was made
+<<<<<<< HEAD
             setPaymentStatus('failed');
             setFormError(`Payment failed: ${response.error?.description || 'Unknown error'}`);
             setIsLoading(false);
           });
+=======
+            localStorage.removeItem(PENDING_PAYMENT_KEY);
+            setPaymentStatus('failed');
+            setFormError(`Payment failed: ${response.error?.description || 'Unknown error'}`);
+            setIsSubmitting(false);
+            setIsLoading(false);
+          });
+          // Fallback for modal close (ondismiss may not fire in all scenarios)
+          rzp.on('close', handleRazorpayClose);
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 
           rzp.open();
         } catch (error) {
           console.error('Error initializing Razorpay:', error);
+<<<<<<< HEAD
           setFormError('Failed to initialize payment. Please try again.');
           setIsLoading(false);
+=======
+          localStorage.removeItem(PENDING_PAYMENT_KEY);
+          setFormError('Unable to connect to payment service. Please try again.');
+          setIsSubmitting(false);
+          setIsLoading(false);
+          toast.error('Unable to connect to payment service. Please try again.');
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
         }
       });
     } catch (error: unknown) {
       console.error('Booking error:', error);
+<<<<<<< HEAD
       setFormError(getBookingErrorMessage(error, 'order'));
       setIsLoading(false);
+=======
+      localStorage.removeItem(PENDING_PAYMENT_KEY);
+      const msg = getBookingErrorMessage(error, 'order');
+      setFormError(msg);
+      setIsSubmitting(false);
+      setIsLoading(false);
+      if (isNetworkError(error)) {
+        toast.error(NETWORK_ERROR_MESSAGE);
+      }
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
     }
   };
 
@@ -993,6 +1166,25 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     setPaymentStatus(null);
   }, []);
 
+<<<<<<< HEAD
+=======
+  const handleRetryPayment = useCallback(() => {
+    setPaymentStatus(null);
+    setFormError(null);
+    setIsSubmitting(false);
+    setIsLoading(false);
+  }, []);
+
+  // Reset attempt count on successful payment
+  const prevPaymentStatus = useRef<'success' | 'failed' | null>(null);
+  useEffect(() => {
+    if (prevPaymentStatus.current !== 'success' && paymentStatus === 'success') {
+      setPaymentAttemptCount(0);
+    }
+    prevPaymentStatus.current = paymentStatus;
+  }, [paymentStatus]);
+
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
   const goToDashboard = useCallback(() => {
     closePaymentPopup();
     navigate('/', { replace: true });
@@ -1135,17 +1327,29 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   const PaymentFailedPopup = () => {
     useEffect(() => {
       const handleEscape = (e: KeyboardEvent) => {
+<<<<<<< HEAD
         if (e.key === 'Escape') closePaymentPopup();
       };
       document.addEventListener('keydown', handleEscape);
       return () => document.removeEventListener('keydown', handleEscape);
     }, [closePaymentPopup]);
+=======
+        if (e.key === 'Escape') handleRetryPayment();
+      };
+      document.addEventListener('keydown', handleEscape);
+      return () => document.removeEventListener('keydown', handleEscape);
+    }, [handleRetryPayment]);
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 
     return (
       <div 
         className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
         onClick={(e) => {
+<<<<<<< HEAD
           if (e.target === e.currentTarget) closePaymentPopup();
+=======
+          if (e.target === e.currentTarget) handleRetryPayment();
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
         }}
       >
         <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full mx-4 max-h-[70vh] overflow-hidden animate-in zoom-in-95 duration-200 relative">
@@ -1154,7 +1358,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
+<<<<<<< HEAD
               setPaymentStatus(null);
+=======
+              handleRetryPayment();
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
             }}
             className="absolute top-4 right-4 z-[60] p-1.5 rounded-full text-gray-500 hover:text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-300 transition-colors"
             aria-label="Close"
@@ -1202,11 +1410,33 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             </p>
 
             {/* Support Contact */}
+<<<<<<< HEAD
             <div className="text-center text-xs text-gray-500 space-y-1">
+=======
+            <div className="text-center text-xs text-gray-500 space-y-1 mb-6">
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
               <p>Call: +91-7032493290</p>
               <p>Email: atlashomeskphb@gmail.com</p>
               <p>Live Chat Available</p>
             </div>
+<<<<<<< HEAD
+=======
+
+            {/* Try Again Button */}
+            <div className="flex justify-center">
+              <Button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleRetryPayment();
+                }}
+                className="px-8 py-3 text-base font-semibold bg-[var(--cta-primary)] hover:bg-[var(--cta-primary)]/90 text-white rounded-xl"
+              >
+                Try Again
+              </Button>
+            </div>
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
           </div>
         </div>
       </div>
@@ -1217,7 +1447,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     <>
       {paymentStatus === 'success' && <PaymentSuccessPopup />}
       {paymentStatus === 'failed' && <PaymentFailedPopup />}
+<<<<<<< HEAD
       <form onSubmit={handleSubmit} className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6 space-y-5">
+=======
+      <form onSubmit={handleSubmit} className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6 space-y-5" role="region" aria-label="Booking and availability">
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 
       <div className="space-y-1">
         <p className="text-sm uppercase tracking-[0.12em] text-text-muted font-semibold">Reserve</p>
@@ -1561,20 +1795,42 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         </div>
       </div>
 
+<<<<<<< HEAD
       {formError && <p className="text-sm text-support-error">{formError}</p>}
+=======
+      {formError && (
+        <div className="space-y-1">
+          <p className="text-sm text-support-error">{formError}</p>
+          {paymentAttemptCount > 0 && (formError.includes('Network') || formError.includes('connection') || formError.includes('Unable to connect')) && (
+            <p className="text-xs text-text-muted">Attempt {Math.min(paymentAttemptCount, 3)} of 3 — Click &quot;Book this home&quot; to retry</p>
+          )}
+        </div>
+      )}
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 
       <Button 
         type="submit" 
         fullWidth 
+<<<<<<< HEAD
         onClick={handleSubmit} 
         disabled={isLoading || !dateRange.startDate || !dateRange.endDate || isBookingDisabled}
         className={isLoading ? 'opacity-75' : ''}
       >
         {isBookingDisabled ? 'Unavailable' : isLoading ? 'Processing...' : 'Book this home'}
+=======
+        disabled={isSubmitting || isLoading || !dateRange.startDate || !dateRange.endDate || isBookingDisabled}
+        className={isSubmitting || isLoading ? 'opacity-75' : ''}
+      >
+        {isBookingDisabled ? 'Unavailable' : isSubmitting || isLoading ? 'Processing...' : 'Book this home'}
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
       </Button>
     </form>
     </>
   );
 };
 
+<<<<<<< HEAD
 export default UnitBookingWidget;
+=======
+export default UnitBookingWidget;
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c

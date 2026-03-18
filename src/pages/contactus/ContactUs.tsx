@@ -8,6 +8,10 @@ import { Card } from "../../components/ui/Card";
 import { Typography } from "../../components/ui/Typography";
 import { Input } from "../../components/ui/Input";
 import { Button } from "../../components/ui/Button";
+<<<<<<< HEAD
+=======
+import { buildApiUrl, getApiHeaders } from "../../api/client";
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 import ErrorBoundary from "../../components/ErrorBoundary";
 import { toast } from "react-toastify";
 import { logUserAction, reportError } from "../../lib/monitoring";
@@ -36,12 +40,30 @@ const ContactUs = () => {
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
 
+<<<<<<< HEAD
         setStatusMessage({ type: "info", text: "Sending your message..." });
 
         try {
             const response = await fetch("/api/contact", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
+=======
+        if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+            toast.error("Please enter a valid email address.");
+            return;
+        }
+        if (formData.contactnumber && formData.contactnumber.replace(/\D/g, '').length < 10) {
+            toast.error("Please enter a valid phone number (at least 10 digits).");
+            return;
+        }
+
+        setStatusMessage({ type: "info", text: "Sending your message..." });
+
+        try {
+            const response = await fetch(buildApiUrl("/api/contact"), {
+                method: "POST",
+                headers: { "Content-Type": "application/json", ...getApiHeaders() },
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
                 body: JSON.stringify(formData),
             });
 
@@ -83,6 +105,7 @@ const ContactUs = () => {
 
     return (
         <section>
+<<<<<<< HEAD
             {/* Penthouse Minimal Banner */}
             <div className="w-full bg-gradient-to-r from-[#1a1a2e] to-[#16213e] py-8">
                 <div className="max-w-6xl mx-auto px-4 flex items-center gap-6">
@@ -106,6 +129,8 @@ const ContactUs = () => {
                 </div>
             </div>
 
+=======
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
             {/* Banner */}
             <div>
                 <CommonBanner image={resolveOptimizedAsset('banner.jpg')} PageName={'Contact Us'} />
@@ -235,6 +260,10 @@ const ContactUs = () => {
                                 required
                             >
                                 <option value="">Select Destination</option>
+<<<<<<< HEAD
+=======
+                                <option value="Hyderabad">Hyderabad</option>
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
                                 <option value="Lonavala">Lonavala</option>
                                 <option value="Dapoli">Dapoli</option>
                             </Input>

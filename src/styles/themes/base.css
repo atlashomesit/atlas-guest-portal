@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 html {
   scroll-behavior: smooth;
 }
@@ -6,6 +7,12 @@ html {
   /* Typography — Editorial display + clean body (no generic Inter/Roboto) */
   --font-family-base: "DM Sans", system-ui, -apple-system, sans-serif;
   --font-family-display: "Cormorant Garamond", "Georgia", serif;
+=======
+:root {
+  /* Typography */
+  --font-family-base: "Plus Jakarta Sans", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-family-display: "Plus Jakarta Sans", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
   --font-size-xs: 0.75rem;
   --font-size-sm: 0.875rem;
   --font-size-md: 1rem;
@@ -15,6 +22,7 @@ html {
   --font-size-3xl: 2.25rem;
   --line-height-tight: 1.2;
   --line-height-snug: 1.35;
+<<<<<<< HEAD
   --line-height-relaxed: 1.75;
   --text-contrast: #ffffff;
   --text-on-hero: #ffffff;
@@ -24,6 +32,11 @@ html {
   --text-h3: clamp(1.375rem, 3vw, 1.875rem);
   --text-body: 18px;
   --text-caption: 13px;
+=======
+  --line-height-relaxed: 1.6;
+  --text-contrast: #ffffff;
+  --text-on-hero: #ffffff;
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 
   /* Spacing */
   --space-1: 0.25rem;
@@ -34,12 +47,19 @@ html {
   --space-6: 1.5rem;
   --space-8: 2rem;
 
+<<<<<<< HEAD
   /* Radius (>=16px for cards/buttons per OLD design) */
   --radius-sm: 0.5rem;
   --radius-md: 0.75rem;
   --radius-lg: 1rem;
   --radius-xl: 1.25rem;
   --radius-2xl: 1.5rem;
+=======
+  /* Radius */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
   --radius-pill: 999px;
 
   /* Design tokens */
@@ -158,6 +178,7 @@ button:active,
   box-shadow: var(--shadow-level-2);
   transform: translateY(-2px);
 }
+<<<<<<< HEAD
 
 /* Hero staggered fade-in-up (0.25s cubic-bezier) */
 @keyframes heroFadeInUp {
@@ -233,3 +254,5 @@ button:active,
   opacity: 1;
   transform: translateY(0);
 }
+=======
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c

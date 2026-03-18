@@ -1,5 +1,10 @@
 # Onboarding Guide
 
+<<<<<<< HEAD
+=======
+> **For full system setup (API + admin + guest + E2E in <60 min):** see [atlas-e2e/docs/08-implementation/local-dev-setup.md](../atlas-e2e/docs/08-implementation/local-dev-setup.md). This guide covers guest-frontend–only onboarding.
+
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 Welcome to the Atlas Homes Frontend project! This guide walks you through environment setup, codebase orientation, and the first validation steps to become productive quickly.
 
 ## 1. Access & Tooling
@@ -7,7 +12,11 @@ Welcome to the Atlas Homes Frontend project! This guide walks you through enviro
 2. Clone the repository and install dependencies:
    ```bash
    git clone <repo-url>
+<<<<<<< HEAD
    cd RatebotaiRepo
+=======
+   cd atlas-guest-portal
+>>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
    npm install
    ```
 3. Copy environment variables and add EmailJS credentials:
