@@ -15,11 +15,7 @@ The hero trust row is intentionally limited to three high-signal badges—**Veri
 
 Rationale: simplify the header for faster wayfinding, surface FAQs in-place of the former Help label without changing content, and keep the full phone number prominent (especially for India users who prefer to call and negotiate) while retaining but softening the Book Now emphasis.
 
-<<<<<<< HEAD
 For feature work spanning guest frontend and API, see workspace root `ATLAS-HIGH-VALUE-BACKLOG.md` and `ATLAS-FEATURE-EXECUTION-PROMPT.md`.
-=======
-For feature work spanning guest frontend and API, see [atlas-e2e/docs/product/ATLAS-HIGH-VALUE-BACKLOG.md](../atlas-e2e/docs/product/ATLAS-HIGH-VALUE-BACKLOG.md) and [ATLAS-FEATURE-EXECUTION-PROMPT.md](../atlas-e2e/docs/product/ATLAS-FEATURE-EXECUTION-PROMPT.md).
->>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 
 ## Prerequisites
 - Node.js **22.12.0+** (required by Vite 7 and enforced in `.nvmrc`/`.node-version`)
@@ -86,11 +82,8 @@ Cloudflare Pages setup:
 
 ## Documentation
 
-<<<<<<< HEAD
-=======
 **System-level docs:** [atlas-e2e/docs](../atlas-e2e/docs/) — Canonical index (00–10 structure) for architecture, roadmap, local-dev setup, and cross-repo docs.
 
->>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 - **CONTRIBUTING.md** — PR checklist, branch model, CI workflow.
 - **SECURITY.md** — Vulnerability reporting.
 - **docs/design-system.md** — Theming, tokens, CTA discipline.
@@ -211,11 +204,7 @@ Each command should return a 301/302 with a `Location` header set to `/property_
 - **Blank property pages:** Ensure navigation via the homepage so React Router receives the `location.state` payload required by [`Homepage_LocationDetails`](src/components/homepage_components/homepage_locationsdetails/Homepage_LocationDetails.tsx).
 - **Runtime blank screens:** The app is wrapped in an error boundary. If a page fails, the boundary renders a fallback and the console shows the captured error; use the Reload button to recover.
 - **Asset resolution rules:** Place shared images (e.g., the brand logo) in `src/assets/` to leverage `resolveOptimizedAsset`, or reference files in `public/` with absolute paths like `/logo.svg` so Vite serves them without import errors. Prefer SVGs or other text-based assets when possible to avoid binary diffs.
-<<<<<<< HEAD
 - **Email delivery fails:** Confirm the EmailJS service, template, and public keys are filled in `.env` and referenced in [`BookingFrom.tsx`](src/components/homepage_components/homepage_Propertydetails/BookingFrom.tsx) and [`ContactUs.tsx`](src/pages/contactus/ContactUs.tsx).
-=======
-- **Email delivery fails:** Confirm the email provider config is filled in `.env` and wired through [`emailService.ts`](src/lib/email/emailService.ts) and [`ContactUs.tsx`](src/pages/contactus/ContactUs.tsx).
->>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 - **Cloudflare deployment issues:** Ensure the Pages build command (`npm run build`) succeeds locally; failed builds prevent deploys.
 
 ## Listings
@@ -226,11 +215,7 @@ Each command should return a 301/302 with a `Location` header set to `/property_
 - **Add a blog post:** edit `src/data/blogPosts.ts` and append a new object with `title`, `slug`, `category` (`guest-guides` or `hospitality-tech`), `excerpt`, `content`, and optional `featuredImage`, `metaTitle`, and `metaDescription`. The routes `/blog`, `/blog/:category`, and `/blog/:slug` automatically surface new entries.
 - **Policies route:** `/policies` renders a single-column page with a table of contents and anchored sections (e.g., `#cancellation-refund-policy`, `#house-rules`). The header and footer link to these anchors, so keep the IDs stable.
 - **Edit policies:** update the content blocks in `src/pages/Policies.tsx` to change wording or add new clauses while keeping the existing anchors to preserve deep links from navigation and the footer.
-<<<<<<< HEAD
 - **Booking confirmations:** the booking confirmation alerts and EmailJS payloads reference the policy URL and cancellation/reschedule anchors (see `BookingFrom.tsx`). Update the shared `policyMessage` string there if the canonical URL ever changes.
-=======
-- **Booking confirmations:** the booking confirmation alerts and email payloads reference the policy URL and cancellation/reschedule anchors (see the booking widgets under `src/components/homepage_components/hotelBooking_form/`). Update the shared `policyMessage` string there if the canonical URL ever changes.
->>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 - **Sitemap URL:** served from a Cloudflare Pages Function at `/sitemap.xml`, which builds entries from the incoming request origin so preview/staging domains emit the correct links; `public/robots.txt` references the same path.
 
 ### Terms & Conditions and stay policies
@@ -265,8 +250,3 @@ Each command should return a 301/302 with a `Location` header set to `/property_
 The Help area (Policies, FAQs, Terms) uses a single source of truth located in `src/content/legal/`. Edit `terms.ts` first, then reference those IDs from `policies.ts` (summaries) and `faqs.ts` (answers). Every policy must include `termsRefs` pointing to valid Terms IDs, and every FAQ needs at least one `linksTo` entry pointing to a policy or terms section. A build/test-time validator (`npm run validate:legal`) blocks builds if IDs are missing, unknown, or if risky promises in Policies/FAQs are not tied back to the Terms.
 
 Shared layout components live under `src/components/legal/` and provide tabs, sticky section navigation, and search for Policies/FAQs. The “Help” navigation group in the header/footer links to all three pages without duplicating content.
-<<<<<<< HEAD
-=======
-
-<!-- Deploy trigger: markdownlint config (2026-02-27) -->
->>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c

@@ -1,8 +1,5 @@
 @import "./styles/themes/index.css";
-<<<<<<< HEAD
-=======
 @import "./styles/responsive.css";
->>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 
 @tailwind base;
 @tailwind components;

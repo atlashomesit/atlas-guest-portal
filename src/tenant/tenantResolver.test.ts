@@ -21,7 +21,6 @@ describe('tenantResolver', () => {
   });
 
   describe('getTenantSlugFromHostname', () => {
-<<<<<<< HEAD
     it('returns "atlas" when hostname is atlashomestays.com', () => {
       setHostname('atlashomestays.com');
       expect(getTenantSlugFromHostname()).toBe('atlas');
@@ -48,17 +47,11 @@ describe('tenantResolver', () => {
     });
 
     it('returns null when hostname is something else (e.g. example.com)', () => {
-      setHostname('example.com');
-=======
-    it('returns null (tenant is not derived from subdomain)', () => {
-      setHostname('contoso.atlashomestays.com');
->>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
-      expect(getTenantSlugFromHostname()).toBeNull();
+      setHostname('example.com');      expect(getTenantSlugFromHostname()).toBeNull();
     });
   });
 
   describe('getTenantSlug', () => {
-<<<<<<< HEAD
     it('uses hostname when it resolves (atlashomestays.com)', () => {
       setHostname('atlashomestays.com');
       expect(getTenantSlug()).toBe('atlas');
@@ -75,31 +68,7 @@ describe('tenantResolver', () => {
     });
 
     it('trims fallback slug', () => {
-      setHostname('localhost');
-=======
-    it('returns only fallbackSlug from config (hostname ignored)', () => {
-      setHostname('dev.atlashomestays.com');
-      expect(getTenantSlug()).toBeNull();
-      expect(getTenantSlug({ fallbackSlug: 'atlas' })).toBe('atlas');
-    });
-
-    it('returns null when no fallback', () => {
-      setHostname('atlashomestays.com');
-      expect(getTenantSlug()).toBeNull();
-    });
-
-    it('uses fallbackSlug from runtime config', () => {
-      expect(getTenantSlug({ fallbackSlug: 'dev-tenant' })).toBe('dev-tenant');
-    });
-
-    it('returns null when fallback is empty', () => {
-      expect(getTenantSlug()).toBeNull();
-      expect(getTenantSlug({ fallbackSlug: '' })).toBeNull();
-    });
-
-    it('trims fallback slug', () => {
->>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
-      expect(getTenantSlug({ fallbackSlug: '  my-tenant  ' })).toBe('my-tenant');
+      setHostname('localhost');      expect(getTenantSlug({ fallbackSlug: '  my-tenant  ' })).toBe('my-tenant');
     });
   });
 

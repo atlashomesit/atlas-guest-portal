@@ -138,8 +138,6 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
     return true;
   };
 
-<<<<<<< HEAD
-=======
   const composedDisabledDay = (date: Date) => {
     const normalized = normalizeDate(date);
     const checkIn = normalizeDate(value.startDate);
@@ -152,150 +150,11 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
     return disabledDay ? disabledDay(date) : false;
   };
 
->>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
   const handleRangeChange = (ranges: RangeKeyDict) => {
     const selection = ranges.selection ?? { startDate: null, endDate: null };
     const startDate = normalizeDate(selection.startDate);
     const endDate = normalizeDate(selection.endDate);
 
-<<<<<<< HEAD
-=======
-    // Reject clicks on disabled dates - ensure visual disabled state matches functional behavior
-    if (startDate && composedDisabledDay(startDate)) {
-      return; // Ignore selection - date is disabled (e.g. past date)
-    }
-    if (endDate && composedDisabledDay(endDate)) {
-      return;
-    }
-
->>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
-    if (!startDate) {
-      applySelection(startDate, endDate);
-      return;
-    }
-
-    if (selectionState === 'IDLE') {
-      if (applySelection(startDate, null)) {
-        setSelectionState('CHECK_IN_SELECTED');
-      }
-      return;
-    }
-
-    if (selectionState === 'CHECK_IN_SELECTED') {
-      const existingCheckIn = normalizeDate(value.startDate);
-      if (!existingCheckIn) {
-        if (applySelection(startDate, null)) {
-          setSelectionState('CHECK_IN_SELECTED');
-        }
-        return;
-      }
-
-      // If we have a valid range (endDate provided and > startDate), complete it
-      if (endDate && startDate && endDate > startDate) {
-        if (applySelection(startDate, endDate)) {
-          setSelectionState('RANGE_SELECTED');
-        }
-        return;
-      }
-
-      // User clicked a date before check-in - reset with new check-in
-      if (startDate < existingCheckIn) {
-        if (applySelection(startDate, null)) {
-          setSelectionState('CHECK_IN_SELECTED');
-        }
-        return;
-      }
-
-      // User clicked same date or a date after check-in - treat as checkout
-      const checkoutDate = endDate && endDate > existingCheckIn ? endDate : startDate;
-      if (checkoutDate > existingCheckIn && applySelection(existingCheckIn, checkoutDate)) {
-        setSelectionState('RANGE_SELECTED');
-      }
-      return;
-    }
-
-    // RANGE_SELECTED: start over with new check-in
-    if (applySelection(startDate, null)) {
-      setSelectionState('CHECK_IN_SELECTED');
-    }
-  };
-
-  const normalizedStart = normalizeDate(value.startDate) ?? normalizeDate(minDate ?? null) ?? startOfDay(new Date());
-  const normalizedEnd = normalizeDate(value.endDate) ?? normalizedStart;
-
-  useEffect(() => {
-    if (!open || typeof document === 'undefined') return;
-
-    const handleClickOutside = (event: Event) => {
-      const target = event.target as HTMLElement;
-      
-    // Ignore clicks on month/year dropdowns so the picker stays open
-    if (target.closest('.rdrMonthPicker') || target.closest('.rdrYearPicker') || target.closest('.rdrMonthAndYearPickers') || (target.tagName === 'SELECT')) {
-      return;
-    }
-    
-      // If click is on anchor element, don't close
-      if (anchorRef.current?.contains(target)) {
-        return;
-      }
-      
-      // If click is inside calendar popover, don't close (let react-date-range handle it)
-      // Check both the popover ref and any element with the booking-calendar-popover class
-      const popoverElement = popoverRef.current || document.querySelector('.booking-calendar-popover');
-      if (popoverElement && (popoverElement.contains(target) || popoverElement === target)) {
-        return; // Don't close for ANY clicks inside the popover
-      }
-      
-      // Click is outside popover and anchor - close it
-      onClose();
-    };
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        onClose();
-      }
-    };
-
-    // Use 'click' event with capture: true so we check BEFORE other handlers
-    // This way we can detect clicks inside the popover and return early
-    document.addEventListener('click', handleClickOutside, true);
-    document.addEventListener('keydown', handleEscape);
-
-    return () => {
-      document.removeEventListener('click', handleClickOutside, true);
-      document.removeEventListener('keydown', handleEscape);
-    };
-  }, [anchorRef, onClose, open, popoverRef]);
-
-  // Sync shownDate prop only when calendar first opens (false -> true transition)
-  const prevOpenRef = useRef(open);
-  useEffect(() => {
-    const wasOpen = prevOpenRef.current;
-    prevOpenRef.current = open;
-    if (!open || wasOpen) {
-      return; // Closing or already was open - don't sync
-    }
-    // Calendar just opened (false -> true)
-    const next = normalizeToStartOfMonth(shownDate ?? value.startDate ?? minDate ?? new Date());
-    setInternalShownDate(next);
-  }, [open, shownDate, value.startDate, minDate]);
-
-<<<<<<< HEAD
-  const composedDisabledDay = (date: Date) => {
-    const normalized = normalizeDate(date);
-    const checkIn = normalizeDate(value.startDate);
-    if (minDate && normalized && normalized < normalizeDate(minDate)!) return true;
-    if (maxDate && normalized && normalized > normalizeDate(maxDate)!) return true;
-    // When selecting checkout, disable same-day or earlier than check-in to enforce 1-night minimum
-    if (selectionState === 'CHECK_IN_SELECTED' && checkIn && normalized && normalized <= checkIn) {
-      return true;
-    }
-    return disabledDay ? disabledDay(date) : false;
-  };
-
-
-=======
->>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
   const handleShownDateChange = (date: Date) => {
     const normalized = normalizeToStartOfMonth(date);
     setInternalShownDate(normalized);

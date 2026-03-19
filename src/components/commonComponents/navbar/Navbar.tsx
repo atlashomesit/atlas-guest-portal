@@ -163,12 +163,7 @@ const Navbar = () => {
               alt="Atlas Homestays"
               className="navbar-logo"
             />
-<<<<<<< HEAD
-            <span className="navbar-logo-text"><span style={{ color: 'var(--brand-primary)' }}>A</span>tlas Homestays</span>
-=======
-            <span className="navbar-logo-text">Atlas Homestays</span>
->>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
-          </Link>
+            <span className="navbar-logo-text"><span style={{ color: 'var(--brand-primary)' }}>A</span>tlas Homestays</span>          </Link>
 
           {/* Mobile Menu Button - Only visible on mobile */}
           <div className="lg:hidden">
@@ -239,8 +234,6 @@ const Navbar = () => {
 
         {/* RIGHT - Desktop Actions */}
         <div className="hidden lg:flex items-center gap-6">
-<<<<<<< HEAD
-=======
           <Link
             to="/become-a-host"
             className="nav-link"
@@ -250,7 +243,6 @@ const Navbar = () => {
             List your property
           </Link>
 
->>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
           <a href={telLink} className="phone flex items-center gap-1">
             <span>{formatDisplayNumber()}</span>
           </a>
@@ -261,72 +253,6 @@ const Navbar = () => {
             onClick={handleBookNow}
             aria-busy={ctaStatus === 'navigating'}
             data-state={ctaStatus}
-<<<<<<< HEAD
-=======
-            data-testid="navbar-book-now"
->>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
-          >
-            {ctaNav.label}
-          </button>
-          {ctaStatus !== 'idle' && (
-            <span className="book-now-status" role="status" aria-live="polite">
-              {ctaStatus === 'navigating'
-                ? 'Opening reservation...'
-                : 'Bringing booking form into view...'}
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* MOBILE MENU */}
-      {isMenuOpen && (
-        <div className="mobile-menu lg:hidden open" id="mobile-menu-panel">
-          {visibleNavItems.map((item) => (
-            item.label === 'Our Homes' ? (
-              <div key={item.label}>
-                <button
-                  type="button"
-                  className="block py-2 text-left font-semibold"
-                  aria-expanded={isHomesMobileOpen}
-                  aria-controls="mobile-homes-menu"
-                  aria-haspopup="menu"
-                  onClick={() => setIsHomesMobileOpen((prev) => !prev)}
-                >
-                  Our Homes
-                </button>
-
-                {isHomesMobileOpen && (
-                  <div id="mobile-homes-menu" className="mobile-submenu">
-                    {homes.map((home) => (
-                      <Link
-                        key={home.roomNo}
-                        to={home.href}
-                        role="menuitem"
-                        className="block py-1 text-sm"
-                        onClick={handleHomeSelect}
-                      >
-                        {home.title}
-                      </Link>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <NavLink
-                key={item.label}
-                onClick={closeMobile}
-                to={item.to}
-                className="block py-2"
-              >
-                {item.label}
-              </NavLink>
-            )
-          ))}
-
-          {/* MOBILE ACTIONS */}
-          <div className="mt-2 flex flex-col gap-3">
-<<<<<<< HEAD
-=======
             <Link
               to="/become-a-host"
               onClick={closeMobile}
@@ -336,7 +262,6 @@ const Navbar = () => {
               List your property
             </Link>
 
->>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
             <a href={telLink} className="phone flex items-center gap-2">
               <IoIosCall />
               <span>{formatDisplayNumber()}</span>

@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 html {
   scroll-behavior: smooth;
 }
@@ -6,14 +5,7 @@ html {
 :root {
   /* Typography — Editorial display + clean body (no generic Inter/Roboto) */
   --font-family-base: "DM Sans", system-ui, -apple-system, sans-serif;
-  --font-family-display: "Cormorant Garamond", "Georgia", serif;
-=======
-:root {
-  /* Typography */
-  --font-family-base: "Plus Jakarta Sans", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-family-display: "Plus Jakarta Sans", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
->>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
-  --font-size-xs: 0.75rem;
+  --font-family-display: "Cormorant Garamond", "Georgia", serif;  --font-size-xs: 0.75rem;
   --font-size-sm: 0.875rem;
   --font-size-md: 1rem;
   --font-size-lg: 1.125rem;
@@ -22,7 +14,6 @@ html {
   --font-size-3xl: 2.25rem;
   --line-height-tight: 1.2;
   --line-height-snug: 1.35;
-<<<<<<< HEAD
   --line-height-relaxed: 1.75;
   --text-contrast: #ffffff;
   --text-on-hero: #ffffff;
@@ -32,12 +23,6 @@ html {
   --text-h3: clamp(1.375rem, 3vw, 1.875rem);
   --text-body: 18px;
   --text-caption: 13px;
-=======
-  --line-height-relaxed: 1.6;
-  --text-contrast: #ffffff;
-  --text-on-hero: #ffffff;
->>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
-
   /* Spacing */
   --space-1: 0.25rem;
   --space-2: 0.5rem;
@@ -47,20 +32,12 @@ html {
   --space-6: 1.5rem;
   --space-8: 2rem;
 
-<<<<<<< HEAD
   /* Radius (>=16px for cards/buttons per OLD design) */
   --radius-sm: 0.5rem;
   --radius-md: 0.75rem;
   --radius-lg: 1rem;
   --radius-xl: 1.25rem;
-  --radius-2xl: 1.5rem;
-=======
-  /* Radius */
-  --radius-sm: 0.5rem;
-  --radius-md: 0.75rem;
-  --radius-lg: 1rem;
->>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
-  --radius-pill: 999px;
+  --radius-2xl: 1.5rem;  --radius-pill: 999px;
 
   /* Design tokens */
   --color-bg: var(--bg-primary);
@@ -178,81 +155,3 @@ button:active,
   box-shadow: var(--shadow-level-2);
   transform: translateY(-2px);
 }
-<<<<<<< HEAD
-
-/* Hero staggered fade-in-up (0.25s cubic-bezier) */
-@keyframes heroFadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(24px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* Global fade/float/shimmer animations */
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes blobFloat {
-  0%, 100% {
-    transform: translate(0, 0) scale(1);
-  }
-  33% {
-    transform: translate(20px, -20px) scale(1.05);
-  }
-  66% {
-    transform: translate(-15px, 10px) scale(0.97);
-  }
-}
-
-@keyframes shimmer {
-  0% {
-    background-position: -200% center;
-  }
-  100% {
-    background-position: 200% center;
-  }
-}
-
-/* Secondary CTA underline animation */
-.hero-link-secondary {
-  position: relative;
-}
-.hero-link-secondary::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: -2px;
-  height: 1px;
-  background: currentColor;
-  transform: scaleX(0);
-  transition: transform 0.2s ease;
-}
-.hero-link-secondary:hover::after {
-  transform: scaleX(1);
-}
-
-/* Scroll reveal: fade-up when section enters viewport (used with IntersectionObserver) */
-.reveal-in {
-  opacity: 0;
-  transform: translateY(24px);
-  transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1), transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.reveal-in.is-visible {
-  opacity: 1;
-  transform: translateY(0);
-}
-=======
->>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c

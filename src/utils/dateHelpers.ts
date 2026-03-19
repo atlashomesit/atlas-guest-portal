@@ -21,8 +21,6 @@ export const formatNightCount = (nights: number): string => {
   return `${nights} night${nights === 1 ? '' : 's'}`;
 };
 
-<<<<<<< HEAD
-=======
 /**
  * Format a date in the given IANA timezone (e.g. Asia/Kolkata) for display.
  * Falls back to local/intl if timezone is missing or invalid.
@@ -42,4 +40,3 @@ export const formatDateInTimezone = (date: Date, timezoneId?: string): string =>
   }
 };
 
->>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c

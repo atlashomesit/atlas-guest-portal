@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import { useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
@@ -8,104 +7,6 @@ import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 
 const SearchPage = () => {
   const [searchParams] = useSearchParams();
-=======
-import { useMemo, useState, useEffect, useCallback } from "react";
-import { Link, useSearchParams } from "react-router-dom";
-
-import { propertyData } from "../data";
-import { fetchPublicListings, type PublicListing } from "../api/listingClient";
-import { formatCurrency, parseDate } from "../utils/formatting";
-import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
-import SkeletonCard from "../components/apartments/SkeletonCard";
-
-const ITEMS_PER_PAGE = 12;
-
-type NormalizedListing = {
-  id: string;
-  numericId: number;
-  title: string;
-  location: string;
-  pricePerNight: number;
-  maxGuests: number;
-  imageUrl: string;
-  amenities: { amenities_icon?: string }[];
-  canonicalPath: string;
-  property?: unknown;
-};
-
-function buildStaticListings(): NormalizedListing[] {
-  return propertyData
-    .map((property) => {
-      const listingId = property.listingId ?? property.id;
-      const id = typeof listingId === "number" ? listingId : Number(listingId);
-      if (!Number.isFinite(id) || id <= 0) return null;
-      const propertySlug = getPropertySlug(property);
-      const canonicalPath = buildHomeUnitPath(propertySlug, id);
-
-      return {
-        id: `${propertySlug}-${id}`,
-        numericId: id,
-        title: property.property_name,
-        location: property.property_location ?? "Hyderabad",
-        pricePerNight: property.property_price ?? 0,
-        maxGuests: property.maxCapacity ?? 4,
-        imageUrl: property.property_img?.[0] ?? "/hero_images/slider_bg.png",
-        amenities: property.property_amenities?.slice(0, 3) ?? [],
-        canonicalPath,
-        property,
-      };
-    })
-    .filter((l): l is NonNullable<typeof l> => l !== null);
-}
-
-function apiToNormalized(listings: PublicListing[]): NormalizedListing[] {
-  return listings
-    .map((l) => {
-      const propertySlug = getPropertySlug({ name: l.propertyName || l.name });
-      const canonicalPath = buildHomeUnitPath(propertySlug, l.id);
-
-      return {
-        id: `api-${l.id}`,
-        numericId: l.id,
-        title: l.name || l.propertyName,
-        location: l.propertyAddress ?? "Hyderabad",
-        pricePerNight: l.baseNightlyRate ?? 0,
-        maxGuests: l.maxGuests,
-        imageUrl: l.coverPhotoUrl ?? "/hero_images/slider_bg.png",
-        amenities: [],
-        canonicalPath,
-      };
-    })
-    .filter((l) => l.numericId > 0);
-}
-
-const SearchPage = () => {
-  const [searchParams] = useSearchParams();
-  const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
-  const [isLoading, setIsLoading] = useState(true);
-  const [apiListings, setApiListings] = useState<NormalizedListing[] | null>(null);
-
-  const loadFromApi = useCallback(async (signal: AbortSignal) => {
-    try {
-      const data = await fetchPublicListings(signal);
-      if (data.length > 0) {
-        setApiListings(apiToNormalized(data));
-      }
-    } catch {
-      // API failed — static fallback is used automatically
-    }
-  }, []);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    setIsLoading(true);
-
-    loadFromApi(controller.signal).finally(() => setIsLoading(false));
-
-    return () => controller.abort();
-  }, [loadFromApi]);
->>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
-
   const checkIn = parseDate(searchParams.get("checkIn"));
   const checkOut = parseDate(searchParams.get("checkOut"));
   const guests = Number(searchParams.get("guests")) || null;
@@ -113,7 +14,6 @@ const SearchPage = () => {
   const hasInvalidDates = Boolean(checkIn && checkOut && checkOut <= checkIn);
 
   const listings = useMemo(
-<<<<<<< HEAD
     () =>
       propertyData
         .map((property) => {
@@ -136,12 +36,7 @@ const SearchPage = () => {
           };
         })
         .filter((l): l is NonNullable<typeof l> => l !== null),
-    [],
-=======
-    () => apiListings ?? buildStaticListings(),
-    [apiListings],
->>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
-  );
+    [],  );
 
   const filteredUnits = useMemo(() => {
     if (hasInvalidDates) return [];
@@ -152,18 +47,7 @@ const SearchPage = () => {
     });
   }, [guests, hasInvalidDates, listings]);
 
-<<<<<<< HEAD
-  const showEmptyState = !hasInvalidDates && filteredUnits.length === 0;
-=======
-  useEffect(() => {
-    setVisibleCount(ITEMS_PER_PAGE);
-  }, [guests, hasInvalidDates]);
-
-  const visibleUnits = filteredUnits.slice(0, visibleCount);
-  const hasMore = visibleCount < filteredUnits.length;
-  const showEmptyState = !isLoading && !hasInvalidDates && filteredUnits.length === 0;
->>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
-  const queryString = searchParams.toString();
+  const showEmptyState = !hasInvalidDates && filteredUnits.length === 0;  const queryString = searchParams.toString();
 
   return (
     <main className="min-h-screen bg-bg-muted py-10">
@@ -177,15 +61,12 @@ const SearchPage = () => {
           </p>
         </header>
 
-<<<<<<< HEAD
-=======
         {!isLoading && apiListings === null && listings.length > 0 && (
           <div className="rounded-xl border border-support-warning/40 bg-support-warning/10 px-4 py-3 text-support-warning">
             Limited results — showing cached data. Search may be temporarily unavailable.
           </div>
         )}
 
->>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
         {hasInvalidDates && (
           <div className="rounded-xl border border-support-error/40 bg-support-error/10 px-4 py-3 text-support-error">
             Check-out date must be after check-in. Please update your search to continue.
@@ -209,7 +90,6 @@ const SearchPage = () => {
           </div>
         )}
 
-<<<<<<< HEAD
         {!showEmptyState && !hasInvalidDates && (
           <section className="grid gap-6 sm:grid-cols-2" data-testid="guest-search-results">
             {filteredUnits.map((unit) => (
@@ -219,28 +99,7 @@ const SearchPage = () => {
                 className="flex flex-col overflow-hidden rounded-2xl border border-border-subtle bg-bg-surface shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
               >
                 <div className="h-48 w-full bg-gradient-to-br from-bg-muted to-bg-surface">
-                  <img src={unit.imageUrl} alt={unit.title ?? "Property listing"} className="h-full w-full object-cover" loading="lazy" />
-=======
-        {isLoading && (
-          <section className="grid gap-6 sm:grid-cols-2" data-testid="search-skeleton">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <SkeletonCard key={i} />
-            ))}
-          </section>
-        )}
-
-        {!isLoading && !showEmptyState && !hasInvalidDates && (
-          <section className="grid gap-6 sm:grid-cols-2" data-testid="guest-search-results">
-            {visibleUnits.map((unit) => (
-              <article
-                key={unit.id}
-                data-testid="listing-card"
-                className="flex flex-col overflow-hidden rounded-2xl border border-border-subtle bg-bg-surface shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
-              >
-                <div className="h-48 w-full bg-gradient-to-br from-bg-muted to-bg-surface">
-                  <img src={unit.imageUrl} alt={unit.title ?? "Property listing"} className="h-full w-full object-cover" loading="lazy" decoding="async" />
->>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
-                </div>
+                  <img src={unit.imageUrl} alt={unit.title ?? "Property listing"} className="h-full w-full object-cover" loading="lazy" />                </div>
                 <div className="flex flex-1 flex-col gap-3 p-5">
                   <div className="flex items-start justify-between gap-3">
                     <div>
@@ -265,38 +124,11 @@ const SearchPage = () => {
                     </div>
                     <Link
                       to={`${unit.canonicalPath}${queryString ? `?${queryString}` : ""}`}
-<<<<<<< HEAD
                       state={{ property: unit.property }}
-                      className="inline-flex items-center justify-center rounded-xl bg-cta-primary px-4 py-2 text-sm font-semibold text-[var(--text-contrast)] shadow hover:bg-cta-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
-=======
-                      className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl bg-cta-primary px-4 py-2 text-sm font-semibold text-[var(--text-contrast)] shadow hover:bg-cta-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
->>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
-                    >
+                      className="inline-flex items-center justify-center rounded-xl bg-cta-primary px-4 py-2 text-sm font-semibold text-[var(--text-contrast)] shadow hover:bg-cta-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"                    >
                       View details
                     </Link>
                   </div>
                 </div>
               </article>
             ))}
-<<<<<<< HEAD
-=======
-            {hasMore && (
-              <div className="col-span-full flex justify-center pt-4">
-                <button
-                  type="button"
-                  onClick={() => setVisibleCount((prev) => prev + ITEMS_PER_PAGE)}
-                  className="min-h-[44px] w-full max-w-sm rounded-xl bg-cta-primary px-6 py-3 text-base font-semibold text-[var(--text-contrast)] shadow hover:bg-cta-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary sm:w-auto"
-                >
-                  Load more
-                </button>
-              </div>
-            )}
->>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
-          </section>
-        )}
-      </div>
-    </main>
-  );
-};
-
-export default SearchPage;

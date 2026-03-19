@@ -11,11 +11,8 @@ import { initAnalytics } from './utils/analytics'
 import { ThemeProvider } from './theme/ThemeProvider'
 import { loadRuntimeConfig, setRuntimeConfig, getApiBaseUrl } from './runtime-config'
 import { getApiHeaders } from './api/client'
-<<<<<<< HEAD
-=======
 import { getTenantSlug } from './tenant/tenantResolver'
 import { validateTenant } from './tenant/tenantContext'
->>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
 import { ConfigLoadingScreen } from './runtime-config/ConfigLoadingScreen'
 import { ConfigErrorScreen } from './runtime-config/ConfigErrorScreen'
 
@@ -49,39 +46,3 @@ const bootstrapApp = async () => {
       }
     }
 
-<<<<<<< HEAD
-=======
-    const tenantSlug = getTenantSlug({ fallbackSlug: config.tenantKey });
-    if (tenantSlug) {
-      try {
-        await validateTenant(tenantSlug);
-      } catch (e) {
-        if (import.meta.env.DEV) {
-          console.warn('[Atlas] Tenant validation failed (dev — continuing):', e);
-        } else {
-          throw e;
-        }
-      }
-    } else if (!import.meta.env.DEV) {
-      throw new Error('Tenant "tenantKey" not found. Check /.well-known/atlas-runtime-config.json and set tenantKey (or ATLAS_TENANT_KEY in Cloudflare Pages env).');
-    }
-
->>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
-    root.render(
-      <StrictMode>
-        <ThemeProvider initialTheme={DEFAULT_THEME}>
-          <ErrorBoundary name="app-shell">
-            <ApiConfigGuard>
-              <App />
-            </ApiConfigGuard>
-          </ErrorBoundary>
-        </ThemeProvider>
-      </StrictMode>,
-    )
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Runtime config missing/invalid'
-    root.render(<ConfigErrorScreen message={message} />)
-  }
-}
-
-bootstrapApp()

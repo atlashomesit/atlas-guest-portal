@@ -2,10 +2,12 @@ import { faqHighlights } from "../../content/faqHighlights";
 
 const FaqHighlights = () => {
   return (
-    <section className="bg-bg-surface border border-border-subtle rounded-2xl p-6 shadow-level1 space-y-4">
-      <div className="space-y-1">
-        <h2 className="text-2xl font-bold text-text-primary">Frequently Asked Questions</h2>
-        <p className="text-text-muted text-sm">
+    <section className="bg-bg-card border border-[var(--border)] rounded-2xl p-6 md:p-8 shadow-level1">
+      <div className="max-w-prose mb-8">
+        <h2 className="font-display text-xl md:text-2xl font-semibold text-[var(--text-primary)] tracking-tight" style={{ fontFamily: 'var(--font-family-display)' }}>
+          Frequently Asked Questions
+        </h2>
+        <p className="mt-3 text-[var(--text-secondary)] text-sm md:text-base leading-relaxed">
           Check-in basics, cancellations, extra guests, Wi-Fi, parking, work-friendly setups, and how to reach us.
         </p>
       </div>
@@ -13,10 +15,10 @@ const FaqHighlights = () => {
         {faqHighlights.map((item) => (
           <div
             key={item.id}
-            className="rounded-xl border border-border-subtle bg-bg-muted p-4 space-y-2 shadow-level1"
+            className="rounded-xl border border-[var(--border)] bg-bg-secondary p-5 md:p-6 space-y-2 transition-all duration-300 hover:shadow-level2"
           >
-            <h3 className="text-lg font-semibold text-text-primary">{item.question}</h3>
-            <p className="text-sm text-text-primary leading-relaxed">{item.answer}</p>
+            <h3 className="text-base md:text-lg font-semibold text-[var(--text-primary)]">{item.question}</h3>
+            <p className="text-sm md:text-base text-[var(--text-primary)] leading-relaxed">{item.answer}</p>
           </div>
         ))}
       </div>

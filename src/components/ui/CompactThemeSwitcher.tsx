@@ -1,11 +1,5 @@
-<<<<<<< HEAD
 import React, { useEffect, useRef, useState } from 'react';
-import { Check, ChevronDown, Palette } from 'lucide-react';
-=======
-import React, { useEffect, useState } from 'react';
-import { Palette } from 'lucide-react';
->>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
-import { applyTheme, availableThemes, themeRegistry, type ThemeName } from '../../styles/theme';
+import { Check, ChevronDown, Palette } from 'lucide-react';import { applyTheme, availableThemes, themeRegistry, type ThemeName } from '../../styles/theme';
 import { getAutoTheme } from '../../utils/seasonalTheme';
 
 const THEME_STORAGE_KEY = 'atlas-theme-preference';
@@ -13,54 +7,8 @@ const AUTO_THEME_KEY = 'auto';
 
 export const CompactThemeSwitcher: React.FC = () => {
   const [selectedTheme, setSelectedTheme] = useState<ThemeName | typeof AUTO_THEME_KEY>('auto');
-<<<<<<< HEAD
   const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement | null>(null);
-=======
->>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
-  
-  useEffect(() => {
-    const saved = localStorage.getItem(THEME_STORAGE_KEY);
-    if (saved) {
-      setSelectedTheme(saved as ThemeName | typeof AUTO_THEME_KEY);
-      if (saved === AUTO_THEME_KEY) {
-        applyTheme(getAutoTheme());
-      } else {
-        applyTheme(saved);
-      }
-    } else {
-      applyTheme(getAutoTheme());
-    }
-  }, []);
-<<<<<<< HEAD
-
-  useEffect(() => {
-    if (!open) return;
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setOpen(false);
-      }
-    };
-
-    const onPointerDown = (event: PointerEvent) => {
-      const root = rootRef.current;
-      if (!root) return;
-      if (event.target instanceof Node && !root.contains(event.target)) {
-        setOpen(false);
-      }
-    };
-
-    document.addEventListener('keydown', onKeyDown);
-    document.addEventListener('pointerdown', onPointerDown, { capture: true });
-    return () => {
-      document.removeEventListener('keydown', onKeyDown);
-      document.removeEventListener('pointerdown', onPointerDown, { capture: true } as AddEventListenerOptions);
-    };
-  }, [open]);
-=======
->>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
-  
+  const rootRef = useRef<HTMLDivElement | null>(null);  
   const handleThemeChange = (theme: ThemeName | typeof AUTO_THEME_KEY) => {
     setSelectedTheme(theme);
     localStorage.setItem(THEME_STORAGE_KEY, theme);
@@ -71,7 +19,6 @@ export const CompactThemeSwitcher: React.FC = () => {
       applyTheme(theme);
     }
   };
-<<<<<<< HEAD
 
   const selectedLabel =
     selectedTheme === AUTO_THEME_KEY ? 'Auto' : themeRegistry[selectedTheme as ThemeName]?.label ?? selectedTheme;
@@ -161,27 +108,3 @@ export const CompactThemeSwitcher: React.FC = () => {
     </div>
   );
 };
-=======
-  
-  return (
-    <div className="inline-flex items-center gap-2">
-      <Palette className="h-5 w-5 text-[var(--footer-link)] hover:text-[var(--footer-link-hover)] transition-colors" aria-hidden="true" />
-      <select
-        id="footer-theme-select"
-        value={selectedTheme}
-        onChange={(e) => handleThemeChange(e.target.value as ThemeName | typeof AUTO_THEME_KEY)}
-        className="bg-transparent border border-[var(--border-subtle)] rounded px-2 py-1 text-sm text-[var(--footer-link)] hover:text-[var(--footer-link-hover)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] cursor-pointer transition-colors"
-        aria-label="Select theme"
-      >
-        <option value="auto" className="bg-[var(--footer-bg)] text-[var(--footer-text)]">Auto</option>
-        {availableThemes.map((theme) => (
-          <option key={theme} value={theme} className="bg-[var(--footer-bg)] text-[var(--footer-text)]">
-            {themeRegistry[theme].label}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-};
-
->>>>>>> d89c465d64614c4151932dfc055e773e7b689f0c
