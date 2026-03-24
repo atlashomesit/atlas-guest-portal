@@ -19,6 +19,8 @@ import { calculateNightlyPrice, inferUnitType } from '@/utils/pricing';
 import priceDisplayConfig from '@/config/priceDisplay.config';
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
 import { fetchCalendarPricing } from '@/api/pricingClient';
+import { useListingPhotosFromApi } from '@/contexts/ListingPhotosContext';
+import OptimizedImage from '@/components/ui/OptimizedImage';
 
 declare global {
   interface Window {
@@ -32,6 +34,8 @@ interface UnitBookingWidgetProps {
   listingName?: string;
   /** IANA timezone for date display (e.g. Asia/Kolkata). From listing/property. */
   timezoneId?: string;
+  /** Cover image from listing/API (e.g. property gallery). Falls back to /listings/public cache. */
+  coverPhotoUrl?: string;
 }
 
 const PENDING_PAYMENT_KEY = 'atlas_pending_razorpay_order';
@@ -88,7 +92,13 @@ function getBookingErrorMessage(error: unknown, context: 'order' | 'verify'): st
     : 'Payment verification failed. Please contact support with your payment ID.';
 }
 
-const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, propertyId, listingName, timezoneId }) => {
+const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
+  listingId,
+  propertyId,
+  listingName,
+  timezoneId,
+  coverPhotoUrl,
+}) => {
   if (import.meta.env.DEV) {
     console.assert(Boolean(propertyId), '[UnitBookingWidget] propertyId is required for unit mode');
   }
@@ -96,7 +106,16 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({ listingId, proper
   const navigate = useNavigate();
   const _location = useLocation();
   const { updateBooking } = useBooking();
+  const { getUrlsForListingId } = useListingPhotosFromApi();
   const isBookingDisabled = !hasRuntimeConfig();
+
+  const coverFromPublicListings = useMemo(() => {
+    const id = listingId != null ? Number(listingId) : NaN;
+    if (!Number.isFinite(id) || id <= 0) return undefined;
+    return getUrlsForListingId(id)?.[0];
+  }, [listingId, getUrlsForListingId]);
+
+  const displayCoverUrl = (coverPhotoUrl?.trim() || coverFromPublicListings || '').trim() || undefined;
 
   const today = useMemo(() => getIstStartOfDay(), []);
   const maxBookingDate = useMemo(() => addDays(today, 365), [today]);
@@ -1318,6 +1337,17 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       {paymentStatus === 'success' && <PaymentSuccessPopup />}
       {paymentStatus === 'failed' && <PaymentFailedPopup />}
       <form onSubmit={handleSubmit} className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6 space-y-5" role="region" aria-label="Booking and availability">
+
+      {displayCoverUrl && (
+        <div className="overflow-hidden rounded-xl border border-border-subtle -mt-1 mb-1">
+          <OptimizedImage
+            src={displayCoverUrl}
+            alt={listingName ? `${listingName} — preview` : 'Listing preview'}
+            className="w-full h-40 sm:h-44 object-cover"
+            loading="lazy"
+          />
+        </div>
+      )}
 
       <div className="space-y-1">
         <p className="text-sm uppercase tracking-[0.12em] text-text-muted font-semibold">Reserve</p>

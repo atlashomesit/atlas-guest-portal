@@ -21,7 +21,9 @@ import { Button } from '../../ui/Button';
 import { calculateNightlyPrice, inferUnitType } from '../../../utils/pricing';
 import { buildHomeUnitPath } from '../../../utils/navigation';
 import { useBooking } from '../../../contexts/BookingContext';
+import { useListingPhotosFromApi } from '../../../contexts/ListingPhotosContext';
 import { resolveListing } from '../../../utils/listingResolver';
+import { filterGuestImageUrls, sanitizeGuestImageUrl } from '../../../utils/guestImageUrl';
 import type { ListingDetail } from '../../../api/listingClient';
 import SEO from '../../SEO';
 
@@ -79,6 +81,7 @@ const PropertyDetails = () => {
     const [showNeighborhoodMore, setShowNeighborhoodMore] = useState(false);
     const unitType = inferUnitType({ id: data?.id, property_name: data?.property_name });
     const { setProperty, updateBooking } = useBooking();
+    const { getUrlsForListingId } = useListingPhotosFromApi();
     const [searchParams] = useSearchParams();
     const showAvailabilityPlaceholder = false;
 
@@ -208,13 +211,16 @@ const PropertyDetails = () => {
         });
 
         if (foundByUnitSlug) {
-            const images = propertyImages[String(foundByUnitSlug.id)] || [];
+            const lid = Number(foundByUnitSlug.listingId);
+            const apiUrls = getUrlsForListingId(Number.isFinite(lid) ? lid : undefined);
+            const staticImgs = propertyImages[String(foundByUnitSlug.id)] || [];
+            const images = filterGuestImageUrls(apiUrls && apiUrls.length > 0 ? apiUrls : staticImgs);
             setData({
                 ...foundByUnitSlug,
                 property_neighborhoods: Array.isArray(foundByUnitSlug.property_neighborhoods)
                     ? foundByUnitSlug.property_neighborhoods
                     : [],
-                property_img: Array.isArray(images) ? images : []
+                property_img: images
             });
             return;
         }
@@ -224,13 +230,16 @@ const PropertyDetails = () => {
         if (propertyId) {
             const foundById = propertyData.find((item: Property) => String(item.id) === String(propertyId));
             if (foundById) {
-                const images = propertyImages[String(foundById.id)] || [];
+                const lid = Number(foundById.listingId);
+                const apiUrls = getUrlsForListingId(Number.isFinite(lid) ? lid : undefined);
+                const staticImgs = propertyImages[String(foundById.id)] || [];
+                const images = filterGuestImageUrls(apiUrls && apiUrls.length > 0 ? apiUrls : staticImgs);
                 setData({
                     ...foundById,
                     property_neighborhoods: Array.isArray(foundById.property_neighborhoods)
                         ? foundById.property_neighborhoods
                         : [],
-                    property_img: Array.isArray(images) ? images : []
+                    property_img: images
                 });
                 return;
             }
@@ -238,13 +247,18 @@ const PropertyDetails = () => {
         // If still not found, try to get from location state
         if (location.state?.property) {
             const prop = location.state.property;
-            const images = propertyImages[String(prop.id)] || [];
+            const navGallery = (location.state as { galleryImages?: string[] }).galleryImages;
+            const fromNav = Array.isArray(navGallery) && navGallery.length > 0 ? navGallery : undefined;
+            const lid = Number(prop.listingId);
+            const apiUrls = getUrlsForListingId(Number.isFinite(lid) ? lid : undefined);
+            const staticImgs = propertyImages[String(prop.id)] || [];
+            const images = filterGuestImageUrls(fromNav ?? (apiUrls && apiUrls.length > 0 ? apiUrls : staticImgs));
             setData({
                 ...prop,
                 property_neighborhoods: Array.isArray(prop.property_neighborhoods)
                     ? prop.property_neighborhoods
                     : [],
-                property_img: Array.isArray(images) ? images : []
+                property_img: images
             });
             return;
         }
@@ -267,13 +281,21 @@ const PropertyDetails = () => {
                         if (!cancelled) setNotFound(true);
                         return;
                     }
-                    const coverUrl = (apiListing as Record<string, unknown>).coverPhotoUrl as string | undefined;
+                    const coverUrl = sanitizeGuestImageUrl(
+                        (apiListing as Record<string, unknown>).coverPhotoUrl as string | undefined,
+                    );
+                    const photoUrlsRaw = (apiListing as Record<string, unknown>).photoUrls;
+                    const photoUrlsList = filterGuestImageUrls(
+                        Array.isArray(photoUrlsRaw)
+                            ? [...new Set((photoUrlsRaw as string[]).filter(Boolean))]
+                            : [],
+                    );
                     const photoCount = Number((apiListing as Record<string, unknown>).photoCount) || 0;
                     const mapped: Property = {
                         id: Number(apiListing.id) || listingId,
                         listingId: Number(apiListing.id) || listingId,
                         property_name: (apiListing.name as string) ?? `Listing ${apiListing.id}`,
-                        property_img: coverUrl ? [coverUrl] : [],
+                        property_img: photoUrlsList.length > 0 ? photoUrlsList : (coverUrl ? [coverUrl] : []),
                         property_location: (apiListing as Record<string, unknown>).property_location as string ?? 'Location not specified',
                         property_neighborhoods: (apiListing as Record<string, unknown>).property_neighborhoods as string[] ?? [],
                         property_amenities: (apiListing as Record<string, unknown>).property_amenities as PropertyAmenity[] ?? [],
@@ -288,8 +310,13 @@ const PropertyDetails = () => {
                         timezoneId: (apiListing as Record<string, unknown>).timezoneId as string | undefined,
                         photoCount: photoCount || (coverUrl ? 1 : 0),
                     };
-                    const images = propertyImages[String(mapped.id)] ?? propertyImages[String(apiListing.id)] ?? mapped.property_img;
-                    setData({ ...mapped, property_img: Array.isArray(images) ? images : mapped.property_img });
+                    const fromApi =
+                        photoUrlsList.length > 0 ? photoUrlsList : (coverUrl ? [coverUrl] : []);
+                    const staticImages = propertyImages[String(mapped.id)] ?? propertyImages[String(apiListing.id)];
+                    const images = filterGuestImageUrls(
+                        fromApi.length > 0 ? fromApi : (staticImages ?? mapped.property_img ?? []),
+                    );
+                    setData({ ...mapped, property_img: images });
                 })
                 .catch(() => {
                     if (!cancelled) setNotFound(true);
@@ -301,7 +328,7 @@ const PropertyDetails = () => {
         }
 
         setNotFound(true);
-    }, [propertySlug, listingIdParam, listingId, location.state]);
+    }, [propertySlug, listingIdParam, listingId, location.state, getUrlsForListingId]);
 useEffect(() => {
   if (!data?.id) return;
 
@@ -410,7 +437,8 @@ useEffect(() => {
     const unitPolicy = getUnitPolicy(data?.id);
 
     const pageUrl = typeof window !== 'undefined' ? window.location.href : '';
-    const primaryImage = (data?.id && propertyImages[String(data.id)]?.[0]) || data?.property_img?.[0];
+    const galleryUrls = filterGuestImageUrls(data?.property_img ?? []);
+    const primaryImage = galleryUrls[0];
 
     const propertyJsonLd = data ? {
         "@context": "https://schema.org",
@@ -495,57 +523,46 @@ useEffect(() => {
                     </div>
                 </div>
 
-                {/* Image Gallery */}
-              {/* Image Gallery */}
+                {/* Image Gallery — Azure blob URLs are skipped (409); API/static must serve reachable images */}
 <div className="flex gap-2 h-64 md:h-96 lg:h-[450px] overflow-hidden ">
-  {/* Main image */}
-  <div className="flex-1 relative h-full">
-    <a href={(data?.id && propertyImages[data.id]?.[0]) || data?.property_img?.[0] || '#'} data-fancybox="property-gallery">
-      <img
-        src={(data?.id && propertyImages[String(data.id)]?.[0]) || data?.property_img?.[0] || ''}
-        alt="Main property"
-        loading="lazy"
-        decoding="async"
-        sizes="(min-width: 1024px) 50vw, 100vw"
-        className="w-full h-full object-cover rounded-md"
-        onError={(e) => {
-          const target = e.target as HTMLImageElement;
-          target.onerror = null;
-          target.src = data?.property_img?.[0] || '';
-        }}
-      />
-    </a>
+  <div className="flex-1 relative h-full rounded-md overflow-hidden bg-bg-muted">
+    {galleryUrls[0] ? (
+      <a href={galleryUrls[0]} data-fancybox="property-gallery">
+        <img
+          src={galleryUrls[0]}
+          alt="Main property"
+          loading="lazy"
+          decoding="async"
+          sizes="(min-width: 1024px) 50vw, 100vw"
+          className="w-full h-full object-cover"
+        />
+      </a>
+    ) : (
+      <div className="w-full h-full min-h-[16rem] bg-bg-muted bg-[linear-gradient(135deg,color-mix(in_srgb,var(--border-subtle)_55%,transparent)_0%,color-mix(in_srgb,var(--bg-muted)_92%,transparent)_100%)]" role="img" aria-label="No photos available" />
+    )}
   </div>
-  {/* Thumbnails */}
   <div className="flex-1 grid grid-cols-2 grid-rows-2 gap-2 h-full">
-    {((data?.id && propertyImages[data.id]?.slice(1, 5)) || data?.property_img?.slice(1, 5) || []).map((img: string, index: number) => (
-      <div key={index} className="relative w-full h-full">
-        <a href={img || '#'} data-fancybox="property-gallery">
+    {galleryUrls.slice(1, 5).map((img: string, index: number) => (
+      <div key={`${img}-${index}`} className="relative w-full h-full rounded-md overflow-hidden">
+        <a href={img} data-fancybox="property-gallery">
           <img
-            src={img || ''}
+            src={img}
             alt={`Thumbnail ${index + 1}`}
             loading="lazy"
             decoding="async"
             sizes="(min-width: 1024px) 25vw, 50vw"
-            className="w-full h-full object-cover rounded-md hover:opacity-80 transition"
-            onError={(e) => {
-              const target = e.target as HTMLImageElement;
-              target.onerror = null;
-              target.src = data?.property_img?.[index + 1] || '';
-            }}
+            className="w-full h-full object-cover hover:opacity-80 transition"
           />
         </a>
-
-        {/* Show "View photos" button only on the 4th thumbnail */}
-        {index === 3 && (
+        {index === 3 && galleryUrls.length > 0 && (
           <button
+            type="button"
             onClick={() => {
-              const images = (data?.id && propertyImages[String(data.id)]) || data?.property_img || [];
               Fancybox.show(
-                images.map((img: string) => ({
-                  src: img,
+                galleryUrls.map((u: string) => ({
+                  src: u,
                   type: "image",
-                }))
+                })),
               );
             }}
             className="absolute bottom-2 right-2 bg-[color:color-mix(in_srgb,var(--text-primary)_65%,transparent)] text-[var(--text-contrast)] text-xs md:text-sm px-3 py-1 rounded-full flex items-center gap-2 hover:bg-[color:color-mix(in_srgb,var(--text-primary)_80%,transparent)] transition"
@@ -738,6 +755,7 @@ useEffect(() => {
                                         propertyId={listingPropertyId ?? undefined}
                                         listingName={data?.property_name || 'This property'}
                                         timezoneId={data?.timezoneId}
+                                        coverPhotoUrl={primaryImage}
                                     />
                                     {showAvailabilityPlaceholder && (
                                         <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6">

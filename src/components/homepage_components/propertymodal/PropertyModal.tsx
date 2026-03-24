@@ -1,6 +1,7 @@
 import { FaBed, FaShower, FaSwimmingPool, FaCar } from "react-icons/fa";
 import { IoMdClose } from "react-icons/io";
 import { Button } from "../../ui/Button";
+import OptimizedImage from "../../ui/OptimizedImage";
 // Define the types for the property amenities
 interface Amenity {
     amenities_type: string;
@@ -46,8 +47,14 @@ const PropertyModal: React.FC<PropertyModalProps> = ({ property, onClose, handle
         <section className="fixed inset-0 flex items-center justify-center w-full bg-[color:color-mix(in_srgb,var(--text-primary)_70%,transparent)] z-[var(--z-modal)]">
             <div className="relative bg-bg-surface flex flex-col md:flex-row gap-5 rounded-lg shadow-level2 p-6 h-[70vh] md:h-[70vh] w-[80%] overflow-y-auto overflow-x-hidden text-text-primary">
                 {/* property image  */}
-                <div className="flex-1 h-full">
-                    <img src={property.property_img[0]} alt={property.property_name} className="w-full  md:h-full object-cover rounded-lg" />
+                <div className="flex-1 h-full min-h-[200px]">
+                    <OptimizedImage
+                        src={property.property_img[0] ?? ""}
+                        alt={property.property_name}
+                        className="w-full md:h-full object-cover rounded-lg"
+                        wrapperClassName="h-full min-h-[200px]"
+                        sizes="(max-width: 768px) 100vw, 40vw"
+                    />
                 </div>
                 {/* property details  */}
                 <div className="flex-1 flex flex-col gap-4">

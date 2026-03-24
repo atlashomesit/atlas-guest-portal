@@ -4,6 +4,8 @@ export type ListingDetail = {
   id: string | number;
   propertyId?: string | number;
   name?: string;
+  coverPhotoUrl?: string;
+  photoUrls?: string[];
   [key: string]: unknown;
 };
 

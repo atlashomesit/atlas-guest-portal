@@ -11,6 +11,8 @@ import { trackEvent } from "../../../utils/analytics";
 import { buildHomeUnitPath, getPropertySlug } from "../../../utils/navigation";
 import OptimizedImage from "../../ui/OptimizedImage";
 import { useDailyPricingSummary } from "../../../hooks/useDailyPricingSummary";
+import { useListingPhotosFromApi } from "../../../contexts/ListingPhotosContext";
+import { filterGuestImageUrls } from "../../../utils/guestImageUrl";
 
 import "./homepage_location.css";
 
@@ -26,9 +28,6 @@ type ListingModel = {
   images: string[];
   price?: ReturnType<typeof calculateNightlyPrice>;
 };
-
-const FALLBACK_IMAGE =
-  "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80";
 
 const formatAmenityName = (value?: string) =>
   (value ?? "")
@@ -78,9 +77,17 @@ const createListingModel = (
   propertyLookup: Record<string, PropertyRecord>,
   checkInDate: string | null,
   guests: number | null,
+  getUrlsForListingId: (listingId: number | undefined) => string[] | undefined,
 ): ListingModel => {
   const property = propertyLookup[listing.id];
-  const images = propertyImages[listing.id] ?? property?.property_img ?? [FALLBACK_IMAGE];
+  const listingDbId = property?.listingId != null ? Number(property.listingId) : undefined;
+  const apiUrls = getUrlsForListingId(Number.isFinite(listingDbId) ? listingDbId : undefined);
+  const raw =
+    (apiUrls && apiUrls.length > 0 ? apiUrls : undefined) ??
+    propertyImages[listing.id] ??
+    property?.property_img ??
+    [];
+  const images = filterGuestImageUrls(Array.isArray(raw) ? raw : []);
 
   let price: ListingModel["price"];
 
@@ -106,6 +113,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
   const { checkIn, checkOut, guests, searchString } = useSearchSelections(location.search);
   const [activeImageIndex, setActiveImageIndex] = React.useState<Record<string, number>>({});
   const { loading: dailyPricingLoading, getListingPricing } = useDailyPricingSummary();
+  const { getUrlsForListingId } = useListingPhotosFromApi();
 
   const getListingNavigation = React.useCallback(
     (model: ListingModel | null) => {
@@ -147,14 +155,14 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
   const otherListings = sortedListings.filter((item) => item !== heroListing);
 
   const heroModel = React.useMemo(
-    () => (heroListing ? createListingModel(heroListing, propertyLookup, checkIn, guests) : null),
-    [checkIn, guests, heroListing, propertyLookup],
+    () => (heroListing ? createListingModel(heroListing, propertyLookup, checkIn, guests, getUrlsForListingId) : null),
+    [checkIn, guests, heroListing, propertyLookup, getUrlsForListingId],
   );
 
   const listingModels = React.useMemo(
     () =>
-      otherListings.map((item) => createListingModel(item, propertyLookup, checkIn, guests)),
-    [checkIn, guests, otherListings, propertyLookup],
+      otherListings.map((item) => createListingModel(item, propertyLookup, checkIn, guests, getUrlsForListingId)),
+    [checkIn, guests, otherListings, propertyLookup, getUrlsForListingId],
   );
 
   React.useEffect(() => {
@@ -196,7 +204,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
 
       navigate(
         { pathname: navigation.path, search: nextSearch },
-        { state: { property: model.property ?? undefined } },
+        { state: { property: model.property ?? undefined, galleryImages: model.images } },
       );
     },
     [checkIn, checkOut, getListingNavigation, guests, navigate, searchString],
@@ -298,17 +306,11 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
             <div className="relative h-full">
               <OptimizedImage
                 key={`${heroModel.listing.id}-${activeImageIndex[heroModel.listing.id] ?? 0}`}
-                src={heroModel.images[activeImageIndex[heroModel.listing.id] ?? 0] ?? FALLBACK_IMAGE}
+                src={heroModel.images[activeImageIndex[heroModel.listing.id] ?? 0] ?? ""}
                 alt={heroModel.listing.title}
                 className="w-full h-full object-cover min-h-[280px]"
                 wrapperClassName="h-full"
                 sizes="(max-width: 1023px) 100vw, 50vw"
-                onError={(event) => {
-                  const target = event.currentTarget;
-                  if (target.src !== FALLBACK_IMAGE) {
-                    target.src = FALLBACK_IMAGE;
-                  }
-                }}
               />
               {heroModel.images.length > 1 && (
                 <div className="absolute bottom-4 left-0 right-0">
@@ -421,7 +423,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
             {listingModels.map((model, index) => {
               const navigation = getListingNavigation(model);
               const activeIndex = activeImageIndex[model.listing.id] ?? 0;
-              const imageSrc = model.images[activeIndex] ?? FALLBACK_IMAGE;
+              const imageSrc = model.images[activeIndex] ?? "";
 
               return (
                 <div
@@ -436,12 +438,6 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
                       className="w-full h-full object-cover"
                       wrapperClassName="h-full"
                       sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                      onError={(event) => {
-                        const target = event.currentTarget;
-                        if (target.src !== FALLBACK_IMAGE) {
-                          target.src = FALLBACK_IMAGE;
-                        }
-                      }}
                     />
                     {model.images.length > 1 && (
                       <div className="absolute bottom-2 left-0 right-0">

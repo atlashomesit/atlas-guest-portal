@@ -10,6 +10,7 @@ import PropertyModal from "../propertymodal/PropertyModal";
 import { useState } from "react";
 import Subheading from "../../commonComponents/subheading/Subheading";
 import Homepage_form from "../hotelBooking_form/BookingCard";
+import { filterGuestImageUrls } from "../../../utils/guestImageUrl";
 
 const Homepage_LocationDetails = () => {
     const location = useLocation();
@@ -208,7 +209,9 @@ const Homepage_LocationDetails = () => {
 
                     {/* our location wise properties = Right side  */}
                     <div className="flex-[3.5] w-full h-fit grid grid-cols-1 place-items-center gap-6">
-                        {locationViseData.map((data: { id?: number; property_name?: string; property_img?: string[]; property_subtitle?: string; property_location?: string; property_description?: string; property_amenities?: Array<{ amenities_icon?: string; amenities_count?: number; amenities_availablity?: string; amenities_type?: string }>; property_address?: Array<{ value?: string }> }) => (
+                        {locationViseData.map((data: { id?: number; property_name?: string; property_img?: string[]; property_subtitle?: string; property_location?: string; property_description?: string; property_amenities?: Array<{ amenities_icon?: string; amenities_count?: number; amenities_availablity?: string; amenities_type?: string }>; property_address?: Array<{ value?: string }> }) => {
+                            const imgs = filterGuestImageUrls(data?.property_img ?? []);
+                            return (
                             <div
                                 key={data.id}
                                 className="group w-full flex flex-col md:flex-row gap-4 bg-bg-surface p-4 border border-border-subtle hover:border-cta-primary rounded-md shadow-level1 transition"
@@ -219,10 +222,11 @@ const Homepage_LocationDetails = () => {
                                         modules={[Navigation, Pagination, Scrollbar, A11y, Autoplay]}
                                         spaceBetween={0}
                                         navigation
-                                        loop
+                                        loop={imgs.length > 1}
                                         className="h-full w-full"
                                     >
-                                        {data?.property_img.map((image: string, index: number) => (
+                                        {imgs.length > 0 ? (
+                                            imgs.map((image: string, index: number) => (
                                             <SwiperSlide key={index}>
                                                 <div
                                                     onClick={() => handleNavigate(data.property_name)}
@@ -235,12 +239,21 @@ const Homepage_LocationDetails = () => {
                                                     />
                                                 </div>
                                             </SwiperSlide>
-                                        ))}
+                                        ))
+                                        ) : (
+                                            <SwiperSlide key="placeholder">
+                                                <div
+                                                    className="h-full w-full min-h-[240px] bg-bg-muted bg-[linear-gradient(135deg,color-mix(in_srgb,var(--border-subtle)_55%,transparent)_0%,color-mix(in_srgb,var(--bg-muted)_92%,transparent)_100%)]"
+                                                    role="img"
+                                                    aria-label="No photos"
+                                                />
+                                            </SwiperSlide>
+                                        )}
                                     </Swiper>
 
                                     {/* Overlay Elements */}
                                     <div className="absolute bottom-2 left-2 bg-[color:color-mix(in_srgb,var(--text-primary)_65%,transparent)] text-[var(--text-contrast)] text-xs px-2 py-1 rounded">
-                                        📷 {data?.property_img?.length || 0} photos
+                                        📷 {imgs.length} photos
                                     </div>
                                     <span
                                         onClick={handleModal(data)}
@@ -303,7 +316,8 @@ const Homepage_LocationDetails = () => {
                                     </div>
                                 </div>
                             </div>
-                        ))}
+                        );
+                        })}
                     </div>
 
                 </div>

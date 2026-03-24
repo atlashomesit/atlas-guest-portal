@@ -9,8 +9,7 @@ exports[`Hero date picker > captures a stable mobile viewport snapshot > date-pi
       class="w-full bg-bg-muted text-text-primary"
     >
       <div
-        class="relative isolate overflow-hidden min-h-[75vh] md:min-h-[70vh] flex items-center justify-center bg-cover bg-center bg-no-repeat pt-[calc(var(--nav-height,80px)+1rem)]"
-        style="background-image: url(https://atlashomestorage.blob.core.windows.net/listing-images/fallback.jpeg);"
+        class="relative isolate overflow-hidden min-h-[75vh] md:min-h-[70vh] flex items-center justify-center bg-bg-muted bg-cover bg-center bg-no-repeat pt-[calc(var(--nav-height,80px)+1rem)]"
       >
         <div
           aria-hidden="true"

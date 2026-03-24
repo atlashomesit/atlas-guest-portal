@@ -14,11 +14,12 @@ const Parallax: React.FC<ParallaxProps> = ({ image, title, description, overlayO
     const overlayTint = `color-mix(in srgb, var(--text-primary) ${Math.round(safeOverlay * 100)}%, transparent)`;
     const overlayDeep = `color-mix(in srgb, var(--text-primary) ${Math.min(Math.round((safeOverlay + 0.08) * 100), 80)}%, transparent)`;
     const overlayCanvas = `color-mix(in srgb, var(--bg-primary) 18%, transparent)`;
+    const bgUrl = image.trim();
 
     return (
         <div
-            className="relative h-[70vh] bg-fixed bg-cover bg-center rounded-2xl overflow-hidden"
-            style={{ backgroundImage: `url(${image})` }}
+            className="relative h-[70vh] bg-fixed bg-cover bg-center rounded-2xl overflow-hidden bg-bg-muted"
+            style={bgUrl ? { backgroundImage: `url(${bgUrl})` } : undefined}
         >
             <div
                 className="absolute inset-0 flex items-center justify-center text-center px-6"

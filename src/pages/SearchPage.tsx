@@ -6,6 +6,8 @@ import { fetchPublicListings, type PublicListing } from "../api/listingClient";
 import { formatCurrency, parseDate } from "../utils/formatting";
 import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 import SkeletonCard from "../components/apartments/SkeletonCard";
+import OptimizedImage from "../components/ui/OptimizedImage";
+import { filterGuestImageUrls, sanitizeGuestImageUrl } from "../utils/guestImageUrl";
 
 const ITEMS_PER_PAGE = 12;
 
@@ -38,7 +40,7 @@ function buildStaticListings(): NormalizedListing[] {
         location: property.property_location ?? "Hyderabad",
         pricePerNight: property.property_price ?? 0,
         maxGuests: property.maxCapacity ?? 4,
-        imageUrl: property.property_img?.[0] ?? "/hero_images/slider_bg.png",
+        imageUrl: sanitizeGuestImageUrl(property.property_img?.[0]) ?? "",
         amenities: property.property_amenities?.slice(0, 3) ?? [],
         canonicalPath,
         property,
@@ -60,7 +62,8 @@ function apiToNormalized(listings: PublicListing[]): NormalizedListing[] {
         location: l.propertyAddress ?? "Hyderabad",
         pricePerNight: l.baseNightlyRate ?? 0,
         maxGuests: l.maxGuests,
-        imageUrl: l.coverPhotoUrl ?? "/hero_images/slider_bg.png",
+        imageUrl:
+          filterGuestImageUrls(l.photoUrls ?? [])[0] ?? sanitizeGuestImageUrl(l.coverPhotoUrl) ?? "",
         amenities: [],
         canonicalPath,
       };
@@ -181,7 +184,13 @@ const SearchPage = () => {
                 className="flex flex-col overflow-hidden rounded-2xl border border-border-subtle bg-bg-surface shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
               >
                 <div className="h-48 w-full bg-gradient-to-br from-bg-muted to-bg-surface">
-                  <img src={unit.imageUrl} alt={unit.title ?? "Property listing"} className="h-full w-full object-cover" loading="lazy" decoding="async" />
+                  <OptimizedImage
+                    src={unit.imageUrl}
+                    alt={unit.title ?? "Property listing"}
+                    className="h-full w-full object-cover"
+                    wrapperClassName="h-full"
+                    sizes="(max-width: 640px) 100vw, 50vw"
+                  />
                 </div>
                 <div className="flex flex-1 flex-col gap-3 p-5">
                   <div className="flex items-start justify-between gap-3">

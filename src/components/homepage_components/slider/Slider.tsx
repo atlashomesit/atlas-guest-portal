@@ -36,8 +36,12 @@ const Slider = () => {
   return (
     <section className="w-full bg-bg-muted text-text-primary">
       <div
-        className="relative isolate overflow-hidden min-h-[75vh] md:min-h-[70vh] flex items-center justify-center bg-cover bg-center bg-no-repeat pt-[calc(var(--nav-height,80px)+1rem)]"
-        style={{ backgroundImage: `url(${HERO_IMAGE_URL})` }}
+        className="relative isolate overflow-hidden min-h-[75vh] md:min-h-[70vh] flex items-center justify-center bg-bg-muted bg-cover bg-center bg-no-repeat pt-[calc(var(--nav-height,80px)+1rem)]"
+        style={
+          HERO_IMAGE_URL.trim()
+            ? { backgroundImage: `url(${HERO_IMAGE_URL})` }
+            : undefined
+        }
       >
         <div
           data-testid="hero-overlay"

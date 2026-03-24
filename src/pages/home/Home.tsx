@@ -10,6 +10,7 @@ import TestimonialsSection from "../../components/home/TestimonialsSection";
 import FooterCtaStrip from "../../components/home/FooterCtaStrip";
 import SEO from "../../components/SEO";
 import { LOGO_URL } from "../../config/branding";
+import { sanitizeGuestImageUrl } from "../../utils/guestImageUrl";
 import { CONTACT } from "../../config/contact";
 import {
     enableFooterMiniCtaAboveFooter,
@@ -23,9 +24,9 @@ import { getEffectiveDiscountPercent } from "../../utils/pricing";
 const Home = () => {
     const { pendingScrollTarget, setPendingScrollTarget } = useBooking();
     const location = useLocation();
-    const primaryOgImage = propertyImages["101"]?.[0] ?? LOGO_URL;
+    const primaryOgImage = sanitizeGuestImageUrl(propertyImages["101"]?.[0]) ?? LOGO_URL;
     const penthouse = propertyData.find((property) => property.id === 501);
-    const penthouseCover = propertyImages["501"]?.[0];
+    const penthouseCover = sanitizeGuestImageUrl(propertyImages["501"]?.[0]);
     const effectiveDiscountPercent = getEffectiveDiscountPercent();
     const penthouseOfferPrice = Math.round(
         pricingConfig.baseNightlyPriceByUnitType.penthouse *
@@ -94,7 +95,7 @@ const Home = () => {
                     "@type": "Apartment",
                     name: "Atlas Penthouse 501",
                     description: penthouse?.property_description,
-                    image: penthouseCover,
+                    image: penthouseCover ?? LOGO_URL,
                     address: {
                         "@type": "PostalAddress",
                         streetAddress: "KPHB, Kukatpally",

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import SEO from "../components/SEO";
 import { propertyData, propertyImages } from "../data/propertyData";
 import { LOGO_URL } from "../config/branding";
+import { filterGuestImageUrls, sanitizeGuestImageUrl } from "../utils/guestImageUrl";
 
 type PropertyData = (typeof propertyData)[number];
 
@@ -28,8 +29,8 @@ const GalleryPage = () => {
 
   const galleryItems = useMemo(() => {
     return propertyData.flatMap((property: PropertyData): GalleryItem[] => {
-      const images = propertyImages[String(property.id)] ?? property.property_img ?? [];
-      const sourceImages = images.length > 0 ? images : [LOGO_URL];
+      const images = filterGuestImageUrls(propertyImages[String(property.id)] ?? property.property_img ?? []);
+      const sourceImages = images.length > 0 ? images : [sanitizeGuestImageUrl(LOGO_URL) ?? ""];
 
       return sourceImages.map((url, index) => ({
         propertyId: property.id,
@@ -143,13 +144,21 @@ const GalleryPage = () => {
                   key={`${item.propertyId}-${item.order}`}
                   className="group relative overflow-hidden rounded-xl border border-border-subtle bg-bg-muted shadow-sm"
                 >
-                  <img
-                    src={item.url}
-                    alt={`${item.propertyName} photo ${item.order + 1}`}
-                    loading="lazy"
-                    decoding="async"
-                    className="h-60 w-full object-cover transition duration-300 group-hover:scale-[1.02]"
-                  />
+                  {item.url ? (
+                    <img
+                      src={item.url}
+                      alt={`${item.propertyName} photo ${item.order + 1}`}
+                      loading="lazy"
+                      decoding="async"
+                      className="h-60 w-full object-cover transition duration-300 group-hover:scale-[1.02]"
+                    />
+                  ) : (
+                    <div
+                      className="h-60 w-full bg-bg-muted bg-[linear-gradient(135deg,color-mix(in_srgb,var(--border-subtle)_55%,transparent)_0%,color-mix(in_srgb,var(--bg-muted)_92%,transparent)_100%)]"
+                      role="img"
+                      aria-label={`${item.propertyName} — no photo`}
+                    />
+                  )}
                   <figcaption className="absolute inset-x-0 bottom-0 bg-[color:color-mix(in_srgb,var(--text-primary)_80%,transparent)] text-[var(--text-contrast)] p-3">
                     <div className="flex items-center justify-between text-sm">
                       <div>
