@@ -71,11 +71,11 @@ const bootstrapApp = async () => {
           </ErrorBoundary>
         </ThemeProvider>
       </StrictMode>,
-    )
+    );
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Runtime config missing/invalid'
-    root.render(<ConfigErrorScreen message={message} />)
+    root.render(<ConfigErrorScreen message={message} />);
   }
-}
+};
 
-bootstrapApp()
+bootstrapApp();
