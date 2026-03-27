@@ -18,14 +18,39 @@ export default {
     extend: {
       fontFamily: {
         roboto: ['Roboto Slab', 'serif'],
-        sans: ['var(--font-family-base)', 'DM Sans', 'system-ui', 'sans-serif'],
-        display: ['var(--font-family-display)', 'Cormorant Garamond', 'Georgia', 'serif'],      },
+        sans: ['var(--font-family-base)', 'Plus Jakarta Sans', 'Inter', 'system-ui', 'sans-serif'],
+      },
       colors: {
         bg: {
           primary: 'var(--bg-primary)',
           surface: 'var(--bg-surface)',
           muted: 'var(--bg-muted)',
-          card: 'var(--bg-card)',      },
+        },
+        text: {
+          primary: 'var(--text-primary)',
+          muted: 'var(--text-muted)',
+        },
+        accent: {
+          primary: withOpacity('--accent-primary-rgb'),
+          soft: withOpacity('--accent-soft-rgb'),
+        },
+        cta: {
+          primary: withOpacity('--cta-primary-rgb'),
+          primaryHover: withOpacity('--cta-primary-hover-rgb'),
+          secondary: withOpacity('--cta-secondary-rgb'),
+        },
+        border: {
+          subtle: 'var(--border-subtle)',
+          strong: 'var(--border-strong)',
+        },
+        primary: withOpacity('--cta-primary-rgb'),
+        success: 'var(--support-success)',
+        danger: 'var(--support-danger)',
+      },
+      boxShadow: {
+        level1: 'var(--shadow-level-1)',
+        level2: 'var(--shadow-level-2)',
+      },
       spacing: {
         1: 'var(--space-1)',
         2: 'var(--space-2)',
@@ -34,13 +59,13 @@ export default {
         5: 'var(--space-5)',
         6: 'var(--space-6)',
         8: 'var(--space-8)',
-        12: '3rem',
-        16: '4rem',
-        20: '5rem',
-        24: '6rem',
-        'section-gap': 'var(--section-gap-mobile)',
-        'section-gap-md': 'var(--section-gap-tablet)',
-        'section-gap-lg': 'var(--section-gap-desktop)',      },
+      },
+      borderRadius: {
+        sm: 'var(--radius-sm)',
+        md: 'var(--radius-md)',
+        lg: 'var(--radius-lg)',
+        pill: 'var(--radius-pill)',
+      },
     },
   },
   plugins: [],

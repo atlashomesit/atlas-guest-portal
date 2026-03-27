@@ -1,32 +1,37 @@
-type EnvSource = Record<string, string | undefined>;
+interface ImportMetaEnv {
+  [key: string]: unknown;
+}
+
+interface ProcessEnv {
+  [key: string]: string | undefined;
+}
+
+const getEnv = (key: string): string | undefined => {
+  if (typeof process !== "undefined") {
+    const val = (process as { env?: ProcessEnv }).env?.[key];
+    if (typeof val === "string") return val;
+  }
+  if (typeof import.meta !== "undefined") {
+    const val = (import.meta as { env?: ImportMetaEnv }).env?.[key];
+    if (typeof val === "string") return val;
   }
   return undefined;
 };
 
-const metaEnvRaw = typeof import.meta !== "undefined" 
-  ? (import.meta as { env?: ImportMetaEnv }).env ?? {} 
-  : {};
-const metaEnv: EnvSource = Object.keys(metaEnvRaw).reduce((acc, key) => {
-  const value = metaEnvRaw[key];
-  acc[key] = typeof value === "string" ? value : undefined;
-  return acc;
-}, {} as EnvSource);
+export const ENV = getEnv("MODE") ?? getEnv("NODE_ENV") ?? "development";
 
-const nodeEnv: EnvSource = typeof process !== "undefined" 
-  ? (process as { env?: ProcessEnv }).env ?? {} 
-  : {};
-
-export const ENV = getEnv("MODE", metaEnv, nodeEnv) ?? getEnv("NODE_ENV", nodeEnv) ?? "development";
 export const IS_LOCALHOST = (() => {
   if (typeof window !== "undefined") {
     const hostname = window.location?.hostname ?? "";
     return hostname === "localhost" || hostname === "127.0.0.1";
   }
-  const devFlag = (getEnv("DEV", metaEnv, nodeEnv) ?? "").toString().toLowerCase();  return devFlag === "true" || devFlag === "1";
+  const devFlag = (getEnv("DEV") ?? "").toLowerCase();
+  return devFlag === "true" || devFlag === "1";
 })();
 
 export const getAllowedEmails = (): string[] => {
-  const raw = getEnv("VITE_ALLOWED_EMAILS", metaEnv, nodeEnv);  if (!raw) return [];
+  const raw = getEnv("VITE_ALLOWED_EMAILS");
+  if (!raw) return [];
 
   const trimmed = raw.trim();
   if (!trimmed) return [];

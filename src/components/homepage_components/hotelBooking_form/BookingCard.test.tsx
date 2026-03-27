@@ -1,14 +1,12 @@
-import { describe, expect, vi, beforeEach, afterEach, it, test } from 'vitest';
-import { render, screen, within, fireEvent, waitFor } from '@testing-library/react';
+import { describe, expect, vi, beforeEach, afterEach, it } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { act, ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
-import { format, startOfDay } from 'date-fns';
-import { getIstCalendarDate, getIstStartOfDay } from '@/utils/date';
 import BookingCard from './BookingCard';
-import { propertyData } from '../../../data';
 import { BookingProvider } from '../../../contexts/BookingContext';
 
-const getPrimaryCta = () =>  screen
+const _getPrimaryCta = () =>
+  screen
     .getAllByRole('button', { name: /check availability/i })
     .find((button) => button.hasAttribute('disabled')) ??
   screen.getByRole('button', { name: /check availability/i });

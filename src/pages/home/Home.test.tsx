@@ -25,5 +25,6 @@ describe("Homepage layout", () => {
 
     const ourHomesSection = screen.getByRole("heading", { name: /our homes/i }).closest("section");
     expect(ourHomesSection).toHaveAttribute("id", "our-homes");
-    expect(screen.getByTestId("hero-widget")).toHaveAttribute("id", "search-form");  });
+    expect(screen.getByTestId("search-input")).toHaveAttribute("id", "search-form");
+  });
 });

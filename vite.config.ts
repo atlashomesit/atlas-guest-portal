@@ -6,16 +6,26 @@ import fs from "fs";
 const RUNTIME_CONFIG_PATH = path.resolve(__dirname, "public/.well-known/atlas-runtime-config.json");
 const BACKEND_TARGET = "http://localhost:5120";
 
-/** In dev, serve runtime config with apiBaseUrl = dev server origin so API calls go through Vite proxy (avoids CORS). */
+/** In dev, serve runtime config with apiBaseUrl = 5120 (API only). */
 function devRuntimeConfigPlugin() {
   return {
     name: "dev-runtime-config",
-    configureServer(server: { config: { server?: { port?: number } }; middlewares: { use: (fn: (req: any, res: any, next: () => void) => void) => void } }) {      server.middlewares.use((req, res, next) => {
+    configureServer(server: { middlewares: { use: (fn: (req: any, res: any, next: () => void) => void) => void } }) {
+      server.middlewares.use((req, res, next) => {
         if (!req.url?.startsWith("/.well-known/atlas-runtime-config.json")) {
           return next();
         }
-        const port = server.config.server?.port ?? 5174;
-        const devOrigin = `http://localhost:${port}`;        res.setHeader("Content-Type", "application/json");
+        let config: Record<string, unknown>;
+        try {
+          const raw = fs.readFileSync(RUNTIME_CONFIG_PATH, "utf-8");
+          config = JSON.parse(raw) as Record<string, unknown>;
+        } catch {
+          return next();
+        }
+        config = { ...config, apiBaseUrl: BACKEND_TARGET };
+        const mapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim();
+        if (mapsKey) config.googleMapsApiKey = mapsKey;
+        res.setHeader("Content-Type", "application/json");
         res.end(JSON.stringify(config));
       });
     },

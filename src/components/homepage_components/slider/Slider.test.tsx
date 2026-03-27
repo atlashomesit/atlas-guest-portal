@@ -1,6 +1,7 @@
 import React from "react";
 import { addDays, format } from "date-fns";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";import { vi } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 
 const navigateMock = vi.fn();
@@ -93,7 +94,8 @@ const renderSlider = () =>
     </MemoryRouter>,
   );
 
-const renderSliderAtWidth = (width: number) => {  const viewportSpy = vi.spyOn(window, "innerWidth", "get");
+const _renderSliderAtWidth = (width: number) => {
+  const viewportSpy = vi.spyOn(window, "innerWidth", "get");
   viewportSpy.mockReturnValue(width);
   const utils = renderSlider();
   return { ...utils, viewportSpy };

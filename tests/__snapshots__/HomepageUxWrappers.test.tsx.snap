@@ -13,8 +13,9 @@ exports[`Homepage UX wrappers (default path) > keeps services on the production 
 exports[`Homepage UX wrappers (default path) > renders the default secondary banner when flags are off 1`] = `
 <DocumentFragment>
   <div
-    class="m-8"
+    class="py-8 md:py-12"
   >
+          
     <div
       data-testid="parallax"
     >

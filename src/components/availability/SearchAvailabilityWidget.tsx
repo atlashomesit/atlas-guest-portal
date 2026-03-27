@@ -462,7 +462,8 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
 
     try {
       if (availabilityUrl) {
-        const response = await fetch(availabilityUrl, { signal: controller?.signal });        const durationMs = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - startedAt);
+        const response = await fetch(availabilityUrl, { signal: controller?.signal, headers: getApiHeaders() });
+        const durationMs = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - startedAt);
 
         trackEvent(
           'availability_search_result',
@@ -581,7 +582,8 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
   const labelClass =
     'flex items-center gap-2.5 text-[10px] font-bold uppercase tracking-[0.10em] text-[var(--text-muted)] whitespace-nowrap';
   return (
-    <form onSubmit={handleSubmit} className={formContainerClass} data-testid="hero-widget" id="search-form">      <div className="sr-only" role="status" aria-live="polite">
+    <form onSubmit={handleSubmit} className={formContainerClass} data-testid="search-input" id="search-form">
+      <div className="sr-only" role="status" aria-live="polite">
         {statusMessage || error || 'Hero form ready.'}
       </div>
       <div className={formGridClass} ref={calendarWrapperRef}>
@@ -725,3 +727,88 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
           <button
             type="submit"
             disabled={isSubmitDisabled || isSubmitting}
+            data-testid="hero-search-submit"
+            className="inline-flex h-[60px] w-full items-center justify-center rounded-[14px] bg-gradient-to-br from-[var(--cta-primary)] to-[var(--cta-primary-hover)] px-6 text-base font-semibold tracking-[0.02em] text-white shadow-[var(--shadow-level-2)] transition-all hover:scale-[1.02] hover:shadow-[var(--shadow-level-3)] active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cta-primary)] disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none disabled:hover:scale-100 aria-busy:cursor-progress aria-busy:opacity-90 whitespace-nowrap"
+            onClick={() => setStatusMessage('Checking availability...')}
+            aria-busy={isSubmitting}
+          >
+            {isSubmitting ? 'Checking...' : 'Check availability'}
+          </button>
+          <Link
+            to="/#our-homes"
+            className="group inline-flex items-center justify-center gap-1 text-[14px] font-medium text-[var(--cta-primary)] transition-all hover:text-[var(--text-body)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#475569] whitespace-nowrap mt-3"
+          >
+            Browse all apartments
+            <span className="inline-block transition-transform group-hover:translate-x-1">→</span>
+          </Link>
+        </div>
+      </div>
+
+      {error && (
+        <p className="text-left text-sm font-semibold text-[color-mix(in_srgb,var(--cta-secondary)_90%,transparent)]">
+          {error}
+        </p>
+      )}
+      {!error && statusMessage && (
+        <p className="text-left text-sm font-semibold text-text-primary" aria-live="polite">
+          {statusMessage}
+        </p>
+      )}
+
+      <div className="flex flex-col gap-3 rounded-2xl bg-[var(--bg-surface)] border border-[var(--bg-muted)] px-6 py-5 text-left md:flex-row md:items-center md:gap-4">
+        <div className="flex items-center gap-2 text-[15px] font-bold text-[var(--text-body)]">
+          <ShieldCheck className="h-4 w-4 text-[var(--cta-primary)]" aria-hidden="true" />
+          <span>Book with confidence</span>
+        </div>
+        <p className="text-[13px] text-[var(--cta-primary)] md:border-l md:border-[var(--border-subtle)] md:pl-4">
+          Instant confirmation • Secure payment • Flexible cancellation
+        </p>
+      </div>
+
+      {isAvailabilityModalOpen && (
+        <div
+          className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-[color:color-mix(in_srgb,var(--text-primary)_70%,transparent)]"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="availability-modal-title"
+          aria-describedby="availability-modal-description"
+          onClick={() => setIsAvailabilityModalOpen(false)}
+        >
+          <div
+            className="relative w-[90%] max-w-lg rounded-2xl bg-bg-surface p-6 shadow-level3"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h3 id="availability-modal-title" className="text-xl font-semibold text-text-primary">
+              Availability
+            </h3>
+            <p id="availability-modal-description" className="mt-3 text-sm text-text-muted">
+              Good news! More than one home is available for your dates.
+            </p>
+            <p className="mt-2 text-sm text-text-muted">
+              Soon you’ll be able to book split stays across multiple apartments without leaving this page.
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                className="inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold text-text-primary underline-offset-4 transition hover:text-cta-secondary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
+                onClick={() => setIsAvailabilityModalOpen(false)}
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center justify-center rounded-lg bg-cta-primary px-4 py-2 text-sm font-semibold text-[var(--text-contrast)] shadow-sm transition hover:bg-cta-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
+                onClick={() => pendingSearchParams && performAvailabilityCheck(pendingSearchParams)}
+                disabled={!pendingSearchParams || isSubmitting}
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </form>
+  );
+};
+
+export default SearchAvailabilityWidget;

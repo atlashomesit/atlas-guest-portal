@@ -23,3 +23,41 @@ export async function apiFetch(path: string, init?: RequestInit): Promise<Respon
   }
   const tenantHeaders = getApiHeaders();
   const mergedHeaders = { ...tenantHeaders, ...(init?.headers as Record<string, string> | undefined) };
+
+  let lastError: Error | undefined;
+  const maxAttempts = isRetryable(init?.method) ? RETRY_LIMIT + 1 : 1;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const res = await monitoredFetch(url, { credentials: 'include', ...init, headers: mergedHeaders });
+      if (!res.ok) {
+        if (isRetryable(init?.method) && RETRYABLE_STATUSES.has(res.status) && attempt < maxAttempts) {
+          await new Promise((r) => setTimeout(r, RETRY_DELAY_MS * attempt));
+          continue;
+        }
+        let body = '';
+        try { body = await res.text(); } catch {
+          // Ignore error when reading response text
+        }
+        logApiError(new Error(`HTTP ${res.status}`), {
+          url,
+          status: res.status,
+          method: init?.method,
+          responseSnippet: body.slice(0, 200),
+          category: 'http',
+        });
+        throw new Error(`HTTP ${res.status}: ${body}`);
+      }
+      return res;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error('Unexpected network error');
+      if (isRetryable(init?.method) && attempt < maxAttempts) {
+        await new Promise((r) => setTimeout(r, RETRY_DELAY_MS * attempt));
+        continue;
+      }
+      logApiError(lastError, { url, method: init?.method, category: 'network' });
+      throw lastError;
+    }
+  }
+  throw lastError ?? new Error('Unexpected error in apiFetch');
+}

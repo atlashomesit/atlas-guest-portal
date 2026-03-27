@@ -163,7 +163,8 @@ const Navbar = () => {
               alt="Atlas Homestays"
               className="navbar-logo"
             />
-            <span className="navbar-logo-text"><span style={{ color: 'var(--brand-primary)' }}>A</span>tlas Homestays</span>          </Link>
+            <span className="navbar-logo-text">Atlas Homestays</span>
+          </Link>
 
           {/* Mobile Menu Button - Only visible on mobile */}
           <div className="lg:hidden">
@@ -253,6 +254,67 @@ const Navbar = () => {
             onClick={handleBookNow}
             aria-busy={ctaStatus === 'navigating'}
             data-state={ctaStatus}
+            data-testid="navbar-book-now"
+          >
+            {ctaNav.label}
+          </button>
+          {ctaStatus !== 'idle' && (
+            <span className="book-now-status" role="status" aria-live="polite">
+              {ctaStatus === 'navigating'
+                ? 'Opening reservation...'
+                : 'Bringing booking form into view...'}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* MOBILE MENU */}
+      {isMenuOpen && (
+        <div className="mobile-menu lg:hidden open" id="mobile-menu-panel">
+          {visibleNavItems.map((item) => (
+            item.label === 'Our Homes' ? (
+              <div key={item.label}>
+                <button
+                  type="button"
+                  className="block py-2 text-left font-semibold"
+                  aria-expanded={isHomesMobileOpen}
+                  aria-controls="mobile-homes-menu"
+                  aria-haspopup="menu"
+                  onClick={() => setIsHomesMobileOpen((prev) => !prev)}
+                >
+                  Our Homes
+                </button>
+
+                {isHomesMobileOpen && (
+                  <div id="mobile-homes-menu" className="mobile-submenu">
+                    {homes.map((home) => (
+                      <Link
+                        key={home.roomNo}
+                        to={home.href}
+                        role="menuitem"
+                        className="block py-1 text-sm"
+                        onClick={handleHomeSelect}
+                      >
+                        {home.title}
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <NavLink
+                key={item.label}
+                onClick={closeMobile}
+                to={item.to}
+                className="block py-2"
+              >
+                {item.label}
+              </NavLink>
+            )
+          ))}
+
+          {/* MOBILE ACTIONS */}
+          <div className="mt-2 flex flex-col gap-3">
             <Link
               to="/become-a-host"
               onClick={closeMobile}

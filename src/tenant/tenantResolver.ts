@@ -1,21 +1,32 @@
 /**
- * Resolves tenant slug for API context from hostname (no UI).
- * Contract: X-Tenant-Slug header; subdomain or default "atlas" in dev.
+ * Resolves tenant slug for X-Tenant-Slug header.
+ * Tenant comes only from runtime config (tenantKey / ATLAS_TENANT_KEY), not from subdomain.
  */
 
-const ATLAS_DOMAIN = 'atlashomestays.com';
-const DEFAULT_TENANT_SLUG = 'atlas';
 function getHostname(): string {
   if (typeof window === 'undefined') return '';
   return (window.location?.hostname ?? '').toLowerCase();
 }
 
-/**
- * True when running on localhost / 127.0.0.1 / *.local (dev).
- */  return null;
+export function isLocalDev(): boolean {
+  const host = getHostname();
+  return host === 'localhost' || host === '127.0.0.1' || host.endsWith('.local');
+}
+
+/** @deprecated Tenant is not derived from subdomain; use config tenantKey only. */
+export function getTenantSlugFromHostname(): string | null {
+  return null;
 }
 
 export type TenantResolverOptions = {
-  /** Fallback slug when hostname does not resolve (e.g. localhost). From runtime config. */  const fallback = options.fallbackSlug ?? null;
+  fallbackSlug?: string | null;
+};
+
+/**
+ * Returns the tenant slug to send as X-Tenant-Slug.
+ * Tenant is from runtime config only (tenantKey / ATLAS_TENANT_KEY), not from hostname/subdomain.
+ */
+export function getTenantSlug(options: TenantResolverOptions = {}): string | null {
+  const fallback = options.fallbackSlug ?? null;
   return typeof fallback === 'string' && fallback.trim() ? fallback.trim() : null;
 }
