@@ -33,22 +33,22 @@ export const SERVICES_CONTENT: {
     {
       title: "Sanctuary of Serenity",
       description: "Retreat to tranquil spaces where comfort meets style, offering you a peaceful escape at the heart of Atlas Homes.",
-      thumbnail: "https://atlashomestorage.blob.core.windows.net/listing-images/102/img_13.jpg",
+      thumbnail: "",
     },
     {
       title: "Tailored for Every Journey",
       description: "Find your perfect fit—our diverse accommodations are designed to suit every traveler, every story, every dream.",
-      thumbnail: "https://atlashomestorage.blob.core.windows.net/listing-images/201/img_15.jpg",
+      thumbnail: "",
     },
     {
       title: "Moments to Savor",
       description: "Delight in gourmet experiences and cozy corners, where every meal and every sip is a celebration of taste.",
-      thumbnail: "https://atlashomestorage.blob.core.windows.net/listing-images/302/img_5.jpg",
+      thumbnail: "",
     },
     {
       title: "Celebrate Life's Milestones",
       description: "Host unforgettable gatherings in elegant spaces, with every detail crafted to make your special moments shine.",
-      thumbnail: "https://atlashomestorage.blob.core.windows.net/listing-images/501/IMG_2378.jpg",
+      thumbnail: "",
     },
   ],
   concreteCopy: servicesConcreteCopy,

@@ -1,4 +1,5 @@
 import { propertyData, propertyImages } from "../data";
+import { filterGuestImageUrls } from "../utils/guestImageUrl";
 
 export type Home = {
   roomNo: string;
@@ -10,8 +11,6 @@ export type Home = {
   highlights?: string[];
   images: string[];
 };
-
-const placeholderImage = "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80";
 
 const roomNoToListingId = Object.fromEntries(
   propertyData.map((p) => [String(p.id), p.listingId]).filter(([, lid]) => lid != null)
@@ -46,7 +45,7 @@ const buildHome = (roomNo: string, config: HomeConfig = {}): Home => {
     href,
     tagline: config.tagline,
     highlights: config.highlights,
-    images: propertyImages[roomNo] ?? [placeholderImage],
+    images: filterGuestImageUrls(propertyImages[roomNo] ?? []),
   };
 };
 

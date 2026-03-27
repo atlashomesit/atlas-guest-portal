@@ -2,6 +2,7 @@ import React, { useMemo } from "react";
 import { Bath, BedDouble, Car, PawPrint, Snowflake, Users, Wifi } from "lucide-react";
 import { priceDisplayConfig } from "../../config/priceDisplay.config";
 import { type NightlyPriceBreakdown } from "../../utils/pricing";
+import OptimizedImage from "../ui/OptimizedImage";
 
 type ListingCardProps = {
   id: string;
@@ -30,6 +31,7 @@ const formatCurrency = (value: number) =>
   }).format(value);
 
 const ListingCard: React.FC<ListingCardProps> = ({
+  id,
   name,
   location,
   neighborhoods = [],
@@ -125,12 +127,12 @@ const ListingCard: React.FC<ListingCardProps> = ({
       }}
     >
       <div className="relative h-56 w-full overflow-hidden">
-        <img
+        <OptimizedImage
           src={image}
           alt={name}
           className="h-full w-full object-cover transition duration-200 md:group-hover:scale-105"
-          loading="lazy"
-          decoding="async"
+          wrapperClassName="h-full"
+          sizes="(max-width: 768px) 100vw, 33vw"
         />
         <span className="absolute left-3 top-3 rounded-full bg-[color:color-mix(in_srgb,var(--bg-surface)_90%,transparent)] px-3 py-1 text-xs font-semibold text-text-primary shadow-level1">
           {propertyType}

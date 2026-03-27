@@ -7,6 +7,7 @@ import ScrollToTop from "./ScrollTop"
 import ErrorBoundary from "./components/ErrorBoundary"
 import { ToastContainer } from "react-toastify"
 import { BookingProvider } from "./contexts/BookingContext"
+import { ListingPhotosProvider } from "./contexts/ListingPhotosContext"
 import { trackEvent } from "./utils/analytics"
 
 const Home = React.lazy(() => import("./pages/home/Home"))
@@ -116,9 +117,11 @@ function AppWrapper() {
 function App() {
   return (
     <BookingProvider>
-      <Router>
-        <AppWrapper />
-      </Router>
+      <ListingPhotosProvider>
+        <Router>
+          <AppWrapper />
+        </Router>
+      </ListingPhotosProvider>
     </BookingProvider>
   );
 }

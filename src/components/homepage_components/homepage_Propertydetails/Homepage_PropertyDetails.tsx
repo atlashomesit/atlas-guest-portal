@@ -1,5 +1,6 @@
 import React from 'react';
-import { Link, useLocation, useParams } from 'react-router-dom';import { FaBed, FaShower, FaSwimmingPool, FaCar, FaWifi, FaTv } from "react-icons/fa";
+import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
+import { FaBed, FaShower, FaSwimmingPool, FaCar, FaWifi, FaTv } from "react-icons/fa";
 import { TbAirConditioning } from "react-icons/tb";
 import { PiElevatorDuotone, PiCoatHangerLight } from "react-icons/pi";
 import { RiLuggageCartLine } from "react-icons/ri";
@@ -8,7 +9,8 @@ import { LiaNewspaper } from "react-icons/lia";
 import { MdOutlineEmojiFoodBeverage, MdOutlineLocalLaundryService, MdOutlineDone } from "react-icons/md";
 import { FaCcMastercard, FaLocationDot } from "react-icons/fa6";
 import { FaStar } from "react-icons/fa";
-import { X, ChevronRight } from 'lucide-react';import { useEffect, useMemo, useState } from 'react';
+import { X, ChevronRight, Clock, KeyRound } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { propertyData, propertyImages } from '../../../data.ts';
 import { getUnitPolicy } from '../../../config/policyConfig';
 import { inlinePolicySnippets } from '../../../content/terms';
@@ -19,7 +21,9 @@ import { Button } from '../../ui/Button';
 import { calculateNightlyPrice, inferUnitType } from '../../../utils/pricing';
 import { buildHomeUnitPath } from '../../../utils/navigation';
 import { useBooking } from '../../../contexts/BookingContext';
+import { useListingPhotosFromApi } from '../../../contexts/ListingPhotosContext';
 import { resolveListing } from '../../../utils/listingResolver';
+import { filterGuestImageUrls, sanitizeGuestImageUrl } from '../../../utils/guestImageUrl';
 import type { ListingDetail } from '../../../api/listingClient';
 import SEO from '../../SEO';
 
@@ -52,6 +56,140 @@ interface Property {
     property_reviews: number;
     property_review_snippets: string[];
     property_price: number;
+    timezoneId?: string;
+    photoCount?: number;
+}
+
+const PropertyDetails = () => {
+    const location = useLocation();
+    const { propertySlug: propertySlugParam, unitSlug: unitSlugParam, id: legacyIdParam } = useParams();
+
+    const normalizedLegacyParts = (legacyIdParam ?? '').split('-');
+    const legacyUnitSlug = normalizedLegacyParts.pop();
+    const legacyPropertySlug = normalizedLegacyParts.join('-') || undefined;
+    const propertySlug = propertySlugParam ?? legacyPropertySlug;
+    const listingIdParam = unitSlugParam ?? legacyUnitSlug ?? legacyIdParam;
+    const listingId = listingIdParam ? Number(listingIdParam) : NaN;
+    const [data, setData] = useState<Property | null>(null);
+    const [notFound, setNotFound] = useState(false);
+    const [listingPropertyId, setListingPropertyId] = useState<string | number | null>(null);
+    const [resolvedListingId, setResolvedListingId] = useState<string | number | null>(null);
+    const [, setListingLookupError] = useState<string | null>(null);
+    const [isListingLookupPending, setIsListingLookupPending] = useState(false);
+    const [showAmenitiesModal, setShowAmenitiesModal] = useState(false);
+    const [showAboutMore, setShowAboutMore] = useState(false);
+    const [showNeighborhoodMore, setShowNeighborhoodMore] = useState(false);
+    const unitType = inferUnitType({ id: data?.id, property_name: data?.property_name });
+    const { setProperty, updateBooking } = useBooking();
+    const { getUrlsForListingId } = useListingPhotosFromApi();
+    const [searchParams] = useSearchParams();
+    const showAvailabilityPlaceholder = false;
+
+    // Hydrate booking context from URL search params (passed from SearchPage)
+    useEffect(() => {
+        const checkIn = searchParams.get('checkIn');
+        const checkOut = searchParams.get('checkOut');
+        const guests = Number(searchParams.get('guests')) || null;
+        if (checkIn || checkOut || guests) {
+            updateBooking({
+                ...(checkIn ? { checkIn: new Date(checkIn).toISOString() } : {}),
+                ...(checkOut ? { checkOut: new Date(checkOut).toISOString() } : {}),
+                ...(guests ? { guests } : {}),
+            });
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+    const nightlyPrice = useMemo(() => {
+        if (!data) return null;
+        try {
+            return calculateNightlyPrice({
+                unitType,
+                checkInDate: new Date(),
+                guests: 2,
+            });
+        } catch {
+            return null;
+        }
+    }, [data, unitType]);
+
+    useEffect(() => {
+        const lookupId = data?.listingId ?? location.state?.property?.listingId ?? listingIdParam;
+
+        if (!lookupId) {
+            setListingPropertyId(null);
+            setResolvedListingId(null);
+            setListingLookupError('Availability temporarily unavailable.');
+            setIsListingLookupPending(false);
+            return;
+        }
+
+        const controller = new AbortController();
+        setListingPropertyId(null);
+        setResolvedListingId(null);
+        setListingLookupError(null);
+        setIsListingLookupPending(true);
+
+        const loadListing = async () => {
+            try {
+                const listing = await resolveListing(String(lookupId), controller.signal);
+                if (!listing) {
+                    setListingLookupError('Property not available.');
+                    return;
+                }
+                if (!listing.propertyId) {
+                    setListingLookupError('Availability temporarily unavailable.');
+                    return;
+                }
+                setListingPropertyId(listing.propertyId);
+                setResolvedListingId(listing.id);
+            } catch {
+                if (controller.signal.aborted) return;
+                setListingLookupError('Availability temporarily unavailable.');
+                // Fallback so booking widget still gets a listing ID from static data (e.g. when API tenant is misconfigured)
+                const fallbackId = data?.listingId;
+                if (typeof fallbackId === 'number' && Number.isFinite(fallbackId)) {
+                    setResolvedListingId(fallbackId);
+                }
+            } finally {
+                if (!controller.signal.aborted) {
+                    setIsListingLookupPending(false);
+                }
+            }
+        };
+
+        loadListing();
+
+        return () => {
+            controller.abort();
+        };
+    }, [data?.listingId, location.state, listingIdParam]);
+
+    useEffect(() => {
+        setNotFound(false);
+        setData(null);
+
+        if (listingIdParam && !Number.isNaN(listingId) && listingId <= 0) {
+            setNotFound(true);
+            return;
+        }
+
+        const normalizeSlug = (value?: string | number | null) =>
+            String(value ?? '')
+                .trim()
+                .toLowerCase()
+                .replace(/\s+/g, '-');
+
+        const stripHyphens = (value: string) => value.replace(/-/g, '');
+
+        const normalizedUnitSlug = normalizeSlug(listingIdParam);
+        const normalizedPropertySlug = normalizeSlug(propertySlug);
+        const normalizedPropertySlugStripped = stripHyphens(normalizedPropertySlug);
+
+        // 1) Match by listingId (PK from DB/API) — IDs 1–7 etc.
+        const foundByListingId = listingIdParam && Number.isFinite(listingId) && listingId > 0
+            ? propertyData.find((item: Property) => Number(item.listingId) === listingId)
+            : null;
+
         if (import.meta.env.DEV && listingIdParam) {
             // eslint-disable-next-line no-console
             console.debug('[PropertyDetails] route params:', { propertySlug, unitSlug: listingIdParam, listingId }, 'foundByListingId:', !!foundByListingId);
@@ -73,28 +211,35 @@ interface Property {
         });
 
         if (foundByUnitSlug) {
-            const images = propertyImages[String(foundByUnitSlug.id)] || [];
+            const lid = Number(foundByUnitSlug.listingId);
+            const apiUrls = getUrlsForListingId(Number.isFinite(lid) ? lid : undefined);
+            const staticImgs = propertyImages[String(foundByUnitSlug.id)] || [];
+            const images = filterGuestImageUrls(apiUrls && apiUrls.length > 0 ? apiUrls : staticImgs);
             setData({
                 ...foundByUnitSlug,
                 property_neighborhoods: Array.isArray(foundByUnitSlug.property_neighborhoods)
                     ? foundByUnitSlug.property_neighborhoods
                     : [],
-                property_img: Array.isArray(images) ? images : []
+                property_img: images
             });
             return;
         }
 
-        // If not found by slug, try to find by ID        const propertyId = normalizedUnitSlug || undefined;
+        // If not found by slug, try to find by ID (e.g. unitSlug "7" matches item.id 501)
+        const propertyId = normalizedUnitSlug || undefined;
         if (propertyId) {
             const foundById = propertyData.find((item: Property) => String(item.id) === String(propertyId));
             if (foundById) {
-                const images = propertyImages[String(foundById.id)] || [];
+                const lid = Number(foundById.listingId);
+                const apiUrls = getUrlsForListingId(Number.isFinite(lid) ? lid : undefined);
+                const staticImgs = propertyImages[String(foundById.id)] || [];
+                const images = filterGuestImageUrls(apiUrls && apiUrls.length > 0 ? apiUrls : staticImgs);
                 setData({
                     ...foundById,
                     property_neighborhoods: Array.isArray(foundById.property_neighborhoods)
                         ? foundById.property_neighborhoods
                         : [],
-                    property_img: Array.isArray(images) ? images : []
+                    property_img: images
                 });
                 return;
             }
@@ -102,19 +247,89 @@ interface Property {
         // If still not found, try to get from location state
         if (location.state?.property) {
             const prop = location.state.property;
-            const images = propertyImages[String(prop.id)] || [];
+            const navGallery = (location.state as { galleryImages?: string[] }).galleryImages;
+            const fromNav = Array.isArray(navGallery) && navGallery.length > 0 ? navGallery : undefined;
+            const lid = Number(prop.listingId);
+            const apiUrls = getUrlsForListingId(Number.isFinite(lid) ? lid : undefined);
+            const staticImgs = propertyImages[String(prop.id)] || [];
+            const images = filterGuestImageUrls(fromNav ?? (apiUrls && apiUrls.length > 0 ? apiUrls : staticImgs));
             setData({
                 ...prop,
                 property_neighborhoods: Array.isArray(prop.property_neighborhoods)
                     ? prop.property_neighborhoods
                     : [],
-                property_img: Array.isArray(images) ? images : []
+                property_img: images
             });
             return;
         }
-        
+
+        // API fallback: fetch from API when not in static data (handles DB IDs not in propertyData)
+        if (listingIdParam && (Number.isFinite(listingId) ? listingId > 0 : true)) {
+            if (import.meta.env.DEV) {
+                // eslint-disable-next-line no-console
+                console.debug('[PropertyDetails] API fallback for listingIdParam:', listingIdParam);
+            }
+            const controller = new AbortController();
+            let cancelled = false;
+            resolveListing(String(listingIdParam), controller.signal)
+                .then((apiListing: ListingDetail | null) => {
+                    if (cancelled || !apiListing) {
+                        if (import.meta.env.DEV && !cancelled) {
+                            // eslint-disable-next-line no-console
+                            console.debug('[PropertyDetails] API returned no listing for:', listingIdParam);
+                        }
+                        if (!cancelled) setNotFound(true);
+                        return;
+                    }
+                    const coverUrl = sanitizeGuestImageUrl(
+                        (apiListing as Record<string, unknown>).coverPhotoUrl as string | undefined,
+                    );
+                    const photoUrlsRaw = (apiListing as Record<string, unknown>).photoUrls;
+                    const photoUrlsList = filterGuestImageUrls(
+                        Array.isArray(photoUrlsRaw)
+                            ? [...new Set((photoUrlsRaw as string[]).filter(Boolean))]
+                            : [],
+                    );
+                    const photoCount = Number((apiListing as Record<string, unknown>).photoCount) || 0;
+                    const mapped: Property = {
+                        id: Number(apiListing.id) || listingId,
+                        listingId: Number(apiListing.id) || listingId,
+                        property_name: (apiListing.name as string) ?? `Listing ${apiListing.id}`,
+                        property_img: photoUrlsList.length > 0 ? photoUrlsList : (coverUrl ? [coverUrl] : []),
+                        property_location: (apiListing as Record<string, unknown>).property_location as string ?? 'Location not specified',
+                        property_neighborhoods: (apiListing as Record<string, unknown>).property_neighborhoods as string[] ?? [],
+                        property_amenities: (apiListing as Record<string, unknown>).property_amenities as PropertyAmenity[] ?? [],
+                        property_description: (apiListing as Record<string, unknown>).property_description as string ?? '',
+                        property_nearplaces: (apiListing as Record<string, unknown>).property_nearplaces as string[] ?? [],
+                        property_mapSrc: (apiListing as Record<string, unknown>).property_mapSrc as string ?? '',
+                        property_policy_details: (apiListing as Record<string, unknown>).property_policy_details as PropertyDetail[] ?? [],
+                        property_rating: Number((apiListing as Record<string, unknown>).property_rating) || 0,
+                        property_reviews: Number((apiListing as Record<string, unknown>).property_reviews) || 0,
+                        property_review_snippets: (apiListing as Record<string, unknown>).property_review_snippets as string[] ?? [],
+                        property_price: Number((apiListing as Record<string, unknown>).property_price) || 0,
+                        timezoneId: (apiListing as Record<string, unknown>).timezoneId as string | undefined,
+                        photoCount: photoCount || (coverUrl ? 1 : 0),
+                    };
+                    const fromApi =
+                        photoUrlsList.length > 0 ? photoUrlsList : (coverUrl ? [coverUrl] : []);
+                    const staticImages = propertyImages[String(mapped.id)] ?? propertyImages[String(apiListing.id)];
+                    const images = filterGuestImageUrls(
+                        fromApi.length > 0 ? fromApi : (staticImages ?? mapped.property_img ?? []),
+                    );
+                    setData({ ...mapped, property_img: images });
+                })
+                .catch(() => {
+                    if (!cancelled) setNotFound(true);
+                });
+            return () => {
+                cancelled = true;
+                controller.abort();
+            };
+        }
+
         setNotFound(true);
-    }, [propertySlug, listingIdParam, location.state]);useEffect(() => {
+    }, [propertySlug, listingIdParam, listingId, location.state, getUrlsForListingId]);
+useEffect(() => {
   if (!data?.id) return;
 
   setProperty(data.id, data.property_name); // ✅ use property_name
@@ -152,7 +367,8 @@ interface Property {
             },
             { listingId: data.listingId ?? data.id, unitCode: data.id, route: propertySlug && (data.listingId ?? listingId) ? buildHomeUnitPath(propertySlug, Number(data.listingId ?? listingId)) : location.pathname },
         );
-    }, [data, location.pathname, nightlyPrice?.finalNightlyPrice, propertySlug, listingIdParam]);
+    }, [data, location.pathname, nightlyPrice?.finalNightlyPrice, propertySlug, listingIdParam, listingId]);
+
     const renderIcon = (iconName: string) => {
         const name = iconName.toLowerCase();
         if (name.includes('bed')) return <FaBed />;
@@ -220,7 +436,52 @@ interface Property {
 
     const unitPolicy = getUnitPolicy(data?.id);
 
-    return (        <section className="w-full pt-28 md:pt-0 tracking-wide">
+    const pageUrl = typeof window !== 'undefined' ? window.location.href : '';
+    const galleryUrls = filterGuestImageUrls(data?.property_img ?? []);
+    const primaryImage = galleryUrls[0];
+
+    const propertyJsonLd = data ? {
+        "@context": "https://schema.org",
+        "@type": "LodgingBusiness",
+        name: data.property_name,
+        description: data.property_description?.slice(0, 300),
+        image: primaryImage,
+        url: pageUrl,
+        address: {
+            "@type": "PostalAddress",
+            addressLocality: data.property_location || "Hyderabad",
+            addressRegion: "Telangana",
+            addressCountry: "IN",
+        },
+        aggregateRating: data.property_rating ? {
+            "@type": "AggregateRating",
+            ratingValue: data.property_rating,
+            reviewCount: data.property_reviews || 0,
+        } : undefined,
+        ...(nightlyPrice?.finalNightlyPrice ? {
+            priceRange: `INR ${nightlyPrice.finalNightlyPrice}/night`,
+            makesOffer: {
+                "@type": "Offer",
+                priceCurrency: "INR",
+                price: nightlyPrice.finalNightlyPrice,
+                availability: "https://schema.org/InStock",
+            },
+        } : {}),
+    } : undefined;
+
+    return (
+        <>
+        {data && (
+            <SEO
+                title={`${data.property_name} | Atlas Homestays`}
+                description={data.property_description?.slice(0, 160) || `Book ${data.property_name} in ${data.property_location || 'Hyderabad'} on Atlas Homestays.`}
+                image={primaryImage}
+                url={pageUrl}
+                type="lodgingBusiness"
+                jsonLd={propertyJsonLd}
+            />
+        )}
+        <section className="w-full pt-28 md:pt-0 tracking-wide">
             <div className='pt-10 pl-32'>
                 <Subheading />
             </div>
@@ -262,57 +523,46 @@ interface Property {
                     </div>
                 </div>
 
-                {/* Image Gallery */}
-              {/* Image Gallery */}
+                {/* Image Gallery — Azure blob URLs are skipped (409); API/static must serve reachable images */}
 <div className="flex gap-2 h-64 md:h-96 lg:h-[450px] overflow-hidden ">
-  {/* Main image */}
-  <div className="flex-1 relative h-full">
-    <a href={(data?.id && propertyImages[data.id]?.[0]) || data?.property_img?.[0] || '#'} data-fancybox="property-gallery">
-      <img
-        src={(data?.id && propertyImages[String(data.id)]?.[0]) || data?.property_img?.[0] || ''}
-        alt="Main property"
-        loading="lazy"
-        decoding="async"
-        sizes="(min-width: 1024px) 50vw, 100vw"
-        className="w-full h-full object-cover rounded-md"
-        onError={(e) => {
-          const target = e.target as HTMLImageElement;
-          target.onerror = null;
-          target.src = data?.property_img?.[0] || '';
-        }}
-      />
-    </a>
+  <div className="flex-1 relative h-full rounded-md overflow-hidden bg-bg-muted">
+    {galleryUrls[0] ? (
+      <a href={galleryUrls[0]} data-fancybox="property-gallery">
+        <img
+          src={galleryUrls[0]}
+          alt="Main property"
+          loading="lazy"
+          decoding="async"
+          sizes="(min-width: 1024px) 50vw, 100vw"
+          className="w-full h-full object-cover"
+        />
+      </a>
+    ) : (
+      <div className="w-full h-full min-h-[16rem] bg-bg-muted bg-[linear-gradient(135deg,color-mix(in_srgb,var(--border-subtle)_55%,transparent)_0%,color-mix(in_srgb,var(--bg-muted)_92%,transparent)_100%)]" role="img" aria-label="No photos available" />
+    )}
   </div>
-  {/* Thumbnails */}
   <div className="flex-1 grid grid-cols-2 grid-rows-2 gap-2 h-full">
-    {((data?.id && propertyImages[data.id]?.slice(1, 5)) || data?.property_img?.slice(1, 5) || []).map((img: string, index: number) => (
-      <div key={index} className="relative w-full h-full">
-        <a href={img || '#'} data-fancybox="property-gallery">
+    {galleryUrls.slice(1, 5).map((img: string, index: number) => (
+      <div key={`${img}-${index}`} className="relative w-full h-full rounded-md overflow-hidden">
+        <a href={img} data-fancybox="property-gallery">
           <img
-            src={img || ''}
+            src={img}
             alt={`Thumbnail ${index + 1}`}
             loading="lazy"
             decoding="async"
             sizes="(min-width: 1024px) 25vw, 50vw"
-            className="w-full h-full object-cover rounded-md hover:opacity-80 transition"
-            onError={(e) => {
-              const target = e.target as HTMLImageElement;
-              target.onerror = null;
-              target.src = data?.property_img?.[index + 1] || '';
-            }}
+            className="w-full h-full object-cover hover:opacity-80 transition"
           />
         </a>
-
-        {/* Show "View photos" button only on the 4th thumbnail */}
-        {index === 3 && (
+        {index === 3 && galleryUrls.length > 0 && (
           <button
+            type="button"
             onClick={() => {
-              const images = (data?.id && propertyImages[String(data.id)]) || data?.property_img || [];
               Fancybox.show(
-                images.map((img: string) => ({
-                  src: img,
+                galleryUrls.map((u: string) => ({
+                  src: u,
                   type: "image",
-                }))
+                })),
               );
             }}
             className="absolute bottom-2 right-2 bg-[color:color-mix(in_srgb,var(--text-primary)_65%,transparent)] text-[var(--text-contrast)] text-xs md:text-sm px-3 py-1 rounded-full flex items-center gap-2 hover:bg-[color:color-mix(in_srgb,var(--text-primary)_80%,transparent)] transition"
@@ -328,6 +578,102 @@ interface Property {
                 <div className='flex flex-col gap-4 sm:flex-row '>
                     {/* Left div  */}
                     <div className="w-full sm:w-2/3">
+                        {/* What this place offers */}
+                        <div className="pb-8 border-b border-border-subtle">
+                            <h2 className="text-xl sm:text-2xl font-semibold mb-6 text-text-primary">What this place offers</h2>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                {(data?.property_amenities || []).length > 0 ? (
+                                    (data?.property_amenities || []).slice(0, 9).map((amenity, idx) => (
+                                        <div key={idx} className="flex flex-col items-center gap-2 p-3 rounded-xl bg-bg-muted border border-border-subtle text-center">
+                                            <span className="text-2xl text-accent-primary">
+                                                {renderIcon(amenity?.amenities_icon || '')}
+                                            </span>
+                                            <span className="text-xs font-medium text-text-primary">
+                                                {amenity?.amenities_icon ? formatAmenityName(amenity.amenities_icon) : 'Amenity'}
+                                            </span>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <p className="text-text-muted">No amenities listed</p>
+                                )}
+                            </div>
+                            <Button
+                                variant="secondary"
+                                onClick={() => setShowAmenitiesModal(true)}
+                                className="mt-6"
+                            >
+                                Show All Amenities
+                            </Button>
+                        </div>
+
+                        {/* Policies Section */}
+                        {data?.property_policy_details && (
+                            <div className="border border-border-subtle rounded-lg overflow-hidden shadow-level1 bg-bg-surface">
+                                <div className="bg-bg-surface p-6">
+                                    <h2 className="text-xl sm:text-2xl font-semibold mb-6 text-text-primary">Things to know</h2>
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
+                                        <div className="p-4 border border-border-subtle rounded-lg bg-bg-muted">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <Clock className="w-4 h-4 text-accent-primary" />
+                                                <p className="text-text-muted text-sm">Check-in / Check-out</p>
+                                            </div>
+                                            <p className="font-medium text-text-primary">
+                                                Check-in {unitPolicy?.checkIn || '2:00 PM'} · Check-out {unitPolicy?.checkOut || '11:00 AM'}
+                                            </p>
+                                            <a className="text-sm text-accent-primary underline" href="/terms#check-in-check-out">View terms</a>
+                                        </div>
+                                        <div className="p-4 border border-border-subtle rounded-lg bg-bg-muted">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <KeyRound className="w-4 h-4 text-accent-primary" />
+                                                <p className="text-text-muted text-sm">Key policies</p>
+                                            </div>
+                                            <p className="font-medium text-text-primary">
+                                                {inlinePolicySnippets?.cancellation || 'Flexible cancellation policy'}
+                                            </p>
+                                            <p className="text-text-primary mt-2 text-sm">
+                                                {inlinePolicySnippets?.houseRules || 'Standard house rules apply'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
+                                        {(data?.property_policy_details || [])
+                                            .filter((policy: PropertyDetail) => policy?.type && !policy.type.includes('Policy') && !policy.type.includes('Detailed'))
+                                            .map((policy: PropertyDetail, idx: number) => (
+                                                <div key={idx}>
+                                                    <p className="text-text-muted text-sm mb-1">{policy.type}</p>
+                                                    <p className="font-medium text-text-primary">{policy.value}</p>
+                                                </div>
+                                            ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Guest Reviews Summary */}
+                        {data?.property_reviews > 0 && (
+                            <div className="pb-8 border-b border-border-subtle">
+                                <h2 className="text-xl sm:text-2xl font-semibold mb-4 text-text-primary">Guest Reviews</h2>
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="flex items-center gap-1 text-accent-primary">
+                                        {Array.from({ length: 5 }).map((_, i) => (
+                                            <FaStar key={i} className={i < Math.round(data.property_rating) ? 'text-accent-primary' : 'text-border-subtle'} />
+                                        ))}
+                                    </div>
+                                    <span className="font-semibold text-text-primary">{data.property_rating.toFixed(1)}</span>
+                                    <span className="text-text-muted text-sm">({data.property_reviews} reviews)</span>
+                                </div>
+                                {data.property_review_snippets && data.property_review_snippets.length > 0 && (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        {data.property_review_snippets.slice(0, 4).map((snippet: string, idx: number) => (
+                                            <div key={idx} className="p-4 rounded-xl bg-bg-muted border border-border-subtle">
+                                                <p className="text-sm text-text-muted italic">"{snippet}"</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         {/* About this place */}
                         <div className="pb-8 border-b border-border-subtle">
                             <h2 className="text-xl sm:text-2xl font-semibold mb-4 text-text-primary">About this place</h2>
@@ -348,7 +694,68 @@ interface Property {
                             </button>
                         </div>
 
+                        {/* Location Map */}
+                        <div className="">
+                            <h2 className="text-xl sm:text-2xl font-semibold mb-4 text-text-primary">Where you'll be</h2>
+                            <div className="rounded-lg overflow-hidden border border-border-subtle">
+                                <iframe
+                                    src={data?.property_mapSrc || ''}
+                                    className="w-full h-64 sm:h-96"
+                                    loading="lazy"
+                                    allowFullScreen
+                                    referrerPolicy="no-referrer-when-downgrade"
+                                    title="Property Location"
+                                ></iframe>
+                            </div>
+                            <p className="mt-4 text-text-muted text-sm sm:text-base">
+                                {data?.property_location || 'Location information not available'}
+                            </p>
+                        </div>
+
+                        {/* About neighborhood */}
+                        <div className="pb-8 border-b border-border-subtle">
+                            <h2 className="text-xl sm:text-2xl font-semibold mb-4 text-text-primary">About neighborhood</h2>
+                            <p className="text-text-muted leading-relaxed mb-2">
+                                Location & Neighborhood Located in {data?.property_location || 'this area'}, this property offers easy access to major attractions and landmarks in the area.
+                            </p>
+                            {showNeighborhoodMore && (data?.property_nearplaces || []).length > 0 && (
+                                <div className="text-text-muted leading-relaxed mt-3">
+                                    <p className="mb-2 font-medium text-text-primary">Nearby places include:</p>
+                                    <ul className="list-disc list-inside space-y-1 ml-2">
+                                        {(data?.property_nearplaces || []).slice(0, 10).map((place: string, idx: number) => (
+                                            <li key={`place-${idx}`}>{place}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+                            <button
+                                onClick={() => setShowNeighborhoodMore(!showNeighborhoodMore)}
+                                className="flex items-center mt-3 font-semibold underline hover:text-text-primary transition"
+                            >
+                                Show {showNeighborhoodMore ? 'Less' : 'More'}
+                                <ChevronRight className={`ml-1 w-4 h-4 transition-transform ${showNeighborhoodMore ? 'rotate-90' : ''}`} />
+                            </button>
+                        </div>
+                    </div>
+                    {/* right div  */}
+                    <div className="w-full sm:w-1/3">
+                        {!data ? (
+                            <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6">
+                                <h3 className="text-lg font-semibold text-text-primary">Loading property details...</h3>
+                            </div>
+                        ) : (
+                            <>
+                                {/* Desktop View */}
+                                <div className='sticky top-16'>
+                                    {data?.photoCount != null && data.photoCount > 0 && (
+                                        <p className="text-sm text-text-muted mb-2" aria-label="Photo count">{data.photoCount} photo{data.photoCount !== 1 ? 's' : ''}</p>
+                                    )}
+                                    <UnitBookingWidget 
+                                        listingId={resolvedListingId ?? undefined}
+                                        propertyId={listingPropertyId ?? undefined}
+                                        listingName={data?.property_name || 'This property'}
                                         timezoneId={data?.timezoneId}
+                                        coverPhotoUrl={primaryImage}
                                     />
                                     {showAvailabilityPlaceholder && (
                                         <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6">
@@ -428,3 +835,33 @@ interface Property {
                 )}
             </div>
         </section>
+
+        {/* Mobile fixed Reserve CTA - visible only below md breakpoint */}
+        {data && (
+          <div
+            className="fixed bottom-0 inset-x-0 z-30 flex items-center justify-between border-t border-border-subtle bg-bg-surface px-4 py-3 shadow-level2 md:hidden"
+            data-testid="mobile-reserve-bar"
+          >
+            <div>
+              <span className="text-base font-bold text-text-primary">
+                {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(nightlyPrice.finalNightlyPrice)}
+              </span>
+              <span className="text-xs text-text-muted"> / night</span>
+            </div>
+            <button
+              type="button"
+              className="rounded-xl bg-cta-primary px-6 py-2.5 text-sm font-semibold text-white shadow-sm"
+              onClick={() => {
+                const widget = document.querySelector('[data-testid="booking-name"]');
+                widget?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }}
+            >
+              Reserve
+            </button>
+          </div>
+        )}
+        </>
+    );
+};
+
+export default PropertyDetails;

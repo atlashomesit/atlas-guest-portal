@@ -6,7 +6,7 @@ import {
   secondaryBannerDefaults,
 } from "../../config/homepageUxFlags";
 
-const parallaxImage = 'https://atlashomestorage.blob.core.windows.net/listing-images/301/img_1.jpg';
+const parallaxImage = "";
 
 const BannerSecondary = () => {
   if (enableSecondaryBannerRemoved) {

@@ -46,3 +46,36 @@ const bootstrapApp = async () => {
       }
     }
 
+    const tenantSlug = getTenantSlug({ fallbackSlug: config.tenantKey });
+    if (tenantSlug) {
+      try {
+        await validateTenant(tenantSlug);
+      } catch (e) {
+        if (import.meta.env.DEV) {
+          console.warn('[Atlas] Tenant validation failed (dev — continuing):', e);
+        } else {
+          throw e;
+        }
+      }
+    } else if (!import.meta.env.DEV) {
+      throw new Error('Tenant "tenantKey" not found. Check /.well-known/atlas-runtime-config.json and set tenantKey (or ATLAS_TENANT_KEY in Cloudflare Pages env).');
+    }
+
+    root.render(
+      <StrictMode>
+        <ThemeProvider initialTheme={DEFAULT_THEME}>
+          <ErrorBoundary name="app-shell">
+            <ApiConfigGuard>
+              <App />
+            </ApiConfigGuard>
+          </ErrorBoundary>
+        </ThemeProvider>
+      </StrictMode>,
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Runtime config missing/invalid'
+    root.render(<ConfigErrorScreen message={message} />);
+  }
+};
+
+bootstrapApp();
