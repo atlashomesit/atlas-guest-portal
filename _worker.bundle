@@ -1,9 +1,9 @@
-------formdata-undici-048091470020
+------formdata-undici-090633554378
 Content-Disposition: form-data; name="metadata"
 
-{"main_module":"functionsWorker-0.6684559907419856.js"}
-------formdata-undici-048091470020
-Content-Disposition: form-data; name="functionsWorker-0.6684559907419856.js"; filename="functionsWorker-0.6684559907419856.js"
+{"main_module":"functionsWorker-0.05577400725744952.js"}
+------formdata-undici-090633554378
+Content-Disposition: form-data; name="functionsWorker-0.05577400725744952.js"; filename="functionsWorker-0.05577400725744952.js"
 Content-Type: application/javascript+module
 
 var __defProp = Object.defineProperty;
@@ -13,21 +13,437 @@ var __esm = (fn, res) => function __init() {
   return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
 };
 
-// ../src/lib/email/emailService.ts
-async function sendEmail(_payload) {
-  return { provider: "stub", simulated: true };
-}
-async function getEmailHealthSnapshot() {
-  return [{ healthy: true }];
-}
-async function sendEmailCanary() {
-}
-var init_emailService = __esm({
-  "../src/lib/email/emailService.ts"() {
-    init_functionsRoutes_0_17599576463241506();
-    __name(sendEmail, "sendEmail");
-    __name(getEmailHealthSnapshot, "getEmailHealthSnapshot");
-    __name(sendEmailCanary, "sendEmailCanary");
+// ../node_modules/@emailjs/browser/es/models/EmailJSResponseStatus.js
+var EmailJSResponseStatus;
+var init_EmailJSResponseStatus = __esm({
+  "../node_modules/@emailjs/browser/es/models/EmailJSResponseStatus.js"() {
+    init_functionsRoutes_0_6247235866690797();
+    EmailJSResponseStatus = class {
+      constructor(_status = 0, _text = "Network Error") {
+        this.status = _status;
+        this.text = _text;
+      }
+    };
+    __name(EmailJSResponseStatus, "EmailJSResponseStatus");
+  }
+});
+
+// ../node_modules/@emailjs/browser/es/utils/createWebStorage/createWebStorage.js
+var createWebStorage;
+var init_createWebStorage = __esm({
+  "../node_modules/@emailjs/browser/es/utils/createWebStorage/createWebStorage.js"() {
+    init_functionsRoutes_0_6247235866690797();
+    createWebStorage = /* @__PURE__ */ __name(() => {
+      if (typeof localStorage === "undefined")
+        return;
+      return {
+        get: (key) => Promise.resolve(localStorage.getItem(key)),
+        set: (key, value) => Promise.resolve(localStorage.setItem(key, value)),
+        remove: (key) => Promise.resolve(localStorage.removeItem(key))
+      };
+    }, "createWebStorage");
+  }
+});
+
+// ../node_modules/@emailjs/browser/es/store/store.js
+var store;
+var init_store = __esm({
+  "../node_modules/@emailjs/browser/es/store/store.js"() {
+    init_functionsRoutes_0_6247235866690797();
+    init_createWebStorage();
+    store = {
+      origin: "https://api.emailjs.com",
+      blockHeadless: false,
+      storageProvider: createWebStorage()
+    };
+  }
+});
+
+// ../node_modules/@emailjs/browser/es/utils/buildOptions/buildOptions.js
+var buildOptions;
+var init_buildOptions = __esm({
+  "../node_modules/@emailjs/browser/es/utils/buildOptions/buildOptions.js"() {
+    init_functionsRoutes_0_6247235866690797();
+    buildOptions = /* @__PURE__ */ __name((options) => {
+      if (!options)
+        return {};
+      if (typeof options === "string") {
+        return {
+          publicKey: options
+        };
+      }
+      if (options.toString() === "[object Object]") {
+        return options;
+      }
+      return {};
+    }, "buildOptions");
+  }
+});
+
+// ../node_modules/@emailjs/browser/es/methods/init/init.js
+var init;
+var init_init = __esm({
+  "../node_modules/@emailjs/browser/es/methods/init/init.js"() {
+    init_functionsRoutes_0_6247235866690797();
+    init_store();
+    init_buildOptions();
+    init = /* @__PURE__ */ __name((options, origin = "https://api.emailjs.com") => {
+      if (!options)
+        return;
+      const opts = buildOptions(options);
+      store.publicKey = opts.publicKey;
+      store.blockHeadless = opts.blockHeadless;
+      store.storageProvider = opts.storageProvider;
+      store.blockList = opts.blockList;
+      store.limitRate = opts.limitRate;
+      store.origin = opts.origin || origin;
+    }, "init");
+  }
+});
+
+// ../node_modules/@emailjs/browser/es/api/sendPost.js
+var sendPost;
+var init_sendPost = __esm({
+  "../node_modules/@emailjs/browser/es/api/sendPost.js"() {
+    init_functionsRoutes_0_6247235866690797();
+    init_EmailJSResponseStatus();
+    init_store();
+    sendPost = /* @__PURE__ */ __name(async (url, data, headers = {}) => {
+      const response = await fetch(store.origin + url, {
+        method: "POST",
+        headers,
+        body: data
+      });
+      const message = await response.text();
+      const responseStatus = new EmailJSResponseStatus(response.status, message);
+      if (response.ok) {
+        return responseStatus;
+      }
+      throw responseStatus;
+    }, "sendPost");
+  }
+});
+
+// ../node_modules/@emailjs/browser/es/utils/validateParams/validateParams.js
+var validateParams;
+var init_validateParams = __esm({
+  "../node_modules/@emailjs/browser/es/utils/validateParams/validateParams.js"() {
+    init_functionsRoutes_0_6247235866690797();
+    validateParams = /* @__PURE__ */ __name((publicKey, serviceID, templateID) => {
+      if (!publicKey || typeof publicKey !== "string") {
+        throw "The public key is required. Visit https://dashboard.emailjs.com/admin/account";
+      }
+      if (!serviceID || typeof serviceID !== "string") {
+        throw "The service ID is required. Visit https://dashboard.emailjs.com/admin";
+      }
+      if (!templateID || typeof templateID !== "string") {
+        throw "The template ID is required. Visit https://dashboard.emailjs.com/admin/templates";
+      }
+    }, "validateParams");
+  }
+});
+
+// ../node_modules/@emailjs/browser/es/utils/validateTemplateParams/validateTemplateParams.js
+var validateTemplateParams;
+var init_validateTemplateParams = __esm({
+  "../node_modules/@emailjs/browser/es/utils/validateTemplateParams/validateTemplateParams.js"() {
+    init_functionsRoutes_0_6247235866690797();
+    validateTemplateParams = /* @__PURE__ */ __name((templateParams) => {
+      if (templateParams && templateParams.toString() !== "[object Object]") {
+        throw "The template params have to be the object. Visit https://www.emailjs.com/docs/sdk/send/";
+      }
+    }, "validateTemplateParams");
+  }
+});
+
+// ../node_modules/@emailjs/browser/es/utils/isHeadless/isHeadless.js
+var isHeadless;
+var init_isHeadless = __esm({
+  "../node_modules/@emailjs/browser/es/utils/isHeadless/isHeadless.js"() {
+    init_functionsRoutes_0_6247235866690797();
+    isHeadless = /* @__PURE__ */ __name((navigator2) => {
+      return navigator2.webdriver || !navigator2.languages || navigator2.languages.length === 0;
+    }, "isHeadless");
+  }
+});
+
+// ../node_modules/@emailjs/browser/es/errors/headlessError/headlessError.js
+var headlessError;
+var init_headlessError = __esm({
+  "../node_modules/@emailjs/browser/es/errors/headlessError/headlessError.js"() {
+    init_functionsRoutes_0_6247235866690797();
+    init_EmailJSResponseStatus();
+    headlessError = /* @__PURE__ */ __name(() => {
+      return new EmailJSResponseStatus(451, "Unavailable For Headless Browser");
+    }, "headlessError");
+  }
+});
+
+// ../node_modules/@emailjs/browser/es/utils/validateBlockListParams/validateBlockListParams.js
+var validateBlockListParams;
+var init_validateBlockListParams = __esm({
+  "../node_modules/@emailjs/browser/es/utils/validateBlockListParams/validateBlockListParams.js"() {
+    init_functionsRoutes_0_6247235866690797();
+    validateBlockListParams = /* @__PURE__ */ __name((list, watchVariable) => {
+      if (!Array.isArray(list)) {
+        throw "The BlockList list has to be an array";
+      }
+      if (typeof watchVariable !== "string") {
+        throw "The BlockList watchVariable has to be a string";
+      }
+    }, "validateBlockListParams");
+  }
+});
+
+// ../node_modules/@emailjs/browser/es/utils/isBlockedValueInParams/isBlockedValueInParams.js
+var isBlockListDisabled, getValue, isBlockedValueInParams;
+var init_isBlockedValueInParams = __esm({
+  "../node_modules/@emailjs/browser/es/utils/isBlockedValueInParams/isBlockedValueInParams.js"() {
+    init_functionsRoutes_0_6247235866690797();
+    init_validateBlockListParams();
+    isBlockListDisabled = /* @__PURE__ */ __name((options) => {
+      return !options.list?.length || !options.watchVariable;
+    }, "isBlockListDisabled");
+    getValue = /* @__PURE__ */ __name((data, name) => {
+      return data instanceof FormData ? data.get(name) : data[name];
+    }, "getValue");
+    isBlockedValueInParams = /* @__PURE__ */ __name((options, params) => {
+      if (isBlockListDisabled(options))
+        return false;
+      validateBlockListParams(options.list, options.watchVariable);
+      const value = getValue(params, options.watchVariable);
+      if (typeof value !== "string")
+        return false;
+      return options.list.includes(value);
+    }, "isBlockedValueInParams");
+  }
+});
+
+// ../node_modules/@emailjs/browser/es/errors/blockedEmailError/blockedEmailError.js
+var blockedEmailError;
+var init_blockedEmailError = __esm({
+  "../node_modules/@emailjs/browser/es/errors/blockedEmailError/blockedEmailError.js"() {
+    init_functionsRoutes_0_6247235866690797();
+    init_EmailJSResponseStatus();
+    blockedEmailError = /* @__PURE__ */ __name(() => {
+      return new EmailJSResponseStatus(403, "Forbidden");
+    }, "blockedEmailError");
+  }
+});
+
+// ../node_modules/@emailjs/browser/es/utils/validateLimitRateParams/validateLimitRateParams.js
+var validateLimitRateParams;
+var init_validateLimitRateParams = __esm({
+  "../node_modules/@emailjs/browser/es/utils/validateLimitRateParams/validateLimitRateParams.js"() {
+    init_functionsRoutes_0_6247235866690797();
+    validateLimitRateParams = /* @__PURE__ */ __name((throttle, id) => {
+      if (typeof throttle !== "number" || throttle < 0) {
+        throw "The LimitRate throttle has to be a positive number";
+      }
+      if (id && typeof id !== "string") {
+        throw "The LimitRate ID has to be a non-empty string";
+      }
+    }, "validateLimitRateParams");
+  }
+});
+
+// ../node_modules/@emailjs/browser/es/utils/isLimitRateHit/isLimitRateHit.js
+var getLeftTime, isLimitRateHit;
+var init_isLimitRateHit = __esm({
+  "../node_modules/@emailjs/browser/es/utils/isLimitRateHit/isLimitRateHit.js"() {
+    init_functionsRoutes_0_6247235866690797();
+    init_validateLimitRateParams();
+    getLeftTime = /* @__PURE__ */ __name(async (id, throttle, storage) => {
+      const lastTime = Number(await storage.get(id) || 0);
+      return throttle - Date.now() + lastTime;
+    }, "getLeftTime");
+    isLimitRateHit = /* @__PURE__ */ __name(async (defaultID, options, storage) => {
+      if (!options.throttle || !storage) {
+        return false;
+      }
+      validateLimitRateParams(options.throttle, options.id);
+      const id = options.id || defaultID;
+      const leftTime = await getLeftTime(id, options.throttle, storage);
+      if (leftTime > 0) {
+        return true;
+      }
+      await storage.set(id, Date.now().toString());
+      return false;
+    }, "isLimitRateHit");
+  }
+});
+
+// ../node_modules/@emailjs/browser/es/errors/limitRateError/limitRateError.js
+var limitRateError;
+var init_limitRateError = __esm({
+  "../node_modules/@emailjs/browser/es/errors/limitRateError/limitRateError.js"() {
+    init_functionsRoutes_0_6247235866690797();
+    init_EmailJSResponseStatus();
+    limitRateError = /* @__PURE__ */ __name(() => {
+      return new EmailJSResponseStatus(429, "Too Many Requests");
+    }, "limitRateError");
+  }
+});
+
+// ../node_modules/@emailjs/browser/es/methods/send/send.js
+var send;
+var init_send = __esm({
+  "../node_modules/@emailjs/browser/es/methods/send/send.js"() {
+    init_functionsRoutes_0_6247235866690797();
+    init_store();
+    init_sendPost();
+    init_buildOptions();
+    init_validateParams();
+    init_validateTemplateParams();
+    init_isHeadless();
+    init_headlessError();
+    init_isBlockedValueInParams();
+    init_blockedEmailError();
+    init_isLimitRateHit();
+    init_limitRateError();
+    send = /* @__PURE__ */ __name(async (serviceID, templateID, templateParams, options) => {
+      const opts = buildOptions(options);
+      const publicKey = opts.publicKey || store.publicKey;
+      const blockHeadless = opts.blockHeadless || store.blockHeadless;
+      const storageProvider = opts.storageProvider || store.storageProvider;
+      const blockList = { ...store.blockList, ...opts.blockList };
+      const limitRate = { ...store.limitRate, ...opts.limitRate };
+      if (blockHeadless && isHeadless(navigator)) {
+        return Promise.reject(headlessError());
+      }
+      validateParams(publicKey, serviceID, templateID);
+      validateTemplateParams(templateParams);
+      if (templateParams && isBlockedValueInParams(blockList, templateParams)) {
+        return Promise.reject(blockedEmailError());
+      }
+      if (await isLimitRateHit(location.pathname, limitRate, storageProvider)) {
+        return Promise.reject(limitRateError());
+      }
+      const params = {
+        lib_version: "4.4.1",
+        user_id: publicKey,
+        service_id: serviceID,
+        template_id: templateID,
+        template_params: templateParams
+      };
+      return sendPost("/api/v1.0/email/send", JSON.stringify(params), {
+        "Content-type": "application/json"
+      });
+    }, "send");
+  }
+});
+
+// ../node_modules/@emailjs/browser/es/utils/validateForm/validateForm.js
+var validateForm;
+var init_validateForm = __esm({
+  "../node_modules/@emailjs/browser/es/utils/validateForm/validateForm.js"() {
+    init_functionsRoutes_0_6247235866690797();
+    validateForm = /* @__PURE__ */ __name((form) => {
+      if (!form || form.nodeName !== "FORM") {
+        throw "The 3rd parameter is expected to be the HTML form element or the style selector of the form";
+      }
+    }, "validateForm");
+  }
+});
+
+// ../node_modules/@emailjs/browser/es/methods/sendForm/sendForm.js
+var findHTMLForm, sendForm;
+var init_sendForm = __esm({
+  "../node_modules/@emailjs/browser/es/methods/sendForm/sendForm.js"() {
+    init_functionsRoutes_0_6247235866690797();
+    init_store();
+    init_sendPost();
+    init_buildOptions();
+    init_validateForm();
+    init_validateParams();
+    init_isHeadless();
+    init_headlessError();
+    init_isBlockedValueInParams();
+    init_blockedEmailError();
+    init_isLimitRateHit();
+    init_limitRateError();
+    findHTMLForm = /* @__PURE__ */ __name((form) => {
+      return typeof form === "string" ? document.querySelector(form) : form;
+    }, "findHTMLForm");
+    sendForm = /* @__PURE__ */ __name(async (serviceID, templateID, form, options) => {
+      const opts = buildOptions(options);
+      const publicKey = opts.publicKey || store.publicKey;
+      const blockHeadless = opts.blockHeadless || store.blockHeadless;
+      const storageProvider = store.storageProvider || opts.storageProvider;
+      const blockList = { ...store.blockList, ...opts.blockList };
+      const limitRate = { ...store.limitRate, ...opts.limitRate };
+      if (blockHeadless && isHeadless(navigator)) {
+        return Promise.reject(headlessError());
+      }
+      const currentForm = findHTMLForm(form);
+      validateParams(publicKey, serviceID, templateID);
+      validateForm(currentForm);
+      const formData = new FormData(currentForm);
+      if (isBlockedValueInParams(blockList, formData)) {
+        return Promise.reject(blockedEmailError());
+      }
+      if (await isLimitRateHit(location.pathname, limitRate, storageProvider)) {
+        return Promise.reject(limitRateError());
+      }
+      formData.append("lib_version", "4.4.1");
+      formData.append("service_id", serviceID);
+      formData.append("template_id", templateID);
+      formData.append("user_id", publicKey);
+      return sendPost("/api/v1.0/email/send-form", formData);
+    }, "sendForm");
+  }
+});
+
+// ../node_modules/@emailjs/browser/es/index.js
+var es_default;
+var init_es = __esm({
+  "../node_modules/@emailjs/browser/es/index.js"() {
+    init_functionsRoutes_0_6247235866690797();
+    init_EmailJSResponseStatus();
+    init_init();
+    init_send();
+    init_sendForm();
+    es_default = {
+      init,
+      send,
+      sendForm,
+      EmailJSResponseStatus
+    };
+  }
+});
+
+// ../src/utils/emailjsConfig.ts
+var trimmed, readEnvValue, rawConfig, requiredEnvKeys, emailJsConfig, getMissingEmailJsEnvKeys, isEmailJsConfigured;
+var init_emailjsConfig = __esm({
+  "../src/utils/emailjsConfig.ts"() {
+    init_functionsRoutes_0_6247235866690797();
+    trimmed = /* @__PURE__ */ __name((value) => value?.trim(), "trimmed");
+    readEnvValue = /* @__PURE__ */ __name((key) => {
+      if (typeof import.meta !== "undefined" && typeof import.meta.env !== "undefined") {
+        const value = import.meta.env[key];
+        if (value)
+          return value;
+      }
+      if (typeof process !== "undefined" && typeof process.env !== "undefined") {
+        return process.env[key];
+      }
+      return void 0;
+    }, "readEnvValue");
+    rawConfig = {
+      serviceId: trimmed(readEnvValue("VITE_EMAILJS_SERVICE_ID")),
+      templateId: trimmed(readEnvValue("VITE_EMAILJS_TEMPLATE_ID")),
+      publicKey: trimmed(readEnvValue("VITE_EMAILJS_PUBLIC_KEY")),
+      ownerEmail: trimmed(readEnvValue("VITE_OWNER_EMAIL"))
+    };
+    requiredEnvKeys = {
+      VITE_EMAILJS_SERVICE_ID: rawConfig.serviceId,
+      VITE_EMAILJS_TEMPLATE_ID: rawConfig.templateId,
+      VITE_EMAILJS_PUBLIC_KEY: rawConfig.publicKey,
+      VITE_OWNER_EMAIL: rawConfig.ownerEmail
+    };
+    emailJsConfig = rawConfig;
+    getMissingEmailJsEnvKeys = /* @__PURE__ */ __name(() => Object.entries(requiredEnvKeys).filter(([, value]) => !value).map(([key]) => key), "getMissingEmailJsEnvKeys");
+    isEmailJsConfigured = /* @__PURE__ */ __name(() => getMissingEmailJsEnvKeys().length === 0, "isEmailJsConfigured");
   }
 });
 
@@ -35,7 +451,7 @@ var init_emailService = __esm({
 var breadcrumbs, monitoringState, toSafeString, createEventId, mapBreadcrumbs, sendToSentry, normalizeError, buildPayload, reportError;
 var init_monitoring = __esm({
   "../src/lib/monitoring.ts"() {
-    init_functionsRoutes_0_17599576463241506();
+    init_functionsRoutes_0_6247235866690797();
     breadcrumbs = [];
     monitoringState = {
       initialized: false,
@@ -120,20 +536,149 @@ var init_monitoring = __esm({
   }
 });
 
+// ../src/lib/email/emailService.ts
+var delay, DEFAULT_MAX_ATTEMPTS, DEFAULT_BASE_DELAY_MS, logStructuredError, attemptWithRetry, emailJsProvider, consoleProvider, providers, sendEmail, getEmailHealthSnapshot, sendEmailCanary;
+var init_emailService = __esm({
+  "../src/lib/email/emailService.ts"() {
+    init_functionsRoutes_0_6247235866690797();
+    init_es();
+    init_emailjsConfig();
+    init_monitoring();
+    delay = /* @__PURE__ */ __name((ms) => new Promise((resolve) => setTimeout(resolve, ms)), "delay");
+    DEFAULT_MAX_ATTEMPTS = 3;
+    DEFAULT_BASE_DELAY_MS = 500;
+    logStructuredError = /* @__PURE__ */ __name((error, provider, stage, extra) => {
+      reportError(error, {
+        tags: { area: "email-service", provider, stage },
+        ...extra
+      });
+    }, "logStructuredError");
+    attemptWithRetry = /* @__PURE__ */ __name(async (operation, provider, stage) => {
+      let attempt = 0;
+      let lastError;
+      while (attempt < DEFAULT_MAX_ATTEMPTS) {
+        try {
+          return await operation();
+        } catch (error) {
+          lastError = error;
+          attempt += 1;
+          logStructuredError(error, provider, stage, { attempt });
+          if (attempt >= DEFAULT_MAX_ATTEMPTS)
+            break;
+          await delay(DEFAULT_BASE_DELAY_MS * 2 ** (attempt - 1));
+        }
+      }
+      throw lastError instanceof Error ? lastError : new Error(String(lastError));
+    }, "attemptWithRetry");
+    emailJsProvider = {
+      name: "emailjs",
+      validateCredentials: () => getMissingEmailJsEnvKeys(),
+      checkConnectivity: async () => {
+        if (!isEmailJsConfigured())
+          return false;
+        try {
+          const response = await fetch("https://api.emailjs.com/api/v1.0/ping", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ publicKey: emailJsConfig.publicKey })
+          });
+          return response.ok;
+        } catch (error) {
+          logStructuredError(error, "emailjs", "connectivity-check");
+          return false;
+        }
+      },
+      send: async (payload) => {
+        await es_default.send(
+          emailJsConfig.serviceId,
+          emailJsConfig.templateId,
+          payload,
+          { publicKey: emailJsConfig.publicKey }
+        );
+      }
+    };
+    consoleProvider = {
+      name: "console-fallback",
+      validateCredentials: () => [],
+      checkConnectivity: async () => true,
+      send: async (payload) => {
+        console.info("[email fallback] delivering message locally", payload);
+      }
+    };
+    providers = [emailJsProvider, consoleProvider];
+    sendEmail = /* @__PURE__ */ __name(async (payload) => {
+      const providerHealth = await getEmailHealthSnapshot();
+      const healthyProviders = providerHealth.filter((snapshot) => snapshot.healthy);
+      if (!healthyProviders.length) {
+        const missingPrimary = providerHealth.find((snapshot) => snapshot.missingCredentials.length);
+        if (missingPrimary) {
+          logStructuredError(
+            `Missing credentials: ${missingPrimary.missingCredentials.join(",")}`,
+            missingPrimary.provider,
+            "credential-validation"
+          );
+        }
+      }
+      for (const provider of providers) {
+        const snapshot = providerHealth.find((item) => item.provider === provider.name);
+        if (!snapshot?.healthy) {
+          if (snapshot?.missingCredentials.length) {
+            logStructuredError(
+              `Missing credentials: ${snapshot.missingCredentials.join(",")}`,
+              provider.name,
+              "credential-validation"
+            );
+          } else {
+            logStructuredError("Provider connectivity check failed", provider.name, "connectivity-check");
+          }
+          continue;
+        }
+        try {
+          await attemptWithRetry(() => provider.send(payload), provider.name, "send");
+          return { provider: provider.name, simulated: provider.name === consoleProvider.name, providerHealth };
+        } catch (error) {
+          logStructuredError(error, provider.name, "send-final");
+        }
+      }
+      throw new Error("All email providers failed to send the message");
+    }, "sendEmail");
+    getEmailHealthSnapshot = /* @__PURE__ */ __name(async () => Promise.all(
+      providers.map(async (provider) => {
+        const missing = provider.validateCredentials();
+        const isConnected = missing.length === 0 ? await provider.checkConnectivity() : false;
+        return {
+          provider: provider.name,
+          healthy: missing.length === 0 && isConnected,
+          missingCredentials: missing,
+          isConnected
+        };
+      })
+    ), "getEmailHealthSnapshot");
+    sendEmailCanary = /* @__PURE__ */ __name(async () => sendEmail({
+      user_name: "Email Canary",
+      user_email: emailJsConfig.ownerEmail ?? "unknown@example.com",
+      user_contactnumber: "health-check",
+      destination: "email-health-check",
+      message: `Automated canary from deployment at ${(/* @__PURE__ */ new Date()).toISOString()}`,
+      to_email: emailJsConfig.ownerEmail ?? "owner-email-not-configured@example.com"
+    }), "sendEmailCanary");
+  }
+});
+
 // api/health/email.ts
 var jsonResponse, deriveStatus, onRequestGet;
 var init_email = __esm({
   "api/health/email.ts"() {
-    init_functionsRoutes_0_17599576463241506();
+    init_functionsRoutes_0_6247235866690797();
     init_emailService();
     init_monitoring();
     jsonResponse = /* @__PURE__ */ __name((body, status = 200) => new Response(JSON.stringify(body), {
       status,
       headers: { "Content-Type": "application/json" }
     }), "jsonResponse");
-    deriveStatus = /* @__PURE__ */ __name((providers) => {
-      const healthyCount = providers.filter((provider) => provider.healthy).length;
-      if (healthyCount === providers.length)
+    deriveStatus = /* @__PURE__ */ __name((providers2) => {
+      const healthyCount = providers2.filter((provider) => provider.healthy).length;
+      if (healthyCount === providers2.length)
         return "operational";
       if (healthyCount > 0)
         return "degraded";
@@ -143,13 +688,13 @@ var init_email = __esm({
       const { searchParams } = new URL(request.url);
       const triggerCanary = searchParams.get("canary") === "true";
       try {
-        const providers = await getEmailHealthSnapshot();
-        const status = deriveStatus(providers);
+        const providers2 = await getEmailHealthSnapshot();
+        const status = deriveStatus(providers2);
         if (status !== "operational") {
           reportError(new Error(`Email health is ${status}`), {
             level: status === "down" ? "error" : "warning",
             tags: { area: "email-health" },
-            providers
+            providers: providers2
           });
         }
         let canary = "skipped";
@@ -165,7 +710,7 @@ var init_email = __esm({
         const statusCode = status === "down" || canary === "failed" ? 503 : 200;
         return jsonResponse({
           status,
-          providers,
+          providers: providers2,
           canary,
           timestamp: (/* @__PURE__ */ new Date()).toISOString()
         }, statusCode);
@@ -187,7 +732,7 @@ var init_email = __esm({
 var encoder, toHex, safeJsonParse, constantTimeCompare, onRequestPost;
 var init_webhook = __esm({
   "api/payment/webhook.ts"() {
-    init_functionsRoutes_0_17599576463241506();
+    init_functionsRoutes_0_6247235866690797();
     encoder = new TextEncoder();
     toHex = /* @__PURE__ */ __name((buffer) => Array.from(new Uint8Array(buffer)).map((byte) => byte.toString(16).padStart(2, "0")).join(""), "toHex");
     safeJsonParse = /* @__PURE__ */ __name((text) => {
@@ -268,7 +813,7 @@ function parseDiscount(raw) {
 var onRequestGet2;
 var init_atlas_runtime_config_json = __esm({
   ".well-known/atlas-runtime-config.json.ts"() {
-    init_functionsRoutes_0_17599576463241506();
+    init_functionsRoutes_0_6247235866690797();
     __name(parseDiscount, "parseDiscount");
     onRequestGet2 = /* @__PURE__ */ __name((context) => {
       const { env } = context;
@@ -307,10 +852,10 @@ var init_atlas_runtime_config_json = __esm({
 });
 
 // api/availability.ts
-var jsonResponse2, getCorsHeaders, parseLimit, withTimeout, validateParams, onRequestOptions, onRequestGet3;
+var jsonResponse2, getCorsHeaders, parseLimit, withTimeout, validateParams2, onRequestOptions, onRequestGet3;
 var init_availability = __esm({
   "api/availability.ts"() {
-    init_functionsRoutes_0_17599576463241506();
+    init_functionsRoutes_0_6247235866690797();
     jsonResponse2 = /* @__PURE__ */ __name((body, status = 200, headers = {}) => new Response(JSON.stringify(body, null, 2), {
       status,
       headers: {
@@ -354,7 +899,7 @@ var init_availability = __esm({
           clearTimeout(timeoutId);
       }
     }, "withTimeout");
-    validateParams = /* @__PURE__ */ __name((params) => {
+    validateParams2 = /* @__PURE__ */ __name((params) => {
       const checkIn = params.get("checkIn");
       const checkOut = params.get("checkOut");
       const guestsRaw = params.get("guests");
@@ -396,7 +941,7 @@ var init_availability = __esm({
         origin: request.headers.get("Origin") || "unknown",
         params: Object.fromEntries(params.entries())
       });
-      const validation = validateParams(params);
+      const validation = validateParams2(params);
       if (validation.error) {
         return validation.response;
       }
@@ -471,52 +1016,19 @@ var init_availability = __esm({
   }
 });
 
-// ../src/utils/emailjsConfig.ts
-var trimmed, readEnvValue, rawConfig, requiredEnvKeys, emailJsConfig;
-var init_emailjsConfig = __esm({
-  "../src/utils/emailjsConfig.ts"() {
-    init_functionsRoutes_0_17599576463241506();
-    trimmed = /* @__PURE__ */ __name((value) => value?.trim(), "trimmed");
-    readEnvValue = /* @__PURE__ */ __name((key) => {
-      if (typeof import.meta !== "undefined" && typeof import.meta.env !== "undefined") {
-        const value = import.meta.env[key];
-        if (value)
-          return value;
-      }
-      if (typeof process !== "undefined" && typeof process.env !== "undefined") {
-        return process.env[key];
-      }
-      return void 0;
-    }, "readEnvValue");
-    rawConfig = {
-      serviceId: trimmed(readEnvValue("VITE_EMAILJS_SERVICE_ID")),
-      templateId: trimmed(readEnvValue("VITE_EMAILJS_TEMPLATE_ID")),
-      publicKey: trimmed(readEnvValue("VITE_EMAILJS_PUBLIC_KEY")),
-      ownerEmail: trimmed(readEnvValue("VITE_OWNER_EMAIL"))
-    };
-    requiredEnvKeys = {
-      VITE_EMAILJS_SERVICE_ID: rawConfig.serviceId,
-      VITE_EMAILJS_TEMPLATE_ID: rawConfig.templateId,
-      VITE_EMAILJS_PUBLIC_KEY: rawConfig.publicKey,
-      VITE_OWNER_EMAIL: rawConfig.ownerEmail
-    };
-    emailJsConfig = rawConfig;
-  }
-});
-
 // api/contact.ts
 var jsonResponse3, queueFailedAttempt, validatePayload, onRequestPost2;
 var init_contact = __esm({
   "api/contact.ts"() {
-    init_functionsRoutes_0_17599576463241506();
+    init_functionsRoutes_0_6247235866690797();
     init_emailService();
     init_emailjsConfig();
     init_monitoring();
-    jsonResponse3 = /* @__PURE__ */ __name((body, init) => new Response(JSON.stringify(body), {
-      status: init?.status ?? 200,
+    jsonResponse3 = /* @__PURE__ */ __name((body, init2) => new Response(JSON.stringify(body), {
+      status: init2?.status ?? 200,
       headers: {
         "Content-Type": "application/json",
-        ...init?.headers
+        ...init2?.headers
       }
     }), "jsonResponse");
     queueFailedAttempt = /* @__PURE__ */ __name(async (env, payload, error) => {
@@ -610,7 +1122,7 @@ var init_contact = __esm({
 var jsonResponse4, getCorsHeaders2, withTimeout2, parseDateParam, toIsoDate, buildDateRange, onRequestOptions2, onRequestGet4;
 var init_listing_availability = __esm({
   "availability/listing-availability.ts"() {
-    init_functionsRoutes_0_17599576463241506();
+    init_functionsRoutes_0_6247235866690797();
     jsonResponse4 = /* @__PURE__ */ __name((body, status = 200, headers = {}) => new Response(JSON.stringify(body, null, 2), {
       status,
       headers: {
@@ -762,8 +1274,8 @@ var init_listing_availability = __esm({
 var LOGO_URL;
 var init_branding = __esm({
   "../src/config/branding.ts"() {
-    init_functionsRoutes_0_17599576463241506();
-    LOGO_URL = "https://atlashomestorage.blob.core.windows.net/listing-images/logo-removebg-preview%20(3).be48d403.webp";
+    init_functionsRoutes_0_6247235866690797();
+    LOGO_URL = "/images/atlas-homestays-logo.webp";
   }
 });
 
@@ -771,7 +1283,7 @@ var init_branding = __esm({
 var CONTACT;
 var init_contact2 = __esm({
   "../src/config/contact.ts"() {
-    init_functionsRoutes_0_17599576463241506();
+    init_functionsRoutes_0_6247235866690797();
     CONTACT = {
       business: {
         phone: "7032493290",
@@ -791,7 +1303,7 @@ var init_contact2 = __esm({
 var logo, propertyImagePaths, propertyImages, propertyData, navbarData, footerData;
 var init_data = __esm({
   "../src/data.ts"() {
-    init_functionsRoutes_0_17599576463241506();
+    init_functionsRoutes_0_6247235866690797();
     init_branding();
     init_contact2();
     logo = LOGO_URL;
@@ -1485,13 +1997,39 @@ Fully equipped kitchen with microwave, refrigerator, RO water, toaster, and gas 
   }
 });
 
+// ../src/utils/guestImageUrl.ts
+function isBlockedGuestImageUrl(url) {
+  const t = (url ?? "").trim();
+  if (!t)
+    return true;
+  try {
+    const base = typeof window !== "undefined" ? window.location.origin : "https://local.invalid";
+    const u = new URL(t, base);
+    return u.hostname.includes("blob.core.windows.net");
+  } catch {
+    return false;
+  }
+}
+function filterGuestImageUrls(urls) {
+  if (!urls?.length)
+    return [];
+  return urls.map((s) => s.trim()).filter(Boolean).filter((u) => !isBlockedGuestImageUrl(u));
+}
+var init_guestImageUrl = __esm({
+  "../src/utils/guestImageUrl.ts"() {
+    init_functionsRoutes_0_6247235866690797();
+    __name(isBlockedGuestImageUrl, "isBlockedGuestImageUrl");
+    __name(filterGuestImageUrls, "filterGuestImageUrls");
+  }
+});
+
 // ../src/content/homes.ts
-var placeholderImage, roomNoToListingId, buildHome, homes;
+var roomNoToListingId, buildHome, homes;
 var init_homes = __esm({
   "../src/content/homes.ts"() {
-    init_functionsRoutes_0_17599576463241506();
+    init_functionsRoutes_0_6247235866690797();
     init_data();
-    placeholderImage = "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80";
+    init_guestImageUrl();
     roomNoToListingId = Object.fromEntries(
       propertyData.map((p) => [String(p.id), p.listingId]).filter(([, lid]) => lid != null)
     );
@@ -1512,7 +2050,7 @@ var init_homes = __esm({
         href,
         tagline: config.tagline,
         highlights: config.highlights,
-        images: propertyImages[roomNo] ?? [placeholderImage]
+        images: filterGuestImageUrls(propertyImages[roomNo] ?? [])
       };
     }, "buildHome");
     homes = [
@@ -1552,7 +2090,7 @@ function buildSitemapXml(baseUrl, paths) {
 var CORE_PATHS, HOME_PATHS, SITEMAP_PATHS, onRequestGet5;
 var init_sitemap_xml = __esm({
   "sitemap.xml.ts"() {
-    init_functionsRoutes_0_17599576463241506();
+    init_functionsRoutes_0_6247235866690797();
     init_homes();
     CORE_PATHS = [
       "/",
@@ -1585,10 +2123,10 @@ var init_sitemap_xml = __esm({
   }
 });
 
-// ../.wrangler/tmp/pages-qBdROY/functionsRoutes-0.17599576463241506.mjs
+// ../.wrangler/tmp/pages-pmKTko/functionsRoutes-0.6247235866690797.mjs
 var routes;
-var init_functionsRoutes_0_17599576463241506 = __esm({
-  "../.wrangler/tmp/pages-qBdROY/functionsRoutes-0.17599576463241506.mjs"() {
+var init_functionsRoutes_0_6247235866690797 = __esm({
+  "../.wrangler/tmp/pages-pmKTko/functionsRoutes-0.6247235866690797.mjs"() {
     init_email();
     init_webhook();
     init_atlas_runtime_config_json();
@@ -1667,10 +2205,10 @@ var init_functionsRoutes_0_17599576463241506 = __esm({
 });
 
 // ../node_modules/wrangler/templates/pages-template-worker.ts
-init_functionsRoutes_0_17599576463241506();
+init_functionsRoutes_0_6247235866690797();
 
 // ../node_modules/path-to-regexp/dist.es2015/index.js
-init_functionsRoutes_0_17599576463241506();
+init_functionsRoutes_0_6247235866690797();
 function lexer(str) {
   var tokens = [];
   var i = 0;
@@ -2053,13 +2591,13 @@ var pages_template_worker_default = {
     const handlerIterator = executeRequest(request);
     let data = {};
     let isFailOpen = false;
-    const next = /* @__PURE__ */ __name(async (input, init) => {
+    const next = /* @__PURE__ */ __name(async (input, init2) => {
       if (input !== void 0) {
         let url = input;
         if (typeof input === "string") {
           url = new URL(input, request.url).toString();
         }
-        request = new Request(url, init);
+        request = new Request(url, init2);
       }
       const result = handlerIterator.next();
       if (result.done === false) {
@@ -2119,4 +2657,4 @@ export {
   pages_template_worker_default as default
 };
 
-------formdata-undici-048091470020--
+------formdata-undici-090633554378--
