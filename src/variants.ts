@@ -1,5 +1,5 @@
 
-export const fadeIn = (direction:any, delay:any) => {
+export const fadeIn = (direction: "up" | "down" | "left" | "right", delay: number) => {
     return {
         hidden: {
             y: direction === "up" ? 40 : direction === "down" ? -40 : 0,
@@ -19,7 +19,7 @@ export const fadeIn = (direction:any, delay:any) => {
         },
     };
 };
-export const zoomIn = (direction:any, delay:any) => {
+export const zoomIn = (direction: "up" | "down" | "left" | "right", delay: number) => {
     return {
         hidden: {
             y: direction === "up" ? 40 : direction === "down" ? -40 : 0,
@@ -41,7 +41,7 @@ export const zoomIn = (direction:any, delay:any) => {
         },
     };
 };
-export const slideFromLeft = (delay:any) => {
+export const slideFromLeft = (delay: number) => {
     return {
         hidden: {
             x: -90,
@@ -60,7 +60,7 @@ export const slideFromLeft = (delay:any) => {
     };
 };
 
-export const slideFromRight = (delay:any) => {
+export const slideFromRight = (delay: number) => {
     return {
         hidden: {
             x: 90,
@@ -79,7 +79,7 @@ export const slideFromRight = (delay:any) => {
     };
 };
 
-export const slideFromBottom = (delay:any) => {
+export const slideFromBottom = (delay: number) => {
     return {
         hidden: {
             y: 50,

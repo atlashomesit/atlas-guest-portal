@@ -1,0 +1,63 @@
+:root[data-theme="jetsetPearl"] {
+  /* Surfaces */
+  --bg-primary: #f8f8f6;
+  --bg-surface: #ffffff;
+  --bg-muted: #f1eeeb;
+
+  /* Text */
+  --text-primary: #2a2e32;
+  --text-muted: #7a828c;
+  --text-body: #3a4046;
+  --text-on-hero: #1f2328;
+
+  /* Accent */
+  --accent-primary: #d8a7a0; /* rose gold */
+  --accent-soft: #f6e8e3;
+  --accent-primary-rgb: 216 167 160;
+  --accent-soft-rgb: 246 232 227;
+
+  /* CTA */
+  --cta-primary: #d4a3a0;
+  --cta-primary-hover: #be8d8a;
+  --cta-secondary: #b57c73;
+  --cta-primary-rgb: 212 163 160;
+  --cta-primary-hover-rgb: 190 141 138;
+  --cta-secondary-rgb: 181 124 115;
+
+  /* Brand */
+  --brand: #d4a3a0;
+  --brand-ink: #2a2e32;
+  --brand-contrast: #ffffff;
+  --brand-soft: #f6e8e3;
+
+  /* Borders */
+  --border-subtle: #e5e0db;
+  --border-strong: #d4cac3;
+
+  /* Status */
+  --support-success: #10b981;
+  --support-danger: #ef4444;
+  --support-error: #ef4444;
+
+  /* Footer */
+  --footer-bg: #f1eeeb;
+  --footer-text: #52575f;
+  --footer-heading: #2a2e32;
+  --footer-link: #7a828c;
+  --footer-link-hover: #2a2e32;
+
+  /* Shadows - light, floating */
+  --shadow-level-1: 0 4px 16px rgba(42, 46, 50, 0.06), 0 1px 3px rgba(42, 46, 50, 0.04);
+  --shadow-level-2: 0 12px 28px rgba(42, 46, 50, 0.08), 0 6px 16px rgba(42, 46, 50, 0.06);
+  --shadow-level-3: 0 20px 48px rgba(42, 46, 50, 0.10), 0 10px 24px rgba(42, 46, 50, 0.08);
+
+  /* Typography */
+  --font-family-base: "Plus Jakarta Sans", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-family-display: "Plus Jakarta Sans", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* Motion */
+  --motion-duration-fast: 120ms;
+  --motion-duration-slow: 260ms;
+  --motion-ease: cubic-bezier(0.4, 0, 0.2, 1);
+}
+

@@ -1,0 +1,72 @@
+:root[data-theme="emeraldDynasty"] {
+  /* Surfaces - Dark Emerald + Royal Lounge */
+  --bg-primary: #04120b;
+  --bg-surface: #0a1f14;
+  --bg-muted: #112d1e;
+
+  /* Text - Crisp Contrast on Emerald */
+  --text-primary: #f0f7f3;
+  --text-muted: #8ba898;
+  --text-body: #d1e2d9;
+  --text-on-hero: #ffffff;
+
+  /* Accent - Gold Concierge */
+  --accent-primary: #d4af37;
+  --accent-soft: #2c2512;
+  --romance-soft: #1a2a22;
+  --accent-primary-rgb: 212 175 55;
+  --accent-soft-rgb: 44 37 18;
+
+  /* CTA - Premium Gold */
+  --cta-primary: #c29b2f;
+  --cta-primary-hover: #a68426;
+  --cta-secondary: #8e7b41;
+  --cta-primary-rgb: 194 155 47;
+  --cta-primary-hover-rgb: 166 132 38;
+  --cta-secondary-rgb: 142 123 65;
+
+  /* Brand - Elite Concierge */
+  --brand: #c29b2f;
+  --brand-ink: #f0f7f3;
+  --brand-contrast: #04120b;
+  --brand-soft: #112d1e;
+
+  /* Borders - Soft Luxury */
+  --border-subtle: #1a3326;
+  --border-strong: #254a37;
+
+  /* Status */
+  --support-success: #10b981;
+  --support-danger: #ef4444;
+  --support-error: #ef4444;
+
+  /* Footer - Midnight Emerald */
+  --footer-bg: #020a06;
+  --footer-text: #8ba898;
+  --footer-heading: #f0f7f3;
+  --footer-link: #5c8c73;
+  --footer-link-hover: #f0f7f3;
+
+  /* Shadows - Premium Heavy Gold Tint */
+  --shadow-level-1: 0 4px 16px rgba(0, 0, 0, 0.45), 0 2px 4px rgba(212, 175, 55, 0.05);
+  --shadow-level-2: 0 12px 32px rgba(0, 0, 0, 0.55), 0 6px 12px rgba(212, 175, 55, 0.08);
+  --shadow-level-3: 0 24px 64px rgba(0, 0, 0, 0.65), 0 12px 24px rgba(212, 175, 55, 0.12);
+  --shadow-1: var(--shadow-level-1);
+  --shadow-2: var(--shadow-level-2);
+  --shadow-3: var(--shadow-level-3);
+
+  /* Radius - Stronger for Soft Luxury */
+  --radius-sm: 0.75rem;
+  --radius-md: 1rem;
+  --radius-lg: 1.25rem;
+
+  /* Typography */
+  --font-family-display: "Cormorant Garamond", serif;
+  --font-family-base: "Plus Jakarta Sans", sans-serif;
+
+  /* Motion - Slower, Luxurious */
+  --motion-duration-fast: 180ms;
+  --motion-duration-slow: 400ms;
+  --motion-ease: cubic-bezier(0.4, 0, 0.2, 1);
+}
+

@@ -1,45 +1,97 @@
-.custom-swiper .swiper-scrollbar {
-    background: rgba(255, 255, 255, 0.3);
-    /* Track color */
-    height: 4px;
-    /* Thickness */
-    border-radius: 4px;
-    /* Rounded edges */
+/* --- Our Homes Custom Grid Layout --- */
+.our-homes-grid {
+  width: 100%;
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.featured-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.side-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  height: 100%;
+}
+.side-card {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+@media (max-width: 1024px) {
+  .our-homes-grid {
+    grid-template-columns: 1fr !important;
+    gap: 1.5rem !important;
+  }
+  .side-cards {
+    flex-direction: row;
+    gap: 1.5rem;
+    height: auto;
+  }
+  .side-card {
+    flex: 1 1 0;
+  }
+}
+@media (max-width: 600px) {
+  .our-homes-grid {
+    gap: 1rem !important;
+  }
+  .featured-card,
+  .side-card {
+    padding: 1rem !important;
+  }
+  .side-cards {
+    flex-direction: column;
+    gap: 1rem;
+  }
+}.slider-wrapper {
+  position: relative; /* already added */
 }
 
-.custom-swiper .swiper-scrollbar-drag {
-    background: #ffffff;
-    /* Draggable bar color */
-    /* border-radius: 4px; */
+.slider-wrapper .slick-list {
+  overflow: visible !important; /* allow dots to show above */
 }
 
-
-/* Hide arrows by default */
-.custom-swiper .swiper-button-next,
-.custom-swiper .swiper-button-prev {
-    opacity: 0;
-    transition: opacity 0.3s;
+.slider-wrapper .slick-slide img {
+  position: relative;
+  z-index: 10; /* below dots */
+  border-radius: 0 0 1rem 1rem; /* optional */
 }
 
-/* Show arrows on hover of the Swiper */
-.custom-swiper:hover .swiper-button-next,
-.custom-swiper:hover .swiper-button-prev {
-    opacity: 1;
-}
-.justify-between {
-    justify-content: space-evenly;
-    font-size: 30px;
-    padding: 10px;
-}
-.py-1 {
-    padding-top: 1rem;
-    padding-bottom: 1rem;
+.slick-dots-above {
+  position: absolute;
+  top: 8px; /* distance from top of slider */
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50; /* above the image */
 }
 
-.px-6 {
-    padding-left: 5rem;
-    padding-right: 5rem;
+.slick-dots-custom {
+  display: flex !important;
+  gap: 8px;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
-#text{
-    font-size: 20px;
+
+.slick-dots-custom li button {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--text-contrast) 80%, transparent);
+  border: none;
+}
+
+.slick-dots-custom li.slick-active button {
+  background: var(--text-contrast);
+}
+
+.slider-wrapper .slick-dots button,
+.slider-wrapper .slick-dots li {
+  display: none;
 }

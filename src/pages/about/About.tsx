@@ -21,16 +21,16 @@ const About = () => {
                 </div>
                 {/* Description */}
                 <div className="text-base font-thin flex flex-col gap-6 px-4 sm:px-6 md:px-12 lg:px-16 xl:px-20 py-8 max-w-7xl mx-auto">
-                    <p className="text-gray-700 text-justify">
+                    <p className="text-text-muted text-justify">
                         Welcome to Only Stay, where luxury and tranquility converge to create an unparalleled escape. Our journey began with a passion for redefining hospitality, establishing a retreat that goes beyond accommodation to offer an immersive experience.
                     </p>
-                    <p className="text-gray-700 text-justify">
+                    <p className="text-text-muted text-justify">
                         At the heart of our ethos is a commitment to excellence. We pride ourselves on delivering exceptional hospitality, from the moment you step through our doors to the conclusion of your stay. Every detail, meticulously curated, reflects our dedication to providing a stay that exceeds expectations.
                     </p>
-                    <p className="text-gray-700 text-justify">
+                    <p className="text-text-muted text-justify">
                         Immerse yourself in the serenity of [Property Name], where a guest-centric approach ensures your comfort and satisfaction. From lavishly designed bedrooms to thoughtful amenities and a harmonious connection with nature, each element is crafted to elevate your experience.
                     </p>
-                    <p className="text-gray-700 text-justify">
+                    <p className="text-text-muted text-justify">
                         Join us and embark on a journey where luxury meets a profound sense of tranquility, creating moments that linger long after your departure.
                     </p>
                 </div>

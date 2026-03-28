@@ -2,6 +2,16 @@
 
 We welcome contributions that improve the Atlas Homes Frontend. Please follow this workflow to keep the project healthy and predictable.
 
+For feature work spanning the guest frontend and API, see workspace root `ATLAS-HIGH-VALUE-BACKLOG.md` and `ATLAS-FEATURE-EXECUTION-PROMPT.md`.
+
+## Release Gate (run before pushing to dev)
+
+```bash
+cd atlas-e2e; npm run release-gate
+```
+
+This is the **single pre-commit gate** for all repos. It runs lint, build, unit tests, integration tests, migrations, smoke curls, and Playwright E2E across all four repos. See [atlas-e2e/docs/PROD_READINESS_CHECKLIST.md](../atlas-e2e/docs/PROD_READINESS_CHECKLIST.md) for the full 16-gate DevSecOps mapping.
+
 ## Branching Model
 - Create feature branches from `main` using the convention `feature/<short-description>`.
 - Use `fix/`, `docs/`, or `chore/` prefixes for bug fixes, documentation updates, and tooling work.
@@ -16,9 +26,9 @@ We welcome contributions that improve the Atlas Homes Frontend. Please follow th
    ```bash
    git checkout -b feature/add-property-carousel
    ```
-3. **Install dependencies** (if not already done):
+3. **Install dependencies** (`npm ci` for clean install; `npm install` to add packages):
    ```bash
-   npm install
+   npm ci
    ```
 4. **Run the dev server:**
    ```bash
@@ -36,7 +46,9 @@ We welcome contributions that improve the Atlas Homes Frontend. Please follow th
 ## Pull Request Checklist
 - [ ] Reference related issues in the description.
 - [ ] Summarize high-level changes and screenshots when UI is impacted.
-- [ ] Ensure `npm run lint` and `npm run build` succeed locally.
+- [ ] Run the **release gate** (`cd atlas-e2e; npm run release-gate`) or at minimum: `npm ci && npm run lint && npm run build && npm test`.
+- [ ] The **CI** workflow (`.github/workflows/ci.yml`) runs the same on push/PR; it must pass before merge.
+- [ ] **Never commit `.env` or `.env.local`** – they may contain API keys and other secrets; keep them out of version control.
 - [ ] Update documentation when new configuration, commands, or data model changes occur.
 - [ ] Request review from at least one maintainer.
 

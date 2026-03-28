@@ -1,47 +1,130 @@
-import { BrowserRouter as Router, Routes, Route, useLocation, matchPath } from "react-router-dom"
+import React, { Suspense, useEffect } from "react"
+import { BrowserRouter as Router, Routes, Route, useLocation, matchPath, Navigate, useParams } from "react-router-dom"
 import './App.css'
-import PageNotFound from "./pages/pagenotfound/PageNotFound"
-import Home from "./pages/home/Home"
 import Navbar from "./components/commonComponents/navbar/Navbar"
 import Footer from "./components/commonComponents/footer/Footer"
-import ContactUs from "./pages/contactus/ContactUs"
-import Homepage_PropertyDetails from "./components/homepage_components/homepage_Propertydetails/Homepage_PropertyDetails"
-// import About from "./pages/about/About"
 import ScrollToTop from "./ScrollTop"
-import Homepage_LocationDetails from "./components/homepage_components/homepage_locationsdetails/Homepage_LocationDetails"
+import ErrorBoundary from "./components/ErrorBoundary"
+import { ToastContainer } from "react-toastify"
+import { BookingProvider } from "./contexts/BookingContext"
+import { ListingPhotosProvider } from "./contexts/ListingPhotosContext"
+import { trackEvent } from "./utils/analytics"
+
+const Home = React.lazy(() => import("./pages/home/Home"))
+const ContactUs = React.lazy(() => import("./pages/contactus/ContactUs"))
+const Homepage_PropertyDetails = React.lazy(() => import("./components/homepage_components/homepage_Propertydetails/Homepage_PropertyDetails"))
+const Homepage_LocationDetails = React.lazy(() => import("./components/homepage_components/homepage_locationsdetails/Homepage_LocationDetails"))
+const Policies = React.lazy(() => import("./pages/Policies"))
+const Terms = React.lazy(() => import("./pages/Terms"))
+const Amenities = React.lazy(() => import("./pages/Amenities"))
+const LocationPage = React.lazy(() => import("./pages/LocationPage"))
+const GalleryPage = React.lazy(() => import("./pages/GalleryPage"))
+const OffersPage = React.lazy(() => import("./pages/OffersPage"))
+const AboutPage = React.lazy(() => import("./pages/AboutPage"))
+const FaqPage = React.lazy(() => import("./pages/FaqPage"))
+const BlogHome = React.lazy(() => import("./pages/blog/BlogHome"))
+const BlogCategory = React.lazy(() => import("./pages/blog/BlogCategory"))
+const BlogPostPage = React.lazy(() => import("./pages/blog/BlogPostPage"))
+const SearchPage = React.lazy(() => import("./pages/SearchPage"))
+const ShortLinkRedirect = React.lazy(() => import("./components/ShortLinkRedirect"))
+const SupportWidget = React.lazy(() => import("./components/support/SupportWidget"))
+const Reserve = React.lazy(() => import("./pages/Reserve"))
+const BecomeHost = React.lazy(() => import("./pages/BecomeHost"))
+const PageNotFound = React.lazy(() => import("./pages/pagenotfound/PageNotFound"))
+
+function LazyFallback() {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '40vh' }}>
+      <div style={{ width: 32, height: 32, border: '3px solid #e5e7eb', borderTopColor: '#ea580c', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  )
+}
 
 function AppWrapper() {
   const location = useLocation();
 
-  // Add routes here where Navbar should be hidden
   const hideNavbarRoutes = ['/property_LocationDetails/:id'];
 
   const shouldHideNavbar = hideNavbarRoutes.some((pattern) =>
     Boolean(matchPath(pattern, location.pathname))
   );
 
+  const withBoundary = (element: React.ReactNode, name: string) => (
+    <ErrorBoundary key={`${name}-${location.pathname}`} name={name}>
+      {element}
+    </ErrorBoundary>
+  );
+
+  useEffect(() => {
+    trackEvent('page_view', { surface: 'router' }, { route: location.pathname });
+  }, [location.pathname]);
+
+  const LegacyPropertyRedirect = () => {
+    const { id } = useParams();
+
+    if (!id) {
+      return <Navigate to="/" replace />;
+    }
+
+    const normalizedId = id.toLowerCase();
+    const idParts = normalizedId.split('-').filter(Boolean);
+    const canonicalPropertySlug = idParts.length >= 2 ? idParts.slice(0, 2).join('-') : 'atlas-homes';
+
+    return <Navigate to={`/homes/${canonicalPropertySlug}/${normalizedId}`} replace />;
+  };
+
   return (
     <>
       {!shouldHideNavbar && <Navbar />}
       <ScrollToTop />
-      <Routes>
-        <Route path="/" element={<Home />} />
-        {/* <Route path="/about" element={<About />} /> */}
-        <Route path="/contact" element={<ContactUs />} />
-        <Route path="/property_details/:id" element={<Homepage_PropertyDetails />} />
-        <Route path="/property_LocationDetails/:id" element={<Homepage_LocationDetails />} />
-        <Route path="/*" element={<PageNotFound />} />
-      </Routes>
+      <ErrorBoundary name="router">
+        <Suspense fallback={<LazyFallback />}>
+        <Routes>
+          <Route path="/" element={withBoundary(<Home />, "home-route")} />
+          <Route path="/contact" element={withBoundary(<ContactUs />, "contact-route")} />
+          <Route path="/apartments" element={withBoundary(<Navigate to="/#our-homes" replace />, "apartments-redirect")} />
+          <Route path="/amenities" element={withBoundary(<Amenities />, "amenities-route")} />
+          <Route path="/location" element={withBoundary(<LocationPage />, "location-route")} />
+          <Route path="/gallery" element={withBoundary(<GalleryPage />, "gallery-route")} />
+          <Route path="/offers" element={withBoundary(<OffersPage />, "offers-route")} />
+          <Route path="/about" element={withBoundary(<AboutPage />, "about-route")} />
+          <Route path="/faq" element={withBoundary(<FaqPage />, "faq-route")} />
+          <Route path="/search" element={withBoundary(<SearchPage />, "search-route")} />
+          <Route path="/blog" element={withBoundary(<BlogHome />, "blog-home-route")} />
+          <Route path="/blog/:category" element={withBoundary(<BlogCategory />, "blog-category-route")} />
+          <Route path="/blog/:category/:slug" element={withBoundary(<BlogPostPage />, "blog-post-route")} />
+          <Route path="/blog/:slug" element={withBoundary(<BlogPostPage />, "blog-legacy-route")} />
+          <Route path="/policies" element={withBoundary(<Policies />, "policies-route")} />
+          <Route path="/terms" element={withBoundary(<Terms />, "terms-route")} />
+          <Route path="/terms-and-conditions" element={withBoundary(<Terms />, "terms-legacy-route")} />
+          <Route path="/homes/:propertySlug/:unitSlug" element={withBoundary(<Homepage_PropertyDetails />, "property-details-home-route")} />
+          <Route path="/property_details/:id" element={withBoundary(<LegacyPropertyRedirect />, "property-details-legacy-route")} />
+          <Route path="/properties/:id" element={withBoundary(<LegacyPropertyRedirect />, "property-details-modern-redirect-route")} />
+          <Route path="/reserve" element={withBoundary(<Reserve />, "reserve-route")} />
+          <Route path="/become-a-host" element={withBoundary(<BecomeHost />, "become-host-route")} />
+          <Route path="/property_LocationDetails/:id" element={withBoundary(<Homepage_LocationDetails />, "location-details-route")} />
+          <Route path="/:shortCode" element={withBoundary(<ShortLinkRedirect />, "shortlink-route")} />
+          <Route path="/*" element={withBoundary(<PageNotFound />, "fallback-route")} />
+        </Routes>
+        </Suspense>
+      </ErrorBoundary>
+      <Suspense fallback={null}><SupportWidget /></Suspense>
       <Footer />
+      <ToastContainer position="top-right" newestOnTop pauseOnFocusLoss={false} />
     </>
   );
 }
 
 function App() {
   return (
-    <Router>
-      <AppWrapper />
-    </Router>
+    <BookingProvider>
+      <ListingPhotosProvider>
+        <Router>
+          <AppWrapper />
+        </Router>
+      </ListingPhotosProvider>
+    </BookingProvider>
   );
 }
 

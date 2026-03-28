@@ -1,4 +1,4 @@
-
+import React from 'react';
 import { FaCar, FaMusic, FaTv, FaWifi } from "react-icons/fa";
 import { MdWifiCalling3 } from "react-icons/md";
 import { TbAirConditioning } from "react-icons/tb";
@@ -6,7 +6,7 @@ import { Link } from "react-router-dom";
 
 interface AmenitiesData {
     id: number,
-    icon: any,
+    icon: React.ReactNode,
     title: string,
 }
 
@@ -46,7 +46,7 @@ const Amenities = () => {
     ]
 
     return (
-        <section className="py-14 lg:py-28  bg-Bg_Primary">
+        <section className="py-14 lg:py-28  bg-bg-primary">
             <div className="w-full h-fit  flex flex-col lg:flex-row justify-center items-center gap-5">
                 {/* content  */}
                 <div className="image w-full h-full flex-1 flex justify-center items-center gap-6">

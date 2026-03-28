@@ -1,0 +1,84 @@
+/**
+ * OLD design — Luxury pastel visual identity (single source of truth).
+ * Hero: peach → light blue gradient. Accent: coral. Footer: dark navy.
+ * Use layered pastel gradients; no flat beige.
+ */
+:root,
+:root[data-theme="default"] {
+  /* —— 1) COLOR TOKENS (sampled from OLD) —— */
+  --primary-gradient-start: #fdeee9;
+  --primary-gradient-end: #e8f7ff;
+  --secondary-gradient-start: #f7eafc;
+  --secondary-gradient-end: #fff4ea;
+  --accent-cta: #ff7a59;
+  --accent-cta-hover: #e86a4a;
+  --dark-footer-start: #071624;
+  --dark-footer-end: #10243a;
+  --text-primary: #0f1724;
+  --text-muted: #6b7280;
+  --section-heading-muted: #9b59b6; /* uppercase small labels */
+  --amenity-icon: #c3b3e8;
+
+  /* Map to existing design tokens */
+  --bg-primary: var(--primary-gradient-start);
+  --bg-secondary: #f7eafc;
+  --bg-card: #ffffff;
+  --bg-surface: #ffffff;
+  --bg-muted: #fff4ea;
+
+  --brand-primary: var(--accent-cta);
+  --brand-accent: var(--accent-cta);
+  --brand-soft: #ffebe6;
+  --accent-primary: var(--accent-cta);
+  --accent-soft: #ffebe6;
+  --accent-primary-rgb: 255 122 89;
+  --accent-soft-rgb: 255 235 230;
+
+  --cta-primary: var(--accent-cta);
+  --cta-primary-hover: var(--accent-cta-hover);
+  --cta-secondary: var(--text-muted);
+  --cta-primary-rgb: 255 122 89;
+  --cta-primary-hover-rgb: 232 106 74;
+  --cta-secondary-rgb: 107 114 128;
+
+  --text-secondary: var(--text-muted);
+  --text-body: var(--text-primary);
+  --text-on-hero: var(--text-primary);
+
+  --border: rgba(15, 23, 36, 0.08);
+  --border-subtle: rgba(15, 23, 36, 0.06);
+  --border-strong: rgba(15, 23, 36, 0.12);
+
+  --support-success: #10b981;
+  --support-danger: #dc2626;
+  --support-error: #dc2626;
+
+  /* Hero: peach top-left → light blue bottom-right */
+  --gradient-hero: linear-gradient(135deg, var(--primary-gradient-start) 0%, #f5f0ff 40%, var(--primary-gradient-end) 100%);
+  --gradient-cta: linear-gradient(135deg, var(--accent-cta), #ff9068);
+  --gradient-card: linear-gradient(180deg, rgba(255, 122, 89, 0.04) 0%, transparent 100%);
+
+  /* Footer: dark navy gradient */
+  --footer-bg: linear-gradient(180deg, var(--dark-footer-start) 0%, var(--dark-footer-end) 100%);
+  --footer-text: rgba(255, 255, 255, 0.82);
+  --footer-heading: #ffffff;
+  --footer-link: rgba(255, 255, 255, 0.7);
+  --footer-link-hover: #ffffff;
+
+  /* Soft layered shadows */
+  --shadow-level-1: 0 2px 8px rgba(15, 23, 36, 0.04), 0 1px 3px rgba(15, 23, 36, 0.02);
+  --shadow-level-2: 0 8px 24px rgba(15, 23, 36, 0.06), 0 4px 12px rgba(15, 23, 36, 0.03);
+  --shadow-level-3: 0 24px 48px rgba(15, 23, 36, 0.08);
+  --shadow-1: var(--shadow-level-1);
+  --shadow-2: var(--shadow-level-2);
+  --shadow-3: var(--shadow-level-3);
+
+  /* Section gaps: desktop 96px, tablet 64px, mobile 40px */
+  --section-gap-mobile: 2.5rem;
+  --section-gap-tablet: 4rem;
+  --section-gap-desktop: 6rem;
+
+  /* Radii >= 16px */
+  --radius-card: 1rem;
+  --radius-card-lg: 1.5rem;
+}

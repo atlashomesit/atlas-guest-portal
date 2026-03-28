@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { resolveOptimizedAsset } from '../../../utils/resolveOptimizedAsset';
 import { MdOutlineDone } from 'react-icons/md';
+import OptimizedImage from '../../ui/OptimizedImage';
 // import { FaArrowRightLong } from 'react-icons/fa6';
 // import { Link } from 'react-router-dom';
 
@@ -52,29 +52,37 @@ const Homepage_WhyChoose = () => {
     }, []);
 
     return (
-        <section className="py-16 lg:py-24 bg-gradient-to-b from-white to-gray-50">
+        <section className="py-16 lg:py-24 bg-gradient-to-b from-bg-surface to-bg-muted">
             <div className="max-w-7xl mx-auto px-6 sm:px-10 lg:px-20">
                 <div className="flex flex-col-reverse lg:flex-row items-center gap-12 lg:gap-16">
                     {/* Left Side - Images */}
                     <div className="flex-1 relative">
                         <div className="relative z-10 rounded-xl overflow-hidden shadow-2xl transform transition duration-500 hover:-translate-y-2">
-                            <img src={featureData.images[0]} alt="Luxury accommodation" className="w-full h-80 lg:h-96 object-cover" />
-                            <div className="absolute inset-0 bg-primary/10 mix-blend-multiply"></div>
+                            <OptimizedImage
+                                src={featureData.images[0]}
+                                alt="Luxury accommodation"
+                                className="w-full h-full object-cover"
+                                wrapperClassName="w-full h-80 lg:h-96"
+                                sizes="(max-width: 1024px) 100vw, 45vw"
+                            />
+                            <div className="absolute inset-0 bg-accent-primary/10 mix-blend-multiply"></div>
                         </div>
-                        <img
+                        <OptimizedImage
                             src={featureData.images[1]}
                             alt="Garden swing area"
-                            className="w-56 sm:w-64 absolute -bottom-8 -right-6 sm:right-0 lg:-right-8 rounded-xl shadow-2xl object-cover border-4 border-white z-20 transition duration-500 hover:scale-105"
+                            className="w-full h-full object-cover"
+                            wrapperClassName="w-56 sm:w-64 absolute -bottom-8 -right-6 sm:right-0 lg:-right-8 rounded-xl shadow-2xl border-4 border-[color:var(--bg-surface)] z-20 transition duration-500 hover:scale-105"
+                            sizes="(max-width: 1024px) 50vw, 28vw"
                         />
                     </div>
 
                     {/* Right Side - Content */}
                     <div className="flex-1">
-                        <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 relative mb-4">
+                        <h2 className="text-3xl lg:text-4xl font-bold text-text-primary relative mb-4">
                             {featureData.title}
-                            <span className="absolute -bottom-2 left-0 w-1/4 h-1 bg-primary rounded-full"></span>
+                       
                         </h2>
-                        <p className="text-gray-600 leading-relaxed mb-6">{featureData.description}</p>
+                        <p className="text-text-muted leading-relaxed mb-6">{featureData.description}</p>
 
                         {/* Features List */}
                         <div className="space-y-2">
@@ -83,19 +91,19 @@ const Homepage_WhyChoose = () => {
                                     key={index}
                                     onClick={() => setActiveFeature(index)}
                                     className={`p-4 rounded-lg transition-all duration-300 cursor-pointer flex items-start gap-4 border-l-4 ${activeFeature === index
-                                        ? 'bg-white shadow-lg border-primary'
-                                        : 'border-transparent hover:bg-white'
+                                        ? 'bg-bg-surface shadow-level1 border-accent-primary'
+                                        : 'border-transparent hover:bg-bg-surface'
                                         }`}
                                 >
                                     <div
-                                        className={`p-2 rounded-full ${activeFeature === index ? 'bg-primary text-white' : 'bg-primary/10 text-primary'
+                                        className={`p-2 rounded-full ${activeFeature === index ? 'bg-accent-primary text-[var(--text-contrast)]' : 'bg-accent-primary/10 text-accent-primary'
                                             }`}
                                     >
                                         <MdOutlineDone className="text-xl" />
                                     </div>
                                     <div>
-                                        <h3 className="text-gray-900 font-semibold text-lg">{feature.title}</h3>
-                                        <p className="text-gray-600 text-xs">{feature.description}</p>
+                                        <h3 className="text-text-primary font-semibold text-lg">{feature.title}</h3>
+                                        <p className="text-text-muted text-xs">{feature.description}</p>
                                     </div>
                                 </div>
                             ))}

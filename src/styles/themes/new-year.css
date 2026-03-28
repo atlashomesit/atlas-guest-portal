@@ -1,0 +1,57 @@
+:root[data-theme="newYear"] {
+  /* Surfaces - Midnight Elegance */
+  --bg-primary: #F8FAFC;         /* Slate-50 - champagne canvas */
+  --bg-surface: #FFFFFF;         /* Pure white */
+  --bg-muted: #F1F5F9;          /* Slate-100 */
+  
+  /* Text - Elegant Contrast */
+  --text-primary: #0F172A;       /* Slate-900 */
+  --text-muted: #64748B;         /* Slate-500 */
+  --text-body: #1E293B;          /* Slate-800 */
+  --text-on-hero: #FFFFFF;
+  
+  /* Accent - Gold Celebration */
+  --accent-primary: #F59E0B;     /* Amber-500 - champagne gold */
+  --accent-soft: #FEF3C7;        /* Amber-100 */
+  --romance-soft: #FFFBEB;       /* Amber-50 */
+  --accent-primary-rgb: 245 158 11;
+  --accent-soft-rgb: 254 243 199;
+  
+  /* CTA - Midnight Blue with Gold */
+  --cta-primary: #1E40AF;        /* Blue-800 - midnight */
+  --cta-primary-hover: #1E3A8A;  /* Blue-900 */
+  --cta-secondary: #3B82F6;      /* Blue-500 */
+  --cta-primary-rgb: 30 64 175;
+  --cta-primary-hover-rgb: 30 58 138;
+  --cta-secondary-rgb: 59 130 246;
+  
+  /* Brand - Celebration */
+  --brand: #1E40AF;
+  --brand-ink: #1E3A8A;
+  --brand-contrast: #F8FAFC;
+  --brand-soft: #DBEAFE;
+  
+  /* Borders */
+  --border-subtle: #E2E8F0;      /* Slate-200 */
+  --border-strong: #CBD5E1;      /* Slate-300 */
+  
+  /* Status */
+  --support-success: #10B981;
+  --support-danger: #EF4444;
+  --support-error: #EF4444;
+  
+  /* Footer */
+  --footer-bg: #0F172A;          /* Slate-900 */
+  --footer-text: #CBD5E1;
+  --footer-heading: #FFFFFF;
+  --footer-link: #94A3B8;
+  --footer-link-hover: #F59E0B;  /* Gold hover */
+  
+  /* Shadows - Celebration Sparkle */
+  --shadow-level-1: 0 2px 8px rgba(245, 158, 11, 0.08), 0 1px 3px rgba(30, 64, 175, 0.04);
+  --shadow-level-2: 0 8px 24px rgba(245, 158, 11, 0.12), 0 4px 12px rgba(30, 64, 175, 0.06);
+  --shadow-level-3: 0 24px 72px rgba(245, 158, 11, 0.15), 0 12px 32px rgba(30, 64, 175, 0.08);
+  --shadow-1: var(--shadow-level-1);
+  --shadow-2: var(--shadow-level-2);
+  --shadow-3: var(--shadow-level-3);
+}

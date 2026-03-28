@@ -12,6 +12,7 @@ const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, '..');
 const manifestPath = path.resolve(projectRoot, 'src/assets/optimized-manifest.json');
 const sizeCeilingBytes = 500 * 1024; // 500 KiB threshold for raw assets
+const maxRuntimeMs = 5 * 60 * 1000; // fail fast if the optimizer stalls
 
 const sourceGlobs = [
   'src/assets/**/*.{jpg,JPG,jpeg,JPEG,png,PNG}',
@@ -48,6 +49,13 @@ async function writeManifest(manifest) {
 }
 
 async function main() {
+  const timeout = setTimeout(() => {
+    console.error(
+      `Image optimization timed out after ${Math.round(maxRuntimeMs / 1000)} seconds. Check for unusually large assets or locked files.`
+    );
+    process.exit(1);
+  }, maxRuntimeMs);
+
   const files = await glob(sourceGlobs, {
     cwd: projectRoot,
     absolute: true,
@@ -102,6 +110,8 @@ async function main() {
     console.warn('Oversized raw images detected (consider archiving or recompressing):');
     oversizedRaw.sort().forEach((item) => console.warn(` - ${item}`));
   }
+
+  clearTimeout(timeout);
 }
 
 main().catch((error) => {

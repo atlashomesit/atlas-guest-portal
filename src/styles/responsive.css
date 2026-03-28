@@ -1,0 +1,44 @@
+/**
+ * Mobile Responsiveness - Atlas Homestays
+ * M6–M10: Admin and guest pages at 375×812 (iPhone 14) viewport.
+ * @see ATLAS HOMESTAYS MOBILE RESPONSIVENESS spec
+ */
+
+@media (max-width: 480px) {
+  /* Table → Card layout for mobile (admin reservations, bookings) */
+  .responsive-table-hide {
+    display: none;
+  }
+
+  .responsive-card-layout {
+    display: block;
+  }
+
+  /* Touch targets: minimum 44×44px for buttons */
+  .responsive-btn {
+    min-height: 44px;
+    min-width: 44px;
+    width: 100%;
+  }
+
+  /* Inputs: font-size 16px prevents iOS zoom on focus */
+  .responsive-input {
+    font-size: 16px;
+    padding: 12px;
+    width: 100%;
+  }
+
+  /* Containers: prevent horizontal overflow */
+  .responsive-container {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+}
+
+/* Small tablets and large phones */
+@media (max-width: 640px) {
+  .responsive-touch-cell {
+    min-height: 40px;
+    min-width: 40px;
+  }
+}

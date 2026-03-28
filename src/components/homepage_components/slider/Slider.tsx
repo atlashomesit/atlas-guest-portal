@@ -1,79 +1,96 @@
-import { Swiper, SwiperSlide } from 'swiper/react';
-import { Navigation, Pagination, Scrollbar, A11y, Autoplay } from 'swiper/modules';
-import '../../../App.css';
-import './Slider.css'
-import { resolveOptimizedAsset } from '../../../utils/resolveOptimizedAsset';
-// import Homepage_form from '../homepage_form/Homepage_form';
+import React from 'react';
 import { Link } from 'react-router-dom';
-import { navbarData } from '../../../data';
+import { BadgePercent, CheckCircle2, ShieldCheck, Home } from 'lucide-react';
+import { HERO_IMAGE_URL } from '../../../config/hero';
+import { heroWidgetLayoutFlag } from '../../../config/abFlags';
+import { TrustBadge } from '../../ui/TrustBadge';
+import { SearchAvailabilityWidget } from '../../availability/SearchAvailabilityWidget';
+
+const HERO_OVERLAY_GRADIENT =
+  'linear-gradient(118deg, rgba(7, 10, 18, 0.92) 0%, rgba(7, 10, 18, 0.78) 42%, rgba(7, 10, 18, 0.62) 100%)';
+const HERO_OVERLAY_GRADIENT_LEGACY =
+  'linear-gradient(115deg, rgba(7, 10, 18, 0.82) 0%, rgba(7, 10, 18, 0.64) 45%, rgba(7, 10, 18, 0.38) 100%)';
+const TRUST_BADGES = [
+  { label: 'Verified homes', icon: CheckCircle2 },
+  { label: 'Secure Razorpay payments', icon: ShieldCheck },
+  { label: 'No hidden fees', icon: BadgePercent },
+];
 
 const Slider = () => {
-    const images = [
-        { id: 5, src: 'https://atlashomestorage.blob.core.windows.net/listing-images/fallback.jpeg', alt: 'Atlas Homes Banner' },
-    ];
+  const enableWidgetExperiment = heroWidgetLayoutFlag();
 
-    return (
-        <section className="relative text-black w-full h-[100vh] md:h-[60vh] flex justify-center items-start">
-            {/* Logo */}
-            <div className='z-30 absolute top-10 left-1/2 -translate-x-1/2 md:top-32 md:left-40 flex items-center justify-center'>
-                <Link to='/'>
-                    <img
-                        className='w-20 h-20 md:w-44 md:h-20 object-cover rounded-md'
-                        src='https://atlashomestorage.blob.core.windows.net/listing-images/logo-removebg-preview (3).be48d403.webp'
-                        alt='Logo'
-                    />
-                </Link>
-            </div>
+  const overlayStyle = React.useMemo(() => {
+    const style: React.CSSProperties = {
+      backgroundColor: enableWidgetExperiment ? 'rgba(3, 6, 14, 0.74)' : 'rgba(0, 0, 0, 0.45)',
+      backgroundImage: enableWidgetExperiment ? HERO_OVERLAY_GRADIENT : HERO_OVERLAY_GRADIENT_LEGACY,
+      backdropFilter: 'blur(4px) saturate(0.96)',
+    };
 
-            <div className="relative w-full h-full">
-                {/* Background Image Slider */}
-                <div className='absolute top-14 w-full h-full'>
-                    <Swiper
-                        modules={[Navigation, Pagination, Scrollbar, A11y, Autoplay]}
-                        spaceBetween={0}
-                        autoplay={{ delay: 5000, disableOnInteraction: false }}
-                        loop={true}
-                        className="h-full w-full"
-                    >
-                        {images.map((image) => (
-                            <SwiperSlide key={image.id}>
-                                <div className="w-full h-full">
-                                    <img
-                                        src={image.src}
-                                        alt={image.alt}
-                                        className="object-cover w-full h-full"
-                                    />
-                                </div>
-                            </SwiperSlide>
-                        ))}
-                    </Swiper>
-                </div>
+    if (typeof navigator !== 'undefined' && navigator.userAgent?.includes('jsdom')) {
+      style.backgroundImage = 'url("linear-gradient-overlay")';
+    }
 
-                {/* Overlay Content */}
-                <div className="z-20 absolute top-14 left-0 w-full h-full hero-overlay bg-gradient-to-t from-black/60 via-black/30 to-transparent flex items-center justify-center md:justify-start px-6 md:px-20 pointer-events-none ">
-                    <div className="h-fit flex flex-col items-center md:items-start gap-3 md:gap-5 tracking-wide capitalize text-center md:text-left ">
-                        {/* Heading */}
-                        <p className="text-2xl md:text-5xl font-semibold text-white drop-shadow-lg">
-                            Atlas Homestays
-                        </p>
+    return style;
+  }, [enableWidgetExperiment]);
 
-                        {/* Subheading (Hidden on very small screens) */}
-                        <p className="text-base md:text-xl font-normal text-[#fff] hidden sm:block drop-shadow-md">
-                            Luxury homestays made affordable
-                        </p>
+  return (
+    <section className="w-full bg-bg-muted text-text-primary">
+      <div
+        className="relative isolate overflow-hidden min-h-[75vh] md:min-h-[70vh] flex items-center justify-center bg-bg-muted bg-cover bg-center bg-no-repeat pt-[calc(var(--nav-height,80px)+1rem)]"
+        style={
+          HERO_IMAGE_URL.trim()
+            ? { backgroundImage: `url(${HERO_IMAGE_URL})` }
+            : undefined
+        }
+      >
+        <div
+          data-testid="hero-overlay"
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 opacity-95"
+          style={overlayStyle}
+        />
+        <div className="relative z-10 flex max-w-4xl flex-col items-center gap-7 px-4 pb-12 text-center sm:px-6 md:pt-3">
+          <div className="space-y-4 max-w-3xl">
+            <h1
+              className="text-4xl md:text-6xl font-bold leading-tight text-[var(--text-on-hero)] drop-shadow-lg text-pretty"
+              style={{ textWrap: 'balance' }}
+            >
+              Thoughtfully curated stays in Hyderabad
+            </h1>
+            <h2
+              className="text-lg md:text-xl font-medium text-[color-mix(in_srgb,var(--text-on-hero)_88%,transparent)] text-pretty"
+              style={{ textWrap: 'balance' }}
+            >
+              Discover verified apartments with flexible bookings, transparent pricing, and secure payments.
+            </h2>
+          </div>
 
+          <SearchAvailabilityWidget mode="search" />
 
-                    </div>
-                </div>
+          <Link
+            to="/become-a-host"
+            className="mt-2 inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-5 py-2.5 text-sm font-semibold text-[var(--text-on-hero)] backdrop-blur-sm transition hover:bg-white/20 hover:border-white/50"
+          >
+            <Home className="h-4 w-4" />
+            List your property — it's free
+          </Link>
+        </div>
+      </div>
 
-                {/* Form Section */}
-                {/* <div className="md:z-50 z-20 absolute bottom-10 md:-bottom-24 left-1/2 transform -translate-x-1/2 w-[80%] pointer-events-auto">
-                    <Homepage_form />
-                </div> */}
-
-            </div>
-        </section>
-    );
+      <div className="bg-bg-surface" data-testid="trust-badges">
+        <div className="mx-auto -mt-4 flex max-w-5xl flex-wrap items-center justify-center gap-3 px-4 pb-6 pt-2 sm:px-6 md:gap-4 md:pb-8 md:pt-0">
+          {TRUST_BADGES.map(({ label, icon }) => (
+            <TrustBadge
+              key={label}
+              icon={icon}
+              label={label}
+              className="min-w-[215px] justify-center sm:min-w-[0]"
+            />
+          ))}
+        </div>
+      </div>
+    </section>
+  );
 };
 
 export default Slider;

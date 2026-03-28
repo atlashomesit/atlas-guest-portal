@@ -1,4 +1,5 @@
-name: lockfile-guard
+# Status check name for branch protection: lockfile-guard
+name: Lockfile guard
 on:
   pull_request:
 jobs:

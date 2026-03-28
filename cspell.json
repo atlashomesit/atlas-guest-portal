@@ -1,0 +1,36 @@
+{
+  "version": "0.2",
+  "language": "en",
+  "ignorePaths": ["**/node_modules/**", "**/dist/**", "**/build/**", "**/coverage/**", "**/public/static/**", "**/.git/**"],
+  "words": [
+    "ADR",
+    "anonymization",
+    "atlashomestays",
+    "Auth0",
+    "Behaviour",
+    "Behavioural",
+    "Channex",
+    "Cloudflare",
+    "Cooldown",
+    "DATEDIFF",
+    "dedup",
+    "DevSecOps",
+    "DPDP",
+    "EmailJS",
+    "Idempotency",
+    "Mermaid",
+    "MSG91",
+    "OpenAPI",
+    "Playwright",
+    "Razorpay",
+    "rebooking",
+    "Recalc",
+    "recalc",
+    "Swashbuckle",
+    "TOGAF",
+    "Vite",
+    "WINBACK",
+    "winback"
+  ]
+}
+
