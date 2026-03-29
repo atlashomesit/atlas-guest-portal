@@ -18,27 +18,35 @@ const TRUST_BADGES = [
 
 const Slider = () => {
   const enableWidgetExperiment = heroWidgetLayoutFlag();
+  const hasHeroPhoto = Boolean(HERO_IMAGE_URL.trim());
 
   const overlayStyle = React.useMemo(() => {
-    const style: React.CSSProperties = {
-      backgroundColor: enableWidgetExperiment ? 'rgba(3, 6, 14, 0.74)' : 'rgba(0, 0, 0, 0.45)',
-      backgroundImage: enableWidgetExperiment ? HERO_OVERLAY_GRADIENT : HERO_OVERLAY_GRADIENT_LEGACY,
-      backdropFilter: 'blur(4px) saturate(0.96)',
-    };
+    // With a photo, keep text readable without painting the whole viewport flat black.
+    const style: React.CSSProperties = hasHeroPhoto
+      ? {
+          backgroundColor: "rgba(7, 10, 18, 0.5)",
+          backgroundImage: HERO_OVERLAY_GRADIENT_LEGACY,
+          backdropFilter: "blur(2px) saturate(0.98)",
+        }
+      : {
+          backgroundColor: enableWidgetExperiment ? "rgba(3, 6, 14, 0.74)" : "rgba(0, 0, 0, 0.45)",
+          backgroundImage: enableWidgetExperiment ? HERO_OVERLAY_GRADIENT : HERO_OVERLAY_GRADIENT_LEGACY,
+          backdropFilter: "blur(4px) saturate(0.96)",
+        };
 
-    if (typeof navigator !== 'undefined' && navigator.userAgent?.includes('jsdom')) {
+    if (typeof navigator !== "undefined" && navigator.userAgent?.includes("jsdom")) {
       style.backgroundImage = 'url("linear-gradient-overlay")';
     }
 
     return style;
-  }, [enableWidgetExperiment]);
+  }, [enableWidgetExperiment, hasHeroPhoto]);
 
   return (
     <section className="w-full bg-bg-muted text-text-primary">
       <div
-        className="relative isolate overflow-hidden min-h-[75vh] md:min-h-[70vh] flex items-center justify-center bg-bg-muted bg-cover bg-center bg-no-repeat pt-[calc(var(--nav-height,80px)+1rem)]"
+        className="relative isolate overflow-hidden min-h-[min(78vh,820px)] md:min-h-[min(72vh,760px)] flex items-center justify-center bg-bg-muted bg-cover bg-center bg-no-repeat pt-[calc(var(--nav-height,80px)+1rem)] pb-8"
         style={
-          HERO_IMAGE_URL.trim()
+          hasHeroPhoto
             ? { backgroundImage: `url(${HERO_IMAGE_URL})` }
             : undefined
         }

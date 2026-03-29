@@ -5,7 +5,8 @@ export const enableSecondaryBannerValueBlock = false;
 export const enableSecondaryBannerImprovedOverlay = false;
 
 export const enableServicesConcreteCopy = true;
-export const enableServicesIconography = false;
+/** Lucide icons from `servicesConcreteCopy` — keep true with concrete copy so cards are not empty shells. */
+export const enableServicesIconography = true;
 export const enableServicesOneLineDescriptions = false;
 export const enableServicesAlternatingBackgrounds = false;
 

@@ -390,7 +390,13 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
                 <span className="rounded-full bg-[color:color-mix(in_srgb,var(--cta-primary)_12%,transparent)] px-3 py-1 text-xs font-semibold text-[color:color-mix(in_srgb,var(--cta-primary)_80%,transparent)]">
                   Featured
                 </span>
-                <span className="text-xs uppercase tracking-[0.08em] font-semibold text-text-muted">Penthouse</span>
+                <span className="text-xs uppercase tracking-[0.08em] font-semibold text-text-muted">
+                  {heroModel.listing.unitType === "penthouse"
+                    ? "Penthouse"
+                    : heroModel.listing.unitType === "1bhk"
+                      ? "Apartment"
+                      : formatAmenityName(heroModel.listing.unitType)}
+                </span>
               </div>
               <div>
                 <p className="text-sm font-semibold uppercase tracking-wide text-text-muted">Atlas Homes</p>

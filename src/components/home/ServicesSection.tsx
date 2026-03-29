@@ -65,7 +65,7 @@ const ServicesSection = () => {
     const items = enableServicesConcreteCopy ? SERVICES_CONTENT.concreteCopy : SERVICES_CONTENT.poeticCopy;
 
     return (
-      <section className="py-16 md:py-4 bg-bg-muted">
+      <section className="py-16 md:py-16 bg-bg-muted">
         <div className="container mx-auto px-4 lg:px-8">
           <div className="text-center flex flex-col gap-4">
             <span className="text-accent-primary font-medium tracking-wider uppercase text-sm">Elite Experiences</span>
