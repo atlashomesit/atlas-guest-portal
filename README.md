@@ -76,6 +76,7 @@ Cloudflare Pages setup:
 ### Lockfile maintenance
 - Use Node 22.x (see `.nvmrc`; required by Vite 7) and run `npm install` to refresh dependencies.
 - Always commit the resulting `package-lock.json` so `npm ci` stays in sync locally, in CI, and during Cloudflare builds.
+- **Cloudflare (Linux) vs Windows:** Some tools (`rollup` native bindings, `sharp` / `@img/*` Linux binaries) are optional dependencies. The repo lists Linux x64 packages under root `optionalDependencies` so the lockfile contains `packages["node_modules/…"]` entries Cloudflare’s `npm ci` can install. `prebuild` runs `scripts/verify-lockfile-linux-ci-deps.mjs` to fail fast if those entries are missing.
 
 ### CI
 - The workflow `.github/workflows/ci.yml` runs on push to `main` and on pull requests: `npm ci` → lint → build → `npm test` → check:local-network. Use the same commands locally before pushing. See `CONTRIBUTING.md` for the PR checklist. Status check name for branch protection: **build**.
