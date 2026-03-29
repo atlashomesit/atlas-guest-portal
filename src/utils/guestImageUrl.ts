@@ -1,6 +1,9 @@
+/** Listing imagery for this product ships from this account (public-read container). */
+const ALLOWED_AZURE_BLOB_HOSTS = new Set(["atlashomestorage.blob.core.windows.net"]);
+
 /**
- * Azure Blob URLs are not publicly readable for this project (409). Never use them as img src
- * in the guest portal — filter them out and show a grey placeholder instead.
+ * Block arbitrary Azure blob hosts (private tenants / accidental URLs). Allow the
+ * canonical listing-images account so cards and galleries can load real photos.
  */
 export function isBlockedGuestImageUrl(url: string): boolean {
   const t = (url ?? "").trim();
@@ -8,7 +11,8 @@ export function isBlockedGuestImageUrl(url: string): boolean {
   try {
     const base = typeof window !== "undefined" ? window.location.origin : "https://local.invalid";
     const u = new URL(t, base);
-    return u.hostname.includes("blob.core.windows.net");
+    if (!u.hostname.includes("blob.core.windows.net")) return false;
+    return !ALLOWED_AZURE_BLOB_HOSTS.has(u.hostname);
   } catch {
     return false;
   }

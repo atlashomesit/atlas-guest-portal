@@ -49,7 +49,13 @@ const buildHome = (roomNo: string, config: HomeConfig = {}): Home => {
   };
 };
 
+/** Same order as Our Homes: penthouse → floor 3 → 2 → 1 */
 export const homes: Home[] = [
+  buildHome("501", { tagline: "Penthouse retreat with rooftop deck" }),
+  buildHome("301", { tagline: "Sunlit duplex with lounge seating" }),
+  buildHome("302", { tagline: "Minimal, airy suite for long stays" }),
+  buildHome("201", { tagline: "Family-friendly stay with study nook" }),
+  buildHome("202", { tagline: "Open-plan flat with private patio" }),
   buildHome("101", {
     tagline: "Bright 3 BHK with skyline views",
     highlights: [
@@ -60,9 +66,4 @@ export const homes: Home[] = [
     ],
   }),
   buildHome("102", { tagline: "Cozy corner suite for work trips" }),
-  buildHome("201", { tagline: "Family-friendly stay with study nook" }),
-  buildHome("202", { tagline: "Open-plan flat with private patio" }),
-  buildHome("301", { tagline: "Sunlit duplex with lounge seating" }),
-  buildHome("302", { tagline: "Minimal, airy suite for long stays" }),
-  buildHome("501", { tagline: "Penthouse retreat with rooftop deck" }),
 ];

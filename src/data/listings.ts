@@ -1,4 +1,5 @@
 import { propertyData } from './propertyData';
+import { compareAtlasHomesBuildingOrder } from '../utils/atlasHomesBuildingOrder';
 
 export interface Listing {
   id: string | number;
@@ -8,10 +9,14 @@ export interface Listing {
   featured?: boolean;
 }
 
-export const LISTINGS: Listing[] = propertyData.map((property, index) => ({
+const orderedProperties = [...propertyData].sort((a, b) =>
+  compareAtlasHomesBuildingOrder(a.id, b.id),
+);
+
+export const LISTINGS: Listing[] = orderedProperties.map((property) => ({
   id: property.id,
   title: property.property_name,
   subtitle: property.property_description.slice(0, 100) + '...',
   unitType: property.unitType,
-  featured: index === 0, // Make the first one featured
+  featured: property.id === 501,
 }));

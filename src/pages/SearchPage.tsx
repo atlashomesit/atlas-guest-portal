@@ -8,6 +8,7 @@ import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 import SkeletonCard from "../components/apartments/SkeletonCard";
 import OptimizedImage from "../components/ui/OptimizedImage";
 import { filterGuestImageUrls, sanitizeGuestImageUrl } from "../utils/guestImageUrl";
+import { compareAtlasHomesBuildingOrder } from "../utils/atlasHomesBuildingOrder";
 
 const ITEMS_PER_PAGE = 12;
 
@@ -25,7 +26,8 @@ type NormalizedListing = {
 };
 
 function buildStaticListings(): NormalizedListing[] {
-  return propertyData
+  return [...propertyData]
+    .sort((a, b) => compareAtlasHomesBuildingOrder(a.id, b.id))
     .map((property) => {
       const listingId = property.listingId ?? property.id;
       const id = typeof listingId === "number" ? listingId : Number(listingId);
@@ -50,7 +52,13 @@ function buildStaticListings(): NormalizedListing[] {
 }
 
 function apiToNormalized(listings: PublicListing[]): NormalizedListing[] {
-  return listings
+  return [...listings]
+    .sort((a, b) => {
+      const fa = a.floor ?? 0;
+      const fb = b.floor ?? 0;
+      if (fb !== fa) return fb - fa;
+      return (a.name || "").localeCompare(b.name || "", undefined, { numeric: true });
+    })
     .map((l) => {
       const propertySlug = getPropertySlug({ name: l.propertyName || l.name });
       const canonicalPath = buildHomeUnitPath(propertySlug, l.id);
