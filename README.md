@@ -18,7 +18,7 @@ Rationale: simplify the header for faster wayfinding, surface FAQs in-place of t
 For feature work spanning guest frontend and API, see workspace root `ATLAS-HIGH-VALUE-BACKLOG.md` and `ATLAS-FEATURE-EXECUTION-PROMPT.md`.
 
 ## Prerequisites
-- Node.js **22.12.0+** (required by Vite 7 and enforced in `.nvmrc`/`.node-version`)
+- Node.js **22.13.0+** (required by Vite 7 / toolchain engines and enforced in `.nvmrc`/`.node-version`)
 - npm **10.9.2+** (ships with the recommended Node releases)
 - Modern browser for previewing the development server
 
@@ -27,9 +27,9 @@ Optional tooling:
 - ESLint-compatible editor integration for real-time lint feedback
  
 ## Build Environment
-- Node **22.12.0** (LTS)
+- Node **22.13.0** (LTS)
 - npm **10.9.2**
-- Cloudflare Pages build vars → `NODE_VERSION=22.12.0`, `NPM_FLAGS=--no-audit --no-fund`
+- Cloudflare Pages build vars → `NODE_VERSION=22.13.0`, `NPM_FLAGS=--no-audit --no-fund`
 - Enforced override → `@jridgewell/sourcemap-codec@1.5.5`
 
 ## Environment Variables
@@ -58,8 +58,8 @@ Cloudflare Pages setup:
 - Production verification: ensure `API_BASE_URL` (runtime) or `VITE_API_BASE_URL` (build-time fallback) is set. Confirm the value is available in `src/config/getApiBaseUrl.ts` at runtime by inspecting the generated `__ATLAS_RUNTIME_CONFIG__` (from `/config.json`) or the deployed environment config (e.g., Cloudflare Pages env vars or the `Startup` console log).
 
 ### Cloudflare Pages settings
-- In the Pages project dashboard, set the environment variable `NODE_VERSION=22.12.0` so builds align with Vite 7's engine requirement (\`^20.19.0 || >=22.12.0\`).
-- The repo includes `.nvmrc` and `.node-version` set to **22.12.0**; use them locally (e.g., `nvm use`) to match the Pages runtime and avoid EBADENGINE warnings.
+- In the Pages project dashboard, set the environment variable `NODE_VERSION=22.13.0` so builds align with Vite 7 and dependency engine ranges (e.g. `eslint-visitor-keys` expects `^22.13.0`).
+- The repo includes `.nvmrc` and `.node-version` set to **22.13.0**; use them locally (e.g., `nvm use`) to match the Pages runtime and avoid EBADENGINE warnings.
 - `npm run validate:legal` uses Vitest with the **jsdom** environment; keep `jsdom` installed and available during builds so the validator can parse the DOM-like structures it asserts against.
 
 ## Security notes (local network access)
