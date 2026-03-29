@@ -13,7 +13,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host",
-    "prebuild": "npm run validate:legal && node tools/optimize-images.mjs",
+    "prebuild": "node scripts/verify-lockfile-linux-ci-deps.mjs && npm run validate:legal && node tools/optimize-images.mjs",
     "build": "node scripts/verify-pages-env.mjs && vite build",
     "build:functions": "wrangler pages functions build",
     "check:local-network": "node tools/check-local-network-apis.mjs",
@@ -32,6 +32,8 @@
   },
   "packageManager": "npm@10.9.2",
   "optionalDependencies": {
+    "@img/sharp-libvips-linux-x64": "1.0.4",
+    "@img/sharp-linux-x64": "0.33.5",
     "@rollup/rollup-linux-x64-gnu": "4.53.2"
   },
   "overrides": {
