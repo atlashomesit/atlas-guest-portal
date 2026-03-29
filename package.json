@@ -27,10 +27,13 @@
     "smoke:preview": "node scripts/smoke-preview-routes.mjs"
   },
   "engines": {
-    "node": ">=22.12.0",
+    "node": ">=22.13.0",
     "npm": ">=10"
   },
   "packageManager": "npm@10.9.2",
+  "optionalDependencies": {
+    "@rollup/rollup-linux-x64-gnu": "4.53.2"
+  },
   "overrides": {
     "@jridgewell/sourcemap-codec": "1.5.5",
     "dom-accessibility-api": "^0.6.3",
