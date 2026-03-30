@@ -8,7 +8,7 @@ const findPropertyImages = (id: number) => {
   return propertyImages[String(id)] ?? fallbackImages;
 };
 
-/** Catalog uses Azure blob URLs (blocked in UI); gallery shows one placeholder tile per property when none remain. */
+/** Tile count matches filtered catalog URLs (allowlisted Azure listing host) or one fallback when empty. */
 const expectedGalleryTilesForProperty = (id: number) => {
   const allowed = filterGuestImageUrls(findPropertyImages(id));
   return allowed.length > 0 ? allowed.length : 1;

@@ -11,6 +11,13 @@ interface Review {
     rating?: number
 }
 
+const initialsFromName = (name: string) => {
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return "?";
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return `${parts[0][0] ?? ""}${parts[parts.length - 1][0] ?? ""}`.toUpperCase();
+};
+
 const Homepage_Testimonial = () => {
     const data: Review[] = [
         {
@@ -103,9 +110,17 @@ const Homepage_Testimonial = () => {
                                             <FaQuoteLeft className="text-accent-primary text-3xl opacity-50" />
                                         </div>
                                         <p className="text-text-muted flex-grow mb-4">{item.review}</p>
-                                        <div className="mt-auto">
-                                            {renderStars(item.rating)}
-                                            <p className="font-medium text-text-primary mt-3">{item.clientName}</p>
+                                        <div className="mt-auto flex items-center gap-3">
+                                            <div
+                                                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[color:color-mix(in_srgb,var(--cta-primary)_22%,var(--bg-muted))] text-sm font-bold text-[color:color-mix(in_srgb,var(--cta-primary)_90%,var(--text-primary))]"
+                                                aria-hidden
+                                            >
+                                                {initialsFromName(item.clientName)}
+                                            </div>
+                                            <div className="min-w-0">
+                                                {renderStars(item.rating)}
+                                                <p className="font-medium text-text-primary mt-1">{item.clientName}</p>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
