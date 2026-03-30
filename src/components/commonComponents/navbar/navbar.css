@@ -1,26 +1,29 @@
-/* Luxury navbar: transparent on load → frosted glass on scroll. Cormorant + DM Sans. */
+/* Luxury navbar: frosted bar from first paint so dark body text stays readable on dark hero imagery. */
 .navbar-container {
   width: 100%;
   position: fixed;
   top: 0;
   z-index: var(--z-sticky);
-  background-color: transparent;
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  background-color: rgba(var(--bg-base-rgb, 255, 250, 245), 0.94);
+  box-shadow: var(--shadow-level-1);
+  border-bottom: 1px solid rgba(240, 230, 220, 0.85);
   transition: background-color 0.25s cubic-bezier(0.4, 0, 0.2, 1),
     box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1),
-    border-color 0.25s cubic-bezier(0.4, 0, 0.2, 1);  display: flex;
+    border-color 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
   flex-direction: column;
   gap: 0.25rem;
   min-height: var(--nav-height);
   padding-top: var(--safe-area-top);
 }
 
-/* Frosted glass on scroll — warm ivory tint */
+/* Slightly stronger separation after scroll (still same readable chrome) */
 .navbar-container.backdrop-blur {
-  -webkit-backdrop-filter: blur(20px);
-  backdrop-filter: blur(20px);
-  background-color: rgba(var(--bg-base-rgb, 255, 250, 245), 0.85);
-  box-shadow: var(--shadow-level-1);
-  border-bottom: 1px solid rgba(240, 230, 220, 0.8);
+  background-color: rgba(var(--bg-base-rgb, 255, 250, 245), 0.98);
+  box-shadow: var(--shadow-level-2, var(--shadow-level-1));
+  border-bottom-color: rgba(230, 218, 205, 0.95);
 }
 
 .navbar-main {
