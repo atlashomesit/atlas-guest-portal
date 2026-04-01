@@ -24,7 +24,7 @@ async function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-async function waitForServer(url, maxAttempts = 30) {
+async function waitForServer(url, maxAttempts = 60) {
   for (let i = 0; i < maxAttempts; i++) {
     try {
       const r = await fetch(url, { method: "HEAD" });
