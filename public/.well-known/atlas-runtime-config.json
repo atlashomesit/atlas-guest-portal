@@ -1,5 +1,5 @@
 {
-    "apiBaseUrl":  "http://127.0.0.1:5125",
+    "apiBaseUrl":  "http://127.0.0.1:5120",
     "globalDiscountPercent":  0,
     "environment":  "local",
     "tenantKey":  "atlas"
