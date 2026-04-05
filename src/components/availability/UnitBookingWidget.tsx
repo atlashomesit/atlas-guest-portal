@@ -1125,7 +1125,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       };
       document.addEventListener('keydown', handleEscape);
       return () => document.removeEventListener('keydown', handleEscape);
-    }, [closePaymentPopup]);
+      // closePaymentPopup is a stable useCallback from the outer component; outer-scope values
+      // are not valid deps for inner component useEffect (react-hooks/exhaustive-deps).
+    }, []);
 
 
     return (
@@ -1243,7 +1245,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       };
       document.addEventListener('keydown', handleEscape);
       return () => document.removeEventListener('keydown', handleEscape);
-    }, [handleRetryPayment]);
+      // handleRetryPayment is a stable useCallback from the outer component; outer-scope values
+      // are not valid deps for inner component useEffect (react-hooks/exhaustive-deps).
+    }, []);
 
     return (
       <div 
