@@ -36,6 +36,8 @@ interface UnitBookingWidgetProps {
   timezoneId?: string;
   /** Cover image from listing/API (e.g. property gallery). Falls back to /listings/public cache. */
   coverPhotoUrl?: string;
+  /** Maximum guests for this listing. Defaults to 16 if not provided. */
+  maxGuests?: number;
 }
 
 const PENDING_PAYMENT_KEY = 'atlas_pending_razorpay_order';
@@ -98,6 +100,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   listingName,
   timezoneId,
   coverPhotoUrl,
+  maxGuests = 16,
 }) => {
   if (import.meta.env.DEV) {
     console.assert(Boolean(propertyId), '[UnitBookingWidget] propertyId is required for unit mode');
@@ -1566,6 +1569,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                 size="sm"
                 className="!px-2 !py-2 h-9 w-9"
                 aria-label="Decrease guests"
+                disabled={guests <= 1}
                 onClick={() => setGuests((current) => Math.max(1, current - 1))}
               >
                 −
@@ -1578,7 +1582,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                 size="sm"
                 className="!px-2 !py-2 h-9 w-9"
                 aria-label="Increase guests"
-                onClick={() => setGuests((current) => Math.min(16, current + 1))}
+                disabled={guests >= maxGuests}
+                onClick={() => setGuests((current) => Math.min(maxGuests, current + 1))}
               >
                 +
               </Button>
@@ -1602,17 +1607,19 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                 }).format(breakdownPrice)}
               </span>
             </div>
-            <div className="grid grid-cols-[140px_12px_1fr]">
-              <span>GST (5%)</span>
-              <span>:</span>
-              <span className="text-right">
-                {new Intl.NumberFormat('en-IN', {
-                  style: 'currency',
-                  currency: 'INR',
-                  maximumFractionDigits: 0,
-                }).format(gstAmount)}
-              </span>
-            </div>
+            {gstAmount > 0 && (
+              <div className="grid grid-cols-[140px_12px_1fr]">
+                <span>GST (5%)</span>
+                <span>:</span>
+                <span className="text-right">
+                  {new Intl.NumberFormat('en-IN', {
+                    style: 'currency',
+                    currency: 'INR',
+                    maximumFractionDigits: 0,
+                  }).format(gstAmount)}
+                </span>
+              </div>
+            )}
             <div className="grid grid-cols-[140px_12px_1fr]">
               <span>Convenience fee</span>
               <span>:</span>

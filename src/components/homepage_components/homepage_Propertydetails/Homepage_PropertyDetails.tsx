@@ -58,6 +58,7 @@ interface Property {
     property_price: number;
     timezoneId?: string;
     photoCount?: number;
+    maxGuests?: number;
 }
 
 const PropertyDetails = () => {
@@ -309,6 +310,7 @@ const PropertyDetails = () => {
                         property_price: Number((apiListing as Record<string, unknown>).property_price) || 0,
                         timezoneId: (apiListing as Record<string, unknown>).timezoneId as string | undefined,
                         photoCount: photoCount || (coverUrl ? 1 : 0),
+                        maxGuests: Number((apiListing as Record<string, unknown>).maxGuests) || undefined,
                     };
                     const fromApi =
                         photoUrlsList.length > 0 ? photoUrlsList : (coverUrl ? [coverUrl] : []);
@@ -577,7 +579,7 @@ useEffect(() => {
 
                 <div className='flex flex-col gap-4 sm:flex-row '>
                     {/* Left div  */}
-                    <div className="w-full sm:w-2/3">
+                    <div className="w-full sm:w-2/3 order-2 sm:order-1">
                         {/* What this place offers */}
                         <div className="pb-8 border-b border-border-subtle">
                             <h2 className="text-xl sm:text-2xl font-semibold mb-6 text-text-primary">What this place offers</h2>
@@ -738,7 +740,7 @@ useEffect(() => {
                         </div>
                     </div>
                     {/* right div  */}
-                    <div className="w-full sm:w-1/3">
+                    <div className="w-full sm:w-1/3 order-1 sm:order-2">
                         {!data ? (
                             <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6">
                                 <h3 className="text-lg font-semibold text-text-primary">Loading property details...</h3>
@@ -750,12 +752,13 @@ useEffect(() => {
                                     {data?.photoCount != null && data.photoCount > 0 && (
                                         <p className="text-sm text-text-muted mb-2" aria-label="Photo count">{data.photoCount} photo{data.photoCount !== 1 ? 's' : ''}</p>
                                     )}
-                                    <UnitBookingWidget 
+                                    <UnitBookingWidget
                                         listingId={resolvedListingId ?? undefined}
                                         propertyId={listingPropertyId ?? undefined}
                                         listingName={data?.property_name || 'This property'}
                                         timezoneId={data?.timezoneId}
                                         coverPhotoUrl={primaryImage}
+                                        maxGuests={data?.maxGuests}
                                     />
                                     {showAvailabilityPlaceholder && (
                                         <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6">

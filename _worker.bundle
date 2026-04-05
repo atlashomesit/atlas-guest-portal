@@ -1,9 +1,9 @@
-------formdata-undici-024082639468
+------formdata-undici-000044824075
 Content-Disposition: form-data; name="metadata"
 
-{"main_module":"functionsWorker-0.659973368224088.js"}
-------formdata-undici-024082639468
-Content-Disposition: form-data; name="functionsWorker-0.659973368224088.js"; filename="functionsWorker-0.659973368224088.js"
+{"main_module":"functionsWorker-0.9483620060960727.js"}
+------formdata-undici-000044824075
+Content-Disposition: form-data; name="functionsWorker-0.9483620060960727.js"; filename="functionsWorker-0.9483620060960727.js"
 Content-Type: application/javascript+module
 
 var __defProp = Object.defineProperty;
@@ -17,7 +17,7 @@ var __esm = (fn, res) => function __init() {
 var EmailJSResponseStatus;
 var init_EmailJSResponseStatus = __esm({
   "../node_modules/@emailjs/browser/es/models/EmailJSResponseStatus.js"() {
-    init_functionsRoutes_0_7365976784261126();
+    init_functionsRoutes_0_2423172362984909();
     EmailJSResponseStatus = class {
       constructor(_status = 0, _text = "Network Error") {
         this.status = _status;
@@ -32,7 +32,7 @@ var init_EmailJSResponseStatus = __esm({
 var createWebStorage;
 var init_createWebStorage = __esm({
   "../node_modules/@emailjs/browser/es/utils/createWebStorage/createWebStorage.js"() {
-    init_functionsRoutes_0_7365976784261126();
+    init_functionsRoutes_0_2423172362984909();
     createWebStorage = /* @__PURE__ */ __name(() => {
       if (typeof localStorage === "undefined")
         return;
@@ -49,7 +49,7 @@ var init_createWebStorage = __esm({
 var store;
 var init_store = __esm({
   "../node_modules/@emailjs/browser/es/store/store.js"() {
-    init_functionsRoutes_0_7365976784261126();
+    init_functionsRoutes_0_2423172362984909();
     init_createWebStorage();
     store = {
       origin: "https://api.emailjs.com",
@@ -63,7 +63,7 @@ var init_store = __esm({
 var buildOptions;
 var init_buildOptions = __esm({
   "../node_modules/@emailjs/browser/es/utils/buildOptions/buildOptions.js"() {
-    init_functionsRoutes_0_7365976784261126();
+    init_functionsRoutes_0_2423172362984909();
     buildOptions = /* @__PURE__ */ __name((options) => {
       if (!options)
         return {};
@@ -84,7 +84,7 @@ var init_buildOptions = __esm({
 var init;
 var init_init = __esm({
   "../node_modules/@emailjs/browser/es/methods/init/init.js"() {
-    init_functionsRoutes_0_7365976784261126();
+    init_functionsRoutes_0_2423172362984909();
     init_store();
     init_buildOptions();
     init = /* @__PURE__ */ __name((options, origin = "https://api.emailjs.com") => {
@@ -105,7 +105,7 @@ var init_init = __esm({
 var sendPost;
 var init_sendPost = __esm({
   "../node_modules/@emailjs/browser/es/api/sendPost.js"() {
-    init_functionsRoutes_0_7365976784261126();
+    init_functionsRoutes_0_2423172362984909();
     init_EmailJSResponseStatus();
     init_store();
     sendPost = /* @__PURE__ */ __name(async (url, data, headers = {}) => {
@@ -128,7 +128,7 @@ var init_sendPost = __esm({
 var validateParams;
 var init_validateParams = __esm({
   "../node_modules/@emailjs/browser/es/utils/validateParams/validateParams.js"() {
-    init_functionsRoutes_0_7365976784261126();
+    init_functionsRoutes_0_2423172362984909();
     validateParams = /* @__PURE__ */ __name((publicKey, serviceID, templateID) => {
       if (!publicKey || typeof publicKey !== "string") {
         throw "The public key is required. Visit https://dashboard.emailjs.com/admin/account";
@@ -147,7 +147,7 @@ var init_validateParams = __esm({
 var validateTemplateParams;
 var init_validateTemplateParams = __esm({
   "../node_modules/@emailjs/browser/es/utils/validateTemplateParams/validateTemplateParams.js"() {
-    init_functionsRoutes_0_7365976784261126();
+    init_functionsRoutes_0_2423172362984909();
     validateTemplateParams = /* @__PURE__ */ __name((templateParams) => {
       if (templateParams && templateParams.toString() !== "[object Object]") {
         throw "The template params have to be the object. Visit https://www.emailjs.com/docs/sdk/send/";
@@ -160,7 +160,7 @@ var init_validateTemplateParams = __esm({
 var isHeadless;
 var init_isHeadless = __esm({
   "../node_modules/@emailjs/browser/es/utils/isHeadless/isHeadless.js"() {
-    init_functionsRoutes_0_7365976784261126();
+    init_functionsRoutes_0_2423172362984909();
     isHeadless = /* @__PURE__ */ __name((navigator2) => {
       return navigator2.webdriver || !navigator2.languages || navigator2.languages.length === 0;
     }, "isHeadless");
@@ -171,7 +171,7 @@ var init_isHeadless = __esm({
 var headlessError;
 var init_headlessError = __esm({
   "../node_modules/@emailjs/browser/es/errors/headlessError/headlessError.js"() {
-    init_functionsRoutes_0_7365976784261126();
+    init_functionsRoutes_0_2423172362984909();
     init_EmailJSResponseStatus();
     headlessError = /* @__PURE__ */ __name(() => {
       return new EmailJSResponseStatus(451, "Unavailable For Headless Browser");
@@ -183,7 +183,7 @@ var init_headlessError = __esm({
 var validateBlockListParams;
 var init_validateBlockListParams = __esm({
   "../node_modules/@emailjs/browser/es/utils/validateBlockListParams/validateBlockListParams.js"() {
-    init_functionsRoutes_0_7365976784261126();
+    init_functionsRoutes_0_2423172362984909();
     validateBlockListParams = /* @__PURE__ */ __name((list, watchVariable) => {
       if (!Array.isArray(list)) {
         throw "The BlockList list has to be an array";
@@ -199,7 +199,7 @@ var init_validateBlockListParams = __esm({
 var isBlockListDisabled, getValue, isBlockedValueInParams;
 var init_isBlockedValueInParams = __esm({
   "../node_modules/@emailjs/browser/es/utils/isBlockedValueInParams/isBlockedValueInParams.js"() {
-    init_functionsRoutes_0_7365976784261126();
+    init_functionsRoutes_0_2423172362984909();
     init_validateBlockListParams();
     isBlockListDisabled = /* @__PURE__ */ __name((options) => {
       return !options.list?.length || !options.watchVariable;
@@ -223,7 +223,7 @@ var init_isBlockedValueInParams = __esm({
 var blockedEmailError;
 var init_blockedEmailError = __esm({
   "../node_modules/@emailjs/browser/es/errors/blockedEmailError/blockedEmailError.js"() {
-    init_functionsRoutes_0_7365976784261126();
+    init_functionsRoutes_0_2423172362984909();
     init_EmailJSResponseStatus();
     blockedEmailError = /* @__PURE__ */ __name(() => {
       return new EmailJSResponseStatus(403, "Forbidden");
@@ -235,7 +235,7 @@ var init_blockedEmailError = __esm({
 var validateLimitRateParams;
 var init_validateLimitRateParams = __esm({
   "../node_modules/@emailjs/browser/es/utils/validateLimitRateParams/validateLimitRateParams.js"() {
-    init_functionsRoutes_0_7365976784261126();
+    init_functionsRoutes_0_2423172362984909();
     validateLimitRateParams = /* @__PURE__ */ __name((throttle, id) => {
       if (typeof throttle !== "number" || throttle < 0) {
         throw "The LimitRate throttle has to be a positive number";
@@ -251,7 +251,7 @@ var init_validateLimitRateParams = __esm({
 var getLeftTime, isLimitRateHit;
 var init_isLimitRateHit = __esm({
   "../node_modules/@emailjs/browser/es/utils/isLimitRateHit/isLimitRateHit.js"() {
-    init_functionsRoutes_0_7365976784261126();
+    init_functionsRoutes_0_2423172362984909();
     init_validateLimitRateParams();
     getLeftTime = /* @__PURE__ */ __name(async (id, throttle, storage) => {
       const lastTime = Number(await storage.get(id) || 0);
@@ -277,7 +277,7 @@ var init_isLimitRateHit = __esm({
 var limitRateError;
 var init_limitRateError = __esm({
   "../node_modules/@emailjs/browser/es/errors/limitRateError/limitRateError.js"() {
-    init_functionsRoutes_0_7365976784261126();
+    init_functionsRoutes_0_2423172362984909();
     init_EmailJSResponseStatus();
     limitRateError = /* @__PURE__ */ __name(() => {
       return new EmailJSResponseStatus(429, "Too Many Requests");
@@ -289,7 +289,7 @@ var init_limitRateError = __esm({
 var send;
 var init_send = __esm({
   "../node_modules/@emailjs/browser/es/methods/send/send.js"() {
-    init_functionsRoutes_0_7365976784261126();
+    init_functionsRoutes_0_2423172362984909();
     init_store();
     init_sendPost();
     init_buildOptions();
@@ -337,7 +337,7 @@ var init_send = __esm({
 var validateForm;
 var init_validateForm = __esm({
   "../node_modules/@emailjs/browser/es/utils/validateForm/validateForm.js"() {
-    init_functionsRoutes_0_7365976784261126();
+    init_functionsRoutes_0_2423172362984909();
     validateForm = /* @__PURE__ */ __name((form) => {
       if (!form || form.nodeName !== "FORM") {
         throw "The 3rd parameter is expected to be the HTML form element or the style selector of the form";
@@ -350,7 +350,7 @@ var init_validateForm = __esm({
 var findHTMLForm, sendForm;
 var init_sendForm = __esm({
   "../node_modules/@emailjs/browser/es/methods/sendForm/sendForm.js"() {
-    init_functionsRoutes_0_7365976784261126();
+    init_functionsRoutes_0_2423172362984909();
     init_store();
     init_sendPost();
     init_buildOptions();
@@ -398,7 +398,7 @@ var init_sendForm = __esm({
 var es_default;
 var init_es = __esm({
   "../node_modules/@emailjs/browser/es/index.js"() {
-    init_functionsRoutes_0_7365976784261126();
+    init_functionsRoutes_0_2423172362984909();
     init_EmailJSResponseStatus();
     init_init();
     init_send();
@@ -416,7 +416,7 @@ var init_es = __esm({
 var trimmed, readEnvValue, rawConfig, requiredEnvKeys, emailJsConfig, getMissingEmailJsEnvKeys, isEmailJsConfigured;
 var init_emailjsConfig = __esm({
   "../src/utils/emailjsConfig.ts"() {
-    init_functionsRoutes_0_7365976784261126();
+    init_functionsRoutes_0_2423172362984909();
     trimmed = /* @__PURE__ */ __name((value) => value?.trim(), "trimmed");
     readEnvValue = /* @__PURE__ */ __name((key) => {
       if (typeof import.meta !== "undefined" && typeof import.meta.env !== "undefined") {
@@ -451,7 +451,7 @@ var init_emailjsConfig = __esm({
 var breadcrumbs, monitoringState, toSafeString, createEventId, mapBreadcrumbs, sendToSentry, normalizeError, buildPayload, reportError;
 var init_monitoring = __esm({
   "../src/lib/monitoring.ts"() {
-    init_functionsRoutes_0_7365976784261126();
+    init_functionsRoutes_0_2423172362984909();
     breadcrumbs = [];
     monitoringState = {
       initialized: false,
@@ -540,7 +540,7 @@ var init_monitoring = __esm({
 var delay, DEFAULT_MAX_ATTEMPTS, DEFAULT_BASE_DELAY_MS, logStructuredError, attemptWithRetry, emailJsProvider, consoleProvider, providers, sendEmail, getEmailHealthSnapshot, sendEmailCanary;
 var init_emailService = __esm({
   "../src/lib/email/emailService.ts"() {
-    init_functionsRoutes_0_7365976784261126();
+    init_functionsRoutes_0_2423172362984909();
     init_es();
     init_emailjsConfig();
     init_monitoring();
@@ -669,7 +669,7 @@ var init_emailService = __esm({
 var jsonResponse, deriveStatus, onRequestGet;
 var init_email = __esm({
   "api/health/email.ts"() {
-    init_functionsRoutes_0_7365976784261126();
+    init_functionsRoutes_0_2423172362984909();
     init_emailService();
     init_monitoring();
     jsonResponse = /* @__PURE__ */ __name((body, status = 200) => new Response(JSON.stringify(body), {
@@ -732,7 +732,7 @@ var init_email = __esm({
 var encoder, toHex, safeJsonParse, constantTimeCompare, onRequestPost;
 var init_webhook = __esm({
   "api/payment/webhook.ts"() {
-    init_functionsRoutes_0_7365976784261126();
+    init_functionsRoutes_0_2423172362984909();
     encoder = new TextEncoder();
     toHex = /* @__PURE__ */ __name((buffer) => Array.from(new Uint8Array(buffer)).map((byte) => byte.toString(16).padStart(2, "0")).join(""), "toHex");
     safeJsonParse = /* @__PURE__ */ __name((text) => {
@@ -813,7 +813,7 @@ function parseDiscount(raw) {
 var onRequestGet2;
 var init_atlas_runtime_config_json = __esm({
   ".well-known/atlas-runtime-config.json.ts"() {
-    init_functionsRoutes_0_7365976784261126();
+    init_functionsRoutes_0_2423172362984909();
     __name(parseDiscount, "parseDiscount");
     onRequestGet2 = /* @__PURE__ */ __name((context) => {
       const { env } = context;
@@ -855,7 +855,7 @@ var init_atlas_runtime_config_json = __esm({
 var jsonResponse2, getCorsHeaders, parseLimit, withTimeout, validateParams2, onRequestOptions, onRequestGet3;
 var init_availability = __esm({
   "api/availability.ts"() {
-    init_functionsRoutes_0_7365976784261126();
+    init_functionsRoutes_0_2423172362984909();
     jsonResponse2 = /* @__PURE__ */ __name((body, status = 200, headers = {}) => new Response(JSON.stringify(body, null, 2), {
       status,
       headers: {
@@ -1020,7 +1020,7 @@ var init_availability = __esm({
 var jsonResponse3, queueFailedAttempt, validatePayload, onRequestPost2;
 var init_contact = __esm({
   "api/contact.ts"() {
-    init_functionsRoutes_0_7365976784261126();
+    init_functionsRoutes_0_2423172362984909();
     init_emailService();
     init_emailjsConfig();
     init_monitoring();
@@ -1122,7 +1122,7 @@ var init_contact = __esm({
 var jsonResponse4, getCorsHeaders2, withTimeout2, parseDateParam, toIsoDate, buildDateRange, onRequestOptions2, onRequestGet4;
 var init_listing_availability = __esm({
   "availability/listing-availability.ts"() {
-    init_functionsRoutes_0_7365976784261126();
+    init_functionsRoutes_0_2423172362984909();
     jsonResponse4 = /* @__PURE__ */ __name((body, status = 200, headers = {}) => new Response(JSON.stringify(body, null, 2), {
       status,
       headers: {
@@ -1274,7 +1274,7 @@ var init_listing_availability = __esm({
 var LOGO_URL;
 var init_branding = __esm({
   "../src/config/branding.ts"() {
-    init_functionsRoutes_0_7365976784261126();
+    init_functionsRoutes_0_2423172362984909();
     LOGO_URL = "/images/atlas-homestays-logo.webp";
   }
 });
@@ -1283,7 +1283,7 @@ var init_branding = __esm({
 var CONTACT;
 var init_contact2 = __esm({
   "../src/config/contact.ts"() {
-    init_functionsRoutes_0_7365976784261126();
+    init_functionsRoutes_0_2423172362984909();
     CONTACT = {
       business: {
         phone: "7032493290",
@@ -1303,7 +1303,7 @@ var init_contact2 = __esm({
 var logo, propertyImagePaths, propertyImages, propertyData, navbarData, footerData;
 var init_data = __esm({
   "../src/data.ts"() {
-    init_functionsRoutes_0_7365976784261126();
+    init_functionsRoutes_0_2423172362984909();
     init_branding();
     init_contact2();
     logo = LOGO_URL;
@@ -2020,7 +2020,7 @@ function filterGuestImageUrls(urls) {
 var ALLOWED_AZURE_BLOB_HOSTS;
 var init_guestImageUrl = __esm({
   "../src/utils/guestImageUrl.ts"() {
-    init_functionsRoutes_0_7365976784261126();
+    init_functionsRoutes_0_2423172362984909();
     ALLOWED_AZURE_BLOB_HOSTS = /* @__PURE__ */ new Set(["atlashomestorage.blob.core.windows.net"]);
     __name(isBlockedGuestImageUrl, "isBlockedGuestImageUrl");
     __name(filterGuestImageUrls, "filterGuestImageUrls");
@@ -2031,7 +2031,7 @@ var init_guestImageUrl = __esm({
 var roomNoToListingId, buildHome, homes;
 var init_homes = __esm({
   "../src/content/homes.ts"() {
-    init_functionsRoutes_0_7365976784261126();
+    init_functionsRoutes_0_2423172362984909();
     init_data();
     init_guestImageUrl();
     roomNoToListingId = Object.fromEntries(
@@ -2094,7 +2094,7 @@ function buildSitemapXml(baseUrl, paths) {
 var CORE_PATHS, HOME_PATHS, SITEMAP_PATHS, onRequestGet5;
 var init_sitemap_xml = __esm({
   "sitemap.xml.ts"() {
-    init_functionsRoutes_0_7365976784261126();
+    init_functionsRoutes_0_2423172362984909();
     init_homes();
     CORE_PATHS = [
       "/",
@@ -2127,10 +2127,10 @@ var init_sitemap_xml = __esm({
   }
 });
 
-// ../.wrangler/tmp/pages-W6r3FW/functionsRoutes-0.7365976784261126.mjs
+// ../.wrangler/tmp/pages-LY185k/functionsRoutes-0.2423172362984909.mjs
 var routes;
-var init_functionsRoutes_0_7365976784261126 = __esm({
-  "../.wrangler/tmp/pages-W6r3FW/functionsRoutes-0.7365976784261126.mjs"() {
+var init_functionsRoutes_0_2423172362984909 = __esm({
+  "../.wrangler/tmp/pages-LY185k/functionsRoutes-0.2423172362984909.mjs"() {
     init_email();
     init_webhook();
     init_atlas_runtime_config_json();
@@ -2209,10 +2209,10 @@ var init_functionsRoutes_0_7365976784261126 = __esm({
 });
 
 // ../node_modules/wrangler/templates/pages-template-worker.ts
-init_functionsRoutes_0_7365976784261126();
+init_functionsRoutes_0_2423172362984909();
 
 // ../node_modules/path-to-regexp/dist.es2015/index.js
-init_functionsRoutes_0_7365976784261126();
+init_functionsRoutes_0_2423172362984909();
 function lexer(str) {
   var tokens = [];
   var i = 0;
@@ -2661,4 +2661,4 @@ export {
   pages_template_worker_default as default
 };
 
-------formdata-undici-024082639468--
+------formdata-undici-000044824075--
