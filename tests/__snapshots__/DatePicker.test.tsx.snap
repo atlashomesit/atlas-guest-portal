@@ -37,31 +37,117 @@ exports[`Hero date picker > captures a stable mobile viewport snapshot > date-pi
               Discover verified apartments with flexible bookings, transparent pricing, and secure payments.
             </h2>
           </div>
-          <form
-            class="hero-form w-full max-w-5xl rounded-[24px] bg-[var(--bg-surface)] shadow-[var(--shadow-level-3)] backdrop-blur-sm border border-[var(--border-subtle)] p-8 flex flex-col gap-6"
-            data-testid="search-input"
-            id="search-form"
+          <div
+            data-testid="hero-widget"
           >
-            <div
-              aria-live="polite"
-              class="sr-only"
-              role="status"
-            >
-              Hero form ready.
-            </div>
-            <div
-              class="hero-form-grid grid grid-cols-1 gap-6 md:grid-cols-2 md:auto-rows-fr lg:grid-cols-4"
+            <form
+              class="hero-form w-full max-w-5xl rounded-[24px] bg-[var(--bg-surface)] shadow-[var(--shadow-level-3)] backdrop-blur-sm border border-[var(--border-subtle)] p-8 flex flex-col gap-6"
+              data-testid="search-input"
+              id="search-form"
             >
               <div
-                class="relative"
+                aria-live="polite"
+                class="sr-only"
+                role="status"
               >
+                Hero form ready.
+              </div>
+              <div
+                class="hero-form-grid grid grid-cols-1 gap-6 md:grid-cols-2 md:auto-rows-fr lg:grid-cols-4"
+              >
+                <div
+                  class="relative"
+                >
+                  <button
+                    aria-controls=":rg:"
+                    aria-expanded="true"
+                    aria-label="Click to select check-in date, then choose from calendar"
+                    class="field-card flex h-full min-h-[120px] flex-col justify-between rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-7 py-7 shadow-[var(--shadow-level-1)] hover:shadow-[var(--shadow-level-2)] hover:scale-[1.01] text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary ring-2 ring-[var(--cta-primary)] ring-offset-2"
+                    data-testid="hero-date-toggle"
+                    title="Click to select check-in date, then choose from calendar"
+                    type="button"
+                  >
+                    <span
+                      class="flex items-center gap-2.5 text-[10px] font-bold uppercase tracking-[0.10em] text-[var(--text-muted)] whitespace-nowrap"
+                    >
+                      <svg
+                        aria-hidden="true"
+                        class="lucide lucide-calendar-range h-[18px] w-[18px] shrink-0 text-[var(--text-muted)]"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <rect
+                          height="18"
+                          rx="2"
+                          width="18"
+                          x="3"
+                          y="4"
+                        />
+                        <path
+                          d="M16 2v4"
+                        />
+                        <path
+                          d="M3 10h18"
+                        />
+                        <path
+                          d="M8 2v4"
+                        />
+                        <path
+                          d="M17 14h-6"
+                        />
+                        <path
+                          d="M13 18H7"
+                        />
+                        <path
+                          d="M7 14h.01"
+                        />
+                        <path
+                          d="M17 18h.01"
+                        />
+                      </svg>
+                      <span
+                        class="truncate"
+                      >
+                        Check-in
+                      </span>
+                    </span>
+                    <span
+                      class="date-value mt-4 flex items-center justify-between gap-2 text-[22px] font-medium text-[var(--text-primary)] leading-tight"
+                    >
+                      15 Feb 2026
+                      <svg
+                        aria-hidden="true"
+                        class="lucide lucide-chevron-down h-[18px] w-[18px] shrink-0 text-[var(--text-muted)] transition-transform duration-200 rotate-180"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="m6 9 6 6 6-6"
+                        />
+                      </svg>
+                    </span>
+                  </button>
+                </div>
                 <button
                   aria-controls=":rg:"
                   aria-expanded="true"
-                  aria-label="Click to select check-in date, then choose from calendar"
-                  class="field-card flex h-full min-h-[120px] flex-col justify-between rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-7 py-7 shadow-[var(--shadow-level-1)] hover:shadow-[var(--shadow-level-2)] hover:scale-[1.01] text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary ring-2 ring-[var(--cta-primary)] ring-offset-2"
-                  data-testid="hero-date-toggle"
-                  title="Click to select check-in date, then choose from calendar"
+                  aria-label="Click to select check-out date, then choose from calendar"
+                  class="field-card flex h-full min-h-[120px] flex-col justify-between rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-7 py-7 shadow-[var(--shadow-level-1)] hover:shadow-[var(--shadow-level-2)] hover:scale-[1.01] text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary md:-ml-[1px]"
+                  title="Click to select check-out date, then choose from calendar"
                   type="button"
                 >
                   <span
@@ -112,13 +198,13 @@ exports[`Hero date picker > captures a stable mobile viewport snapshot > date-pi
                     <span
                       class="truncate"
                     >
-                      Check-in
+                      Check-out
                     </span>
                   </span>
                   <span
                     class="date-value mt-4 flex items-center justify-between gap-2 text-[22px] font-medium text-[var(--text-primary)] leading-tight"
                   >
-                    15 Feb 2026
+                    16 Feb 2026
                     <svg
                       aria-hidden="true"
                       class="lucide lucide-chevron-down h-[18px] w-[18px] shrink-0 text-[var(--text-muted)] transition-transform duration-200 rotate-180"
@@ -137,237 +223,155 @@ exports[`Hero date picker > captures a stable mobile viewport snapshot > date-pi
                       />
                     </svg>
                   </span>
+                  <div
+                    class="mt-3 flex items-center justify-center"
+                  >
+                    <span
+                      class="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--accent-primary)] bg-[var(--bg-muted)] px-3 py-1.5 rounded-lg"
+                    >
+                      1 night
+                    </span>
+                  </div>
                 </button>
-              </div>
-              <button
-                aria-controls=":rg:"
-                aria-expanded="true"
-                aria-label="Click to select check-out date, then choose from calendar"
-                class="field-card flex h-full min-h-[120px] flex-col justify-between rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-7 py-7 shadow-[var(--shadow-level-1)] hover:shadow-[var(--shadow-level-2)] hover:scale-[1.01] text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary md:-ml-[1px]"
-                title="Click to select check-out date, then choose from calendar"
-                type="button"
-              >
-                <span
-                  class="flex items-center gap-2.5 text-[10px] font-bold uppercase tracking-[0.10em] text-[var(--text-muted)] whitespace-nowrap"
-                >
-                  <svg
-                    aria-hidden="true"
-                    class="lucide lucide-calendar-range h-[18px] w-[18px] shrink-0 text-[var(--text-muted)]"
-                    fill="none"
-                    height="24"
-                    stroke="currentColor"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    viewBox="0 0 24 24"
-                    width="24"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <rect
-                      height="18"
-                      rx="2"
-                      width="18"
-                      x="3"
-                      y="4"
-                    />
-                    <path
-                      d="M16 2v4"
-                    />
-                    <path
-                      d="M3 10h18"
-                    />
-                    <path
-                      d="M8 2v4"
-                    />
-                    <path
-                      d="M17 14h-6"
-                    />
-                    <path
-                      d="M13 18H7"
-                    />
-                    <path
-                      d="M7 14h.01"
-                    />
-                    <path
-                      d="M17 18h.01"
-                    />
-                  </svg>
-                  <span
-                    class="truncate"
-                  >
-                    Check-out
-                  </span>
-                </span>
-                <span
-                  class="date-value mt-4 flex items-center justify-between gap-2 text-[22px] font-medium text-[var(--text-primary)] leading-tight"
-                >
-                  16 Feb 2026
-                  <svg
-                    aria-hidden="true"
-                    class="lucide lucide-chevron-down h-[18px] w-[18px] shrink-0 text-[var(--text-muted)] transition-transform duration-200 rotate-180"
-                    fill="none"
-                    height="24"
-                    stroke="currentColor"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    viewBox="0 0 24 24"
-                    width="24"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="m6 9 6 6 6-6"
-                    />
-                  </svg>
-                </span>
                 <div
-                  class="mt-3 flex items-center justify-center"
+                  class="relative"
                 >
-                  <span
-                    class="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--accent-primary)] bg-[var(--bg-muted)] px-3 py-1.5 rounded-lg"
+                  <button
+                    aria-expanded="false"
+                    aria-label="Select guests"
+                    class="field-card flex h-full min-h-[120px] flex-col justify-between rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-7 py-7 shadow-[var(--shadow-level-1)] hover:shadow-[var(--shadow-level-2)] hover:scale-[1.01] text-left w-full transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cta-primary)]"
+                    type="button"
                   >
-                    1 night
+                    <span
+                      class="flex items-center gap-2.5 text-[10px] font-bold uppercase tracking-[0.10em] text-[var(--text-muted)] whitespace-nowrap"
+                    >
+                      <svg
+                        aria-hidden="true"
+                        class="lucide lucide-users h-[18px] w-[18px] shrink-0 text-[var(--text-muted)]"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"
+                        />
+                        <circle
+                          cx="9"
+                          cy="7"
+                          r="4"
+                        />
+                        <path
+                          d="M22 21v-2a4 4 0 0 0-3-3.87"
+                        />
+                        <path
+                          d="M16 3.13a4 4 0 0 1 0 7.75"
+                        />
+                      </svg>
+                      <span
+                        class="truncate"
+                      >
+                        Guests
+                      </span>
+                    </span>
+                    <span
+                      class="guest-value mt-4 flex items-center justify-between gap-2 text-[22px] font-medium text-[var(--text-primary)] leading-tight"
+                    >
+                      1 guest
+                      <svg
+                        aria-hidden="true"
+                        class="lucide lucide-chevron-down h-[18px] w-[18px] shrink-0 text-[var(--text-muted)] transition-transform duration-200"
+                        fill="none"
+                        height="24"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                        width="24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="m6 9 6 6 6-6"
+                        />
+                      </svg>
+                    </span>
+                    <p
+                      class="mt-3 text-[12px] leading-relaxed text-[var(--text-muted)]"
+                    >
+                      Maximum 
+                      20
+                       guests
+                    </p>
+                  </button>
+                </div>
+                <div
+                  class="field-card flex h-full min-h-[120px] flex-col justify-between rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-7 py-7 shadow-[var(--shadow-level-1)] hover:shadow-[var(--shadow-level-2)] hover:scale-[1.01] md:-ml-[1px] lg:min-h-[120px] lg:items-stretch lg:justify-center lg:flex-col"
+                >
+                  <button
+                    aria-busy="false"
+                    class="inline-flex h-[60px] w-full items-center justify-center rounded-[14px] bg-gradient-to-br from-[var(--cta-primary)] to-[var(--cta-primary-hover)] px-6 text-base font-semibold tracking-[0.02em] text-white shadow-[var(--shadow-level-2)] transition-all hover:scale-[1.02] hover:shadow-[var(--shadow-level-3)] active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cta-primary)] disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none disabled:hover:scale-100 aria-busy:cursor-progress aria-busy:opacity-90 whitespace-nowrap"
+                    data-testid="hero-search-submit"
+                    type="submit"
+                  >
+                    Check availability
+                  </button>
+                  <a
+                    class="group inline-flex items-center justify-center gap-1 text-[14px] font-medium text-[var(--cta-primary)] transition-all hover:text-[var(--text-body)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#475569] whitespace-nowrap mt-3"
+                    href="/#our-homes"
+                  >
+                    Browse all apartments
+                    <span
+                      class="inline-block transition-transform group-hover:translate-x-1"
+                    >
+                      →
+                    </span>
+                  </a>
+                </div>
+              </div>
+              <div
+                class="flex flex-col gap-3 rounded-2xl bg-[var(--bg-surface)] border border-[var(--bg-muted)] px-6 py-5 text-left md:flex-row md:items-center md:gap-4"
+              >
+                <div
+                  class="flex items-center gap-2 text-[15px] font-bold text-[var(--text-body)]"
+                >
+                  <svg
+                    aria-hidden="true"
+                    class="lucide lucide-shield-check h-4 w-4 text-[var(--cta-primary)]"
+                    fill="none"
+                    height="24"
+                    stroke="currentColor"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    viewBox="0 0 24 24"
+                    width="24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"
+                    />
+                    <path
+                      d="m9 12 2 2 4-4"
+                    />
+                  </svg>
+                  <span>
+                    Book with confidence
                   </span>
                 </div>
-              </button>
-              <div
-                class="relative"
-              >
-                <button
-                  aria-expanded="false"
-                  aria-label="Select guests"
-                  class="field-card flex h-full min-h-[120px] flex-col justify-between rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-7 py-7 shadow-[var(--shadow-level-1)] hover:shadow-[var(--shadow-level-2)] hover:scale-[1.01] text-left w-full transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cta-primary)]"
-                  type="button"
+                <p
+                  class="text-[13px] text-[var(--cta-primary)] md:border-l md:border-[var(--border-subtle)] md:pl-4"
                 >
-                  <span
-                    class="flex items-center gap-2.5 text-[10px] font-bold uppercase tracking-[0.10em] text-[var(--text-muted)] whitespace-nowrap"
-                  >
-                    <svg
-                      aria-hidden="true"
-                      class="lucide lucide-users h-[18px] w-[18px] shrink-0 text-[var(--text-muted)]"
-                      fill="none"
-                      height="24"
-                      stroke="currentColor"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      viewBox="0 0 24 24"
-                      width="24"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"
-                      />
-                      <circle
-                        cx="9"
-                        cy="7"
-                        r="4"
-                      />
-                      <path
-                        d="M22 21v-2a4 4 0 0 0-3-3.87"
-                      />
-                      <path
-                        d="M16 3.13a4 4 0 0 1 0 7.75"
-                      />
-                    </svg>
-                    <span
-                      class="truncate"
-                    >
-                      Guests
-                    </span>
-                  </span>
-                  <span
-                    class="guest-value mt-4 flex items-center justify-between gap-2 text-[22px] font-medium text-[var(--text-primary)] leading-tight"
-                  >
-                    1 guest
-                    <svg
-                      aria-hidden="true"
-                      class="lucide lucide-chevron-down h-[18px] w-[18px] shrink-0 text-[var(--text-muted)] transition-transform duration-200"
-                      fill="none"
-                      height="24"
-                      stroke="currentColor"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      viewBox="0 0 24 24"
-                      width="24"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        d="m6 9 6 6 6-6"
-                      />
-                    </svg>
-                  </span>
-                  <p
-                    class="mt-3 text-[12px] leading-relaxed text-[var(--text-muted)]"
-                  >
-                    Maximum 
-                    20
-                     guests
-                  </p>
-                </button>
+                  Instant confirmation • Secure payment • Flexible cancellation
+                </p>
               </div>
-              <div
-                class="field-card flex h-full min-h-[120px] flex-col justify-between rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-7 py-7 shadow-[var(--shadow-level-1)] hover:shadow-[var(--shadow-level-2)] hover:scale-[1.01] md:-ml-[1px] lg:min-h-[120px] lg:items-stretch lg:justify-center lg:flex-col"
-              >
-                <button
-                  aria-busy="false"
-                  class="inline-flex h-[60px] w-full items-center justify-center rounded-[14px] bg-gradient-to-br from-[var(--cta-primary)] to-[var(--cta-primary-hover)] px-6 text-base font-semibold tracking-[0.02em] text-white shadow-[var(--shadow-level-2)] transition-all hover:scale-[1.02] hover:shadow-[var(--shadow-level-3)] active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cta-primary)] disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none disabled:hover:scale-100 aria-busy:cursor-progress aria-busy:opacity-90 whitespace-nowrap"
-                  data-testid="hero-search-submit"
-                  type="submit"
-                >
-                  Check availability
-                </button>
-                <a
-                  class="group inline-flex items-center justify-center gap-1 text-[14px] font-medium text-[var(--cta-primary)] transition-all hover:text-[var(--text-body)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#475569] whitespace-nowrap mt-3"
-                  href="/#our-homes"
-                >
-                  Browse all apartments
-                  <span
-                    class="inline-block transition-transform group-hover:translate-x-1"
-                  >
-                    →
-                  </span>
-                </a>
-              </div>
-            </div>
-            <div
-              class="flex flex-col gap-3 rounded-2xl bg-[var(--bg-surface)] border border-[var(--bg-muted)] px-6 py-5 text-left md:flex-row md:items-center md:gap-4"
-            >
-              <div
-                class="flex items-center gap-2 text-[15px] font-bold text-[var(--text-body)]"
-              >
-                <svg
-                  aria-hidden="true"
-                  class="lucide lucide-shield-check h-4 w-4 text-[var(--cta-primary)]"
-                  fill="none"
-                  height="24"
-                  stroke="currentColor"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  viewBox="0 0 24 24"
-                  width="24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"
-                  />
-                  <path
-                    d="m9 12 2 2 4-4"
-                  />
-                </svg>
-                <span>
-                  Book with confidence
-                </span>
-              </div>
-              <p
-                class="text-[13px] text-[var(--cta-primary)] md:border-l md:border-[var(--border-subtle)] md:pl-4"
-              >
-                Instant confirmation • Secure payment • Flexible cancellation
-              </p>
-            </div>
-          </form>
+            </form>
+          </div>
           <a
             class="mt-2 inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-5 py-2.5 text-sm font-semibold text-[var(--text-on-hero)] backdrop-blur-sm transition hover:bg-white/20 hover:border-white/50"
             href="/become-a-host"
