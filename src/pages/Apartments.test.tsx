@@ -44,7 +44,13 @@ describe('Apartments', () => {
 
     await waitFor(() => expect(monitoredFetch).toHaveBeenCalled());
 
-    expect(screen.getByTestId('error-layout')).toBeInTheDocument();
+    // Async fetch + setState; release gate runs guest tests in parallel with API/admin — allow extra time
+    await waitFor(
+      () => {
+        expect(screen.getByTestId('error-layout')).toBeInTheDocument();
+      },
+      { timeout: 10_000 },
+    );
     expect(screen.getByText(/we couldn’t load this page/i)).toBeInTheDocument();
     expect(screen.getByText(/attempted to reach: https:\/\/api.example.com/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument();
