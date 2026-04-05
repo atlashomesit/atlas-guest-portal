@@ -1,4 +1,5 @@
 # Lint, build, test per DEVSECOPS-GATES-BASELINE.md. Status check name for branch protection: build
+# Smoke/preview testing is handled by Cloudflare Pages preview deployments.
 name: CI
 
 on:
@@ -37,6 +38,3 @@ jobs:
 
       - name: Check bundle for local network access APIs
         run: npm run check:local-network
-
-      - name: Smoke test (preview routes)
-        run: npm run smoke:preview
