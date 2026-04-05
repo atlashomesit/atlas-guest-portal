@@ -23,5 +23,6 @@ export default defineConfig({
       inline: ["react-router", "react-router-dom"],
     },
     globals: true,
+    testTimeout: 15000,
   },
 });

@@ -1125,7 +1125,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       };
       document.addEventListener('keydown', handleEscape);
       return () => document.removeEventListener('keydown', handleEscape);
-    }, [closePaymentPopup]);
+      // closePaymentPopup is a stable useCallback from the outer component; outer-scope values
+      // are not valid deps for inner component useEffect (react-hooks/exhaustive-deps).
+    }, []);
 
 
     return (
@@ -1243,7 +1245,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       };
       document.addEventListener('keydown', handleEscape);
       return () => document.removeEventListener('keydown', handleEscape);
-    }, [handleRetryPayment]);
+      // handleRetryPayment is a stable useCallback from the outer component; outer-scope values
+      // are not valid deps for inner component useEffect (react-hooks/exhaustive-deps).
+    }, []);
 
     return (
       <div 
@@ -1336,7 +1340,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     <>
       {paymentStatus === 'success' && <PaymentSuccessPopup />}
       {paymentStatus === 'failed' && <PaymentFailedPopup />}
-      <form onSubmit={handleSubmit} className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6 space-y-5" role="region" aria-label="Booking and availability">
+      <form onSubmit={handleSubmit} className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6 space-y-5" role="region" aria-label="Booking and availability" data-testid="guest-booking-form">
 
       {displayCoverUrl && (
         <div className="overflow-hidden rounded-xl border border-border-subtle -mt-1 mb-1">
@@ -1652,6 +1656,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             disabled={isBookingDisabled}
             className={`w-full rounded-xl border ${formErrors.name ? 'border-support-error' : 'border-border-strong'} bg-bg-muted px-4 py-3 text-text-primary focus:outline-none focus:ring-2 focus:ring-cta-primary`}
             placeholder="Enter your full name"
+            data-testid="guest-booking-name"
           />
           {formErrors.name && <p className="text-sm text-support-error">{formErrors.name}</p>}
         </div>
@@ -1669,6 +1674,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             disabled={isBookingDisabled}
             className={`w-full rounded-xl border ${formErrors.email ? 'border-support-error' : 'border-border-strong'} bg-bg-muted px-4 py-3 text-text-primary focus:outline-none focus:ring-2 focus:ring-cta-primary`}
             placeholder="Enter your email"
+            data-testid="guest-booking-email"
           />
           {formErrors.email && <p className="text-sm text-support-error">{formErrors.email}</p>}
         </div>
@@ -1686,6 +1692,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             disabled={isBookingDisabled}
             className={`w-full rounded-xl border ${formErrors.phone ? 'border-support-error' : 'border-border-strong'} bg-bg-muted px-4 py-3 text-text-primary focus:outline-none focus:ring-2 focus:ring-cta-primary`}
             placeholder="Enter your 10-digit phone number"
+            data-testid="guest-booking-phone"
           />
           {formErrors.phone && <p className="text-sm text-support-error">{formErrors.phone}</p>}
         </div>
@@ -1700,11 +1707,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         </div>
       )}
 
-      <Button 
-        type="submit" 
-        fullWidth 
+      <Button
+        type="submit"
+        fullWidth
         disabled={isSubmitting || isLoading || !dateRange.startDate || !dateRange.endDate || isBookingDisabled}
         className={isSubmitting || isLoading ? 'opacity-75' : ''}
+        data-testid="guest-booking-submit"
       >
         {isBookingDisabled ? 'Unavailable' : isSubmitting || isLoading ? 'Processing...' : 'Book this home'}
       </Button>

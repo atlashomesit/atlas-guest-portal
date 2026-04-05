@@ -188,7 +188,7 @@ const SearchPage = () => {
             {visibleUnits.map((unit) => (
               <article
                 key={unit.id}
-                data-testid="listing-card"
+                data-testid="guest-listing-card"
                 className="flex flex-col overflow-hidden rounded-2xl border border-border-subtle bg-bg-surface shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
               >
                 <div className="h-48 w-full bg-gradient-to-br from-bg-muted to-bg-surface">

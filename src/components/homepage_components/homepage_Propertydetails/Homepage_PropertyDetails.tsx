@@ -191,7 +191,7 @@ const PropertyDetails = () => {
             : null;
 
         if (import.meta.env.DEV && listingIdParam) {
-            // eslint-disable-next-line no-console
+             
             console.debug('[PropertyDetails] route params:', { propertySlug, unitSlug: listingIdParam, listingId }, 'foundByListingId:', !!foundByListingId);
         }
 
@@ -266,7 +266,7 @@ const PropertyDetails = () => {
         // API fallback: fetch from API when not in static data (handles DB IDs not in propertyData)
         if (listingIdParam && (Number.isFinite(listingId) ? listingId > 0 : true)) {
             if (import.meta.env.DEV) {
-                // eslint-disable-next-line no-console
+                 
                 console.debug('[PropertyDetails] API fallback for listingIdParam:', listingIdParam);
             }
             const controller = new AbortController();
@@ -275,7 +275,7 @@ const PropertyDetails = () => {
                 .then((apiListing: ListingDetail | null) => {
                     if (cancelled || !apiListing) {
                         if (import.meta.env.DEV && !cancelled) {
-                            // eslint-disable-next-line no-console
+                             
                             console.debug('[PropertyDetails] API returned no listing for:', listingIdParam);
                         }
                         if (!cancelled) setNotFound(true);
