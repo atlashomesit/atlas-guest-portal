@@ -1,6 +1,5 @@
 // BookingCard.tsx
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 
 interface BookingCardProps {
@@ -9,8 +8,7 @@ interface BookingCardProps {
 }
 
 const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = false }) => {
-  useNavigate();
-  
+
   const [paymentStatus, setPaymentStatus] = useState<{
     state: 'idle' | 'success' | 'failure';
     paymentId?: string;
