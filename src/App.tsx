@@ -31,6 +31,7 @@ const SupportWidget = React.lazy(() => import("./components/support/SupportWidge
 const Reserve = React.lazy(() => import("./pages/Reserve"))
 const BecomeHost = React.lazy(() => import("./pages/BecomeHost"))
 const BookingConfirmationPage = React.lazy(() => import("./pages/BookingConfirmationPage"))
+const ReviewSubmitPage = React.lazy(() => import("./pages/ReviewSubmitPage"))
 const PageNotFound = React.lazy(() => import("./pages/pagenotfound/PageNotFound"))
 
 function LazyFallback() {
@@ -104,6 +105,7 @@ function AppWrapper() {
           <Route path="/properties/:id" element={withBoundary(<LegacyPropertyRedirect />, "property-details-modern-redirect-route")} />
           <Route path="/reserve" element={withBoundary(<Reserve />, "reserve-route")} />
           <Route path="/booking/:bookingId" element={withBoundary(<BookingConfirmationPage />, "booking-confirmation-route")} />
+          <Route path="/review/:bookingId" element={withBoundary(<ReviewSubmitPage />, "review-submit-route")} />
           <Route path="/become-a-host" element={withBoundary(<BecomeHost />, "become-host-route")} />
           <Route path="/property_LocationDetails/:id" element={withBoundary(<Homepage_LocationDetails />, "location-details-route")} />
           <Route path="/:shortCode" element={withBoundary(<ShortLinkRedirect />, "shortlink-route")} />

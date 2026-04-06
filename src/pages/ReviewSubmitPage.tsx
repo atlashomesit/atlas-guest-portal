@@ -1,0 +1,264 @@
+import { useEffect, useState } from "react";
+import { useParams, useSearchParams, Link } from "react-router-dom";
+import SEO from "../components/SEO";
+import { buildApiUrl, getApiHeaders } from "../api/client";
+
+interface ReviewEligibility {
+  bookingId: number;
+  guestName: string;
+  propertyName: string;
+  listingName: string;
+  listingId: number;
+  checkedOut: boolean;
+  alreadyReviewed: boolean;
+  checkoutDate: string;
+}
+
+function StarButton({ value, selected, hovered, onHover, onClick }: {
+  value: number; selected: boolean; hovered: boolean;
+  onHover: (v: number) => void; onClick: (v: number) => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={`${value} star${value !== 1 ? "s" : ""}`}
+      onClick={() => onClick(value)}
+      onMouseEnter={() => onHover(value)}
+      onMouseLeave={() => onHover(0)}
+      className="text-4xl transition-transform hover:scale-110 focus:outline-none focus:scale-110"
+    >
+      <span className={selected || hovered ? "text-amber-400" : "text-gray-300"}>★</span>
+    </button>
+  );
+}
+
+const ratingLabels: Record<number, string> = {
+  1: "Poor",
+  2: "Fair",
+  3: "Good",
+  4: "Very Good",
+  5: "Excellent",
+};
+
+export default function ReviewSubmitPage() {
+  const { bookingId } = useParams<{ bookingId: string }>();
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get("t");
+
+  const [eligibility, setEligibility] = useState<ReviewEligibility | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Form state
+  const [rating, setRating] = useState(0);
+  const [hoveredRating, setHoveredRating] = useState(0);
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!bookingId || !token) {
+      setError("Invalid review link. Please use the link from your check-out message.");
+      setLoading(false);
+      return;
+    }
+
+    const url = buildApiUrl(`/api/reviews/check/${bookingId}?t=${encodeURIComponent(token)}`);
+    fetch(url, { headers: { Accept: "application/json", ...getApiHeaders() } })
+      .then(async (res) => {
+        if (res.status === 404) throw new Error("Review link not found. Please use the link from your message.");
+        if (!res.ok) throw new Error("Unable to load review details. Please try again.");
+        return res.json() as Promise<ReviewEligibility>;
+      })
+      .then(setEligibility)
+      .catch((err: Error) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, [bookingId, token]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (rating === 0) { setSubmitError("Please select a star rating."); return; }
+    if (!body.trim()) { setSubmitError("Please share a bit about your stay."); return; }
+
+    setSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      const url = buildApiUrl("/api/reviews");
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json", ...getApiHeaders() },
+        body: JSON.stringify({ bookingId: Number(bookingId), rating, title: title.trim() || undefined, body: body.trim(), bookingToken: token }),
+      });
+
+      if (res.status === 409) throw new Error("You have already submitted a review for this stay.");
+      if (res.status === 400) {
+        const data = await res.json() as { error?: string };
+        throw new Error(data?.error ?? "Could not submit review. Please try again.");
+      }
+      if (!res.ok) throw new Error("Failed to submit review. Please try again.");
+
+      setSubmitted(true);
+    } catch (err: unknown) {
+      setSubmitError((err as Error).message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-3 border-border-subtle border-t-brand-primary rounded-full animate-spin" />
+          <p className="text-sm text-text-secondary">Loading&hellip;</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !eligibility) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center px-4">
+        <div className="max-w-md text-center space-y-4">
+          <div className="text-4xl">🔍</div>
+          <h1 className="text-xl font-bold text-text-primary">Link not found</h1>
+          <p className="text-sm text-text-secondary">{error ?? "We could not find this review link."}</p>
+          <Link to="/" className="inline-block mt-2 text-sm text-brand-primary underline underline-offset-2">Return to homepage</Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (!eligibility.checkedOut) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center px-4">
+        <div className="max-w-md text-center space-y-4">
+          <div className="text-4xl">🏠</div>
+          <h1 className="text-xl font-bold text-text-primary">Not checked out yet</h1>
+          <p className="text-sm text-text-secondary">
+            You can leave a review after your stay at <strong>{eligibility.propertyName}</strong> ends on {eligibility.checkoutDate}.
+          </p>
+          <Link to="/" className="inline-block mt-2 text-sm text-brand-primary underline underline-offset-2">Return to homepage</Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (eligibility.alreadyReviewed || submitted) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center px-4">
+        <div className="max-w-md text-center space-y-4">
+          <div className="text-4xl">🙏</div>
+          <h1 className="text-xl font-bold text-text-primary">
+            {submitted ? "Thank you for your review!" : "Review already submitted"}
+          </h1>
+          <p className="text-sm text-text-secondary">
+            {submitted
+              ? `Your feedback about ${eligibility.propertyName} means a lot. We hope to welcome you back soon!`
+              : "You have already submitted a review for this stay. Thank you!"}
+          </p>
+          <Link to="/" className="inline-block mt-2 text-sm text-brand-primary underline underline-offset-2">Return to homepage</Link>
+        </div>
+      </div>
+    );
+  }
+
+  const activeRating = hoveredRating || rating;
+
+  return (
+    <>
+      <SEO
+        title={`Leave a review — ${eligibility.propertyName}`}
+        description={`Share your experience staying at ${eligibility.propertyName}.`}
+      />
+      <div className="max-w-lg mx-auto px-4 sm:px-6 py-10 space-y-6">
+
+        <div className="space-y-1">
+          <h1 className="text-2xl font-bold text-text-primary">How was your stay?</h1>
+          <p className="text-sm text-text-secondary">
+            {eligibility.guestName ? `Hi ${eligibility.guestName.split(" ")[0]}, share` : "Share"} your experience at <strong>{eligibility.propertyName}</strong>.
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+
+          {/* Star rating */}
+          <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3">
+            <p className="text-sm font-medium text-text-primary">Overall rating</p>
+            <div className="flex gap-1">
+              {[1, 2, 3, 4, 5].map((v) => (
+                <StarButton
+                  key={v} value={v}
+                  selected={v <= rating}
+                  hovered={v <= hoveredRating}
+                  onHover={setHoveredRating}
+                  onClick={setRating}
+                />
+              ))}
+            </div>
+            {activeRating > 0 && (
+              <p className="text-sm font-semibold text-amber-600">{ratingLabels[activeRating]}</p>
+            )}
+          </div>
+
+          {/* Title */}
+          <div className="space-y-1.5">
+            <label htmlFor="review-title" className="text-sm font-medium text-text-primary">
+              Headline <span className="text-text-muted font-normal">(optional)</span>
+            </label>
+            <input
+              id="review-title"
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="A few words to sum it up"
+              maxLength={100}
+              className="w-full rounded-xl border border-border-subtle bg-bg-surface px-4 py-2.5 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary"
+            />
+          </div>
+
+          {/* Body */}
+          <div className="space-y-1.5">
+            <label htmlFor="review-body" className="text-sm font-medium text-text-primary">
+              Your experience <span className="text-support-error">*</span>
+            </label>
+            <textarea
+              id="review-body"
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              placeholder="Tell us about the property, cleanliness, host responsiveness, check-in experience…"
+              rows={5}
+              maxLength={1000}
+              required
+              className="w-full rounded-xl border border-border-subtle bg-bg-surface px-4 py-2.5 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary resize-none"
+            />
+            <p className="text-xs text-text-muted text-right">{body.length}/1000</p>
+          </div>
+
+          {submitError && (
+            <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+              {submitError}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={submitting}
+            className="w-full rounded-xl bg-brand-primary hover:bg-brand-primary/90 text-white font-semibold py-3 text-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {submitting ? "Submitting…" : "Submit Review"}
+          </button>
+        </form>
+
+        <div className="text-center pt-2">
+          <Link to="/" className="text-sm text-text-muted underline underline-offset-2 hover:text-text-primary">
+            ← Back to Atlas Homestays
+          </Link>
+        </div>
+      </div>
+    </>
+  );
+}
