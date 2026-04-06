@@ -950,7 +950,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         timeout: 15000
       });
 
-      const { keyId: key, orderId, bookingId } = orderResponse.data;
+      const { keyId: key, orderId, bookingId } = orderResponse.data ?? {};
+      if (!key || !orderId || !bookingId) {
+        throw new Error('Checkout could not start: invalid response from payment service. Please try again.');
+      }
 
       // Store pending payment for recovery if user refreshes during modal
       localStorage.setItem(PENDING_PAYMENT_KEY, orderId);
