@@ -159,6 +159,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [paymentStatus, setPaymentStatus] = useState<'success' | 'failed' | null>(null);
   const [bookingDetails, setBookingDetails] = useState<{
     bookingId: string;
+    bookingToken?: string;
     amount: number;
     propertyName: string;
     checkIn: Date;
@@ -950,7 +951,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         timeout: 15000
       });
 
-      const { keyId: key, orderId, bookingId } = orderResponse.data;
+      const { keyId: key, orderId, bookingId, bookingToken } = orderResponse.data ?? {};
+      if (!key || !orderId || !bookingId) {
+        throw new Error('Checkout could not start: invalid response from payment service. Please try again.');
+      }
 
       // Store pending payment for recovery if user refreshes during modal
       localStorage.setItem(PENDING_PAYMENT_KEY, orderId);
@@ -1007,6 +1011,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                 
                 setBookingDetails({
                   bookingId,
+                  bookingToken: bookingToken ?? undefined,
                   amount: finalTotal,
                   propertyName: listingName || 'Selected Property',
                   checkIn: checkinDate,
@@ -1102,8 +1107,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
   const goToDashboard = useCallback(() => {
     closePaymentPopup();
-    navigate('/', { replace: true });
-  }, [navigate, closePaymentPopup]);
+    if (bookingDetails?.bookingId && bookingDetails.bookingToken) {
+      navigate(`/booking/${bookingDetails.bookingId}?t=${encodeURIComponent(bookingDetails.bookingToken)}`, { replace: true });
+    } else {
+      navigate('/', { replace: true });
+    }
+  }, [navigate, closePaymentPopup, bookingDetails]);
 
   // Auto-close timers in parent so they are not reset by inner component re-mounts
   useEffect(() => {
@@ -1226,7 +1235,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                 onClick={goToDashboard}
                 className="px-10 py-3 text-lg font-semibold bg-green-600 hover:bg-green-700 text-white shadow-lg"
               >
-                Go to Dashboard
+                View My Booking
               </Button>
             </div>
 

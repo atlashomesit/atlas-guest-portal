@@ -69,9 +69,6 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
       console.warn('[BookingContext] Failed to persist booking state', error);
     }
   }, [booking]);
-  useEffect(() => {
- 
-}, [booking]);
 
   const updateBooking = useCallback((updates: Partial<BookingState>) => {
         setBooking((prev) => ({
