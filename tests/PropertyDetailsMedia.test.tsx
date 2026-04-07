@@ -1,6 +1,11 @@
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { vi } from "vitest";
+
+vi.mock("@/components/availability/UnitBookingWidget", () => ({
+  __esModule: true,
+  default: () => <div>Booking Widget</div>,
+}));
 
 vi.mock("@/components/homepage_components/hotelBooking_form/BookingCard.tsx", () => ({
   __esModule: true,
@@ -37,10 +42,19 @@ vi.mock("@/contexts/BookingContext", () => ({
   BookingProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
+vi.mock("@/utils/listingResolver", () => ({
+  resolveListing: vi.fn().mockResolvedValue({
+    id: 101,
+    propertyId: 1,
+    name: "Test Property",
+  }),
+}));
+
 vi.mock("@/data", () => ({
   propertyData: [
     {
       id: 101,
+      listingId: 101,
       property_name: "Test Property",
       property_location: "Test City",
       property_img: ["main.jpg", "thumb1.jpg", "thumb2.jpg", "thumb3.jpg", "thumb4.jpg", "thumb5.jpg"],
@@ -69,10 +83,12 @@ vi.mock("@fancyapps/ui", () => ({
 import Homepage_PropertyDetails from "@/components/homepage_components/homepage_Propertydetails/Homepage_PropertyDetails";
 
 describe("Homepage_PropertyDetails gallery", () => {
-  it.skip("lazy loads primary and thumbnail images", async () => {
+  it("lazy loads primary and thumbnail images", async () => {
     render(
-      <MemoryRouter initialEntries={["/homes/atlas-homes-room-101/1"]}>
-        <Homepage_PropertyDetails />
+      <MemoryRouter initialEntries={["/homes/test-property/101"]}>
+        <Routes>
+          <Route path="/homes/:propertySlug/:unitSlug" element={<Homepage_PropertyDetails />} />
+        </Routes>
       </MemoryRouter>,
     );
 

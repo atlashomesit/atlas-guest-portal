@@ -20,6 +20,10 @@ interface BookingSummary {
   wifiVisible: boolean;
   wifiName?: string;
   wifiPassword?: string;
+  /** Present when a non-voided GST invoice exists for this booking. */
+  hasGstInvoice?: boolean;
+  gstInvoiceNumber?: string | null;
+  gstInvoiceTotal?: number | null;
 }
 
 const statusLabel: Record<string, { label: string; color: string }> = {
@@ -89,6 +93,11 @@ export default function BookingConfirmationPage() {
     );
   }
 
+  const pdfUrl =
+    bookingId && token
+      ? buildApiUrl(`/api/guest/bookings/${bookingId}/invoice/pdf?t=${encodeURIComponent(token)}`)
+      : "";
+
   if (error || !booking) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center px-4">
@@ -103,6 +112,11 @@ export default function BookingConfirmationPage() {
   }
 
   const isCancelled = booking.status === "Cancelled";
+  const hostPhone = booking.propertyPhone?.trim() || "+917032493290";
+  const hostPhoneDigits = hostPhone.replace(/[^\d+]/g, "");
+  const whatsappDigits = hostPhoneDigits.replace(/^\+/, "");
+  const whatsappText = encodeURIComponent(`Hi, I have a question about booking #${booking.bookingId}.`);
+  const whatsappUrl = `https://wa.me/${whatsappDigits}?text=${whatsappText}`;
 
   return (
     <>
@@ -161,6 +175,37 @@ export default function BookingConfirmationPage() {
           </div>
         </div>
 
+        {/* GST invoice (token-gated PDF) */}
+        {!isCancelled && booking.hasGstInvoice && pdfUrl && (
+          <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3">
+            <h2 className="text-sm font-semibold text-text-primary">GST invoice</h2>
+            <p className="text-xs text-text-secondary leading-relaxed">
+              Accommodation is billed under SAC&nbsp;9963 (hotel and similar accommodation services) as applicable for Indian GST.
+            </p>
+            <div className="space-y-0 divide-y divide-border-subtle border-t border-border-subtle -mx-5 px-5">
+              {booking.gstInvoiceNumber && (
+                <InfoRow label="Invoice number" value={booking.gstInvoiceNumber} mono />
+              )}
+              {booking.gstInvoiceTotal != null && (
+                <div className="flex flex-col gap-0.5 py-2 border-b border-border-subtle last:border-0">
+                  <span className="text-xs text-text-muted uppercase tracking-wider font-medium">Invoice total (incl. GST)</span>
+                  <span className="text-sm font-semibold text-text-primary">
+                    {booking.currency}&nbsp;{booking.gstInvoiceTotal.toLocaleString("en-IN")}
+                  </span>
+                </div>
+              )}
+            </div>
+            <a
+              href={pdfUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-2.5 hover:opacity-95 transition-opacity"
+            >
+              Download invoice (PDF)
+            </a>
+          </div>
+        )}
+
         {/* Check-in info */}
         {!isCancelled && (
           <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-0">
@@ -197,15 +242,47 @@ export default function BookingConfirmationPage() {
           </div>
         )}
 
+        {/* What happens next */}
+        {!isCancelled && (
+          <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5">
+            <h2 className="text-sm font-semibold text-text-primary mb-3">What happens next</h2>
+            <div className="space-y-2.5 text-sm text-text-secondary">
+              <p>✅ Booking confirmed now.</p>
+              <p>📱 SMS and WhatsApp confirmation should arrive shortly.</p>
+              <p>🏠 Check-in details and access instructions are shared before arrival.</p>
+              <p>
+                💬 Need anything?{" "}
+                <a
+                  href={whatsappUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-brand-primary font-medium underline underline-offset-2"
+                >
+                  Chat with host on WhatsApp
+                </a>
+                .
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Need help */}
         <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-2">
           <h2 className="text-sm font-semibold text-text-primary">Need help?</h2>
           <p className="text-sm text-text-secondary">
             Call or WhatsApp us at{" "}
-            <a href="tel:+917032493290" className="text-brand-primary font-medium">+91&nbsp;70324&nbsp;93290</a>
+            <a href={`tel:${hostPhoneDigits}`} className="text-brand-primary font-medium">{hostPhone}</a>
             {" "}or email{" "}
             <a href="mailto:atlashomeskphb@gmail.com" className="text-brand-primary font-medium">atlashomeskphb@gmail.com</a>.
           </p>
+          <a
+            href={whatsappUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-2 hover:bg-brand-primary/5 transition-colors"
+          >
+            Chat with host on WhatsApp
+          </a>
         </div>
 
         <div className="text-center pt-2">

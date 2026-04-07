@@ -26,6 +26,7 @@ import { resolveListing } from '../../../utils/listingResolver';
 import { filterGuestImageUrls, sanitizeGuestImageUrl } from '../../../utils/guestImageUrl';
 import type { ListingDetail } from '../../../api/listingClient';
 import SEO from '../../SEO';
+import { buildApiUrl, getApiHeaders } from '../../../api/client';
 
 import { Fancybox } from "@fancyapps/ui";
 import "@fancyapps/ui/dist/fancybox/fancybox.css";
@@ -85,6 +86,7 @@ const PropertyDetails = () => {
     const { getUrlsForListingId } = useListingPhotosFromApi();
     const [searchParams] = useSearchParams();
     const showAvailabilityPlaceholder = false;
+    const [availabilityPrefetched, setAvailabilityPrefetched] = useState(false);
 
     // Hydrate booking context from URL search params (passed from SearchPage)
     useEffect(() => {
@@ -337,6 +339,29 @@ useEffect(() => {
   setProperty(data.id, data.property_name); // ✅ use property_name
 
 }, [data?.id, data?.property_name, setProperty]);
+
+    // Prefetch listing availability as soon as listing id resolves so date widget opens warm.
+    useEffect(() => {
+        const listingToPrefetch = Number(resolvedListingId ?? data?.listingId ?? listingId);
+        if (!Number.isFinite(listingToPrefetch) || listingToPrefetch <= 0 || availabilityPrefetched) return;
+
+        const controller = new AbortController();
+        const startDate = new Date().toISOString().slice(0, 10);
+        const url = buildApiUrl(`/availability/listing-availability?listingId=${listingToPrefetch}&startDate=${encodeURIComponent(startDate)}&months=2`);
+        fetch(url, {
+            method: 'GET',
+            headers: { Accept: 'application/json', ...getApiHeaders() },
+            signal: controller.signal,
+        })
+            .then(() => setAvailabilityPrefetched(true))
+            .catch(() => {
+                if (!controller.signal.aborted) {
+                    // non-blocking prefetch; widget still fetches on demand
+                }
+            });
+
+        return () => controller.abort();
+    }, [resolvedListingId, data?.listingId, listingId, availabilityPrefetched]);
 
 
     useEffect(() => {

@@ -1,7 +1,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { addDays, format, startOfMonth } from 'date-fns';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import { Button } from '@/components/ui/Button';
@@ -41,6 +41,10 @@ interface UnitBookingWidgetProps {
 }
 
 const PENDING_PAYMENT_KEY = 'atlas_pending_razorpay_order';
+
+/** COMP-001: keep in sync with Atlas.Api.Constants.GuestConsentConstants.DisplayText */
+const GUEST_DATA_CONSENT_LABEL =
+  'I consent to Atlas Homes collecting and using my name, phone, and email to process my booking and send booking communications.';
 
 const normalizeListingId = (value: string | number | null | undefined) =>
   String(value ?? '')
@@ -88,6 +92,9 @@ function getBookingErrorMessage(error: unknown, context: 'order' | 'verify'): st
   }
   if (status === 400 && (lower.includes('date') || lower.includes('availability'))) {
     return 'The selected dates are no longer available. Please pick different dates and try again.';
+  }
+  if (lower.includes('consent') && lower.includes('booking')) {
+    return 'Please accept the data processing consent below and try again.';
   }
   return context === 'order'
     ? 'We couldn\'t start checkout. Please check your dates and try again, or contact support.'
@@ -156,6 +163,8 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     email: '',
     phone: ''
   });
+  const [guestConsentAccepted, setGuestConsentAccepted] = useState(false);
+  const [consentError, setConsentError] = useState('');
   const [paymentStatus, setPaymentStatus] = useState<'success' | 'failed' | null>(null);
   const [bookingDetails, setBookingDetails] = useState<{
     bookingId: string;
@@ -696,6 +705,13 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       isValid = false;
     }
 
+    if (!guestConsentAccepted) {
+      setConsentError('Please accept the consent to continue.');
+      isValid = false;
+    } else {
+      setConsentError('');
+    }
+
     setFormErrors(errors);
     return isValid;
   };
@@ -932,6 +948,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         },
         amount: Math.round(finalTotal), // Keep amount in rupees, let backend handle conversion if needed
         currency: 'INR',
+        guestConsentAccepted: true,
         guestInfo: {
           name: formData.name.trim(),
           email: formData.email.trim(),
@@ -1712,6 +1729,33 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           />
           {formErrors.phone && <p className="text-sm text-support-error">{formErrors.phone}</p>}
         </div>
+
+        <div className="space-y-2 rounded-xl border border-border-subtle bg-bg-muted/40 px-4 py-3">
+          <label className="flex items-start gap-3 cursor-pointer text-sm text-text-primary">
+            <input
+              type="checkbox"
+              name="guestConsent"
+              checked={guestConsentAccepted}
+              onChange={(e) => {
+                setGuestConsentAccepted(e.target.checked);
+                if (e.target.checked) setConsentError('');
+              }}
+              disabled={isBookingDisabled}
+              required
+              className="mt-1 h-4 w-4 shrink-0 rounded border-border-strong text-cta-primary focus:ring-cta-primary"
+              data-testid="guest-booking-consent"
+              aria-invalid={Boolean(consentError)}
+            />
+            <span>
+              {GUEST_DATA_CONSENT_LABEL}{' '}
+              <Link to="/policies" className="text-cta-primary underline underline-offset-2 hover:opacity-90">
+                View our policies
+              </Link>
+              .
+            </span>
+          </label>
+          {consentError ? <p className="text-sm text-support-error">{consentError}</p> : null}
+        </div>
       </div>
 
       {formError && (
@@ -1726,7 +1770,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       <Button
         type="submit"
         fullWidth
-        disabled={isSubmitting || isLoading || !dateRange.startDate || !dateRange.endDate || isBookingDisabled}
+        disabled={isSubmitting || isLoading || !dateRange.startDate || !dateRange.endDate || isBookingDisabled || !guestConsentAccepted}
         className={isSubmitting || isLoading ? 'opacity-75' : ''}
         data-testid="guest-booking-submit"
       >
