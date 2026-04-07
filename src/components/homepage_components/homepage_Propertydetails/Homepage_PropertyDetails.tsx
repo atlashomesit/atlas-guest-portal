@@ -24,9 +24,11 @@ import { useBooking } from '../../../contexts/BookingContext';
 import { useListingPhotosFromApi } from '../../../contexts/ListingPhotosContext';
 import { resolveListing } from '../../../utils/listingResolver';
 import { filterGuestImageUrls, sanitizeGuestImageUrl } from '../../../utils/guestImageUrl';
-import type { ListingDetail } from '../../../api/listingClient';
+import type { ListingDetail, PublicListing } from '../../../api/listingClient';
 import SEO from '../../SEO';
 import { buildApiUrl, getApiHeaders } from '../../../api/client';
+import { addRecentlyViewed, isFavorite, toggleFavorite } from '../../../utils/guestHistory';
+import { formatCurrency, formatHumanDate } from '../../../utils/formatting';
 
 import { Fancybox } from "@fancyapps/ui";
 import "@fancyapps/ui/dist/fancybox/fancybox.css";
@@ -60,6 +62,9 @@ interface Property {
     timezoneId?: string;
     photoCount?: number;
     maxGuests?: number;
+    /** G3-002: from API listing when available */
+    checkInTime?: string;
+    checkOutTime?: string;
 }
 
 const PropertyDetails = () => {
@@ -87,6 +92,16 @@ const PropertyDetails = () => {
     const [searchParams] = useSearchParams();
     const showAvailabilityPlaceholder = false;
     const [availabilityPrefetched, setAvailabilityPrefetched] = useState(false);
+    const [fav, setFav] = useState(false);
+    const [similarFromApi, setSimilarFromApi] = useState<null | { loading: boolean; items: any[] }>(null);
+
+    /** G3-001: live reviews from `GET /api/listings/{id}/reviews` when listing id resolves */
+    const [listingReviewsFromApi, setListingReviewsFromApi] = useState<null | {
+        loading: boolean;
+        averageRating: number;
+        totalCount: number;
+        reviews: { id: number; guestName?: string | null; rating: number; title?: string | null; body?: string | null; createdAt: string }[];
+    }>(null);
 
     // Hydrate booking context from URL search params (passed from SearchPage)
     useEffect(() => {
@@ -166,6 +181,48 @@ const PropertyDetails = () => {
             controller.abort();
         };
     }, [data?.listingId, location.state, listingIdParam]);
+
+    useEffect(() => {
+        const lid = resolvedListingId;
+        if (lid == null) {
+            setListingReviewsFromApi(null);
+            return;
+        }
+        const num = typeof lid === 'number' ? lid : Number(lid);
+        if (!Number.isFinite(num) || num <= 0) {
+            setListingReviewsFromApi(null);
+            return;
+        }
+        const ac = new AbortController();
+        setListingReviewsFromApi({ loading: true, averageRating: 0, totalCount: 0, reviews: [] });
+        void (async () => {
+            try {
+                const res = await fetch(buildApiUrl(`/api/listings/${num}/reviews`), {
+                    headers: getApiHeaders(),
+                    signal: ac.signal,
+                });
+                if (!res.ok) {
+                    if (!ac.signal.aborted) setListingReviewsFromApi(null);
+                    return;
+                }
+                const j = (await res.json()) as {
+                    averageRating?: number;
+                    totalCount?: number;
+                    reviews?: { id: number; guestName?: string | null; rating: number; title?: string | null; body?: string | null; createdAt: string }[];
+                };
+                if (ac.signal.aborted) return;
+                setListingReviewsFromApi({
+                    loading: false,
+                    averageRating: j.averageRating ?? 0,
+                    totalCount: j.totalCount ?? 0,
+                    reviews: Array.isArray(j.reviews) ? j.reviews : [],
+                });
+            } catch {
+                if (!ac.signal.aborted) setListingReviewsFromApi(null);
+            }
+        })();
+        return () => ac.abort();
+    }, [resolvedListingId]);
 
     useEffect(() => {
         setNotFound(false);
@@ -294,6 +351,7 @@ const PropertyDetails = () => {
                             : [],
                     );
                     const photoCount = Number((apiListing as Record<string, unknown>).photoCount) || 0;
+                    const pub = apiListing as unknown as Partial<PublicListing>;
                     const mapped: Property = {
                         id: Number(apiListing.id) || listingId,
                         listingId: Number(apiListing.id) || listingId,
@@ -313,6 +371,8 @@ const PropertyDetails = () => {
                         timezoneId: (apiListing as Record<string, unknown>).timezoneId as string | undefined,
                         photoCount: photoCount || (coverUrl ? 1 : 0),
                         maxGuests: Number((apiListing as Record<string, unknown>).maxGuests) || undefined,
+                        checkInTime: pub.checkInTime?.trim() || undefined,
+                        checkOutTime: pub.checkOutTime?.trim() || undefined,
                     };
                     const fromApi =
                         photoUrlsList.length > 0 ? photoUrlsList : (coverUrl ? [coverUrl] : []);
@@ -338,7 +398,37 @@ useEffect(() => {
 
   setProperty(data.id, data.property_name); // ✅ use property_name
 
+  const lid = Number(resolvedListingId ?? data?.listingId ?? listingId);
+  if (Number.isFinite(lid) && lid > 0) {
+      setFav(isFavorite(lid));
+      addRecentlyViewed({
+          listingId: lid,
+          path: buildHomeUnitPath({ propertySlug: propertySlug ?? String(data.id), unitSlug: String(lid) }),
+          name: data.property_name,
+          coverPhotoUrl: Array.isArray(data.property_img) ? data.property_img[0] : undefined,
+          location: data.property_location,
+      });
+  }
+
 }, [data?.id, data?.property_name, setProperty]);
+
+    // Similar listings: GET /listings/{id}/similar
+    useEffect(() => {
+        const lid = Number(resolvedListingId ?? data?.listingId ?? listingId);
+        if (!Number.isFinite(lid) || lid <= 0) return;
+        const ac = new AbortController();
+        setSimilarFromApi({ loading: true, items: [] });
+        fetch(buildApiUrl(`/listings/${lid}/similar?limit=6`), { headers: { Accept: 'application/json', ...getApiHeaders() }, signal: ac.signal })
+            .then(async (res) => (res.ok ? (await res.json()) : []))
+            .then((j) => {
+                if (ac.signal.aborted) return;
+                setSimilarFromApi({ loading: false, items: Array.isArray(j) ? j : [] });
+            })
+            .catch(() => {
+                if (!ac.signal.aborted) setSimilarFromApi(null);
+            });
+        return () => ac.abort();
+    }, [resolvedListingId, data?.listingId, listingId]);
 
     // Prefetch listing availability as soon as listing id resolves so date widget opens warm.
     useEffect(() => {
@@ -462,12 +552,20 @@ useEffect(() => {
     }
 
     const unitPolicy = getUnitPolicy(data?.id);
+    const cancellationPolicyText = (() => {
+        const policies = data?.property_policy_details ?? [];
+        const fromListingPolicy = policies.find((p) =>
+            typeof p?.type === 'string' && p.type.toLowerCase().includes('cancellation'),
+        )?.value;
+        return fromListingPolicy || inlinePolicySnippets?.cancellation || 'Standard cancellation policy applies.';
+    })();
 
     const pageUrl = typeof window !== 'undefined' ? window.location.href : '';
     const galleryUrls = filterGuestImageUrls(data?.property_img ?? []);
     const primaryImage = galleryUrls[0];
 
-    const propertyJsonLd = data ? {
+    const propertyJsonLd = data ? [
+        {
         "@context": "https://schema.org",
         "@type": "LodgingBusiness",
         name: data.property_name,
@@ -494,7 +592,21 @@ useEffect(() => {
                 availability: "https://schema.org/InStock",
             },
         } : {}),
-    } : undefined;
+        },
+        // FAQPage: reuse "Things to know" snippets where available for richer search results.
+        ...(Array.isArray(data.property_policy_details) && data.property_policy_details.length > 0 ? [{
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            mainEntity: data.property_policy_details
+                .filter((p: any) => p?.type && p?.value)
+                .slice(0, 6)
+                .map((p: any) => ({
+                    "@type": "Question",
+                    name: String(p.type),
+                    acceptedAnswer: { "@type": "Answer", text: String(p.value) }
+                }))
+        }] : [])
+    ] : undefined;
 
     return (
         <>
@@ -638,6 +750,36 @@ useEffect(() => {
                             <div className="border border-border-subtle rounded-lg overflow-hidden shadow-level1 bg-bg-surface">
                                 <div className="bg-bg-surface p-6">
                                     <h2 className="text-xl sm:text-2xl font-semibold mb-6 text-text-primary">Things to know</h2>
+                                    <div className="flex items-center gap-2 mb-4 flex-wrap">
+                                        <button
+                                            type="button"
+                                            className="px-3 py-1.5 rounded-lg border border-border-subtle bg-bg-muted text-sm font-medium text-text-primary hover:opacity-90"
+                                            onClick={() => {
+                                                const lid = Number(resolvedListingId ?? data?.listingId ?? listingId);
+                                                if (!Number.isFinite(lid) || lid <= 0) return;
+                                                setFav(toggleFavorite(lid));
+                                            }}
+                                        >
+                                            {fav ? '♥ Saved' : '♡ Save'}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="px-3 py-1.5 rounded-lg border border-border-subtle bg-bg-muted text-sm font-medium text-text-primary hover:opacity-90"
+                                            onClick={() => {
+                                                const url = window.location.href;
+                                                const text = `Check out ${data?.property_name ?? 'this home'} on Atlas Homestays`;
+                                                const share = async () => {
+                                                    // Web Share API on mobile; otherwise open WhatsApp in a new tab.
+                                                    const nav: any = navigator;
+                                                    if (nav?.share) return nav.share({ title: document.title, text, url });
+                                                    window.open(`https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`, '_blank', 'noopener,noreferrer');
+                                                };
+                                                void share();
+                                            }}
+                                        >
+                                            Share
+                                        </button>
+                                    </div>
                                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
                                         <div className="p-4 border border-border-subtle rounded-lg bg-bg-muted">
                                             <div className="flex items-center gap-2 mb-1">
@@ -645,21 +787,22 @@ useEffect(() => {
                                                 <p className="text-text-muted text-sm">Check-in / Check-out</p>
                                             </div>
                                             <p className="font-medium text-text-primary">
-                                                Check-in {unitPolicy?.checkIn || '2:00 PM'} · Check-out {unitPolicy?.checkOut || '11:00 AM'}
+                                                Check-in {data.checkInTime?.trim() || unitPolicy?.checkIn || '2:00 PM'} · Check-out {data.checkOutTime?.trim() || unitPolicy?.checkOut || '11:00 AM'}
                                             </p>
                                             <a className="text-sm text-accent-primary underline" href="/terms#check-in-check-out">View terms</a>
                                         </div>
                                         <div className="p-4 border border-border-subtle rounded-lg bg-bg-muted">
                                             <div className="flex items-center gap-2 mb-1">
                                                 <KeyRound className="w-4 h-4 text-accent-primary" />
-                                                <p className="text-text-muted text-sm">Key policies</p>
+                                                <p className="text-text-muted text-sm">Cancellation & rules</p>
                                             </div>
                                             <p className="font-medium text-text-primary">
-                                                {inlinePolicySnippets?.cancellation || 'Flexible cancellation policy'}
+                                                {cancellationPolicyText}
                                             </p>
                                             <p className="text-text-primary mt-2 text-sm">
                                                 {inlinePolicySnippets?.houseRules || 'Standard house rules apply'}
                                             </p>
+                                            <a className="text-sm text-accent-primary underline inline-block mt-2" href="/policies#cancellation-refunds">Read policy</a>
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
@@ -676,20 +819,84 @@ useEffect(() => {
                             </div>
                         )}
 
-                        {/* Guest Reviews Summary */}
-                        {data?.property_reviews > 0 && (
+                        {/* Similar stays — Wave 9 #85 */}
+                        {(() => {
+                            const s = similarFromApi;
+                            if (!s || s.loading || !Array.isArray(s.items) || s.items.length === 0) return null;
+                            return (
+                                <div className="pb-8 border-b border-border-subtle">
+                                    <h2 className="text-xl sm:text-2xl font-semibold mb-4 text-text-primary">Similar stays</h2>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        {s.items.slice(0, 4).map((it: any) => {
+                                            const id = Number(it.id);
+                                            const name = String(it.name ?? it.propertyName ?? `Listing ${it.id}`);
+                                            const img = (it.coverPhotoUrl as string | undefined) ?? (Array.isArray(it.photoUrls) ? it.photoUrls[0] : undefined);
+                                            const path = buildHomeUnitPath({ propertySlug: String(it.propertyName ?? 'home').toLowerCase().replace(/\\s+/g, '-'), unitSlug: String(id) });
+                                            return (
+                                                <Link
+                                                    key={String(it.id)}
+                                                    to={path}
+                                                    className="rounded-xl border border-border-subtle bg-bg-surface overflow-hidden shadow-level1 hover:shadow-level2 transition-shadow"
+                                                >
+                                                    {img ? <img src={img} alt={name} className="w-full h-40 object-cover" loading="lazy" /> : null}
+                                                    <div className="p-4">
+                                                        <p className="font-semibold text-text-primary">{name}</p>
+                                                        <p className="text-sm text-text-secondary">{String(it.propertyAddress ?? '').slice(0, 60)}</p>
+                                                    </div>
+                                                </Link>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            );
+                        })()}
+
+                        {/* Guest Reviews — API when available (G3-001), else static catalog snippets */}
+                        {(() => {
+                            const api = listingReviewsFromApi;
+                            const showApi = api && !api.loading && api.totalCount > 0;
+                            const showStatic = !showApi && data && data.property_reviews > 0;
+                            if (!showApi && !showStatic) return null;
+                            const rating = showApi ? api!.averageRating : data!.property_rating;
+                            const count = showApi ? api!.totalCount : data!.property_reviews;
+                            return (
                             <div className="pb-8 border-b border-border-subtle">
                                 <h2 className="text-xl sm:text-2xl font-semibold mb-4 text-text-primary">Guest Reviews</h2>
                                 <div className="flex items-center gap-3 mb-4">
                                     <div className="flex items-center gap-1 text-accent-primary">
                                         {Array.from({ length: 5 }).map((_, i) => (
-                                            <FaStar key={i} className={i < Math.round(data.property_rating) ? 'text-accent-primary' : 'text-border-subtle'} />
+                                            <FaStar key={i} className={i < Math.round(rating) ? 'text-accent-primary' : 'text-border-subtle'} />
                                         ))}
                                     </div>
-                                    <span className="font-semibold text-text-primary">{data.property_rating.toFixed(1)}</span>
-                                    <span className="text-text-muted text-sm">({data.property_reviews} reviews)</span>
+                                    <span className="font-semibold text-text-primary">{rating.toFixed(1)}</span>
+                                    <span className="text-text-muted text-sm">({count} reviews)</span>
                                 </div>
-                                {data.property_review_snippets && data.property_review_snippets.length > 0 && (
+                                {showApi && api!.reviews.length > 0 ? (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        {api!.reviews.slice(0, 6).map((r) => (
+                                            <div key={r.id} className="p-4 rounded-xl bg-bg-muted border border-border-subtle">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <span className="text-sm font-semibold text-text-primary">{r.guestName ?? 'Guest'}</span>
+                                                    <span className="text-xs text-text-muted">
+                                                        {formatHumanDate(r.createdAt, {
+                                                            locale: 'en-IN',
+                                                            fallback: '—',
+                                                            options: { day: '2-digit', month: 'short', year: 'numeric' },
+                                                        })}
+                                                    </span>
+                                                </div>
+                                                <div className="flex gap-0.5 mb-2">
+                                                    {Array.from({ length: 5 }).map((_, i) => (
+                                                        <FaStar key={i} className={`text-xs ${i < r.rating ? 'text-accent-primary' : 'text-border-subtle'}`} />
+                                                    ))}
+                                                </div>
+                                                {r.title && <p className="text-sm font-medium text-text-primary mb-1">{r.title}</p>}
+                                                {r.body && <p className="text-sm text-text-muted italic">"{r.body}"</p>}
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    data?.property_review_snippets && data.property_review_snippets.length > 0 && (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                         {data.property_review_snippets.slice(0, 4).map((snippet: string, idx: number) => (
                                             <div key={idx} className="p-4 rounded-xl bg-bg-muted border border-border-subtle">
@@ -697,9 +904,11 @@ useEffect(() => {
                                             </div>
                                         ))}
                                     </div>
+                                    )
                                 )}
                             </div>
-                        )}
+                            );
+                        })()}
 
                         {/* About this place */}
                         <div className="pb-8 border-b border-border-subtle">
@@ -872,7 +1081,7 @@ useEffect(() => {
           >
             <div>
               <span className="text-base font-bold text-text-primary">
-                {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(nightlyPrice.finalNightlyPrice)}
+                {formatCurrency(nightlyPrice.finalNightlyPrice, { maximumFractionDigits: 0 })}
               </span>
               <span className="text-xs text-text-muted"> / night</span>
             </div>

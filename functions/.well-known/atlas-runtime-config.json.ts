@@ -17,6 +17,7 @@ interface Env {
   ATLAS_ENVIRONMENT?: string;
   ATLAS_TENANT_KEY?: string;
   ATLAS_GOOGLE_MAPS_API_KEY?: string;
+  ATLAS_WEB_PUSH_PUBLIC_KEY?: string;
 }
 
 function parseDiscount(raw: string | undefined): number {
@@ -50,6 +51,9 @@ export const onRequestGet = (context: { env: Env; request: Request }) => {
     environment: (env.ATLAS_ENVIRONMENT ?? "").trim() || undefined,
     ...(env.ATLAS_GOOGLE_MAPS_API_KEY?.trim()
       ? { googleMapsApiKey: env.ATLAS_GOOGLE_MAPS_API_KEY.trim() }
+      : {}),
+    ...(env.ATLAS_WEB_PUSH_PUBLIC_KEY?.trim()
+      ? { webPushPublicKey: env.ATLAS_WEB_PUSH_PUBLIC_KEY.trim() }
       : {}),
   };
   const tenantKey = (env.ATLAS_TENANT_KEY ?? "").trim();

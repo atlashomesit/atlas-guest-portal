@@ -1,5 +1,6 @@
-import { LOGO_URL } from "./config/branding";
-import { CONTACT } from "./config/contact";
+// NOTE: this file is imported by Node scripts during build; keep ESM imports explicit for Windows.
+import { LOGO_URL } from "./config/branding.ts";
+import { CONTACT } from "./config/contact.ts";
 
 const logo = LOGO_URL;
 

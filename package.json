@@ -13,7 +13,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host",
-    "prebuild": "node scripts/verify-lockfile-linux-ci-deps.mjs && npm run validate:legal && node tools/optimize-images.mjs",
+    "prebuild": "node scripts/verify-lockfile-linux-ci-deps.mjs && npm run validate:legal && node tools/optimize-images.mjs && node tools/generate-sitemap.mjs",
     "build": "node scripts/verify-pages-env.mjs && vite build",
     "build:functions": "wrangler pages functions build",
     "check:local-network": "node tools/check-local-network-apis.mjs",

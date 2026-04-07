@@ -15,6 +15,7 @@ import { apiFetch } from '@/lib/http';
 import { getIstStartOfDay } from '@/utils/date';
 import { calculateNights, formatNightCount, formatDateInTimezone } from '@/utils/dateHelpers';
 import { doesRangeIntersectBlocked, toISODate } from '@/utils/dateRange';
+import { formatCurrency, formatHumanDate } from '@/utils/formatting';
 import { calculateNightlyPrice, inferUnitType } from '@/utils/pricing';
 import priceDisplayConfig from '@/config/priceDisplay.config';
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
@@ -156,7 +157,9 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    phone: ''
+    phone: '',
+    /** QW-005: special requests / notes to host (max 500 server-side) */
+    notes: '',
   });
   const [formErrors, setFormErrors] = useState({
     name: '',
@@ -165,6 +168,14 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   });
   const [guestConsentAccepted, setGuestConsentAccepted] = useState(false);
   const [consentError, setConsentError] = useState('');
+  const [referralCode, setReferralCode] = useState('');
+  const [appliedReferralCode, setAppliedReferralCode] = useState<string | null>(null);
+  const [appliedReferralDiscount, setAppliedReferralDiscount] = useState(0);
+  const [referralMessage, setReferralMessage] = useState<string | null>(null);
+  const [promoCode, setPromoCode] = useState('');
+  const [appliedPromoCode, setAppliedPromoCode] = useState<string | null>(null);
+  const [appliedPromoDiscount, setAppliedPromoDiscount] = useState(0);
+  const [promoMessage, setPromoMessage] = useState<string | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<'success' | 'failed' | null>(null);
   const [bookingDetails, setBookingDetails] = useState<{
     bookingId: string;
@@ -175,6 +186,10 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     checkOut: Date;
     nights: number;
     email: string;
+    referralCode?: string;
+    referralDiscountAmount?: number;
+    promoCode?: string;
+    promoDiscountAmount?: number;
   } | null>(null);
 
   // Availability range always starts from today, independent of selected dates or shown date
@@ -230,6 +245,21 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     if (pending) {
       localStorage.removeItem(PENDING_PAYMENT_KEY);
       toast.info('Your previous payment session was interrupted. You can try booking again.');
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      const url = new URL(window.location.href);
+      const ref = (url.searchParams.get('ref') || '').trim();
+      const stored = (window.localStorage.getItem('atlas_guest_referral_code') || '').trim();
+      const seed = (ref || stored).slice(0, 32);
+      if (seed) {
+        setReferralCode(seed);
+        window.localStorage.setItem('atlas_guest_referral_code', seed);
+      }
+    } catch {
+      // no-op
     }
   }, []);
 
@@ -606,7 +636,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
   const formatCalendarPrice = useCallback((price: number): string => {
     if (price >= 10000) return `₹${(price / 1000).toFixed(1)}K`;
-    return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0, minimumFractionDigits: 0 }).format(price);
+    return formatCurrency(price, { maximumFractionDigits: 0 });
   }, []);
 
   const calendarDealThreshold = useMemo(() => {
@@ -650,7 +680,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   const _convenienceFee = Math.round(subtotalForConvenience * convenienceFeePercent);
   const breakdownSubtotalForConvenience = breakdownPrice + gstAmount;
   const breakdownConvenienceFee = Math.round(breakdownSubtotalForConvenience * convenienceFeePercent);
-  const breakdownFinalTotal = breakdownPrice + gstAmount + breakdownConvenienceFee;
+  const referralDiscountApplied = Math.max(0, appliedReferralDiscount || 0);
+  const promoDiscountApplied = Math.max(0, appliedPromoDiscount || 0);
+  const breakdownFinalTotal = Math.max(1, breakdownPrice + gstAmount + breakdownConvenienceFee - referralDiscountApplied - promoDiscountApplied);
 
   const finalTotal =
     hasSelectedRange && selectedRangeTotalFromCalendar != null
@@ -669,8 +701,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
   /** Format price; show ₹0 when 0 (e.g. when API not loaded or API returned 0). */
   const displayPrice = (n: number) =>
-    new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n);
+    formatCurrency(n, { maximumFractionDigits: 0 });
 
+  const convenienceFeePctLabel = Math.round(convenienceFeePercent * 100);
 
   const formattedDateLabel = dateRange.startDate && dateRange.endDate
     ? `${timezoneId ? formatDateInTimezone(dateRange.startDate, timezoneId) : format(dateRange.startDate, 'EEE, dd MMM')} – ${timezoneId ? formatDateInTimezone(dateRange.endDate, timezoneId) : format(dateRange.endDate, 'EEE, dd MMM')} • ${priceDetails.nights} ${priceDetails.nights === 1 ? 'night' : 'nights'}`
@@ -697,11 +730,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       isValid = false;
     }
 
-    if (!formData.phone) {
+    const normalizedPhone = formData.phone.replace(/\D/g, '').slice(-10);
+    if (!normalizedPhone) {
       errors.phone = 'Phone number is required';
       isValid = false;
-    } else if (!/^\d{10}$/.test(formData.phone)) {
-      errors.phone = 'Phone number must be 10 digits';
+    } else if (!/^\d{10}$/.test(normalizedPhone)) {
+      errors.phone = 'Enter a valid 10-digit Indian mobile number';
       isValid = false;
     }
 
@@ -716,8 +750,17 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     return isValid;
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
+    if (name === 'phone') {
+      // IND-003: Indian phone input behavior (accept +91/spacing, store last 10 digits).
+      const normalizedPhone = value.replace(/\D/g, '').slice(-10);
+      setFormData(prev => ({ ...prev, phone: normalizedPhone }));
+      return;
+    }
+    if (name === 'notes' && value.length > 500) {
+      return;
+    }
     setFormData(prev => ({
       ...prev,
       [name]: value
@@ -934,7 +977,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         checkinDate: toISODate(normalizedCheckin),  // Format as YYYY-MM-DD
         checkoutDate: toISODate(normalizedCheckout),  // Format as YYYY-MM-DD
         guests,
-        notes: ''
+        notes: formData.notes.trim().slice(0, 500),
       };
 
       // 2. Prepare order payload with the exact structure expected by the backend
@@ -944,10 +987,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           checkinDate: bookingDraft.checkinDate,
           checkoutDate: bookingDraft.checkoutDate,
           guests: bookingDraft.guests,
-          notes: bookingDraft.notes || ''
+          notes: bookingDraft.notes,
         },
         amount: Math.round(finalTotal), // Keep amount in rupees, let backend handle conversion if needed
         currency: 'INR',
+        referralCode: referralCode.trim() ? referralCode.trim().slice(0, 32) : undefined,
+        promoCode: promoCode.trim() ? promoCode.trim().slice(0, 32) : undefined,
         guestConsentAccepted: true,
         guestInfo: {
           name: formData.name.trim(),
@@ -968,10 +1013,28 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         timeout: 15000
       });
 
-      const { keyId: key, orderId, bookingId, bookingToken } = orderResponse.data ?? {};
+      const {
+        keyId: key,
+        orderId,
+        bookingId,
+        bookingToken,
+        amount: responseAmount,
+        appliedReferralCode: appliedCode,
+        referralDiscountAmount,
+        referralRewardMessage,
+        appliedPromoCode: promoAppliedCode,
+        promoDiscountAmount,
+        promoMessage: orderPromoMessage,
+      } = orderResponse.data ?? {};
       if (!key || !orderId || !bookingId) {
         throw new Error('Checkout could not start: invalid response from payment service. Please try again.');
       }
+      setAppliedReferralCode(typeof appliedCode === 'string' && appliedCode.trim() ? appliedCode.trim() : null);
+      setAppliedReferralDiscount(Number(referralDiscountAmount) > 0 ? Number(referralDiscountAmount) : 0);
+      setReferralMessage(typeof referralRewardMessage === 'string' && referralRewardMessage.trim() ? referralRewardMessage.trim() : null);
+      setAppliedPromoCode(typeof promoAppliedCode === 'string' && promoAppliedCode.trim() ? promoAppliedCode.trim() : null);
+      setAppliedPromoDiscount(Number(promoDiscountAmount) > 0 ? Number(promoDiscountAmount) : 0);
+      setPromoMessage(typeof orderPromoMessage === 'string' && orderPromoMessage.trim() ? orderPromoMessage.trim() : null);
 
       // Store pending payment for recovery if user refreshes during modal
       localStorage.setItem(PENDING_PAYMENT_KEY, orderId);
@@ -1029,12 +1092,16 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                 setBookingDetails({
                   bookingId,
                   bookingToken: bookingToken ?? undefined,
-                  amount: finalTotal,
+                  amount: Number(responseAmount) > 0 ? Number(responseAmount) : Math.max(1, finalTotal),
                   propertyName: listingName || 'Selected Property',
                   checkIn: checkinDate,
                   checkOut: checkoutDate,
                   nights,
-                  email: formData.email.trim()
+                  email: formData.email.trim(),
+                  referralCode: typeof appliedCode === 'string' ? appliedCode : undefined,
+                  referralDiscountAmount: Number(referralDiscountAmount) > 0 ? Number(referralDiscountAmount) : 0,
+                  promoCode: typeof promoAppliedCode === 'string' ? promoAppliedCode : undefined,
+                  promoDiscountAmount: Number(promoDiscountAmount) > 0 ? Number(promoDiscountAmount) : 0,
                 });
                 
                 // Set payment status to success to show popup
@@ -1208,9 +1275,33 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                 <div className="flex flex-col gap-1">
                   <span className="text-xs uppercase tracking-wider text-gray-500 font-medium">Amount Paid</span>
                   <p className="text-lg font-bold text-gray-900">
-                    {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(bookingDetails.amount)}
+                    {displayPrice(bookingDetails.amount)}
                   </p>
                 </div>
+                {bookingDetails.referralDiscountAmount && bookingDetails.referralDiscountAmount > 0 && (
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs uppercase tracking-wider text-gray-500 font-medium">Referral Reward</span>
+                    <p className="text-base font-semibold text-green-700">
+                      {bookingDetails.referralCode ? `${bookingDetails.referralCode} applied` : 'Applied'} — saved {displayPrice(bookingDetails.referralDiscountAmount)}
+                    </p>
+                  </div>
+                )}
+                {bookingDetails.promoDiscountAmount && bookingDetails.promoDiscountAmount > 0 && (
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs uppercase tracking-wider text-gray-500 font-medium">Promo Discount</span>
+                    <p className="text-base font-semibold text-green-700">
+                      {bookingDetails.promoCode ? `${bookingDetails.promoCode} applied` : 'Applied'} — saved {displayPrice(bookingDetails.promoDiscountAmount)}
+                    </p>
+                  </div>
+                )}
+                {bookingDetails.referralDiscountAmount && bookingDetails.referralDiscountAmount > 0 && (
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs uppercase tracking-wider text-gray-500 font-medium">Referral Reward</span>
+                    <p className="text-base font-semibold text-green-700">
+                      {bookingDetails.referralCode ? `${bookingDetails.referralCode} applied` : 'Applied'} — saved {displayPrice(bookingDetails.referralDiscountAmount)}
+                    </p>
+                  </div>
+                )}
                 <div className="flex flex-col gap-1">
                   <span className="text-xs uppercase tracking-wider text-gray-500 font-medium">Property</span>
                   <p className="text-base font-semibold text-gray-900">{bookingDetails.propertyName}</p>
@@ -1218,11 +1309,23 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="flex flex-col gap-1">
                     <span className="text-xs uppercase tracking-wider text-gray-500 font-medium">Check-in</span>
-                    <p className="text-base font-semibold text-gray-900">{format(bookingDetails.checkIn, 'EEE, dd MMM yyyy')}</p>
+                    <p className="text-base font-semibold text-gray-900">
+                      {formatHumanDate(bookingDetails.checkIn, {
+                        locale: 'en-IN',
+                        fallback: '—',
+                        options: { day: '2-digit', month: 'short', year: 'numeric' },
+                      })}
+                    </p>
                   </div>
                   <div className="flex flex-col gap-1">
                     <span className="text-xs uppercase tracking-wider text-gray-500 font-medium">Check-out</span>
-                    <p className="text-base font-semibold text-gray-900">{format(bookingDetails.checkOut, 'EEE, dd MMM yyyy')}</p>
+                    <p className="text-base font-semibold text-gray-900">
+                      {formatHumanDate(bookingDetails.checkOut, {
+                        locale: 'en-IN',
+                        fallback: '—',
+                        options: { day: '2-digit', month: 'short', year: 'numeric' },
+                      })}
+                    </p>
                   </div>
                 </div>
                 <div className="flex flex-col gap-1">
@@ -1412,7 +1515,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           {!dailyPricingLoading && !dailyPricingError && selectedRangeTotalFromCalendar != null && dateRange.startDate && dateRange.endDate && (
             <div className="flex items-baseline gap-2 flex-wrap">
               <span className="text-2xl font-bold text-black">
-                {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(selectedRangeTotalFromCalendar)}
+                {displayPrice(selectedRangeTotalFromCalendar)}
               </span>
               <span className="text-sm text-gray-400">
                 {priceDetails.nights} {priceDetails.nights === 1 ? 'night' : 'nights'}
@@ -1422,12 +1525,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           {!dailyPricingLoading && !dailyPricingError && selectedRangeTotalFromCalendar == null && effectiveDailyPricing && (
             <div className="flex items-baseline gap-2 flex-wrap">
               <span className="text-2xl font-bold text-black">
-                {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(effectiveDailyPricing.actualPrice)}
+                {displayPrice(effectiveDailyPricing.actualPrice)}
               </span>
               {effectiveDailyPricing.globalDiscountPercent > 0 && (
                 <>
                   <span className="text-sm text-gray-400">
-                    {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(effectiveDailyPricing.baseAmount)}
+                    {displayPrice(effectiveDailyPricing.baseAmount)}
                   </span>
                   <span className="text-sm font-semibold text-[color:color-mix(in_srgb,var(--cta-primary)_80%,transparent)]">
                     {priceDisplayConfig.discount.savingsPrefix} {Math.round(effectiveDailyPricing.globalDiscountPercent)}%
@@ -1447,7 +1550,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         <div className="text-sm text-text-muted space-y-1 mt-1">
           <p>{priceDetails.nights} {priceDetails.nights === 1 ? 'night' : 'nights'} × {displayPrice(perNightForDisplay)}</p>
           {priceDetails.extraGuests > 0 && (
-            <p>{priceDetails.extraGuests} {priceDetails.extraGuests === 1 ? 'extra guest' : 'extra guests'} × {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(priceDetails.extraGuestsFee / priceDetails.nights / priceDetails.extraGuests)}/night</p>
+            <p>{priceDetails.extraGuests} {priceDetails.extraGuests === 1 ? 'extra guest' : 'extra guests'} × {displayPrice(priceDetails.extraGuestsFee / priceDetails.nights / priceDetails.extraGuests)}/night</p>
           )}
           <p className="text-xs">Includes all taxes and fees</p>
         </div>
@@ -1621,54 +1724,78 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           <h4 className="mb-2 text-base font-bold text-text-primary">
             Price Breakdown
           </h4>
+          <p className="mb-2 text-xs text-text-muted">
+            Final amount shown here is what you pay at checkout.
+          </p>
           <div className="space-y-1.5 text-text-secondary">
             <div className="grid grid-cols-[140px_12px_1fr]">
-              <span>Price</span>
+              <span>Room fare</span>
               <span>:</span>
               <span className="text-right">
-                {new Intl.NumberFormat('en-IN', {
-                  style: 'currency',
-                  currency: 'INR',
-                  maximumFractionDigits: 0,
-                }).format(breakdownPrice)}
+                {displayPrice(breakdownPrice)}
               </span>
             </div>
+            {priceDetails.extraGuestsFee > 0 && (
+              <div className="grid grid-cols-[140px_12px_1fr]">
+                <span>Extra guest fee</span>
+                <span>:</span>
+                <span className="text-right">
+                  {displayPrice(priceDetails.extraGuestsFee)}
+                </span>
+              </div>
+            )}
+            {priceDetails.discount > 0 && (
+              <div className="grid grid-cols-[140px_12px_1fr] text-green-700">
+                <span>Discount</span>
+                <span>:</span>
+                <span className="text-right">-{displayPrice(priceDetails.discount)}</span>
+              </div>
+            )}
             {gstAmount > 0 && (
               <div className="grid grid-cols-[140px_12px_1fr]">
                 <span>GST (5%)</span>
                 <span>:</span>
                 <span className="text-right">
-                  {new Intl.NumberFormat('en-IN', {
-                    style: 'currency',
-                    currency: 'INR',
-                    maximumFractionDigits: 0,
-                  }).format(gstAmount)}
+                  {displayPrice(gstAmount)}
                 </span>
               </div>
             )}
             <div className="grid grid-cols-[140px_12px_1fr]">
-              <span>Convenience fee</span>
+              <span>Convenience fee{convenienceFeePctLabel > 0 ? ` (${convenienceFeePctLabel}%)` : ''}</span>
               <span>:</span>
               <span className="text-right">
-                {new Intl.NumberFormat('en-IN', {
-                  style: 'currency',
-                  currency: 'INR',
-                  maximumFractionDigits: 0,
-                }).format(breakdownConvenienceFee)}
+                {displayPrice(breakdownConvenienceFee)}
               </span>
             </div>
+            {referralDiscountApplied > 0 && (
+              <div className="grid grid-cols-[140px_12px_1fr] text-green-700">
+                <span>Referral reward</span>
+                <span>:</span>
+                <span className="text-right">
+                  -{displayPrice(referralDiscountApplied)}
+                </span>
+              </div>
+            )}
+            {promoDiscountApplied > 0 && (
+              <div className="grid grid-cols-[140px_12px_1fr] text-green-700">
+                <span>Promo discount</span>
+                <span>:</span>
+                <span className="text-right">-{displayPrice(promoDiscountApplied)}</span>
+              </div>
+            )}
           </div>
           <div className="mt-3 border-t border-border-subtle pt-3 grid grid-cols-[140px_12px_1fr] text-base font-semibold text-text-primary">
             <span>Total</span>
             <span>:</span>
             <span className="text-right">
-              {new Intl.NumberFormat('en-IN', {
-                style: 'currency',
-                currency: 'INR',
-                maximumFractionDigits: 0,
-              }).format(finalTotal)}
+              {displayPrice(Math.max(1, finalTotal))}
             </span>
           </div>
+          {referralMessage && (
+            <p className="mt-2 text-xs text-green-700">
+              {referralMessage}{appliedReferralCode ? ` (${appliedReferralCode})` : ''}
+            </p>
+          )}
         </div>
 
       </div>
@@ -1716,18 +1843,89 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           <label className="text-sm font-medium text-text-primary" htmlFor="phone">
             Phone Number *
           </label>
+          <div className={`flex items-center rounded-xl border ${formErrors.phone ? 'border-support-error' : 'border-border-strong'} bg-bg-muted px-3`}>
+            <span className="pr-2 text-text-muted select-none">+91</span>
+            <input
+              type="tel"
+              id="phone"
+              name="phone"
+              inputMode="numeric"
+              pattern="[0-9]{10}"
+              value={formData.phone}
+              onChange={handleInputChange}
+              disabled={isBookingDisabled}
+              className="w-full bg-transparent py-3 text-text-primary focus:outline-none"
+              placeholder="9876543210"
+              maxLength={10}
+              data-testid="guest-booking-phone"
+            />
+          </div>
+          <p className="text-xs text-text-muted">Indian mobile number (10 digits)</p>
+          {formErrors.phone && <p className="text-sm text-support-error">{formErrors.phone}</p>}
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-text-primary" htmlFor="referral-code">
+            Referral code <span className="text-text-muted font-normal">(optional)</span>
+          </label>
           <input
-            type="tel"
-            id="phone"
-            name="phone"
-            value={formData.phone}
+            type="text"
+            id="referral-code"
+            name="referralCode"
+            value={referralCode}
+            onChange={(e) => {
+              const next = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 32);
+              setReferralCode(next);
+              if (next) window.localStorage.setItem('atlas_guest_referral_code', next);
+              else window.localStorage.removeItem('atlas_guest_referral_code');
+            }}
+            disabled={isBookingDisabled || isSubmitting || isLoading}
+            className="w-full rounded-xl border border-border-strong bg-bg-muted px-4 py-3 text-text-primary focus:outline-none focus:ring-2 focus:ring-cta-primary"
+            placeholder="Enter referral code for first-booking rewards"
+            data-testid="guest-booking-referral"
+          />
+          <p className="text-xs text-text-muted">First booking reward: 5% off up to ₹1,500.</p>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-text-primary" htmlFor="promo-code">
+            Promo code <span className="text-text-muted font-normal">(optional)</span>
+          </label>
+          <input
+            type="text"
+            id="promo-code"
+            name="promoCode"
+            value={promoCode}
+            onChange={(e) => setPromoCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 32))}
+            disabled={isBookingDisabled || isSubmitting || isLoading}
+            className="w-full rounded-xl border border-border-strong bg-bg-muted px-4 py-3 text-text-primary focus:outline-none focus:ring-2 focus:ring-cta-primary"
+            placeholder="Enter promo code"
+            data-testid="guest-booking-promo"
+          />
+          {promoMessage ? (
+            <p className={`text-xs ${appliedPromoDiscount > 0 ? 'text-green-700' : 'text-text-muted'}`}>
+              {promoMessage}{appliedPromoCode ? ` (${appliedPromoCode})` : ''}
+            </p>
+          ) : null}
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-text-primary" htmlFor="booking-notes">
+            Special requests <span className="text-text-muted font-normal">(optional)</span>
+          </label>
+          <textarea
+            id="booking-notes"
+            name="notes"
+            rows={3}
+            value={formData.notes}
             onChange={handleInputChange}
             disabled={isBookingDisabled}
-            className={`w-full rounded-xl border ${formErrors.phone ? 'border-support-error' : 'border-border-strong'} bg-bg-muted px-4 py-3 text-text-primary focus:outline-none focus:ring-2 focus:ring-cta-primary`}
-            placeholder="Enter your 10-digit phone number"
-            data-testid="guest-booking-phone"
+            maxLength={500}
+            placeholder="e.g. late check-in, dietary needs, celebration setup"
+            className="w-full rounded-xl border border-border-strong bg-bg-muted px-4 py-3 text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-cta-primary resize-y min-h-[88px]"
+            data-testid="guest-booking-notes"
           />
-          {formErrors.phone && <p className="text-sm text-support-error">{formErrors.phone}</p>}
+          <p className="text-xs text-text-muted">{formData.notes.length}/500</p>
         </div>
 
         <div className="space-y-2 rounded-xl border border-border-subtle bg-bg-muted/40 px-4 py-3">
@@ -1748,8 +1946,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             />
             <span>
               {GUEST_DATA_CONSENT_LABEL}{' '}
-              <Link to="/policies" className="text-cta-primary underline underline-offset-2 hover:opacity-90">
-                View our policies
+              <Link to="/privacy" className="text-cta-primary underline underline-offset-2 hover:opacity-90">
+                View Privacy Policy
               </Link>
               .
             </span>

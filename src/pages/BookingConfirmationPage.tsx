@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import SEO from "../components/SEO";
 import { buildApiUrl, getApiHeaders } from "../api/client";
+import { getRuntimeConfig, hasRuntimeConfig } from "../runtime-config";
 
 interface BookingSummary {
   bookingId: number;
@@ -60,6 +61,14 @@ export default function BookingConfirmationPage() {
   const [booking, setBooking] = useState<BookingSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [pushState, setPushState] = useState<"idle" | "loading" | "done" | "error">("idle");
+  const [pushMessage, setPushMessage] = useState<string>("");
+  const [modCheckin, setModCheckin] = useState("");
+  const [modCheckout, setModCheckout] = useState("");
+  const [modGuests, setModGuests] = useState("");
+  const [modNote, setModNote] = useState("");
+  const [modSubmitting, setModSubmitting] = useState(false);
+  const [modMessage, setModMessage] = useState<string>("");
 
   useEffect(() => {
     if (!bookingId || !token) {
@@ -117,6 +126,83 @@ export default function BookingConfirmationPage() {
   const whatsappDigits = hostPhoneDigits.replace(/^\+/, "");
   const whatsappText = encodeURIComponent(`Hi, I have a question about booking #${booking.bookingId}.`);
   const whatsappUrl = `https://wa.me/${whatsappDigits}?text=${whatsappText}`;
+  const supportsPush = typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window;
+  const canRequestModification = !isCancelled && !!token;
+
+  function toBase64UrlUint8Array(base64String: string) {
+    const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+    const rawData = window.atob(base64);
+    return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
+  }
+
+  async function subscribePush() {
+    setPushState("loading");
+    setPushMessage("");
+    try {
+      const vapidKey = hasRuntimeConfig() ? getRuntimeConfig().webPushPublicKey : undefined;
+      if (!vapidKey) throw new Error("Notifications are not configured yet.");
+      if (!supportsPush) throw new Error("Push notifications are not supported in this browser.");
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") throw new Error("Notification permission was denied.");
+
+      const registration = await navigator.serviceWorker.ready;
+      const sub = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: toBase64UrlUint8Array(vapidKey),
+      });
+
+      const res = await fetch(buildApiUrl("/api/public/push/subscribe"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getApiHeaders() },
+        body: JSON.stringify({ subscriptionJson: JSON.stringify(sub.toJSON()) }),
+      });
+      if (!res.ok) throw new Error("Unable to save notification preference.");
+      setPushState("done");
+      setPushMessage("Notifications enabled. We'll send important booking updates.");
+    } catch (e) {
+      setPushState("error");
+      setPushMessage(e instanceof Error ? e.message : "Failed to enable notifications.");
+    }
+  }
+
+  async function submitModificationRequest() {
+    if (!bookingId || !token) return;
+    setModMessage("");
+    if (!modCheckin || !modCheckout) {
+      setModMessage("Please enter both check-in and check-out dates.");
+      return;
+    }
+    setModSubmitting(true);
+    try {
+      const res = await fetch(
+        buildApiUrl(`/api/public/bookings/${bookingId}/modification-request?t=${encodeURIComponent(token)}`),
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...getApiHeaders() },
+          body: JSON.stringify({
+            checkinDateUtc: modCheckin,
+            checkoutDateUtc: modCheckout,
+            guests: modGuests ? Number(modGuests) : undefined,
+            note: modNote,
+          }),
+        },
+      );
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || "Could not submit request.");
+      }
+      setModMessage("Request submitted. Our team will review and contact you.");
+      setModCheckin("");
+      setModCheckout("");
+      setModGuests("");
+      setModNote("");
+    } catch (e) {
+      setModMessage(e instanceof Error ? e.message : "Could not submit request.");
+    } finally {
+      setModSubmitting(false);
+    }
+  }
 
   return (
     <>
@@ -284,6 +370,54 @@ export default function BookingConfirmationPage() {
             Chat with host on WhatsApp
           </a>
         </div>
+
+        {!isCancelled && (
+          <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3">
+            <h2 className="text-sm font-semibold text-text-primary">Trip updates</h2>
+            <p className="text-sm text-text-secondary">Get instant alerts on your booking status and check-in reminders.</p>
+            <button
+              onClick={subscribePush}
+              disabled={pushState === "loading" || !supportsPush}
+              className="inline-flex items-center justify-center rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-2 disabled:opacity-50"
+            >
+              {pushState === "loading" ? "Enabling..." : "Enable notifications"}
+            </button>
+            {pushMessage ? <p className={`text-xs ${pushState === "error" ? "text-red-600" : "text-green-700"}`}>{pushMessage}</p> : null}
+          </div>
+        )}
+
+        {canRequestModification && (
+          <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3">
+            <h2 className="text-sm font-semibold text-text-primary">Request booking changes</h2>
+            <p className="text-sm text-text-secondary">Need a different date or guest count? Send a request and we will review it.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label className="text-sm text-text-secondary">
+                New check-in
+                <input type="date" value={modCheckin} onChange={(e) => setModCheckin(e.target.value)} className="mt-1 w-full rounded-md border border-border-subtle px-3 py-2 text-sm" />
+              </label>
+              <label className="text-sm text-text-secondary">
+                New check-out
+                <input type="date" value={modCheckout} onChange={(e) => setModCheckout(e.target.value)} className="mt-1 w-full rounded-md border border-border-subtle px-3 py-2 text-sm" />
+              </label>
+              <label className="text-sm text-text-secondary sm:col-span-2">
+                Guest count (optional)
+                <input type="number" min={1} value={modGuests} onChange={(e) => setModGuests(e.target.value)} className="mt-1 w-full rounded-md border border-border-subtle px-3 py-2 text-sm" />
+              </label>
+              <label className="text-sm text-text-secondary sm:col-span-2">
+                Note (optional)
+                <textarea value={modNote} onChange={(e) => setModNote(e.target.value)} rows={3} className="mt-1 w-full rounded-md border border-border-subtle px-3 py-2 text-sm" />
+              </label>
+            </div>
+            <button
+              onClick={submitModificationRequest}
+              disabled={modSubmitting}
+              className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-2.5 disabled:opacity-50"
+            >
+              {modSubmitting ? "Submitting..." : "Submit request"}
+            </button>
+            {modMessage ? <p className="text-xs text-text-secondary">{modMessage}</p> : null}
+          </div>
+        )}
 
         <div className="text-center pt-2">
           <Link to="/" className="text-sm text-text-muted underline underline-offset-2 hover:text-text-primary">

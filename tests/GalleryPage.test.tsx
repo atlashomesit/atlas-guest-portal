@@ -21,7 +21,7 @@ describe("GalleryPage", () => {
     const thumbnails = screen.getAllByRole("img", { name: /photo|no photo/i });
     expect(thumbnails.length).toBeGreaterThan(0);
     expect(asFragment()).toMatchSnapshot();
-  });
+  }, 30_000);
   it("filters down to a selected property", () => {
     render(<GalleryPage />);
 

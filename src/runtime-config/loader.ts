@@ -48,6 +48,12 @@ function validateConfig(raw: unknown): { ok: true; config: AtlasRuntimeConfig } 
     if (s) googleMapsApiKey = s;
   }
 
+  let webPushPublicKey: string | undefined;
+  if (obj.webPushPublicKey !== undefined && obj.webPushPublicKey !== null) {
+    const s = String(obj.webPushPublicKey).trim();
+    if (s) webPushPublicKey = s;
+  }
+
   const environment = typeof obj.environment === "string" ? obj.environment.trim() || undefined : undefined;
   const tenantKey = typeof obj.tenantKey === "string" ? obj.tenantKey.trim() || undefined : undefined;
 
@@ -57,6 +63,7 @@ function validateConfig(raw: unknown): { ok: true; config: AtlasRuntimeConfig } 
     environment,
     tenantKey,
     googleMapsApiKey,
+    webPushPublicKey,
   };
   return { ok: true, config };
 }

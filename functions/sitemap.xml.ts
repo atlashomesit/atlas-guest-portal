@@ -1,4 +1,7 @@
-import { homes } from "../src/content/homes";
+interface Env {
+  ATLAS_API_BASE_URL?: string;
+  ATLAS_TENANT_KEY?: string;
+}
 
 const CORE_PATHS = [
   "/",
@@ -16,9 +19,8 @@ const CORE_PATHS = [
   "/terms",
 ];
 
-const HOME_PATHS = homes.map((home) => home.href);
-
-export const SITEMAP_PATHS = Array.from(new Set([...CORE_PATHS, ...HOME_PATHS]));
+// Backward-compatible export used by tests; includes static (always-on) sitemap paths.
+export const SITEMAP_PATHS = CORE_PATHS;
 
 export function buildSitemapXml(baseUrl: string, paths: string[]): string {
   const normalizedBase = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
@@ -36,9 +38,49 @@ export function buildSitemapXml(baseUrl: string, paths: string[]): string {
   ].join("\n");
 }
 
-export const onRequestGet = ({ request }: { request: Request }) => {
-  const baseUrl = new URL(request.url).origin;
-  const sitemapXml = buildSitemapXml(baseUrl, SITEMAP_PATHS);
+function slugify(value: string): string {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+export const onRequestGet = async ({ request, env }: { request: Request; env?: Env }) => {
+  const origin = new URL(request.url).origin;
+  const runtimeEnv = env ?? {};
+  const apiBase = (runtimeEnv.ATLAS_API_BASE_URL ?? "").trim().replace(/\/+$/, "");
+  const tenantKey = (runtimeEnv.ATLAS_TENANT_KEY ?? "").trim();
+
+  const listingPaths: string[] = [];
+  if (apiBase) {
+    try {
+      const res = await fetch(`${apiBase}/listings/public`, {
+        headers: {
+          Accept: "application/json",
+          ...(tenantKey ? { "X-Tenant-Slug": tenantKey } : {}),
+        },
+      });
+      if (res.ok) {
+        const list = (await res.json()) as any[];
+        if (Array.isArray(list)) {
+          for (const l of list) {
+            const id = Number(l?.id);
+            if (!Number.isFinite(id) || id <= 0) continue;
+            const propertySlug = slugify(String(l?.propertyName ?? l?.name ?? `home-${id}`)) || `home-${id}`;
+            listingPaths.push(`/homes/${propertySlug}/${id}`);
+          }
+        }
+      }
+    } catch {
+      // sitemap still works with core paths only
+    }
+  }
+
+  const paths = Array.from(new Set([...CORE_PATHS, ...listingPaths]));
+  const sitemapXml = buildSitemapXml(origin, paths);
 
   return new Response(sitemapXml, {
     headers: {
