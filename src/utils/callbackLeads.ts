@@ -1,4 +1,5 @@
 import { logApiError, logUserAction, monitoredFetch } from "../lib/monitoring";
+import { buildApiUrl, getApiHeaders } from "@/api/client";
 
 type CallbackLeadIdentifiers = {
   listingId?: string | number;
@@ -22,6 +23,17 @@ export type CallbackLeadResponse<T = unknown> = {
 const CALLBACK_LEADS_ENDPOINT = import.meta.env.VITE_CALLBACK_LEADS_ENDPOINT || "/api/leads/callback";
 const CALLBACK_LEADS_BACKLOG_KEY = "callback_leads_backlog";
 const MAX_BACKLOG_ENTRIES = 25;
+
+const resolveCallbackLeadsEndpoint = (): string => {
+  // Allow routing to an external service (absolute URL) via env.
+  // Otherwise, ensure relative paths are sent to the configured Atlas API origin.
+  try {
+    const asUrl = new URL(CALLBACK_LEADS_ENDPOINT);
+    return asUrl.toString();
+  } catch {
+    return buildApiUrl(CALLBACK_LEADS_ENDPOINT);
+  }
+};
 
 const readLocalBacklog = (): CallbackLeadPayload[] => {
   if (typeof localStorage === "undefined") return [];
@@ -60,9 +72,13 @@ export const submitCallbackLead = async <T = unknown>(payload: CallbackLeadPaylo
   logUserAction("callback_lead_submitted", payload);
 
   try {
-    const response = await monitoredFetch(CALLBACK_LEADS_ENDPOINT, {
+    const endpoint = resolveCallbackLeadsEndpoint();
+    const response = await monitoredFetch(endpoint, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...getApiHeaders(),
+      },
       body: JSON.stringify({
         phone: payload.phone,
         route: payload.route,
@@ -75,7 +91,7 @@ export const submitCallbackLead = async <T = unknown>(payload: CallbackLeadPaylo
 
     if (!response.ok) {
       logApiError(new Error("Callback lead submission failed"), {
-        url: CALLBACK_LEADS_ENDPOINT,
+        url: endpoint,
         status: response.status,
         method: "POST",
         category: "http",
@@ -88,7 +104,7 @@ export const submitCallbackLead = async <T = unknown>(payload: CallbackLeadPaylo
     return { ok: true, data, message: "We have received your request and will call you back shortly." };
   } catch (error) {
     persistBacklog(payload);
-    logApiError(error, { url: CALLBACK_LEADS_ENDPOINT, method: "POST", category: "network" });
+    logApiError(error, { url: resolveCallbackLeadsEndpoint(), method: "POST", category: "network" });
     return {
       ok: false,
       error,

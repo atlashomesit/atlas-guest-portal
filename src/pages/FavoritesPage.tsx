@@ -7,15 +7,21 @@ import { getFavoriteIds, getRecentlyViewed } from "../utils/guestHistory";
 export default function FavoritesPage() {
   const [all, setAll] = useState<PublicListing[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadListings = React.useCallback(() => {
     let cancelled = false;
+    setLoading(true);
+    setError(null);
     fetchPublicListings()
       .then((list) => {
         if (!cancelled) setAll(list);
       })
       .catch(() => {
-        if (!cancelled) setAll([]);
+        if (!cancelled) {
+          setAll([]);
+          setError("We couldn’t load saved homes right now. Please try again.");
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -24,6 +30,8 @@ export default function FavoritesPage() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => loadListings(), [loadListings]);
 
   const favIds = useMemo(() => new Set(getFavoriteIds()), []);
   const recent = useMemo(() => getRecentlyViewed(), []);
@@ -42,6 +50,17 @@ export default function FavoritesPage() {
 
       {loading ? (
         <p className="text-sm text-text-secondary">Loading…</p>
+      ) : error ? (
+        <div className="rounded-2xl border border-border-subtle bg-bg-surface p-6 space-y-3">
+          <p className="text-text-secondary">{error}</p>
+          <button
+            type="button"
+            onClick={() => loadListings()}
+            className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-2.5 hover:opacity-95 transition-opacity"
+          >
+            Retry
+          </button>
+        </div>
       ) : favorites.length === 0 ? (
         <div className="rounded-2xl border border-border-subtle bg-bg-surface p-6">
           <p className="text-text-secondary">No saved homes yet. Tap “Save” on a listing.</p>
