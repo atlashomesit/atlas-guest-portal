@@ -90,6 +90,8 @@
   -moz-osx-font-smoothing: grayscale;
   max-width: 100%;
   width: 100%;
+  height: auto;
+  min-height: auto;
 }
 
 /* Ensure month containers don't clip content */
@@ -418,6 +420,8 @@
   overflow: visible;
   gap: 20px;
   width: 100%;
+  height: auto;
+  min-height: auto;
 }
 
 .rdrMonth {
