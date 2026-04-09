@@ -558,7 +558,7 @@
    ============================================ */
 
 /* Ultra-compact calendar - fits 2 months in narrow sidebar */
-.unit-datepicker-wrapper .rdrCalendarWrapper {
+.unit-booking-calendar .rdrCalendarWrapper {
   max-width: 100% !important;
   width: auto !important;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12) !important;
@@ -571,7 +571,7 @@
 }
 
 /* Compact horizontal layout - NO SCROLLING */
-.unit-datepicker-wrapper .rdrMonths {
+.unit-booking-calendar .rdrMonths {
   display: flex !important;
   flex-direction: row !important;
   flex-wrap: nowrap !important;
@@ -587,7 +587,7 @@
   -webkit-overflow-scrolling: auto !important;
 }
 
-.unit-datepicker-wrapper .rdrMonth {
+.unit-booking-calendar .rdrMonth {
   flex: 1 1 0% !important;
   min-width: 0 !important;
   max-width: 50% !important;
@@ -595,31 +595,31 @@
 }
 
 /* Ultra-compact month/year headers */
-.unit-datepicker-wrapper .rdrMonthAndYearWrapper {
+.unit-booking-calendar .rdrMonthAndYearWrapper {
   padding: 8px 6px 4px 6px !important;
   min-height: auto !important;
 }
 
-.unit-datepicker-wrapper .rdrMonthAndYearPickers {
+.unit-booking-calendar .rdrMonthAndYearPickers {
   font-size: 11px !important;
   font-weight: 600 !important;
 }
 
-.unit-datepicker-wrapper .rdrMonthAndYearPickers select {
+.unit-booking-calendar .rdrMonthAndYearPickers select {
   font-size: 10px !important;
   padding: 2px 4px !important;
   min-width: 55px !important;
 }
 
 /* Compact weekday headers */
-.unit-datepicker-wrapper .rdrWeekDays {
+.unit-booking-calendar .rdrWeekDays {
   padding: 4px 6px !important;
   font-size: 9px !important;
   letter-spacing: 0.02em !important;
   background: var(--platinum-50) !important;
 }
 
-.unit-datepicker-wrapper .rdrWeekDay {
+.unit-booking-calendar .rdrWeekDay {
   padding: 2px 0 !important;
   font-weight: 600 !important;
   text-transform: uppercase !important;
@@ -628,14 +628,14 @@
 }
 
 /* Day cell: grid with date row + price row; padding; smaller cell */
-.unit-datepicker-wrapper .unit-booking-day-cell {
+.unit-booking-calendar .unit-booking-day-cell {
   min-height: 48px;
   width: 100%;
   overflow: hidden;
   box-sizing: border-box;
   padding: 3px 2px;
 }
-.unit-datepicker-wrapper .unit-booking-day-cell-inner {
+.unit-booking-calendar .unit-booking-day-cell-inner {
   display: grid !important;
   grid-template-columns: 1fr;
   grid-template-rows: auto auto;
@@ -646,13 +646,13 @@
   box-sizing: border-box;
   min-height: 40px;
 }
-.unit-datepicker-wrapper .unit-booking-day-num {
+.unit-booking-calendar .unit-booking-day-num {
   line-height: 1;
   overflow: hidden;
   margin: 0;
   padding: 0;
 }
-.unit-datepicker-wrapper .unit-booking-day-price {
+.unit-booking-calendar .unit-booking-day-price {
   line-height: 1;
   min-width: 0;
   max-width: 100%;
@@ -664,7 +664,7 @@
 }
 
 /* Day cells: fixed size, no overlap - fill grid cell, no margins */
-.unit-datepicker-wrapper .rdrDay {
+.unit-booking-calendar .rdrDay {
   margin: 0 !important;
   padding: 0 !important;
   width: 100% !important;
@@ -681,7 +681,7 @@
   justify-content: center !important;
 }
 
-.unit-datepicker-wrapper .rdrDayNumber {
+.unit-booking-calendar .rdrDayNumber {
   margin: 0 !important;
   padding: 0 !important;
   font-size: 11px !important;
@@ -697,7 +697,7 @@
   justify-content: center !important;
 }
 
-.unit-datepicker-wrapper .rdrDayNumber span {
+.unit-booking-calendar .rdrDayNumber span {
   margin: 0 !important;
   padding: 0 !important;
   width: 100% !important;
@@ -716,7 +716,7 @@
 }
 
 /* Navigation arrows - compact for sidebar */
-.unit-datepicker-wrapper .rdrNextPrevButton {
+.unit-booking-calendar .rdrNextPrevButton {
   width: 24px !important;
   height: 24px !important;
   background: white !important;
@@ -731,17 +731,17 @@
   margin: 0 2px !important;
 }
 
-.unit-datepicker-wrapper .rdrNextPrevButton:hover {
+.unit-booking-calendar .rdrNextPrevButton:hover {
   background: var(--platinum-100) !important;
   border-color: var(--platinum-300) !important;
 }
 
-.unit-datepicker-wrapper .rdrNextPrevButton:active {
+.unit-booking-calendar .rdrNextPrevButton:active {
   background: #06B6D4 !important;
   border-color: #06B6D4 !important;
 }
 
-.unit-datepicker-wrapper .rdrNextPrevButton i {
+.unit-booking-calendar .rdrNextPrevButton i {
   display: block !important;
   width: 6px !important;
   height: 6px !important;
@@ -753,36 +753,36 @@
   background: transparent !important;
 }
 
-.unit-datepicker-wrapper .rdrNextPrevButton:hover i {
+.unit-booking-calendar .rdrNextPrevButton:hover i {
   border-color: var(--platinum-700) !important;
 }
 
-.unit-datepicker-wrapper .rdrNextPrevButton:active i {
+.unit-booking-calendar .rdrNextPrevButton:active i {
   border-color: white !important;
 }
 
-.unit-datepicker-wrapper .rdrPprevButton i {
+.unit-booking-calendar .rdrPprevButton i {
   transform: rotate(135deg) !important;
   margin-left: 1px !important;
 }
 
-.unit-datepicker-wrapper .rdrNextButton i {
+.unit-booking-calendar .rdrNextButton i {
   transform: rotate(-45deg) !important;
   margin-right: 1px !important;
 }
 
 /* Prevent any overflow */
-.unit-datepicker-wrapper .rdrDateRangeWrapper {
+.unit-booking-calendar .rdrDateRangeWrapper {
   max-width: 100% !important;
   overflow: hidden !important;
 }
 
-.unit-datepicker-wrapper .rdrMonthsHorizontal {
+.unit-booking-calendar .rdrMonthsHorizontal {
   overflow: hidden !important;
 }
 
 /* Calendar grid: exactly 7 equal columns, fixed row height, gap only - no overlap */
-.unit-datepicker-wrapper .rdrDays {
+.unit-booking-calendar .rdrDays {
   display: grid !important;
   grid-template-columns: repeat(7, minmax(28px, 1fr)) !important;
   grid-auto-rows: 48px !important;
@@ -794,15 +794,15 @@
 }
 
 /* Remove horizontal scroll track/progress bar and any navigation indicators */
-.unit-datepicker-wrapper .rdrMonthPicker,
-.unit-datepicker-wrapper .rdrMonthsVertical,
-.unit-datepicker-wrapper .rdrInfiniteMonths,
-.unit-datepicker-wrapper .rdrMonthAndYearWrapper + div[class*="track"],
-.unit-datepicker-wrapper .rdrMonthAndYearWrapper + div[class*="slider"],
-.unit-datepicker-wrapper .rdrMonthAndYearWrapper + div[class*="progress"],
-.unit-datepicker-wrapper [class*="monthTrack"],
-.unit-datepicker-wrapper [class*="monthSlider"],
-.unit-datepicker-wrapper [class*="scrollTrack"] {
+.unit-booking-calendar .rdrMonthPicker,
+.unit-booking-calendar .rdrMonthsVertical,
+.unit-booking-calendar .rdrInfiniteMonths,
+.unit-booking-calendar .rdrMonthAndYearWrapper + div[class*="track"],
+.unit-booking-calendar .rdrMonthAndYearWrapper + div[class*="slider"],
+.unit-booking-calendar .rdrMonthAndYearWrapper + div[class*="progress"],
+.unit-booking-calendar [class*="monthTrack"],
+.unit-booking-calendar [class*="monthSlider"],
+.unit-booking-calendar [class*="scrollTrack"] {
   display: none !important;
   visibility: hidden !important;
   height: 0 !important;
@@ -810,24 +810,24 @@
 }
 
 /* Hide any scroll indicators or tracks */
-.unit-datepicker-wrapper .rdrCalendarWrapper::-webkit-scrollbar,
-.unit-datepicker-wrapper .rdrMonths::-webkit-scrollbar,
-.unit-datepicker-wrapper .rdrDateRangeWrapper::-webkit-scrollbar {
+.unit-booking-calendar .rdrCalendarWrapper::-webkit-scrollbar,
+.unit-booking-calendar .rdrMonths::-webkit-scrollbar,
+.unit-booking-calendar .rdrDateRangeWrapper::-webkit-scrollbar {
   display: none !important;
   width: 0 !important;
   height: 0 !important;
 }
 
 /* Disable scrollbar for Firefox */
-.unit-datepicker-wrapper .rdrCalendarWrapper,
-.unit-datepicker-wrapper .rdrMonths,
-.unit-datepicker-wrapper .rdrDateRangeWrapper {
+.unit-booking-calendar .rdrCalendarWrapper,
+.unit-booking-calendar .rdrMonths,
+.unit-booking-calendar .rdrDateRangeWrapper {
   scrollbar-width: none !important;
   -ms-overflow-style: none !important;
 }
 
 /* Force static positioning for months - no sliding */
-.unit-datepicker-wrapper .rdrMonths {
+.unit-booking-calendar .rdrMonths {
   position: relative !important;
   transform: none !important;
   transition: none !important;
@@ -835,11 +835,11 @@
 
 /* Mobile fallback - single month */
 @media (max-width: 768px) {
-  .unit-datepicker-wrapper .rdrMonth:nth-child(2) {
+  .unit-booking-calendar .rdrMonth:nth-child(2) {
     display: none !important;
   }
   
-  .unit-datepicker-wrapper .rdrMonth {
+  .unit-booking-calendar .rdrMonth {
     max-width: 100% !important;
     padding: 12px !important;
   }

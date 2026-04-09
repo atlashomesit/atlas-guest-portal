@@ -1596,8 +1596,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               </div>
             )}
           </button>
-          <div className="unit-datepicker-wrapper">
-            <AtlasDateRangePicker
+          <AtlasDateRangePicker
               anchorRef={calendarButtonRef}
               open={openCalendar}
               onClose={() => setOpenCalendar(false)}
@@ -1621,6 +1620,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               }}
               loadingLabel="Loading availability"
               rangeColors={['#475569']}
+              popoverClassName="unit-booking-calendar"
               dateRangeProps={{ preventSnapRefocus: true }}
               dayContentRenderer={(day) => {
                 const dayStart = getIstStartOfDay(day);
@@ -1684,7 +1684,6 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                 );
               }}
             />
-          </div>
         </div>
 
         <div className="space-y-2">

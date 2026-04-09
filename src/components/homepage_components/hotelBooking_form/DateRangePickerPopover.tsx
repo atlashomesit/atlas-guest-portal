@@ -14,6 +14,7 @@ interface DateRangePickerPopoverProps {
   onClose: () => void;
   open: boolean;
   children: React.ReactNode;
+  popoverClassName?: string;
 }
 
 const useMediaQuery = (query: string) => {
@@ -50,6 +51,7 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
   onClose,
   open,
   children,
+  popoverClassName,
 }) => {
   const [position, setPosition] = useState({ top: 0, left: 0, width: 420, caretLeft: 24 });
   const localPopoverRef = useRef<HTMLDivElement | null>(null);
@@ -164,7 +166,7 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
         aria-labelledby={labelId}
         id={contentId}
         tabIndex={-1}
-        className={`booking-calendar-popover ${
+        className={`booking-calendar-popover${popoverClassName ? ` ${popoverClassName}` : ''} ${
           isMobile
             ? 'fixed inset-x-0 bottom-0 z-[95] max-h-[80vh] rounded-t-[32px] border border-[var(--border-subtle)] bg-[var(--bg-surface)] shadow-[0_32px_96px_rgba(15,23,42,0.12),0_16px_48px_rgba(15,23,42,0.08)]'
             : 'absolute z-[95] rounded-[20px] border border-[var(--border-subtle)] bg-[var(--bg-surface)] shadow-[0_32px_96px_rgba(15,23,42,0.12),0_16px_48px_rgba(15,23,42,0.08)]'

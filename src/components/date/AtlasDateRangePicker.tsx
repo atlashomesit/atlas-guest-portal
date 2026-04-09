@@ -46,6 +46,7 @@ interface AtlasDateRangePickerProps {
   afterCalendar?: React.ReactNode;
   activeField?: 'checkin' | 'checkout' | null;
   instructionText?: string;
+  popoverClassName?: string;
 }
 
 export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
@@ -69,6 +70,7 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
   onClose,
   onShownDateChange,
   open,
+  popoverClassName,
   rangeColors,
   shownDate,
   value,
@@ -317,6 +319,7 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
       loadingLabel={loadingLabel}
       onClose={onClose}
       open={open}
+      popoverClassName={popoverClassName}
     >
       <div className={`mx-5 mt-4 mb-2 rounded-lg px-4 py-2 text-sm font-semibold ${statusConfig.bg} ${statusConfig.color}`} aria-live="polite">
         <span className={`mr-2 inline-block h-2.5 w-2.5 rounded-full ${statusConfig.dot}`} aria-hidden />

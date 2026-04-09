@@ -65,6 +65,7 @@
   background: var(--bg-muted);
   color: var(--text-muted);
   border-color: var(--border-subtle);
+  cursor: not-allowed;
 }
 
 .rb-button--block {
