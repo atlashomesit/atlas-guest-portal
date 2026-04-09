@@ -1,9 +1,9 @@
-------formdata-undici-085980810213
+------formdata-undici-033630929047
 Content-Disposition: form-data; name="metadata"
 
-{"main_module":"functionsWorker-0.3261021013270675.js"}
-------formdata-undici-085980810213
-Content-Disposition: form-data; name="functionsWorker-0.3261021013270675.js"; filename="functionsWorker-0.3261021013270675.js"
+{"main_module":"functionsWorker-0.0797092212495567.js"}
+------formdata-undici-033630929047
+Content-Disposition: form-data; name="functionsWorker-0.0797092212495567.js"; filename="functionsWorker-0.0797092212495567.js"
 Content-Type: application/javascript+module
 
 var __defProp = Object.defineProperty;
@@ -11,21 +11,23 @@ var __name = (target, value) => __defProp(target, "name", { value, configurable:
 
 // ../node_modules/@emailjs/browser/es/models/EmailJSResponseStatus.js
 var EmailJSResponseStatus = class {
+  static {
+    __name(this, "EmailJSResponseStatus");
+  }
   constructor(_status = 0, _text = "Network Error") {
     this.status = _status;
     this.text = _text;
   }
 };
-__name(EmailJSResponseStatus, "EmailJSResponseStatus");
 
 // ../node_modules/@emailjs/browser/es/utils/createWebStorage/createWebStorage.js
 var createWebStorage = /* @__PURE__ */ __name(() => {
   if (typeof localStorage === "undefined")
     return;
   return {
-    get: (key) => Promise.resolve(localStorage.getItem(key)),
-    set: (key, value) => Promise.resolve(localStorage.setItem(key, value)),
-    remove: (key) => Promise.resolve(localStorage.removeItem(key))
+    get: /* @__PURE__ */ __name((key) => Promise.resolve(localStorage.getItem(key)), "get"),
+    set: /* @__PURE__ */ __name((key, value) => Promise.resolve(localStorage.setItem(key, value)), "set"),
+    remove: /* @__PURE__ */ __name((key) => Promise.resolve(localStorage.removeItem(key)), "remove")
   };
 }, "createWebStorage");
 
@@ -257,8 +259,7 @@ var trimmed = /* @__PURE__ */ __name((value) => value?.trim(), "trimmed");
 var readEnvValue = /* @__PURE__ */ __name((key) => {
   if (typeof import.meta !== "undefined" && typeof import.meta.env !== "undefined") {
     const value = import.meta.env[key];
-    if (value)
-      return value;
+    if (value) return value;
   }
   if (typeof process !== "undefined" && typeof process.env !== "undefined") {
     return process.env[key];
@@ -289,10 +290,8 @@ var monitoringState = {
   parsedDsn: null
 };
 var toSafeString = /* @__PURE__ */ __name((value) => {
-  if (typeof value === "string")
-    return value;
-  if (value instanceof Error)
-    return value.message;
+  if (typeof value === "string") return value;
+  if (value instanceof Error) return value.message;
   try {
     return JSON.stringify(value);
   } catch {
@@ -309,8 +308,7 @@ var mapBreadcrumbs = /* @__PURE__ */ __name(() => breadcrumbs.map((crumb) => ({
   data: crumb.data
 })), "mapBreadcrumbs");
 var sendToSentry = /* @__PURE__ */ __name(async (payload) => {
-  if (!monitoringState.enabled || !monitoringState.parsedDsn || typeof fetch === "undefined")
-    return;
+  if (!monitoringState.enabled || !monitoringState.parsedDsn || typeof fetch === "undefined") return;
   const { protocol, host, projectId, publicKey, path } = monitoringState.parsedDsn;
   const endpoint = `${protocol}//${host}${path ?? ""}/api/${projectId}/store/`;
   const authHeader = `Sentry sentry_version=7, sentry_client=atlas-guest-portal/1.0, sentry_key=${publicKey}`;
@@ -329,8 +327,7 @@ var sendToSentry = /* @__PURE__ */ __name(async (payload) => {
   }
 }, "sendToSentry");
 var normalizeError = /* @__PURE__ */ __name((error) => {
-  if (error instanceof Error)
-    return error;
+  if (error instanceof Error) return error;
   return new Error(toSafeString(error));
 }, "normalizeError");
 var buildPayload = /* @__PURE__ */ __name((message, level, error, context) => ({
@@ -384,8 +381,7 @@ var attemptWithRetry = /* @__PURE__ */ __name(async (operation, provider, stage)
       lastError = error;
       attempt += 1;
       logStructuredError(error, provider, stage, { attempt });
-      if (attempt >= DEFAULT_MAX_ATTEMPTS)
-        break;
+      if (attempt >= DEFAULT_MAX_ATTEMPTS) break;
       await delay(DEFAULT_BASE_DELAY_MS * 2 ** (attempt - 1));
     }
   }
@@ -393,10 +389,9 @@ var attemptWithRetry = /* @__PURE__ */ __name(async (operation, provider, stage)
 }, "attemptWithRetry");
 var emailJsProvider = {
   name: "emailjs",
-  validateCredentials: () => getMissingEmailJsEnvKeys(),
-  checkConnectivity: async () => {
-    if (!isEmailJsConfigured())
-      return false;
+  validateCredentials: /* @__PURE__ */ __name(() => getMissingEmailJsEnvKeys(), "validateCredentials"),
+  checkConnectivity: /* @__PURE__ */ __name(async () => {
+    if (!isEmailJsConfigured()) return false;
     try {
       const response = await fetch("https://api.emailjs.com/api/v1.0/ping", {
         method: "POST",
@@ -408,23 +403,23 @@ var emailJsProvider = {
       logStructuredError(error, "emailjs", "connectivity-check");
       return false;
     }
-  },
-  send: async (payload) => {
+  }, "checkConnectivity"),
+  send: /* @__PURE__ */ __name(async (payload) => {
     await es_default.send(
       emailJsConfig.serviceId,
       emailJsConfig.templateId,
       payload,
       { publicKey: emailJsConfig.publicKey }
     );
-  }
+  }, "send")
 };
 var consoleProvider = {
   name: "console-fallback",
-  validateCredentials: () => [],
-  checkConnectivity: async () => true,
-  send: async (payload) => {
+  validateCredentials: /* @__PURE__ */ __name(() => [], "validateCredentials"),
+  checkConnectivity: /* @__PURE__ */ __name(async () => true, "checkConnectivity"),
+  send: /* @__PURE__ */ __name(async (payload) => {
     console.info("[email fallback] delivering message locally", payload);
-  }
+  }, "send")
 };
 var providers = [emailJsProvider, consoleProvider];
 var sendEmail = /* @__PURE__ */ __name(async (payload) => {
@@ -491,10 +486,8 @@ var jsonResponse = /* @__PURE__ */ __name((body, status = 200) => new Response(J
 }), "jsonResponse");
 var deriveStatus = /* @__PURE__ */ __name((providers2) => {
   const healthyCount = providers2.filter((provider) => provider.healthy).length;
-  if (healthyCount === providers2.length)
-    return "operational";
-  if (healthyCount > 0)
-    return "degraded";
+  if (healthyCount === providers2.length) return "operational";
+  if (healthyCount > 0) return "degraded";
   return "down";
 }, "deriveStatus");
 var onRequestGet = /* @__PURE__ */ __name(async ({ request }) => {
@@ -550,8 +543,7 @@ var safeJsonParse = /* @__PURE__ */ __name((text) => {
   }
 }, "safeJsonParse");
 var constantTimeCompare = /* @__PURE__ */ __name((a, b) => {
-  if (a.length !== b.length)
-    return false;
+  if (a.length !== b.length) return false;
   let result = 0;
   for (let i = 0; i < a.length; i += 1) {
     result |= a.charCodeAt(i) ^ b.charCodeAt(i);
@@ -608,11 +600,9 @@ var onRequestPost = /* @__PURE__ */ __name(async ({ request, env }) => {
 
 // .well-known/atlas-runtime-config.json.ts
 function parseDiscount(raw) {
-  if (raw === void 0 || raw === "")
-    return 0;
+  if (raw === void 0 || raw === "") return 0;
   const n = Number(raw.trim());
-  if (!Number.isFinite(n) || n < 0 || n > 100)
-    return 0;
+  if (!Number.isFinite(n) || n < 0 || n > 100) return 0;
   return n;
 }
 __name(parseDiscount, "parseDiscount");
@@ -641,8 +631,7 @@ var onRequestGet2 = /* @__PURE__ */ __name((context) => {
     ...env.ATLAS_WEB_PUSH_PUBLIC_KEY?.trim() ? { webPushPublicKey: env.ATLAS_WEB_PUSH_PUBLIC_KEY.trim() } : {}
   };
   const tenantKey = (env.ATLAS_TENANT_KEY ?? "").trim();
-  if (tenantKey)
-    config.tenantKey = tenantKey;
+  if (tenantKey) config.tenantKey = tenantKey;
   return new Response(JSON.stringify(config, null, 2), {
     headers: {
       "Content-Type": "application/json",
@@ -673,11 +662,9 @@ var getCorsHeaders = /* @__PURE__ */ __name((request, allowedOrigins) => {
 var parseLimit = /* @__PURE__ */ __name((limitParam) => {
   const DEFAULT_LIMIT = 25;
   const MAX_LIMIT = 100;
-  if (!limitParam)
-    return DEFAULT_LIMIT;
+  if (!limitParam) return DEFAULT_LIMIT;
   const parsed = Number.parseInt(limitParam, 10);
-  if (Number.isNaN(parsed) || parsed <= 0)
-    return DEFAULT_LIMIT;
+  if (Number.isNaN(parsed) || parsed <= 0) return DEFAULT_LIMIT;
   return Math.min(parsed, MAX_LIMIT);
 }, "parseLimit");
 var withTimeout = /* @__PURE__ */ __name(async (promise, timeoutMs, onTimeout) => {
@@ -691,8 +678,7 @@ var withTimeout = /* @__PURE__ */ __name(async (promise, timeoutMs, onTimeout) =
   try {
     return await Promise.race([promise, timeoutPromise]);
   } finally {
-    if (timeoutId)
-      clearTimeout(timeoutId);
+    if (timeoutId) clearTimeout(timeoutId);
   }
 }, "withTimeout");
 var validateParams2 = /* @__PURE__ */ __name((params) => {
@@ -933,16 +919,13 @@ var withTimeout2 = /* @__PURE__ */ __name(async (promise, timeoutMs, onTimeout) 
   try {
     return await Promise.race([promise, timeoutPromise]);
   } finally {
-    if (timeoutId)
-      clearTimeout(timeoutId);
+    if (timeoutId) clearTimeout(timeoutId);
   }
 }, "withTimeout");
 var parseDateParam = /* @__PURE__ */ __name((value) => {
-  if (!value)
-    return null;
+  if (!value) return null;
   const normalized = value.trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized))
-    return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return null;
   const parsed = /* @__PURE__ */ new Date(`${normalized}T00:00:00Z`);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }, "parseDateParam");
@@ -1102,8 +1085,7 @@ var onRequestGet5 = /* @__PURE__ */ __name(async ({ request, env }) => {
         if (Array.isArray(list)) {
           for (const l of list) {
             const id = Number(l?.id);
-            if (!Number.isFinite(id) || id <= 0)
-              continue;
+            if (!Number.isFinite(id) || id <= 0) continue;
             const propertySlug = slugify(String(l?.propertyName ?? l?.name ?? `home-${id}`)) || `home-${id}`;
             listingPaths.push(`/homes/${propertySlug}/${id}`);
           }
@@ -1122,7 +1104,7 @@ var onRequestGet5 = /* @__PURE__ */ __name(async ({ request, env }) => {
   });
 }, "onRequestGet");
 
-// ../.wrangler/tmp/pages-7XWsKi/functionsRoutes-0.6574967624859887.mjs
+// ../.wrangler/tmp/pages-TcdVnV/functionsRoutes-0.6761684411359672.mjs
 var routes = [
   {
     routePath: "/api/health/email",
@@ -1599,9 +1581,9 @@ var pages_template_worker_default = {
           },
           env,
           waitUntil: workerContext.waitUntil.bind(workerContext),
-          passThroughOnException: () => {
+          passThroughOnException: /* @__PURE__ */ __name(() => {
             isFailOpen = true;
-          }
+          }, "passThroughOnException")
         };
         const response = await handler(context);
         if (!(response instanceof Response)) {
@@ -1638,4 +1620,4 @@ export {
   pages_template_worker_default as default
 };
 
-------formdata-undici-085980810213--
+------formdata-undici-033630929047--
