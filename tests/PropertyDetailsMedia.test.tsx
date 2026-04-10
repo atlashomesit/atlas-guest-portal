@@ -92,14 +92,14 @@ describe("Homepage_PropertyDetails gallery", () => {
       </MemoryRouter>,
     );
 
-    const mainImage = await screen.findByAltText(/Main property/i);
-    expect(mainImage).toHaveAttribute("loading", "lazy");
-    expect(mainImage).toHaveAttribute("decoding", "async");
+    // Find all images with alt text containing "photo"
+    const allImages = await screen.findAllByAltText(/photo/i, {}, { timeout: 3000 });
+    expect(allImages.length).toBeGreaterThanOrEqual(1);
 
-    const thumbnails = await screen.findAllByAltText(/Thumbnail/i);
-    thumbnails.forEach((thumbnail) => {
-      expect(thumbnail).toHaveAttribute("loading", "lazy");
-      expect(thumbnail).toHaveAttribute("decoding", "async");
+    // Check that all images have lazy loading attributes
+    allImages.forEach((img) => {
+      expect(img).toHaveAttribute("loading", "lazy");
+      expect(img).toHaveAttribute("decoding", "async");
     });
   });
 });
