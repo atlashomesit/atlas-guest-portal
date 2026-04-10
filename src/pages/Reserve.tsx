@@ -10,6 +10,21 @@ const Reserve = () => {
 
   const hasSelection = Boolean(booking.propertyId && booking.checkIn && booking.checkOut);
 
+  // Build a URL back to the property detail page with dates pre-filled so the
+  // UnitBookingWidget can complete the Razorpay checkout without leaving the page.
+  const goToPayment = () => {
+    if (!booking.propertyId) return;
+
+    // Determine the property slug. If we have it, navigate to the full detail page.
+    // Fall back to home-details page by propertyId if slug is not stored.
+    const checkInParam = booking.checkIn ? `?checkIn=${encodeURIComponent(booking.checkIn)}` : '';
+    const checkOutSep = booking.checkIn && booking.checkOut ? '&' : '?';
+    const checkOutParam = booking.checkOut ? `${checkOutSep}checkOut=${encodeURIComponent(booking.checkOut)}` : '';
+    const guestsParam = booking.guests ? `&guests=${booking.guests}` : '';
+
+    navigate(`/homes/${booking.propertyId}${checkInParam}${checkOutParam}${guestsParam}`);
+  };
+
   return (
     <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-8">
       <div className="pt-6">
@@ -26,10 +41,10 @@ const Reserve = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <p className="text-sm text-text-muted">Property</p>
-           <p className="text-lg font-semibold text-text-primary">
-  {booking.propertyName ?? 'Not selected'}
-</p>
- </div>
+            <p className="text-lg font-semibold text-text-primary">
+              {booking.propertyName ?? 'Not selected'}
+            </p>
+          </div>
           <div>
             <p className="text-sm text-text-muted">Guests</p>
             <p className="text-lg font-semibold text-text-primary">{booking.guests}</p>
@@ -57,13 +72,18 @@ const Reserve = () => {
           >
             Back to previous page
           </Button>
+          {/* Option A: navigate back to property page with dates pre-filled so
+              UnitBookingWidget handles the full Razorpay payment flow inline. */}
           <Button
-            onClick={() => navigate('/contact')}
+            onClick={goToPayment}
             disabled={!hasSelection}
           >
-            Confirm &amp; contact concierge
+            Go to payment
           </Button>
         </div>
+        <p className="text-xs text-text-muted">
+          You will be taken to the property page to complete your secure payment via Razorpay.
+        </p>
       </div>
     </section>
   );

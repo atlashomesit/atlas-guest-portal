@@ -194,6 +194,10 @@ const ListingCard: React.FC<ListingCardProps> = ({
                     <span className="ml-1 text-sm font-semibold text-text-muted">/ night</span>
                   </div>
                 </div>
+                {/* All-inclusive estimate (2 nights + 12% GST) for Indian pricing transparency */}
+                <span className="text-xs text-text-muted">
+                  {formatCurrency(Math.round(finalPrice * 2 * 1.12))} est. total incl. GST (2 nights)
+                </span>
                 {showDiscount && savingsAmount > 0 && (
                   <span className="text-xs font-semibold text-cta-primary">
                     {priceDisplayConfig.discount.savingsPrefix} {formatCurrency(savingsAmount)}

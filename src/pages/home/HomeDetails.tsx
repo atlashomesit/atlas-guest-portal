@@ -1,6 +1,9 @@
 import { Link, useParams } from "react-router-dom";
+import { Suspense, lazy } from "react";
 
 import { homes, defaultHomeHighlights } from "../../content/homes";
+
+const UnitBookingWidget = lazy(() => import("../../components/availability/UnitBookingWidget"));
 
 const fallbackImage = "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80";
 
@@ -54,13 +57,17 @@ const HomeDetails = () => {
         </div>
       </div>
 
+      {/* Booking widget — replaces the old "Contact to book" CTA */}
+      <Suspense fallback={
+        <div className="rounded-2xl border border-border-subtle bg-bg-surface p-6 animate-pulse h-48" />
+      }>
+        <UnitBookingWidget
+          listingId={room.listingId}
+          listingName={room.title}
+        />
+      </Suspense>
+
       <div className="flex flex-wrap gap-3">
-        <Link
-          to="/contact"
-          className="inline-flex items-center justify-center rounded-full bg-[color:var(--cta-primary)] px-5 py-3 text-sm font-semibold text-white shadow-level1 transition hover:-translate-y-0.5"
-        >
-          Contact to book
-        </Link>
         <Link
           to="/#our-homes"
           className="inline-flex items-center justify-center rounded-full border border-border-subtle px-5 py-3 text-sm font-semibold text-text-primary transition hover:border-[color:var(--cta-primary)] hover:text-[color:var(--cta-primary)]"

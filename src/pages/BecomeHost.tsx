@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Card } from "../components/ui/Card";
 import { Typography } from "../components/ui/Typography";
@@ -221,9 +221,12 @@ function StepIndicator({ current }: { current: number }) {
   );
 }
 
+const DRAFT_KEY = "becomehost_draft";
+
 const BecomeHost = () => {
   const [step, setStep] = useState(0);
   const [submitStatus, setSubmitStatus] = useState<SubmitStatus>("idle");
+  const [showResumeBanner, setShowResumeBanner] = useState(false);
 
   const [contact, setContact] = useState<ContactInfo>({
     displayName: "",
@@ -239,6 +242,46 @@ const BecomeHost = () => {
     address: "",
     roomCount: 1,
   });
+
+  // On mount, restore draft if exists (password is excluded for security)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      const draft = JSON.parse(raw);
+      if (draft.contact) setContact((prev) => ({ ...prev, ...draft.contact, password: prev.password }));
+      if (draft.property) setProperty((prev) => ({ ...prev, ...draft.property }));
+      if (typeof draft.step === "number") setStep(draft.step);
+      setShowResumeBanner(true);
+    } catch {
+      // Ignore malformed drafts
+    }
+  }, []);
+
+  // Save draft on every state change (password excluded)
+  useEffect(() => {
+    if (submitStatus === "success") return;
+    try {
+      localStorage.setItem(
+        DRAFT_KEY,
+        JSON.stringify({ step, contact: { ...contact, password: "" }, property }),
+      );
+    } catch {
+      // Ignore storage errors (e.g. private browsing quota)
+    }
+  }, [step, contact, property, submitStatus]);
+
+  const clearDraft = () => {
+    localStorage.removeItem(DRAFT_KEY);
+    setShowResumeBanner(false);
+  };
+
+  const resetForm = () => {
+    clearDraft();
+    setStep(0);
+    setContact({ displayName: "", email: "", phone: "", password: "" });
+    setProperty({ propertyType: "", city: "", pincode: "", address: "", roomCount: 1 });
+  };
 
   const [airbnb, setAirbnb] = useState<AirbnbPrefill>({
     url: "",
@@ -371,6 +414,7 @@ const BecomeHost = () => {
       }
 
       setSubmitStatus("success");
+      localStorage.removeItem(DRAFT_KEY);
       toast.success("Your property has been registered!");
       logUserAction("onboarding_started", { status: "success", feature: "become-host" });
     } catch (err) {
@@ -658,6 +702,25 @@ const BecomeHost = () => {
 
       {/* ── Registration Form ── */}
       <div style={styles.container} id="host-signup-form">
+        {/* Draft resume banner */}
+        {showResumeBanner && (
+          <div
+            className="mb-4 rounded-xl border px-4 py-3 flex items-center justify-between gap-3 flex-wrap"
+            style={{ background: "#f0fdf4", borderColor: "#4ade80" }}
+          >
+            <span style={{ fontSize: 14, color: "#166534", fontWeight: 600 }}>
+              Welcome back — continue where you left off.
+            </span>
+            <button
+              type="button"
+              onClick={resetForm}
+              style={{ fontSize: 13, color: "#6b7280", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}
+            >
+              Clear and start over
+            </button>
+          </div>
+        )}
+
         <div style={styles.header}>
           <Typography variant="h2">Get started in under 5 minutes</Typography>
           <Typography variant="subtitle" className="mt-2">

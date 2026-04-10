@@ -73,66 +73,80 @@ export default function CommunicationPreferences() {
 
   if (unsubscribed === "1") {
     return (
-      <div style={{ maxWidth: 560, margin: "48px auto", padding: 24, fontFamily: "system-ui, sans-serif" }}>
-        <h1 style={{ fontSize: 22, marginBottom: 12 }}>Preferences updated</h1>
-        <p style={{ color: "#374151", lineHeight: 1.6 }}>
-          You have been unsubscribed from marketing messages
-          {channel ? ` on ${channel}` : ""}. Transactional messages about your bookings may still be sent where required.
-        </p>
+      <div className="max-w-xl mx-auto px-4 py-12">
+        <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-5">
+          <h1 className="text-xl font-bold text-text-primary mb-3">Preferences updated</h1>
+          <p className="text-text-secondary leading-relaxed">
+            You have been unsubscribed from marketing messages
+            {channel ? ` on ${channel}` : ""}. Transactional messages about your bookings may still be sent where required.
+          </p>
+        </div>
       </div>
     );
   }
 
   if (guestToken) {
     return (
-      <div style={{ maxWidth: 560, margin: "48px auto", padding: 24, fontFamily: "system-ui, sans-serif" }}>
-        <h1 style={{ fontSize: 22, marginBottom: 12 }}>Communication preferences</h1>
-        {error && <p style={{ color: "#b91c1c" }}>{error}</p>}
-        {saved && <p style={{ color: "#065f46" }}>Preferences updated.</p>}
-        {loading ? (
-          <p style={{ color: "#6b7280" }}>Loading...</p>
-        ) : (
-          <>
-            <label style={{ display: "block", marginBottom: 10 }}>
-              <input type="checkbox" checked disabled /> Transactional messages (required)
-            </label>
-            <label style={{ display: "block", marginBottom: 10 }}>
-              <input
-                type="checkbox"
-                checked={form.checkInCheckoutReminders}
-                onChange={(e) => setForm((f) => ({ ...f, checkInCheckoutReminders: e.target.checked }))}
-              />{" "}
-              Check-in/check-out reminders
-            </label>
-            <label style={{ display: "block", marginBottom: 10 }}>
-              <input
-                type="checkbox"
-                checked={form.postStayReviewRequest}
-                onChange={(e) => setForm((f) => ({ ...f, postStayReviewRequest: e.target.checked }))}
-              />{" "}
-              Post-stay review requests
-            </label>
-            <label style={{ display: "block", marginBottom: 16 }}>
-              <input
-                type="checkbox"
-                checked={form.promotionalOffers}
-                onChange={(e) => setForm((f) => ({ ...f, promotionalOffers: e.target.checked }))}
-              />{" "}
-              Promotional offers
-            </label>
-            <button onClick={onSave} disabled={loading} style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid #111827" }}>
-              Save preferences
-            </button>
-          </>
-        )}
+      <div className="max-w-xl mx-auto px-4 py-12">
+        <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-5">
+          <h1 className="text-xl font-bold text-text-primary mb-4">Communication preferences</h1>
+          {error && <p className="text-support-error text-sm mb-3">{error}</p>}
+          {saved && <p className="text-support-success text-sm mb-3">Preferences updated.</p>}
+          {loading ? (
+            <p className="text-text-muted text-sm">Loading...</p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              <label className="flex items-center gap-3 text-sm text-text-secondary">
+                <input type="checkbox" checked disabled className="h-4 w-4" />
+                <span>Transactional messages (required)</span>
+              </label>
+              <label className="flex items-center gap-3 text-sm text-text-secondary">
+                <input
+                  type="checkbox"
+                  checked={form.checkInCheckoutReminders}
+                  onChange={(e) => setForm((f) => ({ ...f, checkInCheckoutReminders: e.target.checked }))}
+                  className="h-4 w-4"
+                />
+                <span>Check-in/check-out reminders</span>
+              </label>
+              <label className="flex items-center gap-3 text-sm text-text-secondary">
+                <input
+                  type="checkbox"
+                  checked={form.postStayReviewRequest}
+                  onChange={(e) => setForm((f) => ({ ...f, postStayReviewRequest: e.target.checked }))}
+                  className="h-4 w-4"
+                />
+                <span>Post-stay review requests</span>
+              </label>
+              <label className="flex items-center gap-3 text-sm text-text-secondary">
+                <input
+                  type="checkbox"
+                  checked={form.promotionalOffers}
+                  onChange={(e) => setForm((f) => ({ ...f, promotionalOffers: e.target.checked }))}
+                  className="h-4 w-4"
+                />
+                <span>Promotional offers</span>
+              </label>
+              <button
+                onClick={onSave}
+                disabled={loading}
+                className="mt-2 rounded-full bg-[color:var(--cta-primary)] px-5 py-3 text-sm font-semibold text-white shadow-level1 transition hover:opacity-90 disabled:opacity-60 w-fit"
+              >
+                Save preferences
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     );
   }
 
   return (
-    <div style={{ maxWidth: 560, margin: "48px auto", padding: 24, fontFamily: "system-ui, sans-serif" }}>
-      <h1 style={{ fontSize: 22, marginBottom: 12 }}>Communication preferences</h1>
-      <p style={{ color: "#6b7280" }}>Use the link from your email to update marketing preferences.</p>
+    <div className="max-w-xl mx-auto px-4 py-12">
+      <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-5">
+        <h1 className="text-xl font-bold text-text-primary mb-3">Communication preferences</h1>
+        <p className="text-text-muted text-sm">Use the link from your email to update marketing preferences.</p>
+      </div>
     </div>
   );
 }

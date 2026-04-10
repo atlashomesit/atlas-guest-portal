@@ -59,8 +59,12 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
     }
   };
 
+  if (import.meta.env.PROD) {
+    throw new Error('BookingCard stub: remove this component before shipping to production');
+  }
+
   return (
-    <div 
+    <div
       id="booking-form"
       data-property-id={propertyId}
       className={`mx-auto w-full max-w-6xl p-6 bg-white shadow-lg rounded-2xl ${supportPadding ? 'my-8' : ''}`}

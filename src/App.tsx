@@ -27,6 +27,7 @@ const BlogCategory = React.lazy(() => import("./pages/blog/BlogCategory"))
 const BlogPostPage = React.lazy(() => import("./pages/blog/BlogPostPage"))
 const SearchPage = React.lazy(() => import("./pages/SearchPage"))
 const ShortLinkRedirect = React.lazy(() => import("./components/ShortLinkRedirect"))
+const HomeDetails = React.lazy(() => import("./pages/home/HomeDetails"))
 const SupportWidget = React.lazy(() => import("./components/support/SupportWidget"))
 const Reserve = React.lazy(() => import("./pages/Reserve"))
 const BecomeHost = React.lazy(() => import("./pages/BecomeHost"))
@@ -104,6 +105,7 @@ function AppWrapper() {
           <Route path="/terms" element={withBoundary(<Terms />, "terms-route")} />
           <Route path="/terms-and-conditions" element={withBoundary(<Terms />, "terms-legacy-route")} />
           <Route path="/homes/:propertySlug/:unitSlug" element={withBoundary(<Homepage_PropertyDetails />, "property-details-home-route")} />
+          <Route path="/homes/:roomNo" element={withBoundary(<HomeDetails />, "home-details-route")} />
           <Route path="/property_details/:id" element={withBoundary(<LegacyPropertyRedirect />, "property-details-legacy-route")} />
           <Route path="/properties/:id" element={withBoundary(<LegacyPropertyRedirect />, "property-details-modern-redirect-route")} />
           <Route path="/reserve" element={withBoundary(<Reserve />, "reserve-route")} />

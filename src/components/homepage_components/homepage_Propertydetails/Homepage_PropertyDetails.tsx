@@ -669,7 +669,7 @@ useEffect(() => {
       <a href={galleryUrls[0]} data-fancybox="property-gallery">
         <img
           src={galleryUrls[0]}
-          alt="Main property"
+          alt={data?.property_name ? `${data.property_name} photo` : "Main property photo"}
           loading="lazy"
           decoding="async"
           sizes="(min-width: 1024px) 50vw, 100vw"
@@ -686,7 +686,7 @@ useEffect(() => {
         <a href={img} data-fancybox="property-gallery">
           <img
             src={img}
-            alt={`Thumbnail ${index + 1}`}
+            alt={data?.property_name ? `${data.property_name} photo ${index + 2}` : `Property photo ${index + 2}`}
             loading="lazy"
             decoding="async"
             sizes="(min-width: 1024px) 25vw, 50vw"
