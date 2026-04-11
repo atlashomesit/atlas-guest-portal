@@ -40,7 +40,12 @@ const PageNotFound = React.lazy(() => import("./pages/pagenotfound/PageNotFound"
 
 function LazyFallback() {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '40vh' }}>
+    <div
+      role="status"
+      aria-live="polite"
+      aria-label="Loading page"
+      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '40vh' }}
+    >
       <div style={{ width: 32, height: 32, border: '3px solid #e5e7eb', borderTopColor: '#ea580c', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>

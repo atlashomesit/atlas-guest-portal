@@ -810,6 +810,9 @@ const BecomeHost = () => {
           {step === 1 && (
             <>
               <Typography variant="h3">Property details</Typography>
+              <p style={{ ...styles.hint, marginBottom: 12 }}>
+                You can refine photos and pricing later in the admin portal before going live.
+              </p>
               <div style={styles.fieldGroup}>
                 <label htmlFor="propertyType" style={styles.label}>
                   Property type
