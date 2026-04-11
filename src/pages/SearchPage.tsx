@@ -177,7 +177,7 @@ const SearchPage = () => {
 
         {isLoading && (
           <section className="grid gap-6 sm:grid-cols-2" data-testid="search-skeleton">
-            {Array.from({ length: 8 }).map((_, i) => (
+            {Array.from({ length: 6 }).map((_, i) => (
               <SkeletonCard key={i} />
             ))}
           </section>

@@ -43,6 +43,71 @@ interface PropertyDetail {
     value: string;
 }
 
+/** Shown while listing data is resolving (incl. API fallback). Matches loaded page layout for perceived performance. */
+function PropertyDetailsSkeleton() {
+    return (
+        <section
+            className="w-full pt-28 md:pt-0 tracking-wide"
+            data-testid="property-details-skeleton"
+            aria-busy="true"
+            aria-label="Loading property details"
+        >
+            <div className="pt-10 pl-32">
+                <div className="h-4 w-32 animate-pulse rounded bg-bg-muted" />
+            </div>
+            <div className="max-w-[85rem] flex flex-col gap-10 mx-auto px-4 sm:px-8 lg:px-16 py-8">
+                <div className="space-y-3">
+                    <div className="h-9 max-w-xl animate-pulse rounded-lg bg-bg-muted" />
+                    <div className="h-4 w-48 animate-pulse rounded bg-bg-muted" />
+                    <div className="h-4 w-64 animate-pulse rounded bg-bg-muted" />
+                </div>
+
+                <div className="flex gap-2 h-64 md:h-96 lg:h-[450px] overflow-hidden">
+                    <div className="flex-1 h-full rounded-md overflow-hidden animate-pulse bg-bg-muted" />
+                    <div className="flex-1 grid grid-cols-2 grid-rows-2 gap-2 h-full">
+                        {Array.from({ length: 4 }).map((_, i) => (
+                            <div key={i} className="h-full w-full rounded-md animate-pulse bg-bg-muted" />
+                        ))}
+                    </div>
+                </div>
+
+                <div className="flex flex-col gap-4 sm:flex-row">
+                    <div className="w-full sm:w-2/3 order-2 sm:order-1 space-y-6">
+                        <div className="pb-8 border-b border-border-subtle space-y-4">
+                            <div className="h-7 w-56 animate-pulse rounded bg-bg-muted" />
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                {Array.from({ length: 6 }).map((_, i) => (
+                                    <div key={i} className="h-24 rounded-xl animate-pulse bg-bg-muted border border-border-subtle" />
+                                ))}
+                            </div>
+                        </div>
+                        <div className="space-y-3">
+                            <div className="h-7 w-48 animate-pulse rounded bg-bg-muted" />
+                            <div className="h-4 w-full animate-pulse rounded bg-bg-muted" />
+                            <div className="h-4 w-5/6 animate-pulse rounded bg-bg-muted" />
+                            <div className="h-4 w-4/6 animate-pulse rounded bg-bg-muted" />
+                        </div>
+                    </div>
+                    <div className="w-full sm:w-1/3 order-1 sm:order-2">
+                        <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6 space-y-4">
+                            <div className="h-40 w-full animate-pulse rounded-xl bg-bg-muted" />
+                            <div className="h-6 w-28 animate-pulse rounded bg-bg-muted" />
+                            <div className="h-10 w-full animate-pulse rounded-xl bg-bg-muted" />
+                            <div className="h-12 w-full animate-pulse rounded-xl bg-bg-muted" />
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex justify-center sm:justify-start">
+                    <Button onClick={() => window.history.back()} className="mt-2" variant="secondary">
+                        Go Back
+                    </Button>
+                </div>
+            </div>
+        </section>
+    );
+}
+
 interface Property {
     id: number;
     listingId?: number | string;
@@ -511,20 +576,7 @@ useEffect(() => {
     };
 
     if (!data && !notFound) {
-        return (
-            <div className="min-h-screen flex items-center justify-center">
-                <div className="text-center">
-                    <div className="text-2xl font-semibold text-text-primary mb-4">Loading property details...</div>
-                    <div className="text-text-muted">If this takes too long, the property may not exist or there might be a connection issue.</div>
-                    <Button 
-                        onClick={() => window.history.back()}
-                        className="mt-4"
-                    >
-                        Go Back
-                    </Button>
-                </div>
-            </div>
-        );
+        return <PropertyDetailsSkeleton />;
     }
 
     if (!data && notFound) {
@@ -975,45 +1027,35 @@ useEffect(() => {
                     </div>
                     {/* right div  */}
                     <div className="w-full sm:w-1/3 order-1 sm:order-2">
-                        {!data ? (
-                            <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6">
-                                <h3 className="text-lg font-semibold text-text-primary">Loading property details...</h3>
-                            </div>
-                        ) : (
-                            <>
-                                {/* Desktop View */}
-                                <div className='sticky top-16'>
-                                    {data?.photoCount != null && data.photoCount > 0 && (
-                                        <p className="text-sm text-text-muted mb-2" aria-label="Photo count">{data.photoCount} photo{data.photoCount !== 1 ? 's' : ''}</p>
-                                    )}
-                                    <UnitBookingWidget
-                                        listingId={resolvedListingId ?? undefined}
-                                        propertyId={listingPropertyId ?? undefined}
-                                        listingName={data?.property_name || 'This property'}
-                                        timezoneId={data?.timezoneId}
-                                        coverPhotoUrl={primaryImage}
-                                        maxGuests={data?.maxGuests}
-                                    />
-                                    {showAvailabilityPlaceholder && (
-                                        <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6">
-                                            <h3 className="text-lg font-semibold text-text-primary mb-2">Check Availability</h3>
-                                            <p className="text-text-muted text-sm mb-4">
-                                                Availability check is currently unavailable. Please try again later.
-                                            </p>
-                                            <Button 
-                                                variant="primary" 
-                                                fullWidth 
-                                                onClick={() => window.location.reload()}
-                                                disabled={isListingLookupPending}
-                                            >
-                                                {isListingLookupPending ? 'Loading...' : 'Try Again'}
-                                            </Button>
-                                        </div>
-                                    )}
-                                    
+                        <div className="sticky top-16">
+                            {data.photoCount != null && data.photoCount > 0 && (
+                                <p className="text-sm text-text-muted mb-2" aria-label="Photo count">{data.photoCount} photo{data.photoCount !== 1 ? 's' : ''}</p>
+                            )}
+                            <UnitBookingWidget
+                                listingId={resolvedListingId ?? undefined}
+                                propertyId={listingPropertyId ?? undefined}
+                                listingName={data.property_name || 'This property'}
+                                timezoneId={data.timezoneId}
+                                coverPhotoUrl={primaryImage}
+                                maxGuests={data.maxGuests}
+                            />
+                            {showAvailabilityPlaceholder && (
+                                <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6">
+                                    <h3 className="text-lg font-semibold text-text-primary mb-2">Check Availability</h3>
+                                    <p className="text-text-muted text-sm mb-4">
+                                        Availability check is currently unavailable. Please try again later.
+                                    </p>
+                                    <Button
+                                        variant="primary"
+                                        fullWidth
+                                        onClick={() => window.location.reload()}
+                                        disabled={isListingLookupPending}
+                                    >
+                                        {isListingLookupPending ? 'Loading...' : 'Try Again'}
+                                    </Button>
                                 </div>
-                            </>
-                        )}
+                            )}
+                        </div>
                     </div>
                 </div>
 
