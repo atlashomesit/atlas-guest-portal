@@ -50,7 +50,7 @@
     "@types/swiper": "^5.4.3",
     "axios": "^1.13.2",
     "date-fns": "^4.1.0",
-    "framer-motion": "^10.12.0",
+    "framer-motion": "^12.38.0",
     "lucide-react": "^0.484.0",
     "luxon": "^3.5.0",
     "react": "^18.3.1",
