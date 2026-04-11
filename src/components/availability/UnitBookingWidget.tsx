@@ -116,7 +116,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
 
   const navigate = useNavigate();
   const _location = useLocation();
-  const { updateBooking } = useBooking();
+  const { booking, updateBooking } = useBooking();
   const { getUrlsForListingId } = useListingPhotosFromApi();
   const isBookingDisabled = !hasRuntimeConfig();
 
@@ -262,6 +262,25 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
       // no-op
     }
   }, []);
+
+  // Hydrate widget from booking context (e.g. ?checkIn=&checkOut=&guests= from property URL)
+  useEffect(() => {
+    const ci = booking.checkIn;
+    const co = booking.checkOut;
+    if (!ci || !co) return;
+    const start = getIstStartOfDay(new Date(ci));
+    const end = getIstStartOfDay(new Date(co));
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return;
+    if (end.getTime() <= start.getTime()) return;
+    setDateRange({ startDate: start, endDate: end });
+  }, [booking.checkIn, booking.checkOut]);
+
+  useEffect(() => {
+    const g = booking.guests;
+    if (typeof g === 'number' && g >= 1 && g <= maxGuests) {
+      setGuests(g);
+    }
+  }, [booking.guests, maxGuests]);
 
   // Fetch availability automatically on component load and when the calendar is opened
   // Availability always starts from today, independent of selected dates
@@ -552,8 +571,15 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     return;
   }
 
-  const startISO = toISODate(getIstStartOfDay(startDate));
-  const endISO = toISODate(getIstStartOfDay(endDate));
+  const startIST = getIstStartOfDay(startDate);
+  const endIST = getIstStartOfDay(endDate);
+  if (endIST.getTime() <= startIST.getTime()) {
+    setDateError('Check-out must be after check-in.');
+    return;
+  }
+
+  const startISO = toISODate(startIST);
+  const endISO = toISODate(endIST);
 
   // Prevent blocked/hold ranges
   if (doesRangeIntersectBlocked(startISO, endISO, blockedSet)) {
@@ -725,8 +751,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     if (!formData.email) {
       errors.email = 'Email is required';
       isValid = false;
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      errors.email = 'Email is invalid';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      errors.email = 'Please enter a valid email address';
       isValid = false;
     }
 
@@ -876,6 +902,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       return;
     }
 
+    setDateError(null);
+
     if (!validateForm()) {
       return;
     }
@@ -925,6 +953,18 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     } else {
       checkinDate = dateRange.startDate;
       checkoutDate = dateRange.endDate;
+    }
+
+    const checkinIst = getIstStartOfDay(checkinDate);
+    const checkoutIst = getIstStartOfDay(checkoutDate);
+    if (checkoutIst.getTime() <= checkinIst.getTime()) {
+      setDateError('Check-out must be after check-in.');
+      return;
+    }
+    const stayNights = calculateNights(checkinIst, checkoutIst);
+    if (stayNights < 1) {
+      setDateError('Check-out must be after check-in.');
+      return;
     }
 
     // Final validation: Only check-in date must be available
@@ -1817,7 +1857,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             placeholder="Enter your full name"
             data-testid="guest-booking-name"
           />
-          {formErrors.name && <p className="text-sm text-support-error">{formErrors.name}</p>}
+          {formErrors.name && (
+            <p className="text-sm text-support-error" role="alert">
+              {formErrors.name}
+            </p>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -1835,7 +1879,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             placeholder="Enter your email"
             data-testid="guest-booking-email"
           />
-          {formErrors.email && <p className="text-sm text-support-error">{formErrors.email}</p>}
+          {formErrors.email && (
+            <p className="text-sm text-support-error" role="alert">
+              {formErrors.email}
+            </p>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -1860,7 +1908,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             />
           </div>
           <p className="text-xs text-text-muted">Indian mobile number (10 digits)</p>
-          {formErrors.phone && <p className="text-sm text-support-error">{formErrors.phone}</p>}
+          {formErrors.phone && (
+            <p className="text-sm text-support-error" role="alert">
+              {formErrors.phone}
+            </p>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -1951,13 +2003,19 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               .
             </span>
           </label>
-          {consentError ? <p className="text-sm text-support-error">{consentError}</p> : null}
+          {consentError ? (
+            <p className="text-sm text-support-error" role="alert">
+              {consentError}
+            </p>
+          ) : null}
         </div>
       </div>
 
       {formError && (
         <div className="space-y-1">
-          <p className="text-sm text-support-error">{formError}</p>
+          <p className="text-sm text-support-error" role="alert">
+            {formError}
+          </p>
           {paymentAttemptCount > 0 && (formError.includes('Network') || formError.includes('connection') || formError.includes('Unable to connect')) && (
             <p className="text-xs text-text-muted">Attempt {Math.min(paymentAttemptCount, 3)} of 3 — Click &quot;Book this home&quot; to retry</p>
           )}
@@ -1967,7 +2025,14 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       <Button
         type="submit"
         fullWidth
-        disabled={isSubmitting || isLoading || !dateRange.startDate || !dateRange.endDate || isBookingDisabled || !guestConsentAccepted}
+        disabled={
+          isSubmitting ||
+          isLoading ||
+          !dateRange.startDate ||
+          !dateRange.endDate ||
+          isBookingDisabled ||
+          priceDetails.nights < 1
+        }
         className={isSubmitting || isLoading ? 'opacity-75' : ''}
         data-testid="guest-booking-submit"
       >
