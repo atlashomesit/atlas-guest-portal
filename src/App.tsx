@@ -82,10 +82,14 @@ function AppWrapper() {
 
   return (
     <>
+      <a href="#main-content" className="skip-to-main">
+        Skip to main content
+      </a>
       {!shouldHideNavbar && <Navbar />}
       <ScrollToTop />
       <ErrorBoundary name="router">
         <Suspense fallback={<LazyFallback />}>
+        <main id="main-content" tabIndex={-1}>
         <Routes>
           <Route path="/" element={withBoundary(<Home />, "home-route")} />
           <Route path="/contact" element={withBoundary(<ContactUs />, "contact-route")} />
@@ -120,6 +124,7 @@ function AppWrapper() {
           <Route path="/:shortCode" element={withBoundary(<ShortLinkRedirect />, "shortlink-route")} />
           <Route path="/*" element={withBoundary(<PageNotFound />, "fallback-route")} />
         </Routes>
+        </main>
         </Suspense>
       </ErrorBoundary>
       <Suspense fallback={null}><SupportWidget /></Suspense>

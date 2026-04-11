@@ -735,6 +735,9 @@ const BecomeHost = () => {
           {step === 0 && (
             <>
               <Typography variant="h3">Your contact details</Typography>
+              <p style={{ ...styles.hint, marginBottom: 12 }}>
+                Use the email and phone you want for guest messages and payout notifications.
+              </p>
               <div style={styles.fieldGroup}>
                 <label htmlFor="displayName" style={styles.label}>
                   Display name

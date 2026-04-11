@@ -176,7 +176,12 @@ const SearchPage = () => {
         )}
 
         {isLoading && (
-          <section className="grid gap-6 sm:grid-cols-2" data-testid="search-skeleton">
+          <section
+            className="grid gap-6 sm:grid-cols-2"
+            data-testid="search-skeleton"
+            aria-busy="true"
+            aria-label="Loading search results"
+          >
             {Array.from({ length: 6 }).map((_, i) => (
               <SkeletonCard key={i} />
             ))}
@@ -184,7 +189,12 @@ const SearchPage = () => {
         )}
 
         {!isLoading && !showEmptyState && !hasInvalidDates && (
-          <section className="grid gap-6 sm:grid-cols-2" data-testid="guest-search-results">
+          <section
+            className="grid gap-6 sm:grid-cols-2"
+            data-testid="guest-search-results"
+            aria-live="polite"
+            aria-label={`${filteredUnits.length} apartments match your filters`}
+          >
             {visibleUnits.map((unit) => (
               <article
                 key={unit.id}

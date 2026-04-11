@@ -66,6 +66,10 @@ export const formatHumanDate = (
   return date.toLocaleDateString(locale, options);
 };
 
+/**
+ * Guest/marketing display of money (rounded for readability).
+ * Tax invoices and GST line items use server-side rounding — do not rely on this for compliance totals.
+ */
 export const formatCurrency = (
   amount: number,
   {
