@@ -951,7 +951,23 @@ useEffect(() => {
                         {/* Similar stays — Wave 9 #85 */}
                         {(() => {
                             const s = similarFromApi;
-                            if (!s || s.loading || !Array.isArray(s.items) || s.items.length === 0) return null;
+                            if (s?.loading) return (
+                                <div className="pb-8 border-b border-border-subtle">
+                                    <div className="h-7 w-48 animate-pulse rounded bg-bg-muted mb-4" />
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        {Array.from({ length: 2 }).map((_, i) => (
+                                            <div key={i} className="rounded-xl border border-border-subtle bg-bg-surface overflow-hidden shadow-level1">
+                                                <div className="h-40 w-full animate-pulse bg-bg-muted" />
+                                                <div className="p-4 space-y-2">
+                                                    <div className="h-4 w-3/4 animate-pulse rounded bg-bg-muted" />
+                                                    <div className="h-3 w-1/2 animate-pulse rounded bg-bg-muted" />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            );
+                            if (!s || !Array.isArray(s.items) || s.items.length === 0) return null;
                             return (
                                 <div className="pb-8 border-b border-border-subtle">
                                     <h2 className="text-xl sm:text-2xl font-semibold mb-4 text-text-primary">Similar stays</h2>
@@ -985,6 +1001,25 @@ useEffect(() => {
                             const api = listingReviewsFromApi;
                             const showApi = api && !api.loading && api.totalCount > 0;
                             const showStatic = !showApi && data && data.property_reviews > 0;
+                            if (api?.loading && !showStatic) return (
+                                <div className="pb-8 border-b border-border-subtle">
+                                    <div className="h-7 w-40 animate-pulse rounded bg-bg-muted mb-4" />
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        {Array.from({ length: 2 }).map((_, i) => (
+                                            <div key={i} className="p-4 rounded-xl bg-bg-muted border border-border-subtle space-y-2">
+                                                <div className="h-3 w-24 animate-pulse rounded bg-bg-surface" />
+                                                <div className="flex gap-1">
+                                                    {Array.from({ length: 5 }).map((__, j) => (
+                                                        <div key={j} className="h-3 w-3 animate-pulse rounded-full bg-bg-surface" />
+                                                    ))}
+                                                </div>
+                                                <div className="h-3 w-full animate-pulse rounded bg-bg-surface" />
+                                                <div className="h-3 w-4/5 animate-pulse rounded bg-bg-surface" />
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            );
                             if (!showApi && !showStatic) return null;
                             const rating = showApi ? api!.averageRating : data!.property_rating;
                             const count = showApi ? api!.totalCount : data!.property_reviews;
