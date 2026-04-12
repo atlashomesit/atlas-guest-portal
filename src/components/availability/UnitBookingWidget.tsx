@@ -178,6 +178,9 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [appliedPromoCode, setAppliedPromoCode] = useState<string | null>(null);
   const [appliedPromoDiscount, setAppliedPromoDiscount] = useState(0);
   const [promoMessage, setPromoMessage] = useState<string | null>(null);
+  // TASK-171: add-on services for this listing
+  const [availableAddOns, setAvailableAddOns] = useState<Array<{ addOnServiceId: number; name: string; description?: string | null; price: number; priceType: string }>>([]);
+  const [selectedAddOns, setSelectedAddOns] = useState<Record<number, number>>({}); // addOnServiceId -> quantity (0 = not selected)
   const [paymentStatus, setPaymentStatus] = useState<'success' | 'failed' | null>(null);
   const [bookingDetails, setBookingDetails] = useState<{
     bookingId: string;
@@ -239,6 +242,23 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   // Reset auto-adjust flag when listing changes
   useEffect(() => {
     hasAutoAdjustedRef.current = false;
+  }, [listingId]);
+
+  // TASK-171: fetch add-on services available for this listing
+  useEffect(() => {
+    const id = listingId != null ? Number(listingId) : NaN;
+    if (!Number.isFinite(id) || id <= 0) return;
+    const headers = getApiHeaders();
+    void (async () => {
+      try {
+        const url = buildApiUrl(`/listings/${id}/add-ons`);
+        const res = await fetch(url, { headers });
+        if (res.ok) {
+          const data = await res.json() as Array<{ addOnServiceId: number; name: string; description?: string | null; price: number; priceType: string }>;
+          setAvailableAddOns(Array.isArray(data) ? data : []);
+        }
+      } catch { /* non-critical: just don't show add-ons */ }
+    })();
   }, [listingId]);
 
   // On mount: clear any stale pending payment (e.g. user refreshed during Razorpay modal)
@@ -760,7 +780,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   const breakdownConvenienceFee = Math.round(breakdownSubtotalForConvenience * convenienceFeePercent);
   const referralDiscountApplied = Math.max(0, appliedReferralDiscount || 0);
   const promoDiscountApplied = Math.max(0, appliedPromoDiscount || 0);
-  const breakdownFinalTotal = Math.max(1, breakdownPrice + gstAmount + breakdownConvenienceFee - referralDiscountApplied - promoDiscountApplied);
+  // TASK-171: compute add-ons subtotal from guest selections
+  const addOnsTotal = availableAddOns.reduce((sum, ao) => {
+    const qty = selectedAddOns[ao.addOnServiceId] ?? 0;
+    return sum + (qty > 0 ? ao.price * qty : 0);
+  }, 0);
+  const breakdownFinalTotal = Math.max(1, breakdownPrice + gstAmount + breakdownConvenienceFee - referralDiscountApplied - promoDiscountApplied + addOnsTotal);
 
   const finalTotal =
     hasSelectedRange && selectedRangeTotalFromCalendar != null
@@ -1073,6 +1098,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       };
 
       // 2. Prepare order payload with the exact structure expected by the backend
+      // TASK-171: build selectedAddOns array for bookingDraft
+      const selectedAddOnsList = availableAddOns
+        .filter(ao => (selectedAddOns[ao.addOnServiceId] ?? 0) > 0)
+        .map(ao => ({ addOnServiceId: ao.addOnServiceId, quantity: selectedAddOns[ao.addOnServiceId] }));
+
       const orderPayload = {
         bookingDraft: {
           listingId: bookingDraft.listingId,
@@ -1080,6 +1110,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           checkoutDate: bookingDraft.checkoutDate,
           guests: bookingDraft.guests,
           notes: bookingDraft.notes,
+          selectedAddOns: selectedAddOnsList.length > 0 ? selectedAddOnsList : undefined,
         },
         amount: Math.round(finalTotal), // Keep amount in rupees, let backend handle conversion if needed
         currency: 'INR',
@@ -1875,6 +1906,13 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               </div>
             )}
           </div>
+          {addOnsTotal > 0 && (
+            <div className="grid grid-cols-[140px_12px_1fr] text-text-secondary">
+              <span>Add-ons</span>
+              <span>:</span>
+              <span className="text-right">{displayPrice(addOnsTotal)}</span>
+            </div>
+          )}
           <div className="mt-3 border-t border-border-subtle pt-3 grid grid-cols-[140px_12px_1fr] text-base font-semibold text-text-primary">
             <span>Total</span>
             <span>:</span>
@@ -1890,6 +1928,50 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         </div>
 
       </div>
+
+      {/* TASK-171: add-on services selection */}
+      {availableAddOns.length > 0 && (
+        <div className="rounded-xl border border-border-subtle bg-bg-muted/40 p-4 space-y-3">
+          <p className="text-sm font-semibold text-text-primary">Add-on services</p>
+          {availableAddOns.map(ao => {
+            const qty = selectedAddOns[ao.addOnServiceId] ?? 0;
+            return (
+              <div key={ao.addOnServiceId} className="flex items-center justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-text-primary truncate">{ao.name}</p>
+                  {ao.description && <p className="text-xs text-text-muted truncate">{ao.description}</p>}
+                  <p className="text-xs text-text-secondary">{displayPrice(ao.price)} / {ao.priceType.replace('_', ' ')}</p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {qty > 0 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedAddOns(prev => ({ ...prev, [ao.addOnServiceId]: Math.max(0, (prev[ao.addOnServiceId] ?? 0) - 1) }))}
+                        className="w-7 h-7 rounded-full border border-border-strong text-text-primary flex items-center justify-center text-base leading-none"
+                        aria-label={`Remove one ${ao.name}`}
+                      >−</button>
+                      <span className="text-sm font-medium w-4 text-center">{qty}</span>
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedAddOns(prev => ({ ...prev, [ao.addOnServiceId]: (prev[ao.addOnServiceId] ?? 0) + 1 }))}
+                    className="w-7 h-7 rounded-full border border-border-strong text-text-primary flex items-center justify-center text-base leading-none"
+                    aria-label={`Add ${ao.name}`}
+                  >+</button>
+                </div>
+              </div>
+            );
+          })}
+          {addOnsTotal > 0 && (
+            <div className="pt-2 border-t border-border-subtle grid grid-cols-[120px_12px_1fr] text-sm text-text-secondary">
+              <span>Add-ons</span><span>:</span>
+              <span className="text-right">{displayPrice(addOnsTotal)}</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {dateError && <p className="text-sm text-support-error">{dateError}</p>}
       {statusMessage && <p className="text-sm text-text-secondary">{statusMessage}</p>}
