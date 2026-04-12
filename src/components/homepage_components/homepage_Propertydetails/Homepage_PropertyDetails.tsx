@@ -16,6 +16,7 @@ import { getUnitPolicy } from '../../../config/policyConfig';
 import { inlinePolicySnippets } from '../../../content/terms';
 import Subheading from '../../commonComponents/subheading/Subheading';
 import UnitBookingWidget from '../../availability/UnitBookingWidget';
+import AvailabilityCalendar from '../../AvailabilityCalendar';
 import { trackEvent } from '../../../utils/analytics';
 import { Button } from '../../ui/Button';
 import { calculateNightlyPrice, inferUnitType } from '../../../utils/pricing';
@@ -1151,6 +1152,15 @@ useEffect(() => {
                                 coverPhotoUrl={primaryImage}
                                 maxGuests={data.maxGuests}
                             />
+                            {resolvedListingId && (
+                                <AvailabilityCalendar
+                                    listingId={resolvedListingId}
+                                    onDateSelect={(ymd) => {
+                                        const ev = new CustomEvent('atlas:set-checkin', { detail: ymd });
+                                        window.dispatchEvent(ev);
+                                    }}
+                                />
+                            )}
                             {showAvailabilityPlaceholder && (
                                 <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6">
                                     <h3 className="text-lg font-semibold text-text-primary mb-2">Check Availability</h3>
