@@ -160,6 +160,13 @@ const PropertyDetails = () => {
     const { setProperty, updateBooking } = useBooking();
     const { getUrlsForListingId } = useListingPhotosFromApi();
     const [searchParams] = useSearchParams();
+    // Build a back-to-results link when the user arrived from /search (params preserved in URL by SearchPage)
+    const backToResultsHref = useMemo(() => {
+        const searchKeys = ["checkIn", "checkOut", "guests", "minPrice", "maxPrice"];
+        const hasSearchParams = searchKeys.some((k) => searchParams.has(k));
+        if (!hasSearchParams) return null;
+        return `/search?${searchParams.toString()}`;
+    }, [searchParams]);
     const showAvailabilityPlaceholder = false;
     const [availabilityPrefetched, setAvailabilityPrefetched] = useState(false);
     const [fav, setFav] = useState(false);
@@ -742,6 +749,18 @@ useEffect(() => {
             </div>
 
             <div className="max-w-[85rem] flex flex-col gap-10 mx-auto px-4 sm:px-8 lg:px-16 py-8">
+                {backToResultsHref && (
+                    <div>
+                        <Link
+                            to={backToResultsHref}
+                            className="inline-flex items-center gap-1.5 text-sm font-medium text-text-muted hover:text-text-primary transition-colors"
+                            data-testid="back-to-results"
+                        >
+                            <span aria-hidden="true">←</span> Back to results
+                        </Link>
+                    </div>
+                )}
+
                 {/* Property Header */}
                 <div className="">
                     <h1 className="text-2xl sm:text-3xl font-semibold mb-2 capitalize text-text-primary">{data?.property_name}</h1>
