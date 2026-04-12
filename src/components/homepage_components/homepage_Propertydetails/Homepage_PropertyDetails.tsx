@@ -797,6 +797,20 @@ useEffect(() => {
                     </div>
                 </div>
 
+                {/* Check-in / check-out times — shown prominently before gallery */}
+                {(data?.checkInTime || data?.checkOutTime) && (
+                    <div className="flex flex-wrap gap-4 text-sm font-medium mt-1 mb-2">
+                        <div className="flex items-center gap-1.5 text-text-primary">
+                            <KeyRound className="w-4 h-4 text-accent-primary flex-shrink-0" />
+                            <span>Check-in from <strong>{data.checkInTime?.trim() || 'Flexible'}</strong></span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-text-primary">
+                            <Clock className="w-4 h-4 text-accent-primary flex-shrink-0" />
+                            <span>Checkout by <strong>{data.checkOutTime?.trim() || 'Flexible'}</strong></span>
+                        </div>
+                    </div>
+                )}
+
                 {/* Image Gallery — Azure blob URLs are skipped (409); API/static must serve reachable images */}
 <div className="flex gap-2 h-64 md:h-96 lg:h-[450px] overflow-hidden ">
   <div className="flex-1 relative h-full rounded-md overflow-hidden bg-bg-muted">
