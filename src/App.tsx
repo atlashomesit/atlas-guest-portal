@@ -34,6 +34,7 @@ const BecomeHost = React.lazy(() => import("./pages/BecomeHost"))
 const BookingConfirmationPage = React.lazy(() => import("./pages/BookingConfirmationPage"))
 const ReviewSubmitPage = React.lazy(() => import("./pages/ReviewSubmitPage"))
 const CommunicationPreferences = React.lazy(() => import("./pages/CommunicationPreferences"))
+const ProfilePage = React.lazy(() => import("./pages/ProfilePage"))
 const FavoritesPage = React.lazy(() => import("./pages/FavoritesPage"))
 const RecentlyViewedPage = React.lazy(() => import("./pages/RecentlyViewedPage"))
 const PageNotFound = React.lazy(() => import("./pages/pagenotfound/PageNotFound"))
@@ -122,6 +123,7 @@ function AppWrapper() {
           <Route path="/review/:bookingId" element={withBoundary(<ReviewSubmitPage />, "review-submit-route")} />
           <Route path="/communication-preferences" element={withBoundary(<CommunicationPreferences />, "communication-preferences-route")} />
           <Route path="/preferences/:guestToken" element={withBoundary(<CommunicationPreferences />, "communication-preferences-token-route")} />
+          <Route path="/profile" element={withBoundary(<ProfilePage />, "profile-route")} />
           <Route path="/favorites" element={withBoundary(<FavoritesPage />, "favorites-route")} />
           <Route path="/recent" element={withBoundary(<RecentlyViewedPage />, "recent-route")} />
           <Route path="/become-a-host" element={withBoundary(<BecomeHost />, "become-host-route")} />

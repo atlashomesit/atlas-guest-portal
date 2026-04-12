@@ -425,7 +425,15 @@ export default function BookingConfirmationPage() {
           </div>
         )}
 
-        <div className="text-center pt-2">
+        <div className="text-center pt-2 flex flex-col items-center gap-2">
+          {bookingId && token && (
+            <Link
+              to={`/profile?bookingId=${bookingId}&t=${encodeURIComponent(token)}`}
+              className="text-sm text-brand-primary underline underline-offset-2 hover:text-brand-primary/80"
+            >
+              Update contact details
+            </Link>
+          )}
           <Link
             to="/"
             data-testid="confirmation-cta"
