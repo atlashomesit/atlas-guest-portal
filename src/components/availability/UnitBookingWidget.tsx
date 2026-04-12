@@ -155,6 +155,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [formError, setFormError] = useState<string | null>(null);
   const [dateError, setDateError] = useState<string | null>(null);
   const [minStayNights, setMinStayNights] = useState(1);
+  const [minAdvanceDays, setMinAdvanceDays] = useState(0);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -294,12 +295,15 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     apiFetch(buildApiUrl(`/listings/${listingId}/availability-rules`))
       .then((r) => r.json())
       .then((d: unknown) => {
-        const data = d as { minStayNights?: number };
+        const data = d as { minStayNights?: number; advanceBookingHours?: number };
         if (active && typeof data?.minStayNights === 'number' && data.minStayNights > 1) {
           setMinStayNights(data.minStayNights);
         }
+        if (active && typeof data?.advanceBookingHours === 'number' && data.advanceBookingHours > 0) {
+          setMinAdvanceDays(Math.ceil(data.advanceBookingHours / 24));
+        }
       })
-      .catch(() => { /* non-critical — default stays 1 */ });
+      .catch(() => { /* non-critical — defaults stay */ });
     return () => { active = false; };
   }, [listingId]);
 
@@ -603,6 +607,14 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   if (minStayNights > 1 && selectedNights < minStayNights) {
     setDateError(`Minimum stay is ${minStayNights} nights.`);
     return;
+  }
+
+  if (minAdvanceDays > 0) {
+    const minCheckin = addDays(getIstStartOfDay(new Date()), minAdvanceDays);
+    if (startIST < minCheckin) {
+      setDateError(`This listing requires at least ${minAdvanceDays} day${minAdvanceDays !== 1 ? 's' : ''} advance notice.`);
+      return;
+    }
   }
 
   const startISO = toISODate(startIST);
@@ -1683,7 +1695,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               value={dateRange}
               onChange={handleRangeChange}
               loading={isLoading}
-              minDate={addDays(today, -1)}
+              minDate={addDays(today, Math.max(-1, minAdvanceDays - 1))}
               maxDate={maxBookingDate}
               disabledDay={disabledDay}
               months={2}
