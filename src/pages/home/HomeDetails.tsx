@@ -1,5 +1,11 @@
 import { Link, useParams } from "react-router-dom";
 import { Suspense, lazy } from "react";
+import type { LucideIcon } from "lucide-react";
+import {
+  Wifi, Snowflake, Tv, Car, UtensilsCrossed, WashingMachine,
+  Dumbbell, Waves, TreePine, Mountain, BedDouble, Briefcase,
+  ShieldCheck, Sparkles, Users, CheckCircle2,
+} from "lucide-react";
 
 import { homes, defaultHomeHighlights } from "../../content/homes";
 
@@ -7,12 +13,49 @@ const UnitBookingWidget = lazy(() => import("../../components/availability/UnitB
 
 const fallbackImage = "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80";
 
+type AmenityDef = { icon: LucideIcon; keywords: string[] };
+
+const AMENITY_MAP: AmenityDef[] = [
+  { icon: Wifi,           keywords: ["wi-fi", "wifi", "internet", "broadband"] },
+  { icon: Snowflake,      keywords: ["ac", "air con", "air-con", "cooling"] },
+  { icon: Tv,             keywords: ["tv", "television", "smart tv", "streaming"] },
+  { icon: Car,            keywords: ["parking", "car park", "garage"] },
+  { icon: UtensilsCrossed,keywords: ["kitchen", "cooking", "utensil", "kitchenette"] },
+  { icon: WashingMachine, keywords: ["washing", "laundry", "washer"] },
+  { icon: Dumbbell,       keywords: ["gym", "fitness", "workout"] },
+  { icon: Waves,          keywords: ["pool", "swimming"] },
+  { icon: TreePine,       keywords: ["garden", "balcony", "terrace", "outdoor"] },
+  { icon: Mountain,       keywords: ["mountain view", "sea view", "view"] },
+  { icon: BedDouble,      keywords: ["bedding", "bed", "linen", "mattress"] },
+  { icon: Briefcase,      keywords: ["workspace", "work", "desk"] },
+  { icon: ShieldCheck,    keywords: ["security", "safe", "cctv", "guard"] },
+  { icon: Sparkles,       keywords: ["housekeeping", "cleaning", "clean"] },
+  { icon: Users,          keywords: ["concierge", "reception", "support"] },
+];
+
+function resolveIcon(label: string): LucideIcon {
+  const lower = label.toLowerCase();
+  for (const { icon, keywords } of AMENITY_MAP) {
+    if (keywords.some((kw) => lower.includes(kw))) return icon;
+  }
+  return CheckCircle2;
+}
+
+function AmenityChip({ label }: { label: string }) {
+  const Icon = resolveIcon(label);
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-border-subtle bg-bg-surface px-3 py-1.5 text-sm text-text-secondary">
+      <Icon size={15} className="shrink-0 text-brand-primary" />
+      {label}
+    </span>
+  );
+}
+
 const HomeDetails = () => {
   const { roomNo } = useParams<{ roomNo: string }>();
   const room = homes.find((item) => item.roomNo === roomNo);
 
   const primaryImage = room?.images?.[0] ?? fallbackImage;
-
   const highlights = room?.highlights?.length ? room.highlights : defaultHomeHighlights;
 
   if (!room) {
@@ -57,7 +100,17 @@ const HomeDetails = () => {
         </div>
       </div>
 
-      {/* Booking widget — replaces the old "Contact to book" CTA */}
+      {/* Amenities icon chips */}
+      <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5">
+        <h2 className="text-lg font-semibold text-text-primary mb-3">Amenities</h2>
+        <div className="flex flex-wrap gap-2">
+          {highlights.slice(0, 12).map((label) => (
+            <AmenityChip key={label} label={label} />
+          ))}
+        </div>
+      </div>
+
+      {/* Booking widget */}
       <Suspense fallback={
         <div className="rounded-2xl border border-border-subtle bg-bg-surface p-6 animate-pulse h-48" />
       }>
