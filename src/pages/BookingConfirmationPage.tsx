@@ -6,6 +6,7 @@ import { getRuntimeConfig, hasRuntimeConfig } from "../runtime-config";
 
 interface BookingSummary {
   bookingId: number;
+  guestId?: number;
   guestName: string;
   propertyName: string;
   listingName: string;
@@ -426,6 +427,14 @@ export default function BookingConfirmationPage() {
         )}
 
         <div className="text-center pt-2 flex flex-col items-center gap-2">
+          {bookingId && token && booking?.guestId && (
+            <Link
+              to={`/my-bookings?guestId=${booking.guestId}&t=${encodeURIComponent(token)}`}
+              className="text-sm text-brand-primary underline underline-offset-2 hover:text-brand-primary/80"
+            >
+              View all my bookings
+            </Link>
+          )}
           {bookingId && token && (
             <Link
               to={`/profile?bookingId=${bookingId}&t=${encodeURIComponent(token)}`}
