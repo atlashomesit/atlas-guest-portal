@@ -154,6 +154,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [paymentAttemptCount, setPaymentAttemptCount] = useState(0);
   const [formError, setFormError] = useState<string | null>(null);
   const [dateError, setDateError] = useState<string | null>(null);
+  const [minStayNights, setMinStayNights] = useState(1);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -285,6 +286,22 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   useEffect(() => {
     setGuests((current) => Math.min(maxGuests, Math.max(1, current)));
   }, [maxGuests]);
+
+  // Fetch min stay nights from availability rules (non-blocking)
+  useEffect(() => {
+    if (!listingId) return;
+    let active = true;
+    apiFetch(buildApiUrl(`/listings/${listingId}/availability-rules`))
+      .then((r) => r.json())
+      .then((d: unknown) => {
+        const data = d as { minStayNights?: number };
+        if (active && typeof data?.minStayNights === 'number' && data.minStayNights > 1) {
+          setMinStayNights(data.minStayNights);
+        }
+      })
+      .catch(() => { /* non-critical — default stays 1 */ });
+    return () => { active = false; };
+  }, [listingId]);
 
   // Fetch availability automatically on component load and when the calendar is opened
   // Availability always starts from today, independent of selected dates
@@ -579,6 +596,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   const endIST = getIstStartOfDay(endDate);
   if (endIST.getTime() <= startIST.getTime()) {
     setDateError('Check-out must be after check-in.');
+    return;
+  }
+
+  const selectedNights = Math.round((endIST.getTime() - startIST.getTime()) / 86400000);
+  if (minStayNights > 1 && selectedNights < minStayNights) {
+    setDateError(`Minimum stay is ${minStayNights} nights.`);
     return;
   }
 
