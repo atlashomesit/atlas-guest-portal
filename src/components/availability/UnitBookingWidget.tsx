@@ -609,10 +609,16 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     const unitType = inferUnitType({ id: propertyId, property_name: listingName });
     const includedGuests = 2;
     
-    // Calculate number of nights
-    const nights = dateRange.startDate && dateRange.endDate 
-      ? calculateNights(dateRange.startDate, dateRange.endDate) 
-      : 1; // Default to 1 night if no dates selected
+    // Nights: IST-normalized; 0 if partial range or same-day / invalid (never default to 1 — that enabled submit on bad state).
+    const nights =
+      dateRange.startDate && dateRange.endDate
+        ? (() => {
+            const s = getIstStartOfDay(dateRange.startDate);
+            const e = getIstStartOfDay(dateRange.endDate);
+            if (e.getTime() <= s.getTime()) return 0;
+            return calculateNights(s, e);
+          })()
+        : 0;
     
     // Calculate extra guests
     const extraGuests = Math.max(0, guests - includedGuests);
@@ -651,6 +657,13 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   };
 
   const priceDetails = calculatePrice();
+
+  const invalidIstStayRange = useMemo(() => {
+    if (!dateRange.startDate || !dateRange.endDate) return false;
+    const s = getIstStartOfDay(dateRange.startDate).getTime();
+    const e = getIstStartOfDay(dateRange.endDate).getTime();
+    return e <= s;
+  }, [dateRange.startDate, dateRange.endDate]);
   const { loading: dailyPricingLoading, error: dailyPricingError, getListingPricing } = useDailyPricingSummary();
   const dailyPricing = useMemo(
     () => (listingId != null && String(listingId).trim() !== '' ? getListingPricing(listingId) : null),
@@ -1589,7 +1602,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         </div>
         <div className="text-sm text-text-muted space-y-1 mt-1">
           <p>{priceDetails.nights} {priceDetails.nights === 1 ? 'night' : 'nights'} × {displayPrice(perNightForDisplay)}</p>
-          {priceDetails.extraGuests > 0 && (
+          {priceDetails.extraGuests > 0 && priceDetails.nights > 0 && (
             <p>{priceDetails.extraGuests} {priceDetails.extraGuests === 1 ? 'extra guest' : 'extra guests'} × {displayPrice(priceDetails.extraGuestsFee / priceDetails.nights / priceDetails.extraGuests)}/night</p>
           )}
           <p className="text-xs">Includes all taxes and fees</p>
@@ -2031,6 +2044,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           !dateRange.startDate ||
           !dateRange.endDate ||
           isBookingDisabled ||
+          invalidIstStayRange ||
           priceDetails.nights < 1
         }
         className={isSubmitting || isLoading ? 'opacity-75' : ''}
