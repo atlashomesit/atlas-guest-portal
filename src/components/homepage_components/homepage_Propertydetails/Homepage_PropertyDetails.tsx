@@ -25,6 +25,7 @@ import { useListingPhotosFromApi } from '../../../contexts/ListingPhotosContext'
 import { resolveListing } from '../../../utils/listingResolver';
 import { filterGuestImageUrls, sanitizeGuestImageUrl } from '../../../utils/guestImageUrl';
 import type { ListingDetail, PublicListing } from '../../../api/listingClient';
+import { fetchListingById, parseMaxGuestsFromPayload, resolveStaticMaxGuests } from '../../../api/listingClient';
 import SEO from '../../SEO';
 import { buildApiUrl, getApiHeaders } from '../../../api/client';
 import { addRecentlyViewed, isFavorite, toggleFavorite } from '../../../utils/guestHistory';
@@ -127,6 +128,7 @@ interface Property {
     timezoneId?: string;
     photoCount?: number;
     maxGuests?: number;
+    maxCapacity?: number;
     /** G3-002: from API listing when available */
     checkInTime?: string;
     checkOutTime?: string;
@@ -225,6 +227,10 @@ const PropertyDetails = () => {
                 }
                 setListingPropertyId(listing.propertyId);
                 setResolvedListingId(listing.id);
+                const mgFromResolve = parseMaxGuestsFromPayload(listing as Record<string, unknown>);
+                if (mgFromResolve != null) {
+                    setData((prev) => (prev ? { ...prev, maxGuests: mgFromResolve } : prev));
+                }
             } catch {
                 if (controller.signal.aborted) return;
                 setListingLookupError('Availability temporarily unavailable.');
@@ -246,6 +252,21 @@ const PropertyDetails = () => {
             controller.abort();
         };
     }, [data?.listingId, location.state, listingIdParam]);
+
+    useEffect(() => {
+        const lid = Number(resolvedListingId ?? data?.listingId ?? NaN);
+        if (!data || !Number.isFinite(lid) || lid <= 0) return;
+        if (typeof data.maxGuests === 'number' && data.maxGuests >= 1) return;
+        const ac = new AbortController();
+        void fetchListingById(lid, ac.signal)
+            .then((detail) => {
+                const mg = parseMaxGuestsFromPayload(detail as Record<string, unknown>);
+                if (mg == null) return;
+                setData((prev) => (prev ? { ...prev, maxGuests: mg } : prev));
+            })
+            .catch(() => {});
+        return () => ac.abort();
+    }, [resolvedListingId, data?.listingId, data?.maxGuests]);
 
     useEffect(() => {
         const lid = resolvedListingId;
@@ -345,7 +366,10 @@ const PropertyDetails = () => {
                 property_neighborhoods: Array.isArray(foundByUnitSlug.property_neighborhoods)
                     ? foundByUnitSlug.property_neighborhoods
                     : [],
-                property_img: images
+                property_img: images,
+                maxGuests:
+                    resolveStaticMaxGuests(foundByUnitSlug as unknown as Record<string, unknown>) ??
+                    foundByUnitSlug.maxGuests,
             });
             return;
         }
@@ -364,7 +388,9 @@ const PropertyDetails = () => {
                     property_neighborhoods: Array.isArray(foundById.property_neighborhoods)
                         ? foundById.property_neighborhoods
                         : [],
-                    property_img: images
+                    property_img: images,
+                    maxGuests:
+                        resolveStaticMaxGuests(foundById as unknown as Record<string, unknown>) ?? foundById.maxGuests,
                 });
                 return;
             }
@@ -383,7 +409,10 @@ const PropertyDetails = () => {
                 property_neighborhoods: Array.isArray(prop.property_neighborhoods)
                     ? prop.property_neighborhoods
                     : [],
-                property_img: images
+                property_img: images,
+                maxGuests:
+                    resolveStaticMaxGuests(prop as unknown as Record<string, unknown>) ??
+                    (prop as Property).maxGuests,
             });
             return;
         }
@@ -435,7 +464,7 @@ const PropertyDetails = () => {
                         property_price: Number((apiListing as Record<string, unknown>).property_price) || 0,
                         timezoneId: (apiListing as Record<string, unknown>).timezoneId as string | undefined,
                         photoCount: photoCount || (coverUrl ? 1 : 0),
-                        maxGuests: Number((apiListing as Record<string, unknown>).maxGuests) || undefined,
+                        maxGuests: parseMaxGuestsFromPayload(apiListing as Record<string, unknown>),
                         checkInTime: pub.checkInTime?.trim() || undefined,
                         checkOutTime: pub.checkOutTime?.trim() || undefined,
                     };

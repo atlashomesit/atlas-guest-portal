@@ -282,6 +282,10 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     }
   }, [booking.guests, maxGuests]);
 
+  useEffect(() => {
+    setGuests((current) => Math.min(maxGuests, Math.max(1, current)));
+  }, [maxGuests]);
+
   // Fetch availability automatically on component load and when the calendar is opened
   // Availability always starts from today, independent of selected dates
   useEffect(() => {

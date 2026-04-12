@@ -1,3 +1,4 @@
+import { resolveStaticMaxGuests } from "../api/listingClient";
 import { propertyData, propertyImages } from "../data";
 import { filterGuestImageUrls } from "../utils/guestImageUrl";
 
@@ -7,6 +8,7 @@ export type Home = {
   title: string;
   slug: string;
   href: string;
+  maxGuests: number;
   tagline?: string;
   highlights?: string[];
   images: string[];
@@ -15,6 +17,11 @@ export type Home = {
 const roomNoToListingId = Object.fromEntries(
   propertyData.map((p) => [String(p.id), p.listingId]).filter(([, lid]) => lid != null)
 ) as Record<string, number>;
+
+const roomNoToPropertyRow = Object.fromEntries(propertyData.map((p) => [String(p.id), p])) as Record<
+  string,
+  (typeof propertyData)[number]
+>;
 
 export const defaultHomeHighlights = [
   "Premium, hotel-grade bedding",
@@ -36,6 +43,8 @@ const buildHome = (roomNo: string, config: HomeConfig = {}): Home => {
   }
   const href = `/homes/${pathPrefix}/${listingId}`;
   const slug = `atlas-homes-room-${roomNo}`;
+  const row = roomNoToPropertyRow[roomNo];
+  const maxGuests = resolveStaticMaxGuests((row ?? {}) as Record<string, unknown>) ?? 2;
 
   return {
     roomNo,
@@ -43,6 +52,7 @@ const buildHome = (roomNo: string, config: HomeConfig = {}): Home => {
     title: `Atlas ${isPenthouse ? 'Penthouse' : 'Homes'} ${roomNo}`,
     slug,
     href,
+    maxGuests,
     tagline: config.tagline,
     highlights: config.highlights,
     images: filterGuestImageUrls(propertyImages[roomNo] ?? []),

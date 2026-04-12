@@ -64,6 +64,7 @@ const HomeDetails = () => {
         <UnitBookingWidget
           listingId={room.listingId}
           listingName={room.title}
+          maxGuests={room.maxGuests}
         />
       </Suspense>
 
