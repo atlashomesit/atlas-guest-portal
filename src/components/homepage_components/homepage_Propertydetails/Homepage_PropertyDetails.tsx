@@ -132,6 +132,8 @@ interface Property {
     /** G3-002: from API listing when available */
     checkInTime?: string;
     checkOutTime?: string;
+    /** AMN-001: amenity codes from API (e.g. ["wifi","ac","parking"]) */
+    amenityCodes?: string[];
 }
 
 const PropertyDetails = () => {
@@ -161,6 +163,8 @@ const PropertyDetails = () => {
     const [availabilityPrefetched, setAvailabilityPrefetched] = useState(false);
     const [fav, setFav] = useState(false);
     const [similarFromApi, setSimilarFromApi] = useState<null | { loading: boolean; items: any[] }>(null);
+    /** AMN-001: amenity master code→label map */
+    const [amenityMaster, setAmenityMaster] = useState<Map<string, string>>(new Map());
 
     /** G3-001: live reviews from `GET /api/listings/{id}/reviews` when listing id resolves */
     const [listingReviewsFromApi, setListingReviewsFromApi] = useState<null | {
@@ -169,6 +173,23 @@ const PropertyDetails = () => {
         totalCount: number;
         reviews: { id: number; guestName?: string | null; rating: number; title?: string | null; body?: string | null; createdAt: string }[];
     }>(null);
+
+    // AMN-001: Fetch amenity master list once on mount
+    useEffect(() => {
+        let active = true;
+        fetch(buildApiUrl('/listings/amenities/master'), { headers: getApiHeaders() })
+            .then((r) => r.ok ? r.json() : Promise.reject())
+            .then((items: unknown) => {
+                if (!active || !Array.isArray(items)) return;
+                const map = new Map<string, string>();
+                (items as { code: string; label: string }[]).forEach(({ code, label }) => {
+                    if (code && label) map.set(code.toLowerCase(), label);
+                });
+                setAmenityMaster(map);
+            })
+            .catch(() => { /* non-critical */ });
+        return () => { active = false; };
+    }, []);
 
     // Hydrate booking context from URL search params (passed from SearchPage)
     useEffect(() => {
@@ -467,6 +488,14 @@ const PropertyDetails = () => {
                         maxGuests: parseMaxGuestsFromPayload(apiListing as Record<string, unknown>),
                         checkInTime: pub.checkInTime?.trim() || undefined,
                         checkOutTime: pub.checkOutTime?.trim() || undefined,
+                        amenityCodes: (() => {
+                            const raw = (apiListing as Record<string, unknown>).amenityCodes;
+                            if (Array.isArray(raw)) return raw.filter((c): c is string => typeof c === 'string');
+                            if (typeof raw === 'string') {
+                                try { const p = JSON.parse(raw); return Array.isArray(p) ? p : undefined; } catch { return undefined; }
+                            }
+                            return undefined;
+                        })(),
                     };
                     const fromApi =
                         photoUrlsList.length > 0 ? photoUrlsList : (coverUrl ? [coverUrl] : []);
@@ -579,6 +608,11 @@ useEffect(() => {
             { listingId: data.listingId ?? data.id, unitCode: data.id, route: propertySlug && (data.listingId ?? listingId) ? buildHomeUnitPath(propertySlug, Number(data.listingId ?? listingId)) : location.pathname },
         );
     }, [data, location.pathname, nightlyPrice?.finalNightlyPrice, propertySlug, listingIdParam, listingId]);
+
+    /** AMN-001: maps amenity code to a React icon for guest portal display */
+    const renderIconForCode = (code: string) => {
+        return renderIcon(code);
+    };
 
     const renderIcon = (iconName: string) => {
         const name = iconName.toLowerCase();
@@ -802,7 +836,19 @@ useEffect(() => {
                         <div className="pb-8 border-b border-border-subtle">
                             <h2 className="text-xl sm:text-2xl font-semibold mb-6 text-text-primary">What this place offers</h2>
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                {(data?.property_amenities || []).length > 0 ? (
+                                {data?.amenityCodes && data.amenityCodes.length > 0 ? (
+                                    data.amenityCodes.slice(0, 9).map((code) => {
+                                        const label = amenityMaster.get(code.toLowerCase()) ?? formatAmenityName(code);
+                                        return (
+                                            <div key={code} className="flex flex-col items-center gap-2 p-3 rounded-xl bg-bg-muted border border-border-subtle text-center">
+                                                <span className="text-2xl text-accent-primary">
+                                                    {renderIconForCode(code)}
+                                                </span>
+                                                <span className="text-xs font-medium text-text-primary">{label}</span>
+                                            </div>
+                                        );
+                                    })
+                                ) : (data?.property_amenities || []).length > 0 ? (
                                     (data?.property_amenities || []).slice(0, 9).map((amenity, idx) => (
                                         <div key={idx} className="flex flex-col items-center gap-2 p-3 rounded-xl bg-bg-muted border border-border-subtle text-center">
                                             <span className="text-2xl text-accent-primary">
@@ -814,16 +860,18 @@ useEffect(() => {
                                         </div>
                                     ))
                                 ) : (
-                                    <p className="text-text-muted">No amenities listed</p>
+                                    <p className="text-text-muted col-span-2 sm:col-span-3">No amenities listed</p>
                                 )}
                             </div>
-                            <Button
-                                variant="secondary"
-                                onClick={() => setShowAmenitiesModal(true)}
-                                className="mt-6"
-                            >
-                                Show All Amenities
-                            </Button>
+                            {((data?.amenityCodes?.length ?? 0) > 9 || (data?.property_amenities?.length ?? 0) > 0) && (
+                                <Button
+                                    variant="secondary"
+                                    onClick={() => setShowAmenitiesModal(true)}
+                                    className="mt-6"
+                                >
+                                    Show All Amenities
+                                </Button>
+                            )}
                         </div>
 
                         {/* Policies Section */}
@@ -1104,28 +1152,36 @@ useEffect(() => {
 
                             <div className="overflow-y-auto p-6" role="region" aria-label="List of all amenities">
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-                                    {(data?.property_amenities || []).map((amenity: PropertyAmenity, idx: number) => {
-                                        const icon = amenity?.amenities_icon || '';
-                                        const displayName = icon ? formatAmenityName(icon) : 'Amenity';
-                                        
-                                        return (
-                                            <div 
-                                                key={`amenity-${idx}-${displayName}`} 
-                                                className="flex items-center gap-3 sm:gap-4"
-                                                role="listitem"
-                                            >
-                                                <span 
-                                                    className="text-xl sm:text-2xl text-text-primary"
-                                                    aria-hidden="true"
+                                    {data?.amenityCodes && data.amenityCodes.length > 0 ? (
+                                        data.amenityCodes.map((code) => {
+                                            const label = amenityMaster.get(code.toLowerCase()) ?? formatAmenityName(code);
+                                            return (
+                                                <div key={code} className="flex items-center gap-3 sm:gap-4" role="listitem">
+                                                    <span className="text-xl sm:text-2xl text-text-primary" aria-hidden="true">
+                                                        {renderIconForCode(code)}
+                                                    </span>
+                                                    <span className="text-text-primary text-sm sm:text-base">{label}</span>
+                                                </div>
+                                            );
+                                        })
+                                    ) : (
+                                        (data?.property_amenities || []).map((amenity: PropertyAmenity, idx: number) => {
+                                            const icon = amenity?.amenities_icon || '';
+                                            const displayName = icon ? formatAmenityName(icon) : 'Amenity';
+                                            return (
+                                                <div
+                                                    key={`amenity-${idx}-${displayName}`}
+                                                    className="flex items-center gap-3 sm:gap-4"
+                                                    role="listitem"
                                                 >
-                                                    {renderIcon(icon) || '•'}
-                                                </span>
-                                                <span className="text-text-primary text-sm sm:text-base">
-                                                    {displayName}
-                                                </span>
-                                            </div>
-                                        );
-                                    })}
+                                                    <span className="text-xl sm:text-2xl text-text-primary" aria-hidden="true">
+                                                        {renderIcon(icon) || '•'}
+                                                    </span>
+                                                    <span className="text-text-primary text-sm sm:text-base">{displayName}</span>
+                                                </div>
+                                            );
+                                        })
+                                    )}
                                 </div>
                             </div>
 
