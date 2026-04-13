@@ -618,7 +618,7 @@
 /* Compact weekday headers */
 .unit-booking-calendar .rdrWeekDays {
   padding: 4px 6px !important;
-  font-size: 9px !important;
+  font-size: 12px !important;
   letter-spacing: 0.02em !important;
   background: var(--platinum-50) !important;
 }
@@ -628,7 +628,7 @@
   font-weight: 600 !important;
   text-transform: uppercase !important;
   color: var(--platinum-500) !important;
-  font-size: 9px !important;
+  font-size: 12px !important;
 }
 
 /* Day cell: grid with date row + price row; padding; smaller cell */

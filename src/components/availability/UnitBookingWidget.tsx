@@ -102,6 +102,20 @@ function getBookingErrorMessage(error: unknown, context: 'order' | 'verify'): st
     : 'Payment verification failed. Please contact support with your payment ID.';
 }
 
+/** TASK-255: Best-effort removal of PaymentPending row after Razorpay dismiss/failure (token = order response bookingToken). */
+async function abandonPaymentPendingCheckout(bookingId: number, bookingToken: string | null | undefined) {
+  const token = typeof bookingToken === 'string' ? bookingToken.trim() : '';
+  if (!token) return;
+  try {
+    const url = buildApiUrl(
+      `/api/guest/bookings/${bookingId}/abandon-checkout?t=${encodeURIComponent(token)}`
+    );
+    await apiFetch(url, { method: 'POST' });
+  } catch {
+    /* non-blocking */
+  }
+}
+
 const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   listingId,
   propertyId,
@@ -116,7 +130,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
 
   const navigate = useNavigate();
   const _location = useLocation();
-  const { updateBooking } = useBooking();
+  const { booking, updateBooking } = useBooking();
   const { getUrlsForListingId } = useListingPhotosFromApi();
   const isBookingDisabled = !hasRuntimeConfig();
 
@@ -154,6 +168,8 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [paymentAttemptCount, setPaymentAttemptCount] = useState(0);
   const [formError, setFormError] = useState<string | null>(null);
   const [dateError, setDateError] = useState<string | null>(null);
+  const [minStayNights, setMinStayNights] = useState(1);
+  const [minAdvanceDays, setMinAdvanceDays] = useState(0);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -176,6 +192,9 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [appliedPromoCode, setAppliedPromoCode] = useState<string | null>(null);
   const [appliedPromoDiscount, setAppliedPromoDiscount] = useState(0);
   const [promoMessage, setPromoMessage] = useState<string | null>(null);
+  // TASK-171: add-on services for this listing
+  const [availableAddOns, setAvailableAddOns] = useState<Array<{ addOnServiceId: number; name: string; description?: string | null; price: number; priceType: string }>>([]);
+  const [selectedAddOns, setSelectedAddOns] = useState<Record<number, number>>({}); // addOnServiceId -> quantity (0 = not selected)
   const [paymentStatus, setPaymentStatus] = useState<'success' | 'failed' | null>(null);
   const [bookingDetails, setBookingDetails] = useState<{
     bookingId: string;
@@ -239,6 +258,23 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     hasAutoAdjustedRef.current = false;
   }, [listingId]);
 
+  // TASK-171: fetch add-on services available for this listing
+  useEffect(() => {
+    const id = listingId != null ? Number(listingId) : NaN;
+    if (!Number.isFinite(id) || id <= 0) return;
+    const headers = getApiHeaders();
+    void (async () => {
+      try {
+        const url = buildApiUrl(`/listings/${id}/add-ons`);
+        const res = await fetch(url, { headers });
+        if (res.ok) {
+          const data = await res.json() as Array<{ addOnServiceId: number; name: string; description?: string | null; price: number; priceType: string }>;
+          setAvailableAddOns(Array.isArray(data) ? data : []);
+        }
+      } catch { /* non-critical: just don't show add-ons */ }
+    })();
+  }, [listingId]);
+
   // On mount: clear any stale pending payment (e.g. user refreshed during Razorpay modal)
   useEffect(() => {
     const pending = localStorage.getItem(PENDING_PAYMENT_KEY);
@@ -262,6 +298,48 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
       // no-op
     }
   }, []);
+
+  // Hydrate widget from booking context (e.g. ?checkIn=&checkOut=&guests= from property URL)
+  useEffect(() => {
+    const ci = booking.checkIn;
+    const co = booking.checkOut;
+    if (!ci || !co) return;
+    const start = getIstStartOfDay(new Date(ci));
+    const end = getIstStartOfDay(new Date(co));
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return;
+    if (end.getTime() <= start.getTime()) return;
+    setDateRange({ startDate: start, endDate: end });
+  }, [booking.checkIn, booking.checkOut]);
+
+  useEffect(() => {
+    const g = booking.guests;
+    if (typeof g === 'number' && g >= 1 && g <= maxGuests) {
+      setGuests(g);
+    }
+  }, [booking.guests, maxGuests]);
+
+  useEffect(() => {
+    setGuests((current) => Math.min(maxGuests, Math.max(1, current)));
+  }, [maxGuests]);
+
+  // Fetch min stay nights from availability rules (non-blocking)
+  useEffect(() => {
+    if (!listingId) return;
+    let active = true;
+    apiFetch(buildApiUrl(`/api/public/listings/${listingId}/availability-rules`))
+      .then((r) => r.json())
+      .then((d: unknown) => {
+        const data = d as { minStayNights?: number; advanceBookingHours?: number };
+        if (active && typeof data?.minStayNights === 'number' && data.minStayNights > 1) {
+          setMinStayNights(data.minStayNights);
+        }
+        if (active && typeof data?.advanceBookingHours === 'number' && data.advanceBookingHours > 0) {
+          setMinAdvanceDays(Math.ceil(data.advanceBookingHours / 24));
+        }
+      })
+      .catch(() => { /* non-critical — defaults stay */ });
+    return () => { active = false; };
+  }, [listingId]);
 
   // Fetch availability automatically on component load and when the calendar is opened
   // Availability always starts from today, independent of selected dates
@@ -552,8 +630,29 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     return;
   }
 
-  const startISO = toISODate(getIstStartOfDay(startDate));
-  const endISO = toISODate(getIstStartOfDay(endDate));
+  const startIST = getIstStartOfDay(startDate);
+  const endIST = getIstStartOfDay(endDate);
+  if (endIST.getTime() <= startIST.getTime()) {
+    setDateError('Check-out must be after check-in.');
+    return;
+  }
+
+  const selectedNights = Math.round((endIST.getTime() - startIST.getTime()) / 86400000);
+  if (minStayNights > 1 && selectedNights < minStayNights) {
+    setDateError(`Minimum stay is ${minStayNights} nights.`);
+    return;
+  }
+
+  if (minAdvanceDays > 0) {
+    const minCheckin = addDays(getIstStartOfDay(new Date()), minAdvanceDays);
+    if (startIST < minCheckin) {
+      setDateError(`This listing requires at least ${minAdvanceDays} day${minAdvanceDays !== 1 ? 's' : ''} advance notice.`);
+      return;
+    }
+  }
+
+  const startISO = toISODate(startIST);
+  const endISO = toISODate(endIST);
 
   // Prevent blocked/hold ranges
   if (doesRangeIntersectBlocked(startISO, endISO, blockedSet)) {
@@ -583,10 +682,16 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     const unitType = inferUnitType({ id: propertyId, property_name: listingName });
     const includedGuests = 2;
     
-    // Calculate number of nights
-    const nights = dateRange.startDate && dateRange.endDate 
-      ? calculateNights(dateRange.startDate, dateRange.endDate) 
-      : 1; // Default to 1 night if no dates selected
+    // Nights: IST-normalized; 0 if partial range or same-day / invalid (never default to 1 — that enabled submit on bad state).
+    const nights =
+      dateRange.startDate && dateRange.endDate
+        ? (() => {
+            const s = getIstStartOfDay(dateRange.startDate);
+            const e = getIstStartOfDay(dateRange.endDate);
+            if (e.getTime() <= s.getTime()) return 0;
+            return calculateNights(s, e);
+          })()
+        : 0;
     
     // Calculate extra guests
     const extraGuests = Math.max(0, guests - includedGuests);
@@ -625,6 +730,13 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   };
 
   const priceDetails = calculatePrice();
+
+  const invalidIstStayRange = useMemo(() => {
+    if (!dateRange.startDate || !dateRange.endDate) return false;
+    const s = getIstStartOfDay(dateRange.startDate).getTime();
+    const e = getIstStartOfDay(dateRange.endDate).getTime();
+    return e <= s;
+  }, [dateRange.startDate, dateRange.endDate]);
   const { loading: dailyPricingLoading, error: dailyPricingError, getListingPricing } = useDailyPricingSummary();
   const dailyPricing = useMemo(
     () => (listingId != null && String(listingId).trim() !== '' ? getListingPricing(listingId) : null),
@@ -682,7 +794,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   const breakdownConvenienceFee = Math.round(breakdownSubtotalForConvenience * convenienceFeePercent);
   const referralDiscountApplied = Math.max(0, appliedReferralDiscount || 0);
   const promoDiscountApplied = Math.max(0, appliedPromoDiscount || 0);
-  const breakdownFinalTotal = Math.max(1, breakdownPrice + gstAmount + breakdownConvenienceFee - referralDiscountApplied - promoDiscountApplied);
+  // TASK-171: compute add-ons subtotal from guest selections
+  const addOnsTotal = availableAddOns.reduce((sum, ao) => {
+    const qty = selectedAddOns[ao.addOnServiceId] ?? 0;
+    return sum + (qty > 0 ? ao.price * qty : 0);
+  }, 0);
+  const breakdownFinalTotal = Math.max(1, breakdownPrice + gstAmount + breakdownConvenienceFee - referralDiscountApplied - promoDiscountApplied + addOnsTotal);
 
   const finalTotal =
     hasSelectedRange && selectedRangeTotalFromCalendar != null
@@ -725,8 +842,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     if (!formData.email) {
       errors.email = 'Email is required';
       isValid = false;
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      errors.email = 'Email is invalid';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      errors.email = 'Please enter a valid email address';
       isValid = false;
     }
 
@@ -876,6 +993,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       return;
     }
 
+    setDateError(null);
+
     if (!validateForm()) {
       return;
     }
@@ -925,6 +1044,18 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     } else {
       checkinDate = dateRange.startDate;
       checkoutDate = dateRange.endDate;
+    }
+
+    const checkinIst = getIstStartOfDay(checkinDate);
+    const checkoutIst = getIstStartOfDay(checkoutDate);
+    if (checkoutIst.getTime() <= checkinIst.getTime()) {
+      setDateError('Check-out must be after check-in.');
+      return;
+    }
+    const stayNights = calculateNights(checkinIst, checkoutIst);
+    if (stayNights < 1) {
+      setDateError('Check-out must be after check-in.');
+      return;
     }
 
     // Final validation: Only check-in date must be available
@@ -981,6 +1112,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       };
 
       // 2. Prepare order payload with the exact structure expected by the backend
+      // TASK-171: build selectedAddOns array for bookingDraft
+      const selectedAddOnsList = availableAddOns
+        .filter(ao => (selectedAddOns[ao.addOnServiceId] ?? 0) > 0)
+        .map(ao => ({ addOnServiceId: ao.addOnServiceId, quantity: selectedAddOns[ao.addOnServiceId] }));
+
       const orderPayload = {
         bookingDraft: {
           listingId: bookingDraft.listingId,
@@ -988,6 +1124,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           checkoutDate: bookingDraft.checkoutDate,
           guests: bookingDraft.guests,
           notes: bookingDraft.notes,
+          selectedAddOns: selectedAddOnsList.length > 0 ? selectedAddOnsList : undefined,
         },
         amount: Math.round(finalTotal), // Keep amount in rupees, let backend handle conversion if needed
         currency: 'INR',
@@ -1047,6 +1184,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           const handleRazorpayClose = () => {
             if (paymentCompleted) return;
             paymentCompleted = true; // Prevent double-reset from ondismiss + close event
+            void abandonPaymentPendingCheckout(bookingId, bookingToken);
             localStorage.removeItem(PENDING_PAYMENT_KEY);
             setIsSubmitting(false);
             setIsLoading(false);
@@ -1137,6 +1275,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           const rzp = new window.Razorpay(options);
           rzp.on('payment.failed', (response: { error?: { description?: string } }) => {
             paymentCompleted = true; // Payment attempt was made
+            void abandonPaymentPendingCheckout(bookingId, bookingToken);
             localStorage.removeItem(PENDING_PAYMENT_KEY);
             setPaymentStatus('failed');
             setFormError(`Payment failed: ${response.error?.description || 'Unknown error'}`);
@@ -1549,7 +1688,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         </div>
         <div className="text-sm text-text-muted space-y-1 mt-1">
           <p>{priceDetails.nights} {priceDetails.nights === 1 ? 'night' : 'nights'} × {displayPrice(perNightForDisplay)}</p>
-          {priceDetails.extraGuests > 0 && (
+          {priceDetails.extraGuests > 0 && priceDetails.nights > 0 && (
             <p>{priceDetails.extraGuests} {priceDetails.extraGuests === 1 ? 'extra guest' : 'extra guests'} × {displayPrice(priceDetails.extraGuestsFee / priceDetails.nights / priceDetails.extraGuests)}/night</p>
           )}
           <p className="text-xs">Includes all taxes and fees</p>
@@ -1603,7 +1742,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               value={dateRange}
               onChange={handleRangeChange}
               loading={isLoading}
-              minDate={addDays(today, -1)}
+              minDate={addDays(today, Math.max(-1, minAdvanceDays - 1))}
               maxDate={maxBookingDate}
               disabledDay={disabledDay}
               months={2}
@@ -1676,7 +1815,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                     )}
                     <div className={`unit-booking-day-cell-inner relative z-10 grid grid-cols-1 grid-rows-2 place-items-center gap-0 min-h-0 overflow-hidden box-border ${selectionClasses || disabledClasses}`}>
                       <span className="unit-booking-day-num text-[11px] font-bold leading-none overflow-hidden truncate">{format(day, 'd')}</span>
-                      <span className={`unit-booking-day-price text-[9px] leading-none whitespace-nowrap overflow-hidden truncate min-w-0 ${isDeal ? 'text-green-600 font-semibold' : ''}`}>
+                      <span className={`unit-booking-day-price text-xs leading-none whitespace-nowrap overflow-hidden truncate min-w-0 ${isDeal ? 'text-green-600 font-semibold' : ''}`}>
                         {priceText}
                       </span>
                     </div>
@@ -1695,7 +1834,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               <Button
                 variant="secondary"
                 size="sm"
-                className="!px-2 !py-2 h-9 w-9 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="!px-2 !py-2 h-12 w-12 disabled:opacity-40 disabled:cursor-not-allowed"
                 aria-label="Decrease guests"
                 disabled={guests <= 1}
                 onClick={() => setGuests((current) => Math.max(1, current - 1))}
@@ -1708,7 +1847,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               <Button
                 variant="secondary"
                 size="sm"
-                className="!px-2 !py-2 h-9 w-9 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="!px-2 !py-2 h-12 w-12 disabled:opacity-40 disabled:cursor-not-allowed"
                 aria-label="Increase guests"
                 disabled={guests >= maxGuests}
                 onClick={() => setGuests((current) => Math.min(maxGuests, current + 1))}
@@ -1783,6 +1922,13 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               </div>
             )}
           </div>
+          {addOnsTotal > 0 && (
+            <div className="grid grid-cols-[140px_12px_1fr] text-text-secondary">
+              <span>Add-ons</span>
+              <span>:</span>
+              <span className="text-right">{displayPrice(addOnsTotal)}</span>
+            </div>
+          )}
           <div className="mt-3 border-t border-border-subtle pt-3 grid grid-cols-[140px_12px_1fr] text-base font-semibold text-text-primary">
             <span>Total</span>
             <span>:</span>
@@ -1798,6 +1944,50 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         </div>
 
       </div>
+
+      {/* TASK-171: add-on services selection */}
+      {availableAddOns.length > 0 && (
+        <div className="rounded-xl border border-border-subtle bg-bg-muted/40 p-4 space-y-3">
+          <p className="text-sm font-semibold text-text-primary">Add-on services</p>
+          {availableAddOns.map(ao => {
+            const qty = selectedAddOns[ao.addOnServiceId] ?? 0;
+            return (
+              <div key={ao.addOnServiceId} className="flex items-center justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-text-primary truncate">{ao.name}</p>
+                  {ao.description && <p className="text-xs text-text-muted truncate">{ao.description}</p>}
+                  <p className="text-xs text-text-secondary">{displayPrice(ao.price)} / {ao.priceType.replace('_', ' ')}</p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {qty > 0 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedAddOns(prev => ({ ...prev, [ao.addOnServiceId]: Math.max(0, (prev[ao.addOnServiceId] ?? 0) - 1) }))}
+                        className="w-7 h-7 rounded-full border border-border-strong text-text-primary flex items-center justify-center text-base leading-none"
+                        aria-label={`Remove one ${ao.name}`}
+                      >−</button>
+                      <span className="text-sm font-medium w-4 text-center">{qty}</span>
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedAddOns(prev => ({ ...prev, [ao.addOnServiceId]: (prev[ao.addOnServiceId] ?? 0) + 1 }))}
+                    className="w-7 h-7 rounded-full border border-border-strong text-text-primary flex items-center justify-center text-base leading-none"
+                    aria-label={`Add ${ao.name}`}
+                  >+</button>
+                </div>
+              </div>
+            );
+          })}
+          {addOnsTotal > 0 && (
+            <div className="pt-2 border-t border-border-subtle grid grid-cols-[120px_12px_1fr] text-sm text-text-secondary">
+              <span>Add-ons</span><span>:</span>
+              <span className="text-right">{displayPrice(addOnsTotal)}</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {dateError && <p className="text-sm text-support-error">{dateError}</p>}
       {statusMessage && <p className="text-sm text-text-secondary">{statusMessage}</p>}
@@ -1817,7 +2007,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             placeholder="Enter your full name"
             data-testid="guest-booking-name"
           />
-          {formErrors.name && <p className="text-sm text-support-error">{formErrors.name}</p>}
+          {formErrors.name && (
+            <p className="text-sm text-support-error" role="alert">
+              {formErrors.name}
+            </p>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -1835,7 +2029,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             placeholder="Enter your email"
             data-testid="guest-booking-email"
           />
-          {formErrors.email && <p className="text-sm text-support-error">{formErrors.email}</p>}
+          {formErrors.email && (
+            <p className="text-sm text-support-error" role="alert">
+              {formErrors.email}
+            </p>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -1860,7 +2058,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             />
           </div>
           <p className="text-xs text-text-muted">Indian mobile number (10 digits)</p>
-          {formErrors.phone && <p className="text-sm text-support-error">{formErrors.phone}</p>}
+          {formErrors.phone && (
+            <p className="text-sm text-support-error" role="alert">
+              {formErrors.phone}
+            </p>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -1951,13 +2153,19 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               .
             </span>
           </label>
-          {consentError ? <p className="text-sm text-support-error">{consentError}</p> : null}
+          {consentError ? (
+            <p className="text-sm text-support-error" role="alert">
+              {consentError}
+            </p>
+          ) : null}
         </div>
       </div>
 
       {formError && (
         <div className="space-y-1">
-          <p className="text-sm text-support-error">{formError}</p>
+          <p className="text-sm text-support-error" role="alert">
+            {formError}
+          </p>
           {paymentAttemptCount > 0 && (formError.includes('Network') || formError.includes('connection') || formError.includes('Unable to connect')) && (
             <p className="text-xs text-text-muted">Attempt {Math.min(paymentAttemptCount, 3)} of 3 — Click &quot;Book this home&quot; to retry</p>
           )}
@@ -1967,12 +2175,25 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       <Button
         type="submit"
         fullWidth
-        disabled={isSubmitting || isLoading || !dateRange.startDate || !dateRange.endDate || isBookingDisabled || !guestConsentAccepted}
+        disabled={
+          isSubmitting ||
+          isLoading ||
+          !dateRange.startDate ||
+          !dateRange.endDate ||
+          isBookingDisabled ||
+          invalidIstStayRange ||
+          priceDetails.nights < 1
+        }
         className={isSubmitting || isLoading ? 'opacity-75' : ''}
         data-testid="guest-booking-submit"
       >
         {isBookingDisabled ? 'Unavailable' : isSubmitting || isLoading ? 'Processing...' : 'Book this home'}
       </Button>
+      {!isBookingDisabled && (
+        <p className="text-xs text-text-muted mt-1 text-center">
+          Pay via UPI, card, or netbanking
+        </p>
+      )}
     </form>
     </>
   );

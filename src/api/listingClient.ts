@@ -1,5 +1,20 @@
 import { buildApiUrl, getApiHeaders } from '@/api/client';
 
+/** Parse maxGuests from listing JSON (camelCase or PascalCase). Returns undefined if missing/invalid. */
+export function parseMaxGuestsFromPayload(payload: Record<string, unknown>): number | undefined {
+  const raw = payload.maxGuests ?? payload.MaxGuests;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 1 ? Math.min(16, Math.floor(n)) : undefined;
+}
+
+/** Static catalog rows: prefer API-shaped maxGuests, else numeric maxCapacity (capped at 16). */
+export function resolveStaticMaxGuests(source: Record<string, unknown>): number | undefined {
+  const fromApi = parseMaxGuestsFromPayload(source);
+  if (fromApi != null) return fromApi;
+  const cap = Number(source.maxCapacity);
+  return Number.isFinite(cap) && cap >= 1 ? Math.min(16, Math.floor(cap)) : undefined;
+}
+
 export type ListingDetail = {
   id: string | number;
   propertyId?: string | number;

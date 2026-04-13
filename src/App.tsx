@@ -34,13 +34,20 @@ const BecomeHost = React.lazy(() => import("./pages/BecomeHost"))
 const BookingConfirmationPage = React.lazy(() => import("./pages/BookingConfirmationPage"))
 const ReviewSubmitPage = React.lazy(() => import("./pages/ReviewSubmitPage"))
 const CommunicationPreferences = React.lazy(() => import("./pages/CommunicationPreferences"))
+const ProfilePage = React.lazy(() => import("./pages/ProfilePage"))
+const MyBookingsPage = React.lazy(() => import("./pages/MyBookingsPage"))
 const FavoritesPage = React.lazy(() => import("./pages/FavoritesPage"))
 const RecentlyViewedPage = React.lazy(() => import("./pages/RecentlyViewedPage"))
 const PageNotFound = React.lazy(() => import("./pages/pagenotfound/PageNotFound"))
 
 function LazyFallback() {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '40vh' }}>
+    <div
+      role="status"
+      aria-live="polite"
+      aria-label="Loading page"
+      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '40vh' }}
+    >
       <div style={{ width: 32, height: 32, border: '3px solid #e5e7eb', borderTopColor: '#ea580c', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
@@ -82,10 +89,14 @@ function AppWrapper() {
 
   return (
     <>
+      <a href="#main-content" className="skip-to-main">
+        Skip to main content
+      </a>
       {!shouldHideNavbar && <Navbar />}
       <ScrollToTop />
       <ErrorBoundary name="router">
         <Suspense fallback={<LazyFallback />}>
+        <main id="main-content" tabIndex={-1}>
         <Routes>
           <Route path="/" element={withBoundary(<Home />, "home-route")} />
           <Route path="/contact" element={withBoundary(<ContactUs />, "contact-route")} />
@@ -113,6 +124,8 @@ function AppWrapper() {
           <Route path="/review/:bookingId" element={withBoundary(<ReviewSubmitPage />, "review-submit-route")} />
           <Route path="/communication-preferences" element={withBoundary(<CommunicationPreferences />, "communication-preferences-route")} />
           <Route path="/preferences/:guestToken" element={withBoundary(<CommunicationPreferences />, "communication-preferences-token-route")} />
+          <Route path="/profile" element={withBoundary(<ProfilePage />, "profile-route")} />
+          <Route path="/my-bookings" element={withBoundary(<MyBookingsPage />, "my-bookings-route")} />
           <Route path="/favorites" element={withBoundary(<FavoritesPage />, "favorites-route")} />
           <Route path="/recent" element={withBoundary(<RecentlyViewedPage />, "recent-route")} />
           <Route path="/become-a-host" element={withBoundary(<BecomeHost />, "become-host-route")} />
@@ -120,6 +133,7 @@ function AppWrapper() {
           <Route path="/:shortCode" element={withBoundary(<ShortLinkRedirect />, "shortlink-route")} />
           <Route path="/*" element={withBoundary(<PageNotFound />, "fallback-route")} />
         </Routes>
+        </main>
         </Suspense>
       </ErrorBoundary>
       <Suspense fallback={null}><SupportWidget /></Suspense>

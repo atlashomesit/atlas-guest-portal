@@ -16,15 +16,17 @@ import { getUnitPolicy } from '../../../config/policyConfig';
 import { inlinePolicySnippets } from '../../../content/terms';
 import Subheading from '../../commonComponents/subheading/Subheading';
 import UnitBookingWidget from '../../availability/UnitBookingWidget';
+import AvailabilityCalendar from '../../AvailabilityCalendar';
 import { trackEvent } from '../../../utils/analytics';
 import { Button } from '../../ui/Button';
 import { calculateNightlyPrice, inferUnitType } from '../../../utils/pricing';
-import { buildHomeUnitPath } from '../../../utils/navigation';
+import { buildHomeUnitPath, getPropertySlug } from '../../../utils/navigation';
 import { useBooking } from '../../../contexts/BookingContext';
 import { useListingPhotosFromApi } from '../../../contexts/ListingPhotosContext';
 import { resolveListing } from '../../../utils/listingResolver';
 import { filterGuestImageUrls, sanitizeGuestImageUrl } from '../../../utils/guestImageUrl';
 import type { ListingDetail, PublicListing } from '../../../api/listingClient';
+import { fetchListingById, parseMaxGuestsFromPayload, resolveStaticMaxGuests } from '../../../api/listingClient';
 import SEO from '../../SEO';
 import { buildApiUrl, getApiHeaders } from '../../../api/client';
 import { addRecentlyViewed, isFavorite, toggleFavorite } from '../../../utils/guestHistory';
@@ -41,6 +43,71 @@ interface PropertyAmenity {
 interface PropertyDetail {
     type: string;
     value: string;
+}
+
+/** Shown while listing data is resolving (incl. API fallback). Matches loaded page layout for perceived performance. */
+function PropertyDetailsSkeleton() {
+    return (
+        <section
+            className="w-full pt-28 md:pt-0 tracking-wide"
+            data-testid="property-details-skeleton"
+            aria-busy="true"
+            aria-label="Loading property details"
+        >
+            <div className="pt-10 pl-32">
+                <div className="h-4 w-32 animate-pulse rounded bg-bg-muted" />
+            </div>
+            <div className="max-w-[85rem] flex flex-col gap-10 mx-auto px-4 sm:px-8 lg:px-16 py-8">
+                <div className="space-y-3">
+                    <div className="h-9 max-w-xl animate-pulse rounded-lg bg-bg-muted" />
+                    <div className="h-4 w-48 animate-pulse rounded bg-bg-muted" />
+                    <div className="h-4 w-64 animate-pulse rounded bg-bg-muted" />
+                </div>
+
+                <div className="flex gap-2 h-64 md:h-96 lg:h-[450px] overflow-hidden">
+                    <div className="flex-1 h-full rounded-md overflow-hidden animate-pulse bg-bg-muted" />
+                    <div className="flex-1 grid grid-cols-2 grid-rows-2 gap-2 h-full">
+                        {Array.from({ length: 4 }).map((_, i) => (
+                            <div key={i} className="h-full w-full rounded-md animate-pulse bg-bg-muted" />
+                        ))}
+                    </div>
+                </div>
+
+                <div className="flex flex-col gap-4 sm:flex-row">
+                    <div className="w-full sm:w-2/3 order-2 sm:order-1 space-y-6">
+                        <div className="pb-8 border-b border-border-subtle space-y-4">
+                            <div className="h-7 w-56 animate-pulse rounded bg-bg-muted" />
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                {Array.from({ length: 6 }).map((_, i) => (
+                                    <div key={i} className="h-24 rounded-xl animate-pulse bg-bg-muted border border-border-subtle" />
+                                ))}
+                            </div>
+                        </div>
+                        <div className="space-y-3">
+                            <div className="h-7 w-48 animate-pulse rounded bg-bg-muted" />
+                            <div className="h-4 w-full animate-pulse rounded bg-bg-muted" />
+                            <div className="h-4 w-5/6 animate-pulse rounded bg-bg-muted" />
+                            <div className="h-4 w-4/6 animate-pulse rounded bg-bg-muted" />
+                        </div>
+                    </div>
+                    <div className="w-full sm:w-1/3 order-1 sm:order-2">
+                        <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6 space-y-4">
+                            <div className="h-40 w-full animate-pulse rounded-xl bg-bg-muted" />
+                            <div className="h-6 w-28 animate-pulse rounded bg-bg-muted" />
+                            <div className="h-10 w-full animate-pulse rounded-xl bg-bg-muted" />
+                            <div className="h-12 w-full animate-pulse rounded-xl bg-bg-muted" />
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex justify-center sm:justify-start">
+                    <Button onClick={() => window.history.back()} className="mt-2" variant="secondary">
+                        Go Back
+                    </Button>
+                </div>
+            </div>
+        </section>
+    );
 }
 
 interface Property {
@@ -62,9 +129,12 @@ interface Property {
     timezoneId?: string;
     photoCount?: number;
     maxGuests?: number;
+    maxCapacity?: number;
     /** G3-002: from API listing when available */
     checkInTime?: string;
     checkOutTime?: string;
+    /** AMN-001: amenity codes from API (e.g. ["wifi","ac","parking"]) */
+    amenityCodes?: string[];
 }
 
 const PropertyDetails = () => {
@@ -90,10 +160,19 @@ const PropertyDetails = () => {
     const { setProperty, updateBooking } = useBooking();
     const { getUrlsForListingId } = useListingPhotosFromApi();
     const [searchParams] = useSearchParams();
+    // Build a back-to-results link when the user arrived from /search (params preserved in URL by SearchPage)
+    const backToResultsHref = useMemo(() => {
+        const searchKeys = ["checkIn", "checkOut", "guests", "minPrice", "maxPrice"];
+        const hasSearchParams = searchKeys.some((k) => searchParams.has(k));
+        if (!hasSearchParams) return null;
+        return `/search?${searchParams.toString()}`;
+    }, [searchParams]);
     const showAvailabilityPlaceholder = false;
     const [availabilityPrefetched, setAvailabilityPrefetched] = useState(false);
     const [fav, setFav] = useState(false);
     const [similarFromApi, setSimilarFromApi] = useState<null | { loading: boolean; items: any[] }>(null);
+    /** AMN-001: amenity master code→label map */
+    const [amenityMaster, setAmenityMaster] = useState<Map<string, string>>(new Map());
 
     /** G3-001: live reviews from `GET /api/listings/{id}/reviews` when listing id resolves */
     const [listingReviewsFromApi, setListingReviewsFromApi] = useState<null | {
@@ -102,6 +181,23 @@ const PropertyDetails = () => {
         totalCount: number;
         reviews: { id: number; guestName?: string | null; rating: number; title?: string | null; body?: string | null; createdAt: string }[];
     }>(null);
+
+    // AMN-001: Fetch amenity master list once on mount
+    useEffect(() => {
+        let active = true;
+        fetch(buildApiUrl('/listings/amenities/master'), { headers: getApiHeaders() })
+            .then((r) => r.ok ? r.json() : Promise.reject())
+            .then((items: unknown) => {
+                if (!active || !Array.isArray(items)) return;
+                const map = new Map<string, string>();
+                (items as { code: string; label: string }[]).forEach(({ code, label }) => {
+                    if (code && label) map.set(code.toLowerCase(), label);
+                });
+                setAmenityMaster(map);
+            })
+            .catch(() => { /* non-critical */ });
+        return () => { active = false; };
+    }, []);
 
     // Hydrate booking context from URL search params (passed from SearchPage)
     useEffect(() => {
@@ -160,6 +256,10 @@ const PropertyDetails = () => {
                 }
                 setListingPropertyId(listing.propertyId);
                 setResolvedListingId(listing.id);
+                const mgFromResolve = parseMaxGuestsFromPayload(listing as Record<string, unknown>);
+                if (mgFromResolve != null) {
+                    setData((prev) => (prev ? { ...prev, maxGuests: mgFromResolve } : prev));
+                }
             } catch {
                 if (controller.signal.aborted) return;
                 setListingLookupError('Availability temporarily unavailable.');
@@ -181,6 +281,21 @@ const PropertyDetails = () => {
             controller.abort();
         };
     }, [data?.listingId, location.state, listingIdParam]);
+
+    useEffect(() => {
+        const lid = Number(resolvedListingId ?? data?.listingId ?? NaN);
+        if (!data || !Number.isFinite(lid) || lid <= 0) return;
+        if (typeof data.maxGuests === 'number' && data.maxGuests >= 1) return;
+        const ac = new AbortController();
+        void fetchListingById(lid, ac.signal)
+            .then((detail) => {
+                const mg = parseMaxGuestsFromPayload(detail as Record<string, unknown>);
+                if (mg == null) return;
+                setData((prev) => (prev ? { ...prev, maxGuests: mg } : prev));
+            })
+            .catch(() => {});
+        return () => ac.abort();
+    }, [resolvedListingId, data?.listingId, data?.maxGuests]);
 
     useEffect(() => {
         const lid = resolvedListingId;
@@ -280,7 +395,10 @@ const PropertyDetails = () => {
                 property_neighborhoods: Array.isArray(foundByUnitSlug.property_neighborhoods)
                     ? foundByUnitSlug.property_neighborhoods
                     : [],
-                property_img: images
+                property_img: images,
+                maxGuests:
+                    resolveStaticMaxGuests(foundByUnitSlug as unknown as Record<string, unknown>) ??
+                    foundByUnitSlug.maxGuests,
             });
             return;
         }
@@ -299,7 +417,9 @@ const PropertyDetails = () => {
                     property_neighborhoods: Array.isArray(foundById.property_neighborhoods)
                         ? foundById.property_neighborhoods
                         : [],
-                    property_img: images
+                    property_img: images,
+                    maxGuests:
+                        resolveStaticMaxGuests(foundById as unknown as Record<string, unknown>) ?? foundById.maxGuests,
                 });
                 return;
             }
@@ -318,7 +438,10 @@ const PropertyDetails = () => {
                 property_neighborhoods: Array.isArray(prop.property_neighborhoods)
                     ? prop.property_neighborhoods
                     : [],
-                property_img: images
+                property_img: images,
+                maxGuests:
+                    resolveStaticMaxGuests(prop as unknown as Record<string, unknown>) ??
+                    (prop as Property).maxGuests,
             });
             return;
         }
@@ -370,9 +493,17 @@ const PropertyDetails = () => {
                         property_price: Number((apiListing as Record<string, unknown>).property_price) || 0,
                         timezoneId: (apiListing as Record<string, unknown>).timezoneId as string | undefined,
                         photoCount: photoCount || (coverUrl ? 1 : 0),
-                        maxGuests: Number((apiListing as Record<string, unknown>).maxGuests) || undefined,
+                        maxGuests: parseMaxGuestsFromPayload(apiListing as Record<string, unknown>),
                         checkInTime: pub.checkInTime?.trim() || undefined,
                         checkOutTime: pub.checkOutTime?.trim() || undefined,
+                        amenityCodes: (() => {
+                            const raw = (apiListing as Record<string, unknown>).amenityCodes;
+                            if (Array.isArray(raw)) return raw.filter((c): c is string => typeof c === 'string');
+                            if (typeof raw === 'string') {
+                                try { const p = JSON.parse(raw); return Array.isArray(p) ? p : undefined; } catch { return undefined; }
+                            }
+                            return undefined;
+                        })(),
                     };
                     const fromApi =
                         photoUrlsList.length > 0 ? photoUrlsList : (coverUrl ? [coverUrl] : []);
@@ -401,16 +532,18 @@ useEffect(() => {
   const lid = Number(resolvedListingId ?? data?.listingId ?? listingId);
   if (Number.isFinite(lid) && lid > 0) {
       setFav(isFavorite(lid));
+      const path = buildHomeUnitPath(propertySlug ?? String(data.id), lid);
       addRecentlyViewed({
           listingId: lid,
-          path: buildHomeUnitPath({ propertySlug: propertySlug ?? String(data.id), unitSlug: String(lid) }),
+          path,
           name: data.property_name,
           coverPhotoUrl: Array.isArray(data.property_img) ? data.property_img[0] : undefined,
           location: data.property_location,
       });
+      updateBooking({ listingDetailPath: path });
   }
 
-}, [data?.id, data?.property_name, setProperty]);
+}, [data?.id, data?.property_name, data?.listingId, listingId, propertySlug, resolvedListingId, setProperty, updateBooking]);
 
     // Similar listings: GET /listings/{id}/similar
     useEffect(() => {
@@ -486,6 +619,11 @@ useEffect(() => {
         );
     }, [data, location.pathname, nightlyPrice?.finalNightlyPrice, propertySlug, listingIdParam, listingId]);
 
+    /** AMN-001: maps amenity code to a React icon for guest portal display */
+    const renderIconForCode = (code: string) => {
+        return renderIcon(code);
+    };
+
     const renderIcon = (iconName: string) => {
         const name = iconName.toLowerCase();
         if (name.includes('bed')) return <FaBed />;
@@ -511,20 +649,7 @@ useEffect(() => {
     };
 
     if (!data && !notFound) {
-        return (
-            <div className="min-h-screen flex items-center justify-center">
-                <div className="text-center">
-                    <div className="text-2xl font-semibold text-text-primary mb-4">Loading property details...</div>
-                    <div className="text-text-muted">If this takes too long, the property may not exist or there might be a connection issue.</div>
-                    <Button 
-                        onClick={() => window.history.back()}
-                        className="mt-4"
-                    >
-                        Go Back
-                    </Button>
-                </div>
-            </div>
-        );
+        return <PropertyDetailsSkeleton />;
     }
 
     if (!data && notFound) {
@@ -626,6 +751,18 @@ useEffect(() => {
             </div>
 
             <div className="max-w-[85rem] flex flex-col gap-10 mx-auto px-4 sm:px-8 lg:px-16 py-8">
+                {backToResultsHref && (
+                    <div>
+                        <Link
+                            to={backToResultsHref}
+                            className="inline-flex items-center gap-1.5 text-sm font-medium text-text-muted hover:text-text-primary transition-colors"
+                            data-testid="back-to-results"
+                        >
+                            <span aria-hidden="true">←</span> Back to results
+                        </Link>
+                    </div>
+                )}
+
                 {/* Property Header */}
                 <div className="">
                     <h1 className="text-2xl sm:text-3xl font-semibold mb-2 capitalize text-text-primary">{data?.property_name}</h1>
@@ -661,6 +798,20 @@ useEffect(() => {
                         )}
                     </div>
                 </div>
+
+                {/* Check-in / check-out times — shown prominently before gallery */}
+                {(data?.checkInTime || data?.checkOutTime) && (
+                    <div className="flex flex-wrap gap-4 text-sm font-medium mt-1 mb-2">
+                        <div className="flex items-center gap-1.5 text-text-primary">
+                            <KeyRound className="w-4 h-4 text-accent-primary flex-shrink-0" />
+                            <span>Check-in from <strong>{data.checkInTime?.trim() || 'Flexible'}</strong></span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-text-primary">
+                            <Clock className="w-4 h-4 text-accent-primary flex-shrink-0" />
+                            <span>Checkout by <strong>{data.checkOutTime?.trim() || 'Flexible'}</strong></span>
+                        </div>
+                    </div>
+                )}
 
                 {/* Image Gallery — Azure blob URLs are skipped (409); API/static must serve reachable images */}
 <div className="flex gap-2 h-64 md:h-96 lg:h-[450px] overflow-hidden ">
@@ -721,7 +872,19 @@ useEffect(() => {
                         <div className="pb-8 border-b border-border-subtle">
                             <h2 className="text-xl sm:text-2xl font-semibold mb-6 text-text-primary">What this place offers</h2>
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                {(data?.property_amenities || []).length > 0 ? (
+                                {data?.amenityCodes && data.amenityCodes.length > 0 ? (
+                                    data.amenityCodes.slice(0, 9).map((code) => {
+                                        const label = amenityMaster.get(code.toLowerCase()) ?? formatAmenityName(code);
+                                        return (
+                                            <div key={code} className="flex flex-col items-center gap-2 p-3 rounded-xl bg-bg-muted border border-border-subtle text-center">
+                                                <span className="text-2xl text-accent-primary">
+                                                    {renderIconForCode(code)}
+                                                </span>
+                                                <span className="text-xs font-medium text-text-primary">{label}</span>
+                                            </div>
+                                        );
+                                    })
+                                ) : (data?.property_amenities || []).length > 0 ? (
                                     (data?.property_amenities || []).slice(0, 9).map((amenity, idx) => (
                                         <div key={idx} className="flex flex-col items-center gap-2 p-3 rounded-xl bg-bg-muted border border-border-subtle text-center">
                                             <span className="text-2xl text-accent-primary">
@@ -733,16 +896,18 @@ useEffect(() => {
                                         </div>
                                     ))
                                 ) : (
-                                    <p className="text-text-muted">No amenities listed</p>
+                                    <p className="text-text-muted col-span-2 sm:col-span-3">No amenities listed</p>
                                 )}
                             </div>
-                            <Button
-                                variant="secondary"
-                                onClick={() => setShowAmenitiesModal(true)}
-                                className="mt-6"
-                            >
-                                Show All Amenities
-                            </Button>
+                            {((data?.amenityCodes?.length ?? 0) > 9 || (data?.property_amenities?.length ?? 0) > 0) && (
+                                <Button
+                                    variant="secondary"
+                                    onClick={() => setShowAmenitiesModal(true)}
+                                    className="mt-6"
+                                >
+                                    Show All Amenities
+                                </Button>
+                            )}
                         </div>
 
                         {/* Policies Section */}
@@ -822,7 +987,23 @@ useEffect(() => {
                         {/* Similar stays — Wave 9 #85 */}
                         {(() => {
                             const s = similarFromApi;
-                            if (!s || s.loading || !Array.isArray(s.items) || s.items.length === 0) return null;
+                            if (s?.loading) return (
+                                <div className="pb-8 border-b border-border-subtle">
+                                    <div className="h-7 w-48 animate-pulse rounded bg-bg-muted mb-4" />
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        {Array.from({ length: 2 }).map((_, i) => (
+                                            <div key={i} className="rounded-xl border border-border-subtle bg-bg-surface overflow-hidden shadow-level1">
+                                                <div className="h-40 w-full animate-pulse bg-bg-muted" />
+                                                <div className="p-4 space-y-2">
+                                                    <div className="h-4 w-3/4 animate-pulse rounded bg-bg-muted" />
+                                                    <div className="h-3 w-1/2 animate-pulse rounded bg-bg-muted" />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            );
+                            if (!s || !Array.isArray(s.items) || s.items.length === 0) return null;
                             return (
                                 <div className="pb-8 border-b border-border-subtle">
                                     <h2 className="text-xl sm:text-2xl font-semibold mb-4 text-text-primary">Similar stays</h2>
@@ -831,7 +1012,7 @@ useEffect(() => {
                                             const id = Number(it.id);
                                             const name = String(it.name ?? it.propertyName ?? `Listing ${it.id}`);
                                             const img = (it.coverPhotoUrl as string | undefined) ?? (Array.isArray(it.photoUrls) ? it.photoUrls[0] : undefined);
-                                            const path = buildHomeUnitPath({ propertySlug: String(it.propertyName ?? 'home').toLowerCase().replace(/\\s+/g, '-'), unitSlug: String(id) });
+                                            const path = buildHomeUnitPath(getPropertySlug({ name: it.propertyName, property_name: it.propertyName }), id);
                                             return (
                                                 <Link
                                                     key={String(it.id)}
@@ -856,6 +1037,25 @@ useEffect(() => {
                             const api = listingReviewsFromApi;
                             const showApi = api && !api.loading && api.totalCount > 0;
                             const showStatic = !showApi && data && data.property_reviews > 0;
+                            if (api?.loading && !showStatic) return (
+                                <div className="pb-8 border-b border-border-subtle">
+                                    <div className="h-7 w-40 animate-pulse rounded bg-bg-muted mb-4" />
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        {Array.from({ length: 2 }).map((_, i) => (
+                                            <div key={i} className="p-4 rounded-xl bg-bg-muted border border-border-subtle space-y-2">
+                                                <div className="h-3 w-24 animate-pulse rounded bg-bg-surface" />
+                                                <div className="flex gap-1">
+                                                    {Array.from({ length: 5 }).map((__, j) => (
+                                                        <div key={j} className="h-3 w-3 animate-pulse rounded-full bg-bg-surface" />
+                                                    ))}
+                                                </div>
+                                                <div className="h-3 w-full animate-pulse rounded bg-bg-surface" />
+                                                <div className="h-3 w-4/5 animate-pulse rounded bg-bg-surface" />
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            );
                             if (!showApi && !showStatic) return null;
                             const rating = showApi ? api!.averageRating : data!.property_rating;
                             const count = showApi ? api!.totalCount : data!.property_reviews;
@@ -975,45 +1175,44 @@ useEffect(() => {
                     </div>
                     {/* right div  */}
                     <div className="w-full sm:w-1/3 order-1 sm:order-2">
-                        {!data ? (
-                            <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6">
-                                <h3 className="text-lg font-semibold text-text-primary">Loading property details...</h3>
-                            </div>
-                        ) : (
-                            <>
-                                {/* Desktop View */}
-                                <div className='sticky top-16'>
-                                    {data?.photoCount != null && data.photoCount > 0 && (
-                                        <p className="text-sm text-text-muted mb-2" aria-label="Photo count">{data.photoCount} photo{data.photoCount !== 1 ? 's' : ''}</p>
-                                    )}
-                                    <UnitBookingWidget
-                                        listingId={resolvedListingId ?? undefined}
-                                        propertyId={listingPropertyId ?? undefined}
-                                        listingName={data?.property_name || 'This property'}
-                                        timezoneId={data?.timezoneId}
-                                        coverPhotoUrl={primaryImage}
-                                        maxGuests={data?.maxGuests}
-                                    />
-                                    {showAvailabilityPlaceholder && (
-                                        <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6">
-                                            <h3 className="text-lg font-semibold text-text-primary mb-2">Check Availability</h3>
-                                            <p className="text-text-muted text-sm mb-4">
-                                                Availability check is currently unavailable. Please try again later.
-                                            </p>
-                                            <Button 
-                                                variant="primary" 
-                                                fullWidth 
-                                                onClick={() => window.location.reload()}
-                                                disabled={isListingLookupPending}
-                                            >
-                                                {isListingLookupPending ? 'Loading...' : 'Try Again'}
-                                            </Button>
-                                        </div>
-                                    )}
-                                    
+                        <div className="sticky top-16">
+                            {data.photoCount != null && data.photoCount > 0 && (
+                                <p className="text-sm text-text-muted mb-2" aria-label="Photo count">{data.photoCount} photo{data.photoCount !== 1 ? 's' : ''}</p>
+                            )}
+                            <UnitBookingWidget
+                                listingId={resolvedListingId ?? undefined}
+                                propertyId={listingPropertyId ?? undefined}
+                                listingName={data.property_name || 'This property'}
+                                timezoneId={data.timezoneId}
+                                coverPhotoUrl={primaryImage}
+                                maxGuests={data.maxGuests}
+                            />
+                            {resolvedListingId && (
+                                <AvailabilityCalendar
+                                    listingId={resolvedListingId}
+                                    onDateSelect={(ymd) => {
+                                        const ev = new CustomEvent('atlas:set-checkin', { detail: ymd });
+                                        window.dispatchEvent(ev);
+                                    }}
+                                />
+                            )}
+                            {showAvailabilityPlaceholder && (
+                                <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6">
+                                    <h3 className="text-lg font-semibold text-text-primary mb-2">Check Availability</h3>
+                                    <p className="text-text-muted text-sm mb-4">
+                                        Availability check is currently unavailable. Please try again later.
+                                    </p>
+                                    <Button
+                                        variant="primary"
+                                        fullWidth
+                                        onClick={() => window.location.reload()}
+                                        disabled={isListingLookupPending}
+                                    >
+                                        {isListingLookupPending ? 'Loading...' : 'Try Again'}
+                                    </Button>
                                 </div>
-                            </>
-                        )}
+                            )}
+                        </div>
                     </div>
                 </div>
 
@@ -1033,28 +1232,36 @@ useEffect(() => {
 
                             <div className="overflow-y-auto p-6" role="region" aria-label="List of all amenities">
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-                                    {(data?.property_amenities || []).map((amenity: PropertyAmenity, idx: number) => {
-                                        const icon = amenity?.amenities_icon || '';
-                                        const displayName = icon ? formatAmenityName(icon) : 'Amenity';
-                                        
-                                        return (
-                                            <div 
-                                                key={`amenity-${idx}-${displayName}`} 
-                                                className="flex items-center gap-3 sm:gap-4"
-                                                role="listitem"
-                                            >
-                                                <span 
-                                                    className="text-xl sm:text-2xl text-text-primary"
-                                                    aria-hidden="true"
+                                    {data?.amenityCodes && data.amenityCodes.length > 0 ? (
+                                        data.amenityCodes.map((code) => {
+                                            const label = amenityMaster.get(code.toLowerCase()) ?? formatAmenityName(code);
+                                            return (
+                                                <div key={code} className="flex items-center gap-3 sm:gap-4" role="listitem">
+                                                    <span className="text-xl sm:text-2xl text-text-primary" aria-hidden="true">
+                                                        {renderIconForCode(code)}
+                                                    </span>
+                                                    <span className="text-text-primary text-sm sm:text-base">{label}</span>
+                                                </div>
+                                            );
+                                        })
+                                    ) : (
+                                        (data?.property_amenities || []).map((amenity: PropertyAmenity, idx: number) => {
+                                            const icon = amenity?.amenities_icon || '';
+                                            const displayName = icon ? formatAmenityName(icon) : 'Amenity';
+                                            return (
+                                                <div
+                                                    key={`amenity-${idx}-${displayName}`}
+                                                    className="flex items-center gap-3 sm:gap-4"
+                                                    role="listitem"
                                                 >
-                                                    {renderIcon(icon) || '•'}
-                                                </span>
-                                                <span className="text-text-primary text-sm sm:text-base">
-                                                    {displayName}
-                                                </span>
-                                            </div>
-                                        );
-                                    })}
+                                                    <span className="text-xl sm:text-2xl text-text-primary" aria-hidden="true">
+                                                        {renderIcon(icon) || '•'}
+                                                    </span>
+                                                    <span className="text-text-primary text-sm sm:text-base">{displayName}</span>
+                                                </div>
+                                            );
+                                        })
+                                    )}
                                 </div>
                             </div>
 

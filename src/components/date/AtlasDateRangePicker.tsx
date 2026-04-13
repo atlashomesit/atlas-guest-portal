@@ -159,6 +159,13 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
 
     // Reject clicks on disabled dates - ensure visual disabled state matches functional behavior
     if (startDate && composedDisabledDay(startDate)) {
+      if (selectionState === 'CHECK_IN_SELECTED') {
+        const checkIn = normalizeDate(value.startDate);
+        const normalized = normalizeDate(startDate);
+        if (checkIn && normalized && normalized.getTime() <= checkIn.getTime()) {
+          setValidationError('Minimum stay is one night. Select a check-out date after check-in.');
+        }
+      }
       return; // Ignore selection - date is disabled (e.g. past date)
     }
     if (endDate && composedDisabledDay(endDate)) {

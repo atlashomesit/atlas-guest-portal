@@ -109,6 +109,7 @@ export const propertyData = [
     {
         id: 101,
         listingId: 1,
+        maxGuests: 2,
         unitType: "1bhk",
         property_name: "Room 101",
         property_description: `A cozy and comfortable room with modern amenities.`,
@@ -132,6 +133,7 @@ export const propertyData = [
     {
         id: 102,
         listingId: 2,
+        maxGuests: 2,
         unitType: "1bhk",
         property_name: "Room 102",
         property_description: `A spacious room with modern amenities and a beautiful view.`,
@@ -155,6 +157,7 @@ export const propertyData = [
     {
         id: 201,
         listingId: 3,
+        maxGuests: 2,
         unitType: "1bhk",
         property_name: "Room 201",
         property_description: `A comfortable room with all necessary amenities for a pleasant stay.`,
@@ -178,6 +181,7 @@ export const propertyData = [
     {
         id: 202,
         listingId: 4,
+        maxGuests: 2,
         unitType: "1bhk",
         property_name: "Room 202",
         property_description: `A modern and well-equipped room for a comfortable stay.`,
@@ -201,6 +205,7 @@ export const propertyData = [
     {
         id: 301,
         listingId: 5,
+        maxGuests: 2,
         unitType: "1bhk",
         property_name: "Room 301",
         property_description: `A comfortable and well-appointed room for your stay.`,
@@ -224,6 +229,7 @@ export const propertyData = [
     {
         id: 302,
         listingId: 6,
+        maxGuests: 2,
         unitType: "1bhk",
         property_name: "Room 302",
         property_description: `A cozy room with all the necessary amenities for a comfortable stay.`,
@@ -247,6 +253,7 @@ export const propertyData = [
     {
         id: 501,
         listingId: 7,
+        maxGuests: 6,
         unitType: "penthouse",
         property_name: "Penthouse 501",
         property_description: `A luxurious penthouse with stunning views and premium amenities.`,

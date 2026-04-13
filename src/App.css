@@ -116,3 +116,24 @@ body::-webkit-scrollbar {
     justify-content: center;
   }
 }
+
+/* Skip link: guest-experience / UX — keyboard users jump past chrome */
+.skip-to-main {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 100;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  background: var(--cta-primary, #ea580c);
+  color: var(--text-contrast, #fff);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+.skip-to-main:focus {
+  left: 1rem;
+  top: 1rem;
+  outline: 2px solid var(--cta-secondary, #c2410c);
+  outline-offset: 2px;
+}

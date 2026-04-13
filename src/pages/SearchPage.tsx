@@ -80,7 +80,7 @@ function apiToNormalized(listings: PublicListing[]): NormalizedListing[] {
 }
 
 const SearchPage = () => {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
   const [isLoading, setIsLoading] = useState(true);
   const [apiListings, setApiListings] = useState<NormalizedListing[] | null>(null);
@@ -108,8 +108,11 @@ const SearchPage = () => {
   const checkIn = parseDate(searchParams.get("checkIn"));
   const checkOut = parseDate(searchParams.get("checkOut"));
   const guests = Number(searchParams.get("guests")) || null;
+  const minPrice = Number(searchParams.get("minPrice")) || null;
+  const maxPrice = Number(searchParams.get("maxPrice")) || null;
 
   const hasInvalidDates = Boolean(checkIn && checkOut && checkOut <= checkIn);
+  const hasActiveFilters = Boolean(minPrice || maxPrice);
 
   const listings = useMemo(
     () => apiListings ?? buildStaticListings(),
@@ -120,14 +123,34 @@ const SearchPage = () => {
     if (hasInvalidDates) return [];
 
     return listings.filter((unit) => {
-      const matchesGuests = !guests || guests <= unit.maxGuests;
-      return matchesGuests;
+      if (guests && guests > unit.maxGuests) return false;
+      if (minPrice && unit.pricePerNight > 0 && unit.pricePerNight < minPrice) return false;
+      if (maxPrice && unit.pricePerNight > maxPrice) return false;
+      return true;
     });
-  }, [guests, hasInvalidDates, listings]);
+  }, [guests, hasInvalidDates, listings, minPrice, maxPrice]);
 
   useEffect(() => {
     setVisibleCount(ITEMS_PER_PAGE);
-  }, [guests, hasInvalidDates]);
+  }, [guests, hasInvalidDates, minPrice, maxPrice]);
+
+  const updateParam = (key: string, value: string) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (value) next.set(key, value);
+      else next.delete(key);
+      return next;
+    }, { replace: true });
+  };
+
+  const clearFilters = () => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete("minPrice");
+      next.delete("maxPrice");
+      return next;
+    }, { replace: true });
+  };
 
   const visibleUnits = filteredUnits.slice(0, visibleCount);
   const hasMore = visibleCount < filteredUnits.length;
@@ -145,6 +168,61 @@ const SearchPage = () => {
             provided.
           </p>
         </header>
+
+        {/* Filter bar */}
+        <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-border-subtle bg-bg-surface px-4 py-3 shadow-sm">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-text-muted" htmlFor="filter-min-price">Min price / night</label>
+            <input
+              id="filter-min-price"
+              type="number"
+              min={0}
+              placeholder="₹ Any"
+              value={minPrice ?? ""}
+              onChange={(e) => updateParam("minPrice", e.target.value)}
+              className="w-32 rounded-lg border border-border-subtle bg-bg-muted px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-cta-primary"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-text-muted" htmlFor="filter-max-price">Max price / night</label>
+            <input
+              id="filter-max-price"
+              type="number"
+              min={0}
+              placeholder="₹ Any"
+              value={maxPrice ?? ""}
+              onChange={(e) => updateParam("maxPrice", e.target.value)}
+              className="w-32 rounded-lg border border-border-subtle bg-bg-muted px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-cta-primary"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-text-muted" htmlFor="filter-guests">Guests</label>
+            <input
+              id="filter-guests"
+              type="number"
+              min={1}
+              max={16}
+              placeholder="Any"
+              value={guests ?? ""}
+              onChange={(e) => updateParam("guests", e.target.value)}
+              className="w-24 rounded-lg border border-border-subtle bg-bg-muted px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-cta-primary"
+            />
+          </div>
+          <div className="ml-auto flex items-end gap-3">
+            {!isLoading && (
+              <span className="text-sm text-text-muted">{filteredUnits.length} {filteredUnits.length === 1 ? "property" : "properties"} found</span>
+            )}
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="rounded-lg border border-border-subtle px-3 py-2 text-xs font-medium text-text-muted hover:bg-bg-muted focus:outline-none"
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+        </div>
 
         {!isLoading && apiListings === null && listings.length > 0 && (
           <div className="rounded-xl border border-support-warning/40 bg-support-warning/10 px-4 py-3 text-support-warning">
@@ -176,15 +254,25 @@ const SearchPage = () => {
         )}
 
         {isLoading && (
-          <section className="grid gap-6 sm:grid-cols-2" data-testid="search-skeleton">
-            {Array.from({ length: 8 }).map((_, i) => (
+          <section
+            className="grid gap-6 sm:grid-cols-2"
+            data-testid="search-skeleton"
+            aria-busy="true"
+            aria-label="Loading search results"
+          >
+            {Array.from({ length: 6 }).map((_, i) => (
               <SkeletonCard key={i} />
             ))}
           </section>
         )}
 
         {!isLoading && !showEmptyState && !hasInvalidDates && (
-          <section className="grid gap-6 sm:grid-cols-2" data-testid="guest-search-results">
+          <section
+            className="grid gap-6 sm:grid-cols-2"
+            data-testid="guest-search-results"
+            aria-live="polite"
+            aria-label={`${filteredUnits.length} apartments match your filters`}
+          >
             {visibleUnits.map((unit) => (
               <article
                 key={unit.id}
@@ -214,6 +302,7 @@ const SearchPage = () => {
                     <div className="space-y-1">
                       <p className="text-2xl font-bold text-text-primary" data-testid="guest-listing-nightly-price">{formatCurrency(unit.pricePerNight)}</p>
                       <p className="text-sm text-text-muted">per night</p>
+                      <p className="text-xs text-text-muted">+ 12% GST</p>
                     </div>
                     <div className="flex flex-col gap-1 text-right text-xs text-text-muted">
                       {unit.amenities.map((amenity, index) => (

@@ -6,6 +6,7 @@ import { getRuntimeConfig, hasRuntimeConfig } from "../runtime-config";
 
 interface BookingSummary {
   bookingId: number;
+  guestId?: number;
   guestName: string;
   propertyName: string;
   listingName: string;
@@ -210,7 +211,7 @@ export default function BookingConfirmationPage() {
         title={`Booking #${booking.bookingId} — ${booking.propertyName}`}
         description={`Your stay at ${booking.propertyName}: ${booking.checkinDate} to ${booking.checkoutDate}.`}
       />
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10 space-y-6">
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10 space-y-6" data-testid="booking-confirmation-page">
 
         {/* Header */}
         <div className="space-y-1">
@@ -219,9 +220,14 @@ export default function BookingConfirmationPage() {
             <StatusBadge status={booking.status} />
           </div>
           <p className="text-sm text-text-secondary">
-            Ref&nbsp;<span className="font-mono font-semibold text-text-primary">#{booking.bookingId}</span>
+            Ref&nbsp;<span className="font-mono font-semibold text-text-primary" data-testid="booking-reference">#{booking.bookingId}</span>
             &nbsp;&middot;&nbsp;{booking.listingName !== booking.propertyName ? booking.listingName : booking.propertyName}
           </p>
+          {booking.guestName ? (
+            <p className="text-sm text-text-secondary" data-testid="confirmation-guest-name">
+              {booking.guestName}
+            </p>
+          ) : null}
         </div>
 
         {isCancelled && (
@@ -235,7 +241,7 @@ export default function BookingConfirmationPage() {
           <div className="pb-4 flex items-start gap-3">
             <span className="text-2xl">🏠</span>
             <div>
-              <p className="font-semibold text-text-primary">{booking.propertyName}</p>
+              <p className="font-semibold text-text-primary" data-testid="confirmation-property-name">{booking.propertyName}</p>
               {booking.propertyAddress && (
                 <p className="text-sm text-text-secondary mt-0.5">{booking.propertyAddress}</p>
               )}
@@ -244,18 +250,18 @@ export default function BookingConfirmationPage() {
           <div className="grid grid-cols-2 gap-4 py-4">
             <div>
               <p className="text-xs text-text-muted uppercase tracking-wider font-medium">Check-in</p>
-              <p className="text-base font-semibold text-text-primary mt-0.5">{booking.checkinDate}</p>
+              <p className="text-base font-semibold text-text-primary mt-0.5" data-testid="confirmation-checkin">{booking.checkinDate}</p>
             </div>
             <div>
               <p className="text-xs text-text-muted uppercase tracking-wider font-medium">Check-out</p>
-              <p className="text-base font-semibold text-text-primary mt-0.5">{booking.checkoutDate}</p>
+              <p className="text-base font-semibold text-text-primary mt-0.5" data-testid="confirmation-checkout">{booking.checkoutDate}</p>
             </div>
           </div>
           <div className="pt-4 flex justify-between items-center">
             <span className="text-sm text-text-secondary">
               {booking.nights} {booking.nights === 1 ? "night" : "nights"}
             </span>
-            <span className="text-base font-bold text-text-primary">
+            <span className="text-base font-bold text-text-primary" data-testid="confirmation-total">
               {booking.currency}&nbsp;{booking.totalAmount.toLocaleString("en-IN")}
             </span>
           </div>
@@ -285,6 +291,7 @@ export default function BookingConfirmationPage() {
               href={pdfUrl}
               target="_blank"
               rel="noopener noreferrer"
+              data-testid="download-invoice-btn"
               className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-2.5 hover:opacity-95 transition-opacity"
             >
               Download invoice (PDF)
@@ -419,8 +426,28 @@ export default function BookingConfirmationPage() {
           </div>
         )}
 
-        <div className="text-center pt-2">
-          <Link to="/" className="text-sm text-text-muted underline underline-offset-2 hover:text-text-primary">
+        <div className="text-center pt-2 flex flex-col items-center gap-2">
+          {bookingId && token && booking?.guestId && (
+            <Link
+              to={`/my-bookings?guestId=${booking.guestId}&t=${encodeURIComponent(token)}`}
+              className="text-sm text-brand-primary underline underline-offset-2 hover:text-brand-primary/80"
+            >
+              View all my bookings
+            </Link>
+          )}
+          {bookingId && token && (
+            <Link
+              to={`/profile?bookingId=${bookingId}&t=${encodeURIComponent(token)}`}
+              className="text-sm text-brand-primary underline underline-offset-2 hover:text-brand-primary/80"
+            >
+              Update contact details
+            </Link>
+          )}
+          <Link
+            to="/"
+            data-testid="confirmation-cta"
+            className="text-sm text-text-muted underline underline-offset-2 hover:text-text-primary"
+          >
             ← Back to Atlas Homestays
           </Link>
         </div>
