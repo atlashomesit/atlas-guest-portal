@@ -1815,7 +1815,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                     )}
                     <div className={`unit-booking-day-cell-inner relative z-10 grid grid-cols-1 grid-rows-2 place-items-center gap-0 min-h-0 overflow-hidden box-border ${selectionClasses || disabledClasses}`}>
                       <span className="unit-booking-day-num text-[11px] font-bold leading-none overflow-hidden truncate">{format(day, 'd')}</span>
-                      <span className={`unit-booking-day-price text-[9px] leading-none whitespace-nowrap overflow-hidden truncate min-w-0 ${isDeal ? 'text-green-600 font-semibold' : ''}`}>
+                      <span className={`unit-booking-day-price text-xs leading-none whitespace-nowrap overflow-hidden truncate min-w-0 ${isDeal ? 'text-green-600 font-semibold' : ''}`}>
                         {priceText}
                       </span>
                     </div>
@@ -1834,7 +1834,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               <Button
                 variant="secondary"
                 size="sm"
-                className="!px-2 !py-2 h-9 w-9 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="!px-2 !py-2 h-12 w-12 disabled:opacity-40 disabled:cursor-not-allowed"
                 aria-label="Decrease guests"
                 disabled={guests <= 1}
                 onClick={() => setGuests((current) => Math.max(1, current - 1))}
@@ -1847,7 +1847,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               <Button
                 variant="secondary"
                 size="sm"
-                className="!px-2 !py-2 h-9 w-9 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="!px-2 !py-2 h-12 w-12 disabled:opacity-40 disabled:cursor-not-allowed"
                 aria-label="Increase guests"
                 disabled={guests >= maxGuests}
                 onClick={() => setGuests((current) => Math.min(maxGuests, current + 1))}
@@ -2189,6 +2189,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       >
         {isBookingDisabled ? 'Unavailable' : isSubmitting || isLoading ? 'Processing...' : 'Book this home'}
       </Button>
+      {!isBookingDisabled && (
+        <p className="text-xs text-text-muted mt-1 text-center">
+          Pay via UPI, card, or netbanking
+        </p>
+      )}
     </form>
     </>
   );
