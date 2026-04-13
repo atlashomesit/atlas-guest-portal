@@ -6,6 +6,8 @@ type BookingState = {
   checkIn: string | null;
   checkOut: string | null;
   guests: number;
+  /** Canonical `/homes/{propertySlug}/{listingId}` for returning from /reserve to pay (TASK-258). */
+  listingDetailPath: string | null;
 };
 
 type BookingContextValue = {
@@ -30,6 +32,7 @@ const defaultState: BookingState = {
   checkIn: null,
   checkOut: null,
   guests: 2,
+  listingDetailPath: null,
 };
 
 
@@ -51,6 +54,10 @@ const loadState = (): BookingState => {
       checkIn: parsed.checkIn ?? null,
       checkOut: parsed.checkOut ?? null,
       guests: typeof parsed.guests === 'number' && parsed.guests > 0 ? parsed.guests : defaultState.guests,
+      listingDetailPath:
+        typeof parsed.listingDetailPath === 'string' && parsed.listingDetailPath.trim()
+          ? parsed.listingDetailPath.trim()
+          : null,
     };
   } catch (error) {
     console.warn('[BookingContext] Failed to load persisted booking state', error);

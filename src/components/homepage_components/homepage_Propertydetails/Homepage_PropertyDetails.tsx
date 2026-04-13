@@ -20,7 +20,7 @@ import AvailabilityCalendar from '../../AvailabilityCalendar';
 import { trackEvent } from '../../../utils/analytics';
 import { Button } from '../../ui/Button';
 import { calculateNightlyPrice, inferUnitType } from '../../../utils/pricing';
-import { buildHomeUnitPath } from '../../../utils/navigation';
+import { buildHomeUnitPath, getPropertySlug } from '../../../utils/navigation';
 import { useBooking } from '../../../contexts/BookingContext';
 import { useListingPhotosFromApi } from '../../../contexts/ListingPhotosContext';
 import { resolveListing } from '../../../utils/listingResolver';
@@ -532,16 +532,18 @@ useEffect(() => {
   const lid = Number(resolvedListingId ?? data?.listingId ?? listingId);
   if (Number.isFinite(lid) && lid > 0) {
       setFav(isFavorite(lid));
+      const path = buildHomeUnitPath(propertySlug ?? String(data.id), lid);
       addRecentlyViewed({
           listingId: lid,
-          path: buildHomeUnitPath({ propertySlug: propertySlug ?? String(data.id), unitSlug: String(lid) }),
+          path,
           name: data.property_name,
           coverPhotoUrl: Array.isArray(data.property_img) ? data.property_img[0] : undefined,
           location: data.property_location,
       });
+      updateBooking({ listingDetailPath: path });
   }
 
-}, [data?.id, data?.property_name, setProperty]);
+}, [data?.id, data?.property_name, data?.listingId, listingId, propertySlug, resolvedListingId, setProperty, updateBooking]);
 
     // Similar listings: GET /listings/{id}/similar
     useEffect(() => {
@@ -1010,7 +1012,7 @@ useEffect(() => {
                                             const id = Number(it.id);
                                             const name = String(it.name ?? it.propertyName ?? `Listing ${it.id}`);
                                             const img = (it.coverPhotoUrl as string | undefined) ?? (Array.isArray(it.photoUrls) ? it.photoUrls[0] : undefined);
-                                            const path = buildHomeUnitPath({ propertySlug: String(it.propertyName ?? 'home').toLowerCase().replace(/\\s+/g, '-'), unitSlug: String(id) });
+                                            const path = buildHomeUnitPath(getPropertySlug({ name: it.propertyName, property_name: it.propertyName }), id);
                                             return (
                                                 <Link
                                                     key={String(it.id)}

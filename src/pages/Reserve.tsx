@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
 import { useBooking } from '../contexts/BookingContext';
 import { Button } from '../components/ui/Button';
 import Subheading from '../components/commonComponents/subheading/Subheading';
@@ -8,21 +9,23 @@ const Reserve = () => {
   const { booking } = useBooking();
   const navigate = useNavigate();
 
-  const hasSelection = Boolean(booking.propertyId && booking.checkIn && booking.checkOut);
+  const hasSelection = Boolean(booking.listingDetailPath?.trim() && booking.checkIn && booking.checkOut);
 
   // Build a URL back to the property detail page with dates pre-filled so the
   // UnitBookingWidget can complete the Razorpay checkout without leaving the page.
   const goToPayment = () => {
-    if (!booking.propertyId) return;
+    const base = booking.listingDetailPath?.trim();
+    if (!base) {
+      toast.error('Open a property from search or Our Homes first, then return here to pay.');
+      return;
+    }
 
-    // Determine the property slug. If we have it, navigate to the full detail page.
-    // Fall back to home-details page by propertyId if slug is not stored.
     const checkInParam = booking.checkIn ? `?checkIn=${encodeURIComponent(booking.checkIn)}` : '';
     const checkOutSep = booking.checkIn && booking.checkOut ? '&' : '?';
     const checkOutParam = booking.checkOut ? `${checkOutSep}checkOut=${encodeURIComponent(booking.checkOut)}` : '';
     const guestsParam = booking.guests ? `&guests=${booking.guests}` : '';
 
-    navigate(`/homes/${booking.propertyId}${checkInParam}${checkOutParam}${guestsParam}`);
+    navigate(`${base}${checkInParam}${checkOutParam}${guestsParam}`);
   };
 
   return (
@@ -61,7 +64,7 @@ const Reserve = () => {
 
         {!hasSelection && (
           <div className="rounded-xl border border-support-error bg-[color:color-mix(in_srgb,var(--support-error)_10%,transparent)] text-support-error p-4 text-sm">
-            We could not find complete booking details. Please return to the property page and try again.
+            We could not find complete booking details (including which property to pay for). Open a listing, pick dates, then use Reserve again — or go back to the property page.
           </div>
         )}
 

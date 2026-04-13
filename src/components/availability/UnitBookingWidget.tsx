@@ -102,6 +102,20 @@ function getBookingErrorMessage(error: unknown, context: 'order' | 'verify'): st
     : 'Payment verification failed. Please contact support with your payment ID.';
 }
 
+/** TASK-255: Best-effort removal of PaymentPending row after Razorpay dismiss/failure (token = order response bookingToken). */
+async function abandonPaymentPendingCheckout(bookingId: number, bookingToken: string | null | undefined) {
+  const token = typeof bookingToken === 'string' ? bookingToken.trim() : '';
+  if (!token) return;
+  try {
+    const url = buildApiUrl(
+      `/api/guest/bookings/${bookingId}/abandon-checkout?t=${encodeURIComponent(token)}`
+    );
+    await apiFetch(url, { method: 'POST' });
+  } catch {
+    /* non-blocking */
+  }
+}
+
 const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   listingId,
   propertyId,
@@ -312,7 +326,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   useEffect(() => {
     if (!listingId) return;
     let active = true;
-    apiFetch(buildApiUrl(`/listings/${listingId}/availability-rules`))
+    apiFetch(buildApiUrl(`/api/public/listings/${listingId}/availability-rules`))
       .then((r) => r.json())
       .then((d: unknown) => {
         const data = d as { minStayNights?: number; advanceBookingHours?: number };
@@ -1170,6 +1184,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           const handleRazorpayClose = () => {
             if (paymentCompleted) return;
             paymentCompleted = true; // Prevent double-reset from ondismiss + close event
+            void abandonPaymentPendingCheckout(bookingId, bookingToken);
             localStorage.removeItem(PENDING_PAYMENT_KEY);
             setIsSubmitting(false);
             setIsLoading(false);
@@ -1260,6 +1275,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           const rzp = new window.Razorpay(options);
           rzp.on('payment.failed', (response: { error?: { description?: string } }) => {
             paymentCompleted = true; // Payment attempt was made
+            void abandonPaymentPendingCheckout(bookingId, bookingToken);
             localStorage.removeItem(PENDING_PAYMENT_KEY);
             setPaymentStatus('failed');
             setFormError(`Payment failed: ${response.error?.description || 'Unknown error'}`);

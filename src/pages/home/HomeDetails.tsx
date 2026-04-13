@@ -1,5 +1,5 @@
 import { Link, useParams } from "react-router-dom";
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useEffect } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   Wifi, Snowflake, Tv, Car, UtensilsCrossed, WashingMachine,
@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 
 import { homes, defaultHomeHighlights } from "../../content/homes";
+import { useBooking } from "../../contexts/BookingContext";
 
 const UnitBookingWidget = lazy(() => import("../../components/availability/UnitBookingWidget"));
 
@@ -54,6 +55,12 @@ function AmenityChip({ label }: { label: string }) {
 const HomeDetails = () => {
   const { roomNo } = useParams<{ roomNo: string }>();
   const room = homes.find((item) => item.roomNo === roomNo);
+  const { updateBooking } = useBooking();
+
+  useEffect(() => {
+    if (!room) return;
+    updateBooking({ listingDetailPath: room.href });
+  }, [room, updateBooking]);
 
   const primaryImage = room?.images?.[0] ?? fallbackImage;
   const highlights = room?.highlights?.length ? room.highlights : defaultHomeHighlights;
