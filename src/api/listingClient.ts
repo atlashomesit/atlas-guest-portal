@@ -45,6 +45,8 @@ export type PublicListing = {
   coverPhotoUrl?: string | null;
   photoUrls?: string[];
   timezoneId?: string;
+  /** TASK-355: On-site contact phone for WhatsApp CTA. */
+  hostPhone?: string | null;
 };
 
 function normalizePublicListing(payload: Record<string, unknown>): PublicListing {
@@ -85,6 +87,10 @@ function normalizePublicListing(payload: Record<string, unknown>): PublicListing
         : undefined,
     photoUrls: Array.isArray(photos) ? photos.filter((u): u is string => typeof u === 'string') : [],
     timezoneId: typeof payload.timezoneId === 'string' ? payload.timezoneId : undefined,
+    hostPhone:
+      payload.hostPhone === null || typeof payload.hostPhone === 'string'
+        ? (payload.hostPhone as string | null)
+        : undefined,
   };
 }
 
