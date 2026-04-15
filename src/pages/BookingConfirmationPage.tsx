@@ -70,6 +70,12 @@ export default function BookingConfirmationPage() {
   const [modNote, setModNote] = useState("");
   const [modSubmitting, setModSubmitting] = useState(false);
   const [modMessage, setModMessage] = useState<string>("");
+  // TASK-350: guest self-service cancellation request
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelSubmitting, setCancelSubmitting] = useState(false);
+  const [cancelMessage, setCancelMessage] = useState<string>("");
+  const [cancelRequested, setCancelRequested] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   useEffect(() => {
     if (!bookingId || !token) {
@@ -241,6 +247,38 @@ export default function BookingConfirmationPage() {
       setModMessage(e instanceof Error ? e.message : "Could not submit request.");
     } finally {
       setModSubmitting(false);
+    }
+  }
+
+  // TASK-350: submit guest cancellation request
+  async function submitCancellationRequest() {
+    if (!bookingId || !token) return;
+    setCancelSubmitting(true);
+    setCancelMessage("");
+    try {
+      const res = await fetch(
+        buildApiUrl(`/api/public/bookings/${bookingId}/cancellation-request?t=${encodeURIComponent(token)}`),
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...getApiHeaders() },
+          body: JSON.stringify({ reason: cancelReason }),
+        },
+      );
+      if (res.status === 409) {
+        setCancelMessage("This booking is already cancelled or checked out.");
+        return;
+      }
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || "Could not submit request.");
+      }
+      setCancelRequested(true);
+      setCancelMessage("Cancellation request submitted. Our team will review and contact you within 24 hours.");
+      setShowCancelConfirm(false);
+    } catch (e) {
+      setCancelMessage(e instanceof Error ? e.message : "Could not submit request. Please contact us.");
+    } finally {
+      setCancelSubmitting(false);
     }
   }
 
@@ -477,6 +515,65 @@ export default function BookingConfirmationPage() {
               {modSubmitting ? "Submitting..." : "Submit request"}
             </button>
             {modMessage ? <p className="text-xs text-text-secondary">{modMessage}</p> : null}
+          </div>
+        )}
+
+        {/* TASK-350: guest self-service cancellation request */}
+        {canRequestModification && !cancelRequested && (
+          <div className="rounded-2xl border border-red-100 bg-red-50/40 p-5 space-y-3">
+            <h2 className="text-sm font-semibold text-red-800">Request cancellation</h2>
+            <p className="text-sm text-red-700">
+              Cancellations are subject to our cancellation policy. Submitting a request does not
+              automatically cancel your booking — our team will review it and contact you within 24 hours.
+            </p>
+            {!showCancelConfirm ? (
+              <button
+                onClick={() => setShowCancelConfirm(true)}
+                className="inline-flex items-center justify-center rounded-lg border border-red-400 text-red-700 text-sm font-medium px-4 py-2 hover:bg-red-100 transition-colors"
+                data-testid="request-cancellation-btn"
+              >
+                Request cancellation
+              </button>
+            ) : (
+              <div className="space-y-3">
+                <label className="text-sm text-red-700 block">
+                  Reason (optional)
+                  <textarea
+                    value={cancelReason}
+                    onChange={(e) => setCancelReason(e.target.value)}
+                    rows={2}
+                    placeholder="e.g., change of plans, emergency…"
+                    className="mt-1 w-full rounded-md border border-red-200 px-3 py-2 text-sm bg-white"
+                  />
+                </label>
+                <div className="flex gap-3">
+                  <button
+                    onClick={submitCancellationRequest}
+                    disabled={cancelSubmitting}
+                    className="inline-flex items-center justify-center rounded-lg bg-red-600 text-white text-sm font-medium px-4 py-2 disabled:opacity-50 hover:bg-red-700 transition-colors"
+                    data-testid="confirm-cancellation-btn"
+                  >
+                    {cancelSubmitting ? "Submitting…" : "Confirm request"}
+                  </button>
+                  <button
+                    onClick={() => setShowCancelConfirm(false)}
+                    className="inline-flex items-center justify-center rounded-lg border border-gray-300 text-gray-700 text-sm font-medium px-4 py-2 hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+            {cancelMessage && (
+              <p className={`text-xs font-medium ${cancelMessage.includes("submitted") ? "text-green-700" : "text-red-700"}`}>
+                {cancelMessage}
+              </p>
+            )}
+          </div>
+        )}
+        {cancelRequested && (
+          <div className="rounded-2xl border border-green-200 bg-green-50/60 p-4 text-sm text-green-800">
+            ✅ Cancellation request received. We'll contact you within 24 hours.
           </div>
         )}
 
