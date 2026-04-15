@@ -170,6 +170,9 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [dateError, setDateError] = useState<string | null>(null);
   const [minStayNights, setMinStayNights] = useState(1);
   const [minAdvanceDays, setMinAdvanceDays] = useState(0);
+  // BUG-104 TASK-314: per-listing max guests from API (overrides static prop default of 16)
+  const [apiMaxGuests, setApiMaxGuests] = useState<number | undefined>(undefined);
+  const effectiveMaxGuests = apiMaxGuests ?? maxGuests;
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -313,14 +316,14 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
 
   useEffect(() => {
     const g = booking.guests;
-    if (typeof g === 'number' && g >= 1 && g <= maxGuests) {
+    if (typeof g === 'number' && g >= 1 && g <= effectiveMaxGuests) {
       setGuests(g);
     }
-  }, [booking.guests, maxGuests]);
+  }, [booking.guests, effectiveMaxGuests]);
 
   useEffect(() => {
-    setGuests((current) => Math.min(maxGuests, Math.max(1, current)));
-  }, [maxGuests]);
+    setGuests((current) => Math.min(effectiveMaxGuests, Math.max(1, current)));
+  }, [effectiveMaxGuests]);
 
   // Fetch min stay nights from availability rules (non-blocking)
   useEffect(() => {
@@ -329,12 +332,16 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     apiFetch(buildApiUrl(`/api/public/listings/${listingId}/availability-rules`))
       .then((r) => r.json())
       .then((d: unknown) => {
-        const data = d as { minStayNights?: number; advanceBookingHours?: number };
+        const data = d as { minStayNights?: number; advanceBookingHours?: number; maxGuests?: number };
         if (active && typeof data?.minStayNights === 'number' && data.minStayNights > 1) {
           setMinStayNights(data.minStayNights);
         }
         if (active && typeof data?.advanceBookingHours === 'number' && data.advanceBookingHours > 0) {
           setMinAdvanceDays(Math.ceil(data.advanceBookingHours / 24));
+        }
+        // BUG-104 TASK-314: enforce per-listing maxGuests (not hardcoded 16)
+        if (active && typeof data?.maxGuests === 'number' && data.maxGuests >= 1) {
+          setApiMaxGuests(data.maxGuests);
         }
       })
       .catch(() => { /* non-critical — defaults stay */ });
@@ -1849,8 +1856,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                 size="sm"
                 className="!px-2 !py-2 h-12 w-12 disabled:opacity-40 disabled:cursor-not-allowed"
                 aria-label="Increase guests"
-                disabled={guests >= maxGuests}
-                onClick={() => setGuests((current) => Math.min(maxGuests, current + 1))}
+                disabled={guests >= effectiveMaxGuests}
+                onClick={() => setGuests((current) => Math.min(effectiveMaxGuests, current + 1))}
               >
                 +
               </Button>
