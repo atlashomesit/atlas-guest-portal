@@ -130,6 +130,45 @@ export default function BookingConfirmationPage() {
   const supportsPush = typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window;
   const canRequestModification = !isCancelled && !!token;
 
+  // TASK-333: Generate and download ICS calendar event for check-in
+  function downloadCalendar() {
+    const formatIcsDate = (dateStr: string, timeStr: string) => {
+      // dateStr is YYYY-MM-DD, timeStr is HH:MM (24h IST)
+      const [y, m, d] = dateStr.split("-");
+      const [h, min] = timeStr.split(":");
+      // Store as floating time (no timezone conversion needed — IST local)
+      return `${y}${m}${d}T${h}${min}00`;
+    };
+    const checkin = formatIcsDate(booking.checkinDate, "14:00");
+    const checkout = formatIcsDate(booking.checkoutDate, "12:00");
+    const uid = `atlas-booking-${booking.bookingId}@atlashomestays.com`;
+    const ics = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//Atlas Homestays//BookingConfirmation//EN",
+      "CALSCALE:GREGORIAN",
+      "METHOD:PUBLISH",
+      "BEGIN:VEVENT",
+      `UID:${uid}`,
+      `DTSTART:${checkin}`,
+      `DTEND:${checkout}`,
+      `SUMMARY:Check-in at ${booking.propertyName}`,
+      `DESCRIPTION:Booking #${booking.bookingId}. Host: ${hostPhone}. Check-out on ${booking.checkoutDate}.`,
+      `LOCATION:${booking.propertyAddress || booking.propertyName}`,
+      "STATUS:CONFIRMED",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n");
+
+    const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `atlas-booking-${booking.bookingId}.ics`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   function toBase64UrlUint8Array(base64String: string) {
     const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
     const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
@@ -377,6 +416,21 @@ export default function BookingConfirmationPage() {
             Chat with host on WhatsApp
           </a>
         </div>
+
+        {/* Add to Calendar (TASK-333) */}
+        {!isCancelled && (
+          <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3">
+            <h2 className="text-sm font-semibold text-text-primary">Add to your calendar</h2>
+            <p className="text-sm text-text-secondary">Save your check-in date and property details to your phone calendar.</p>
+            <button
+              onClick={downloadCalendar}
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-2 hover:bg-brand-primary/5 transition-colors"
+              aria-label="Download calendar event for your stay"
+            >
+              📅 Add to Calendar
+            </button>
+          </div>
+        )}
 
         {!isCancelled && (
           <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3">
