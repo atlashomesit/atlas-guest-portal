@@ -135,6 +135,8 @@ interface Property {
     checkOutTime?: string;
     /** AMN-001: amenity codes from API (e.g. ["wifi","ac","parking"]) */
     amenityCodes?: string[];
+    /** TASK-355: host/on-site contact phone for WhatsApp CTA */
+    hostPhone?: string | null;
 }
 
 const PropertyDetails = () => {
@@ -156,6 +158,7 @@ const PropertyDetails = () => {
     const [showAmenitiesModal, setShowAmenitiesModal] = useState(false);
     const [showAboutMore, setShowAboutMore] = useState(false);
     const [showNeighborhoodMore, setShowNeighborhoodMore] = useState(false);
+    const [copyLinkLabel, setCopyLinkLabel] = useState<'Copy link' | 'Copied!'>('Copy link');
     const unitType = inferUnitType({ id: data?.id, property_name: data?.property_name });
     const { setProperty, updateBooking } = useBooking();
     const { getUrlsForListingId } = useListingPhotosFromApi();
@@ -179,7 +182,7 @@ const PropertyDetails = () => {
         loading: boolean;
         averageRating: number;
         totalCount: number;
-        reviews: { id: number; guestName?: string | null; rating: number; title?: string | null; body?: string | null; createdAt: string }[];
+        reviews: { id: number; guestName?: string | null; rating: number; title?: string | null; body?: string | null; createdAt: string; hostResponse?: string | null; hostResponseAt?: string | null }[];
     }>(null);
 
     // AMN-001: Fetch amenity master list once on mount
@@ -289,9 +292,17 @@ const PropertyDetails = () => {
         const ac = new AbortController();
         void fetchListingById(lid, ac.signal)
             .then((detail) => {
-                const mg = parseMaxGuestsFromPayload(detail as Record<string, unknown>);
-                if (mg == null) return;
-                setData((prev) => (prev ? { ...prev, maxGuests: mg } : prev));
+                const d = detail as Record<string, unknown>;
+                const mg = parseMaxGuestsFromPayload(d);
+                const rawPhone = d.hostPhone ?? d.contactPhone;
+                const phone = typeof rawPhone === 'string' && rawPhone.trim() ? rawPhone.trim() : null;
+                setData((prev) => {
+                    if (!prev) return prev;
+                    const updates: Partial<typeof prev> = {};
+                    if (mg != null) updates.maxGuests = mg;
+                    if (phone !== null && !prev.hostPhone) updates.hostPhone = phone;
+                    return Object.keys(updates).length > 0 ? { ...prev, ...updates } : prev;
+                });
             })
             .catch(() => {});
         return () => ac.abort();
@@ -323,7 +334,7 @@ const PropertyDetails = () => {
                 const j = (await res.json()) as {
                     averageRating?: number;
                     totalCount?: number;
-                    reviews?: { id: number; guestName?: string | null; rating: number; title?: string | null; body?: string | null; createdAt: string }[];
+                    reviews?: { id: number; guestName?: string | null; rating: number; title?: string | null; body?: string | null; createdAt: string; hostResponse?: string | null; hostResponseAt?: string | null }[];
                 };
                 if (ac.signal.aborted) return;
                 setListingReviewsFromApi({
@@ -496,6 +507,10 @@ const PropertyDetails = () => {
                         maxGuests: parseMaxGuestsFromPayload(apiListing as Record<string, unknown>),
                         checkInTime: pub.checkInTime?.trim() || undefined,
                         checkOutTime: pub.checkOutTime?.trim() || undefined,
+                        hostPhone: (() => {
+                            const raw = (apiListing as Record<string, unknown>).hostPhone ?? (apiListing as Record<string, unknown>).contactPhone;
+                            return typeof raw === 'string' && raw.trim() ? raw.trim() : null;
+                        })(),
                         amenityCodes: (() => {
                             const raw = (apiListing as Record<string, unknown>).amenityCodes;
                             if (Array.isArray(raw)) return raw.filter((c): c is string => typeof c === 'string');
@@ -799,6 +814,31 @@ useEffect(() => {
                     </div>
                 </div>
 
+                {/* Social sharing — minimal, does not distract from booking CTA */}
+                <div className="flex items-center gap-3 mt-2 flex-wrap">
+                    <a
+                        href={`https://wa.me/?text=${encodeURIComponent(`Check out ${data?.property_name ?? 'this home'}: ${window.location.href}`)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.85rem', color: '#25d366' }}
+                    >
+                        💬 Share on WhatsApp
+                    </a>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            navigator.clipboard.writeText(window.location.href).then(() => {
+                                setCopyLinkLabel('Copied!');
+                                setTimeout(() => setCopyLinkLabel('Copy link'), 2000);
+                            }).catch(() => {});
+                        }}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.85rem', background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'inherit' }}
+                        className="text-text-muted hover:text-text-primary transition"
+                    >
+                        🔗 {copyLinkLabel}
+                    </button>
+                </div>
+
                 {/* Check-in / check-out times — shown prominently before gallery */}
                 {(data?.checkInTime || data?.checkOutTime) && (
                     <div className="flex flex-wrap gap-4 text-sm font-medium mt-1 mb-2">
@@ -1092,6 +1132,12 @@ useEffect(() => {
                                                 </div>
                                                 {r.title && <p className="text-sm font-medium text-text-primary mb-1">{r.title}</p>}
                                                 {r.body && <p className="text-sm text-text-muted italic">"{r.body}"</p>}
+                                                {r.hostResponse && (
+                                                    <div className="mt-2 pl-3 border-l-2 border-accent-primary/40">
+                                                        <p className="text-xs text-text-muted font-medium mb-0.5">Owner's response:</p>
+                                                        <p className="text-sm text-text-muted">{r.hostResponse}</p>
+                                                    </div>
+                                                )}
                                             </div>
                                         ))}
                                     </div>
@@ -1187,6 +1233,31 @@ useEffect(() => {
                                 coverPhotoUrl={primaryImage}
                                 maxGuests={data.maxGuests}
                             />
+                            <div className="mt-3 flex flex-wrap gap-2">
+                                <span className="inline-flex items-center gap-1 rounded-full bg-green-50 border border-green-200 px-2.5 py-1 text-xs font-medium text-green-700">
+                                    ✓ Verified listing
+                                </span>
+                                <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2.5 py-1 text-xs font-medium text-blue-700">
+                                    ⚡ Instant book
+                                </span>
+                            </div>
+                            {data.hostPhone && (
+                                <div className="mt-3">
+                                    <a
+                                        href={`https://wa.me/${data.hostPhone.replace(/\D/g, '')}?text=Hi%2C%20I'm%20interested%20in%20booking%20${encodeURIComponent(data.property_name || 'this property')}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        data-testid="chat-with-host-btn"
+                                        className="flex items-center justify-center gap-2 w-full rounded-xl border border-border-strong bg-bg-surface px-4 py-3 text-sm font-medium text-text-primary hover:bg-bg-muted transition"
+                                        onClick={() => trackEvent('whatsapp_cta_click', { listingId: resolvedListingId })}
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="#25D366" aria-hidden="true">
+                                            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                                        </svg>
+                                        Chat with host
+                                    </a>
+                                </div>
+                            )}
                             {resolvedListingId && (
                                 <AvailabilityCalendar
                                     listingId={resolvedListingId}

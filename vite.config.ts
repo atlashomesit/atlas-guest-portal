@@ -58,10 +58,16 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ["react", "react-dom", "react-router-dom"],
-          razorpay: ["axios"],
-          ui: ["lucide-react", "react-toastify", "date-fns"],
+        manualChunks(id: string) {
+          if (id.includes("node_modules/react") || id.includes("node_modules/react-dom") || id.includes("node_modules/react-router-dom")) {
+            return "vendor";
+          }
+          if (id.includes("node_modules/axios")) {
+            return "razorpay";
+          }
+          if (id.includes("node_modules/lucide-react") || id.includes("node_modules/react-toastify") || id.includes("node_modules/date-fns")) {
+            return "ui";
+          }
         },
       },
     },

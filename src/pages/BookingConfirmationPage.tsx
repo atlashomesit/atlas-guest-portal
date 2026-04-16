@@ -47,7 +47,7 @@ function StatusBadge({ status }: { status: string }) {
 function InfoRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   if (!value) return null;
   return (
-    <div className="flex flex-col gap-0.5 py-2 border-b border-border-subtle last:border-0">
+    <div className="flex flex-col gap-0.5 py-3 border-b border-border-subtle last:border-0">
       <span className="text-xs text-text-muted uppercase tracking-wider font-medium">{label}</span>
       <span className={`text-sm text-text-primary ${mono ? "font-mono" : ""}`}>{value}</span>
     </div>
@@ -70,6 +70,12 @@ export default function BookingConfirmationPage() {
   const [modNote, setModNote] = useState("");
   const [modSubmitting, setModSubmitting] = useState(false);
   const [modMessage, setModMessage] = useState<string>("");
+  // TASK-350: guest self-service cancellation request
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelSubmitting, setCancelSubmitting] = useState(false);
+  const [cancelMessage, setCancelMessage] = useState<string>("");
+  const [cancelRequested, setCancelRequested] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   useEffect(() => {
     if (!bookingId || !token) {
@@ -129,6 +135,45 @@ export default function BookingConfirmationPage() {
   const whatsappUrl = `https://wa.me/${whatsappDigits}?text=${whatsappText}`;
   const supportsPush = typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window;
   const canRequestModification = !isCancelled && !!token;
+
+  // TASK-333: Generate and download ICS calendar event for check-in
+  function downloadCalendar() {
+    const formatIcsDate = (dateStr: string, timeStr: string) => {
+      // dateStr is YYYY-MM-DD, timeStr is HH:MM (24h IST)
+      const [y, m, d] = dateStr.split("-");
+      const [h, min] = timeStr.split(":");
+      // Store as floating time (no timezone conversion needed — IST local)
+      return `${y}${m}${d}T${h}${min}00`;
+    };
+    const checkin = formatIcsDate(booking.checkinDate, "14:00");
+    const checkout = formatIcsDate(booking.checkoutDate, "12:00");
+    const uid = `atlas-booking-${booking.bookingId}@atlashomestays.com`;
+    const ics = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//Atlas Homestays//BookingConfirmation//EN",
+      "CALSCALE:GREGORIAN",
+      "METHOD:PUBLISH",
+      "BEGIN:VEVENT",
+      `UID:${uid}`,
+      `DTSTART:${checkin}`,
+      `DTEND:${checkout}`,
+      `SUMMARY:Check-in at ${booking.propertyName}`,
+      `DESCRIPTION:Booking #${booking.bookingId}. Host: ${hostPhone}. Check-out on ${booking.checkoutDate}.`,
+      `LOCATION:${booking.propertyAddress || booking.propertyName}`,
+      "STATUS:CONFIRMED",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n");
+
+    const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `atlas-booking-${booking.bookingId}.ics`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   function toBase64UrlUint8Array(base64String: string) {
     const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -202,6 +247,38 @@ export default function BookingConfirmationPage() {
       setModMessage(e instanceof Error ? e.message : "Could not submit request.");
     } finally {
       setModSubmitting(false);
+    }
+  }
+
+  // TASK-350: submit guest cancellation request
+  async function submitCancellationRequest() {
+    if (!bookingId || !token) return;
+    setCancelSubmitting(true);
+    setCancelMessage("");
+    try {
+      const res = await fetch(
+        buildApiUrl(`/api/public/bookings/${bookingId}/cancellation-request?t=${encodeURIComponent(token)}`),
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...getApiHeaders() },
+          body: JSON.stringify({ reason: cancelReason }),
+        },
+      );
+      if (res.status === 409) {
+        setCancelMessage("This booking is already cancelled or checked out.");
+        return;
+      }
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || "Could not submit request.");
+      }
+      setCancelRequested(true);
+      setCancelMessage("Cancellation request submitted. Our team will review and contact you within 24 hours.");
+      setShowCancelConfirm(false);
+    } catch (e) {
+      setCancelMessage(e instanceof Error ? e.message : "Could not submit request. Please contact us.");
+    } finally {
+      setCancelSubmitting(false);
     }
   }
 
@@ -279,7 +356,7 @@ export default function BookingConfirmationPage() {
                 <InfoRow label="Invoice number" value={booking.gstInvoiceNumber} mono />
               )}
               {booking.gstInvoiceTotal != null && (
-                <div className="flex flex-col gap-0.5 py-2 border-b border-border-subtle last:border-0">
+                <div className="flex flex-col gap-0.5 py-3 border-b border-border-subtle last:border-0">
                   <span className="text-xs text-text-muted uppercase tracking-wider font-medium">Invoice total (incl. GST)</span>
                   <span className="text-sm font-semibold text-text-primary">
                     {booking.currency}&nbsp;{booking.gstInvoiceTotal.toLocaleString("en-IN")}
@@ -378,6 +455,21 @@ export default function BookingConfirmationPage() {
           </a>
         </div>
 
+        {/* Add to Calendar (TASK-333) */}
+        {!isCancelled && (
+          <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3">
+            <h2 className="text-sm font-semibold text-text-primary">Add to your calendar</h2>
+            <p className="text-sm text-text-secondary">Save your check-in date and property details to your phone calendar.</p>
+            <button
+              onClick={downloadCalendar}
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-2 hover:bg-brand-primary/5 transition-colors"
+              aria-label="Download calendar event for your stay"
+            >
+              📅 Add to Calendar
+            </button>
+          </div>
+        )}
+
         {!isCancelled && (
           <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3">
             <h2 className="text-sm font-semibold text-text-primary">Trip updates</h2>
@@ -423,6 +515,65 @@ export default function BookingConfirmationPage() {
               {modSubmitting ? "Submitting..." : "Submit request"}
             </button>
             {modMessage ? <p className="text-xs text-text-secondary">{modMessage}</p> : null}
+          </div>
+        )}
+
+        {/* TASK-350: guest self-service cancellation request */}
+        {canRequestModification && !cancelRequested && (
+          <div className="rounded-2xl border border-red-100 bg-red-50/40 p-5 space-y-3">
+            <h2 className="text-sm font-semibold text-red-800">Request cancellation</h2>
+            <p className="text-sm text-red-700">
+              Cancellations are subject to our cancellation policy. Submitting a request does not
+              automatically cancel your booking — our team will review it and contact you within 24 hours.
+            </p>
+            {!showCancelConfirm ? (
+              <button
+                onClick={() => setShowCancelConfirm(true)}
+                className="inline-flex items-center justify-center rounded-lg border border-red-400 text-red-700 text-sm font-medium px-4 py-2 hover:bg-red-100 transition-colors"
+                data-testid="request-cancellation-btn"
+              >
+                Request cancellation
+              </button>
+            ) : (
+              <div className="space-y-3">
+                <label className="text-sm text-red-700 block">
+                  Reason (optional)
+                  <textarea
+                    value={cancelReason}
+                    onChange={(e) => setCancelReason(e.target.value)}
+                    rows={2}
+                    placeholder="e.g., change of plans, emergency…"
+                    className="mt-1 w-full rounded-md border border-red-200 px-3 py-2 text-sm bg-white"
+                  />
+                </label>
+                <div className="flex gap-3">
+                  <button
+                    onClick={submitCancellationRequest}
+                    disabled={cancelSubmitting}
+                    className="inline-flex items-center justify-center rounded-lg bg-red-600 text-white text-sm font-medium px-4 py-2 disabled:opacity-50 hover:bg-red-700 transition-colors"
+                    data-testid="confirm-cancellation-btn"
+                  >
+                    {cancelSubmitting ? "Submitting…" : "Confirm request"}
+                  </button>
+                  <button
+                    onClick={() => setShowCancelConfirm(false)}
+                    className="inline-flex items-center justify-center rounded-lg border border-gray-300 text-gray-700 text-sm font-medium px-4 py-2 hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+            {cancelMessage && (
+              <p className={`text-xs font-medium ${cancelMessage.includes("submitted") ? "text-green-700" : "text-red-700"}`}>
+                {cancelMessage}
+              </p>
+            )}
+          </div>
+        )}
+        {cancelRequested && (
+          <div className="rounded-2xl border border-green-200 bg-green-50/60 p-4 text-sm text-green-800">
+            ✅ Cancellation request received. We'll contact you within 24 hours.
           </div>
         )}
 

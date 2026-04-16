@@ -23,6 +23,7 @@ type NormalizedListing = {
   amenities: { amenities_icon?: string }[];
   canonicalPath: string;
   property?: unknown;
+  rating?: number;
 };
 
 function buildStaticListings(): NormalizedListing[] {
@@ -46,6 +47,7 @@ function buildStaticListings(): NormalizedListing[] {
         amenities: property.property_amenities?.slice(0, 3) ?? [],
         canonicalPath,
         property,
+        rating: property.property_rating ?? undefined,
       };
     })
     .filter((l): l is NonNullable<typeof l> => l !== null);
@@ -293,6 +295,11 @@ const SearchPage = () => {
                     <div>
                       <h2 className="text-xl font-semibold text-text-primary">{unit.title}</h2>
                       <p className="text-sm text-text-muted">Sleeps up to {unit.maxGuests} guests</p>
+                      {unit.rating != null && unit.rating > 0 && (
+                        <p className="mt-0.5 text-sm text-accent-primary font-medium">
+                          {"★".repeat(Math.round(unit.rating))}<span className="text-text-muted ml-1">{unit.rating.toFixed(1)}</span>
+                        </p>
+                      )}
                     </div>
                     <span className="rounded-full bg-[color-mix(in_srgb,var(--cta-secondary)_14%,transparent)] px-3 py-1 text-xs font-semibold text-cta-secondary">
                       {unit.location}
