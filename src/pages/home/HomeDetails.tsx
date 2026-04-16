@@ -96,6 +96,19 @@ const HomeDetails = () => {
             className="w-full h-80 object-cover rounded-2xl shadow-level1"
             loading="lazy"
           />
+          {room.images && room.images.length > 1 && (
+            <div className="flex gap-2 mt-3">
+              {room.images.slice(0, 4).map((img, idx) => (
+                <img
+                  key={idx}
+                  src={img}
+                  alt={`${room.title} photo ${idx + 1}`}
+                  className="h-20 w-24 flex-shrink-0 rounded-lg object-cover"
+                  loading="lazy"
+                />
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="bg-white rounded-2xl shadow-level1 border border-border-subtle p-5 h-fit">

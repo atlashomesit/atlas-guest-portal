@@ -47,7 +47,7 @@ function StatusBadge({ status }: { status: string }) {
 function InfoRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   if (!value) return null;
   return (
-    <div className="flex flex-col gap-0.5 py-2 border-b border-border-subtle last:border-0">
+    <div className="flex flex-col gap-0.5 py-3 border-b border-border-subtle last:border-0">
       <span className="text-xs text-text-muted uppercase tracking-wider font-medium">{label}</span>
       <span className={`text-sm text-text-primary ${mono ? "font-mono" : ""}`}>{value}</span>
     </div>
@@ -356,7 +356,7 @@ export default function BookingConfirmationPage() {
                 <InfoRow label="Invoice number" value={booking.gstInvoiceNumber} mono />
               )}
               {booking.gstInvoiceTotal != null && (
-                <div className="flex flex-col gap-0.5 py-2 border-b border-border-subtle last:border-0">
+                <div className="flex flex-col gap-0.5 py-3 border-b border-border-subtle last:border-0">
                   <span className="text-xs text-text-muted uppercase tracking-wider font-medium">Invoice total (incl. GST)</span>
                   <span className="text-sm font-semibold text-text-primary">
                     {booking.currency}&nbsp;{booking.gstInvoiceTotal.toLocaleString("en-IN")}

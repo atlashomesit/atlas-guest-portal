@@ -44,12 +44,12 @@ const HOST_TESTIMONIALS = [
 
 const COMPARISON_FEATURES = [
   { feature: "Channel distribution", self: "1–2 platforms", atlas: "Airbnb, Booking.com, MMT & more" },
-  { feature: "Pricing optimization", self: "Manual guesswork", atlas: "Dynamic AI pricing" },
-  { feature: "Guest communication", self: "You handle 24/7", atlas: "Dedicated support team" },
-  { feature: "Payment collection", self: "Per-platform payouts", atlas: "Unified monthly payouts" },
-  { feature: "Reviews management", self: "Manual follow-ups", atlas: "Automated & optimized" },
-  { feature: "Professional photography", self: "DIY", atlas: "Included free" },
-  { feature: "Listing optimization", self: "Trial & error", atlas: "Data-driven SEO" },
+  { feature: "Pricing optimization", self: "Manual guesswork", atlas: "Dynamic AI pricing tools" },
+  { feature: "Guest communication", self: "You handle 24/7", atlas: "Automated messaging templates" },
+  { feature: "Payment collection", self: "Per-platform payouts", atlas: "Unified dashboard & payouts" },
+  { feature: "Reviews management", self: "Manual follow-ups", atlas: "Automated review requests" },
+  { feature: "Professional photography", self: "DIY", atlas: "Guided photo upload & tips" },
+  { feature: "Listing optimization", self: "Trial & error", atlas: "Data-driven SEO tools" },
 ];
 
 function formatINR(amount: number): string {
@@ -478,8 +478,8 @@ const BecomeHost = () => {
           className="mt-4 text-lg"
           style={{ color: "#64748b", maxWidth: 560, margin: "16px auto 0" }}
         >
-          Atlas Homestays handles everything — from guest bookings to checkout —
-          so you earn more while doing less.
+          Atlas PMS gives you the tools to manage guest bookings, pricing, and
+          channels — so you earn more while staying in control.
         </p>
         <a
           href="#host-signup-form"
@@ -570,7 +570,7 @@ const BecomeHost = () => {
               ₹{formatINR(estimatorRooms * 15000)} – ₹{formatINR(estimatorRooms * 40000)}
             </p>
             <p className="text-xs mt-2" style={{ color: "#94a3b8" }}>
-              Based on average occupancy for Atlas-managed properties
+              Based on average occupancy for properties using Atlas PMS
             </p>
           </div>
         </div>
@@ -590,10 +590,10 @@ const BecomeHost = () => {
               className="text-2xl font-bold"
               style={{ color: "var(--text-primary, #1e293b)" }}
             >
-              Self-Managed vs Atlas Managed
+              DIY vs Atlas PMS Software
             </h2>
             <p className="text-sm mt-1" style={{ color: "#64748b" }}>
-              See what you get when Atlas handles your property
+              See what you get with Atlas PMS software
             </p>
           </div>
           <div className="overflow-x-auto">
@@ -616,7 +616,7 @@ const BecomeHost = () => {
                     className="p-3 pr-6 text-center font-semibold"
                     style={{ color: "var(--cta-primary, #2563eb)" }}
                   >
-                    Atlas Managed
+                    Atlas PMS
                   </th>
                 </tr>
               </thead>

@@ -23,22 +23,31 @@ export default function RecentlyViewedPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {items.map((it) => (
-            <Link
+            <div
               key={`${it.listingId}-${it.viewedAtUtc}`}
-              to={it.path}
               className="rounded-xl border border-border-subtle bg-bg-surface overflow-hidden shadow-level1 hover:shadow-level2 transition-shadow"
             >
-              {it.coverPhotoUrl ? (
-                <img src={it.coverPhotoUrl} alt={it.name ?? "Home"} className="w-full h-40 object-cover" loading="lazy" />
-              ) : null}
-              <div className="p-4">
-                <p className="font-semibold text-text-primary">{it.name ?? `Listing ${it.listingId}`}</p>
-                <p className="text-sm text-text-secondary">{it.location ?? ""}</p>
-                <p className="text-xs text-text-muted mt-1">
-                  Viewed {new Date(it.viewedAtUtc).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
-                </p>
+              <Link to={it.path}>
+                {it.coverPhotoUrl ? (
+                  <img src={it.coverPhotoUrl} alt={it.name ?? "Home"} className="w-full h-40 object-cover" loading="lazy" />
+                ) : null}
+                <div className="p-4 pb-2">
+                  <p className="font-semibold text-text-primary">{it.name ?? `Listing ${it.listingId}`}</p>
+                  <p className="text-sm text-text-secondary">{it.location ?? ""}</p>
+                  <p className="text-xs text-text-muted mt-1">
+                    Viewed {new Date(it.viewedAtUtc).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                  </p>
+                </div>
+              </Link>
+              <div className="px-4 pb-4">
+                <Link
+                  to={it.path}
+                  className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-2 hover:opacity-95 transition-opacity"
+                >
+                  Book now
+                </Link>
               </div>
-            </Link>
+            </div>
           ))}
         </div>
       )}

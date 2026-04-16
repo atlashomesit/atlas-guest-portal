@@ -1233,6 +1233,14 @@ useEffect(() => {
                                 coverPhotoUrl={primaryImage}
                                 maxGuests={data.maxGuests}
                             />
+                            <div className="mt-3 flex flex-wrap gap-2">
+                                <span className="inline-flex items-center gap-1 rounded-full bg-green-50 border border-green-200 px-2.5 py-1 text-xs font-medium text-green-700">
+                                    ✓ Verified listing
+                                </span>
+                                <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2.5 py-1 text-xs font-medium text-blue-700">
+                                    ⚡ Instant book
+                                </span>
+                            </div>
                             {data.hostPhone && (
                                 <div className="mt-3">
                                     <a
