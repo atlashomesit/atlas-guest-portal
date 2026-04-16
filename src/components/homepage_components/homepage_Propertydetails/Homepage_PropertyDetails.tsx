@@ -158,6 +158,7 @@ const PropertyDetails = () => {
     const [showAmenitiesModal, setShowAmenitiesModal] = useState(false);
     const [showAboutMore, setShowAboutMore] = useState(false);
     const [showNeighborhoodMore, setShowNeighborhoodMore] = useState(false);
+    const [copyLinkLabel, setCopyLinkLabel] = useState<'Copy link' | 'Copied!'>('Copy link');
     const unitType = inferUnitType({ id: data?.id, property_name: data?.property_name });
     const { setProperty, updateBooking } = useBooking();
     const { getUrlsForListingId } = useListingPhotosFromApi();
@@ -811,6 +812,31 @@ useEffect(() => {
                             </p>
                         )}
                     </div>
+                </div>
+
+                {/* Social sharing — minimal, does not distract from booking CTA */}
+                <div className="flex items-center gap-3 mt-2 flex-wrap">
+                    <a
+                        href={`https://wa.me/?text=${encodeURIComponent(`Check out ${data?.property_name ?? 'this home'}: ${window.location.href}`)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.85rem', color: '#25d366' }}
+                    >
+                        💬 Share on WhatsApp
+                    </a>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            navigator.clipboard.writeText(window.location.href).then(() => {
+                                setCopyLinkLabel('Copied!');
+                                setTimeout(() => setCopyLinkLabel('Copy link'), 2000);
+                            }).catch(() => {});
+                        }}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.85rem', background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'inherit' }}
+                        className="text-text-muted hover:text-text-primary transition"
+                    >
+                        🔗 {copyLinkLabel}
+                    </button>
                 </div>
 
                 {/* Check-in / check-out times — shown prominently before gallery */}
