@@ -14,7 +14,8 @@ import { ThemeProvider } from './theme/ThemeProvider'
 import { loadRuntimeConfig, setRuntimeConfig, getApiBaseUrl } from './runtime-config'
 import { getApiHeaders } from './api/client'
 import { getTenantSlug } from './tenant/tenantResolver'
-import { validateTenant } from './tenant/tenantContext'
+import { validateTenant, resolveFromDomain, getTenantContext } from './tenant/tenantContext'
+import { applyTenantBranding } from './tenant/tenantBranding'
 import { ConfigLoadingScreen } from './runtime-config/ConfigLoadingScreen'
 import { ConfigErrorScreen } from './runtime-config/ConfigErrorScreen'
 
@@ -66,20 +67,33 @@ const bootstrapApp = async () => {
       }
     }
 
-    const tenantSlug = getTenantSlug({ fallbackSlug: config.tenantKey });
-    if (tenantSlug) {
-      try {
-        await validateTenant(tenantSlug);
-      } catch (e) {
-        if (import.meta.env.DEV) {
-          console.warn('[Atlas] Tenant validation failed (dev — continuing):', e);
-        } else {
-          throw e;
+    // 1. Try domain-based tenant resolution (white-label + default Atlas domains)
+    //    Calls /tenants/from-domain?domain=<hostname> — no auth needed.
+    //    Sets the resolved slug so all subsequent API calls use X-Tenant-Slug from context.
+    const domain = typeof window !== 'undefined' ? window.location.hostname : '';
+    const domainResolved = domain ? await resolveFromDomain(apiBaseUrl, domain) : null;
+
+    if (!domainResolved) {
+      // 2. Fall back to runtime config tenantKey (legacy / explicit override)
+      const tenantSlug = getTenantSlug({ fallbackSlug: config.tenantKey });
+      if (tenantSlug) {
+        try {
+          await validateTenant(tenantSlug);
+        } catch (e) {
+          if (import.meta.env.DEV) {
+            console.warn('[Atlas] Tenant validation failed (dev — continuing):', e);
+          } else {
+            throw e;
+          }
         }
+      } else if (!import.meta.env.DEV) {
+        throw new Error('Tenant could not be resolved. Check /.well-known/atlas-runtime-config.json (tenantKey) or ensure the domain is registered in the Atlas tenant table.');
       }
-    } else if (!import.meta.env.DEV) {
-      throw new Error('Tenant "tenantKey" not found. Check /.well-known/atlas-runtime-config.json and set tenantKey (or ATLAS_TENANT_KEY in Cloudflare Pages env).');
     }
+
+    // 3. Apply brand config to DOM (title, primaryColor CSS vars, favicon)
+    const resolved = getTenantContext();
+    if (resolved) applyTenantBranding(resolved);
 
     root.render(
       <StrictMode>
