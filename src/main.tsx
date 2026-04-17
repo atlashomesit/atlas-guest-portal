@@ -18,6 +18,14 @@ import { validateTenant } from './tenant/tenantContext'
 import { ConfigLoadingScreen } from './runtime-config/ConfigLoadingScreen'
 import { ConfigErrorScreen } from './runtime-config/ConfigErrorScreen'
 
+// Suppress chrome extension module loading errors in console (non-critical, expected in dev)
+window.addEventListener("error", (event) => {
+  if (event.message?.includes("Failed to fetch dynamically imported module") &&
+      event.filename?.includes("chrome-extension://")) {
+    event.preventDefault();
+  }
+}, true);
+
 const rootEl = document.getElementById('root')!
 const root = createRoot(rootEl)
 
