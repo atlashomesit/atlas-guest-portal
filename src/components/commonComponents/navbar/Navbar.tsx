@@ -5,12 +5,17 @@ import './navbar.css';
 import { IoIosCall } from 'react-icons/io';
 import { primaryNav, ctaNav } from '../../../config/navigation';
 import { LOGO_URL } from '../../../config/branding';
+import { getTenantContext } from '../../../tenant/tenantContext';
 import { formatDisplayNumber, getTelLink } from '../../../config/contact';
 import { trackEvent } from '../../../utils/analytics';
 import { homes } from '../../../content/homes';
 import { useBooking } from '../../../contexts/BookingContext';
 
 const Navbar = () => {
+  const tenant = getTenantContext();
+  const logoSrc = tenant?.logoUrl ?? LOGO_URL;
+  const brandName = tenant?.name ?? 'Atlas Homestays';
+
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isHomesOpen, setIsHomesOpen] = useState(false);
   const [isHomesMobileOpen, setIsHomesMobileOpen] = useState(false);
@@ -159,11 +164,11 @@ const Navbar = () => {
         <div className="flex items-center justify-between w-full lg:w-auto">
           <Link to="/" className="flex items-center gap-2">
             <img
-              src={LOGO_URL}
-              alt="Atlas Homestays"
+              src={logoSrc}
+              alt={brandName}
               className="navbar-logo"
             />
-            <span className="navbar-logo-text">Atlas Homestays</span>
+            <span className="navbar-logo-text">{brandName}</span>
           </Link>
 
           {/* Mobile Menu Button - Only visible on mobile */}
