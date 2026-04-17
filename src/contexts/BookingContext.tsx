@@ -85,17 +85,28 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }));
   }, []);
 
+  const setProperty = useCallback(
+    (propertyId: string | number | null, propertyName?: string | null) => updateBooking({ propertyId, propertyName: propertyName ?? null }),
+    [updateBooking],
+  );
+  const setDates = useCallback(
+    (checkIn: string | null, checkOut: string | null) => updateBooking({ checkIn, checkOut }),
+    [updateBooking],
+  );
+  const setGuests = useCallback(
+    (guests: number) => updateBooking({ guests }),
+    [updateBooking],
+  );
+
   const value = useMemo<BookingContextValue>(() => ({
     booking,
     pendingScrollTarget,
     setPendingScrollTarget,
     updateBooking,
-setProperty: (propertyId, propertyName) =>
-  updateBooking({ propertyId, propertyName }),
-
-    setDates: (checkIn, checkOut) => updateBooking({ checkIn, checkOut }),
-    setGuests: (guests) => updateBooking({ guests }),
-  }), [booking, pendingScrollTarget, updateBooking]);
+    setProperty,
+    setDates,
+    setGuests,
+  }), [booking, pendingScrollTarget, updateBooking, setProperty, setDates, setGuests]);
 
   return <BookingContext.Provider value={value}>{children}</BookingContext.Provider>;
 };

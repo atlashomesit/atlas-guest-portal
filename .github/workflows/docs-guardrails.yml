@@ -1,8 +1,6 @@
 name: Docs Guardrails
 
 on:
-  push:
-    branches: [main, dev]
   pull_request:
 
 concurrency:
