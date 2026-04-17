@@ -17,6 +17,8 @@ const PROPERTY_TYPES = [
   "Bungalow",
   "Guest House",
   "Studio",
+  "Hotel",
+  "Service Apartment",
 ] as const;
 
 const TOTAL_STEPS = 3;
@@ -441,7 +443,7 @@ const BecomeHost = () => {
               <a
                 href={
                   import.meta.env.VITE_ADMIN_PORTAL_URL ||
-                  "https://admin.atlashomestays.com"
+                  "https://app.atlaspms.in"
                 }
                 style={styles.adminLink}
               >
