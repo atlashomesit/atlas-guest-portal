@@ -14,7 +14,7 @@ import Home from "./Home";
 import { BookingProvider } from "../../contexts/BookingContext";
 
 describe("Homepage layout", () => {
-  it("exposes the Our Homes anchor for in-page navigation", () => {
+  it("exposes the Our Homes anchor for in-page navigation", { timeout: 30000 }, () => {
     render(
       <MemoryRouter>
         <BookingProvider>

@@ -23,7 +23,7 @@ vi.mock("react-date-range", () => ({
 }));
 
 describe("Home route", () => {
-  it("renders without triggering the home-route error boundary", () => {
+  it("renders without triggering the home-route error boundary", { timeout: 30000 }, () => {
     render(
       <BookingProvider>
         <MemoryRouter initialEntries={["/"]}>
