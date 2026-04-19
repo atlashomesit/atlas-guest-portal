@@ -8,6 +8,13 @@ setRuntimeConfig({
   globalDiscountPercent: 0,
 });
 
+// Prevent real network requests from hanging tests (e.g. SearchAvailabilityWidget's hero
+// availability fetch). Tests that need fetch should mock it per-test with vi.mocked(global.fetch).
+Object.defineProperty(global, "fetch", {
+  writable: true,
+  value: vi.fn().mockRejectedValue(new Error("Network requests are disabled in tests. Mock global.fetch in your test.")),
+});
+
 // Avoid "window.matchMedia is not a function" in components that use media queries
 Object.defineProperty(window, "matchMedia", {
   writable: true,
