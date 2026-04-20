@@ -73,7 +73,7 @@ const derivePropertyType = (name?: string): string => {
 
 const deriveGuests = (property: PropertyRecord): number => {
   const baseOccupancy = property.property_policy_details?.find((policy) =>
-    policy.type?.toLowerCase().includes("base occupancy")
+    (policy.type ?? "").toLowerCase().includes("base occupancy")
   );
 
   const match = baseOccupancy?.value?.match(/(\d+)/);
@@ -85,7 +85,7 @@ const deriveGuests = (property: PropertyRecord): number => {
 const derivePetFriendly = (property: PropertyRecord): boolean =>
   Boolean(
     property.property_amenities?.some((amenity) =>
-      amenity.amenities_icon?.toLowerCase().includes("pet")
+      (amenity.amenities_icon ?? "").toLowerCase().includes("pet")
     )
   );
 
@@ -103,7 +103,7 @@ const deriveBedrooms = (property: PropertyRecord): number | null => {
 const deriveAmenityFlag = (property: PropertyRecord, keyword: string): boolean =>
   Boolean(
     property.property_amenities?.some((amenity) =>
-      amenity.amenities_icon?.toLowerCase().includes(keyword)
+      (amenity.amenities_icon ?? "").toLowerCase().includes(keyword)
     )
   );
 
