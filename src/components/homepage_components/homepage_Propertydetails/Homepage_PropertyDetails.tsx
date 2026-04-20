@@ -1100,7 +1100,7 @@ useEffect(() => {
                             const rating = showApi ? api!.averageRating : data!.property_rating;
                             const count = showApi ? api!.totalCount : data!.property_reviews;
                             return (
-                            <div className="pb-8 border-b border-border-subtle">
+                            <div className="pb-8 border-b border-border-subtle" data-testid="reviews-section">
                                 <h2 className="text-xl sm:text-2xl font-semibold mb-4 text-text-primary">Guest Reviews</h2>
                                 <div className="flex items-center gap-3 mb-4">
                                     <div className="flex items-center gap-1 text-accent-primary">
