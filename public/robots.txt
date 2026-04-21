@@ -1,3 +1,22 @@
 User-agent: *
 Allow: /
 Sitemap: https://atlashomestays.com/sitemap.xml
+
+# AI search crawlers — explicitly allow for GEO visibility
+User-agent: GPTBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Anthropic-AI
+Allow: /
+
+User-agent: Bytespider
+Allow: /
