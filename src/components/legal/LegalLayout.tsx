@@ -5,10 +5,11 @@ const tabs = [
   { label: "Policies", to: "/policies" },
   { label: "FAQs", to: "/faq" },
   { label: "Terms", to: "/terms" },
+  { label: "Privacy", to: "/privacy" },
 ];
 
 interface LegalLayoutProps {
-  current: "policies" | "faq" | "terms";
+  current: "policies" | "faq" | "terms" | "privacy";
   title: string;
   description: string;
   lastUpdated?: string;

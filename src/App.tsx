@@ -16,6 +16,8 @@ const Homepage_PropertyDetails = React.lazy(() => import("./components/homepage_
 const Homepage_LocationDetails = React.lazy(() => import("./components/homepage_components/homepage_locationsdetails/Homepage_LocationDetails"))
 const Policies = React.lazy(() => import("./pages/Policies"))
 const Terms = React.lazy(() => import("./pages/Terms"))
+const PrivacyPage = React.lazy(() => import("./pages/PrivacyPage"))
+const CookieConsentBanner = React.lazy(() => import("./components/CookieConsentBanner"))
 const Amenities = React.lazy(() => import("./pages/Amenities"))
 const LocationPage = React.lazy(() => import("./pages/LocationPage"))
 const GalleryPage = React.lazy(() => import("./pages/GalleryPage"))
@@ -115,6 +117,8 @@ function AppWrapper() {
           <Route path="/policies" element={withBoundary(<Policies />, "policies-route")} />
           <Route path="/terms" element={withBoundary(<Terms />, "terms-route")} />
           <Route path="/terms-and-conditions" element={withBoundary(<Terms />, "terms-legacy-route")} />
+          <Route path="/privacy" element={withBoundary(<PrivacyPage />, "privacy-route")} />
+          <Route path="/privacy-policy" element={withBoundary(<PrivacyPage />, "privacy-policy-legacy-route")} />
           <Route path="/homes/:propertySlug/:unitSlug" element={withBoundary(<Homepage_PropertyDetails />, "property-details-home-route")} />
           <Route path="/homes/:roomNo" element={withBoundary(<HomeDetails />, "home-details-route")} />
           <Route path="/property_details/:id" element={withBoundary(<LegacyPropertyRedirect />, "property-details-legacy-route")} />
@@ -138,6 +142,7 @@ function AppWrapper() {
       </ErrorBoundary>
       <Suspense fallback={null}><SupportWidget /></Suspense>
       <Footer />
+      <Suspense fallback={null}><CookieConsentBanner /></Suspense>
       <ToastContainer position="top-right" newestOnTop pauseOnFocusLoss={false} />
     </>
   );
