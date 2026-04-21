@@ -492,15 +492,15 @@ const PropertyDetails = () => {
                         property_name: (apiListing.name as string) ?? `Listing ${apiListing.id}`,
                         property_img: photoUrlsList.length > 0 ? photoUrlsList : (coverUrl ? [coverUrl] : []),
                         property_location: (apiListing as Record<string, unknown>).property_location as string ?? 'Location not specified',
-                        property_neighborhoods: (apiListing as Record<string, unknown>).property_neighborhoods as string[] ?? [],
-                        property_amenities: (apiListing as Record<string, unknown>).property_amenities as PropertyAmenity[] ?? [],
+                        property_neighborhoods: Array.isArray((apiListing as Record<string, unknown>).property_neighborhoods) ? (apiListing as Record<string, unknown>).property_neighborhoods as string[] : [],
+                        property_amenities: Array.isArray((apiListing as Record<string, unknown>).property_amenities) ? (apiListing as Record<string, unknown>).property_amenities as PropertyAmenity[] : [],
                         property_description: (apiListing as Record<string, unknown>).property_description as string ?? '',
-                        property_nearplaces: (apiListing as Record<string, unknown>).property_nearplaces as string[] ?? [],
+                        property_nearplaces: Array.isArray((apiListing as Record<string, unknown>).property_nearplaces) ? (apiListing as Record<string, unknown>).property_nearplaces as string[] : [],
                         property_mapSrc: (apiListing as Record<string, unknown>).property_mapSrc as string ?? '',
-                        property_policy_details: (apiListing as Record<string, unknown>).property_policy_details as PropertyDetail[] ?? [],
+                        property_policy_details: Array.isArray((apiListing as Record<string, unknown>).property_policy_details) ? (apiListing as Record<string, unknown>).property_policy_details as PropertyDetail[] : [],
                         property_rating: Number((apiListing as Record<string, unknown>).property_rating) || 0,
                         property_reviews: Number((apiListing as Record<string, unknown>).property_reviews) || 0,
-                        property_review_snippets: (apiListing as Record<string, unknown>).property_review_snippets as string[] ?? [],
+                        property_review_snippets: Array.isArray((apiListing as Record<string, unknown>).property_review_snippets) ? (apiListing as Record<string, unknown>).property_review_snippets as string[] : [],
                         property_price: Number((apiListing as Record<string, unknown>).property_price) || 0,
                         timezoneId: (apiListing as Record<string, unknown>).timezoneId as string | undefined,
                         photoCount: photoCount || (coverUrl ? 1 : 0),
@@ -1100,7 +1100,7 @@ useEffect(() => {
                             const rating = showApi ? api!.averageRating : data!.property_rating;
                             const count = showApi ? api!.totalCount : data!.property_reviews;
                             return (
-                            <div className="pb-8 border-b border-border-subtle">
+                            <div className="pb-8 border-b border-border-subtle" data-testid="reviews-section">
                                 <h2 className="text-xl sm:text-2xl font-semibold mb-4 text-text-primary">Guest Reviews</h2>
                                 <div className="flex items-center gap-3 mb-4">
                                     <div className="flex items-center gap-1 text-accent-primary">

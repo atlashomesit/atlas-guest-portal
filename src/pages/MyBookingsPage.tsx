@@ -47,7 +47,7 @@ export default function MyBookingsPage() {
         if (!res.ok) throw new Error("Unable to load your bookings. Please try again.");
         return res.json() as Promise<BookingItem[]>;
       })
-      .then(setBookings)
+      .then((data) => setBookings(Array.isArray(data) ? data : []))
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
   }, [guestId, token]);
