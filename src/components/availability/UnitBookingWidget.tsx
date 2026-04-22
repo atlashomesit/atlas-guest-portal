@@ -1999,7 +1999,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         </div>
       )}
 
-      {dateError && <p className="text-sm text-support-error">{dateError}</p>}
+      {dateError && (
+        <p role="alert" data-testid="guest-booking-date-error" className="text-sm text-support-error">
+          {dateError}
+        </p>
+      )}
       {statusMessage && <p className="text-sm text-text-secondary">{statusMessage}</p>}
       <div className="space-y-4">
         <div className="space-y-2">

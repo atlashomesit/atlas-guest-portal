@@ -419,9 +419,28 @@ export default function BookingConfirmationPage() {
             <div className="space-y-2.5 text-sm text-text-secondary">
               <p>✅ Booking confirmed now.</p>
               <p>📱 SMS and WhatsApp confirmation should arrive shortly.</p>
-              <p>🏠 Check-in details and access instructions are shared before arrival.</p>
+              <p data-testid="confirmation-t-minus-1">
+                {/* TASK-546: Explicit T-1 WhatsApp reminder date */}
+                {(() => {
+                  try {
+                    const checkinDate = new Date(booking.checkinDate);
+                    if (!isNaN(checkinDate.getTime())) {
+                      const tMinus1 = new Date(checkinDate.getTime() - 24 * 60 * 60 * 1000);
+                      const formatted = tMinus1.toLocaleDateString("en-IN", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                      });
+                      return `🏠 WhatsApp reminder with check-in instructions will be sent on ${formatted}.`;
+                    }
+                  } catch {
+                    /* fall through */
+                  }
+                  return "🏠 WhatsApp reminder with check-in instructions will be sent the day before your stay.";
+                })()}
+              </p>
               <p>
-                💬 Need anything?{" "}
+                💬 Need details sooner?{" "}
                 <a
                   href={whatsappUrl}
                   target="_blank"
