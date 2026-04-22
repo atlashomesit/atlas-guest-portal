@@ -1,0 +1,7 @@
+<svg viewBox="0 0 120 40" xmlns="http://www.w3.org/2000/svg" fill="none">
+  <!-- RuPay Logo: Red circle and blue rectangle design -->
+  <rect width="120" height="40" rx="2" fill="#FFFFFF" stroke="#E31B23" stroke-width="1"/>
+  <circle cx="30" cy="20" r="12" fill="#E31B23"/>
+  <circle cx="50" cy="20" r="12" fill="#1F3A93"/>
+  <text x="75" y="26" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#1F3A93" text-anchor="start">RuPay</text>
+</svg>

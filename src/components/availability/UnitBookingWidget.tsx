@@ -2197,9 +2197,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         {isBookingDisabled ? 'Unavailable' : isSubmitting || isLoading ? 'Processing...' : 'Book this home'}
       </Button>
       {!isBookingDisabled && (
-        <p className="text-xs text-text-muted mt-1 text-center">
-          Pay via UPI, card, or netbanking
-        </p>
+        <div className="flex items-center gap-2 mt-2 flex-wrap justify-center">
+          <img src="/icons/upi.svg" alt="UPI" className="h-5" />
+          <img src="/icons/visa.svg" alt="Visa" className="h-4" />
+          <img src="/icons/rupay.svg" alt="RuPay" className="h-4" />
+          <span className="text-xs text-text-muted">Secured by Razorpay</span>
+        </div>
       )}
     </form>
     </>
