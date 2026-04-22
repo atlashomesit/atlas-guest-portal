@@ -19,7 +19,7 @@ import { formatCurrency, formatHumanDate } from '@/utils/formatting';
 import { calculateNightlyPrice, inferUnitType } from '@/utils/pricing';
 import priceDisplayConfig from '@/config/priceDisplay.config';
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
-import { fetchCalendarPricing } from '@/api/pricingClient';
+import { fetchCalendarPricing, fetchPricingBreakdown } from '@/api/pricingClient';
 import { useListingPhotosFromApi } from '@/contexts/ListingPhotosContext';
 import OptimizedImage from '@/components/ui/OptimizedImage';
 
@@ -156,6 +156,9 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [calendarDailyPrices, setCalendarDailyPrices] = useState<Map<string, number>>(new Map());
   const [calendarConvenienceFeePercent, setCalendarConvenienceFeePercent] = useState<number | undefined>(undefined);
   const [calendarPricingLoading, setCalendarPricingLoading] = useState(false);
+  // TASK-571: long-stay (LOS) auto-discount shown in the price breakdown.
+  const [losDiscountAmount, setLosDiscountAmount] = useState<number>(0);
+  const [losDiscountPercent, setLosDiscountPercent] = useState<number>(0);
   const [guests, setGuests] = useState(2);
   const [_bookedDates, setBookedDates] = useState<Date[]>([]);
   const [blockedSet, setBlockedSet] = useState<Set<string>>(new Set());
@@ -535,6 +538,40 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
       });
     return () => controller.abort();
   }, [listingId, shownDate]);
+
+  // TASK-571: Fetch long-stay (LOS) discount breakdown when guest selects a valid range.
+  useEffect(() => {
+    if (!listingId || String(listingId).trim() === '') {
+      setLosDiscountAmount(0);
+      setLosDiscountPercent(0);
+      return;
+    }
+    if (!dateRange?.startDate || !dateRange?.endDate) {
+      setLosDiscountAmount(0);
+      setLosDiscountPercent(0);
+      return;
+    }
+    const controller = new AbortController();
+    fetchPricingBreakdown(
+      {
+        listingId,
+        checkIn: toISODate(dateRange.startDate),
+        checkOut: toISODate(dateRange.endDate),
+      },
+      controller.signal,
+    )
+      .then((b) => {
+        const amt = Number(b.losDiscountAmount ?? b.LosDiscountAmount ?? 0);
+        const pct = Number(b.losDiscountPercent ?? b.LosDiscountPercent ?? 0);
+        setLosDiscountAmount(Number.isFinite(amt) && amt > 0 ? amt : 0);
+        setLosDiscountPercent(Number.isFinite(pct) && pct > 0 ? pct : 0);
+      })
+      .catch(() => {
+        setLosDiscountAmount(0);
+        setLosDiscountPercent(0);
+      });
+    return () => controller.abort();
+  }, [listingId, dateRange?.startDate, dateRange?.endDate]);
 
   const isCheckInAllowed = (date: Date) => {
   const iso = toISODate(getIstStartOfDay(date));
@@ -1894,6 +1931,17 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                 <span>Discount</span>
                 <span>:</span>
                 <span className="text-right">-{displayPrice(priceDetails.discount)}</span>
+              </div>
+            )}
+            {/* TASK-571: long-stay discount row */}
+            {losDiscountAmount > 0 && (
+              <div className="grid grid-cols-[140px_12px_1fr] text-green-700">
+                <span>
+                  Long-stay discount
+                  {losDiscountPercent > 0 ? ` (−${Math.round(losDiscountPercent)}%)` : ''}
+                </span>
+                <span>:</span>
+                <span className="text-right">-{displayPrice(losDiscountAmount)}</span>
               </div>
             )}
             {gstAmount > 0 && (
