@@ -449,7 +449,7 @@ export default function BookingConfirmationPage() {
             href={whatsappUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center justify-center rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-2 hover:bg-brand-primary/5 transition-colors"
+            className="inline-flex items-center justify-center rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-3 hover:bg-brand-primary/5 transition-colors"
           >
             Chat with host on WhatsApp
           </a>
@@ -462,7 +462,7 @@ export default function BookingConfirmationPage() {
             <p className="text-sm text-text-secondary">Save your check-in date and property details to your phone calendar.</p>
             <button
               onClick={downloadCalendar}
-              className="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-2 hover:bg-brand-primary/5 transition-colors"
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-3 hover:bg-brand-primary/5 transition-colors"
               aria-label="Download calendar event for your stay"
             >
               📅 Add to Calendar
@@ -477,7 +477,7 @@ export default function BookingConfirmationPage() {
             <button
               onClick={subscribePush}
               disabled={pushState === "loading" || !supportsPush}
-              className="inline-flex items-center justify-center rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-2 disabled:opacity-50"
+              className="inline-flex items-center justify-center rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-3 disabled:opacity-50"
             >
               {pushState === "loading" ? "Enabling..." : "Enable notifications"}
             </button>
@@ -529,7 +529,7 @@ export default function BookingConfirmationPage() {
             {!showCancelConfirm ? (
               <button
                 onClick={() => setShowCancelConfirm(true)}
-                className="inline-flex items-center justify-center rounded-lg border border-red-400 text-red-700 text-sm font-medium px-4 py-2 hover:bg-red-100 transition-colors"
+                className="inline-flex items-center justify-center rounded-lg border border-red-400 text-red-700 text-sm font-medium px-4 py-3 hover:bg-red-100 transition-colors"
                 data-testid="request-cancellation-btn"
               >
                 Request cancellation
