@@ -1241,6 +1241,26 @@ useEffect(() => {
                                     ⚡ Instant book
                                 </span>
                             </div>
+                            {/* TASK-545: Host profile card — builds trust (#2 signal per 2025 Indian hospitality research). */}
+                            <div
+                                className="mt-3 flex items-center gap-3 rounded-2xl border border-border-subtle bg-bg-surface p-3"
+                                data-testid="host-profile-card"
+                            >
+                                <div
+                                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-primary text-white text-sm font-semibold"
+                                    aria-hidden="true"
+                                >
+                                    {"AH"}
+                                </div>
+                                <div className="min-w-0">
+                                    <p className="text-sm font-semibold text-text-primary truncate">
+                                        Managed by Atlas Homestays
+                                    </p>
+                                    <p className="text-xs text-text-muted">
+                                        24/7 WhatsApp support · Typically replies within 1 hour
+                                    </p>
+                                </div>
+                            </div>
                             {data.hostPhone && (
                                 <div className="mt-3">
                                     <a
