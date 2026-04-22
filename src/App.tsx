@@ -17,7 +17,6 @@ const Homepage_LocationDetails = React.lazy(() => import("./components/homepage_
 const Policies = React.lazy(() => import("./pages/Policies"))
 const Terms = React.lazy(() => import("./pages/Terms"))
 const PrivacyPage = React.lazy(() => import("./pages/PrivacyPage"))
-const CookieConsentBanner = React.lazy(() => import("./components/CookieConsentBanner"))
 const Amenities = React.lazy(() => import("./pages/Amenities"))
 const LocationPage = React.lazy(() => import("./pages/LocationPage"))
 const GalleryPage = React.lazy(() => import("./pages/GalleryPage"))
