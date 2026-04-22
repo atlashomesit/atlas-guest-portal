@@ -76,6 +76,7 @@ function apiToNormalized(listings: PublicListing[]): NormalizedListing[] {
           filterGuestImageUrls(l.photoUrls ?? [])[0] ?? sanitizeGuestImageUrl(l.coverPhotoUrl) ?? "",
         amenities: [],
         canonicalPath,
+        rating: l.propertyRating ?? undefined,
       };
     })
     .filter((l) => l.numericId > 0);
@@ -309,7 +310,9 @@ const SearchPage = () => {
                     <div className="space-y-1">
                       <p className="text-2xl font-bold text-text-primary" data-testid="guest-listing-nightly-price">{formatCurrency(unit.pricePerNight)}</p>
                       <p className="text-sm text-text-muted">per night</p>
-                      <p className="text-xs text-text-muted">+ 12% GST</p>
+                      <p className="text-xs text-text-muted">
+                        Est. total: {formatCurrency(Math.round(unit.pricePerNight * 1.12))} (incl. 12% GST)
+                      </p>
                     </div>
                     <div className="flex flex-col gap-1 text-right text-xs text-text-muted">
                       {unit.amenities.map((amenity, index) => (

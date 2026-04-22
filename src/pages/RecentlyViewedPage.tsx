@@ -34,6 +34,12 @@ export default function RecentlyViewedPage() {
                 <div className="p-4 pb-2">
                   <p className="font-semibold text-text-primary">{it.name ?? `Listing ${it.listingId}`}</p>
                   <p className="text-sm text-text-secondary">{it.location ?? ""}</p>
+                  {it.pricePerNight != null && it.pricePerNight > 0 ? (
+                    <p className="text-sm text-text-primary mt-1">
+                      <span className="font-semibold">₹{it.pricePerNight.toLocaleString("en-IN")}</span>
+                      <span className="text-text-secondary"> / night</span>
+                    </p>
+                  ) : null}
                   <p className="text-xs text-text-muted mt-1">
                     Viewed {new Date(it.viewedAtUtc).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
                   </p>

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <!-- TASK-559: OG image for social sharing (atlashomestays.com guest portal) -->
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1a2332"/>
+      <stop offset="100%" stop-color="#2a3f5f"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <!-- Atlas logo circle -->
+  <circle cx="180" cy="200" r="56" fill="#FFFFFF" opacity="0.1"/>
+  <text x="180" y="222" font-family="system-ui, -apple-system, sans-serif" font-size="56" font-weight="700"
+        fill="#FFFFFF" text-anchor="middle">A</text>
+  <!-- Brand text -->
+  <text x="270" y="185" font-family="system-ui, -apple-system, sans-serif" font-size="36" font-weight="600" fill="#FFFFFF">Atlas Homestays</text>
+  <text x="270" y="220" font-family="system-ui, -apple-system, sans-serif" font-size="20" fill="#a3b5d1">Hyderabad Serviced Apartments &amp; Vacation Rentals</text>
+  <!-- Headline -->
+  <text x="100" y="360" font-family="system-ui, -apple-system, sans-serif" font-size="72" font-weight="700" fill="#FFFFFF">
+    <tspan x="100" dy="0">Book Direct.</tspan>
+    <tspan x="100" dy="80">Keep 100%.</tspan>
+  </text>
+  <!-- Sub-headline -->
+  <text x="100" y="540" font-family="system-ui, -apple-system, sans-serif" font-size="26" fill="#a3b5d1">
+    Zero booking fees · Instant WhatsApp confirmation · Verified properties
+  </text>
+  <!-- URL -->
+  <text x="100" y="585" font-family="system-ui, -apple-system, sans-serif" font-size="22" fill="#60a5fa">atlashomestays.com</text>
+</svg>
