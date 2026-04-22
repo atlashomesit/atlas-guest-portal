@@ -19,7 +19,7 @@ import { formatCurrency, formatHumanDate } from '@/utils/formatting';
 import { calculateNightlyPrice, inferUnitType } from '@/utils/pricing';
 import priceDisplayConfig from '@/config/priceDisplay.config';
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
-import { fetchCalendarPricing } from '@/api/pricingClient';
+import { fetchCalendarPricing, fetchPricingBreakdown } from '@/api/pricingClient';
 import { useListingPhotosFromApi } from '@/contexts/ListingPhotosContext';
 import OptimizedImage from '@/components/ui/OptimizedImage';
 
@@ -156,6 +156,9 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [calendarDailyPrices, setCalendarDailyPrices] = useState<Map<string, number>>(new Map());
   const [calendarConvenienceFeePercent, setCalendarConvenienceFeePercent] = useState<number | undefined>(undefined);
   const [calendarPricingLoading, setCalendarPricingLoading] = useState(false);
+  // TASK-571: long-stay (LOS) auto-discount shown in the price breakdown.
+  const [losDiscountAmount, setLosDiscountAmount] = useState<number>(0);
+  const [losDiscountPercent, setLosDiscountPercent] = useState<number>(0);
   const [guests, setGuests] = useState(2);
   const [_bookedDates, setBookedDates] = useState<Date[]>([]);
   const [blockedSet, setBlockedSet] = useState<Set<string>>(new Set());
@@ -535,6 +538,40 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
       });
     return () => controller.abort();
   }, [listingId, shownDate]);
+
+  // TASK-571: Fetch long-stay (LOS) discount breakdown when guest selects a valid range.
+  useEffect(() => {
+    if (!listingId || String(listingId).trim() === '') {
+      setLosDiscountAmount(0);
+      setLosDiscountPercent(0);
+      return;
+    }
+    if (!dateRange?.startDate || !dateRange?.endDate) {
+      setLosDiscountAmount(0);
+      setLosDiscountPercent(0);
+      return;
+    }
+    const controller = new AbortController();
+    fetchPricingBreakdown(
+      {
+        listingId,
+        checkIn: toISODate(dateRange.startDate),
+        checkOut: toISODate(dateRange.endDate),
+      },
+      controller.signal,
+    )
+      .then((b) => {
+        const amt = Number(b.losDiscountAmount ?? b.LosDiscountAmount ?? 0);
+        const pct = Number(b.losDiscountPercent ?? b.LosDiscountPercent ?? 0);
+        setLosDiscountAmount(Number.isFinite(amt) && amt > 0 ? amt : 0);
+        setLosDiscountPercent(Number.isFinite(pct) && pct > 0 ? pct : 0);
+      })
+      .catch(() => {
+        setLosDiscountAmount(0);
+        setLosDiscountPercent(0);
+      });
+    return () => controller.abort();
+  }, [listingId, dateRange?.startDate, dateRange?.endDate]);
 
   const isCheckInAllowed = (date: Date) => {
   const iso = toISODate(getIstStartOfDay(date));
@@ -1896,6 +1933,17 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                 <span className="text-right">-{displayPrice(priceDetails.discount)}</span>
               </div>
             )}
+            {/* TASK-571: long-stay discount row */}
+            {losDiscountAmount > 0 && (
+              <div className="grid grid-cols-[140px_12px_1fr] text-green-700">
+                <span>
+                  Long-stay discount
+                  {losDiscountPercent > 0 ? ` (−${Math.round(losDiscountPercent)}%)` : ''}
+                </span>
+                <span>:</span>
+                <span className="text-right">-{displayPrice(losDiscountAmount)}</span>
+              </div>
+            )}
             {gstAmount > 0 && (
               <div className="grid grid-cols-[140px_12px_1fr]">
                 <span>GST (5%)</span>
@@ -1948,6 +1996,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               {referralMessage}{appliedReferralCode ? ` (${appliedReferralCode})` : ''}
             </p>
           )}
+          <p className="mt-3 text-xs text-text-muted">
+            Direct booking — no platform fee. Pay securely via Razorpay.
+          </p>
         </div>
 
       </div>
@@ -1996,7 +2047,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         </div>
       )}
 
-      {dateError && <p className="text-sm text-support-error">{dateError}</p>}
+      {dateError && (
+        <p role="alert" data-testid="guest-booking-date-error" className="text-sm text-support-error">
+          {dateError}
+        </p>
+      )}
       {statusMessage && <p className="text-sm text-text-secondary">{statusMessage}</p>}
       <div className="space-y-4">
         <div className="space-y-2">
@@ -2197,9 +2252,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         {isBookingDisabled ? 'Unavailable' : isSubmitting || isLoading ? 'Processing...' : 'Book this home'}
       </Button>
       {!isBookingDisabled && (
-        <p className="text-xs text-text-muted mt-1 text-center">
-          Pay via UPI, card, or netbanking
-        </p>
+        <div className="flex items-center gap-2 mt-2 flex-wrap justify-center">
+          <img src="/icons/upi.svg" alt="UPI" className="h-5" />
+          <img src="/icons/visa.svg" alt="Visa" className="h-4" />
+          <img src="/icons/rupay.svg" alt="RuPay" className="h-4" />
+          <span className="text-xs text-text-muted">Secured by Razorpay</span>
+        </div>
       )}
     </form>
     </>

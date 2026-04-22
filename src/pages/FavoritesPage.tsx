@@ -84,6 +84,12 @@ export default function FavoritesPage() {
                 <div className="p-4 pb-2">
                   <p className="font-semibold text-text-primary">{l.name ?? l.propertyName ?? `Listing ${l.id}`}</p>
                   <p className="text-sm text-text-secondary">{l.propertyAddress ?? ""}</p>
+                  {l.baseNightlyRate != null && l.baseNightlyRate > 0 ? (
+                    <p className="text-sm text-text-primary mt-1">
+                      <span className="font-semibold">₹{l.baseNightlyRate.toLocaleString("en-IN")}</span>
+                      <span className="text-text-secondary"> / night</span>
+                    </p>
+                  ) : null}
                 </div>
               </Link>
               <div className="px-4 pb-4">

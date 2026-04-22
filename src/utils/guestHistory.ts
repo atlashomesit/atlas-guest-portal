@@ -7,6 +7,8 @@ export type GuestListingHistoryItem = {
   name?: string;
   coverPhotoUrl?: string;
   location?: string;
+  /** TASK-547: nightly price captured at time of view (optional, for display). */
+  pricePerNight?: number;
   viewedAtUtc: string;
 };
 

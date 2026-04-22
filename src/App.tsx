@@ -40,6 +40,8 @@ const ProfilePage = React.lazy(() => import("./pages/ProfilePage"))
 const MyBookingsPage = React.lazy(() => import("./pages/MyBookingsPage"))
 const FavoritesPage = React.lazy(() => import("./pages/FavoritesPage"))
 const RecentlyViewedPage = React.lazy(() => import("./pages/RecentlyViewedPage"))
+const PrivacyPolicyPage = React.lazy(() => import("./pages/PrivacyPolicyPage"))
+const CookieConsent = React.lazy(() => import("./components/CookieConsent"))
 const PageNotFound = React.lazy(() => import("./pages/pagenotfound/PageNotFound"))
 
 function LazyFallback() {
@@ -115,6 +117,7 @@ function AppWrapper() {
           <Route path="/blog/:category/:slug" element={withBoundary(<BlogPostPage />, "blog-post-route")} />
           <Route path="/blog/:slug" element={withBoundary(<BlogPostPage />, "blog-legacy-route")} />
           <Route path="/policies" element={withBoundary(<Policies />, "policies-route")} />
+          <Route path="/privacy" element={withBoundary(<PrivacyPolicyPage />, "privacy-route")} />
           <Route path="/terms" element={withBoundary(<Terms />, "terms-route")} />
           <Route path="/terms-and-conditions" element={withBoundary(<Terms />, "terms-legacy-route")} />
           <Route path="/privacy" element={withBoundary(<PrivacyPage />, "privacy-route")} />
@@ -142,7 +145,7 @@ function AppWrapper() {
       </ErrorBoundary>
       <Suspense fallback={null}><SupportWidget /></Suspense>
       <Footer />
-      <Suspense fallback={null}><CookieConsentBanner /></Suspense>
+      <Suspense fallback={null}><CookieConsent /></Suspense>
       <ToastContainer position="top-right" newestOnTop pauseOnFocusLoss={false} />
     </>
   );
