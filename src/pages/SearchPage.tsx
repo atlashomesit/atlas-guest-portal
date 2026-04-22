@@ -113,9 +113,10 @@ const SearchPage = () => {
   const guests = Number(searchParams.get("guests")) || null;
   const minPrice = Number(searchParams.get("minPrice")) || null;
   const maxPrice = Number(searchParams.get("maxPrice")) || null;
+  const remoteWork = searchParams.get("remoteWork") === "true";
 
   const hasInvalidDates = Boolean(checkIn && checkOut && checkOut <= checkIn);
-  const hasActiveFilters = Boolean(minPrice || maxPrice);
+  const hasActiveFilters = Boolean(minPrice || maxPrice || remoteWork);
 
   const listings = useMemo(
     () => apiListings ?? buildStaticListings(),
