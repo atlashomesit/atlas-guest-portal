@@ -130,13 +130,18 @@ const SearchPage = () => {
       if (guests && guests > unit.maxGuests) return false;
       if (minPrice && unit.pricePerNight > 0 && unit.pricePerNight < minPrice) return false;
       if (maxPrice && unit.pricePerNight > maxPrice) return false;
+      // TASK-577: Filter by remote work friendliness (co-working desk or WiFi >= 25 Mbps)
+      if (remoteWork) {
+        const isRemoteWorkFriendly = (unit as any).hasCoworkingDesk || ((unit as any).wifiSpeedMbps ?? 0) >= 25;
+        if (!isRemoteWorkFriendly) return false;
+      }
       return true;
     });
-  }, [guests, hasInvalidDates, listings, minPrice, maxPrice]);
+  }, [guests, hasInvalidDates, listings, minPrice, maxPrice, remoteWork]);
 
   useEffect(() => {
     setVisibleCount(ITEMS_PER_PAGE);
-  }, [guests, hasInvalidDates, minPrice, maxPrice]);
+  }, [guests, hasInvalidDates, minPrice, maxPrice, remoteWork]);
 
   const updateParam = (key: string, value: string) => {
     setSearchParams((prev) => {
@@ -212,6 +217,16 @@ const SearchPage = () => {
               className="w-24 rounded-lg border border-border-subtle bg-bg-muted px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-cta-primary"
             />
           </div>
+          <label className="flex items-center gap-2 rounded-lg border border-border-subtle bg-bg-muted px-3 py-2 text-sm">
+            <input
+              type="checkbox"
+              id="filter-remote-work"
+              checked={remoteWork}
+              onChange={(e) => updateParam("remoteWork", e.target.checked ? "true" : "")}
+              className="cursor-pointer"
+            />
+            <span className="text-text-primary">Remote work friendly</span>
+          </label>
           <div className="ml-auto flex items-end gap-3">
             {!isLoading && (
               <span className="text-sm text-text-muted">{filteredUnits.length} {filteredUnits.length === 1 ? "property" : "properties"} found</span>
@@ -297,6 +312,19 @@ const SearchPage = () => {
                     <div>
                       <h2 className="text-xl font-semibold text-text-primary">{unit.title}</h2>
                       <p className="text-sm text-text-muted">Sleeps up to {unit.maxGuests} guests</p>
+                      {/* TASK-577: Show WiFi speed and co-working desk badges */}
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {(unit as any).wifiSpeedMbps && (unit as any).wifiSpeedMbps >= 25 && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700">
+                            📶 WiFi {(unit as any).wifiSpeedMbps}Mbps
+                          </span>
+                        )}
+                        {(unit as any).hasCoworkingDesk && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700">
+                            💼 Co-working desk
+                          </span>
+                        )}
+                      </div>
                       {unit.rating != null && unit.rating > 0 && (
                         <p className="mt-0.5 text-sm text-accent-primary font-medium">
                           {"★".repeat(Math.round(unit.rating))}<span className="text-text-muted ml-1">{unit.rating.toFixed(1)}</span>
