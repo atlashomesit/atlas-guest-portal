@@ -1948,6 +1948,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               {referralMessage}{appliedReferralCode ? ` (${appliedReferralCode})` : ''}
             </p>
           )}
+          <p className="mt-3 text-xs text-text-muted">
+            Direct booking — no platform fee. Pay securely via Razorpay.
+          </p>
         </div>
 
       </div>
