@@ -17,7 +17,12 @@ const Homepage_LocationDetails = React.lazy(() => import("./components/homepage_
 const Policies = React.lazy(() => import("./pages/Policies"))
 const Terms = React.lazy(() => import("./pages/Terms"))
 const PrivacyPage = React.lazy(() => import("./pages/PrivacyPage"))
-const CookieConsentBanner = React.lazy(() => import("./components/CookieConsentBanner"))
+// CookieConsentBanner (concurrent agent addition) is architecturally preferable to
+// CookieConsent (TASK-016 inline version) — it uses src/utils/cookieConsent helpers
+// and stays DPDP-aligned. Switching the mount is a refactor, not a mechanical fix.
+// For now the lint-unused import is dropped; mounted <CookieConsent /> below is the
+// TASK-016 version. Follow-up: replace <CookieConsent /> with <CookieConsentBanner />
+// and delete src/components/CookieConsent.tsx + src/pages/PrivacyPolicyPage.tsx.
 const Amenities = React.lazy(() => import("./pages/Amenities"))
 const LocationPage = React.lazy(() => import("./pages/LocationPage"))
 const GalleryPage = React.lazy(() => import("./pages/GalleryPage"))
@@ -118,10 +123,9 @@ function AppWrapper() {
           <Route path="/blog/:slug" element={withBoundary(<BlogPostPage />, "blog-legacy-route")} />
           <Route path="/policies" element={withBoundary(<Policies />, "policies-route")} />
           <Route path="/privacy" element={withBoundary(<PrivacyPolicyPage />, "privacy-route")} />
+          <Route path="/privacy-policy" element={withBoundary(<PrivacyPage />, "privacy-policy-legacy-route")} />
           <Route path="/terms" element={withBoundary(<Terms />, "terms-route")} />
           <Route path="/terms-and-conditions" element={withBoundary(<Terms />, "terms-legacy-route")} />
-          <Route path="/privacy" element={withBoundary(<PrivacyPage />, "privacy-route")} />
-          <Route path="/privacy-policy" element={withBoundary(<PrivacyPage />, "privacy-policy-legacy-route")} />
           <Route path="/homes/:propertySlug/:unitSlug" element={withBoundary(<Homepage_PropertyDetails />, "property-details-home-route")} />
           <Route path="/homes/:roomNo" element={withBoundary(<HomeDetails />, "home-details-route")} />
           <Route path="/property_details/:id" element={withBoundary(<LegacyPropertyRedirect />, "property-details-legacy-route")} />
