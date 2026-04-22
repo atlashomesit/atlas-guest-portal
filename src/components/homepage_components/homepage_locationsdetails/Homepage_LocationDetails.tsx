@@ -52,12 +52,6 @@ const Homepage_LocationDetails = () => {
 };
 
 
-
-    // on the basis upon id 
-    // const handleNavigate = (id: any) => {
-    //     navigate(`/property_details/${id}`);
-    // };
-
     const handleModal = (property: { id?: number; property_name?: string }) => () => {
         setSelectedProperty(property);
         setIsModalOpen(true);
