@@ -16,6 +16,13 @@ const Homepage_PropertyDetails = React.lazy(() => import("./components/homepage_
 const Homepage_LocationDetails = React.lazy(() => import("./components/homepage_components/homepage_locationsdetails/Homepage_LocationDetails"))
 const Policies = React.lazy(() => import("./pages/Policies"))
 const Terms = React.lazy(() => import("./pages/Terms"))
+const PrivacyPage = React.lazy(() => import("./pages/PrivacyPage"))
+// CookieConsentBanner (concurrent agent addition) is architecturally preferable to
+// CookieConsent (TASK-016 inline version) — it uses src/utils/cookieConsent helpers
+// and stays DPDP-aligned. Switching the mount is a refactor, not a mechanical fix.
+// For now the lint-unused import is dropped; mounted <CookieConsent /> below is the
+// TASK-016 version. Follow-up: replace <CookieConsent /> with <CookieConsentBanner />
+// and delete src/components/CookieConsent.tsx + src/pages/PrivacyPolicyPage.tsx.
 const Amenities = React.lazy(() => import("./pages/Amenities"))
 const LocationPage = React.lazy(() => import("./pages/LocationPage"))
 const GalleryPage = React.lazy(() => import("./pages/GalleryPage"))
@@ -38,6 +45,8 @@ const ProfilePage = React.lazy(() => import("./pages/ProfilePage"))
 const MyBookingsPage = React.lazy(() => import("./pages/MyBookingsPage"))
 const FavoritesPage = React.lazy(() => import("./pages/FavoritesPage"))
 const RecentlyViewedPage = React.lazy(() => import("./pages/RecentlyViewedPage"))
+const PrivacyPolicyPage = React.lazy(() => import("./pages/PrivacyPolicyPage"))
+const CookieConsent = React.lazy(() => import("./components/CookieConsent"))
 const PageNotFound = React.lazy(() => import("./pages/pagenotfound/PageNotFound"))
 
 function LazyFallback() {
@@ -113,6 +122,8 @@ function AppWrapper() {
           <Route path="/blog/:category/:slug" element={withBoundary(<BlogPostPage />, "blog-post-route")} />
           <Route path="/blog/:slug" element={withBoundary(<BlogPostPage />, "blog-legacy-route")} />
           <Route path="/policies" element={withBoundary(<Policies />, "policies-route")} />
+          <Route path="/privacy" element={withBoundary(<PrivacyPolicyPage />, "privacy-route")} />
+          <Route path="/privacy-policy" element={withBoundary(<PrivacyPage />, "privacy-policy-legacy-route")} />
           <Route path="/terms" element={withBoundary(<Terms />, "terms-route")} />
           <Route path="/terms-and-conditions" element={withBoundary(<Terms />, "terms-legacy-route")} />
           <Route path="/homes/:propertySlug/:unitSlug" element={withBoundary(<Homepage_PropertyDetails />, "property-details-home-route")} />
@@ -138,6 +149,7 @@ function AppWrapper() {
       </ErrorBoundary>
       <Suspense fallback={null}><SupportWidget /></Suspense>
       <Footer />
+      <Suspense fallback={null}><CookieConsent /></Suspense>
       <ToastContainer position="top-right" newestOnTop pauseOnFocusLoss={false} />
     </>
   );

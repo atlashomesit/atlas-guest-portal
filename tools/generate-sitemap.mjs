@@ -33,6 +33,7 @@ const staticUrls = [
   "/contact",
   "/terms",
   "/policies",
+  "/privacy",
   "/blog",
 ];
 

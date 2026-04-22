@@ -47,6 +47,12 @@ export type PublicListing = {
   timezoneId?: string;
   /** TASK-355: On-site contact phone for WhatsApp CTA. */
   hostPhone?: string | null;
+  /** TASK-543: Property-level aggregate rating shown on search cards. */
+  propertyRating?: number | null;
+  /** TASK-577: WiFi speed in Mbps for digital nomad filtering. */
+  wifiSpeedMbps?: number | null;
+  /** TASK-577: Whether co-working desk is available. */
+  hasCoworkingDesk?: boolean;
 };
 
 function normalizePublicListing(payload: Record<string, unknown>): PublicListing {
@@ -91,6 +97,15 @@ function normalizePublicListing(payload: Record<string, unknown>): PublicListing
       payload.hostPhone === null || typeof payload.hostPhone === 'string'
         ? (payload.hostPhone as string | null)
         : undefined,
+    propertyRating:
+      payload.propertyRating == null || payload.propertyRating === ''
+        ? null
+        : Number(payload.propertyRating),
+    wifiSpeedMbps:
+      payload.wifiSpeedMbps == null || payload.wifiSpeedMbps === ''
+        ? null
+        : Number(payload.wifiSpeedMbps),
+    hasCoworkingDesk: Boolean(payload.hasCoworkingDesk),
   };
 }
 

@@ -116,6 +116,8 @@ const Footer = () => {
                     <span>|</span>
                     <Link to="/terms" className='hover:text-[var(--footer-link-hover)] transition-colors'>Terms</Link>
                     <span>|</span>
+                    <Link to="/privacy" className='hover:text-[var(--footer-link-hover)] transition-colors'>Privacy</Link>
+                    <span>|</span>
                     <Link to="/contact" className='hover:text-[var(--footer-link-hover)] transition-colors'>Contact</Link>                </div>
                 <div className='flex items-center'>
                     <span className='hidden sm:inline mr-2'>|</span>

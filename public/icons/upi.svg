@@ -1,0 +1,5 @@
+<svg viewBox="0 0 120 40" xmlns="http://www.w3.org/2000/svg" fill="none">
+  <!-- UPI Logo: Blue rectangle with white letters -->
+  <rect width="120" height="40" rx="2" fill="#1F3A93"/>
+  <text x="60" y="26" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="white" text-anchor="middle">UPI</text>
+</svg>

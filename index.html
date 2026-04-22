@@ -16,8 +16,8 @@
   <meta name="description" content="Book directly at Atlas Homestays properties in Hyderabad. Zero booking fees. Instant WhatsApp confirmation. Verified properties." />
   <meta property="og:title" content="Atlas Homestays — Hyderabad Serviced Apartments &amp; Vacation Rentals | Direct Booking" />
   <meta property="og:description" content="Book directly at Atlas Homestays properties in Hyderabad. Zero booking fees. Instant WhatsApp confirmation. Verified properties." />
-  <!-- TODO: add a 1200×630 og-image.png to public/ for social sharing -->
-  <meta property="og:image" content="https://atlashomestays.com/og-image.png" />
+  <!-- TASK-559: og-image.svg is a 1200×630 fallback; og-image.png is recommended (SVG may not render on X/Twitter). -->
+  <meta property="og:image" content="https://atlashomestays.com/og-image.svg" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta property="og:type" content="website" />
@@ -26,12 +26,87 @@
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Atlas Homestays — Hyderabad Serviced Apartments &amp; Vacation Rentals | Direct Booking" />
   <meta name="twitter:description" content="Book directly at Atlas Homestays properties in Hyderabad. Zero booking fees. Instant WhatsApp confirmation. Verified properties." />
-  <meta name="twitter:image" content="https://atlashomestays.com/og-image.png" />
+  <meta name="twitter:image" content="https://atlashomestays.com/og-image.svg" />
 </head>
 
 <body>
   <div id="root"></div>
   <script type="module" src="/src/main.tsx"></script>
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "Atlas Homestays",
+      "url": "https://atlashomestays.com/",
+      "logo": "https://atlashomestays.com/og-image.png",
+      "telephone": "+917246161981",
+      "email": "atlashomestayskphb@gmail.com",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "KPHB, Kukatpally",
+        "addressLocality": "Hyderabad",
+        "addressRegion": "Telangana",
+        "postalCode": "500072",
+        "addressCountry": "IN"
+      },
+      "sameAs": [
+        "https://atlaspms.in/",
+        "https://www.instagram.com/atlashomeskphb/"
+      ],
+      "areaServed": {
+        "@type": "City",
+        "name": "Hyderabad"
+      }
+    }
+  </script>
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "How do I book a property at Atlas Homestays?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Browse properties on atlashomestays.com, select your dates, and complete booking via UPI or card through Razorpay. You will receive an instant WhatsApp confirmation."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What properties are available at Atlas Homestays in Hyderabad?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Atlas Homestays offers serviced apartments and vacation rentals in KPHB, Kukatpally, Hyderabad — including studio rooms, 1BHK, and 2BHK units. All properties are verified and managed directly."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is there a booking fee at Atlas Homestays?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No booking fees. Direct booking on atlashomestays.com means zero commission and zero platform fees. You pay only the nightly rate plus applicable GST."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What payment methods are accepted?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "UPI, credit card, debit card, and net banking via Razorpay. UPI payment is instant with immediate booking confirmation."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Do Atlas Homestays properties provide GST invoices?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. GST-compliant invoices are automatically generated after checkout for all bookings. SAC 9963 with CGST/SGST breakdown for intra-state guests."
+          }
+        }
+      ]
+    }
+  </script>
 </body>
 
 </html>

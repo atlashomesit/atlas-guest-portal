@@ -5,10 +5,16 @@ export type PricingBreakdown = {
   discountAmount?: number;
   convenienceFeeAmount?: number;
   finalAmount?: number;
+  /** TASK-571 long-stay discount */
+  losDiscountAmount?: number;
+  /** TASK-571 long-stay discount percent actually applied */
+  losDiscountPercent?: number;
   BaseAmount?: number;
   DiscountAmount?: number;
   ConvenienceFeeAmount?: number;
   FinalAmount?: number;
+  LosDiscountAmount?: number;
+  LosDiscountPercent?: number;
 };
 
 export type PricingBreakdownParams = {
