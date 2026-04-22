@@ -209,22 +209,9 @@ const Home = () => {
                     <Slider />
                 </div>
                 <div>
-                    {/* <Homepage_Properties /> */}
-                </div>
-                <div>
                     <HomePage_Locations />
                 </div>
                 <BannerSecondary />
-
-                {/* <div className=" px-4 lg:px-20 ">
-                <Amenities />
-            </div> */}
-                {/* <div className=" px-4 lg:px-20 ">
-                <CounterUp />
-            </div> */}
-                {/* <div className="">
-                <Homepage_LetUsGuide />
-            </div> */}
                 <div className="">
                     <ServicesSection />
                 </div>

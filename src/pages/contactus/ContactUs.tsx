@@ -264,11 +264,6 @@ const ContactUs = () => {
                 </Card>
             </div>
 
-            {/* Homepage Property section */}
-            <div>
-                {/* <Homepage_Properties /> */}
-            </div>
-
 
         </section>
     );

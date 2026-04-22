@@ -413,11 +413,6 @@ const BookingForm = ({ propertyData }: { propertyData: Property }) => {
           </div>
         </div>
 
-        {/* Price Display */}
-        {/* <div className="text-2xl font-semibold text-text-primary">
-                    ₹{totalPrice.toLocaleString()} <span className="text-base font-normal text-text-muted">for {nights} nights</span>
-                </div> */}
-
         {/* Check-in/Check-out */}
         <div className="border border-border-subtle rounded-lg overflow-hidden">
           <div className="flex">

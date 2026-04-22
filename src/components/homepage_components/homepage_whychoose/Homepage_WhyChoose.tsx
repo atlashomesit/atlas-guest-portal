@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
 import { MdOutlineDone } from 'react-icons/md';
 import OptimizedImage from '../../ui/OptimizedImage';
-// import { FaArrowRightLong } from 'react-icons/fa6';
-// import { Link } from 'react-router-dom';
 
 const featureData = {
     images: [

@@ -26,11 +26,6 @@ const Homepage_LetUsGuide = () => {
                         <span className="text-base md:text-xl font-light text-center md:text-left">
                             Only Stay is a serene retreat where luxury meets tranquility. Experience exceptional hospitality, elegant spaces, and a seamless blend of comfort and nature for a truly memorable stay.
                         </span>
-                        {/* <span className="text-center md:text-left">
-                            <Link to={'/contact'} className="px-6 py-3 bg-primary text-lg md:text-xl rounded-2xl inline-block">
-                                Contact Us
-                            </Link>
-                        </span> */}
                     </div>
                 </div>
             </div>
