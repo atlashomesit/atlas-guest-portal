@@ -12,9 +12,6 @@ The guest portal now ships with a compact “Chat with us” pill (bottom-right)
 ### Where to edit
 
 - **Floating pill + panel:** `src/components/support/SupportWidget.tsx`
-- **Legacy chatbot shell:** `src/components/support/chatbot/ChatWidget.tsx`, `src/components/support/chatbot/ChatLauncherPill.tsx` (kept for future richer messaging)
-- **FAQ intents & quick actions (for future chat):** `src/components/support/chatbot/intents.ts`
-- **Callback capture:** `src/components/support/callbackService.ts`
 
 ### Suppression (when not to show)
 
