@@ -224,6 +224,7 @@ function StepIndicator({ current }: { current: number }) {
 }
 
 const DRAFT_KEY = "becomehost_draft";
+const PROPERTY_ID_KEY = "becomehost_property_id";
 
 const BecomeHost = () => {
   const [step, setStep] = useState(0);
@@ -415,10 +416,16 @@ const BecomeHost = () => {
         throw new Error(body?.message || "Onboarding request failed.");
       }
 
+      const body = await res.json();
+      const propertyId = body?.propertyId;
+      if (propertyId) {
+        localStorage.setItem(PROPERTY_ID_KEY, propertyId.toString());
+      }
+
       setSubmitStatus("success");
       localStorage.removeItem(DRAFT_KEY);
       toast.success("Your property has been registered!");
-      logUserAction("onboarding_started", { status: "success", feature: "become-host" });
+      logUserAction("onboarding_started", { status: "success", feature: "become-host", propertyId });
     } catch (err) {
       reportError(err, { feature: "become-host-submit" });
       toast.error("Something went wrong. Please try again.");
