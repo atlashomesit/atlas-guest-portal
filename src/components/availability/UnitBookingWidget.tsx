@@ -1629,11 +1629,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               Persistent issues? Our team is here to help.
             </p>
 
-            {/* Support Contact */}
-            <div className="text-center text-xs text-gray-500 space-y-1 mb-6">
-              <p>Call: +91-7032493290</p>
-              <p>Email: atlashomeskphb@gmail.com</p>
-              <p>Live Chat Available</p>
+            {/* Support Message */}
+            <div className="text-center text-xs text-gray-500 mb-6">
+              <p>Refresh and try again or contact your host for assistance.</p>
             </div>
 
             {/* Try Again Button */}
