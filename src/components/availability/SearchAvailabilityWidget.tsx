@@ -425,9 +425,9 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
     if (!formattedCheckIn || !formattedCheckOut) return;
 
     const listingSearchRoute = `/search?${params.toString()}`;
-    let availabilityUrl = '';
-    let controller: AbortController | null = null;
-    let timeoutId: number | null = null;
+    let availabilityUrl: string;
+    let controller: AbortController | null;
+    let timeoutId: number | null;
     const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
 
     try {
