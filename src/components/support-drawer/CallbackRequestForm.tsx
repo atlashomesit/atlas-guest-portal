@@ -59,7 +59,10 @@ const CallbackRequestForm = ({
         <button
           type="button"
           onClick={onClose}
-          className="rounded-full px-3 py-2 text-xs font-semibold text-text-muted underline underline-offset-2"
+          // TASK-958: bump cancel button to 14px text + ~44px tap target
+          // (px-3 py-2 text-xs → px-4 py-3 text-sm). Below-minimum targets
+          // on mobile caused frequent mis-taps when dismissing the form.
+          className="rounded-full px-4 py-3 text-sm font-semibold text-text-muted underline underline-offset-2"
         >
           {copy.closeLabel}
         </button>

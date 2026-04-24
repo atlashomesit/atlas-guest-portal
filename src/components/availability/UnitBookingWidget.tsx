@@ -1861,7 +1861,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                       <div className={`absolute inset-0 rounded-lg ${statusBg}`} style={{ margin: '2px' }} aria-hidden />
                     )}
                     <div className={`unit-booking-day-cell-inner relative z-10 grid grid-cols-1 grid-rows-2 place-items-center gap-0 min-h-0 overflow-hidden box-border ${selectionClasses || disabledClasses}`}>
-                      <span className="unit-booking-day-num text-[11px] font-bold leading-none overflow-hidden truncate">{format(day, 'd')}</span>
+                      {/* TASK-957: bump calendar day number from 11px → 12px (text-xs) for readability on 360px Android. */}
+                      <span className="unit-booking-day-num text-xs font-bold leading-none overflow-hidden truncate">{format(day, 'd')}</span>
                       <span className={`unit-booking-day-price text-xs leading-none whitespace-nowrap overflow-hidden truncate min-w-0 ${isDeal ? 'text-green-600 font-semibold' : ''}`}>
                         {priceText}
                       </span>

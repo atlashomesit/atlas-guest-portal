@@ -509,17 +509,20 @@ export default function BookingConfirmationPage() {
             <h2 className="text-sm font-semibold text-text-primary">Request booking changes</h2>
             <p className="text-sm text-text-secondary">Need a different date or guest count? Send a request and we will review it.</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* TASK-959: bump booking-modification inputs to py-3 so they meet the 48px
+                  minimum tap target. Text is already text-base (16px) which prevents the
+                  iOS Safari auto-zoom on focus. */}
               <label className="text-sm text-text-secondary">
                 New check-in
-                <input type="date" value={modCheckin} onChange={(e) => setModCheckin(e.target.value)} className="mt-1 w-full rounded-md border border-border-subtle px-3 py-2.5 text-base" />
+                <input type="date" value={modCheckin} onChange={(e) => setModCheckin(e.target.value)} className="mt-1 w-full rounded-md border border-border-subtle px-3 py-3 text-base" />
               </label>
               <label className="text-sm text-text-secondary">
                 New check-out
-                <input type="date" value={modCheckout} onChange={(e) => setModCheckout(e.target.value)} className="mt-1 w-full rounded-md border border-border-subtle px-3 py-2.5 text-base" />
+                <input type="date" value={modCheckout} onChange={(e) => setModCheckout(e.target.value)} className="mt-1 w-full rounded-md border border-border-subtle px-3 py-3 text-base" />
               </label>
               <label className="text-sm text-text-secondary sm:col-span-2">
                 Guest count (optional)
-                <input type="number" min={1} value={modGuests} onChange={(e) => setModGuests(e.target.value)} className="mt-1 w-full rounded-md border border-border-subtle px-3 py-2.5 text-base" />
+                <input type="number" min={1} value={modGuests} onChange={(e) => setModGuests(e.target.value)} className="mt-1 w-full rounded-md border border-border-subtle px-3 py-3 text-base" />
               </label>
               <label className="text-sm text-text-secondary sm:col-span-2">
                 Note (optional)
