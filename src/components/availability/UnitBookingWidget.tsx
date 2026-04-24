@@ -1747,6 +1747,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           <label className="text-sm font-medium text-text-primary" htmlFor="unit-booking-dates">
             Dates
           </label>
+          {minStayNights > 1 && (
+            <p className="text-xs font-medium text-text-muted">Minimum stay: {minStayNights} nights</p>
+          )}
           <p className="text-xs text-text-secondary">Some dates are unavailable due to existing bookings.</p>
           <button
             id="unit-booking-dates"

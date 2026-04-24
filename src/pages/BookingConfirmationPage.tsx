@@ -114,6 +114,11 @@ export default function BookingConfirmationPage() {
       ? buildApiUrl(`/api/guest/bookings/${bookingId}/invoice/pdf?t=${encodeURIComponent(token)}`)
       : "";
 
+  const voucherUrl =
+    bookingId && token
+      ? buildApiUrl(`/api/guest/bookings/${bookingId}/voucher?t=${encodeURIComponent(token)}`)
+      : "";
+
   if (error || !booking) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center px-4">
@@ -372,6 +377,25 @@ export default function BookingConfirmationPage() {
               className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-3.5 hover:opacity-95 transition-opacity"
             >
               Download invoice (PDF)
+            </a>
+          </div>
+        )}
+
+        {/* Booking confirmation voucher (printable arrival document) */}
+        {!isCancelled && voucherUrl && (
+          <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3">
+            <h2 className="text-sm font-semibold text-text-primary">Booking confirmation voucher</h2>
+            <p className="text-xs text-text-secondary leading-relaxed">
+              Print or share this confirmation as your proof of booking. Present it during check-in.
+            </p>
+            <a
+              href={voucherUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="download-voucher-btn"
+              className="inline-flex items-center justify-center rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-3.5 hover:bg-brand-primary/5 transition-colors"
+            >
+              Download voucher (PDF)
             </a>
           </div>
         )}
