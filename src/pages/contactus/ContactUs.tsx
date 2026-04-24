@@ -255,10 +255,10 @@ const ContactUs = () => {
                         <Typography variant="subtitle">Jump to the most requested pages before you reach out.</Typography>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <Link to="/policies" className="px-4 py-3 rounded-xl border border-border-subtle bg-bg-surface hover:border-cta-primary font-semibold text-text-primary transition">Policies</Link>
-                        <Link to="/faq" className="px-4 py-3 rounded-xl border border-border-subtle bg-bg-surface hover:border-cta-primary font-semibold text-text-primary transition">FAQs</Link>
-                        <Link to="/terms" className="px-4 py-3 rounded-xl border border-border-subtle bg-bg-surface hover:border-cta-primary font-semibold text-text-primary transition">Terms</Link>
-                        <Link to={ctaNav.to} className="px-4 py-3 rounded-xl border border-border-subtle bg-bg-surface hover:border-cta-primary font-semibold text-text-primary transition">Book now</Link>
+                        <Link to="/policies" aria-label="Read our guest policies" className="px-4 py-3 rounded-xl border border-border-subtle bg-bg-surface hover:border-cta-primary font-semibold text-text-primary transition">Policies</Link>
+                        <Link to="/faq" aria-label="Frequently asked questions" className="px-4 py-3 rounded-xl border border-border-subtle bg-bg-surface hover:border-cta-primary font-semibold text-text-primary transition">FAQs</Link>
+                        <Link to="/terms" aria-label="Read our terms and conditions" className="px-4 py-3 rounded-xl border border-border-subtle bg-bg-surface hover:border-cta-primary font-semibold text-text-primary transition">Terms</Link>
+                        <Link to={ctaNav.to} aria-label="Book a stay at Atlas Homestays" className="px-4 py-3 rounded-xl border border-border-subtle bg-bg-surface hover:border-cta-primary font-semibold text-text-primary transition">Book now</Link>
                     </div>
                     <div className="bg-bg-surface border border-dashed border-cta-primary/30 rounded-xl p-4 text-sm text-text-muted">
                         Prefer a quick response? WhatsApp us on {formatDisplayNumber()} for booking confirmations.

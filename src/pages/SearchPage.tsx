@@ -262,7 +262,7 @@ const SearchPage = () => {
               <button
                 type="button"
                 onClick={clearFilters}
-                className="rounded-lg border border-border-subtle px-3 py-2 text-xs font-medium text-text-muted hover:bg-bg-muted focus:outline-none"
+                className="rounded-lg border border-border-subtle px-3 py-3 text-xs font-medium text-text-muted hover:bg-bg-muted focus:outline-none"
               >
                 Clear filters
               </button>

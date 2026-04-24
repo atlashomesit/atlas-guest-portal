@@ -101,6 +101,7 @@ const Policies = () => {
                       className="text-sm font-semibold px-3 py-3 rounded-full border border-border-subtle hover:border-cta-primary text-primary"
                       aria-expanded={open.has(section.id)}
                       aria-controls={`${section.id}-details`}
+                      aria-label={open.has(section.id) ? `Hide details for ${section.title}` : `Read details for ${section.title}`}
                     >
                       {open.has(section.id) ? "Hide details" : "Read details"}
                     </button>
