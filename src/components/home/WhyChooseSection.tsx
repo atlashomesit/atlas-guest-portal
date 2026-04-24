@@ -56,6 +56,7 @@ const WhyChooseSection = () => {
             {whyChooseStatsBadges.map((label) => (
               <span
                 key={label}
+                role="presentation"
                 className="rounded-full border border-border-subtle bg-bg-surface px-4 py-2 text-sm font-medium text-text-primary"
               >
                 {label}

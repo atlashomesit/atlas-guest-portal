@@ -369,7 +369,7 @@ export default function BookingConfirmationPage() {
               target="_blank"
               rel="noopener noreferrer"
               data-testid="download-invoice-btn"
-              className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-3 hover:opacity-95 transition-opacity"
+              className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-3.5 hover:opacity-95 transition-opacity"
             >
               Download invoice (PDF)
             </a>
@@ -511,25 +511,25 @@ export default function BookingConfirmationPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <label className="text-sm text-text-secondary">
                 New check-in
-                <input type="date" value={modCheckin} onChange={(e) => setModCheckin(e.target.value)} className="mt-1 w-full rounded-md border border-border-subtle px-3 py-2 text-sm" />
+                <input type="date" value={modCheckin} onChange={(e) => setModCheckin(e.target.value)} className="mt-1 w-full rounded-md border border-border-subtle px-3 py-2.5 text-base" />
               </label>
               <label className="text-sm text-text-secondary">
                 New check-out
-                <input type="date" value={modCheckout} onChange={(e) => setModCheckout(e.target.value)} className="mt-1 w-full rounded-md border border-border-subtle px-3 py-2 text-sm" />
+                <input type="date" value={modCheckout} onChange={(e) => setModCheckout(e.target.value)} className="mt-1 w-full rounded-md border border-border-subtle px-3 py-2.5 text-base" />
               </label>
               <label className="text-sm text-text-secondary sm:col-span-2">
                 Guest count (optional)
-                <input type="number" min={1} value={modGuests} onChange={(e) => setModGuests(e.target.value)} className="mt-1 w-full rounded-md border border-border-subtle px-3 py-2 text-sm" />
+                <input type="number" min={1} value={modGuests} onChange={(e) => setModGuests(e.target.value)} className="mt-1 w-full rounded-md border border-border-subtle px-3 py-2.5 text-base" />
               </label>
               <label className="text-sm text-text-secondary sm:col-span-2">
                 Note (optional)
-                <textarea value={modNote} onChange={(e) => setModNote(e.target.value)} rows={3} className="mt-1 w-full rounded-md border border-border-subtle px-3 py-2 text-sm" />
+                <textarea value={modNote} onChange={(e) => setModNote(e.target.value)} rows={3} className="mt-1 w-full rounded-md border border-border-subtle px-3 py-2.5 text-base" />
               </label>
             </div>
             <button
               onClick={submitModificationRequest}
               disabled={modSubmitting}
-              className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-3 disabled:opacity-50"
+              className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-3.5 disabled:opacity-50"
             >
               {modSubmitting ? "Submitting..." : "Submit request"}
             </button>

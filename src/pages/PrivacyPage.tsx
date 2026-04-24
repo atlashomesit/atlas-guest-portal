@@ -86,7 +86,7 @@ const PrivacyPage = () => {
               <button
                 type="button"
                 onClick={handleRevokeConsent}
-                className="px-4 py-2 bg-primary text-[var(--text-contrast)] font-semibold rounded-xl shadow-level1 hover:shadow-level2"
+                className="px-4 py-3 bg-primary text-[var(--text-contrast)] font-semibold rounded-xl shadow-level1 hover:shadow-level2"
               >
                 Reset my cookie consent
               </button>
@@ -152,7 +152,7 @@ const PrivacyPage = () => {
               <div className="flex flex-wrap gap-3">
                 <a
                   href={`mailto:${privacyMetadata.grievanceOfficer.email}`}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-bg-surface text-primary font-semibold rounded-xl shadow-level1 hover:shadow-level2"
+                  className="inline-flex items-center gap-2 px-4 py-3 bg-bg-surface text-primary font-semibold rounded-xl shadow-level1 hover:shadow-level2"
                 >
                   Email Grievance Officer
                 </a>
@@ -160,7 +160,7 @@ const PrivacyPage = () => {
                   href={whatsappLink}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-bg-surface text-primary font-semibold rounded-xl shadow-level1 hover:shadow-level2"
+                  className="inline-flex items-center gap-2 px-4 py-3 bg-bg-surface text-primary font-semibold rounded-xl shadow-level1 hover:shadow-level2"
                 >
                   Message on WhatsApp
                 </a>
