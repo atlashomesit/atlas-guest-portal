@@ -526,7 +526,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     const controller = new AbortController();
     const startDate = toISODate(startOfMonth(shownDate));
     setCalendarPricingLoading(true);
-    fetchCalendarPricing(listingId, startDate, 2, controller.signal)
+    fetchCalendarPricing(listingId, startDate, 3, controller.signal)
       .then((result) => {
         setCalendarDailyPrices(result.dateToPrice);
         setCalendarConvenienceFeePercent(result.convenienceFeePercent);

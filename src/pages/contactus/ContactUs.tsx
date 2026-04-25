@@ -1,5 +1,4 @@
 import CommonBanner from "../../components/commonComponents/banner/CommonBanner";
-import { resolveOptimizedAsset } from "../../utils/resolveOptimizedAsset";
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { formatDisplayNumber, getTelLink, getWhatsAppLink } from "../../config/contact";
@@ -95,7 +94,7 @@ const ContactUs = () => {
         <section>
             {/* Banner */}
             <div>
-                <CommonBanner image={resolveOptimizedAsset('banner.jpg')} PageName={'Contact Us'} />
+                <CommonBanner image="" PageName={'Contact Us'} />
             </div>
 
             {/* Contact Info Section */}
