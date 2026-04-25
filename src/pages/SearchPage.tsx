@@ -200,7 +200,7 @@ const SearchPage = () => {
   const queryString = searchParams.toString();
 
   return (
-    <main className="min-h-screen bg-bg-muted py-10">
+    <div className="min-h-screen bg-bg-muted py-10">
       <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 md:px-8">
         <header className="space-y-2">
           <p className="text-sm font-semibold uppercase tracking-wide text-text-muted">Search results</p>
@@ -440,7 +440,7 @@ const SearchPage = () => {
           </section>
         )}
       </div>
-    </main>
+    </div>
   );
 };
 

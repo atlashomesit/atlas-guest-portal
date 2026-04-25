@@ -540,7 +540,7 @@ export const Apartments = () => {
 
   if (fetchState === "error") {
     return (
-      <main className="bg-bg-muted py-10">
+      <div className="bg-bg-muted py-10">
         <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 md:px-8">
           <ErrorLayout
             title="We couldn’t load this page"
@@ -553,12 +553,12 @@ export const Apartments = () => {
             )}
           </ErrorLayout>
         </div>
-      </main>
+      </div>
     );
   }
 
   return (
-    <main className="bg-bg-muted py-10">
+    <div className="bg-bg-muted py-10">
       <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 md:px-8">
         <header className="space-y-2">
           <p className="text-sm font-semibold uppercase tracking-wide text-primary">Atlas Homestays</p>
@@ -670,7 +670,7 @@ export const Apartments = () => {
           </>
         )}
       </div>
-    </main>
+    </div>
   );
 };
 
