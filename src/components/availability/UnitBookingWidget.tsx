@@ -39,6 +39,8 @@ interface UnitBookingWidgetProps {
   coverPhotoUrl?: string;
   /** Maximum guests for this listing. Defaults to 16 if not provided. */
   maxGuests?: number;
+  /** Optional host WhatsApp/phone for payment-failure support CTA. */
+  hostPhone?: string | null;
 }
 
 const PENDING_PAYMENT_KEY = 'atlas_pending_razorpay_order';
@@ -116,6 +118,9 @@ async function abandonPaymentPendingCheckout(bookingId: number, bookingToken: st
   }
 }
 
+/** Day-level status from listing availability API — Turnover is checkout morning (selectable like Available). */
+type ListingCalendarDayStatus = 'Blocked' | 'Available' | 'Hold' | 'Turnover';
+
 const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   listingId,
   propertyId,
@@ -123,6 +128,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   timezoneId,
   coverPhotoUrl,
   maxGuests = 16,
+  hostPhone,
 }) => {
   if (import.meta.env.DEV) {
     console.assert(Boolean(propertyId), '[UnitBookingWidget] propertyId is required for unit mode');
@@ -141,6 +147,14 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   }, [listingId, getUrlsForListingId]);
 
   const displayCoverUrl = (coverPhotoUrl?.trim() || coverFromPublicListings || '').trim() || undefined;
+  const hostWhatsAppDigits = useMemo(() => {
+    const raw = (hostPhone ?? '').trim();
+    if (!raw) return '';
+    const cleaned = raw.replace(/\D/g, '');
+    if (cleaned.length === 10) return `91${cleaned}`;
+    if (cleaned.length >= 11) return cleaned;
+    return '';
+  }, [hostPhone]);
 
   const today = useMemo(() => getIstStartOfDay(), []);
   const maxBookingDate = useMemo(() => addDays(today, 365), [today]);
@@ -162,7 +176,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [guests, setGuests] = useState(2);
   const [_bookedDates, setBookedDates] = useState<Date[]>([]);
   const [blockedSet, setBlockedSet] = useState<Set<string>>(new Set());
-  const [dateStatusMap, setDateStatusMap] = useState<Map<string, 'Blocked' | 'Available' | 'Hold'>>(new Map());
+  const [dateStatusMap, setDateStatusMap] = useState<Map<string, ListingCalendarDayStatus>>(new Map());
   const [isLoading, setIsLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const lastAvailabilityKeyRef = useRef<string | null>(null);
@@ -405,7 +419,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         
         // Filter out past dates and process availability with status
         const newBlockedDates = new Set<string>();
-        const newDateStatusMap = new Map<string, 'Blocked' | 'Available' | 'Hold'>();
+        const newDateStatusMap = new Map<string, ListingCalendarDayStatus>();
         
         entries.forEach((item: { 
           date?: string; 
@@ -429,13 +443,13 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
           if (itemDate.getTime() < today.getTime()) return;
           
           // Get status from the response (handle both status and Status fields)
-          const status = (item.status || item.Status || 'Available') as 'Blocked' | 'Available' | 'Hold';
+          const status = (item.status || item.Status || 'Available') as ListingCalendarDayStatus;
           
           // Store status for rendering
           newDateStatusMap.set(itemISO, status);
           
           // Update blockedSet for backward compatibility with existing logic
-          // Blocked and Hold dates should be in blockedSet (both are non-selectable)
+          // Blocked and Hold dates should be in blockedSet (both are non-selectable). Turnover is bookable.
           const isBlocked = 
             status === 'Blocked' ||
             status === 'Hold' ||
@@ -1018,7 +1032,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       // Consider date available if:
       // 1. Status is explicitly 'Available', OR
       // 2. Status is undefined but date is not in blockedSet (API might not return all available dates)
-      const isAvailable = checkStatus === 'Available' || (checkStatus === undefined && !blockedSet.has(checkISO));
+      const isAvailable =
+        checkStatus === 'Available' ||
+        checkStatus === 'Turnover' ||
+        (checkStatus === undefined && !blockedSet.has(checkISO));
       
       if (isAvailable) {
         // Checkout date can be blocked/hold - that's allowed (you're leaving, not staying)
@@ -1631,7 +1648,20 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
             {/* Support Message */}
             <div className="text-center text-xs text-gray-500 mb-6">
-              <p>Refresh and try again or contact your host for assistance.</p>
+              {hostWhatsAppDigits ? (
+                <a
+                  href={`https://wa.me/${hostWhatsAppDigits}?text=${encodeURIComponent(
+                    `Hi, I need help completing payment for ${listingName || 'this booking'}.`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center rounded-lg border border-[#25D366] px-3 py-2 text-sm font-medium text-[#1a9e4f] hover:bg-[#f0fdf4]"
+                >
+                  Contact host on WhatsApp
+                </a>
+              ) : (
+                <p>Contact property directly.</p>
+              )}
             </div>
 
             {/* Try Again Button */}
@@ -1852,6 +1882,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                 let statusBg = '';
                 if (status === 'Blocked') statusBg = 'bg-red-500/20';
                 else if (status === 'Hold') statusBg = 'bg-orange-500/20';
+                else if (status === 'Turnover') statusBg = 'bg-emerald-500/15';
                 else if (status === 'Available') statusBg = 'bg-green-500/15';
 
                 const selectionClasses = isRangeStart || isRangeEnd
