@@ -73,7 +73,7 @@ const Slider = () => {
             </h2>
           </div>
 
-          <div data-testid="hero-widget"><SearchAvailabilityWidget mode="search" /></div>
+          <div data-testid="hero-widget"><SearchAvailabilityWidget /></div>
 
           <Link
             to="/become-a-host"

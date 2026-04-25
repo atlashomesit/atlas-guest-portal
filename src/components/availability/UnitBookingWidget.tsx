@@ -1750,6 +1750,15 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           {minStayNights > 1 && (
             <p className="text-xs font-medium text-text-muted">Minimum stay: {minStayNights} nights</p>
           )}
+          {dateRange.startDate && !dateRange.endDate && (
+            <p
+              role="status"
+              data-testid="guest-booking-incomplete-dates"
+              className="text-sm text-text-secondary"
+            >
+              Select your check-out date (minimum one night after check-in).
+            </p>
+          )}
           <p className="text-xs text-text-secondary">Some dates are unavailable due to existing bookings.</p>
           <button
             id="unit-booking-dates"
