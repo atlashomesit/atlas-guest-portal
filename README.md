@@ -205,7 +205,7 @@ Each command should return a 301/302 with a `Location` header set to `/property_
 - **Blank property pages:** Ensure navigation via the homepage so React Router receives the `location.state` payload required by [`Homepage_LocationDetails`](src/components/homepage_components/homepage_locationsdetails/Homepage_LocationDetails.tsx).
 - **Runtime blank screens:** The app is wrapped in an error boundary. If a page fails, the boundary renders a fallback and the console shows the captured error; use the Reload button to recover.
 - **Asset resolution rules:** Place shared images (e.g., the brand logo) in `src/assets/` to leverage `resolveOptimizedAsset`, or reference files in `public/` with absolute paths like `/logo.svg` so Vite serves them without import errors. Prefer SVGs or other text-based assets when possible to avoid binary diffs.
-- **Email delivery fails:** Confirm the EmailJS service, template, and public keys are filled in `.env` and referenced in [`BookingFrom.tsx`](src/components/homepage_components/homepage_Propertydetails/BookingFrom.tsx) and [`ContactUs.tsx`](src/pages/contactus/ContactUs.tsx).
+- **Email delivery fails:** Confirm the EmailJS service, template, and public keys are filled in `.env` and referenced in [`UnitBookingWidget.tsx`](src/components/availability/UnitBookingWidget.tsx) and [`ContactUs.tsx`](src/pages/contactus/ContactUs.tsx).
 - **Cloudflare deployment issues:** Ensure the Pages build command (`npm run build`) succeeds locally; failed builds prevent deploys.
 
 ## Listings
@@ -216,14 +216,14 @@ Each command should return a 301/302 with a `Location` header set to `/property_
 - **Add a blog post:** edit `src/data/blogPosts.ts` and append a new object with `title`, `slug`, `category` (`guest-guides` or `hospitality-tech`), `excerpt`, `content`, and optional `featuredImage`, `metaTitle`, and `metaDescription`. The routes `/blog`, `/blog/:category`, and `/blog/:slug` automatically surface new entries.
 - **Policies route:** `/policies` renders a single-column page with a table of contents and anchored sections (e.g., `#cancellation-refund-policy`, `#house-rules`). The header and footer link to these anchors, so keep the IDs stable.
 - **Edit policies:** update the content blocks in `src/pages/Policies.tsx` to change wording or add new clauses while keeping the existing anchors to preserve deep links from navigation and the footer.
-- **Booking confirmations:** the booking confirmation alerts and EmailJS payloads reference the policy URL and cancellation/reschedule anchors (see `BookingFrom.tsx`). Update the shared `policyMessage` string there if the canonical URL ever changes.
+- **Booking confirmations:** booking confirmation alerts and EmailJS payloads reference the policy URL and cancellation/reschedule anchors (see `UnitBookingWidget.tsx`). Update the shared `policyMessage` string there if the canonical URL ever changes.
 - **Sitemap URL:** served from a Cloudflare Pages Function at `/sitemap.xml`, which builds entries from the incoming request origin so preview/staging domains emit the correct links; `public/robots.txt` references the same path.
 
 ### Terms & Conditions and stay policies
 - **Content source:** `src/content/terms.ts` holds the numbered Terms & Conditions sections, inline policy snippets, and the Razorpay consent note used across the booking flow.
 - **Route:** `/terms` (aliased at `/terms-and-conditions`) renders the structured terms page defined in `src/pages/Terms.tsx` with anchor links and last-updated metadata.
 - **Unit timings & fees:** `src/config/policyConfig.ts` centralizes per-unit check-in/out windows and extra-guest fee ranges (`baseGuestAllowance`, `unitPolicies`).
-- **UI reuse:** booking widgets (`BookingFrom.tsx`, `hotelBooking_form/HotelBooking_Form.tsx`) and property details (`Homepage_PropertyDetails.tsx`) pull inline snippets and timing data from those sources to avoid hardcoded strings.
+- **UI reuse:** the booking widget (`UnitBookingWidget.tsx`) and property details (`Homepage_PropertyDetails.tsx`) pull inline snippets and timing data from shared policy/content sources to avoid hardcoded strings.
 
 ## Pricing configuration
 - **Never show ₹0** — when API returns 0 (e.g. listing has no ListingPricing row), the widget treats it as invalid and falls back to client-side pricing or "Price unavailable". See `docs/rca/guest-portal-zero-price.md`.
