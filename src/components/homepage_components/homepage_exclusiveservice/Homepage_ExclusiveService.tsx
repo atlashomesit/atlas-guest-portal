@@ -15,14 +15,6 @@ const Homepage_ExclusiveService = () => {
 
         <ExclusiveService_Card />
 
-        {/* <div className="text-center mt-12">
-          <a 
-            href="/services" 
-            className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-primary hover:bg-primary-dark transition duration-300 shadow-md hover:shadow-lg"
-          >
-            View All Services
-          </a>
-        </div> */}
       </div>
     </section>
   );

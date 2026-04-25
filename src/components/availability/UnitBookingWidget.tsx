@@ -182,6 +182,8 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     phone: '',
     /** QW-005: special requests / notes to host (max 500 server-side) */
     notes: '',
+    /** TASK-782: Guest nationality for Indian police homestay reporting (default India). */
+    nationality: 'India',
   });
   const [formErrors, setFormErrors] = useState({
     name: '',
@@ -911,7 +913,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     return isValid;
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     if (name === 'phone') {
       // IND-003: Indian phone input behavior (accept +91/spacing, store last 10 digits).
@@ -1153,6 +1155,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         checkoutDate: toISODate(normalizedCheckout),  // Format as YYYY-MM-DD
         guests,
         notes: formData.notes.trim().slice(0, 500),
+        // TASK-782: guest nationality for Indian police homestay records.
+        guestNationality: (formData.nationality || 'India').slice(0, 50),
       };
 
       // 2. Prepare order payload with the exact structure expected by the backend
@@ -1168,6 +1172,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           checkoutDate: bookingDraft.checkoutDate,
           guests: bookingDraft.guests,
           notes: bookingDraft.notes,
+          guestNationality: bookingDraft.guestNationality,
           selectedAddOns: selectedAddOnsList.length > 0 ? selectedAddOnsList : undefined,
         },
         amount: Math.round(finalTotal), // Keep amount in rupees, let backend handle conversion if needed
@@ -1624,11 +1629,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               Persistent issues? Our team is here to help.
             </p>
 
-            {/* Support Contact */}
-            <div className="text-center text-xs text-gray-500 space-y-1 mb-6">
-              <p>Call: +91-7032493290</p>
-              <p>Email: atlashomeskphb@gmail.com</p>
-              <p>Live Chat Available</p>
+            {/* Support Message */}
+            <div className="text-center text-xs text-gray-500 mb-6">
+              <p>Refresh and try again or contact your host for assistance.</p>
             </div>
 
             {/* Try Again Button */}
@@ -1744,6 +1747,18 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           <label className="text-sm font-medium text-text-primary" htmlFor="unit-booking-dates">
             Dates
           </label>
+          {minStayNights > 1 && (
+            <p className="text-xs font-medium text-text-muted">Minimum stay: {minStayNights} nights</p>
+          )}
+          {dateRange.startDate && !dateRange.endDate && (
+            <p
+              role="status"
+              data-testid="guest-booking-incomplete-dates"
+              className="text-sm text-text-secondary"
+            >
+              Select your check-out date (minimum one night after check-in).
+            </p>
+          )}
           <p className="text-xs text-text-secondary">Some dates are unavailable due to existing bookings.</p>
           <button
             id="unit-booking-dates"
@@ -1858,7 +1873,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                       <div className={`absolute inset-0 rounded-lg ${statusBg}`} style={{ margin: '2px' }} aria-hidden />
                     )}
                     <div className={`unit-booking-day-cell-inner relative z-10 grid grid-cols-1 grid-rows-2 place-items-center gap-0 min-h-0 overflow-hidden box-border ${selectionClasses || disabledClasses}`}>
-                      <span className="unit-booking-day-num text-[11px] font-bold leading-none overflow-hidden truncate">{format(day, 'd')}</span>
+                      {/* TASK-957: bump calendar day number from 11px → 12px (text-xs) for readability on 360px Android. */}
+                      <span className="unit-booking-day-num text-xs font-bold leading-none overflow-hidden truncate">{format(day, 'd')}</span>
                       <span className={`unit-booking-day-price text-xs leading-none whitespace-nowrap overflow-hidden truncate min-w-0 ${isDeal ? 'text-green-600 font-semibold' : ''}`}>
                         {priceText}
                       </span>
@@ -2170,6 +2186,39 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               {promoMessage}{appliedPromoCode ? ` (${appliedPromoCode})` : ''}
             </p>
           ) : null}
+        </div>
+
+        {/* TASK-782: Guest nationality for Indian police homestay reporting. India is pre-selected; Other is free-text via Notes. */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-text-primary" htmlFor="booking-nationality">
+            Nationality <span className="text-text-muted font-normal">(required)</span>
+          </label>
+          <select
+            id="booking-nationality"
+            name="nationality"
+            value={formData.nationality}
+            onChange={handleInputChange}
+            disabled={isBookingDisabled}
+            className="w-full rounded-xl border border-border-strong bg-bg-muted px-4 py-3 text-text-primary focus:outline-none focus:ring-2 focus:ring-cta-primary"
+            data-testid="guest-booking-nationality"
+          >
+            <option value="India">India</option>
+            <option value="Australia">Australia</option>
+            <option value="Canada">Canada</option>
+            <option value="China">China</option>
+            <option value="France">France</option>
+            <option value="Germany">Germany</option>
+            <option value="Japan">Japan</option>
+            <option value="Malaysia">Malaysia</option>
+            <option value="Nepal">Nepal</option>
+            <option value="Singapore">Singapore</option>
+            <option value="Sri Lanka">Sri Lanka</option>
+            <option value="UAE">UAE</option>
+            <option value="UK">UK</option>
+            <option value="USA">USA</option>
+            <option value="Other">Other</option>
+          </select>
+          <p className="text-xs text-text-muted">Required by Indian police homestay guest-record rules.</p>
         </div>
 
         <div className="space-y-2">

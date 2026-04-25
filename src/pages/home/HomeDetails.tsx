@@ -73,7 +73,7 @@ const HomeDetails = () => {
         <p className="mt-3 text-text-secondary">
           We could not find that home. Please return to the catalog to see available stays.
         </p>
-        <Link to="/#our-homes" className="inline-flex mt-6 rounded-full bg-[color:var(--cta-primary)] px-4 py-2 text-white font-semibold">
+        <Link to="/#our-homes" className="inline-flex mt-6 rounded-full bg-[color:var(--cta-primary)] px-4 py-3 text-white font-semibold">
           Back to Our Homes
         </Link>
       </section>

@@ -17,12 +17,6 @@ const Homepage_LocationDetails = React.lazy(() => import("./components/homepage_
 const Policies = React.lazy(() => import("./pages/Policies"))
 const Terms = React.lazy(() => import("./pages/Terms"))
 const PrivacyPage = React.lazy(() => import("./pages/PrivacyPage"))
-// CookieConsentBanner (concurrent agent addition) is architecturally preferable to
-// CookieConsent (TASK-016 inline version) — it uses src/utils/cookieConsent helpers
-// and stays DPDP-aligned. Switching the mount is a refactor, not a mechanical fix.
-// For now the lint-unused import is dropped; mounted <CookieConsent /> below is the
-// TASK-016 version. Follow-up: replace <CookieConsent /> with <CookieConsentBanner />
-// and delete src/components/CookieConsent.tsx + src/pages/PrivacyPolicyPage.tsx.
 const Amenities = React.lazy(() => import("./pages/Amenities"))
 const LocationPage = React.lazy(() => import("./pages/LocationPage"))
 const GalleryPage = React.lazy(() => import("./pages/GalleryPage"))
@@ -46,7 +40,7 @@ const MyBookingsPage = React.lazy(() => import("./pages/MyBookingsPage"))
 const FavoritesPage = React.lazy(() => import("./pages/FavoritesPage"))
 const RecentlyViewedPage = React.lazy(() => import("./pages/RecentlyViewedPage"))
 const PrivacyPolicyPage = React.lazy(() => import("./pages/PrivacyPolicyPage"))
-const CookieConsent = React.lazy(() => import("./components/CookieConsent"))
+const CookieConsentBanner = React.lazy(() => import("./components/CookieConsentBanner"))
 const PageNotFound = React.lazy(() => import("./pages/pagenotfound/PageNotFound"))
 
 function LazyFallback() {
@@ -149,7 +143,7 @@ function AppWrapper() {
       </ErrorBoundary>
       <Suspense fallback={null}><SupportWidget /></Suspense>
       <Footer />
-      <Suspense fallback={null}><CookieConsent /></Suspense>
+      <Suspense fallback={null}><CookieConsentBanner /></Suspense>
       <ToastContainer position="top-right" newestOnTop pauseOnFocusLoss={false} />
     </>
   );

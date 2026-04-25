@@ -131,7 +131,7 @@ export default function ProfilePage() {
               onChange={(e) => setName(e.target.value)}
               required
               maxLength={100}
-              className="w-full rounded-xl border border-border-subtle bg-bg-surface px-4 py-2.5 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary"
+              className="w-full rounded-xl border border-border-subtle bg-bg-surface px-4 py-2.5 text-base text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary"
             />
           </div>
 
@@ -145,7 +145,7 @@ export default function ProfilePage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               maxLength={200}
-              className="w-full rounded-xl border border-border-subtle bg-bg-surface px-4 py-2.5 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary"
+              className="w-full rounded-xl border border-border-subtle bg-bg-surface px-4 py-2.5 text-base text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary"
             />
           </div>
 
@@ -159,7 +159,7 @@ export default function ProfilePage() {
               maxLength={10}
               inputMode="numeric"
               placeholder="10-digit Indian mobile"
-              className={`w-full rounded-xl border bg-bg-surface px-4 py-2.5 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary ${phoneError ? "border-red-400" : "border-border-subtle"}`}
+              className={`w-full rounded-xl border bg-bg-surface px-4 py-2.5 text-base text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary ${phoneError ? "border-red-400" : "border-border-subtle"}`}
             />
             {phoneError && <p className="text-xs text-red-600">{phoneError}</p>}
           </div>

@@ -578,14 +578,14 @@ export const Apartments = () => {
             <div className="flex flex-wrap gap-4 justify-center">
               <button
                 onClick={fetchData}
-                className="px-6 py-2 bg-cta-primary text-[var(--text-contrast)] rounded-full hover:bg-cta-secondary transition-colors"
+                className="px-6 py-3 bg-cta-primary text-[var(--text-contrast)] rounded-full hover:bg-cta-secondary transition-colors"
                 disabled={fetchState === "loading"}
               >
                 {fetchState === "loading" ? "Refreshing..." : "Retry loading"}
               </button>
               <button
                 onClick={() => window.location.href = '/'}
-                className="px-6 py-2 bg-bg-muted text-text-primary rounded-full hover:bg-border-subtle transition-colors"
+                className="px-6 py-3 bg-bg-muted text-text-primary rounded-full hover:bg-border-subtle transition-colors"
               >
                 Go to Home
               </button>

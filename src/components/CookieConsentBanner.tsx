@@ -63,14 +63,14 @@ const CookieConsentBanner = () => {
             <button
               type="button"
               onClick={onReject}
-              className="px-4 py-2 rounded-xl border border-border-subtle text-text-primary font-semibold hover:border-primary flex-1 md:flex-none"
+              className="px-4 py-4 rounded-xl border border-border-subtle text-text-primary font-semibold hover:border-primary flex-1 md:flex-none"
             >
               Reject non-essential
             </button>
             <button
               type="button"
               onClick={onAccept}
-              className="px-4 py-2 rounded-xl bg-primary text-[var(--text-contrast)] font-semibold hover:shadow-level2 flex-1 md:flex-none"
+              className="px-4 py-4 rounded-xl bg-primary text-[var(--text-contrast)] font-semibold hover:shadow-level2 flex-1 md:flex-none"
             >
               Accept all
             </button>

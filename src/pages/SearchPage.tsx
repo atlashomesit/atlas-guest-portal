@@ -114,14 +114,28 @@ const SearchPage = () => {
   const minPrice = Number(searchParams.get("minPrice")) || null;
   const maxPrice = Number(searchParams.get("maxPrice")) || null;
   const remoteWork = searchParams.get("remoteWork") === "true";
+  const amenitiesParam = searchParams.get("amenities") || "";
+  const selectedAmenities = amenitiesParam ? amenitiesParam.split(",") : [];
 
   const hasInvalidDates = Boolean(checkIn && checkOut && checkOut <= checkIn);
-  const hasActiveFilters = Boolean(minPrice || maxPrice || remoteWork);
+  const hasActiveFilters = Boolean(minPrice || maxPrice || remoteWork || selectedAmenities.length > 0);
 
   const listings = useMemo(
     () => apiListings ?? buildStaticListings(),
     [apiListings],
   );
+
+  const hasAmenity = (unit: NormalizedListing, amenity: string): boolean => {
+    const amenityIcons = (unit.amenities || []).map(a => (a.amenities_icon || "").toLowerCase());
+    const amenityMap: Record<string, string[]> = {
+      ac: ["ac", "air conditioning", "air-conditioner"],
+      parking: ["parking", "garage"],
+      pool: ["pool", "swimming"],
+      wifi: ["wifi", "internet"],
+    };
+    const targets = amenityMap[amenity.toLowerCase()] || [];
+    return targets.some(target => amenityIcons.some(icon => icon.includes(target)));
+  };
 
   const filteredUnits = useMemo(() => {
     if (hasInvalidDates) return [];
@@ -135,13 +149,18 @@ const SearchPage = () => {
         const isRemoteWorkFriendly = (unit as any).hasCoworkingDesk || ((unit as any).wifiSpeedMbps ?? 0) >= 25;
         if (!isRemoteWorkFriendly) return false;
       }
+      // Filter by selected amenities
+      if (selectedAmenities.length > 0) {
+        const hasAllSelectedAmenities = selectedAmenities.every(amenity => hasAmenity(unit, amenity));
+        if (!hasAllSelectedAmenities) return false;
+      }
       return true;
     });
-  }, [guests, hasInvalidDates, listings, minPrice, maxPrice, remoteWork]);
+  }, [guests, hasInvalidDates, listings, minPrice, maxPrice, remoteWork, selectedAmenities]);
 
   useEffect(() => {
     setVisibleCount(ITEMS_PER_PAGE);
-  }, [guests, hasInvalidDates, minPrice, maxPrice, remoteWork]);
+  }, [guests, hasInvalidDates, minPrice, maxPrice, remoteWork, selectedAmenities]);
 
   const updateParam = (key: string, value: string) => {
     setSearchParams((prev) => {
@@ -152,11 +171,19 @@ const SearchPage = () => {
     }, { replace: true });
   };
 
+  const toggleAmenity = (amenity: string) => {
+    const newAmenities = selectedAmenities.includes(amenity)
+      ? selectedAmenities.filter(a => a !== amenity)
+      : [...selectedAmenities, amenity];
+    updateParam("amenities", newAmenities.join(","));
+  };
+
   const clearFilters = () => {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
       next.delete("minPrice");
       next.delete("maxPrice");
+      next.delete("amenities");
       return next;
     }, { replace: true });
   };
@@ -189,7 +216,7 @@ const SearchPage = () => {
               placeholder="₹ Any"
               value={minPrice ?? ""}
               onChange={(e) => updateParam("minPrice", e.target.value)}
-              className="w-32 rounded-lg border border-border-subtle bg-bg-muted px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-cta-primary"
+              className="w-32 rounded-lg border border-border-subtle bg-bg-muted px-3 py-2 text-base text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-cta-primary"
             />
           </div>
           <div className="flex flex-col gap-1">
@@ -201,7 +228,7 @@ const SearchPage = () => {
               placeholder="₹ Any"
               value={maxPrice ?? ""}
               onChange={(e) => updateParam("maxPrice", e.target.value)}
-              className="w-32 rounded-lg border border-border-subtle bg-bg-muted px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-cta-primary"
+              className="w-32 rounded-lg border border-border-subtle bg-bg-muted px-3 py-2 text-base text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-cta-primary"
             />
           </div>
           <div className="flex flex-col gap-1">
@@ -214,7 +241,7 @@ const SearchPage = () => {
               placeholder="Any"
               value={guests ?? ""}
               onChange={(e) => updateParam("guests", e.target.value)}
-              className="w-24 rounded-lg border border-border-subtle bg-bg-muted px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-cta-primary"
+              className="w-24 rounded-lg border border-border-subtle bg-bg-muted px-3 py-2 text-base text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-cta-primary"
             />
           </div>
           <label className="flex items-center gap-2 rounded-lg border border-border-subtle bg-bg-muted px-3 py-2 text-sm">
@@ -235,12 +262,30 @@ const SearchPage = () => {
               <button
                 type="button"
                 onClick={clearFilters}
-                className="rounded-lg border border-border-subtle px-3 py-2 text-xs font-medium text-text-muted hover:bg-bg-muted focus:outline-none"
+                className="rounded-lg border border-border-subtle px-3 py-3 text-xs font-medium text-text-muted hover:bg-bg-muted focus:outline-none"
               >
                 Clear filters
               </button>
             )}
           </div>
+        </div>
+
+        {/* Amenity filters */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-text-muted uppercase tracking-wide">Amenities:</span>
+          {["AC", "Parking", "Pool", "WiFi"].map((amenity) => (
+            <button
+              key={amenity}
+              onClick={() => toggleAmenity(amenity)}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors min-h-11 ${
+                selectedAmenities.includes(amenity)
+                  ? "bg-cta-primary text-white border border-cta-primary"
+                  : "bg-bg-surface border border-border-subtle text-text-primary hover:border-cta-primary"
+              } focus:outline-none focus:ring-2 focus:ring-cta-primary focus:ring-offset-2`}
+            >
+              {amenity}
+            </button>
+          ))}
         </div>
 
         {!isLoading && apiListings === null && listings.length > 0 && (

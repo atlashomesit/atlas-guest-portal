@@ -95,7 +95,7 @@ export default function FavoritesPage() {
               <div className="px-4 pb-4">
                 <Link
                   to={`/homes/${String(l.propertyName ?? "home").toLowerCase().replace(/\\s+/g, "-")}/${l.id}`}
-                  className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-2 hover:opacity-95 transition-opacity"
+                  className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-3 hover:opacity-95 transition-opacity"
                 >
                   Book now
                 </Link>

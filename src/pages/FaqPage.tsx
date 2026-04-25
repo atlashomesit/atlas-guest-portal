@@ -142,7 +142,7 @@ const FaqPage = () => {
                 href={whatsappLink}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-bg-surface text-primary font-semibold rounded-xl shadow-level1 hover:shadow-level2"
+                className="inline-flex items-center gap-2 px-4 py-3 bg-bg-surface text-primary font-semibold rounded-xl shadow-level1 hover:shadow-level2"
               >
                 Message on WhatsApp
               </a>

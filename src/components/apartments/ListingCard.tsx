@@ -240,7 +240,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
               </div>
               <button
                 type="button"
-                className="inline-flex flex-1 items-center justify-center rounded-full bg-[color:var(--brand)] px-4 py-2 text-sm font-semibold text-[color:var(--text-contrast)] shadow-level1 transition duration-150 hover:-translate-y-0.5 hover:shadow-level2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brand)]"
+                className="inline-flex flex-1 items-center justify-center rounded-full bg-[color:var(--brand)] px-4 py-4 text-sm font-semibold text-[color:var(--text-contrast)] shadow-level1 transition duration-150 hover:-translate-y-0.5 hover:shadow-level2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brand)]"
                 onClick={(event) => {
                   event.stopPropagation();
                   onClick?.();

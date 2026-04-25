@@ -216,7 +216,7 @@ export default function ReviewSubmitPage() {
               onChange={(e) => setTitle(e.target.value)}
               placeholder="A few words to sum it up"
               maxLength={100}
-              className="w-full rounded-xl border border-border-subtle bg-bg-surface px-4 py-2.5 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary"
+              className="w-full rounded-xl border border-border-subtle bg-bg-surface px-4 py-2.5 text-base text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary"
             />
           </div>
 
@@ -233,7 +233,7 @@ export default function ReviewSubmitPage() {
               rows={5}
               maxLength={1000}
               required
-              className="w-full rounded-xl border border-border-subtle bg-bg-surface px-4 py-2.5 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary resize-none"
+              className="w-full rounded-xl border border-border-subtle bg-bg-surface px-4 py-2.5 text-base text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary resize-none"
             />
             <p className="text-xs text-text-muted text-right">{body.length}/1000</p>
           </div>
@@ -247,9 +247,35 @@ export default function ReviewSubmitPage() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full rounded-xl bg-brand-primary hover:bg-brand-primary/90 text-white font-semibold py-3 text-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            aria-busy={submitting}
+            className="w-full rounded-xl bg-brand-primary hover:bg-brand-primary/90 text-white font-semibold py-3 text-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            {submitting ? "Submitting…" : "Submit Review"}
+            {submitting && (
+              // TASK-837: inline spinner reassures guests on slow connections
+              // that the submission is in-flight (prevents double-taps).
+              <svg
+                className="animate-spin h-4 w-4 text-white"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                />
+              </svg>
+            )}
+            <span>{submitting ? "Submitting…" : "Submit Review"}</span>
           </button>
         </form>
 

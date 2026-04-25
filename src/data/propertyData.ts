@@ -1,5 +1,3 @@
-// import { LOGO_URL } from "../config/branding"; // Unused import
-
 const propertyImagePaths: Record<string, string[]> = {
     "101": [
         'https://atlashomestorage.blob.core.windows.net/listing-images/101/cover.jpg',

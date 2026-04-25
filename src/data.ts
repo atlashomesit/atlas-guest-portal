@@ -691,9 +691,6 @@ import {
 } from 'react-icons/fa';
 import { ImGithub } from 'react-icons/im';
 import { IoIosMail, IoIosCall, IoIosArrowForward } from 'react-icons/io';
-// import { p } from "framer-motion/client";
-// import ExclusiveService_Card from "./components/homepage_components/homepage_exclusiveservice/ExclusiveService_Card";
-
 // Define icon keys as a union type
 export type IconKey =
     | 'FaFacebook'

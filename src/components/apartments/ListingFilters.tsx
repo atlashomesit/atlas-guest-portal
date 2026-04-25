@@ -41,7 +41,7 @@ const ListingFilters: React.FC<ListingFiltersProps> = ({
           max={selectedMaxPrice}
           value={selectedMinPrice}
           onChange={(event) => onPriceChange("min", Number(event.target.value) || priceMin)}
-          className="w-full rounded-lg border border-border-subtle px-3 py-2 text-sm bg-bg-surface text-text-primary focus:border-cta-primary focus:outline-none focus:ring-1 focus:ring-cta-primary"
+          className="w-full rounded-lg border border-border-subtle px-3 py-2 text-base bg-bg-surface text-text-primary focus:border-cta-primary focus:outline-none focus:ring-1 focus:ring-cta-primary"
         />
       </label>
 
@@ -53,7 +53,7 @@ const ListingFilters: React.FC<ListingFiltersProps> = ({
           max={priceMax}
           value={selectedMaxPrice}
           onChange={(event) => onPriceChange("max", Number(event.target.value) || priceMax)}
-          className="w-full rounded-lg border border-border-subtle px-3 py-2 text-sm bg-bg-surface text-text-primary focus:border-cta-primary focus:outline-none focus:ring-1 focus:ring-cta-primary"
+          className="w-full rounded-lg border border-border-subtle px-3 py-2 text-base bg-bg-surface text-text-primary focus:border-cta-primary focus:outline-none focus:ring-1 focus:ring-cta-primary"
         />
       </label>
 
@@ -65,7 +65,7 @@ const ListingFilters: React.FC<ListingFiltersProps> = ({
           max={8}
           value={guests}
           onChange={(event) => onGuestsChange(Number(event.target.value) || 1)}
-          className="w-full rounded-lg border border-border-subtle px-3 py-2 text-sm bg-bg-surface text-text-primary focus:border-cta-primary focus:outline-none focus:ring-1 focus:ring-cta-primary"
+          className="w-full rounded-lg border border-border-subtle px-3 py-2 text-base bg-bg-surface text-text-primary focus:border-cta-primary focus:outline-none focus:ring-1 focus:ring-cta-primary"
         />
       </label>
 
@@ -74,7 +74,7 @@ const ListingFilters: React.FC<ListingFiltersProps> = ({
         <select
           value={propertyType}
           onChange={(event) => onPropertyTypeChange(event.target.value)}
-          className="w-full rounded-lg border border-border-subtle px-3 py-2 text-sm bg-bg-surface text-text-primary focus:border-cta-primary focus:outline-none focus:ring-1 focus:ring-cta-primary"
+          className="w-full rounded-lg border border-border-subtle px-3 py-2 text-base bg-bg-surface text-text-primary focus:border-cta-primary focus:outline-none focus:ring-1 focus:ring-cta-primary"
         >
           <option value="all">All</option>
           <option value="Penthouse">Penthouse</option>
@@ -99,7 +99,7 @@ const ListingFilters: React.FC<ListingFiltersProps> = ({
         <select
           value={sortBy}
           onChange={(event) => onSortChange(event.target.value)}
-          className="w-full rounded-lg border border-border-subtle px-3 py-2 text-sm bg-bg-surface text-text-primary focus:border-cta-primary focus:outline-none focus:ring-1 focus:ring-cta-primary"
+          className="w-full rounded-lg border border-border-subtle px-3 py-2 text-base bg-bg-surface text-text-primary focus:border-cta-primary focus:outline-none focus:ring-1 focus:ring-cta-primary"
         >
           <option value="featured">Featured</option>
           <option value="price">Price</option>

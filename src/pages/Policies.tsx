@@ -88,7 +88,7 @@ const Policies = () => {
                       return (
                         <a
                           key={ref}
-                          className="text-sm px-3 py-1 rounded-full bg-bg-muted text-primary font-semibold hover:bg-primary/10"
+                          className="text-sm px-3 py-2 rounded-full bg-bg-muted text-primary font-semibold hover:bg-primary/10"
                           href={`/terms#${ref}`}
                         >
                           Terms: {term?.title || ref}
@@ -98,9 +98,10 @@ const Policies = () => {
                     <button
                       type="button"
                       onClick={() => toggle(section.id)}
-                      className="text-sm font-semibold px-3 py-2 rounded-full border border-border-subtle hover:border-cta-primary text-primary"
+                      className="text-sm font-semibold px-3 py-3 rounded-full border border-border-subtle hover:border-cta-primary text-primary"
                       aria-expanded={open.has(section.id)}
                       aria-controls={`${section.id}-details`}
+                      aria-label={open.has(section.id) ? `Hide details for ${section.title}` : `Read details for ${section.title}`}
                     >
                       {open.has(section.id) ? "Hide details" : "Read details"}
                     </button>
@@ -136,7 +137,8 @@ const Policies = () => {
                 href={whatsappLink}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-bg-surface text-primary font-semibold rounded-xl shadow-level1 hover:shadow-level2"
+                aria-label="Contact Atlas support on WhatsApp"
+                className="inline-flex items-center gap-2 px-4 py-3 bg-bg-surface text-primary font-semibold rounded-xl shadow-level1 hover:shadow-level2"
               >
                 Message on WhatsApp
               </a>

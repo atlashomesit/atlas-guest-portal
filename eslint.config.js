@@ -19,6 +19,22 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
+      // react-hooks@7.x added React Compiler rules not yet enforced in this codebase
+      'react-hooks/static-components': 'off',
+      'react-hooks/use-memo': 'off',
+      'react-hooks/preserve-manual-memoization': 'off',
+      'react-hooks/incompatible-library': 'off',
+      'react-hooks/immutability': 'off',
+      'react-hooks/globals': 'off',
+      'react-hooks/refs': 'off',
+      'react-hooks/set-state-in-effect': 'off',
+      'react-hooks/error-boundaries': 'off',
+      'react-hooks/purity': 'off',
+      'react-hooks/set-state-in-render': 'off',
+      'react-hooks/unsupported-syntax': 'off',
+      'react-hooks/config': 'off',
+      'react-hooks/gating': 'off',
+      'preserve-caught-error': 'off',
       'no-undef': 'off',
       '@typescript-eslint/no-unused-vars': [
         'error',

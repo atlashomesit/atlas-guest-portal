@@ -114,6 +114,11 @@ export default function BookingConfirmationPage() {
       ? buildApiUrl(`/api/guest/bookings/${bookingId}/invoice/pdf?t=${encodeURIComponent(token)}`)
       : "";
 
+  const voucherUrl =
+    bookingId && token
+      ? buildApiUrl(`/api/guest/bookings/${bookingId}/voucher?t=${encodeURIComponent(token)}`)
+      : "";
+
   if (error || !booking) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center px-4">
@@ -369,9 +374,28 @@ export default function BookingConfirmationPage() {
               target="_blank"
               rel="noopener noreferrer"
               data-testid="download-invoice-btn"
-              className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-2.5 hover:opacity-95 transition-opacity"
+              className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-3.5 hover:opacity-95 transition-opacity"
             >
               Download invoice (PDF)
+            </a>
+          </div>
+        )}
+
+        {/* Booking confirmation voucher (printable arrival document) */}
+        {!isCancelled && voucherUrl && (
+          <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3">
+            <h2 className="text-sm font-semibold text-text-primary">Booking confirmation voucher</h2>
+            <p className="text-xs text-text-secondary leading-relaxed">
+              Print or share this confirmation as your proof of booking. Present it during check-in.
+            </p>
+            <a
+              href={voucherUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="download-voucher-btn"
+              className="inline-flex items-center justify-center rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-3.5 hover:bg-brand-primary/5 transition-colors"
+            >
+              Download voucher (PDF)
             </a>
           </div>
         )}
@@ -509,27 +533,30 @@ export default function BookingConfirmationPage() {
             <h2 className="text-sm font-semibold text-text-primary">Request booking changes</h2>
             <p className="text-sm text-text-secondary">Need a different date or guest count? Send a request and we will review it.</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* TASK-959: bump booking-modification inputs to py-3 so they meet the 48px
+                  minimum tap target. Text is already text-base (16px) which prevents the
+                  iOS Safari auto-zoom on focus. */}
               <label className="text-sm text-text-secondary">
                 New check-in
-                <input type="date" value={modCheckin} onChange={(e) => setModCheckin(e.target.value)} className="mt-1 w-full rounded-md border border-border-subtle px-3 py-2 text-sm" />
+                <input type="date" value={modCheckin} onChange={(e) => setModCheckin(e.target.value)} className="mt-1 w-full rounded-md border border-border-subtle px-3 py-3 text-base" />
               </label>
               <label className="text-sm text-text-secondary">
                 New check-out
-                <input type="date" value={modCheckout} onChange={(e) => setModCheckout(e.target.value)} className="mt-1 w-full rounded-md border border-border-subtle px-3 py-2 text-sm" />
+                <input type="date" value={modCheckout} onChange={(e) => setModCheckout(e.target.value)} className="mt-1 w-full rounded-md border border-border-subtle px-3 py-3 text-base" />
               </label>
               <label className="text-sm text-text-secondary sm:col-span-2">
                 Guest count (optional)
-                <input type="number" min={1} value={modGuests} onChange={(e) => setModGuests(e.target.value)} className="mt-1 w-full rounded-md border border-border-subtle px-3 py-2 text-sm" />
+                <input type="number" min={1} value={modGuests} onChange={(e) => setModGuests(e.target.value)} className="mt-1 w-full rounded-md border border-border-subtle px-3 py-3 text-base" />
               </label>
               <label className="text-sm text-text-secondary sm:col-span-2">
                 Note (optional)
-                <textarea value={modNote} onChange={(e) => setModNote(e.target.value)} rows={3} className="mt-1 w-full rounded-md border border-border-subtle px-3 py-2 text-sm" />
+                <textarea value={modNote} onChange={(e) => setModNote(e.target.value)} rows={3} className="mt-1 w-full rounded-md border border-border-subtle px-3 py-2.5 text-base" />
               </label>
             </div>
             <button
               onClick={submitModificationRequest}
               disabled={modSubmitting}
-              className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-2.5 disabled:opacity-50"
+              className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-3.5 disabled:opacity-50"
             >
               {modSubmitting ? "Submitting..." : "Submit request"}
             </button>

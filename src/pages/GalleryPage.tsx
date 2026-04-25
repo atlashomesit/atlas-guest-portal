@@ -93,7 +93,7 @@ const GalleryPage = () => {
                 <button
                   key={segment.id}
                   onClick={() => setActiveSegment(segment.id)}
-                  className={`rounded-full border px-4 py-2 text-sm font-semibold transition shadow-sm ${
+                  className={`rounded-full border px-4 py-4 text-sm font-semibold transition shadow-sm ${
                     activeSegment === segment.id
                       ? "bg-primary text-[var(--text-contrast)] border-primary"
                       : "bg-bg-muted text-text-primary border-border-subtle hover:border-primary"

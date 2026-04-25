@@ -415,10 +415,17 @@ const BecomeHost = () => {
         throw new Error(body?.message || "Onboarding request failed.");
       }
 
+      // TASK-764: store propertyId so SetupWizard can PUT the existing draft
+      // property instead of POSTing a second one (which would trigger PLAN_LIMIT_REACHED).
+      const data = await res.json().catch(() => null);
+      if (data?.propertyId) {
+        localStorage.setItem('onboarding_property_id', String(data.propertyId));
+      }
+
       setSubmitStatus("success");
       localStorage.removeItem(DRAFT_KEY);
       toast.success("Your property has been registered!");
-      logUserAction("onboarding_started", { status: "success", feature: "become-host" });
+      logUserAction("onboarding_started", { status: "success", feature: "become-host", propertyId: data?.propertyId });
     } catch (err) {
       reportError(err, { feature: "become-host-submit" });
       toast.error("Something went wrong. Please try again.");
