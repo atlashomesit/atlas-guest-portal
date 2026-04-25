@@ -114,11 +114,12 @@ const SearchPage = () => {
   const minPrice = Number(searchParams.get("minPrice")) || null;
   const maxPrice = Number(searchParams.get("maxPrice")) || null;
   const remoteWork = searchParams.get("remoteWork") === "true";
+  const longStay = searchParams.get("longStay") === "true";
   const amenitiesParam = searchParams.get("amenities") || "";
   const selectedAmenities = amenitiesParam ? amenitiesParam.split(",") : [];
 
   const hasInvalidDates = Boolean(checkIn && checkOut && checkOut <= checkIn);
-  const hasActiveFilters = Boolean(minPrice || maxPrice || remoteWork || selectedAmenities.length > 0);
+  const hasActiveFilters = Boolean(minPrice || maxPrice || remoteWork || longStay || selectedAmenities.length > 0);
 
   const listings = useMemo(
     () => apiListings ?? buildStaticListings(),
@@ -149,6 +150,11 @@ const SearchPage = () => {
         const isRemoteWorkFriendly = (unit as any).hasCoworkingDesk || ((unit as any).wifiSpeedMbps ?? 0) >= 25;
         if (!isRemoteWorkFriendly) return false;
       }
+      // TASK-1025: Filter by long-stay (7+ night minimum)
+      if (longStay) {
+        const minStay = (unit as any).minStay ?? 1;
+        if (minStay < 7) return false;
+      }
       // Filter by selected amenities
       if (selectedAmenities.length > 0) {
         const hasAllSelectedAmenities = selectedAmenities.every(amenity => hasAmenity(unit, amenity));
@@ -156,11 +162,11 @@ const SearchPage = () => {
       }
       return true;
     });
-  }, [guests, hasInvalidDates, listings, minPrice, maxPrice, remoteWork, selectedAmenities]);
+  }, [guests, hasInvalidDates, listings, longStay, minPrice, maxPrice, remoteWork, selectedAmenities]);
 
   useEffect(() => {
     setVisibleCount(ITEMS_PER_PAGE);
-  }, [guests, hasInvalidDates, minPrice, maxPrice, remoteWork, selectedAmenities]);
+  }, [guests, hasInvalidDates, longStay, minPrice, maxPrice, remoteWork, selectedAmenities]);
 
   const updateParam = (key: string, value: string) => {
     setSearchParams((prev) => {
@@ -253,6 +259,16 @@ const SearchPage = () => {
               className="cursor-pointer"
             />
             <span className="text-text-primary">Remote work friendly</span>
+          </label>
+          <label className="flex items-center gap-2 rounded-lg border border-border-subtle bg-bg-muted px-3 py-2 text-sm">
+            <input
+              type="checkbox"
+              id="filter-long-stay"
+              checked={longStay}
+              onChange={(e) => updateParam("longStay", e.target.checked ? "true" : "")}
+              className="cursor-pointer"
+            />
+            <span className="text-text-primary">Long stay (7+ nights)</span>
           </label>
           <div className="ml-auto flex items-end gap-3">
             {!isLoading && (
@@ -387,6 +403,11 @@ const SearchPage = () => {
                       <p className="text-xs text-text-muted">
                         Est. total: {formatCurrency(Math.round(unit.pricePerNight * 1.12))} (incl. 12% GST)
                       </p>
+                      {longStay && (
+                        <p className="text-sm font-semibold text-cta-primary">
+                          from {formatCurrency(unit.pricePerNight * 30)}/month
+                        </p>
+                      )}
                     </div>
                     <div className="flex flex-col gap-1 text-right text-xs text-text-muted">
                       {unit.amenities.map((amenity, index) => (

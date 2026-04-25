@@ -53,6 +53,8 @@ export type PublicListing = {
   wifiSpeedMbps?: number | null;
   /** TASK-577: Whether co-working desk is available. */
   hasCoworkingDesk?: boolean;
+  /** TASK-1025: Minimum stay requirement in nights. */
+  minStay?: number | null;
 };
 
 function normalizePublicListing(payload: Record<string, unknown>): PublicListing {
@@ -60,6 +62,7 @@ function normalizePublicListing(payload: Record<string, unknown>): PublicListing
   const maxGuests = Number(payload.maxGuests ?? 0);
   const rawRate = payload.baseNightlyRate;
   const photos = payload.photoUrls;
+  const minStay = payload.minStay != null ? Number(payload.minStay) : null;
   return {
     id: Number.isFinite(id) ? id : 0,
     propertyId:
@@ -106,6 +109,7 @@ function normalizePublicListing(payload: Record<string, unknown>): PublicListing
         ? null
         : Number(payload.wifiSpeedMbps),
     hasCoworkingDesk: Boolean(payload.hasCoworkingDesk),
+    minStay: Number.isFinite(minStay) && minStay > 0 ? minStay : null,
   };
 }
 
