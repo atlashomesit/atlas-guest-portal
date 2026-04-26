@@ -2329,7 +2329,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         className={isSubmitting || isLoading ? 'opacity-75' : ''}
         data-testid="guest-booking-submit"
       >
-        {isBookingDisabled ? 'Unavailable' : isSubmitting || isLoading ? 'Processing...' : 'Book this home'}
+        {isBookingDisabled ? 'Unavailable' : isSubmitting || isLoading ? 'Processing...' : 'Book Now'}
       </Button>
       {!isBookingDisabled && (
         <div className="flex items-center gap-2 mt-2 flex-wrap justify-center">
