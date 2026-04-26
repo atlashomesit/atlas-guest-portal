@@ -1,8 +1,28 @@
-# Agent instructions (RatebotaiRepo — Atlas guest frontend)
+# Agent instructions (atlas-guest-portal)
 
 For AI assistants (Cursor, Codex, etc.) working in this repo:
 
 - **PRs and CI:** Run lint, build, and tests locally before suggesting a PR (see [CONTRIBUTING.md](CONTRIBUTING.md)). The **CI** workflow (`.github/workflows/ci.yml`) must pass before merge. Status check name for branch protection: **build**.
-- **Feature work:** Backend roadmap and execution workflow live at the workspace root — see `ATLAS-HIGH-VALUE-BACKLOG.md` and `ATLAS-FEATURE-EXECUTION-PROMPT.md` when changes span API and guest frontend.
+- **Feature work:** Product roadmap and execution workflow live in [atlas-e2e/docs/product/](../atlas-e2e/docs/product/) — use `backlog.md` and `ATLAS-DEVELOPER-TASKS.md` for current priorities spanning API + guest frontend.
 - **Docs:** See `docs/design-system.md`, `docs/short-links.md`, and README for theming, short links, and project map. Messaging/booking integration: `atlas-api/docs/eventing-servicebus-implementation-plan.md`.
 - **Security (CISO):** Cloudflare Pages serves `public/_headers` (CSP, HSTS, frame-ancestors). When adding third-party scripts or API origins, update `_headers` and note the change in `atlas-e2e/docs/context/integration-contract.md` if it affects payments or auth.
+
+## Current architecture conventions
+
+- **Booking APIs are `/api/...`:** client modules should use `buildApiUrl("/api/...")` and not bare route prefixes.
+- **Contact/support details are centralized:** use `src/config/contact.ts` helpers for phone/WhatsApp links; avoid hardcoded numbers in page components.
+- **Banner usage:** common banner components must handle missing assets gracefully (fallback UI instead of broken `<img>`).
+- **CSP discipline:** any Razorpay, Maps, or analytics origin changes require matching `public/_headers` updates.
+
+## Recent architectural changes (since 2026-04-12)
+
+- `d7b264bb` — pricing endpoint paths fixed to canonical `/api/pricing/...` routes.
+- `1eccd4d0` + `9150baae` — contact/banner resilience: gradient fallback and missing-asset warning cleanup.
+- `1f12a4e2` — `dev` merged into `main` for guest portal release alignment.
+- `3f45a626` — booking confirmation voucher download feature added.
+- `428959e3` + `7d55c09e` — UX/accessibility polish batch across guest booking surfaces.
+- `494eaa67` — guest nationality compliance field shipped.
+- `4a2d76ed` — search amenity filters (AC/Parking/Pool/WiFi) added.
+- `ffa61c9a` + `b8e7cf16` — onboarding flow now stores `propertyId` from start response to avoid plan-limit dead end.
+- `b52b5965` + `329d4691` — Razorpay CSP allowlist tightened/updated in Cloudflare headers.
+- `7dd1d77b` + `cc496a0f` — CookieConsentBanner/DPDP privacy flow established as the active consent pattern.

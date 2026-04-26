@@ -18,7 +18,15 @@ interface TypographyProps<T extends TagName> extends HTMLAttributes<AllowedEleme
 }
 
 export function Typography<T extends TagName = "p">({ as, variant = "body", className, children, ...rest }: TypographyProps<T>) {
-  const Component = (as || variant) as keyof JSX.IntrinsicElements;
+  const variantTagMap: Record<TypographyVariant, TagName> = {
+    h1: "h1",
+    h2: "h2",
+    h3: "h3",
+    subtitle: "p",
+    body: "p",
+    muted: "span",
+  };
+  const Component = (as || variantTagMap[variant]) as keyof JSX.IntrinsicElements;
   const classes = ["rb-typography", `rb-typography--${variant}`, className].filter(Boolean).join(" ");
 
   return (

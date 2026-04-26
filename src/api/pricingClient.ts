@@ -70,8 +70,8 @@ export type CalendarPricingViewDto = {
   listings: CalendarPricingListingDto[];
 };
 
-const BREAKDOWN_ENDPOINT = '/pricing/breakdown';
-const DAILY_SUMMARY_ENDPOINT = '/pricing/daily-summary';
+const BREAKDOWN_ENDPOINT = '/api/pricing/breakdown';
+const DAILY_SUMMARY_ENDPOINT = '/api/pricing/daily-summary';
 
 export async function fetchPricingBreakdown(
   params: PricingBreakdownParams,

@@ -6,5 +6,9 @@ dist/
 .env
 .env.*
 !.env.example
+
+# Local dev logs
+*.log
+
 # Wrangler Pages Functions build output
 _worker.bundle/

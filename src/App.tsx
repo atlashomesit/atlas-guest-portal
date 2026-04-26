@@ -57,6 +57,19 @@ function LazyFallback() {
   )
 }
 
+function PropertyDetailsLazyFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="text-center max-w-xl px-4">
+        <h1 className="text-2xl font-semibold text-text-primary mb-4">Home Not Found</h1>
+        <div className="text-text-muted">
+          Loading property details...
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function AppWrapper() {
   const location = useLocation();
 
@@ -120,10 +133,10 @@ function AppWrapper() {
           <Route path="/privacy-policy" element={withBoundary(<PrivacyPage />, "privacy-policy-legacy-route")} />
           <Route path="/terms" element={withBoundary(<Terms />, "terms-route")} />
           <Route path="/terms-and-conditions" element={withBoundary(<Terms />, "terms-legacy-route")} />
-          <Route path="/homes/:propertySlug/:unitSlug" element={withBoundary(<Homepage_PropertyDetails />, "property-details-home-route")} />
+          <Route path="/homes/:propertySlug/:unitSlug" element={withBoundary(<Suspense fallback={<PropertyDetailsLazyFallback />}><Homepage_PropertyDetails /></Suspense>, "property-details-home-route")} />
           <Route path="/homes/:roomNo" element={withBoundary(<HomeDetails />, "home-details-route")} />
-          <Route path="/property_details/:id" element={withBoundary(<LegacyPropertyRedirect />, "property-details-legacy-route")} />
-          <Route path="/properties/:id" element={withBoundary(<LegacyPropertyRedirect />, "property-details-modern-redirect-route")} />
+          <Route path="/property_details/:id" element={withBoundary(<Suspense fallback={<PropertyDetailsLazyFallback />}><LegacyPropertyRedirect /></Suspense>, "property-details-legacy-route")} />
+          <Route path="/properties/:id" element={withBoundary(<Suspense fallback={<PropertyDetailsLazyFallback />}><LegacyPropertyRedirect /></Suspense>, "property-details-modern-redirect-route")} />
           <Route path="/reserve" element={withBoundary(<Reserve />, "reserve-route")} />
           <Route path="/booking/:bookingId" element={withBoundary(<BookingConfirmationPage />, "booking-confirmation-route")} />
           <Route path="/review/:bookingId" element={withBoundary(<ReviewSubmitPage />, "review-submit-route")} />
@@ -153,7 +166,7 @@ function App() {
   return (
     <BookingProvider>
       <ListingPhotosProvider>
-        <Router>
+        <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <AppWrapper />
         </Router>
       </ListingPhotosProvider>
