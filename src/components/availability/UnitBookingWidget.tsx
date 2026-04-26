@@ -165,10 +165,6 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     startDate: today,
     endDate: addDays(today, 1),
   });
-  // TASK-1229: Book Now must be disabled until the guest explicitly picks dates.
-  // dateRange is seeded with today/tomorrow for calendar rendering, so we track
-  // a separate "user touched the picker" flag.
-  const [datesUserSelected, setDatesUserSelected] = useState(false);
   const [openCalendar, setOpenCalendar] = useState(false);
   const [shownDate, setShownDate] = useState<Date>(today);
   const [calendarDailyPrices, setCalendarDailyPrices] = useState<Map<string, number>>(new Map());
@@ -676,7 +672,6 @@ const _isCheckOutAllowed = (date: Date) => {
 
 const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   setDateError(null);
-  setDatesUserSelected(true);
   const { startDate, endDate } = next;
 
   if (!startDate) {
@@ -2325,7 +2320,6 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         disabled={
           isSubmitting ||
           isLoading ||
-          !datesUserSelected ||
           !dateRange.startDate ||
           !dateRange.endDate ||
           isBookingDisabled ||
