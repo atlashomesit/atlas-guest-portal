@@ -671,7 +671,7 @@ useEffect(() => {
         return (
             <div className="min-h-screen flex items-center justify-center">
                 <div className="text-center max-w-xl px-4">
-                    <div className="text-2xl font-semibold text-text-primary mb-4">We couldn’t find that home.</div>
+                    <h1 className="text-2xl font-semibold text-text-primary mb-4">Home Not Found</h1>
                     <div className="text-text-muted">
                         Please check the link and try again, or head back to our homes catalog to continue browsing.
                     </div>
