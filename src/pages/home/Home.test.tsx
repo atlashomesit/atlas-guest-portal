@@ -10,6 +10,10 @@ vi.mock("../../utils/analytics", async () => {
   };
 });
 
+vi.mock("../../api/listingClient", () => ({
+  fetchPublicListings: vi.fn(() => Promise.resolve([])),
+}));
+
 import Home from "./Home";
 import { BookingProvider } from "../../contexts/BookingContext";
 
