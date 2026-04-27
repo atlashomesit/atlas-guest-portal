@@ -2,8 +2,8 @@ import React from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import Heading from "../../commonComponents/heading/Heading";
-import { LISTINGS, type Listing } from "../../../data/listings";
-import { propertyData, propertyImages } from "../../../data";
+import { type Listing } from "../../../data/listings";
+import { propertyImages } from "../../../data";
 import priceDisplayConfig from "../../../config/priceDisplay.config";
 import { calculateNightlyPrice, inferUnitType } from "../../../utils/pricing";
 import { sanitizeItems, getItemKey } from "../../../utils/sanitizeItems";
@@ -12,6 +12,7 @@ import { buildHomeUnitPath, getPropertySlug } from "../../../utils/navigation";
 import OptimizedImage from "../../ui/OptimizedImage";
 import { useDailyPricingSummary } from "../../../hooks/useDailyPricingSummary";
 import { useListingPhotosFromApi } from "../../../contexts/ListingPhotosContext";
+import { useTenantListings, type TenantPropertyRecord } from "../../../hooks/useTenantListings";
 import { filterGuestImageUrls } from "../../../utils/guestImageUrl";
 import { compareAtlasHomesBuildingOrder } from "../../../utils/atlasHomesBuildingOrder";
 
@@ -21,7 +22,7 @@ type HomePageLocationsProps = {
   listings?: unknown;
 };
 
-type PropertyRecord = (typeof propertyData)[number];
+type PropertyRecord = TenantPropertyRecord;
 
 type ListingModel = {
   listing: Listing;
@@ -115,6 +116,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
   const [activeImageIndex, setActiveImageIndex] = React.useState<Record<string, number>>({});
   const { loading: dailyPricingLoading, getListingPricing } = useDailyPricingSummary();
   const { getUrlsForListingId } = useListingPhotosFromApi();
+  const { listings: tenantListings, properties: tenantProperties } = useTenantListings();
 
   const getListingNavigation = React.useCallback(
     (model: ListingModel | null) => {
@@ -135,16 +137,16 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
 
   const propertyLookup = React.useMemo(
     () =>
-      propertyData.reduce<Record<string, PropertyRecord>>((acc, property) => {
+      tenantProperties.reduce<Record<string, PropertyRecord>>((acc, property) => {
         acc[String(property.id)] = property;
         return acc;
       }, {}),
-    [],
+    [tenantProperties],
   );
 
   const safeListings = React.useMemo(
-    () => sanitizeItems<Listing>(listings ?? LISTINGS),
-    [listings],
+    () => sanitizeItems<Listing>(listings ?? tenantListings),
+    [listings, tenantListings],
   );
 
   const sortedListings = React.useMemo(() => {

@@ -16,10 +16,8 @@ vi.mock('../utils/analytics', () => ({
   trackEvent: vi.fn(),
 }));
 
-vi.mock('../lib/monitoring', () => ({
-  isAtlasApiRequest: vi.fn(() => false),
-  logApiError: vi.fn(),
-  monitoredFetch: vi.fn(() => Promise.reject(new Error('network fail'))),
+vi.mock('../api/listingClient', () => ({
+  fetchPublicListings: vi.fn(() => Promise.reject(new Error('network fail'))),
 }));
 
 vi.mock('../runtime-config', async (importOriginal) => {
@@ -31,7 +29,7 @@ vi.mock('../runtime-config', async (importOriginal) => {
   };
 });
 
-import { monitoredFetch } from '../lib/monitoring';
+import { fetchPublicListings } from '../api/listingClient';
 import { Apartments } from './Apartments';
 
 describe('Apartments', () => {
@@ -42,7 +40,7 @@ describe('Apartments', () => {
       </MemoryRouter>
     );
 
-    await waitFor(() => expect(monitoredFetch).toHaveBeenCalled());
+    await waitFor(() => expect(fetchPublicListings).toHaveBeenCalled());
 
     // Async fetch + setState; release gate runs guest tests in parallel with API/admin — allow extra time
     await waitFor(
@@ -52,7 +50,6 @@ describe('Apartments', () => {
       { timeout: 10_000 },
     );
     expect(screen.getByText(/we couldn’t load this page/i)).toBeInTheDocument();
-    expect(screen.getByText(/attempted to reach: https:\/\/api.example.com/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /back to home/i })).toHaveAttribute('href', '/');
   });
