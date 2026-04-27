@@ -15,12 +15,12 @@ const resolveApiBaseUrl = (): string | null => {
 
 /** Headers to attach to Atlas API requests when contract requires tenant (e.g. X-Tenant-Slug). */
 export const getApiHeaders = (): Record<string, string> => {
-  // Prefer runtime config tenantKey so dev/staging can send "atlas" even when hostname is dev.atlashomestays.com
-  if (hasRuntimeConfig()) {
-    const configSlug = getRuntimeConfig().tenantKey?.trim();
-    if (configSlug) return { 'X-Tenant-Slug': configSlug };
-  }
-  const slug = getTenantSlug({ fallbackSlug: undefined });  if (!slug) return {};
+  // Priority matches tenantResolver: domain-resolved slug first, runtime config tenantKey only as
+  // fallback. This lets a single deploy serve multiple tenants by hostname while still allowing
+  // dev/staging to force a slug via ATLAS_TENANT_KEY when the hostname can't be resolved.
+  const fallbackSlug = hasRuntimeConfig() ? getRuntimeConfig().tenantKey?.trim() : undefined;
+  const slug = getTenantSlug({ fallbackSlug });
+  if (!slug) return {};
   return { 'X-Tenant-Slug': slug };
 };
 
