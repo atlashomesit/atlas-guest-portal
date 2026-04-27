@@ -421,6 +421,21 @@ const BecomeHost = () => {
       if (data?.propertyId) {
         localStorage.setItem('onboarding_property_id', String(data.propertyId));
       }
+      if (data?.listingId) {
+        localStorage.setItem('onboarding_listing_id', String(data.listingId));
+      }
+      if (data?.token) {
+        // Keep admin portal auth keys in sync for setup auto-login.
+        localStorage.setItem('atlas_admin_token', String(data.token));
+        localStorage.setItem('auth_token', String(data.token));
+      }
+      if (data?.tenantSlug) {
+        localStorage.setItem('auth_tenant_slug', String(data.tenantSlug));
+      }
+      if (data?.tenantId) {
+        localStorage.setItem('auth_tenant_id', String(data.tenantId));
+      }
+      localStorage.setItem('onboarding_user_email', contact.email.trim());
 
       setSubmitStatus("success");
       localStorage.removeItem(DRAFT_KEY);
@@ -448,10 +463,7 @@ const BecomeHost = () => {
                 to set up pricing, upload photos, and go live.
               </Typography>
               <a
-                href={
-                  import.meta.env.VITE_ADMIN_PORTAL_URL ||
-                  "https://app.atlaspms.in"
-                }
+                href={`${import.meta.env.VITE_ADMIN_PORTAL_URL || "https://app.atlaspms.in"}/onboarding/setup?auto_login=1`}
                 style={styles.adminLink}
               >
                 Open Admin Portal
