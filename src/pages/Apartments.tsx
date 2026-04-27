@@ -6,13 +6,12 @@ import ErrorLayout from "../components/ErrorLayout";
 import ListingCard from "../components/apartments/ListingCard";
 import ListingFilters from "../components/apartments/ListingFilters";
 import { LOGO_URL } from "../config/branding";
-import { LISTINGS, type Listing } from "../data/listings";
-import { propertyData, propertyImages } from "../data/propertyData";
-import { getApiBaseUrl } from "../runtime-config";
+import type { Listing } from "../data/listings";
+import { propertyImages } from "../data/propertyData";
+import { useTenantListings } from "../hooks/useTenantListings";
 import { trackEvent } from "../utils/analytics";
 import { buildHomeUnitPath, getPropertySlug, navigateToHomeUnit } from "../utils/navigation";
 import { calculateNightlyPrice, inferUnitType, type NightlyPriceBreakdown } from "../utils/pricing";
-import { isAtlasApiRequest, logApiError, monitoredFetch } from "../lib/monitoring";
 import type { UnitType } from "../config/pricing.config";
 
 type PropertyMetadata = {
@@ -107,26 +106,20 @@ const deriveAmenityFlag = (property: PropertyRecord, keyword: string): boolean =
     )
   );
 
-const buildApiUrl = (baseUrl: string, path: string): string => {
-  const normalizedBase = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
-  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-  return `${normalizedBase}${normalizedPath}`;
-};
-
 const sanitizeListings = (listingsInput: unknown): Listing[] => {
   try {
     if (!listingsInput) {
-      console.error("LISTINGS is undefined");
+      console.error("listingsSource is undefined");
       return [];
     }
 
     if (!Array.isArray(listingsInput)) {
-      console.error("LISTINGS is not an array:", listingsInput);
+      console.error("listingsSource is not an array:", listingsInput);
       return [];
     }
 
     if (listingsInput.length === 0) {
-      console.warn("LISTINGS is empty");
+      console.warn("listingsSource is empty");
       return [];
     }
 
@@ -147,7 +140,7 @@ const sanitizeListings = (listingsInput: unknown): Listing[] => {
       })
       .filter((listing) => Boolean(listing.id));
   } catch (error) {
-    console.error("Error processing LISTINGS:", error);
+    console.error("Error processing listingsSource:", error);
     return [];
   }
 };
@@ -155,17 +148,17 @@ const sanitizeListings = (listingsInput: unknown): Listing[] => {
 const sanitizeProperties = (propertiesInput: unknown): PropertyRecord[] => {
   try {
     if (!propertiesInput) {
-      console.error("propertyData is undefined");
+      console.error("propertiesSource is undefined");
       return [];
     }
 
     if (!Array.isArray(propertiesInput)) {
-      console.error("propertyData is not an array:", propertiesInput);
+      console.error("propertiesSource is not an array:", propertiesInput);
       return [];
     }
 
     if (propertiesInput.length === 0) {
-      console.warn("propertyData is empty");
+      console.warn("propertiesSource is empty");
       return [];
     }
 
@@ -210,7 +203,7 @@ const sanitizeProperties = (propertiesInput: unknown): PropertyRecord[] => {
       return safeProperty;
     });
   } catch (error) {
-    console.error("Error processing propertyData:", error);
+    console.error("Error processing propertiesSource:", error);
     return [];
   }
 };
@@ -219,93 +212,15 @@ export const Apartments = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [listingsSource, setListingsSource] = React.useState<Listing[]>(() => sanitizeListings(LISTINGS));
-  const [propertiesSource, setPropertiesSource] = React.useState<PropertyRecord[]>(() =>
-    sanitizeProperties(propertyData)
-  );
-  const [fetchState, setFetchState] = React.useState<"idle" | "loading" | "error" | "success">("idle");
-  const [statusMessage, setStatusMessage] = React.useState<string | null>(null);
-  const [apiBaseUrlUsed, setApiBaseUrlUsed] = React.useState<string>("");
+  const {
+    listings: listingsSource,
+    properties: propertiesSource,
+    state: fetchState,
+    refetch: fetchData,
+  } = useTenantListings();
 
   const safeListings = React.useMemo(() => sanitizeListings(listingsSource), [listingsSource]);
   const safeProperties = React.useMemo(() => sanitizeProperties(propertiesSource), [propertiesSource]);
-
-  const logStructuredError = React.useCallback(
-    (details: { url: string; status?: number; responseSnippet?: string; category?: "http" | "network" }) => {
-      logApiError(new Error("Apartments API request failed"), {
-        url: details.url,
-        status: details.status,
-        method: "GET",
-        responseSnippet: details.responseSnippet,
-        category: details.category ?? "http",
-        tags: { page: "apartments", apiBaseUrlUsed, atlasApi: String(isAtlasApiRequest(details.url)) },
-      });
-    },
-    [apiBaseUrlUsed],
-  );
-
-  const fetchFromApi = React.useCallback(
-    async <T,>(baseUrl: string, path: string): Promise<T | null> => {
-      const url = buildApiUrl(baseUrl, path);
-      try {
-        const response = await monitoredFetch(url, { requestName: path });
-        const text = await response.text();
-        const snippet = text.slice(0, 200);
-
-        if (!response.ok) {
-          logStructuredError({ url, status: response.status, responseSnippet: snippet, category: "http" });
-          throw new Error("We are unable to load apartments right now. Please try again shortly.");
-        }
-
-        try {
-          return JSON.parse(text) as T;
-        } catch (parseError) {
-          logStructuredError({ url, status: response.status, responseSnippet: snippet });
-          throw parseError;
-        }
-      } catch (error) {
-        if (!(error instanceof Error)) {
-          logStructuredError({ url, responseSnippet: String(error), category: "network" });
-        } else {
-          logStructuredError({ url, responseSnippet: error.message, category: "network" });
-        }
-        throw error;
-      }
-    },
-    [logStructuredError],
-  );
-
-  const fetchData = React.useCallback(async () => {
-    const resolvedBaseUrl = getApiBaseUrl();
-    setApiBaseUrlUsed(resolvedBaseUrl);
-
-    setFetchState("loading");
-
-    try {
-      const [listingsResponse, propertiesResponse] = await Promise.all([
-        fetchFromApi<Listing[]>(resolvedBaseUrl, "/listings"),
-        fetchFromApi<PropertyRecord[]>(resolvedBaseUrl, "/properties"),
-      ]);
-
-      if (listingsResponse) {
-        setListingsSource(sanitizeListings(listingsResponse));
-      }
-
-      if (propertiesResponse) {
-        setPropertiesSource(sanitizeProperties(propertiesResponse));
-      }
-
-      setFetchState("success");
-      setStatusMessage(null);
-    } catch {
-      setStatusMessage("We're having trouble loading apartments right now. Please try again.");
-      setFetchState("error");
-    }
-  }, [fetchFromApi]);
-
-  React.useEffect(() => {
-    fetchData();
-  }, [fetchData]);
 
   const [guests, setGuests] = React.useState(2);
   const [checkIn, setCheckIn] = React.useState<string | null>(null);
@@ -544,14 +459,10 @@ export const Apartments = () => {
         <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 md:px-8">
           <ErrorLayout
             title="We couldn’t load this page"
-            description={statusMessage ?? "We’re having trouble loading apartments right now. Please try again."}
+            description="We’re having trouble loading apartments right now. Please try again."
             primaryAction={{ label: "Try again", onClick: fetchData, disabled: fetchState === "loading" }}
             secondaryAction={{ label: "Back to home", href: "/" }}
-          >
-            {apiBaseUrlUsed && (
-              <p className="text-sm text-text-muted">Attempted to reach: {apiBaseUrlUsed}</p>
-            )}
-          </ErrorLayout>
+          />
         </div>
       </div>
     );
