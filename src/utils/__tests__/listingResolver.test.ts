@@ -86,6 +86,44 @@ describe('resolveListing', () => {
     expect(result).toBeNull();
   });
 
+  it('TASK-1185: garbage legacy slug does not false-match a short listing name (e.g. "In")', async () => {
+    fetchMock
+      .mockResolvedValueOnce(makeResponse({ ok: false, status: 404 }))
+      .mockResolvedValueOnce(
+        makeResponse({
+          ok: true,
+          status: 200,
+          json: async () => [{ name: 'In', listingId: 'in-1', propertyId: 'P1' }],
+        }),
+      );
+
+    const result = await resolveListing('invalid-slug-xyz-404');
+
+    expect(result).toBeNull();
+  });
+
+  it('accepts paged { items } shape from GET /listings/public', async () => {
+    fetchMock
+      .mockResolvedValueOnce(makeResponse({ ok: false, status: 404 }))
+      .mockResolvedValueOnce(
+        makeResponse({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            items: [{ name: 'Atlas102', listingId: 'atlas-102', propertyId: 'P102' }],
+          }),
+        }),
+      );
+
+    const result = await resolveListing('102');
+
+    expect(result).toMatchObject({
+      name: 'Atlas102',
+      id: 'atlas-102',
+      propertyId: 'P102',
+    });
+  });
+
   it('returns listing directly when param is Listing.Id (PK)', async () => {
     fetchMock.mockResolvedValueOnce(
       makeResponse({

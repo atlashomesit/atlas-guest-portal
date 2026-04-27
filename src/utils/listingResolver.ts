@@ -20,6 +20,22 @@ const normalizeMatchValue = (value: string) =>
     .toLowerCase()
     .replace(/[\s_-]+/g, '');
 
+/** Names shorter than this must not use "param includes name" matching (TASK-1185: "in"/"id" inside "invalid-…"). */
+const MIN_NORMALIZED_NAME_LEN_FOR_PARAM_INCLUDES = 8;
+
+const coercePublicListingsArray = (payload: unknown): Record<string, unknown>[] => {
+  if (Array.isArray(payload)) {
+    return payload.filter((e): e is Record<string, unknown> => Boolean(e) && typeof e === 'object');
+  }
+  if (payload && typeof payload === 'object') {
+    const items = (payload as { items?: unknown }).items;
+    if (Array.isArray(items)) {
+      return items.filter((e): e is Record<string, unknown> => Boolean(e) && typeof e === 'object');
+    }
+  }
+  return [];
+};
+
 const isAbortLikeError = (error: unknown, signal?: AbortSignal) => {
   if (signal?.aborted === true) {
     return true;
@@ -86,19 +102,17 @@ export const resolveListing = async (
       }
 
       const listPayload = (await listResponse.json()) as unknown;
-
-      if (!Array.isArray(listPayload)) {
-        return { listing: null, error: new Error('Listing response did not return an array') };
-      }
+      const listingRows = coercePublicListingsArray(listPayload);
 
       const normalizedParam = normalizeMatchValue(param);
       const atlasParam = `atlas${normalizedParam}`;
+      const paramIsAllDigits = /^\d+$/.test(normalizedParam);
+      const allowLooseNameIncludesParam =
+        normalizedParam.length >= 4 || paramIsAllDigits;
 
       // Try to find a match using different strategies
-      const match = listPayload.find((entry) => {
-        if (!entry || typeof entry !== 'object') return false;
-
-        const payload = entry as Record<string, unknown>;
+      const match = listingRows.find((entry) => {
+        const payload = entry;
         const name = (payload.name ?? payload.property_name ?? payload.title ?? payload.listingName) as
           | string
           | undefined;
@@ -115,10 +129,15 @@ export const resolveListing = async (
         if (normalizedName === atlasParam) return true;
 
         // 3. Match when param is a substring of the name (e.g., "501" matches "Atlas501_PH")
-        if (normalizedName.includes(normalizedParam)) return true;
+        if (allowLooseNameIncludesParam && normalizedName.includes(normalizedParam)) return true;
 
-        // 4. Match when name is a substring of the param
-        if (normalizedParam.includes(normalizedName)) return true;
+        // 4. Match when name is a substring of the param (strict min length — avoids "in"/"id" in "invalid-…")
+        if (
+          normalizedName.length >= MIN_NORMALIZED_NAME_LEN_FOR_PARAM_INCLUDES &&
+          normalizedParam.includes(normalizedName)
+        ) {
+          return true;
+        }
 
         return false;
       }) as Record<string, unknown> | undefined;
