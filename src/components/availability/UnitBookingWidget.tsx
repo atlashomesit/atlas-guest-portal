@@ -1192,7 +1192,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           guestNationality: bookingDraft.guestNationality,
           selectedAddOns: selectedAddOnsList.length > 0 ? selectedAddOnsList : undefined,
         },
-        amount: Math.round(finalTotal), // Keep amount in rupees, let backend handle conversion if needed
+        // TASK-1228: final amount is computed server-side from bookingDraft + pricing; do not send client amount.
         currency: 'INR',
         referralCode: referralCode.trim() ? referralCode.trim().slice(0, 32) : undefined,
         promoCode: promoCode.trim() ? promoCode.trim().slice(0, 32) : undefined,
