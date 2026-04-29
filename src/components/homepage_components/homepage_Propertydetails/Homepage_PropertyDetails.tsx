@@ -580,7 +580,7 @@ useEffect(() => {
         return () => ac.abort();
     }, [resolvedListingId, data?.listingId, listingId]);
 
-    // Prefetch admin calendar as soon as listing id resolves so date widget opens warm.
+    // Prefetch public availability calendar as soon as listing id resolves so date widget opens warm.
     useEffect(() => {
         const listingToPrefetch = Number(resolvedListingId ?? data?.listingId ?? listingId);
         if (!Number.isFinite(listingToPrefetch) || listingToPrefetch <= 0 || availabilityPrefetched) return;
@@ -591,7 +591,7 @@ useEffect(() => {
         const toDate = new Date(today);
         toDate.setDate(toDate.getDate() + 60);
         const to = toDate.toISOString().slice(0, 10);
-        const url = buildApiUrl(`/admin/calendar?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
+        const url = buildApiUrl(`/api/public/listings/${listingToPrefetch}/availability-calendar?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
         fetch(url, {
             method: 'GET',
             headers: { Accept: 'application/json', ...getApiHeaders() },
