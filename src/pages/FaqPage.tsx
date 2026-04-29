@@ -10,7 +10,7 @@ import { useScrollToHash } from "../hooks/useScrollToHash";
 import { CONTACT } from "../config/contact";
 import { buildWaLink, defaultPrefill } from "../utils/whatsapp";
 import FaqHighlights from "../components/faq/FaqHighlights";
-import { faqHighlights } from "../content/faqHighlights";
+import { getFaqHighlights } from "../content/faqHighlights";
 
 const FaqPage = () => {
   useScrollToHash();
@@ -41,6 +41,7 @@ const FaqPage = () => {
 
   const sectionNav = grouped.map(({ category }) => ({ id: category.toLowerCase().replace(/\s+/g, "-"), label: category }));
 
+  const faqHighlights = getFaqHighlights();
   const faqStructuredData = {
     "@context": "https://schema.org",
     "@type": "FAQPage",

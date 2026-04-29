@@ -2,7 +2,7 @@ import Slider from "../../components/homepage_components/slider/Slider";
 import HomePage_Locations from "../../components/homepage_components/homepage_locations/HomePage_Locations";
 import { useEffect } from "react";
 import { propertyData, propertyImages } from "../../data";
-import { faqHighlights } from "../../content/faqHighlights";
+import { getFaqHighlights } from "../../content/faqHighlights";
 import { trackEvent } from "../../utils/analytics";
 import BannerSecondary from "../../components/home/BannerSecondary";
 import ServicesSection from "../../components/home/ServicesSection";
@@ -33,6 +33,7 @@ const Home = () => {
             (1 - effectiveDiscountPercent / 100),
     );
 
+    const faqHighlights = getFaqHighlights();
     const homepageJsonLd = [
         {
             "@context": "https://schema.org",
