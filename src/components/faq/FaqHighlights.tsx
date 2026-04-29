@@ -1,6 +1,8 @@
-import { faqHighlights } from "../../content/faqHighlights";
+import { getFaqHighlights } from "../../content/faqHighlights";
 
 const FaqHighlights = () => {
+  const faqHighlights = getFaqHighlights();
+
   return (
     <section className="bg-bg-card border border-[var(--border)] rounded-2xl p-6 md:p-8 shadow-level1">
       <div className="max-w-prose mb-8">

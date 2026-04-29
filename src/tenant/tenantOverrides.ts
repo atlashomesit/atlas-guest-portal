@@ -1,0 +1,80 @@
+/**
+ * Per-tenant overrides for guest-portal UI/content that the tenant API
+ * does not (yet) carry. Keyed by tenant slug. All fields are optional —
+ * callers fall back to defaults when a slug is not found or a field is
+ * absent. Other tenants are unaffected by entries added here.
+ */
+
+export type TenantHomeLink = {
+  /** Unique key for the dropdown entry (used as React key). */
+  roomNo: string;
+  /** Display label in the dropdown. */
+  title: string;
+  /** Route to navigate to when clicked. */
+  href: string;
+};
+
+export type TenantContactOverrides = {
+  /** Primary business phone, digits only, no country code (e.g. "7799779192"). */
+  businessPhone?: string;
+  /** Owner / escalation phone, digits only, no country code. */
+  ownerPhone?: string;
+  /** WhatsApp number, digits only, no country code. Defaults to businessPhone. */
+  whatsappPhone?: string;
+  /** Public contact email. */
+  email?: string;
+};
+
+export type TenantOverrides = {
+  /** Hide the logo image in the navbar/footer. */
+  hideLogo?: boolean;
+  /** Hide the "List your property" CTA in the header (desktop + mobile). */
+  hideListProperty?: boolean;
+  /** Override the "Our Homes" dropdown contents. */
+  homes?: TenantHomeLink[];
+  /** Override contact details (phone numbers, email). */
+  contact?: TenantContactOverrides;
+};
+
+const STAR_GUEST_HOUSE_HOMES: TenantHomeLink[] = [
+  { roomNo: '301', title: 'Star_Guest_House_301', href: '/homes/star-guest-house-301' },
+  { roomNo: '302', title: 'Star_Guest_House_302', href: '/homes/star-guest-house-302' },
+  { roomNo: '303', title: 'Star_Guest_House_303', href: '/homes/star-guest-house-303' },
+  { roomNo: '304', title: 'Star_Guest_House_304', href: '/homes/star-guest-house-304' },
+  { roomNo: '305', title: 'Star_Guest_House_305', href: '/homes/star-guest-house-305' },
+  { roomNo: '306', title: 'Star_Guest_House_306', href: '/homes/star-guest-house-306' },
+  { roomNo: '307', title: 'Star_Guest_House_307', href: '/homes/star-guest-house-307' },
+  { roomNo: '308', title: 'Star_Guest_House_308', href: '/homes/star-guest-house-308' },
+  { roomNo: '201', title: 'Star_Guest_House_201', href: '/homes/star-guest-house-201' },
+  { roomNo: '202', title: 'Star_Guest_House_202', href: '/homes/star-guest-house-202' },
+  { roomNo: '203', title: 'Star_Guest_House_203', href: '/homes/star-guest-house-203' },
+  { roomNo: '204', title: 'Star_Guest_House_204', href: '/homes/star-guest-house-204' },
+  { roomNo: '205', title: 'Star_Guest_House_205', href: '/homes/star-guest-house-205' },
+  { roomNo: '206', title: 'Star_Guest_House_206', href: '/homes/star-guest-house-206' },
+  { roomNo: '207', title: 'Star_Guest_House_207', href: '/homes/star-guest-house-207' },
+  { roomNo: '208', title: 'Star_Guest_House_208', href: '/homes/star-guest-house-208' },
+  { roomNo: '108', title: 'Star_Guest_House_108', href: '/homes/star-guest-house-108' },
+  { roomNo: '109', title: 'Star_Guest_House_109', href: '/homes/star-guest-house-109' },
+  { roomNo: '110', title: 'Star_Guest_House_110', href: '/homes/star-guest-house-110' },
+];
+
+const TENANT_OVERRIDES: Record<string, TenantOverrides> = {
+  starguesthouse: {
+    hideLogo: true,
+    hideListProperty: true,
+    homes: STAR_GUEST_HOUSE_HOMES,
+    contact: {
+      businessPhone: '7799779192',
+      ownerPhone: '7799779192',
+      whatsappPhone: '7799779192',
+      email: 'starguesthousekondapur@gmail.com',
+    },
+  },
+};
+
+const EMPTY_OVERRIDES: TenantOverrides = {};
+
+export function getTenantOverrides(slug?: string | null): TenantOverrides {
+  if (!slug) return EMPTY_OVERRIDES;
+  return TENANT_OVERRIDES[slug] ?? EMPTY_OVERRIDES;
+}
