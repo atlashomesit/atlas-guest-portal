@@ -457,8 +457,10 @@ const PropertyDetails = () => {
             return;
         }
 
-        // API fallback: fetch from API when not in static data (handles DB IDs not in propertyData)
-        if (listingIdParam && (Number.isFinite(listingId) ? listingId > 0 : true)) {
+        // API fallback: fetch from API when not in static data (handles DB numeric IDs not in propertyData).
+        // TASK-1220: legacy slug-style unit params like "invalid-slug-xyz-404" can trigger a
+        // failing resolver path and blank error state; only numeric listing ids should call API.
+        if (listingIdParam && Number.isFinite(listingId) && listingId > 0) {
             if (import.meta.env.DEV) {
                  
                 console.debug('[PropertyDetails] API fallback for listingIdParam:', listingIdParam);
@@ -578,14 +580,18 @@ useEffect(() => {
         return () => ac.abort();
     }, [resolvedListingId, data?.listingId, listingId]);
 
-    // Prefetch listing availability as soon as listing id resolves so date widget opens warm.
+    // Prefetch admin calendar as soon as listing id resolves so date widget opens warm.
     useEffect(() => {
         const listingToPrefetch = Number(resolvedListingId ?? data?.listingId ?? listingId);
         if (!Number.isFinite(listingToPrefetch) || listingToPrefetch <= 0 || availabilityPrefetched) return;
 
         const controller = new AbortController();
-        const startDate = new Date().toISOString().slice(0, 10);
-        const url = buildApiUrl(`/availability/listing-availability?listingId=${listingToPrefetch}&startDate=${encodeURIComponent(startDate)}&months=2`);
+        const today = new Date();
+        const from = today.toISOString().slice(0, 10);
+        const toDate = new Date(today);
+        toDate.setDate(toDate.getDate() + 60);
+        const to = toDate.toISOString().slice(0, 10);
+        const url = buildApiUrl(`/admin/calendar?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
         fetch(url, {
             method: 'GET',
             headers: { Accept: 'application/json', ...getApiHeaders() },

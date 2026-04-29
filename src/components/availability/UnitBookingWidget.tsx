@@ -118,7 +118,18 @@ async function abandonPaymentPendingCheckout(bookingId: number, bookingToken: st
   }
 }
 
-/** Day-level status from listing availability API — Turnover is checkout morning (selectable like Available). */
+type AdminCalendarDay = {
+  date?: string;
+  status?: string;
+  minNights?: number | null;
+};
+
+type AdminCalendarListing = {
+  listingId?: number;
+  days?: AdminCalendarDay[];
+};
+
+/** Day-level status from admin calendar API. */
 type ListingCalendarDayStatus = 'Blocked' | 'Available' | 'Hold' | 'Turnover';
 
 const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
@@ -162,8 +173,8 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const calendarButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const [dateRange, setDateRange] = useState<AtlasDateRangePickerValue>({
-    startDate: today,
-    endDate: addDays(today, 1),
+    startDate: null,
+    endDate: null,
   });
   const [openCalendar, setOpenCalendar] = useState(false);
   const [shownDate, setShownDate] = useState<Date>(today);
@@ -186,10 +197,8 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [formError, setFormError] = useState<string | null>(null);
   const [dateError, setDateError] = useState<string | null>(null);
   const [minStayNights, setMinStayNights] = useState(1);
-  const [minAdvanceDays, setMinAdvanceDays] = useState(0);
-  // BUG-104 TASK-314: per-listing max guests from API (overrides static prop default of 16)
-  const [apiMaxGuests, setApiMaxGuests] = useState<number | undefined>(undefined);
-  const effectiveMaxGuests = apiMaxGuests ?? maxGuests;
+  const minAdvanceDays = 0;
+  const effectiveMaxGuests = maxGuests;
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -344,28 +353,48 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     setGuests((current) => Math.min(effectiveMaxGuests, Math.max(1, current)));
   }, [effectiveMaxGuests]);
 
-  // Fetch min stay nights from availability rules (non-blocking)
+  // Pull per-day min-night hints from admin calendar (non-blocking).
   useEffect(() => {
     if (!listingId) return;
     let active = true;
-    apiFetch(buildApiUrl(`/api/public/listings/${listingId}/availability-rules`))
+    const from = toISODate(getIstStartOfDay(availabilityRange.startDate));
+    const to = toISODate(getIstStartOfDay(availabilityRange.endDate));
+    apiFetch(buildApiUrl(`/admin/calendar?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`))
       .then((r) => r.json())
       .then((d: unknown) => {
-        const data = d as { minStayNights?: number; advanceBookingHours?: number; maxGuests?: number };
-        if (active && typeof data?.minStayNights === 'number' && data.minStayNights > 1) {
-          setMinStayNights(data.minStayNights);
-        }
-        if (active && typeof data?.advanceBookingHours === 'number' && data.advanceBookingHours > 0) {
-          setMinAdvanceDays(Math.ceil(data.advanceBookingHours / 24));
-        }
-        // BUG-104 TASK-314: enforce per-listing maxGuests (not hardcoded 16)
-        if (active && typeof data?.maxGuests === 'number' && data.maxGuests >= 1) {
-          setApiMaxGuests(data.maxGuests);
+        const listings = Array.isArray(d) ? (d as AdminCalendarListing[]) : [];
+        const resolvedListingId = Number(listingId);
+        const listing = listings.find((item) => Number(item?.listingId) === resolvedListingId);
+        if (!listing || !Array.isArray(listing.days) || !active) return;
+        const minNightCandidates = listing.days
+          .map((day) => day?.minNights)
+          .filter((n): n is number => typeof n === 'number' && n > 1);
+        if (minNightCandidates.length > 0) {
+          setMinStayNights(Math.max(...minNightCandidates));
         }
       })
       .catch(() => { /* non-critical — defaults stay */ });
     return () => { active = false; };
-  }, [listingId]);
+  }, [listingId, availabilityRange.endDate, availabilityRange.startDate]);
+
+  // Pull iCal sync status (best-effort) so we can warn when upstream sync is unhealthy.
+  useEffect(() => {
+    let isActive = true;
+    apiFetch(buildApiUrl('/api/ical/sync-status'))
+      .then((r) => r.json())
+      .then((data: unknown) => {
+        if (!isActive) return;
+        const calendars = Array.isArray((data as { calendars?: unknown[] })?.calendars)
+          ? ((data as { calendars?: Array<{ lastSyncStatus?: string | null }> }).calendars ?? [])
+          : [];
+        const hasSyncError = calendars.some((cal) => String(cal?.lastSyncStatus ?? '').toLowerCase() === 'error');
+        if (hasSyncError) {
+          setStatusMessage('Some calendar feeds are delayed. Availability may update shortly.');
+        }
+      })
+      .catch(() => { /* non-critical */ });
+    return () => { isActive = false; };
+  }, []);
 
   // Fetch availability automatically on component load and when the calendar is opened
   // Availability always starts from today, independent of selected dates
@@ -377,23 +406,10 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     let isActive = true;
 
     const fetchBlockedDates = async () => {
-      let availabilityBaseUrl: string;
       try {
-        availabilityBaseUrl = buildApiUrl('/availability/listing-availability');
-      } catch {
-        if (isActive) {
-          setIsLoading(false);
-        }
-        setStatusMessage('Availability service is unavailable. Please try again later.');
-        return;
-      }
-      
-      try {
-        const url = new URL(availabilityBaseUrl);
-        url.searchParams.set('listingId', String(listingId));
-        url.searchParams.set('startDate', toISODate(getIstStartOfDay(availabilityRange.startDate)));
-        // API expects months (1–12), default 2; we show ~60 days so use 2
-        url.searchParams.set('months', '2');
+        const url = new URL(buildApiUrl('/admin/calendar'));
+        url.searchParams.set('from', toISODate(getIstStartOfDay(availabilityRange.startDate)));
+        url.searchParams.set('to', toISODate(getIstStartOfDay(availabilityRange.endDate)));
 
         const availabilityKey = url.toString();
         if (lastAvailabilityKeyRef.current === availabilityKey) {
@@ -405,15 +421,11 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         setStatusMessage('Checking availability...');
 
         const response = await apiFetch(availabilityKey);
-        const data = await response.json();
-
-        const entries = Array.isArray(data?.dates)
-          ? data.dates
-          : Array.isArray(data?.availability)
-            ? data.availability
-            : Array.isArray(data?.Availability)
-              ? data.Availability
-              : [];
+        const data = await response.json() as unknown;
+        const listings = Array.isArray(data) ? (data as AdminCalendarListing[]) : [];
+        const resolvedListingId = Number(listingId);
+        const listing = listings.find((item) => Number(item?.listingId) === resolvedListingId);
+        const entries = Array.isArray(listing?.days) ? listing.days : [];
         
         if (!isActive) return;
         
@@ -421,18 +433,8 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         const newBlockedDates = new Set<string>();
         const newDateStatusMap = new Map<string, ListingCalendarDayStatus>();
         
-        entries.forEach((item: { 
-          date?: string; 
-          Date?: string;
-          status?: string;
-          Status?: string;
-          inventory?: number; 
-          Inventory?: number;
-          available?: boolean; 
-          blocked?: boolean 
-        }) => {
-          // Handle both date and Date fields
-          const dateStr = item?.date || item?.Date;
+        entries.forEach((item) => {
+          const dateStr = item?.date;
           if (!dateStr) return;
           
           const itemDate = getIstStartOfDay(new Date(dateStr));
@@ -442,8 +444,15 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
           // Use <= instead of < to ensure today is included, but we want >= today, so keep <
           if (itemDate.getTime() < today.getTime()) return;
           
-          // Get status from the response (handle both status and Status fields)
-          const status = (item.status || item.Status || 'Available') as ListingCalendarDayStatus;
+          const normalizedStatus = String(item?.status ?? '').toLowerCase();
+          const status: ListingCalendarDayStatus =
+            normalizedStatus === 'blocked'
+              ? 'Blocked'
+              : normalizedStatus === 'hold'
+                ? 'Hold'
+                : normalizedStatus === 'turnover'
+                  ? 'Turnover'
+                  : 'Available';
           
           // Store status for rendering
           newDateStatusMap.set(itemISO, status);
@@ -452,11 +461,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
           // Blocked and Hold dates should be in blockedSet (both are non-selectable). Turnover is bookable.
           const isBlocked = 
             status === 'Blocked' ||
-            status === 'Hold' ||
-            item.blocked === true ||
-            item.available === false ||
-            (typeof item.inventory === 'number' && item.inventory <= 0) ||
-            (typeof item.Inventory === 'number' && item.Inventory <= 0);
+            status === 'Hold';
           
           if (isBlocked) {
             newBlockedDates.add(itemISO);
