@@ -9,6 +9,7 @@ import { ToastContainer } from "react-toastify"
 import { BookingProvider } from "./contexts/BookingContext"
 import { ListingPhotosProvider } from "./contexts/ListingPhotosContext"
 import { trackEvent } from "./utils/analytics"
+import { isMarketplaceMode } from "./tenant/tenantResolver"
 
 const Home = React.lazy(() => import("./pages/home/Home"))
 const ContactUs = React.lazy(() => import("./pages/contactus/ContactUs"))
@@ -27,6 +28,7 @@ const BlogHome = React.lazy(() => import("./pages/blog/BlogHome"))
 const BlogCategory = React.lazy(() => import("./pages/blog/BlogCategory"))
 const BlogPostPage = React.lazy(() => import("./pages/blog/BlogPostPage"))
 const SearchPage = React.lazy(() => import("./pages/SearchPage"))
+const MarketplaceHomepage = React.lazy(() => import("./pages/MarketplaceHomepage"))
 const ShortLinkRedirect = React.lazy(() => import("./components/ShortLinkRedirect"))
 const HomeDetails = React.lazy(() => import("./pages/home/HomeDetails"))
 const SupportWidget = React.lazy(() => import("./components/support/SupportWidget"))
@@ -97,6 +99,12 @@ function AppWrapper() {
     }
 
     const normalizedId = id.toLowerCase();
+    const trailingNumericId = normalizedId.match(/(\d+)$/)?.[1];
+    if (!trailingNumericId) {
+      // TASK-1220: malformed legacy slugs (no numeric listing id) should still land on a
+      // concrete not-found page instead of hanging behind the property-details resolver.
+      return <Navigate to={`/homes/${normalizedId}`} replace />;
+    }
     const idParts = normalizedId.split('-').filter(Boolean);
     const canonicalPropertySlug = idParts.length >= 2 ? idParts.slice(0, 2).join('-') : 'atlas-homes';
 
@@ -111,10 +119,13 @@ function AppWrapper() {
       {!shouldHideNavbar && <Navbar />}
       <ScrollToTop />
       <ErrorBoundary name="router">
-        <Suspense fallback={<LazyFallback />}>
         <main id="main-content" tabIndex={-1}>
+        <Suspense fallback={<LazyFallback />}>
         <Routes>
-          <Route path="/" element={withBoundary(<Home />, "home-route")} />
+          <Route
+            path="/"
+            element={withBoundary(isMarketplaceMode() ? <MarketplaceHomepage /> : <Home />, isMarketplaceMode() ? "marketplace-home-route" : "home-route")}
+          />
           <Route path="/contact" element={withBoundary(<ContactUs />, "contact-route")} />
           <Route path="/apartments" element={withBoundary(<Navigate to="/#our-homes" replace />, "apartments-redirect")} />
           <Route path="/amenities" element={withBoundary(<Amenities />, "amenities-route")} />
@@ -151,8 +162,8 @@ function AppWrapper() {
           <Route path="/:shortCode" element={withBoundary(<ShortLinkRedirect />, "shortlink-route")} />
           <Route path="/*" element={withBoundary(<PageNotFound />, "fallback-route")} />
         </Routes>
-        </main>
         </Suspense>
+        </main>
       </ErrorBoundary>
       <Suspense fallback={null}><SupportWidget /></Suspense>
       <Footer />
