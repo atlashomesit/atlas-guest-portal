@@ -13,7 +13,7 @@ import { initAnalytics } from './utils/analytics'
 import { ThemeProvider } from './theme/ThemeProvider'
 import { loadRuntimeConfig, setRuntimeConfig, getApiBaseUrl } from './runtime-config'
 import { getApiHeaders } from './api/client'
-import { getTenantSlug } from './tenant/tenantResolver'
+import { getTenantSlug, setMarketplaceMode } from './tenant/tenantResolver'
 import { validateTenant, resolveFromDomain, getTenantContext } from './tenant/tenantContext'
 import { applyTenantBranding } from './tenant/tenantBranding'
 import { ConfigLoadingScreen } from './runtime-config/ConfigLoadingScreen'
@@ -92,8 +92,13 @@ const bootstrapApp = async () => {
     }
 
     // 3. Apply brand config to DOM (title, primaryColor CSS vars, favicon)
+    const forceMarketplaceFromConfig = (config.tenantKey || '').trim().toLowerCase() === 'marketplace-root';
     const resolved = getTenantContext();
-    if (resolved) applyTenantBranding(resolved);
+    if (resolved?.isMarketplaceRoot || forceMarketplaceFromConfig) {
+      setMarketplaceMode(true);
+    } else if (resolved) {
+      applyTenantBranding(resolved);
+    }
 
     root.render(
       <StrictMode>
