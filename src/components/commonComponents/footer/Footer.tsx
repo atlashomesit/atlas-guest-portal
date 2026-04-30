@@ -5,6 +5,8 @@ import { footerData } from '../../../data';
 import { Link } from 'react-router-dom';
 import { helpNav, moreNav, primaryNav } from '../../../config/navigation';
 import { LOGO_URL } from '../../../config/branding';
+import { getTenantContext } from '../../../tenant/tenantContext';
+import { getTenantOverrides } from '../../../tenant/tenantOverrides';
 import { CompactThemeSwitcher } from '../../ui/CompactThemeSwitcher';
 import { formatDisplayNumber, getContactEmail } from '../../../config/contact';
 
@@ -28,6 +30,10 @@ const socialLabelByIcon: Record<string, string> = {
 };
 
 const Footer = () => {
+    const tenant = getTenantContext();
+    const overrides = getTenantOverrides(tenant?.slug);
+    const showLogo = !overrides.hideLogo;
+
     const socialLinks = Array.isArray(footerData?.socialLinks) ? footerData.socialLinks : [];
     const contactInfo: { icon: keyof typeof iconMap; text: string | string[] }[] = [
         { icon: 'IoIosMail', text: getContactEmail() },
@@ -42,7 +48,9 @@ const Footer = () => {
         >
             <div className='max-w-luxury mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-12'>
                 <div className='flex flex-col gap-4 items-center lg:items-start'>
-                    <img className='w-32 md:w-24 rounded-md' src={logoSrc} alt="Atlas Homestays" />
+                    {showLogo && (
+                        <img className='w-32 md:w-24 rounded-md' src={logoSrc} alt="Atlas Homestays" />
+                    )}
                     <p className='text-sm text-[var(--footer-link)]'>Thoughtfully curated stays in Hyderabad</p>                    <div className='flex text-lg gap-6 text-[color:var(--footer-link)]'>
                         {socialLinks.map(({ icon, link }, index) => {
                             const IconComponent = iconMap[icon];
