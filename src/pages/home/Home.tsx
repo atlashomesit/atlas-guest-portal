@@ -178,7 +178,7 @@ const Home = () => {
 
     useEffect(() => {
         trackEvent("home_view", { surface: "home", listings: propertyData.length });
-    }, []);
+    }, [propertyData.length]);
 
     useEffect(() => {
         const target = pendingScrollTarget || (location.state as { scrollTo?: string } | null)?.scrollTo;

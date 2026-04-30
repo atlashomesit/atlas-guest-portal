@@ -38,7 +38,7 @@ const getFeatureData = (brandName: string) => ({
                 "From bespoke recommendations to curated local activities, we go beyond accommodation to create memories that last a lifetime."
         }
     ]
-};
+});
 
 const Homepage_WhyChoose = () => {
     const tenant = getTenantContext();
