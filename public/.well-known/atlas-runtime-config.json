@@ -2,6 +2,5 @@
     "apiBaseUrl":  "http://127.0.0.1:5120",
     "globalDiscountPercent":  25,
     "environment":  "prod",
-    "googleMapsApiKey":  "AIzaSyCr8gyMNTxoolatYJCUlbY_D3YEmlojlco",
-    "tenantKey":  "atlas"
+    "googleMapsApiKey":  "AIzaSyCr8gyMNTxoolatYJCUlbY_D3YEmlojlco"
 }
