@@ -5,10 +5,14 @@ import {
   enableSecondaryBannerValueBlock,
   secondaryBannerDefaults,
 } from "../../config/homepageUxFlags";
+import { getTenantContext } from "../../tenant/tenantContext";
 
 const parallaxImage = "";
 
 const BannerSecondary = () => {
+  const tenant = getTenantContext();
+  const brandName = tenant?.name ?? "Atlas Homes";
+
   if (enableSecondaryBannerRemoved) {
     return null;
   }
@@ -18,7 +22,7 @@ const BannerSecondary = () => {
       <div className="py-16 md:py-20">
         <div className="rounded-2xl border border-[var(--border)] bg-bg-card p-8 md:p-12 text-center shadow-level1 max-w-prose mx-auto">
           <h2 className="font-display text-xl md:text-2xl font-semibold text-[var(--text-primary)] tracking-tight" style={{ fontFamily: 'var(--font-family-display)' }}>
-            Discover the Atlas Homes difference
+            Discover the {brandName} difference
           </h2>
           <p className="mt-4 text-[var(--text-secondary)] text-base md:text-lg leading-relaxed">
             Flexible stays, verified support, and curated homes — all in one place.          </p>
