@@ -60,7 +60,6 @@ const STAR_GUEST_HOUSE_HOMES: TenantHomeLink[] = [
 
 const TENANT_OVERRIDES: Record<string, TenantOverrides> = {
   starguesthouse: {
-    hideLogo: true,
     hideListProperty: true,
     homes: STAR_GUEST_HOUSE_HOMES,
     contact: {
