@@ -19,6 +19,8 @@ export interface TenantInfo {
   faviconUrl?: string;
   /** @deprecated Use primaryColor */
   brandColor?: string;
+  isMarketplaceRoot?: boolean;
+  category?: string;
 }
 
 let tenantInfo: TenantInfo | null = null;
@@ -38,25 +40,52 @@ export async function resolveFromDomain(apiBaseUrl: string, domain: string): Pro
     const url = `${apiBaseUrl.replace(/\/$/, '')}/tenants/from-domain?domain=${encodeURIComponent(domain)}`;
     const res = await fetch(url); // No auth headers — this is the bootstrap endpoint
 
-    if (!res.ok) return null;
+    if (!res.ok) {
+      if (import.meta.env.DEV) {
+        console.warn('[tenantContext] resolveFromDomain non-OK response', {
+          domain,
+          status: res.status,
+          url,
+        });
+      }
+      return null;
+    }
 
     const data = await res.json();
-    const slug = data.tenantSlug as string;
-    if (!slug) return null;
+    const isMarketplaceRoot = Boolean(data.isMarketplaceRoot);
+    const slug = data.tenantSlug as string | null;
+    if (!slug && !isMarketplaceRoot) {
+      if (import.meta.env.DEV) {
+        console.warn('[tenantContext] resolveFromDomain invalid payload shape', {
+          domain,
+          data,
+        });
+      }
+      return null;
+    }
 
-    setDomainResolvedSlug(slug);
+    if (slug) setDomainResolvedSlug(slug);
 
     tenantInfo = {
       name: data.brandName ?? '',
-      slug,
+      slug: slug ?? '',
       logoUrl: data.logoUrl ?? undefined,
       primaryColor: data.primaryColor ?? undefined,
       tagline: data.tagline ?? undefined,
       faviconUrl: data.faviconUrl ?? undefined,
+      category: data.category ?? undefined,
+      isMarketplaceRoot,
       brandColor: data.primaryColor ?? undefined, // backward compat
     };
     return tenantInfo;
-  } catch {
+  } catch (error) {
+    if (import.meta.env.DEV) {
+      console.warn('[tenantContext] resolveFromDomain failed', {
+        domain,
+        apiBaseUrl,
+        error,
+      });
+    }
     return null; // Network error — caller falls back to validateTenant()
   }
 }

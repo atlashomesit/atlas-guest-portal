@@ -147,6 +147,7 @@ const HomeDetails = () => {
         href={`https://wa.me/${CONTACT.business.whatsapp}?text=${encodeURIComponent(`Hi, I'm interested in booking ${room.title}`)}`}
         target="_blank"
         rel="noopener noreferrer"
+        data-testid="chat-with-host-btn"
         className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#25D366] text-[#1a9e4f] bg-[#f0fdf4] px-5 py-3 text-sm font-semibold transition hover:bg-[#dcfce7]"
         aria-label={`Chat with host on WhatsApp about ${room.title}`}
       >

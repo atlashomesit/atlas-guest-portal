@@ -137,3 +137,12 @@ body::-webkit-scrollbar {
   outline: 2px solid var(--cta-secondary, #c2410c);
   outline-offset: 2px;
 }
+
+/* Improve contrast for uppercase micro-label chips across themes. */
+.uppercase.tracking-wide.font-semibold {
+  color: var(--text-primary);
+}
+
+.uppercase.tracking-wide.font-medium {
+  color: var(--text-primary);
+}

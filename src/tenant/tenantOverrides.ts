@@ -75,6 +75,18 @@ const TENANT_OVERRIDES: Record<string, TenantOverrides> = {
 const EMPTY_OVERRIDES: TenantOverrides = {};
 
 export function getTenantOverrides(slug?: string | null): TenantOverrides {
-  if (!slug) return EMPTY_OVERRIDES;
-  return TENANT_OVERRIDES[slug] ?? EMPTY_OVERRIDES;
+  // Check overrides by slug first
+  if (slug && TENANT_OVERRIDES[slug]) {
+    return TENANT_OVERRIDES[slug];
+  }
+
+  // Fallback: check hostname for domain-based overrides
+  if (typeof window !== 'undefined' && window.location?.hostname) {
+    const hostname = window.location.hostname.toLowerCase();
+    if (hostname.includes('starguesthouse')) {
+      return TENANT_OVERRIDES.starguesthouse;
+    }
+  }
+
+  return EMPTY_OVERRIDES;
 }

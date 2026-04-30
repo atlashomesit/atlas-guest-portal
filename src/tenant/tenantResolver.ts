@@ -6,9 +6,18 @@
 
 // Set by resolveFromDomain() in tenantContext.ts during app boot.
 let _domainResolvedSlug: string | null = null;
+let _marketplaceMode = false;
 
 export function setDomainResolvedSlug(slug: string): void {
   _domainResolvedSlug = slug;
+}
+
+export function setMarketplaceMode(enabled: boolean): void {
+  _marketplaceMode = enabled;
+}
+
+export function isMarketplaceMode(): boolean {
+  return _marketplaceMode;
 }
 
 function getHostname(): string {
