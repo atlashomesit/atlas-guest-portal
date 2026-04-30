@@ -11,6 +11,7 @@ import { formatDisplayNumber, getTelLink } from '../../../config/contact';
 import { trackEvent } from '../../../utils/analytics';
 import { homes as defaultHomes } from '../../../content/homes';
 import { useBooking } from '../../../contexts/BookingContext';
+import { usePropertyListings } from '../../../hooks/usePropertyListings';
 
 const Navbar = () => {
   const tenant = getTenantContext();
@@ -19,7 +20,9 @@ const Navbar = () => {
   const brandName = tenant?.name ?? 'Atlas Homestays';
   const showLogo = !overrides.hideLogo;
   const showListProperty = !overrides.hideListProperty;
-  const homesEntries = overrides.homes ?? defaultHomes;
+
+  const apiListings = usePropertyListings();
+  const homesEntries = apiListings.length > 0 ? apiListings : (overrides.homes ?? defaultHomes);
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isHomesOpen, setIsHomesOpen] = useState(false);
