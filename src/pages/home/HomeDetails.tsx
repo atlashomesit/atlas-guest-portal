@@ -1,5 +1,5 @@
 import { Link, useParams } from "react-router-dom";
-import { Suspense, lazy, useEffect, useState } from "react";
+import { Suspense, lazy, useEffect } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   Wifi, Snowflake, Tv, Car, UtensilsCrossed, WashingMachine,
