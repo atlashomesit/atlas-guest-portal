@@ -19,13 +19,36 @@ const BlogPostPage = () => {
 
   return (
     <div className="px-4 md:px-10 lg:px-20 py-24 bg-bg-muted min-h-screen">
+      {(() => {
+        const canonicalUrl = `https://www.atlastays.com${post.canonicalPath || `/blog/${post.slug}`}`;
+        const jsonLd = {
+          "@context": "https://schema.org",
+          "@type": "Article",
+          headline: post.metaTitle || post.title,
+          description: post.metaDescription || post.excerpt,
+          image: post.featuredImage ? [post.featuredImage] : undefined,
+          mainEntityOfPage: canonicalUrl,
+          datePublished: "2026-04-28",
+          author: {
+            "@type": "Organization",
+            name: "Atlas Stays",
+          },
+          publisher: {
+            "@type": "Organization",
+            name: "Atlas Stays",
+          },
+        };
+        return (
       <SEO
         title={post.metaTitle || post.title}
         description={post.metaDescription || post.excerpt}
         image={post.featuredImage}
-        url={`https://atlashomestays.com/blog/${post.slug}`}
+        url={canonicalUrl}
         type="article"
+        jsonLd={jsonLd}
       />
+        );
+      })()}
       <div className="max-w-4xl mx-auto space-y-6 bg-bg-surface p-6 md:p-10 rounded-2xl border border-border-subtle shadow-level1">
         <div className="space-y-2">
           <Link to="/blog" className="text-primary font-semibold">
