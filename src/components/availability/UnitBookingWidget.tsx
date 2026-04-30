@@ -420,15 +420,19 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
             : 'All dates shown are available to book.'
         );
       } catch (error) {
-        // Handle 404 as "availability not available" - silently skip
-        const is404 = (error as { message?: string })?.message?.includes('HTTP 404');
-        if (!is404) {
+        // Silently handle expected errors: 404, CORS, cancelled requests
+        const errorMessage = (error as { message?: string })?.message ?? String(error);
+        const is404 = errorMessage.includes('HTTP 404') || errorMessage.includes('404');
+        const isCancelled = error instanceof Error && error.name === 'AbortError';
+        const isCors = errorMessage.includes('CORS') || errorMessage.includes('Failed to fetch');
+
+        if (!is404 && !isCancelled && !isCors) {
           console.error('Error fetching blocked dates:', error);
           if (isActive) {
-            setStatusMessage('Failed to load availability. Please try again.');
+            setStatusMessage('');
           }
         } else if (isActive) {
-          // 404 means endpoint doesn't exist for this listing - that's OK
+          // 404, CORS, or cancelled - that's OK, just clear the status message
           setStatusMessage('');
         }
       } finally {
