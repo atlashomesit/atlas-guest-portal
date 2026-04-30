@@ -1,5 +1,5 @@
 import { Link, useParams } from "react-router-dom";
-import { Suspense, lazy, useEffect } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   Wifi, Snowflake, Tv, Car, UtensilsCrossed, WashingMachine,
@@ -10,6 +10,7 @@ import {
 import { homes, defaultHomeHighlights } from "../../content/homes";
 import { useBooking } from "../../contexts/BookingContext";
 import { CONTACT } from "../../config/contact";
+import { usePropertyListings } from "../../hooks/usePropertyListings";
 
 const UnitBookingWidget = lazy(() => import("../../components/availability/UnitBookingWidget"));
 
@@ -55,7 +56,21 @@ function AmenityChip({ label }: { label: string }) {
 
 const HomeDetails = () => {
   const { roomNo } = useParams<{ roomNo: string }>();
-  const room = homes.find((item) => item.roomNo === roomNo);
+  const { homes: apiHomes } = usePropertyListings();
+
+  // First try to find in API data (by listing ID)
+  const apiRoom = apiHomes.find((item) => item.roomNo === roomNo);
+
+  // Fallback to hardcoded homes
+  const room = apiRoom ? {
+    roomNo,
+    title: apiRoom.title,
+    href: apiRoom.href,
+    slug: apiRoom.title.toLowerCase().replace(/_/g, '-'),
+    images: [],
+    maxGuests: 2,
+  } : homes.find((item) => item.roomNo === roomNo);
+
   const { updateBooking } = useBooking();
 
   useEffect(() => {

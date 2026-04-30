@@ -17,13 +17,20 @@ export type HomeLink = {
   href: string;
 };
 
-export function usePropertyListings(): HomeLink[] {
+export type PropertyListingsState = {
+  homes: HomeLink[];
+  isLoading: boolean;
+};
+
+export function usePropertyListings(): PropertyListingsState {
   const [homes, setHomes] = useState<HomeLink[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const tenant = getTenantContext();
   const overrides = getTenantOverrides(tenant?.slug);
 
   useEffect(() => {
     const fetchListings = async () => {
+      setIsLoading(true);
       try {
         // Use proper API client with tenant headers
         const listingsUrl = buildApiUrl('/listings/public');
@@ -36,6 +43,7 @@ export function usePropertyListings(): HomeLink[] {
           if (overrides.homes) {
             setHomes(overrides.homes);
           }
+          setIsLoading(false);
           return;
         }
 
@@ -50,14 +58,16 @@ export function usePropertyListings(): HomeLink[] {
         // If API returns no listings or filtered results are empty, use hardcoded overrides
         if (propertyListings.length === 0 && overrides.homes) {
           setHomes(overrides.homes);
+          setIsLoading(false);
           return;
         }
 
-        // Map listings to HomeLink format
+        // Map listings to HomeLink format with correct URL structure
         const mappedHomes: HomeLink[] = propertyListings.map(listing => ({
           roomNo: listing.id.toString(),
           title: listing.name,
-          href: `/homes/${listing.name.toLowerCase().replace(/_/g, '-')}`,
+          // Use room ID directly as roomNo for HomeDetails page routing
+          href: `/homes/${listing.id}`,
         }));
 
         setHomes(mappedHomes);
@@ -67,11 +77,13 @@ export function usePropertyListings(): HomeLink[] {
         if (overrides.homes) {
           setHomes(overrides.homes);
         }
+      } finally {
+        setIsLoading(false);
       }
     };
 
     fetchListings();
   }, [tenant?.name, tenant?.slug, overrides.homes]);
 
-  return homes;
+  return { homes, isLoading };
 }

@@ -3,6 +3,7 @@ import { Link, NavLink, useNavigate, useLocation, matchPath } from 'react-router
 import './navbar.css';
 
 import { IoIosCall } from 'react-icons/io';
+import { Loader } from 'lucide-react';
 import { primaryNav, ctaNav } from '../../../config/navigation';
 import { LOGO_URL } from '../../../config/branding';
 import { getTenantContext } from '../../../tenant/tenantContext';
@@ -22,7 +23,7 @@ const Navbar = () => {
   const showListProperty = !overrides.hideListProperty;
 
   const apiListings = usePropertyListings();
-  const homesEntries = apiListings.length > 0 ? apiListings : (overrides.homes ?? defaultHomes);
+  const homesEntries = apiListings.homes.length > 0 ? apiListings.homes : (overrides.homes ?? defaultHomes);
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isHomesOpen, setIsHomesOpen] = useState(false);
@@ -224,16 +225,22 @@ const Navbar = () => {
                 </button>
 
                 <div className="dropdown-menu" role="menu" id="homes-menu">
-                  {homesEntries.map((home) => (
-                    <Link
-                      key={home.roomNo}
-                      to={home.href}
-                      role="menuitem"
-                      onClick={handleHomeSelect}
-                    >
-                      {home.title}
-                    </Link>
-                  ))}
+                  {apiListings.isLoading ? (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader size={20} className="animate-spin text-brand-primary" />
+                    </div>
+                  ) : (
+                    homesEntries.map((home) => (
+                      <Link
+                        key={home.roomNo}
+                        to={home.href}
+                        role="menuitem"
+                        onClick={handleHomeSelect}
+                      >
+                        {home.title}
+                      </Link>
+                    ))
+                  )}
                 </div>
               </div>
             ) : (
