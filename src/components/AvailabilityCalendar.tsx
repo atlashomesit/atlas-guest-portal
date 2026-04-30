@@ -50,14 +50,26 @@ export default function AvailabilityCalendar({ listingId, onDateSelect }: Props)
     setLoading(true);
     const url = buildApiUrl(`/api/public/listings/${listingId}/availability-calendar?from=${fromStr}&to=${toStr}`);
     fetch(url, { headers: getApiHeaders() })
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((r) => {
+        if (!r.ok) {
+          if (import.meta.env.DEV) {
+            console.warn(`Availability calendar not available for listing ${listingId}:`, r.status);
+          }
+          return Promise.reject(new Error(`API returned ${r.status}`));
+        }
+        return r.json();
+      })
       .then((items: unknown) => {
         if (!Array.isArray(items)) return;
         const map = new Map<string, DayEntry['status']>();
         (items as DayEntry[]).forEach(({ date, status }) => map.set(date, status));
         setCalData(map);
       })
-      .catch(() => {})
+      .catch((error) => {
+        if (import.meta.env.DEV) {
+          console.warn('Failed to fetch availability calendar:', error);
+        }
+      })
       .finally(() => setLoading(false));
   }, [listingId, fromStr, toStr]);
 

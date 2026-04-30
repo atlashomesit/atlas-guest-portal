@@ -420,9 +420,16 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
             : 'All dates shown are available to book.'
         );
       } catch (error) {
-        console.error('Error fetching blocked dates:', error);
-        if (isActive) {
-          setStatusMessage('Failed to load availability. Please try again.');
+        // Handle 404 as "availability not available" - silently skip
+        const is404 = (error as { message?: string })?.message?.includes('HTTP 404');
+        if (!is404) {
+          console.error('Error fetching blocked dates:', error);
+          if (isActive) {
+            setStatusMessage('Failed to load availability. Please try again.');
+          }
+        } else if (isActive) {
+          // 404 means endpoint doesn't exist for this listing - that's OK
+          setStatusMessage('');
         }
       } finally {
         if (isActive) {
