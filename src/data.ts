@@ -753,10 +753,7 @@ export const footerData: FooterDataInterface = {
         { icon: 'FaTwitter', link: 'https://x.com/atlashomeskphb' },
         { icon: 'FaYoutube', link: 'https://www.youtube.com/@atlashomestays' },
     ],
-    contactInfo: [
-        { icon: 'IoIosMail', text: 'atlashomeskphb@gmail.com' },
-        { icon: 'IoIosCall', text: [`+91-${CONTACT.business.phone}`] },
-    ],
+    contactInfo: [],
     villaLinks: [
         { icon: 'IoIosArrowForward', text: 'Vrindavan', link: '/' },
         { icon: 'IoIosArrowForward', text: 'Agra', link: '/' },
