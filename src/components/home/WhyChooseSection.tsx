@@ -7,8 +7,12 @@ import {
   whyChooseHighlights,
   whyChooseStatsBadges,
 } from "../../config/homepageUxFlags";
+import { getTenantContext } from "../../tenant/tenantContext";
 
 const WhyChooseSection = () => {
+  const tenant = getTenantContext();
+  const brandName = tenant?.name ?? "Atlas Homes";
+
   const useExperimentalLayout =
     enableWhyChooseAccordion ||
     enableWhyChooseConciseBullets ||
@@ -24,7 +28,7 @@ const WhyChooseSection = () => {
       <section className="py-16 lg:py-24 bg-gradient-to-b from-bg-surface to-bg-muted" aria-labelledby="why-choose-heading">
         <div className="max-w-3xl mx-auto px-6">
           <h2 id="why-choose-heading" className="text-3xl font-bold text-text-primary mb-2">
-            Why choose Atlas Homes
+            Why choose {brandName}
           </h2>
           <p className="text-text-muted mb-6">
             Accordion layout: tap each item to expand details — a compact alternative to the carousel selector.
@@ -46,7 +50,7 @@ const WhyChooseSection = () => {
     <section className="py-16 lg:py-24 bg-gradient-to-b from-bg-surface to-bg-muted">
       <div className="max-w-7xl mx-auto px-6 sm:px-10 lg:px-20">
         <div className="text-center max-w-2xl mx-auto mb-12">
-          <h2 className="text-3xl lg:text-4xl font-bold text-text-primary">Why choose Atlas Homes</h2>
+          <h2 className="text-3xl lg:text-4xl font-bold text-text-primary">Why choose {brandName}</h2>
           <p className="mt-4 text-text-muted">
             Serviced apartments in Hyderabad with responsive hosts and work-friendly spaces.
           </p>

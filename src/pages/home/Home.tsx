@@ -1,7 +1,8 @@
 import Slider from "../../components/homepage_components/slider/Slider";
 import HomePage_Locations from "../../components/homepage_components/homepage_locations/HomePage_Locations";
 import { useEffect } from "react";
-import { propertyData, propertyImages } from "../../data";
+import { propertyImages } from "../../data";
+import { getTenantPropertyData } from "../../utils/propertyDataUtils";
 import { getFaqHighlights } from "../../content/faqHighlights";
 import { trackEvent } from "../../utils/analytics";
 import BannerSecondary from "../../components/home/BannerSecondary";
@@ -24,6 +25,7 @@ import { getEffectiveDiscountPercent } from "../../utils/pricing";
 const Home = () => {
     const { pendingScrollTarget, setPendingScrollTarget } = useBooking();
     const location = useLocation();
+    const propertyData = getTenantPropertyData();
     const primaryOgImage = sanitizeGuestImageUrl(propertyImages["101"]?.[0]) ?? LOGO_URL;
     const penthouse = propertyData.find((property) => property.id === 501);
     const penthouseCover = sanitizeGuestImageUrl(propertyImages["501"]?.[0]);
@@ -176,7 +178,7 @@ const Home = () => {
 
     useEffect(() => {
         trackEvent("home_view", { surface: "home", listings: propertyData.length });
-    }, []);
+    }, [propertyData.length]);
 
     useEffect(() => {
         const target = pendingScrollTarget || (location.state as { scrollTo?: string } | null)?.scrollTo;

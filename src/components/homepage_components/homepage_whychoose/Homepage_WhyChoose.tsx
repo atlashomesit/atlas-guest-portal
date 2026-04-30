@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react';
 import { MdOutlineDone } from 'react-icons/md';
 import OptimizedImage from '../../ui/OptimizedImage';
+import { getTenantContext } from '../../../tenant/tenantContext';
 
-const featureData = {
+const getFeatureData = (brandName: string) => ({
     images: [
         'https://atlashomestorage.blob.core.windows.net/listing-images/201/img_11.jpg',
         'https://atlashomestorage.blob.core.windows.net/listing-images/301/img_8.jpg',
     ],
-    title: "Why Choose Atlas Homes?",
+    title: `Why Choose ${brandName}?`,
     description:
-        "At Atlas Homes, we believe that where you stay is just as important as where you go. Experience the perfect blend of luxury, comfort, and exceptional service that makes every stay memorable.",
+        `At ${brandName}, we believe that where you stay is just as important as where you go. Experience the perfect blend of luxury, comfort, and exceptional service that makes every stay memorable.`,
     features: [
         {
             title: "Comfort Redefined",
@@ -37,9 +38,13 @@ const featureData = {
                 "From bespoke recommendations to curated local activities, we go beyond accommodation to create memories that last a lifetime."
         }
     ]
-};
+});
 
 const Homepage_WhyChoose = () => {
+    const tenant = getTenantContext();
+    const brandName = tenant?.name ?? "Atlas Homes";
+    const featureData = getFeatureData(brandName);
+
     const [activeFeature, setActiveFeature] = useState(0);
 
     useEffect(() => {
@@ -47,7 +52,7 @@ const Homepage_WhyChoose = () => {
             setActiveFeature((prev) => (prev + 1) % featureData.features.length);
         }, 4000);
         return () => clearInterval(interval);
-    }, []);
+    }, [featureData.features.length]);
 
     return (
         <section className="py-16 lg:py-24 bg-gradient-to-b from-bg-surface to-bg-muted">
