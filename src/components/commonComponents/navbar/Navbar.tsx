@@ -6,15 +6,20 @@ import { IoIosCall } from 'react-icons/io';
 import { primaryNav, ctaNav } from '../../../config/navigation';
 import { LOGO_URL } from '../../../config/branding';
 import { getTenantContext } from '../../../tenant/tenantContext';
+import { getTenantOverrides } from '../../../tenant/tenantOverrides';
 import { formatDisplayNumber, getTelLink } from '../../../config/contact';
 import { trackEvent } from '../../../utils/analytics';
-import { homes } from '../../../content/homes';
+import { homes as defaultHomes } from '../../../content/homes';
 import { useBooking } from '../../../contexts/BookingContext';
 
 const Navbar = () => {
   const tenant = getTenantContext();
+  const overrides = getTenantOverrides(tenant?.slug);
   const logoSrc = tenant?.logoUrl ?? LOGO_URL;
   const brandName = tenant?.name ?? 'Atlas Homestays';
+  const showLogo = !overrides.hideLogo;
+  const showListProperty = !overrides.hideListProperty;
+  const homesEntries = overrides.homes ?? defaultHomes;
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isHomesOpen, setIsHomesOpen] = useState(false);
@@ -157,17 +162,20 @@ const Navbar = () => {
   }, [location.pathname]);
 
   return (
-    <section className="navbar-container" id="navbar_container">
+    <header className="navbar-container" id="navbar_container">
       <div className="navbar-main">
 
         {/* LEFT - Logo and Mobile Menu Button */}
         <div className="flex items-center justify-between w-full lg:w-auto">
           <Link to="/" className="flex items-center gap-2">
-            <img
-              src={logoSrc}
-              alt={brandName}
-              className="navbar-logo"
-            />
+            {showLogo && (
+              <img
+                src={logoSrc}
+                alt=""
+                aria-hidden="true"
+                className="navbar-logo"
+              />
+            )}
             <span className="navbar-logo-text">{brandName}</span>
           </Link>
 
@@ -213,7 +221,7 @@ const Navbar = () => {
                 </button>
 
                 <div className="dropdown-menu" role="menu" id="homes-menu">
-                  {homes.map((home) => (
+                  {homesEntries.map((home) => (
                     <Link
                       key={home.roomNo}
                       to={home.href}
@@ -240,14 +248,16 @@ const Navbar = () => {
 
         {/* RIGHT - Desktop Actions */}
         <div className="hidden lg:flex items-center gap-6">
-          <Link
-            to="/become-a-host"
-            className="nav-link"
-            data-testid="navbar-list-property"
-            style={{ fontWeight: 600, whiteSpace: 'nowrap' }}
-          >
-            List your property
-          </Link>
+          {showListProperty && (
+            <Link
+              to="/become-a-host"
+              className="nav-link"
+              data-testid="navbar-list-property"
+              style={{ fontWeight: 600, whiteSpace: 'nowrap' }}
+            >
+              List your property
+            </Link>
+          )}
 
           <a href={telLink} className="phone flex items-center gap-1">
             <span>{formatDisplayNumber()}</span>
@@ -292,7 +302,7 @@ const Navbar = () => {
 
                 {isHomesMobileOpen && (
                   <div id="mobile-homes-menu" className="mobile-submenu">
-                    {homes.map((home) => (
+                    {homesEntries.map((home) => (
                       <Link
                         key={home.roomNo}
                         to={home.href}
@@ -320,14 +330,16 @@ const Navbar = () => {
 
           {/* MOBILE ACTIONS */}
           <div className="mt-2 flex flex-col gap-3">
-            <Link
-              to="/become-a-host"
-              onClick={closeMobile}
-              className="block py-2 font-semibold"
-              style={{ color: 'var(--cta-primary, #2563eb)' }}
-            >
-              List your property
-            </Link>
+            {showListProperty && (
+              <Link
+                to="/become-a-host"
+                onClick={closeMobile}
+                className="block py-2 font-semibold"
+                style={{ color: 'var(--cta-primary, #2563eb)' }}
+              >
+                List your property
+              </Link>
+            )}
 
             <a href={telLink} className="phone flex items-center gap-2">
               <IoIosCall />
@@ -355,7 +367,7 @@ const Navbar = () => {
           </div>
         </div>
       )}
-    </section>
+    </header>
   );
 };
 

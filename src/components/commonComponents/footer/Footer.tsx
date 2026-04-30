@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom';
 import { helpNav, moreNav, primaryNav } from '../../../config/navigation';
 import { LOGO_URL } from '../../../config/branding';
 import { CompactThemeSwitcher } from '../../ui/CompactThemeSwitcher';
+import { formatDisplayNumber, getContactEmail } from '../../../config/contact';
 
 const iconMap = {
     ImGithub,
@@ -18,9 +19,20 @@ const iconMap = {
     IoIosArrowForward
 };
 
+const socialLabelByIcon: Record<string, string> = {
+    FaFacebook: 'Visit Atlas Homestays on Facebook',
+    FaInstagram: 'Visit Atlas Homestays on Instagram',
+    FaTwitter: 'Visit Atlas Homestays on X',
+    FaYoutube: 'Visit Atlas Homestays on YouTube',
+    ImGithub: 'Visit Atlas Homestays on GitHub',
+};
+
 const Footer = () => {
     const socialLinks = Array.isArray(footerData?.socialLinks) ? footerData.socialLinks : [];
-    const contactInfo = Array.isArray(footerData?.contactInfo) ? footerData.contactInfo : [];
+    const contactInfo: { icon: keyof typeof iconMap; text: string | string[] }[] = [
+        { icon: 'IoIosMail', text: getContactEmail() },
+        { icon: 'IoIosCall', text: [formatDisplayNumber()] },
+    ];
     const logoSrc = LOGO_URL;
 
     return (
@@ -34,9 +46,18 @@ const Footer = () => {
                     <p className='text-sm text-[var(--footer-link)]'>Thoughtfully curated stays in Hyderabad</p>                    <div className='flex text-lg gap-6 text-[color:var(--footer-link)]'>
                         {socialLinks.map(({ icon, link }, index) => {
                             const IconComponent = iconMap[icon];
+                            const ariaLabel = socialLabelByIcon[icon] ?? 'Open social profile';
                             return (
-                                <a key={index} href={link} target="_blank" rel="noopener noreferrer">
-                                    <IconComponent className='hover:text-[var(--footer-link-hover)] duration-300 cursor-pointer' />                                </a>
+                                <a
+                                    key={index}
+                                    href={link}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    aria-label={ariaLabel}
+                                    title={ariaLabel}
+                                >
+                                    <IconComponent className='hover:text-[var(--footer-link-hover)] duration-300 cursor-pointer' />
+                                </a>
                             );
                         })}
                     </div>
