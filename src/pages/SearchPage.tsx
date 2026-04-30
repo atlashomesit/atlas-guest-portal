@@ -205,7 +205,7 @@ const SearchPage = () => {
         <header className="space-y-2">
           <p className="text-sm font-semibold uppercase tracking-wide text-text-muted">Search results</p>
           <h1 className="text-3xl font-bold text-text-primary sm:text-4xl">Available apartments</h1>
-          <p className="max-w-3xl text-base text-text-muted">
+          <p className="max-w-3xl text-base text-text-body">
             Browse apartments using the filters from the homepage hero. Results are based on your dates and guest count when
             provided.
           </p>
@@ -392,7 +392,7 @@ const SearchPage = () => {
                         </p>
                       )}
                     </div>
-                    <span className="rounded-full bg-[color-mix(in_srgb,var(--cta-secondary)_14%,transparent)] px-3 py-1 text-xs font-semibold text-cta-secondary">
+                    <span className="rounded-full bg-bg-muted px-3 py-1 text-xs font-semibold text-text-primary">
                       {unit.location}
                     </span>
                   </div>
@@ -418,7 +418,7 @@ const SearchPage = () => {
                     </div>
                     <Link
                       to={`${unit.canonicalPath}${queryString ? `?${queryString}` : ""}`}
-                      className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl bg-cta-primary px-4 py-2 text-sm font-semibold text-[var(--text-contrast)] shadow hover:bg-cta-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
+                      className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl bg-[var(--cta-primary-hover)] px-4 py-2 text-sm font-semibold text-white shadow hover:bg-[var(--cta-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
                     >
                       View details
                     </Link>
