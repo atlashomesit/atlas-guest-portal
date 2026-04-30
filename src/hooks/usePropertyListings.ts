@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getTenantContext } from '../tenant/tenantContext';
 import { getTenantOverrides } from '../tenant/tenantOverrides';
+import { getApiHeaders, buildApiUrl } from '../api/client';
 
 export type PropertyListing = {
   id: number;
@@ -16,8 +17,6 @@ export type HomeLink = {
   href: string;
 };
 
-const API_BASE_URL = 'https://atlas-homes-api-gxdqfjc2btc0atbv.centralus-01.azurewebsites.net';
-
 export function usePropertyListings(): HomeLink[] {
   const [homes, setHomes] = useState<HomeLink[]>([]);
   const tenant = getTenantContext();
@@ -26,13 +25,13 @@ export function usePropertyListings(): HomeLink[] {
   useEffect(() => {
     const fetchListings = async () => {
       try {
-        // Construct tenant-specific API URL
-        const tenantSlug = tenant?.slug || 'default';
-        const listingsApiUrl = `${API_BASE_URL}/listings/${tenantSlug}/public`;
+        // Use proper API client with tenant headers
+        const listingsUrl = buildApiUrl('/listings/public');
+        const headers = getApiHeaders();
 
-        const response = await fetch(listingsApiUrl);
+        const response = await fetch(listingsUrl, { headers });
         if (!response.ok) {
-          console.warn('Failed to fetch listings:', response.status, listingsApiUrl);
+          console.warn('Failed to fetch listings:', response.status, listingsUrl);
           // Fallback to hardcoded overrides if API returns error
           if (overrides.homes) {
             setHomes(overrides.homes);
