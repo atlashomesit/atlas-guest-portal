@@ -10,6 +10,7 @@ export interface BlogPost {
   featuredImage?: string;
   metaTitle?: string;
   metaDescription?: string;
+  canonicalPath?: string;
 }
 
 export const blogPosts: BlogPost[] = [
@@ -24,6 +25,7 @@ export const blogPosts: BlogPost[] = [
     featuredImage: "https://atlashomestorage.blob.core.windows.net/listing-images/101/img_9.jpg",
     metaTitle: "Guest Guide | Atlas Homestays",
     metaDescription: "Arrival tips, local attractions, and stay recommendations for Atlas Homestays guests.",
+    canonicalPath: "/blog/essential-guest-guide",
   },
   {
     id: "2",
@@ -35,5 +37,32 @@ export const blogPosts: BlogPost[] = [
     featuredImage: "https://atlashomestorage.blob.core.windows.net/listing-images/102/img_2.jpg",
     metaTitle: "Hospitality Tech & AI | Atlas Homestays",
     metaDescription: "Discover the technology powering comfort, safety, and service at Atlas Homestays.",
+    canonicalPath: "/blog/hospitality-tech-ai",
+  },
+  {
+    id: "3",
+    title: "Best Homestays in Hyderabad for Work and Weekend Trips",
+    slug: "homestays-in-hyderabad",
+    category: "guest-guides",
+    excerpt: "A practical shortlist for travelers who want comfort, fast check-in, and reliable neighborhoods.",
+    content:
+      "Compare neighborhoods, commute windows, and must-have amenities before choosing your Hyderabad stay.",
+    featuredImage: "https://atlashomestorage.blob.core.windows.net/listing-images/103/img_1.jpg",
+    metaTitle: "Homestays in Hyderabad | Atlas Stays Blog",
+    metaDescription: "Explore how to choose the right Hyderabad homestay by area, budget, and trip type.",
+    canonicalPath: "/blog/homestays-in-hyderabad",
+  },
+  {
+    id: "4",
+    title: "Rooms vs Homes: Which Marketplace Category Fits Your Trip?",
+    slug: "rooms-vs-homes",
+    category: "hospitality-tech",
+    excerpt: "Understand when to book a room listing versus a whole-home listing for better value.",
+    content:
+      "Use trip length, group size, and privacy needs to pick the best category across marketplace stays.",
+    featuredImage: "https://atlashomestorage.blob.core.windows.net/listing-images/104/img_3.jpg",
+    metaTitle: "Rooms vs Homes | Atlas Stays Blog",
+    metaDescription: "A quick guide to choosing between room and home category listings on Atlas Stays.",
+    canonicalPath: "/blog/rooms-vs-homes",
   },
 ];
