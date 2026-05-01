@@ -1,13 +1,7 @@
 import { useState, useEffect } from 'react';
+import { fetchPublicListings } from '../api/listingClient';
 import { getTenantContext } from '../tenant/tenantContext';
-
-export type PropertyListing = {
-  id: number;
-  name: string;
-  propertyName: string;
-  floor?: number;
-  type?: string;
-};
+import { buildHomeUnitPath, getPropertySlug } from '../utils/navigation';
 
 export type HomeLink = {
   roomNo: string;
@@ -15,44 +9,55 @@ export type HomeLink = {
   href: string;
 };
 
-const LISTINGS_API_URL = 'https://atlas-homes-api-gxdqfjc2btc0atbv.centralus-01.azurewebsites.net/listings/public';
+export type PropertyListingsState = {
+  homes: HomeLink[];
+  isLoading: boolean;
+  /** True when the API request failed and static tenant/default homes are shown instead. */
+  usedFallback: boolean;
+};
 
-export function usePropertyListings(): HomeLink[] {
+function mapPublicListingToHomeLink(listing: {
+  id: number;
+  name?: string;
+  propertyName?: string;
+}): HomeLink {
+  const propertySlug = getPropertySlug({
+    property_name: listing.propertyName,
+    name: listing.name,
+  });
+  return {
+    roomNo: String(listing.id),
+    title: listing.name?.trim() || `Listing ${listing.id}`,
+    href: buildHomeUnitPath(propertySlug, listing.id),
+  };
+}
+
+export function usePropertyListings(): PropertyListingsState {
   const [homes, setHomes] = useState<HomeLink[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [usedFallback, setUsedFallback] = useState(false);
   const tenant = getTenantContext();
 
   useEffect(() => {
-    const fetchListings = async () => {
+    const load = async () => {
+      setIsLoading(true);
+      setUsedFallback(false);
       try {
-        const response = await fetch(LISTINGS_API_URL);
-        if (!response.ok) {
-          console.warn('Failed to fetch listings:', response.status);
-          return;
-        }
-
-        const listings: PropertyListing[] = await response.json();
-
-        // Filter listings for the current property (use tenant name if available)
-        const propertyName = tenant?.name || 'Star Guest House';
-        const propertyListings = listings.filter(
-          listing => listing.propertyName === propertyName
-        );
-
-        // Map listings to HomeLink format
-        const mappedHomes: HomeLink[] = propertyListings.map(listing => ({
-          roomNo: listing.id.toString(),
-          title: listing.name,
-          href: `/homes/${listing.name.toLowerCase().replace(/_/g, '-')}`,
-        }));
-
-        setHomes(mappedHomes);
+        const listings = await fetchPublicListings();
+        const mapped = listings.map(mapPublicListingToHomeLink);
+        mapped.sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: 'base' }));
+        setHomes(mapped);
       } catch (error) {
         console.warn('Error fetching listings:', error);
+        setUsedFallback(true);
+        setHomes([]);
+      } finally {
+        setIsLoading(false);
       }
     };
 
-    fetchListings();
-  }, [tenant?.name]);
+    void load();
+  }, [tenant?.slug]);
 
-  return homes;
+  return { homes, isLoading, usedFallback };
 }

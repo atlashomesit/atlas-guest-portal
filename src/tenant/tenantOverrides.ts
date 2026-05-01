@@ -34,6 +34,8 @@ export type TenantOverrides = {
   homes?: TenantHomeLink[];
   /** Override contact details (phone numbers, email). */
   contact?: TenantContactOverrides;
+  /** Listings API endpoint URL (e.g., https://api.example.com/listings/public). */
+  listingsApiUrl?: string;
 };
 
 const STAR_GUEST_HOUSE_HOMES: TenantHomeLink[] = [
@@ -60,7 +62,6 @@ const STAR_GUEST_HOUSE_HOMES: TenantHomeLink[] = [
 
 const TENANT_OVERRIDES: Record<string, TenantOverrides> = {
   starguesthouse: {
-    hideLogo: true,
     hideListProperty: true,
     homes: STAR_GUEST_HOUSE_HOMES,
     contact: {

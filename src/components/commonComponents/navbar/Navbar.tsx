@@ -3,6 +3,7 @@ import { Link, NavLink, useNavigate, useLocation, matchPath } from 'react-router
 import './navbar.css';
 
 import { IoIosCall } from 'react-icons/io';
+import { Loader } from 'lucide-react';
 import { primaryNav, ctaNav } from '../../../config/navigation';
 import { LOGO_URL } from '../../../config/branding';
 import { getTenantContext } from '../../../tenant/tenantContext';
@@ -22,7 +23,9 @@ const Navbar = () => {
   const showListProperty = !overrides.hideListProperty;
 
   const apiListings = usePropertyListings();
-  const homesEntries = apiListings.length > 0 ? apiListings : (overrides.homes ?? defaultHomes);
+  const homesEntries = apiListings.usedFallback
+    ? (overrides.homes ?? defaultHomes)
+    : apiListings.homes;
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isHomesOpen, setIsHomesOpen] = useState(false);
@@ -223,17 +226,27 @@ const Navbar = () => {
                   Our Homes
                 </button>
 
-                <div className="dropdown-menu" role="menu" id="homes-menu">
-                  {homesEntries.map((home) => (
-                    <Link
-                      key={home.roomNo}
-                      to={home.href}
-                      role="menuitem"
-                      onClick={handleHomeSelect}
-                    >
-                      {home.title}
-                    </Link>
-                  ))}
+                <div className="dropdown-menu dropdown-menu-scrollable" role="menu" id="homes-menu">
+                  {apiListings.isLoading ? (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader size={20} className="animate-spin text-brand-primary" />
+                    </div>
+                  ) : homesEntries.length === 0 ? (
+                    <div className="dropdown-menu-empty" role="presentation">
+                      No listings available
+                    </div>
+                  ) : (
+                    homesEntries.map((home) => (
+                      <Link
+                        key={home.roomNo}
+                        to={home.href}
+                        role="menuitem"
+                        onClick={handleHomeSelect}
+                      >
+                        {home.title}
+                      </Link>
+                    ))
+                  )}
                 </div>
               </div>
             ) : (
