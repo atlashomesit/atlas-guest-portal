@@ -83,7 +83,7 @@ export const propertyData = [
         property_neighborhoods: ["Financial District"],
         property_reviews: 47,
         property_rating: 4.5,
-        property_img: [],202"],
+        property_img: [],
         property_amenities: [
             { amenities_icon: "wifi", name: "Free WiFi" },
             { amenities_icon: "ac", name: "Air Conditioning" },
