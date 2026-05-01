@@ -1,10 +1,8 @@
 import { useMemo, useState } from "react";
 import SEO from "../components/SEO";
-import { propertyData, propertyImages } from "../data/propertyData";
 import { LOGO_URL } from "../config/branding";
+import { useTenantListings } from "../hooks/useTenantListings";
 import { filterGuestImageUrls, sanitizeGuestImageUrl } from "../utils/guestImageUrl";
-
-type PropertyData = (typeof propertyData)[number];
 
 interface GalleryItem {
   propertyId: number;
@@ -23,25 +21,33 @@ const getSegment = (id: number) => {
 };
 
 const GalleryPage = () => {
+  const { properties } = useTenantListings();
   const [activeSegment, setActiveSegment] = useState<string>("all");
   const [propertyFilter, setPropertyFilter] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState<string>("");
 
   const galleryItems = useMemo(() => {
-    return propertyData.flatMap((property: PropertyData): GalleryItem[] => {
-      const images = filterGuestImageUrls(propertyImages[String(property.id)] ?? property.property_img ?? []);
+    return properties.flatMap((property): GalleryItem[] => {
+      const rawId = property.id;
+      const id = typeof rawId === "string" ? Number(rawId) : rawId;
+      if (!Number.isFinite(id)) return [];
+
+      const images = filterGuestImageUrls(property.property_img ?? []);
       const sourceImages = images.length > 0 ? images : [sanitizeGuestImageUrl(LOGO_URL) ?? ""];
 
+      const name = property.property_name ?? `Listing ${property.listingId ?? id}`;
+      const location = property.property_location ?? "";
+
       return sourceImages.map((url, index) => ({
-        propertyId: property.id,
-        propertyName: property.property_name,
-        location: property.property_location,
-        segment: getSegment(property.id),
+        propertyId: id,
+        propertyName: name,
+        location,
+        segment: getSegment(id),
         url,
         order: index,
       }));
     });
-  }, []);
+  }, [properties]);
 
   const segments = useMemo(() => {
     const segmentCounts = galleryItems.reduce<Record<string, number>>((acc, item) => {
@@ -114,11 +120,18 @@ const GalleryPage = () => {
                   onChange={(event) => setPropertyFilter(event.target.value)}
                 >
                   <option value="all">All properties</option>
-                  {propertyData.map((property) => (
-                    <option key={property.id} value={property.id}>
-                      {property.property_name}
-                    </option>
-                  ))}
+                  {properties
+                    .map((property) => {
+                      const rawId = property.id;
+                      const id = typeof rawId === "string" ? Number(rawId) : rawId;
+                      return Number.isFinite(id) ? { property, id: id as number } : null;
+                    })
+                    .filter((row): row is { property: (typeof properties)[number]; id: number } => row !== null)
+                    .map(({ property, id }) => (
+                      <option key={`${property.listingId ?? "x"}-${id}`} value={String(id)}>
+                        {property.property_name ?? `Room ${id}`}
+                      </option>
+                    ))}
                 </select>
               </label>
 

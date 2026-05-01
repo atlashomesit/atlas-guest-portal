@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearRuntimeConfig, setRuntimeConfig } from "@/runtime-config";
-import { fetchListingById } from "./listingClient";
+import {
+  fetchListingById,
+  fetchListingPhotos,
+  normalizeListingPhotoResponse,
+} from "./listingClient";
 
 const API_BASE = "https://api.example.com";
 
@@ -44,5 +48,44 @@ describe("listingClient", () => {
     const calledUrl = fetchMock.mock.calls[0]?.[0];
     expect(calledUrl).toBe(`${API_BASE}/listings/2`);
     expect(calledUrl).not.toContain("/listings/102");
+  });
+
+  it("fetchListingPhotos(9) calls GET /listings/9/photos", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => [
+        "https://atlashomestorage.blob.core.windows.net/listing-images/9/cover.jpg",
+      ],
+    });
+
+    const urls = await fetchListingPhotos(9);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${API_BASE}/listings/9/photos`,
+      expect.objectContaining({ headers: expect.any(Object) }),
+    );
+    expect(urls).toEqual([
+      "https://atlashomestorage.blob.core.windows.net/listing-images/9/cover.jpg",
+    ]);
+  });
+
+  it("fetchListingPhotos returns [] on 404", async () => {
+    fetchMock.mockResolvedValueOnce({ ok: false, status: 404 });
+
+    await expect(fetchListingPhotos(99)).resolves.toEqual([]);
+  });
+});
+
+describe("normalizeListingPhotoResponse", () => {
+  it("accepts string[]", () => {
+    expect(normalizeListingPhotoResponse(["a", " b "])).toEqual(["a", "b"]);
+  });
+
+  it("accepts { items: [{ url }] }", () => {
+    expect(
+      normalizeListingPhotoResponse({
+        items: [{ url: "https://example.com/1.jpg" }, { photoUrl: "https://example.com/2.jpg" }],
+      }),
+    ).toEqual(["https://example.com/1.jpg", "https://example.com/2.jpg"]);
   });
 });

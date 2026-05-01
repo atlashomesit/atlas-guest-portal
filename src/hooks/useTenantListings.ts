@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { fetchPublicListings, type PublicListing } from "@/api/listingClient";
+import { fetchListingPhotos, fetchPublicListings, type PublicListing } from "@/api/listingClient";
 import { LISTINGS, type Listing } from "@/data/listings";
-import { propertyData, propertyImages } from "@/data/propertyData";
+import { propertyData } from "@/data/propertyData";
 
 type LocalProperty = (typeof propertyData)[number];
 
@@ -52,17 +52,17 @@ const inferUnitTypeFromName = (name: string | undefined | null): string => {
   return (name ?? "").toLowerCase().includes("penthouse") ? "penthouse" : "1bhk";
 };
 
-const mapDtoToProperty = (dto: PublicListing): TenantPropertyRecord => {
+const mapDtoToProperty = (dto: PublicListing, photosFromEndpoint: string[]): TenantPropertyRecord => {
   const local = localPropertyByListingId.get(dto.id);
   const propertyNumber =
     local?.id ??
     extractPropertyNumberFromName(dto.name ?? dto.propertyName) ??
     dto.id;
 
+  const endpointPhotos = photosFromEndpoint.length > 0 ? photosFromEndpoint : null;
   const apiPhotos = dto.photoUrls && dto.photoUrls.length > 0 ? dto.photoUrls : null;
-  const fallbackPhotos =
-    propertyImages[String(propertyNumber)] ?? local?.property_img ?? [];
-  const photoUrls = apiPhotos ?? fallbackPhotos;
+  const fallbackPhotos = local?.property_img ?? [];
+  const photoUrls = endpointPhotos ?? apiPhotos ?? fallbackPhotos;
 
   return {
     id: propertyNumber,
@@ -85,10 +85,11 @@ const mapDtoToProperty = (dto: PublicListing): TenantPropertyRecord => {
 
 const mapDtosToData = (
   dtos: PublicListing[],
+  photosByListingId: Map<number, string[]>,
 ): { listings: Listing[]; properties: TenantPropertyRecord[] } => {
   const properties = dtos
     .filter((dto) => dto.id > 0)
-    .map(mapDtoToProperty);
+    .map((dto) => mapDtoToProperty(dto, photosByListingId.get(dto.id) ?? []));
 
   const listings: Listing[] = properties.map((p) => ({
     id: p.id,
@@ -121,7 +122,23 @@ export function useTenantListings(): UseTenantListings {
       const dtos = await fetchPublicListings(controller.signal);
       if (controller.signal.aborted) return;
 
-      const mapped = mapDtosToData(dtos);
+      const photosByListingId = new Map<number, string[]>();
+      await Promise.all(
+        dtos.map(async (dto) => {
+          if (dto.id <= 0) return;
+          try {
+            const urls = await fetchListingPhotos(dto.id, controller.signal);
+            if (urls.length > 0) {
+              photosByListingId.set(dto.id, urls);
+            }
+          } catch {
+            /* keep dto.photoUrls / local fallback */
+          }
+        }),
+      );
+      if (controller.signal.aborted) return;
+
+      const mapped = mapDtosToData(dtos, photosByListingId);
       if (mapped.properties.length === 0) {
         // Keep the fallback so the page never goes blank on an empty/unfiltered response.
         setState("success");
