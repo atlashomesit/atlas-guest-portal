@@ -1,11 +1,10 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import GalleryPage from "../src/pages/GalleryPage";
-import { propertyData, propertyImages } from "../src/data/propertyData";
+import { propertyData } from "../src/data/propertyData";
 import { filterGuestImageUrls } from "../src/utils/guestImageUrl";
 
 const findPropertyImages = (id: number) => {
-  const fallbackImages = propertyData.find((property) => property.id === id)?.property_img ?? [];
-  return propertyImages[String(id)] ?? fallbackImages;
+  return propertyData.find((property) => property.id === id)?.property_img ?? [];
 };
 
 /** Tile count matches filtered catalog URLs (allowlisted Azure listing host) or one fallback when empty. */
