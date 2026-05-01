@@ -4,133 +4,8 @@ import { CONTACT } from "./config/contact.ts";
 
 const logo = LOGO_URL;
 
-const propertyImagePaths: Record<string, string[]> = {
-    "101": [
-        'https://atlashomestorage.blob.core.windows.net/listing-images/101/cover.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/101/img_9.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/101/img_2.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/101/img_3.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/101/img_4.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/101/img_5.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/101/img_6.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/101/img_7.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/101/img_8.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/101/img_1.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/101/img_10.jpg',
-    ],
-    "102": [
-        'https://atlashomestorage.blob.core.windows.net/listing-images/102/img_1.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/102/img_1.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/102/img_2.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/102/img_3.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/102/img_4.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/102/img_5.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/102/img_6.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/102/img_7.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/102/img_8.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/102/img_9.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/102/img_10.jpg',
-    ],
-    "201": [
-        'https://atlashomestorage.blob.core.windows.net/listing-images/201/img_11.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/201/img_1.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/201/img_2.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/201/img_3.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/201/img_4.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/201/img_5.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/201/img_6.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/201/img_7.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/201/img_8.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/201/img_9.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/201/img_10.jpg',
-    ],
-    "202": [
-        'https://atlashomestorage.blob.core.windows.net/listing-images/202/cover.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/202/img_1.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/202/img_2.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/202/img_3.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/202/img_4.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/202/img_5.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/202/img_6.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/202/img_7.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/202/img_8.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/202/img_9.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/202/img_10.jpg',
-    ],
-    "301": [
-        'https://atlashomestorage.blob.core.windows.net/listing-images/301/cover.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/301/img_5.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/301/img_2.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/301/img_3.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/301/img_4.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/301/img_1.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/301/img_6.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/301/img_7.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/301/img_8.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/301/img_9.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/301/img_10.jpg',
-    ],
-    "302": [
-        'https://atlashomestorage.blob.core.windows.net/listing-images/302/cover.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/302/img_5.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/302/img_2.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/302/img_3.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/302/img_4.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/302/img_1.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/302/img_6.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/302/img_7.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/302/img_8.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/302/img_9.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/302/img_10.jpg',
-    ],
-    "501": [
-        'https://atlashomestorage.blob.core.windows.net/listing-images/501/cover.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/501/IMG_1.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/501/IMG_2.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/501/IMG_3.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/501/IMG_4.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/501/IMG_5.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/501/IMG_6.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/501/IMG_7.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/501/IMG_8.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/501/IMG_10.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/501/IMG_22.JPG',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/501/IMG_24.JPG',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/501/IMG_31.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/501/IMG_2378.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/501/IMG_2381.jpg',
-        'https://atlashomestorage.blob.core.windows.net/listing-images/501/IMG_2390.jpg',
-        '501/IMG_2393.jpg',
-        '501/IMG_1069.jpg',
-    ],
-};
-
-const propertyImages: Record<string, string[]> = Object.fromEntries(
-    Object.entries(propertyImagePaths).map(([key, paths]) => [
-        key,
-        paths.map(path => {
-            // If the path is already a full URL, return it as is
-            if (path.startsWith('http')) {
-                return path;
-            }
-            // If the path starts with a number (like '101/'), assume it's a property folder
-            if (/^\d+\//.test(path)) {
-                return `https://atlashomestorage.blob.core.windows.net/listing-images/${path}`;
-            }
-            // If the path starts with 'airbnb', it's in a subfolder
-            if (path.startsWith('airbnb')) {
-                const [folder, ...rest] = path.split('/');
-                const propertyId = folder.replace('airbnb', '');
-                return `https://atlashomestorage.blob.core.windows.net/listing-images/${propertyId}/${rest.join('/')}`;
-            }
-            // Default case
-            return `https://atlashomestorage.blob.core.windows.net/listing-images/${path}`;
-        })
-    ])
-);
-
-// Export the propertyImages object
-export { propertyImages };
+/** Bundled listing photo URLs removed; UI loads images via GET /listings/:id/photos. */
+export const propertyImages: Record<string, string[]> = {};
 
 export const propertyData = [
     {
@@ -171,7 +46,7 @@ private bar setup, wine chiller, Nespresso machine, washer-dryer, ironing statio
             "Concierge support and housekeeping were prompt and thoughtful."
         ],
         property_price: 4999,
-        property_img: propertyImages["501"],
+        property_img: [],
         property_nearplaces: [
             "Inorbit Mall (3 km)",
             "Cyber Towers (2 km)",
@@ -242,7 +117,7 @@ High-speed Wi-Fi (150 Mbps, multiple ISPs), air-conditioning in the bedroom, a f
             "Proximity to Cyber Towers made daily commuting simple."
         ],
         property_price: 2999,
-        property_img: propertyImages["201"],
+        property_img: [],
         property_nearplaces: [
             "Cyber Towers (2 km)",
             "Local Markets",
@@ -309,7 +184,7 @@ Complimentary Wi-Fi, air-conditioning, inverter backup, daily housekeeping, and 
             "Hosts responded quickly to every small request."
         ],
         property_price: 2999,
-        property_img: propertyImages["202"],
+        property_img: [],
         property_nearplaces: [
             "Cyber Towers (2 km)",
             "KPHB Local Shops",
@@ -379,7 +254,7 @@ Complimentary Wi-Fi (150 Mbps), fully equipped kitchen (gas stove, microwave, re
             "Walking distance to markets and eateries was a big plus."
         ],
         property_price: 2999,
-        property_img: propertyImages["301"],
+        property_img: [],
         property_nearplaces: [
             "Cyber Towers (2 km)",
             "KPHB Local Shops",
@@ -445,7 +320,7 @@ High-speed Wi-Fi (150 Mbps, multiple ISPs), air-conditioning in the bedroom, a f
             "Guests highlight the pristine linens and airy bedrooms."
         ],
         property_price: 2999,
-        property_img: propertyImages["101"],
+        property_img: [],
         property_nearplaces: [
             "Cyber Towers (2 km)",
             "Local Markets",
@@ -512,7 +387,7 @@ Enjoy uninterrupted high-speed Wi-Fi, AC, and a fully equipped kitchen with gas 
             "Neighborhood felt safe and everything was within a short drive."
         ],
         property_price: 2999,
-        property_img: propertyImages["102"],
+        property_img: [],
         property_nearplaces: [
             "Cyber Towers (2 km)",
             "IT Hubs",
@@ -579,7 +454,7 @@ Fully equipped kitchen with microwave, refrigerator, RO water, toaster, and gas 
             "Host communication was quick, making arrivals stress-free."
         ],
         property_price: 2999,
-        property_img: propertyImages["302"],
+        property_img: [],
         property_nearplaces: [
             "Cyber Towers (2 km)",
             "KPHB Cafes",

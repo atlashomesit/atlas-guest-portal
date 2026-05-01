@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import Heading from "../../commonComponents/heading/Heading";
 import { type Listing } from "../../../data/listings";
-import { propertyImages } from "../../../data";
+import { LOGO_URL } from "../../../config/branding";
 import priceDisplayConfig from "../../../config/priceDisplay.config";
 import { calculateNightlyPrice, inferUnitType } from "../../../utils/pricing";
 import { sanitizeItems, getItemKey } from "../../../utils/sanitizeItems";
@@ -13,7 +13,7 @@ import OptimizedImage from "../../ui/OptimizedImage";
 import { useDailyPricingSummary } from "../../../hooks/useDailyPricingSummary";
 import { useListingPhotosFromApi } from "../../../contexts/ListingPhotosContext";
 import { useTenantListings, type TenantPropertyRecord } from "../../../hooks/useTenantListings";
-import { filterGuestImageUrls } from "../../../utils/guestImageUrl";
+import { filterGuestImageUrls, sanitizeGuestImageUrl } from "../../../utils/guestImageUrl";
 import { compareAtlasHomesBuildingOrder } from "../../../utils/atlasHomesBuildingOrder";
 
 import "./homepage_location.css";
@@ -84,12 +84,14 @@ const createListingModel = (
   const property = propertyLookup[listing.id];
   const listingDbId = property?.listingId != null ? Number(property.listingId) : undefined;
   const apiUrls = getUrlsForListingId(Number.isFinite(listingDbId) ? listingDbId : undefined);
+  const fromTenant = property?.property_img?.filter((u) => typeof u === "string" && u.trim()) ?? [];
   const raw =
     (apiUrls && apiUrls.length > 0 ? apiUrls : undefined) ??
-    propertyImages[listing.id] ??
-    property?.property_img ??
+    (fromTenant.length > 0 ? fromTenant : undefined) ??
     [];
-  const images = filterGuestImageUrls(Array.isArray(raw) ? raw : []);
+  const filtered = filterGuestImageUrls(Array.isArray(raw) ? raw : []);
+  const images =
+    filtered.length > 0 ? filtered : [sanitizeGuestImageUrl(LOGO_URL) ?? ""].filter(Boolean);
 
   let price: ListingModel["price"];
 

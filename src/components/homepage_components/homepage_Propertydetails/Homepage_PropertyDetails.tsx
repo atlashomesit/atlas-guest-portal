@@ -11,7 +11,7 @@ import { FaCcMastercard, FaLocationDot } from "react-icons/fa6";
 import { FaStar } from "react-icons/fa";
 import { X, ChevronRight, Clock, KeyRound } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { propertyData, propertyImages } from '../../../data.ts';
+import { propertyData } from '../../../data.ts';
 import { getUnitPolicy } from '../../../config/policyConfig';
 import { inlinePolicySnippets } from '../../../content/terms';
 import Subheading from '../../commonComponents/subheading/Subheading';
@@ -26,7 +26,12 @@ import { useListingPhotosFromApi } from '../../../contexts/ListingPhotosContext'
 import { resolveListing } from '../../../utils/listingResolver';
 import { filterGuestImageUrls, sanitizeGuestImageUrl } from '../../../utils/guestImageUrl';
 import type { ListingDetail, PublicListing } from '../../../api/listingClient';
-import { fetchListingById, parseMaxGuestsFromPayload, resolveStaticMaxGuests } from '../../../api/listingClient';
+import {
+    fetchListingById,
+    fetchListingPhotos,
+    parseMaxGuestsFromPayload,
+    resolveStaticMaxGuests,
+} from '../../../api/listingClient';
 import SEO from '../../SEO';
 import { buildApiUrl, getApiHeaders } from '../../../api/client';
 import { addRecentlyViewed, isFavorite, toggleFavorite } from '../../../utils/guestHistory';
@@ -399,8 +404,7 @@ const PropertyDetails = () => {
         if (foundByUnitSlug) {
             const lid = Number(foundByUnitSlug.listingId);
             const apiUrls = getUrlsForListingId(Number.isFinite(lid) ? lid : undefined);
-            const staticImgs = propertyImages[String(foundByUnitSlug.id)] || [];
-            const images = filterGuestImageUrls(apiUrls && apiUrls.length > 0 ? apiUrls : staticImgs);
+            const images = filterGuestImageUrls(apiUrls && apiUrls.length > 0 ? apiUrls : []);
             setData({
                 ...foundByUnitSlug,
                 property_neighborhoods: Array.isArray(foundByUnitSlug.property_neighborhoods)
@@ -421,8 +425,7 @@ const PropertyDetails = () => {
             if (foundById) {
                 const lid = Number(foundById.listingId);
                 const apiUrls = getUrlsForListingId(Number.isFinite(lid) ? lid : undefined);
-                const staticImgs = propertyImages[String(foundById.id)] || [];
-                const images = filterGuestImageUrls(apiUrls && apiUrls.length > 0 ? apiUrls : staticImgs);
+                const images = filterGuestImageUrls(apiUrls && apiUrls.length > 0 ? apiUrls : []);
                 setData({
                     ...foundById,
                     property_neighborhoods: Array.isArray(foundById.property_neighborhoods)
@@ -442,8 +445,7 @@ const PropertyDetails = () => {
             const fromNav = Array.isArray(navGallery) && navGallery.length > 0 ? navGallery : undefined;
             const lid = Number(prop.listingId);
             const apiUrls = getUrlsForListingId(Number.isFinite(lid) ? lid : undefined);
-            const staticImgs = propertyImages[String(prop.id)] || [];
-            const images = filterGuestImageUrls(fromNav ?? (apiUrls && apiUrls.length > 0 ? apiUrls : staticImgs));
+            const images = filterGuestImageUrls(fromNav ?? (apiUrls && apiUrls.length > 0 ? apiUrls : []));
             setData({
                 ...prop,
                 property_neighborhoods: Array.isArray(prop.property_neighborhoods)
@@ -468,7 +470,7 @@ const PropertyDetails = () => {
             const controller = new AbortController();
             let cancelled = false;
             resolveListing(String(listingIdParam), controller.signal)
-                .then((apiListing: ListingDetail | null) => {
+                .then(async (apiListing: ListingDetail | null) => {
                     if (cancelled || !apiListing) {
                         if (import.meta.env.DEV && !cancelled) {
                              
@@ -488,9 +490,18 @@ const PropertyDetails = () => {
                     );
                     const photoCount = Number((apiListing as Record<string, unknown>).photoCount) || 0;
                     const pub = apiListing as unknown as Partial<PublicListing>;
+                    const listingNumericId = Number(apiListing.id) || listingId;
+                    let fromPhotos: string[] = [];
+                    try {
+                        fromPhotos = filterGuestImageUrls(
+                            await fetchListingPhotos(listingNumericId, controller.signal),
+                        );
+                    } catch {
+                        /* use DTO fields */
+                    }
                     const mapped: Property = {
-                        id: Number(apiListing.id) || listingId,
-                        listingId: Number(apiListing.id) || listingId,
+                        id: listingNumericId,
+                        listingId: listingNumericId,
                         property_name: (apiListing.name as string) ?? `Listing ${apiListing.id}`,
                         property_img: photoUrlsList.length > 0 ? photoUrlsList : (coverUrl ? [coverUrl] : []),
                         property_location: (apiListing as Record<string, unknown>).property_location as string ?? 'Location not specified',
@@ -522,12 +533,12 @@ const PropertyDetails = () => {
                             return undefined;
                         })(),
                     };
-                    const fromApi =
+                    const fromDto =
                         photoUrlsList.length > 0 ? photoUrlsList : (coverUrl ? [coverUrl] : []);
-                    const staticImages = propertyImages[String(mapped.id)] ?? propertyImages[String(apiListing.id)];
                     const images = filterGuestImageUrls(
-                        fromApi.length > 0 ? fromApi : (staticImages ?? mapped.property_img ?? []),
+                        fromPhotos.length > 0 ? fromPhotos : fromDto,
                     );
+                    if (cancelled) return;
                     setData({ ...mapped, property_img: images });
                 })
                 .catch(() => {

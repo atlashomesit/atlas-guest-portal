@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { fetchPublicListings } from '@/api/listingClient';
+import { fetchListingPhotos, fetchPublicListings } from '@/api/listingClient';
 import { filterGuestImageUrls, sanitizeGuestImageUrl } from '@/utils/guestImageUrl';
 
 type ListingPhotosContextValue = {
@@ -20,15 +20,30 @@ export function ListingPhotosProvider({ children }: { children: React.ReactNode 
   useEffect(() => {
     let cancelled = false;
     fetchPublicListings()
-      .then((listings) => {
+      .then(async (listings) => {
         if (cancelled) return;
         const next = new Map<number, string[]>();
-        for (const l of listings) {
-          const ordered = filterGuestImageUrls((l.photoUrls ?? []).filter(Boolean));
-          const cover = sanitizeGuestImageUrl(l.coverPhotoUrl);
-          const urls = ordered.length > 0 ? ordered : cover ? [cover] : [];
-          if (urls.length > 0) next.set(l.id, urls);
-        }
+
+        await Promise.all(
+          listings.map(async (l) => {
+            if (l.id <= 0) return;
+            let urls: string[] = [];
+            try {
+              const fromPhotos = filterGuestImageUrls(await fetchListingPhotos(l.id));
+              if (fromPhotos.length > 0) urls = fromPhotos;
+            } catch {
+              /* fall back to public DTO fields */
+            }
+            if (urls.length === 0) {
+              const ordered = filterGuestImageUrls((l.photoUrls ?? []).filter(Boolean));
+              const cover = sanitizeGuestImageUrl(l.coverPhotoUrl);
+              urls = ordered.length > 0 ? ordered : cover ? [cover] : [];
+            }
+            if (urls.length > 0) next.set(l.id, urls);
+          }),
+        );
+
+        if (cancelled) return;
         setByListingId(next);
       })
       .catch(() => {

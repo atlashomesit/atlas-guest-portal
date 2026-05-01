@@ -1,5 +1,5 @@
 import { resolveStaticMaxGuests } from "../api/listingClient";
-import { propertyData, propertyImages } from "../data";
+import { propertyData } from "../data";
 import { filterGuestImageUrls } from "../utils/guestImageUrl";
 
 export type Home = {
@@ -55,7 +55,7 @@ const buildHome = (roomNo: string, config: HomeConfig = {}): Home => {
     maxGuests,
     tagline: config.tagline,
     highlights: config.highlights,
-    images: filterGuestImageUrls(propertyImages[roomNo] ?? []),
+    images: filterGuestImageUrls(row?.property_img ?? []),
   };
 };
 

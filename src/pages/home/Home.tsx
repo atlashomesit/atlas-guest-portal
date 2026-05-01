@@ -1,7 +1,6 @@
 import Slider from "../../components/homepage_components/slider/Slider";
 import HomePage_Locations from "../../components/homepage_components/homepage_locations/HomePage_Locations";
 import { useEffect } from "react";
-import { propertyImages } from "../../data";
 import { getTenantPropertyData } from "../../utils/propertyDataUtils";
 import { getFaqHighlights } from "../../content/faqHighlights";
 import { trackEvent } from "../../utils/analytics";
@@ -26,9 +25,11 @@ const Home = () => {
     const { pendingScrollTarget, setPendingScrollTarget } = useBooking();
     const location = useLocation();
     const propertyData = getTenantPropertyData();
-    const primaryOgImage = sanitizeGuestImageUrl(propertyImages["101"]?.[0]) ?? LOGO_URL;
     const penthouse = propertyData.find((property) => property.id === 501);
-    const penthouseCover = sanitizeGuestImageUrl(propertyImages["501"]?.[0]);
+    const primaryOgImage =
+      sanitizeGuestImageUrl(propertyData.find((property) => property.id === 101)?.property_img?.[0]) ?? LOGO_URL;
+    const penthouseCover =
+      sanitizeGuestImageUrl(penthouse?.property_img?.[0]) ?? LOGO_URL;
     const effectiveDiscountPercent = getEffectiveDiscountPercent();
     const penthouseOfferPrice = Math.round(
         pricingConfig.baseNightlyPriceByUnitType.penthouse *
