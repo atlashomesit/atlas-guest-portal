@@ -20,6 +20,17 @@ vi.mock("../../../utils/analytics", async () => {
   };
 });
 
+vi.mock("../../../hooks/usePropertyListings", async () => {
+  const { homes } = await import("../../../content/homes");
+  return {
+    usePropertyListings: () => ({
+      homes: homes.map((h) => ({ roomNo: h.roomNo, title: h.title, href: h.href })),
+      isLoading: false,
+      usedFallback: true,
+    }),
+  };
+});
+
 import Navbar from "./Navbar";
 import { trackEvent } from "../../../utils/analytics";
 import { homes } from "../../../content/homes";

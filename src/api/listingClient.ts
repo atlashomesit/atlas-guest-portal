@@ -113,6 +113,19 @@ function normalizePublicListing(payload: Record<string, unknown>): PublicListing
   };
 }
 
+const coercePublicListingsPayload = (payload: unknown): Record<string, unknown>[] => {
+  if (Array.isArray(payload)) {
+    return payload.filter((e): e is Record<string, unknown> => Boolean(e) && typeof e === 'object');
+  }
+  if (payload && typeof payload === 'object') {
+    const items = (payload as { items?: unknown }).items;
+    if (Array.isArray(items)) {
+      return items.filter((e): e is Record<string, unknown> => Boolean(e) && typeof e === 'object');
+    }
+  }
+  return [];
+};
+
 export const fetchPublicListings = async (signal?: AbortSignal): Promise<PublicListing[]> => {
   const response = await fetch(buildApiUrl(PUBLIC_LISTINGS_ENDPOINT), {
     signal,
@@ -124,16 +137,10 @@ export const fetchPublicListings = async (signal?: AbortSignal): Promise<PublicL
   }
 
   const payload = (await response.json()) as unknown;
-  if (!Array.isArray(payload)) {
-    return [];
-  }
+  const rows = coercePublicListingsPayload(payload);
 
-  return payload
-    .map((item) =>
-      item && typeof item === 'object'
-        ? normalizePublicListing(item as Record<string, unknown>)
-        : null,
-    )
+  return rows
+    .map((item) => normalizePublicListing(item))
     .filter((row): row is PublicListing => row !== null && row.id > 0);
 };
 
