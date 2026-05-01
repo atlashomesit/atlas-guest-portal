@@ -144,6 +144,62 @@ export const fetchPublicListings = async (signal?: AbortSignal): Promise<PublicL
     .filter((row): row is PublicListing => row !== null && row.id > 0);
 };
 
+/** Normalize JSON from GET /listings/:id/photos into ordered URL strings. */
+export function normalizeListingPhotoResponse(payload: unknown): string[] {
+  if (Array.isArray(payload)) {
+    if (payload.length === 0) return [];
+    if (payload.every((x): x is string => typeof x === 'string')) {
+      return (payload as string[]).map((s) => s.trim()).filter(Boolean);
+    }
+    return payload
+      .map((entry) => {
+        if (typeof entry === 'string') return entry.trim();
+        if (entry && typeof entry === 'object') {
+          const o = entry as Record<string, unknown>;
+          const url =
+            o.url ??
+            o.photoUrl ??
+            o.imageUrl ??
+            o.src ??
+            (typeof o.path === 'string' ? o.path : undefined);
+          return typeof url === 'string' ? url.trim() : '';
+        }
+        return '';
+      })
+      .filter(Boolean);
+  }
+  if (payload && typeof payload === 'object') {
+    const o = payload as Record<string, unknown>;
+    const nested = o.photos ?? o.items ?? o.urls ?? o.photoUrls ?? o.data ?? o.results;
+    if (nested !== undefined) return normalizeListingPhotoResponse(nested);
+  }
+  return [];
+}
+
+/** Guest catalog: GET /listings/{listingId}/photos */
+export async function fetchListingPhotos(
+  listingId: number,
+  signal?: AbortSignal,
+): Promise<string[]> {
+  if (!Number.isFinite(listingId) || listingId <= 0) return [];
+
+  const response = await fetch(buildApiUrl(`${LISTING_ENDPOINT}/${listingId}/photos`), {
+    signal,
+    headers: getApiHeaders(),
+  });
+
+  if (response.status === 404) {
+    return [];
+  }
+
+  if (!response.ok) {
+    throw new Error(`Listing photos request failed with status ${response.status}`);
+  }
+
+  const payload = (await response.json()) as unknown;
+  return normalizeListingPhotoResponse(payload);
+}
+
 export const fetchListingById = async (
   listingId: string | number,
   signal?: AbortSignal,
