@@ -107,7 +107,7 @@ export const propertyData = [
         property_neighborhoods: ["Kukatpally"],
         property_reviews: 56,
         property_rating: 4.7,
-        property_img: [],301"],
+        property_img: [],
         property_amenities: [
             { amenities_icon: "wifi", name: "Free WiFi" },
             { amenities_icon: "ac", name: "Air Conditioning" },
@@ -131,7 +131,7 @@ export const propertyData = [
         property_neighborhoods: ["Hitech City"],
         property_reviews: 49,
         property_rating: 4.6,
-        property_img: [],302"],
+        property_img: [],
         property_amenities: [
             { amenities_icon: "wifi", name: "Free WiFi" },
             { amenities_icon: "ac", name: "Air Conditioning" },
@@ -155,7 +155,7 @@ export const propertyData = [
         property_neighborhoods: ["Hitech City"],
         property_reviews: 68,
         property_rating: 4.9,
-        property_img: [],501"],
+        property_img: [],
         property_amenities: [
             { amenities_icon: "wifi", name: "Free WiFi" },
             { amenities_icon: "ac", name: "Air Conditioning" },
