@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { fetchPublicListings, type PublicListing } from "@/api/listingClient";
 import { LISTINGS, type Listing } from "@/data/listings";
-import { propertyData, propertyImages } from "@/data/propertyData";
+import { propertyData } from "@/data/propertyData";
 
 type LocalProperty = (typeof propertyData)[number];
 
@@ -60,8 +60,7 @@ const mapDtoToProperty = (dto: PublicListing): TenantPropertyRecord => {
     dto.id;
 
   const apiPhotos = dto.photoUrls && dto.photoUrls.length > 0 ? dto.photoUrls : null;
-  const fallbackPhotos =
-    propertyImages[String(propertyNumber)] ?? local?.property_img ?? [];
+  const fallbackPhotos = local?.property_img ?? [];
   const photoUrls = apiPhotos ?? fallbackPhotos;
 
   return {

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import SEO from "../components/SEO";
-import { propertyData, propertyImages } from "../data/propertyData";
+import { propertyData } from "../data/propertyData";
 import { LOGO_URL } from "../config/branding";
 import { filterGuestImageUrls, sanitizeGuestImageUrl } from "../utils/guestImageUrl";
 
@@ -29,7 +29,7 @@ const GalleryPage = () => {
 
   const galleryItems = useMemo(() => {
     return propertyData.flatMap((property: PropertyData): GalleryItem[] => {
-      const images = filterGuestImageUrls(propertyImages[String(property.id)] ?? property.property_img ?? []);
+      const images = filterGuestImageUrls(property.property_img ?? []);
       const sourceImages = images.length > 0 ? images : [sanitizeGuestImageUrl(LOGO_URL) ?? ""];
 
       return sourceImages.map((url, index) => ({
