@@ -7,7 +7,6 @@ import ListingCard from "../components/apartments/ListingCard";
 import ListingFilters from "../components/apartments/ListingFilters";
 import { LOGO_URL } from "../config/branding";
 import type { Listing } from "../data/listings";
-import { propertyImages } from "../data/propertyData";
 import { useTenantListings } from "../hooks/useTenantListings";
 import { trackEvent } from "../utils/analytics";
 import { buildHomeUnitPath, getPropertySlug, navigateToHomeUnit } from "../utils/navigation";
@@ -311,7 +310,7 @@ export const Apartments = () => {
           };
 
           // Ensure we have a valid image URL
-          const images = property.property_img || propertyImages?.[String(listing.id)] || [LOGO_URL];
+          const images = property.property_img || [];
           const name = property.property_name || listing.title || `Property ${listing.id}`;
           const location = property.property_location || listing.subtitle || "Hyderabad";
           const neighborhoods = property.property_neighborhoods ?? [];
