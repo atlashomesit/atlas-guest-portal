@@ -10,6 +10,8 @@ import {
 import { homes, defaultHomeHighlights } from "../../content/homes";
 import { useBooking } from "../../contexts/BookingContext";
 import { CONTACT } from "../../config/contact";
+import { getTenantContext } from "../../tenant/tenantContext";
+import { getTenantOverrides } from "../../tenant/tenantOverrides";
 import { usePropertyListings } from "../../hooks/usePropertyListings";
 
 const UnitBookingWidget = lazy(() => import("../../components/availability/UnitBookingWidget"));
@@ -57,6 +59,7 @@ function AmenityChip({ label }: { label: string }) {
 const HomeDetails = () => {
   const { roomNo } = useParams<{ roomNo: string }>();
   const { homes: apiHomes } = usePropertyListings();
+  const tenantOverrides = getTenantOverrides(getTenantContext()?.slug);
 
   // First try to find in API data (by listing ID)
   const apiRoom = apiHomes.find((item) => item.roomNo === roomNo);
@@ -98,7 +101,9 @@ const HomeDetails = () => {
   return (
     <section className="max-w-5xl mx-auto px-4 py-12 flex flex-col gap-6">
       <div>
-        <p className="text-sm uppercase tracking-wide text-text-muted">Atlas Homes</p>
+        {!tenantOverrides.hideAtlasHomesBranding && (
+          <p className="text-sm uppercase tracking-wide text-text-muted">Atlas Homes</p>
+        )}
         <h1 className="text-4xl font-bold text-text-primary">{room.title}</h1>
         {room.tagline && <p className="mt-2 text-lg text-text-secondary">{room.tagline}</p>}
       </div>

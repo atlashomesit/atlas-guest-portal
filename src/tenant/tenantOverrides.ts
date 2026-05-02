@@ -26,8 +26,10 @@ export type TenantContactOverrides = {
 };
 
 export type TenantOverrides = {
-  /** Hide the logo image in the navbar/footer. */
+  /** Hide the logo image in the navbar/footer/subheading. */
   hideLogo?: boolean;
+  /** Hide default "Atlas Homes" / Atlas Homestays copy where we show a listing brand row. */
+  hideAtlasHomesBranding?: boolean;
   /** Hide the "List your property" CTA in the header (desktop + mobile). */
   hideListProperty?: boolean;
   /** Override the "Our Homes" dropdown contents. */
@@ -62,6 +64,8 @@ const STAR_GUEST_HOUSE_HOMES: TenantHomeLink[] = [
 
 const TENANT_OVERRIDES: Record<string, TenantOverrides> = {
   starguesthouse: {
+    hideLogo: true,
+    hideAtlasHomesBranding: true,
     hideListProperty: true,
     homes: STAR_GUEST_HOUSE_HOMES,
     contact: {

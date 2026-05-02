@@ -32,14 +32,19 @@ const socialLabelByIcon: Record<string, string> = {
 const Footer = () => {
     const tenant = getTenantContext();
     const overrides = getTenantOverrides(tenant?.slug);
-    const showLogo = !overrides.hideLogo;
+    const logoSrc = overrides.hideLogo ? "" : (tenant?.logoUrl ?? LOGO_URL);
+    const showLogo = Boolean(logoSrc);
+    const footerBrand = overrides.hideAtlasHomesBranding ? (tenant?.name?.trim() || "Guest stays") : "Atlas Homes";
+    const footerTagline = overrides.hideAtlasHomesBranding
+        ? (tenant?.tagline?.trim() || "Comfortable stays with responsive support.")
+        : "Thoughtfully curated stays in Hyderabad";
+    const year = new Date().getFullYear();
 
     const socialLinks = Array.isArray(footerData?.socialLinks) ? footerData.socialLinks : [];
     const contactInfo: { icon: keyof typeof iconMap; text: string | string[] }[] = [
         { icon: 'IoIosMail', text: getContactEmail() },
         { icon: 'IoIosCall', text: [formatDisplayNumber()] },
     ];
-    const logoSrc = LOGO_URL;
 
     return (
         <footer
@@ -49,12 +54,16 @@ const Footer = () => {
             <div className='max-w-luxury mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-12'>
                 <div className='flex flex-col gap-4 items-center lg:items-start'>
                     {showLogo && (
-                        <img className='w-32 md:w-24 rounded-md' src={logoSrc} alt="Atlas Homestays" />
+                        <img className='w-32 md:w-24 rounded-md' src={logoSrc} alt="" aria-hidden />
                     )}
-                    <p className='text-sm text-[var(--footer-link)]'>Thoughtfully curated stays in Hyderabad</p>                    <div className='flex text-lg gap-6 text-[color:var(--footer-link)]'>
+                    <p className='text-sm text-[var(--footer-link)]'>{footerTagline}</p>
+                    <div className='flex text-lg gap-6 text-[color:var(--footer-link)]'>
                         {socialLinks.map(({ icon, link }, index) => {
                             const IconComponent = iconMap[icon];
-                            const ariaLabel = socialLabelByIcon[icon] ?? 'Open social profile';
+                            const baseLabel = socialLabelByIcon[icon] ?? "Open social profile";
+                            const ariaLabel = overrides.hideAtlasHomesBranding
+                                ? baseLabel.replace(/Atlas Homestays/g, footerBrand)
+                                : baseLabel;
                             return (
                                 <a
                                     key={index}
@@ -139,7 +148,9 @@ const Footer = () => {
 
             <div className='flex flex-col sm:flex-row items-center justify-center gap-4 text-sm text-center mt-16 pt-8 border-t border-white/10 text-[var(--footer-link)]'>
                 <div className='flex items-center gap-2 flex-wrap justify-center'>
-                    <span>© 2025 Atlas Homes</span>
+                    <span>
+                        © {year} {footerBrand}
+                    </span>
                     <span className='hidden sm:inline'>|</span>
                     <Link to="/policies" className='hover:text-[var(--footer-link-hover)] transition-colors'>Policies</Link>
                     <span>|</span>

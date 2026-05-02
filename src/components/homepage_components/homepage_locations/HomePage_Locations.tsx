@@ -15,6 +15,8 @@ import { useListingPhotosFromApi } from "../../../contexts/ListingPhotosContext"
 import { useTenantListings, type TenantPropertyRecord } from "../../../hooks/useTenantListings";
 import { filterGuestImageUrls, sanitizeGuestImageUrl } from "../../../utils/guestImageUrl";
 import { compareAtlasHomesBuildingOrder } from "../../../utils/atlasHomesBuildingOrder";
+import { getTenantContext } from "../../../tenant/tenantContext";
+import { getTenantOverrides, type TenantOverrides } from "../../../tenant/tenantOverrides";
 
 import "./homepage_location.css";
 
@@ -80,6 +82,7 @@ const createListingModel = (
   checkInDate: string | null,
   guests: number | null,
   getUrlsForListingId: (listingId: number | undefined) => string[] | undefined,
+  tenantOverrides: TenantOverrides,
 ): ListingModel => {
   const property = propertyLookup[listing.id];
   const listingDbId = property?.listingId != null ? Number(property.listingId) : undefined;
@@ -91,7 +94,11 @@ const createListingModel = (
     [];
   const filtered = filterGuestImageUrls(Array.isArray(raw) ? raw : []);
   const images =
-    filtered.length > 0 ? filtered : [sanitizeGuestImageUrl(LOGO_URL) ?? ""].filter(Boolean);
+    filtered.length > 0
+      ? filtered
+      : tenantOverrides.hideLogo
+        ? [""]
+        : [sanitizeGuestImageUrl(LOGO_URL) ?? ""].filter(Boolean);
 
   let price: ListingModel["price"];
 
@@ -114,6 +121,8 @@ const createListingModel = (
 const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
   const location = useLocation();
   const navigate = useNavigate();
+  const tenant = getTenantContext();
+  const tenantOverrides = getTenantOverrides(tenant?.slug);
   const { checkIn, checkOut, guests, searchString } = useSearchSelections(location.search);
   const [activeImageIndex, setActiveImageIndex] = React.useState<Record<string, number>>({});
   const { loading: dailyPricingLoading, getListingPricing } = useDailyPricingSummary();
@@ -163,14 +172,19 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
   const otherListings = sortedListings.filter((item) => item !== heroListing);
 
   const heroModel = React.useMemo(
-    () => (heroListing ? createListingModel(heroListing, propertyLookup, checkIn, guests, getUrlsForListingId) : null),
-    [checkIn, guests, heroListing, propertyLookup, getUrlsForListingId],
+    () =>
+      heroListing
+        ? createListingModel(heroListing, propertyLookup, checkIn, guests, getUrlsForListingId, tenantOverrides)
+        : null,
+    [checkIn, guests, heroListing, propertyLookup, getUrlsForListingId, tenantOverrides],
   );
 
   const listingModels = React.useMemo(
     () =>
-      otherListings.map((item) => createListingModel(item, propertyLookup, checkIn, guests, getUrlsForListingId)),
-    [checkIn, guests, otherListings, propertyLookup, getUrlsForListingId],
+      otherListings.map((item) =>
+        createListingModel(item, propertyLookup, checkIn, guests, getUrlsForListingId, tenantOverrides),
+      ),
+    [checkIn, guests, otherListings, propertyLookup, getUrlsForListingId, tenantOverrides],
   );
 
   React.useEffect(() => {
@@ -403,7 +417,9 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
                 </span>
               </div>
               <div>
-                <p className="text-sm font-semibold uppercase tracking-wide text-text-muted">Atlas Homes</p>
+                {!tenantOverrides.hideAtlasHomesBranding && (
+                  <p className="text-sm font-semibold uppercase tracking-wide text-text-muted">Atlas Homes</p>
+                )}
                 <h3 className="text-3xl font-bold text-text-primary">{heroModel.listing.title}</h3>
                 {heroModel.listing.subtitle && (
                   <p className="text-base text-text-secondary mt-1">{heroModel.listing.subtitle}</p>
@@ -524,7 +540,9 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
 
                   <div className="p-4 flex flex-col gap-3 flex-1">
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">Atlas Homes</p>
+                      {!tenantOverrides.hideAtlasHomesBranding && (
+                        <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">Atlas Homes</p>
+                      )}
                       <h3 className="text-lg font-semibold text-text-primary">{model.listing.title}</h3>
                       {model.listing.subtitle && (
                         <p className="text-sm text-text-secondary mt-1">{model.listing.subtitle}</p>

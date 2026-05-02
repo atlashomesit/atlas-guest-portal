@@ -3,6 +3,8 @@ import SEO from "../components/SEO";
 import { LOGO_URL } from "../config/branding";
 import { useTenantListings } from "../hooks/useTenantListings";
 import { filterGuestImageUrls, sanitizeGuestImageUrl } from "../utils/guestImageUrl";
+import { getTenantContext } from "../tenant/tenantContext";
+import { getTenantOverrides } from "../tenant/tenantOverrides";
 
 interface GalleryItem {
   propertyId: number;
@@ -22,6 +24,8 @@ const getSegment = (id: number) => {
 
 const GalleryPage = () => {
   const { properties } = useTenantListings();
+  const tenant = getTenantContext();
+  const tenantOverrides = getTenantOverrides(tenant?.slug);
   const [activeSegment, setActiveSegment] = useState<string>("all");
   const [propertyFilter, setPropertyFilter] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState<string>("");
@@ -33,7 +37,12 @@ const GalleryPage = () => {
       if (!Number.isFinite(id)) return [];
 
       const images = filterGuestImageUrls(property.property_img ?? []);
-      const sourceImages = images.length > 0 ? images : [sanitizeGuestImageUrl(LOGO_URL) ?? ""];
+      const sourceImages =
+        images.length > 0
+          ? images
+          : tenantOverrides.hideLogo
+            ? [""]
+            : [sanitizeGuestImageUrl(LOGO_URL) ?? ""];
 
       const name = property.property_name ?? `Listing ${property.listingId ?? id}`;
       const location = property.property_location ?? "";
@@ -47,7 +56,7 @@ const GalleryPage = () => {
         order: index,
       }));
     });
-  }, [properties]);
+  }, [properties, tenantOverrides.hideLogo]);
 
   const segments = useMemo(() => {
     const segmentCounts = galleryItems.reduce<Record<string, number>>((acc, item) => {
@@ -78,13 +87,27 @@ const GalleryPage = () => {
   return (
     <div className="px-4 md:px-10 lg:px-20 py-24 bg-bg-muted min-h-screen">
       <SEO
-        title="Gallery | Atlas Homestays"
-        description="Browse Atlas Homestays property photos, grouped by floor and suite type."
+        title={
+          tenantOverrides.hideAtlasHomesBranding && tenant?.name?.trim()
+            ? `Gallery | ${tenant.name.trim()}`
+            : "Gallery | Atlas Homestays"
+        }
+        description={
+          tenantOverrides.hideAtlasHomesBranding && tenant?.name?.trim()
+            ? `Browse property photos for ${tenant.name.trim()}.`
+            : "Browse Atlas Homestays property photos, grouped by floor and suite type."
+        }
       />
 
       <div className="max-w-6xl mx-auto space-y-10">
         <div className="space-y-3 text-center md:text-left">
-          <p className="uppercase tracking-[0.2em] text-primary font-semibold">Atlas Homestays</p>
+          {tenantOverrides.hideAtlasHomesBranding ? (
+            tenant?.name?.trim() ? (
+              <p className="uppercase tracking-[0.2em] text-primary font-semibold">{tenant.name.trim()}</p>
+            ) : null
+          ) : (
+            <p className="uppercase tracking-[0.2em] text-primary font-semibold">Atlas Homestays</p>
+          )}
           <h1 className="text-3xl md:text-4xl font-bold text-text-primary">Gallery</h1>
           <p className="text-lg text-text-muted">
             Explore our homes through curated photography. Filter by suite type or select a specific room to see

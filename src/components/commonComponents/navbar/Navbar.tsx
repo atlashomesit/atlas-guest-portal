@@ -18,7 +18,9 @@ const Navbar = () => {
   const tenant = getTenantContext();
   const overrides = getTenantOverrides(tenant?.slug);
   const logoSrc = tenant?.logoUrl ?? LOGO_URL;
-  const brandName = tenant?.name ?? 'Atlas Homestays';
+  const brandName = overrides.hideAtlasHomesBranding
+    ? (tenant?.name?.trim() ?? '')
+    : (tenant?.name ?? 'Atlas Homestays');
   const showLogo = !overrides.hideLogo;
   const showListProperty = !overrides.hideListProperty;
 
@@ -182,7 +184,7 @@ const Navbar = () => {
                 className="navbar-logo"
               />
             )}
-            <span className="navbar-logo-text">{brandName}</span>
+            {brandName ? <span className="navbar-logo-text">{brandName}</span> : null}
           </Link>
 
           {/* Mobile Menu Button - Only visible on mobile */}

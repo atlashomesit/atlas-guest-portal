@@ -1,6 +1,6 @@
 import Slider from "../../components/homepage_components/slider/Slider";
 import HomePage_Locations from "../../components/homepage_components/homepage_locations/HomePage_Locations";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { getTenantPropertyData } from "../../utils/propertyDataUtils";
 import { getFaqHighlights } from "../../content/faqHighlights";
 import { trackEvent } from "../../utils/analytics";
@@ -11,7 +11,7 @@ import FooterCtaStrip from "../../components/home/FooterCtaStrip";
 import SEO from "../../components/SEO";
 import { LOGO_URL } from "../../config/branding";
 import { sanitizeGuestImageUrl } from "../../utils/guestImageUrl";
-import { CONTACT } from "../../config/contact";
+import { CONTACT, getContactEmail } from "../../config/contact";
 import {
     enableFooterMiniCtaAboveFooter,
 } from "../../config/homepageUxFlags";
@@ -20,16 +20,23 @@ import { useLocation } from "react-router-dom";
 import FaqHighlights from "../../components/faq/FaqHighlights";
 import pricingConfig from "../../config/pricing.config";
 import { getEffectiveDiscountPercent } from "../../utils/pricing";
+import { getTenantContext } from "../../tenant/tenantContext";
+import { getTenantOverrides } from "../../tenant/tenantOverrides";
 
 const Home = () => {
     const { pendingScrollTarget, setPendingScrollTarget } = useBooking();
     const location = useLocation();
     const propertyData = getTenantPropertyData();
+    const tenant = getTenantContext();
+    const overrides = getTenantOverrides(tenant?.slug);
+    const schemaBrandName =
+        overrides.hideAtlasHomesBranding && tenant?.name?.trim() ? tenant.name.trim() : "Atlas Homestays";
+    const schemaLogo = overrides.hideLogo ? undefined : sanitizeGuestImageUrl(tenant?.logoUrl) ?? LOGO_URL;
+    const contactEmail = getContactEmail();
     const penthouse = propertyData.find((property) => property.id === 501);
-    const primaryOgImage =
-      sanitizeGuestImageUrl(propertyData.find((property) => property.id === 101)?.property_img?.[0]) ?? LOGO_URL;
-    const penthouseCover =
-      sanitizeGuestImageUrl(penthouse?.property_img?.[0]) ?? LOGO_URL;
+    const room101Cover = sanitizeGuestImageUrl(propertyData.find((property) => property.id === 101)?.property_img?.[0]);
+    const primaryOgImage = room101Cover ?? (!overrides.hideLogo ? LOGO_URL : undefined);
+    const penthouseCover = sanitizeGuestImageUrl(penthouse?.property_img?.[0]) ?? (!overrides.hideLogo ? LOGO_URL : undefined);
     const effectiveDiscountPercent = getEffectiveDiscountPercent();
     const penthouseOfferPrice = Math.round(
         pricingConfig.baseNightlyPriceByUnitType.penthouse *
@@ -37,13 +44,14 @@ const Home = () => {
     );
 
     const faqHighlights = getFaqHighlights();
-    const homepageJsonLd = [
+    const homepageJsonLd = useMemo(
+        () => [
         {
             "@context": "https://schema.org",
             "@type": "Organization",
-            name: "Atlas Homestays",
+            name: schemaBrandName,
             url: "https://atlashomestays.com/",
-            logo: LOGO_URL,
+            ...(schemaLogo ? { logo: schemaLogo } : {}),
             description:
                 "Serviced apartments in Hyderabad designed for business travel, family trips, and extended stays.",
             sameAs: [
@@ -65,14 +73,14 @@ const Home = () => {
         {
             "@context": "https://schema.org",
             "@type": ["LodgingBusiness", "Hotel"],
-            name: "Atlas Homestays",
+            name: schemaBrandName,
             url: "https://atlashomestays.com/",
-            logo: LOGO_URL,
+            ...(schemaLogo ? { logo: schemaLogo } : {}),
             description:
                 "Serviced apartments in KPHB, Hyderabad with Wi-Fi, parking, and responsive support for business and family stays.",
             slogan: "Best price on our website",
             telephone: `+91-${CONTACT.business.phone}`,
-            email: "atlashomeskphb@gmail.com",
+            email: contactEmail,
             address: {
                 "@type": "PostalAddress",
                 streetAddress: "KPHB, Kukatpally",
@@ -99,7 +107,7 @@ const Home = () => {
                     "@type": "Apartment",
                     name: "Atlas Penthouse 501",
                     description: penthouse?.property_description,
-                    image: penthouseCover ?? LOGO_URL,
+                    ...(penthouseCover ? { image: penthouseCover } : {}),
                     address: {
                         "@type": "PostalAddress",
                         streetAddress: "KPHB, Kukatpally",
@@ -175,7 +183,19 @@ const Home = () => {
                 acceptedAnswer: { "@type": "Answer", text: item.answer },
             })),
         },
-    ];
+    ],
+        [
+            contactEmail,
+            faqHighlights,
+            penthouse?.property_description,
+            penthouse?.property_rating,
+            penthouse?.property_reviews,
+            penthouseCover,
+            penthouseOfferPrice,
+            schemaBrandName,
+            schemaLogo,
+        ],
+    );
 
     useEffect(() => {
         trackEvent("home_view", { surface: "home", listings: propertyData.length });
@@ -200,8 +220,16 @@ const Home = () => {
     return (
         <>
             <SEO
-                title="Atlas Homestays | Serviced apartments in Hyderabad"
-                description="Book serviced apartments in Hyderabad with business-ready amenities, flexible stays, and attentive on-call support from Atlas Homestays."
+                title={
+                    overrides.hideAtlasHomesBranding && tenant?.name?.trim()
+                        ? `${tenant.name.trim()} | Book your stay`
+                        : "Atlas Homestays | Serviced apartments in Hyderabad"
+                }
+                description={
+                    overrides.hideAtlasHomesBranding && tenant?.name?.trim()
+                        ? `Book your stay with ${tenant.name.trim()}. Questions? Call ${CONTACT.business.phone} or email ${contactEmail}.`
+                        : "Book serviced apartments in Hyderabad with business-ready amenities, flexible stays, and attentive on-call support from Atlas Homestays."
+                }
                 image={primaryOgImage}
                 url="https://atlashomestays.com/"
                 twitterCard="summary_large_image"
