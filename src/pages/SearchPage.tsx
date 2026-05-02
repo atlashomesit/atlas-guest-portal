@@ -273,11 +273,14 @@ const SearchPage = () => {
 
   const hasAmenity = (unit: NormalizedListing, amenity: string): boolean => {
     const amenityIcons = (unit.amenities || []).map(a => (a.amenities_icon || "").toLowerCase());
+    // TASK-1711: expanded amenity map — Pet-friendly + Balcony added to reach 8 total filter chips.
     const amenityMap: Record<string, string[]> = {
       ac: ["ac", "air conditioning", "air-conditioner"],
       parking: ["parking", "garage"],
       pool: ["pool", "swimming"],
       wifi: ["wifi", "internet"],
+      "pet-friendly": ["pet", "dog", "cat"],
+      balcony: ["balcony", "terrace", "patio", "deck"],
     };
     const targets = amenityMap[amenity.toLowerCase()] || [];
     return targets.some(target => amenityIcons.some(icon => icon.includes(target)));
@@ -513,10 +516,10 @@ const SearchPage = () => {
           </div>
         </div>
 
-        {/* Amenity filters */}
+        {/* Amenity filters — TASK-1711: 6 basic chips + 2 nomad chips = 8 total */}
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-medium text-text-muted uppercase tracking-wide">Amenities:</span>
-          {["AC", "Parking", "Pool", "WiFi"].map((amenity) => (
+          {["AC", "Parking", "Pool", "WiFi", "Pet-friendly", "Balcony"].map((amenity) => (
             <button
               key={amenity}
               onClick={() => toggleAmenity(amenity)}
