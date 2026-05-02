@@ -142,6 +142,10 @@ interface Property {
     amenityCodes?: string[];
     /** TASK-355: host/on-site contact phone for WhatsApp CTA */
     hostPhone?: string | null;
+    /** Street-level address from API (TASK-1896); may be null if host chose not to expose pre-booking */
+    propertyAddress?: string | null;
+    /** Legacy / alternate JSON key for same */
+    property_address?: string | null;
 }
 
 const PropertyDetails = () => {
@@ -490,6 +494,11 @@ const PropertyDetails = () => {
                     );
                     const photoCount = Number((apiListing as Record<string, unknown>).photoCount) || 0;
                     const pub = apiListing as unknown as Partial<PublicListing>;
+                    const rawAddr =
+                        (apiListing as Record<string, unknown>).propertyAddress ??
+                        (apiListing as Record<string, unknown>).property_address;
+                    const streetFromApi =
+                        typeof rawAddr === 'string' && rawAddr.trim() ? rawAddr.trim() : null;
                     const listingNumericId = Number(apiListing.id) || listingId;
                     let fromPhotos: string[] = [];
                     try {
@@ -532,6 +541,11 @@ const PropertyDetails = () => {
                             }
                             return undefined;
                         })(),
+                        propertyAddress:
+                            streetFromApi ??
+                            (typeof pub.propertyAddress === 'string' && pub.propertyAddress.trim()
+                                ? pub.propertyAddress.trim()
+                                : null),
                     };
                     const fromDto =
                         photoUrlsList.length > 0 ? photoUrlsList : (coverUrl ? [coverUrl] : []);
@@ -816,6 +830,14 @@ useEffect(() => {
                                 </div>
                             ))}
                         </div>
+                    )}
+                    {(data?.propertyAddress || data?.property_address) && (
+                        <p
+                            className="text-sm text-text-muted mt-1"
+                            data-testid="property-street-address"
+                        >
+                            {String(data.propertyAddress || data.property_address).trim()}
+                        </p>
                     )}
                     <div className="mt-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3 text-sm text-text-muted">
                         <div className="flex items-center gap-2 font-semibold text-text-primary">
