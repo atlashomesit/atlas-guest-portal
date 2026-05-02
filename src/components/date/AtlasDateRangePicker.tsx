@@ -1,5 +1,5 @@
-import React, { useEffect, useId, useRef, useState } from 'react';
-import { startOfDay } from 'date-fns';
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { addDays, startOfDay } from 'date-fns';
 import { DateRange, type RangeKeyDict } from 'react-date-range';
 
 import { DateRangePickerPopover } from '../homepage_components/hotelBooking_form/DateRangePickerPopover';
@@ -94,6 +94,46 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
     return 'IDLE';
   });
 
+  /** TASK-1712: Quick-preset date ranges */
+  const quickPresets = useMemo(() => {
+    const today = getIstStartOfDay(new Date());
+    const dayOfWeek = today.getDay(); // 0=Sun … 6=Sat
+
+    // Next Friday (0 if today is Friday)
+    const daysUntilFriday = ((5 - dayOfWeek) + 7) % 7;
+    const nextFriday = addDays(today, daysUntilFriday);
+    const nextSunday = addDays(nextFriday, 2);
+
+    // "This weekend": if today is Sat use today→Sun, otherwise Fri→Sun
+    const thisWeekendStart = dayOfWeek === 6 ? today : nextFriday;
+    const thisWeekendEnd   = dayOfWeek === 6 ? addDays(today, 1) : nextSunday;
+
+    // "Next weekend": 7 days after this weekend's Friday
+    const nextWeekendStart = addDays(nextFriday, 7);
+    const nextWeekendEnd   = addDays(nextSunday, 7);
+
+    // "This week": today → nearest Sunday (next Sunday if today is Sunday)
+    const daysUntilSunday = dayOfWeek === 0 ? 7 : 7 - dayOfWeek;
+    const thisWeekEnd = addDays(today, daysUntilSunday);
+
+    // "Next month": first of next month, 7 nights
+    const nextMonthFirst = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+    const nextMonthEnd   = addDays(nextMonthFirst, 7);
+
+    const isDisabled = (start: Date) => {
+      if (!minDate) return false;
+      return getIstStartOfDay(start) < getIstStartOfDay(minDate);
+    };
+
+    return [
+      { label: 'Tonight',      start: today,           end: addDays(today, 1),  disabled: isDisabled(today) },
+      { label: 'This weekend', start: thisWeekendStart, end: thisWeekendEnd,     disabled: isDisabled(thisWeekendStart) },
+      { label: 'Next weekend', start: nextWeekendStart, end: nextWeekendEnd,     disabled: isDisabled(nextWeekendStart) },
+      { label: 'This week',    start: today,            end: thisWeekEnd,        disabled: isDisabled(today) },
+      { label: 'Next month',   start: nextMonthFirst,   end: nextMonthEnd,       disabled: isDisabled(nextMonthFirst) },
+    ];
+  }, [minDate]);
+
   const nights =
     value.startDate && value.endDate
       ? Math.max(
@@ -138,6 +178,15 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
     setValidationError(null);
     onChange({ startDate, endDate });
     return true;
+  };
+
+  /** TASK-1712: Apply a quick-preset range and close the popover. */
+  const handlePresetClick = (start: Date, end: Date) => {
+    if (applySelection(start, end)) {
+      setSelectionState('RANGE_SELECTED');
+      setInternalShownDate(normalizeToStartOfMonth(start));
+      onClose();
+    }
   };
 
   const composedDisabledDay = (date: Date) => {
@@ -331,6 +380,24 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
       <div className={`mx-5 mt-4 mb-2 rounded-lg px-4 py-2 text-sm font-semibold ${statusConfig.bg} ${statusConfig.color}`} aria-live="polite">
         <span className={`mr-2 inline-block h-2.5 w-2.5 rounded-full ${statusConfig.dot}`} aria-hidden />
         {statusConfig.label}
+      </div>
+      {/* TASK-1712: Quick-preset pills */}
+      <div className="mx-5 mb-3 flex flex-wrap gap-1.5" role="group" aria-label="Quick date presets">
+        {quickPresets.map((preset) => (
+          <button
+            key={preset.label}
+            type="button"
+            disabled={preset.disabled}
+            onClick={() => handlePresetClick(preset.start, preset.end)}
+            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors
+              ${preset.disabled
+                ? 'cursor-not-allowed text-slate-300 ring-1 ring-inset ring-slate-200'
+                : 'cursor-pointer bg-white text-slate-600 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 hover:text-slate-800 hover:ring-slate-400 active:bg-slate-100'
+              }`}
+          >
+            {preset.label}
+          </button>
+        ))}
       </div>
       {validationError && (
         <div className="mx-5 mt-4 mb-2 rounded-lg bg-red-50 px-4 py-2 text-sm font-medium text-red-700" role="alert">

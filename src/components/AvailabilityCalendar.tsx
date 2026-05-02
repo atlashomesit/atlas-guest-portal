@@ -48,8 +48,10 @@ export default function AvailabilityCalendar({ listingId, onDateSelect }: Props)
   useEffect(() => {
     if (!listingId) return;
     setLoading(true);
-    const url = buildApiUrl(`/api/public/listings/${listingId}/availability-calendar?from=${fromStr}&to=${toStr}`);
-    fetch(url, { headers: getApiHeaders() })
+    const url = new URL(buildApiUrl(`/api/listings/${listingId}/availability`));
+    url.searchParams.set('from', fromStr);
+    url.searchParams.set('to', toStr);
+    fetch(url.toString(), { headers: getApiHeaders() })
       .then((r) => {
         if (!r.ok) {
           if (import.meta.env.DEV) {

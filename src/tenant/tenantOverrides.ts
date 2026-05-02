@@ -5,6 +5,13 @@
  * absent. Other tenants are unaffected by entries added here.
  */
 
+// Inline re-export of FaqHighlight to avoid circular deps with content/faqHighlights.ts
+export type TenantFaqEntry = {
+  id: string;
+  question: string;
+  answer: string;
+};
+
 export type TenantHomeLink = {
   /** Unique key for the dropdown entry (used as React key). */
   roomNo: string;
@@ -32,6 +39,15 @@ export type TenantDirectBookingPromo = {
   subline?: string;
 };
 
+export type TenantCookieBanner = {
+  /** Full consent text shown in the banner body. */
+  text: string;
+  /** URL to the tenant's privacy notice. */
+  privacyUrl: string;
+  /** Label for the privacy notice link (default: "privacy notice"). */
+  privacyLinkLabel?: string;
+};
+
 export type TenantOverrides = {
   /** Hide the logo image in the navbar/footer/subheading. */
   hideLogo?: boolean;
@@ -47,6 +63,10 @@ export type TenantOverrides = {
   listingsApiUrl?: string;
   /** TASK-1293: homepage strip above hero (direct booking value prop). */
   directBookingPromo?: TenantDirectBookingPromo;
+  /** TASK-1877: white-label cookie banner copy + privacy link override. */
+  cookieBanner?: TenantCookieBanner;
+  /** TASK-1878: tenant-specific FAQ entries — replaces Atlas defaults when set. */
+  faq?: TenantFaqEntry[];
 };
 
 const STAR_GUEST_HOUSE_HOMES: TenantHomeLink[] = [
@@ -83,6 +103,54 @@ const TENANT_OVERRIDES: Record<string, TenantOverrides> = {
       whatsappPhone: '7799779192',
       email: 'starguesthousekondapur@gmail.com',
     },
+    // TASK-1877: white-label cookie banner with tenant-specific copy + privacy link
+    cookieBanner: {
+      text:
+        'We use strictly necessary cookies to make this site work, and optional analytics cookies ' +
+        "to understand how it's used. Under India's DPDP Act 2023 we ask for your consent before " +
+        'loading anything non-essential. Read our',
+      privacyUrl: '/privacy',
+      privacyLinkLabel: 'privacy notice',
+    },
+    // TASK-1878: tenant-specific FAQ entries for Star Guest House, Kondapur
+    faq: [
+      {
+        id: 'sgh-checkin-checkout',
+        question: 'How do check-in and check-out work?',
+        answer:
+          'Check-in is from 2:00 PM and check-out is by 11:00 AM. Self check-in with ID is supported. Early or late arrangements can be made based on availability — contact us on WhatsApp.',
+      },
+      {
+        id: 'sgh-cancellation',
+        question: 'What is the cancellation and change policy?',
+        answer:
+          'Date changes are allowed when the room is available. Cancellations follow the notice-based policy shown at the time of booking. Refunds are processed within 5–7 business days.',
+      },
+      {
+        id: 'sgh-wifi-amenities',
+        question: 'Is Wi-Fi included? What other amenities are available?',
+        answer:
+          'Yes, high-speed Wi-Fi is included in all rooms. Rooms include AC, TV, geyser, and daily housekeeping. Parking is available on-site on a first-come basis.',
+      },
+      {
+        id: 'sgh-meals',
+        question: 'Are meals or kitchen access available?',
+        answer:
+          'Star Guest House does not provide meals. A shared kitchen facility is available for guests. Kondapur has excellent dining options within walking distance.',
+      },
+      {
+        id: 'sgh-long-stay',
+        question: 'Do you offer monthly or long-stay rates?',
+        answer:
+          'Yes, we offer discounted monthly rates for stays of 30 nights or more. Contact us directly on WhatsApp at 7799779192 to get a custom quote for extended stays.',
+      },
+      {
+        id: 'sgh-contact',
+        question: 'How can I reach Star Guest House during my stay?',
+        answer:
+          'WhatsApp or call us at 7799779192 for any assistance. Our team is available 9 AM–9 PM. For after-hours emergencies, the owner line is the same number.',
+      },
+    ],
   },
 };
 

@@ -752,21 +752,21 @@ export default function BookingConfirmationPage() {
                     onChange={(e) => setCancelReason(e.target.value)}
                     rows={2}
                     placeholder="e.g., change of plans, emergency…"
-                    className="mt-1 w-full rounded-md border border-red-200 px-3 py-2 text-sm bg-white"
+                    className="mt-1 w-full rounded-md border border-red-200 px-3 py-3 text-base bg-white"
                   />
                 </label>
                 <div className="flex gap-3">
                   <button
                     onClick={submitCancellationRequest}
                     disabled={cancelSubmitting}
-                    className="inline-flex items-center justify-center rounded-lg bg-red-600 text-white text-sm font-medium px-4 py-3 disabled:opacity-50 hover:bg-red-700 transition-colors"
+                    className="inline-flex items-center justify-center rounded-lg bg-red-600 text-white text-base font-medium px-4 py-3 disabled:opacity-50 hover:bg-red-700 transition-colors"
                     data-testid="confirm-cancellation-btn"
                   >
                     {cancelSubmitting ? "Submitting…" : "Confirm request"}
                   </button>
                   <button
                     onClick={() => setShowCancelConfirm(false)}
-                    className="inline-flex items-center justify-center rounded-lg border border-gray-300 text-gray-700 text-sm font-medium px-4 py-3 hover:bg-gray-50 transition-colors"
+                    className="inline-flex items-center justify-center rounded-lg border border-gray-300 text-gray-700 text-base font-medium px-4 py-3 hover:bg-gray-50 transition-colors"
                   >
                     Cancel
                   </button>
@@ -774,7 +774,7 @@ export default function BookingConfirmationPage() {
               </div>
             )}
             {cancelMessage && (
-              <p className={`text-xs font-medium ${cancelMessage.includes("submitted") ? "text-green-700" : "text-red-700"}`}>
+              <p className={`text-sm font-medium ${cancelMessage.includes("submitted") ? "text-green-700" : "text-red-700"}`}>
                 {cancelMessage}
               </p>
             )}

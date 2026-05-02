@@ -24,6 +24,7 @@ import {
   toRazorpayContactDigits,
 } from '@/utils/guestPhoneDial';
 import { calculateNightlyPrice, inferUnitType } from '@/utils/pricing';
+import { mapRazorpayFailureCode } from '@/utils/razorpayGuestErrors';
 import priceDisplayConfig from '@/config/priceDisplay.config';
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
 import { fetchCalendarPricing, fetchPricingBreakdown } from '@/api/pricingClient';
@@ -51,6 +52,8 @@ interface UnitBookingWidgetProps {
 }
 
 const PENDING_PAYMENT_KEY = 'atlas_pending_razorpay_order';
+/** TASK-1468: browser-local last UPI VPA for Razorpay prefill (also persisted server-side on Guests when verify returns it). */
+const LAST_UPI_VPA_KEY = 'atlas_last_upi_vpa';
 
 /** COMP-001: keep in sync with Atlas.Api.Constants.GuestConsentConstants.DisplayText */
 const GUEST_DATA_CONSENT_LABEL =
@@ -223,12 +226,16 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [referralMessage, setReferralMessage] = useState<string | null>(null);
   const [promoCode, setPromoCode] = useState('');
   const [appliedPromoCode, setAppliedPromoCode] = useState<string | null>(null);
+  // TASK-1710: DPDP WhatsApp marketing opt-in — unchecked by default
+  const [whatsappMarketingOptIn, setWhatsappMarketingOptIn] = useState(false);
   const [appliedPromoDiscount, setAppliedPromoDiscount] = useState(0);
   const [promoMessage, setPromoMessage] = useState<string | null>(null);
   // TASK-171: add-on services for this listing
   const [availableAddOns, setAvailableAddOns] = useState<Array<{ addOnServiceId: number; name: string; description?: string | null; price: number; priceType: string }>>([]);
   const [selectedAddOns, setSelectedAddOns] = useState<Record<number, number>>({}); // addOnServiceId -> quantity (0 = not selected)
   const [paymentStatus, setPaymentStatus] = useState<'success' | 'failed' | null>(null);
+  /** TASK-1469: Razorpay `payment.failed` metadata for richer failure UI. */
+  const [razorpayFailure, setRazorpayFailure] = useState<{ code: string; description: string } | null>(null);
   const [bookingDetails, setBookingDetails] = useState<{
     bookingId: string;
     bookingToken?: string;
@@ -822,8 +829,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
   // ---------- Fee calculations ----------
 
-  // GST = 5% on discounted price
-  const gstAmount = 0;
+  // TASK-1871: GST is all-inclusive in the listed nightly rate (baked into breakdownPrice).
+  // The dead `gstAmount = 0` + misleading comment + never-rendering row have been removed.
+  // Header reads "All-inclusive rate · GST included" to match.
 
   // When API has loaded: use API price (or calendar sum). When API has not loaded: use 0.
   const hasSelectedRange = Boolean(dateRange.startDate && dateRange.endDate);
@@ -834,10 +842,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         ? Math.round(effectiveDailyPricing.actualPrice * (hasSelectedRange ? priceDetails.nights : 1))
         : 0;
   const convenienceFeePercent = calendarConvenienceFeePercent != null ? calendarConvenienceFeePercent / 100 : 0;
-  const subtotalForConvenience = priceDetails.total + gstAmount;
-  const _convenienceFee = Math.round(subtotalForConvenience * convenienceFeePercent);
-  const breakdownSubtotalForConvenience = breakdownPrice + gstAmount;
-  const breakdownConvenienceFee = Math.round(breakdownSubtotalForConvenience * convenienceFeePercent);
+  const _convenienceFee = Math.round(priceDetails.total * convenienceFeePercent);
+  const breakdownConvenienceFee = Math.round(breakdownPrice * convenienceFeePercent);
   const referralDiscountApplied = Math.max(0, appliedReferralDiscount || 0);
   const promoDiscountApplied = Math.max(0, appliedPromoDiscount || 0);
   // TASK-171: compute add-ons subtotal from guest selections
@@ -845,7 +851,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     const qty = selectedAddOns[ao.addOnServiceId] ?? 0;
     return sum + (qty > 0 ? ao.price * qty : 0);
   }, 0);
-  const breakdownFinalTotal = Math.max(1, breakdownPrice + gstAmount + breakdownConvenienceFee - referralDiscountApplied - promoDiscountApplied + addOnsTotal);
+  const breakdownFinalTotal = Math.max(1, breakdownPrice + breakdownConvenienceFee - referralDiscountApplied - promoDiscountApplied + addOnsTotal);
 
   const finalTotal =
     hasSelectedRange && selectedRangeTotalFromCalendar != null
@@ -971,10 +977,18 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       }
 
       const requestData = {
-        bookingId: paymentData.bookingId,
+        bookingId: Number(paymentData.bookingId),
         razorpayOrderId: paymentData.razorpay_order_id,
         razorpayPaymentId: paymentData.razorpay_payment_id,
-        razorpaySignature: paymentData.razorpay_signature
+        razorpaySignature: paymentData.razorpay_signature,
+        guestInfo: {
+          name: formData.name.trim(),
+          email: formData.email.trim(),
+          phone: toGuestPhoneE164(
+            phoneDialCode,
+            clampNationalDigits(formData.phone, getGuestDialOption(phoneDialCode).maxDigits),
+          ),
+        },
       };
 
       const response = await axios.post(buildApiUrl('/api/Razorpay/verify'), requestData, {
@@ -988,6 +1002,14 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       
       if (response.data.success) {
         setStatusMessage('Payment successful! Your booking is confirmed.');
+        const vpa = typeof response.data.lastUpiVpa === 'string' ? response.data.lastUpiVpa.trim() : '';
+        if (vpa) {
+          try {
+            localStorage.setItem(LAST_UPI_VPA_KEY, vpa);
+          } catch {
+            /* ignore quota / private mode */
+          }
+        }
       } else {
         throw new Error(response.data.message || 'Payment verification failed');
       }
@@ -1191,6 +1213,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             phoneDialCode,
             clampNationalDigits(formData.phone, getGuestDialOption(phoneDialCode).maxDigits)
           ),
+          // TASK-1710: DPDP WhatsApp opt-in — only true when guest explicitly checks the box
+          marketingWhatsAppOptIn: whatsappMarketingOptIn,
         }
       };
 
@@ -1237,6 +1261,13 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         try {
           let paymentCompleted = false; // Track if payment handler was called
 
+          let lastUpiVpaPrefill = '';
+          try {
+            lastUpiVpaPrefill = localStorage.getItem(LAST_UPI_VPA_KEY)?.trim() ?? '';
+          } catch {
+            /* ignore */
+          }
+
           const handleRazorpayClose = () => {
             if (paymentCompleted) return;
             paymentCompleted = true; // Prevent double-reset from ondismiss + close event
@@ -1245,6 +1276,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             setIsSubmitting(false);
             setIsLoading(false);
             setPaymentStatus(null);
+            setRazorpayFailure(null);
             setFormError('Payment was cancelled. You can try booking again.');
             toast.info('Payment cancelled. You can try booking again.');
           };
@@ -1263,6 +1295,13 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                 phoneDialCode,
                 clampNationalDigits(formData.phone, getGuestDialOption(phoneDialCode).maxDigits)
               ),
+              method: 'upi',
+              ...(lastUpiVpaPrefill ? { vpa: lastUpiVpaPrefill } : {}),
+            },
+            config: {
+              display: {
+                sequence: ['block.upi', 'block.card', 'block.netbanking', 'block.wallet'],
+              },
             },
             theme: {
               color: '#2563eb'
@@ -1332,12 +1371,15 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           };
 
           const rzp = new window.Razorpay(options);
-          rzp.on('payment.failed', (response: { error?: { description?: string } }) => {
+          rzp.on('payment.failed', (response: { error?: { code?: string; description?: string } }) => {
             paymentCompleted = true; // Payment attempt was made
             void abandonPaymentPendingCheckout(bookingId, bookingToken);
             localStorage.removeItem(PENDING_PAYMENT_KEY);
+            const code = String(response?.error?.code ?? '');
+            const description = String(response?.error?.description ?? '');
+            setRazorpayFailure({ code, description });
             setPaymentStatus('failed');
-            setFormError(`Payment failed: ${response.error?.description || 'Unknown error'}`);
+            setFormError(mapRazorpayFailureCode(code, description));
             setIsSubmitting(false);
             setIsLoading(false);
           });
@@ -1369,10 +1411,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
   const closePaymentPopup = useCallback(() => {
     setPaymentStatus(null);
+    setRazorpayFailure(null);
   }, []);
 
   const handleRetryPayment = useCallback(() => {
     setPaymentStatus(null);
+    setRazorpayFailure(null);
     setFormError(null);
     setIsSubmitting(false);
     setIsLoading(false);
@@ -1399,8 +1443,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   // Auto-close timers in parent so they are not reset by inner component re-mounts
   useEffect(() => {
     if (paymentStatus === 'failed') {
-      const t = window.setTimeout(() => setPaymentStatus(null), 3000);
-      return () => window.clearTimeout(t);
+      // TASK-1469: keep failure dialog until the guest dismisses or retries (no auto-dismiss).
+      return undefined;
     }
     if (paymentStatus === 'success') {
       const t = window.setTimeout(() => setPaymentStatus(null), 6000);
@@ -1612,9 +1656,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Payment Could Not Be Processed</h2>
             </div>
 
-            {/* Primary Message */}
+            {/* Primary Message (TASK-1469: Razorpay code → friendly copy) */}
             <p className="text-center text-gray-700 mb-6">
-              We're sorry, but your payment didn't go through. Please try again or use a different payment method.
+              {mapRazorpayFailureCode(razorpayFailure?.code, razorpayFailure?.description)}
             </p>
 
             {/* Possible Reasons Section */}
@@ -1765,7 +1809,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           {priceDetails.extraGuests > 0 && priceDetails.nights > 0 && (
             <p>{priceDetails.extraGuests} {priceDetails.extraGuests === 1 ? 'extra guest' : 'extra guests'} × {displayPrice(priceDetails.extraGuestsFee / priceDetails.nights / priceDetails.extraGuests)}/night</p>
           )}
-          <p className="text-xs">Includes all taxes and fees</p>
+          <p className="text-xs">All-inclusive rate · GST included</p>
         </div>
       </div>
 
@@ -1990,15 +2034,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                 <span className="text-right">-{displayPrice(losDiscountAmount)}</span>
               </div>
             )}
-            {gstAmount > 0 && (
-              <div className="grid grid-cols-[140px_12px_1fr]">
-                <span>GST (5%)</span>
-                <span>:</span>
-                <span className="text-right">
-                  {displayPrice(gstAmount)}
-                </span>
-              </div>
-            )}
+            {/* TASK-1871: GST row removed — all-inclusive rate, no separate GST line */}
             <div className="grid grid-cols-[140px_12px_1fr]">
               <span>Convenience fee{convenienceFeePctLabel > 0 ? ` (${convenienceFeePctLabel}%)` : ''}</span>
               <span>:</span>
@@ -2062,13 +2098,13 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                   {ao.description && <p className="text-xs text-text-muted truncate">{ao.description}</p>}
                   <p className="text-xs text-text-secondary">{displayPrice(ao.price)} / {ao.priceType.replace('_', ' ')}</p>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-1 shrink-0">
                   {qty > 0 && (
                     <>
                       <button
                         type="button"
                         onClick={() => setSelectedAddOns(prev => ({ ...prev, [ao.addOnServiceId]: Math.max(0, (prev[ao.addOnServiceId] ?? 0) - 1) }))}
-                        className="w-7 h-7 rounded-full border border-border-strong text-text-primary flex items-center justify-center text-base leading-none"
+                        className="w-11 h-11 rounded-full border border-border-strong text-text-primary flex items-center justify-center text-base leading-none"
                         aria-label={`Remove one ${ao.name}`}
                       >−</button>
                       <span className="text-sm font-medium w-4 text-center">{qty}</span>
@@ -2077,7 +2113,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                   <button
                     type="button"
                     onClick={() => setSelectedAddOns(prev => ({ ...prev, [ao.addOnServiceId]: (prev[ao.addOnServiceId] ?? 0) + 1 }))}
-                    className="w-7 h-7 rounded-full border border-border-strong text-text-primary flex items-center justify-center text-base leading-none"
+                    className="w-11 h-11 rounded-full border border-border-strong text-text-primary flex items-center justify-center text-base leading-none"
                     aria-label={`Add ${ao.name}`}
                   >+</button>
                 </div>
@@ -2315,6 +2351,19 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               {consentError}
             </p>
           ) : null}
+          {/* TASK-1710: DPDP-compliant WhatsApp marketing opt-in — unchecked by default */}
+          <label className="flex items-start gap-3 cursor-pointer text-sm text-text-muted mt-2">
+            <input
+              type="checkbox"
+              name="whatsappMarketingOptIn"
+              checked={whatsappMarketingOptIn}
+              onChange={(e) => setWhatsappMarketingOptIn(e.target.checked)}
+              disabled={isBookingDisabled}
+              className="mt-1 h-4 w-4 shrink-0 rounded border-border-strong text-cta-primary focus:ring-cta-primary"
+              aria-label="Send me deals and exclusive offers on WhatsApp (optional)"
+            />
+            <span>Send me exclusive deals and offers on WhatsApp <em className="not-italic text-text-muted">(optional)</em></span>
+          </label>
         </div>
       </div>
 
@@ -2331,9 +2380,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
       {!isBookingDisabled && (
         <div className="flex items-center gap-2 flex-wrap justify-center py-1">
-          <img src="/icons/upi.svg" alt="UPI" className="h-5" />
-          <img src="/icons/visa.svg" alt="Visa" className="h-4" />
-          <img src="/icons/rupay.svg" alt="RuPay" className="h-4" />
+          <img src="/icons/upi.svg" alt="UPI" className="h-5" loading="lazy" decoding="async" />
+          <img src="/icons/visa.svg" alt="Visa" className="h-4" loading="lazy" decoding="async" />
+          <img src="/icons/rupay.svg" alt="RuPay" className="h-4" loading="lazy" decoding="async" />
           <span className="text-xs text-text-muted">Secured by Razorpay · UPI / Visa / RuPay</span>
         </div>
       )}

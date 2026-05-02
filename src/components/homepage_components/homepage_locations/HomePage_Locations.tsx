@@ -333,6 +333,8 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
                 className="w-full h-full object-cover min-h-[280px]"
                 wrapperClassName="h-full"
                 sizes="(max-width: 1023px) 100vw, 50vw"
+                loading="eager"
+                fetchPriority="high"
               />
               {heroModel.images.length > 1 && (
                 <div className="absolute bottom-4 left-0 right-0">

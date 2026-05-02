@@ -26,6 +26,11 @@ export function addRecentlyViewed(item: Omit<GuestListingHistoryItem, "viewedAtU
   const next: GuestListingHistoryItem = { ...item, viewedAtUtc: new Date().toISOString() };
   const deduped = [next, ...list.filter((x) => x.listingId !== item.listingId)].slice(0, 24);
   localStorage.setItem(RECENT_KEY, JSON.stringify(deduped));
+  try {
+    window.dispatchEvent(new CustomEvent("atlas-recently-viewed-changed"));
+  } catch {
+    /* non-browser */
+  }
 }
 
 export function getRecentlyViewed(): GuestListingHistoryItem[] {
@@ -56,6 +61,11 @@ export function toggleFavorite(listingId: number): boolean {
   else ids.add(listingId);
   const next = Array.from(ids).filter((n) => Number.isFinite(n) && n > 0).slice(0, 200);
   localStorage.setItem(FAV_KEY, JSON.stringify(next));
+  try {
+    window.dispatchEvent(new CustomEvent("atlas-favorites-changed"));
+  } catch {
+    /* non-browser */
+  }
   return next.includes(listingId);
 }
 

@@ -13,6 +13,7 @@ import { CONTACT } from "../../config/contact";
 import { getTenantContext } from "../../tenant/tenantContext";
 import { getTenantOverrides } from "../../tenant/tenantOverrides";
 import { usePropertyListings } from "../../hooks/usePropertyListings";
+import { addRecentlyViewed } from "../../utils/guestHistory";
 
 const UnitBookingWidget = lazy(() => import("../../components/availability/UnitBookingWidget"));
 
@@ -70,8 +71,9 @@ const HomeDetails = () => {
     title: apiRoom.title,
     href: apiRoom.href,
     slug: apiRoom.title.toLowerCase().replace(/_/g, '-'),
-    images: [],
+    images: [] as string[],
     maxGuests: 2,
+    listingId: Number(apiRoom.roomNo),
   } : homes.find((item) => item.roomNo === roomNo);
 
   const { updateBooking } = useBooking();
@@ -81,7 +83,35 @@ const HomeDetails = () => {
     updateBooking({ listingDetailPath: room.href });
   }, [room, updateBooking]);
 
+  /** TASK-1459: record listing view for Recently viewed strip. */
+  useEffect(() => {
+    if (!room) return;
+    const lid = "listingId" in room && typeof room.listingId === "number" ? room.listingId : Number(roomNo);
+    if (!Number.isFinite(lid) || lid <= 0) return;
+    addRecentlyViewed({
+      listingId: lid,
+      path: room.href,
+      name: room.title,
+      coverPhotoUrl: room.images?.[0],
+    });
+  }, [room, roomNo]);
+
   const primaryImage = room?.images?.[0] ?? fallbackImage;
+
+  /** TASK-1453: LCP preload for hero photo (no react-helmet-async — inject once per navigation). */
+  useEffect(() => {
+    if (!room || !primaryImage) return;
+    const link = document.createElement("link");
+    link.rel = "preload";
+    link.as = "image";
+    link.href = primaryImage;
+    link.setAttribute("fetchpriority", "high");
+    link.setAttribute("data-atlas-home-lcp", "1");
+    document.head.appendChild(link);
+    return () => {
+      link.remove();
+    };
+  }, [room, primaryImage]);
   const highlights = room?.highlights?.length ? room.highlights : defaultHomeHighlights;
 
   if (!room) {
@@ -114,7 +144,9 @@ const HomeDetails = () => {
             src={primaryImage}
             alt={room.title}
             className="w-full h-80 object-cover rounded-2xl shadow-level1"
-            loading="lazy"
+            loading="eager"
+            decoding="async"
+            fetchPriority="high"
           />
           {room.images && room.images.length > 1 && (
             <div className="flex gap-2 mt-3">
@@ -125,6 +157,7 @@ const HomeDetails = () => {
                   alt={`${room.title} photo ${idx + 1}`}
                   className="h-20 w-24 flex-shrink-0 rounded-lg object-cover"
                   loading="lazy"
+                  decoding="async"
                 />
               ))}
             </div>
