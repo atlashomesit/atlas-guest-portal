@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import SEO from "../components/SEO";
 import { buildApiUrl, getApiHeaders } from "../api/client";
+import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 
 interface ReviewEligibility {
   bookingId: number;
@@ -160,7 +161,21 @@ export default function ReviewSubmitPage() {
               ? `Your feedback about ${eligibility.propertyName} means a lot. We hope to welcome you back soon!`
               : "You have already submitted a review for this stay. Thank you!"}
           </p>
-          <Link to="/" className="inline-block mt-2 text-sm text-brand-primary underline underline-offset-2">Return to homepage</Link>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-2 flex-wrap">
+            <Link
+              to={buildHomeUnitPath(getPropertySlug({ property_name: eligibility.propertyName }), eligibility.listingId)}
+              data-testid="review-success-view-property"
+              className="inline-block text-sm font-medium text-brand-primary underline underline-offset-2"
+            >
+              View {eligibility.propertyName}
+            </Link>
+            <span className="hidden sm:inline text-text-muted text-sm" aria-hidden>
+              ·
+            </span>
+            <Link to="/" className="inline-block text-sm text-brand-primary underline underline-offset-2">
+              Return to homepage
+            </Link>
+          </div>
         </div>
       </div>
     );
