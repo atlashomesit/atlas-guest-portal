@@ -100,6 +100,10 @@ const bootstrapApp = async () => {
       applyTenantBranding(resolved);
     }
 
+    // Keep loading screen visible briefly to prevent tenant flicker
+    // This ensures the correct tenant branding is applied before the app renders
+    await new Promise(resolve => setTimeout(resolve, 100));
+
     root.render(
       <StrictMode>
         <ThemeProvider initialTheme={DEFAULT_THEME}>

@@ -85,7 +85,10 @@ export async function fetchPricingBreakdown(
   const response = await fetch(url.toString(), { signal, headers: getApiHeaders() });
 
   if (!response.ok) {
-    throw new Error(`Pricing breakdown failed with status ${response.status}`);
+    const errorMsg = response.status === 400
+      ? `Invalid pricing request: listingId=${params.listingId}, checkIn=${params.checkIn}, checkOut=${params.checkOut}`
+      : `Pricing breakdown failed with status ${response.status}`;
+    throw new Error(errorMsg);
   }
 
   const data = (await response.json()) as Record<string, unknown>;
