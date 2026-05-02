@@ -162,6 +162,9 @@ const SearchPage = () => {
 
   const [tonightAvailableIds, setTonightAvailableIds] = useState<Set<number> | null>(null);
   const [tonightProbeLoading, setTonightProbeLoading] = useState(false);
+  // TASK-1865: batch availability check for checkIn+checkOut dates
+  const [dateAvailableIds, setDateAvailableIds] = useState<Set<number> | null>(null);
+  const [dateAvailLoading, setDateAvailLoading] = useState(false);
 
   const listings = useMemo(
     () => apiListings ?? buildStaticListings(),
@@ -233,6 +236,41 @@ const SearchPage = () => {
     return () => controller.abort();
   }, [availableNow, listings]);
 
+  // TASK-1865: When checkIn+checkOut set, call batch availability endpoint to get available listing IDs
+  useEffect(() => {
+    if (!checkIn || !checkOut || hasInvalidDates) {
+      setDateAvailableIds(null);
+      setDateAvailLoading(false);
+      return;
+    }
+    const startStr = checkIn.toISOString().slice(0, 10);
+    const endStr = checkOut.toISOString().slice(0, 10);
+    const controller = new AbortController();
+    setDateAvailLoading(true);
+    setDateAvailableIds(null);
+
+    fetch(buildApiUrl(`/api/public/listings/availability-batch?startDate=${startStr}&endDate=${endStr}`), {
+      signal: controller.signal,
+      headers: { Accept: "application/json", ...getApiHeaders() },
+    })
+      .then((res) => res.ok ? res.json() : Promise.reject(res.status))
+      .then((data: { availableListingIds?: number[] }) => {
+        if (!controller.signal.aborted) {
+          setDateAvailableIds(new Set(data.availableListingIds ?? []));
+          setDateAvailLoading(false);
+        }
+      })
+      .catch(() => {
+        // On failure, don't block — show all listings with "not confirmed" badge
+        if (!controller.signal.aborted) {
+          setDateAvailableIds(null);
+          setDateAvailLoading(false);
+        }
+      });
+
+    return () => controller.abort();
+  }, [checkIn, checkOut, hasInvalidDates]);
+
   const hasAmenity = (unit: NormalizedListing, amenity: string): boolean => {
     const amenityIcons = (unit.amenities || []).map(a => (a.amenities_icon || "").toLowerCase());
     const amenityMap: Record<string, string[]> = {
@@ -252,6 +290,10 @@ const SearchPage = () => {
       if (guests && guests > unit.maxGuests) return false;
       if (minPrice && unit.pricePerNight > 0 && unit.pricePerNight < minPrice) return false;
       if (maxPrice && unit.pricePerNight > maxPrice) return false;
+      // TASK-1865: exclude listings confirmed unavailable for selected dates; skip when still loading or fetch failed
+      if (checkIn && checkOut && !dateAvailLoading && dateAvailableIds !== null) {
+        if (!dateAvailableIds.has(unit.numericId)) return false;
+      }
       // TASK-577: Filter by remote work friendliness (co-working desk or WiFi >= 25 Mbps)
       if (remoteWork) {
         const isRemoteWorkFriendly = (unit as any).hasCoworkingDesk || ((unit as any).wifiSpeedMbps ?? 0) >= 25;
@@ -288,6 +330,10 @@ const SearchPage = () => {
     });
   }, [
     availableNow,
+    checkIn,
+    checkOut,
+    dateAvailableIds,
+    dateAvailLoading,
     guests,
     hasInvalidDates,
     listings,
@@ -447,7 +493,10 @@ const SearchPage = () => {
           <div className="ml-auto flex items-end gap-3">
             {!isLoading && (
               <span className="text-sm text-text-muted">
-                {availableNow && tonightProbeLoading
+                {/* TASK-1865: show availability check status for date filter */}
+                {checkIn && checkOut && dateAvailLoading
+                  ? "Checking availability for your dates…"
+                  : availableNow && tonightProbeLoading
                   ? "Checking tonight's availability..."
                   : `${filteredUnits.length} ${filteredUnits.length === 1 ? "property" : "properties"} found`}
               </span>
