@@ -25,6 +25,13 @@ export type TenantContactOverrides = {
   email?: string;
 };
 
+export type TenantDirectBookingPromo = {
+  /** When false, strip is hidden even on marketplace theme. */
+  enabled?: boolean;
+  headline?: string;
+  subline?: string;
+};
+
 export type TenantOverrides = {
   /** Hide the logo image in the navbar/footer/subheading. */
   hideLogo?: boolean;
@@ -38,6 +45,8 @@ export type TenantOverrides = {
   contact?: TenantContactOverrides;
   /** Listings API endpoint URL (e.g., https://api.example.com/listings/public). */
   listingsApiUrl?: string;
+  /** TASK-1293: homepage strip above hero (direct booking value prop). */
+  directBookingPromo?: TenantDirectBookingPromo;
 };
 
 const STAR_GUEST_HOUSE_HOMES: TenantHomeLink[] = [
