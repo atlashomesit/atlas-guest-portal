@@ -157,9 +157,10 @@ const SearchPage = () => {
   const monthlyStay = searchParams.get("monthlyStay") === "true";   // 30+ nights min stay
 
   const hasInvalidDates = Boolean(checkIn && checkOut && checkOut <= checkIn);
+  /** TASK-1451: include guests so "Clear filters" resets guest count too. */
   const hasActiveFilters = Boolean(
     minPrice || maxPrice || remoteWork || longStay || availableNow || selectedAmenities.length > 0
-    || nomadWifi || nomadWorkspace || monthlyStay,
+    || nomadWifi || nomadWorkspace || monthlyStay || guests != null,
   );
 
   const [tonightAvailableIds, setTonightAvailableIds] = useState<Set<number> | null>(null);
@@ -395,6 +396,7 @@ const SearchPage = () => {
       next.delete("remoteWork");
       next.delete("longStay");
       next.delete("availableNow");
+      next.delete("guests");
       // TASK-1738: clear digital nomad filters
       next.delete("nomadWifi");
       next.delete("nomadWorkspace");
@@ -407,6 +409,11 @@ const SearchPage = () => {
   const hasMore = visibleCount < sortedUnits.length;
   const showEmptyState = !isLoading && !hasInvalidDates && sortedUnits.length === 0;
   const queryString = searchParams.toString();
+  /** TASK-1451: first three catalog listings as "you might also like" (same pool as `fetchPublicListings`; no extra round-trip). */
+  const emptyStateSuggestions = useMemo(
+    () => (listings.length > 0 ? listings.slice(0, 3) : []),
+    [listings],
+  );
 
   return (
     <div className="min-h-screen bg-bg-muted py-10">
@@ -594,19 +601,82 @@ const SearchPage = () => {
         )}
 
         {showEmptyState && (
-          <div className="rounded-2xl border border-border-subtle bg-bg-surface p-8 text-center shadow-sm">
-            <p className="text-lg font-semibold text-text-primary">No apartments match these filters</p>
-            <p className="mt-2 text-text-muted">
-              Try adjusting your dates or guest count, or browse all apartments to see everything that&apos;s available.
-            </p>
-            <div className="mt-6 flex justify-center">
-              <Link
-                to="/search"
-                className="inline-flex items-center justify-center rounded-xl bg-cta-primary px-5 py-3 text-sm font-semibold text-[var(--text-contrast)] shadow hover:bg-cta-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
-              >
-                Browse all apartments
-              </Link>
+          <div className="flex flex-col gap-8">
+            <div
+              className="rounded-2xl border border-border-subtle bg-bg-surface px-4 py-8 text-center shadow-sm sm:px-8"
+              data-testid="search-empty-state"
+            >
+              <div className="mx-auto mb-6 flex max-w-xs justify-center" aria-hidden>
+                <img
+                  src="/images/atlas-homestays-static-map.svg"
+                  alt=""
+                  className="h-28 w-auto max-w-full object-contain opacity-90"
+                />
+              </div>
+              <h2 className="text-xl font-bold text-text-primary sm:text-2xl">No homestays match your filters</h2>
+              <p className="mx-auto mt-3 max-w-lg text-text-muted">
+                Try adjusting dates, price range, or guest count.
+              </p>
+              <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row sm:flex-wrap">
+                {hasActiveFilters ? (
+                  <button
+                    type="button"
+                    onClick={clearFilters}
+                    className="inline-flex min-h-[44px] w-full max-w-xs items-center justify-center rounded-xl bg-cta-primary px-5 py-3 text-sm font-semibold text-[var(--text-contrast)] shadow hover:bg-cta-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary sm:w-auto"
+                    data-testid="search-empty-clear-filters"
+                  >
+                    Clear filters
+                  </button>
+                ) : null}
+                <Link
+                  to="/search"
+                  className={`inline-flex min-h-[44px] w-full max-w-xs items-center justify-center rounded-xl border border-border-subtle px-5 py-3 text-sm font-semibold text-text-primary shadow-sm hover:bg-bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary sm:w-auto ${hasActiveFilters ? "" : "bg-cta-primary text-[var(--text-contrast)] border-transparent hover:bg-cta-secondary"}`}
+                  data-testid="search-empty-browse-all"
+                >
+                  Browse all apartments
+                </Link>
+              </div>
             </div>
+
+            {emptyStateSuggestions.length > 0 && (
+              <section
+                className="space-y-4"
+                data-testid="search-empty-suggestions"
+                aria-label="You might also like"
+              >
+                <h3 className="text-lg font-semibold text-text-primary">You might also like</h3>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                  {emptyStateSuggestions.map((unit) => (
+                    <article
+                      key={`suggest-${unit.id}`}
+                      className="flex flex-col overflow-hidden rounded-2xl border border-border-subtle bg-bg-surface shadow-sm"
+                      data-testid="search-empty-suggestion-card"
+                    >
+                      <div className="h-36 w-full bg-gradient-to-br from-bg-muted to-bg-surface">
+                        <OptimizedImage
+                          src={unit.imageUrl}
+                          alt={unit.title ?? "Property listing"}
+                          className="h-full w-full object-cover"
+                          wrapperClassName="h-full"
+                          sizes="(max-width: 640px) 100vw, 33vw"
+                        />
+                      </div>
+                      <div className="flex flex-1 flex-col gap-2 p-4">
+                        <h4 className="line-clamp-2 text-base font-semibold text-text-primary">{unit.title}</h4>
+                        <p className="text-sm text-text-muted">{unit.location}</p>
+                        <p className="text-lg font-bold text-text-primary">{formatDisplayCurrency(unit.pricePerNight)}<span className="text-sm font-normal text-text-muted"> / night</span></p>
+                        <Link
+                          to={`${unit.canonicalPath}${queryString ? `?${queryString}` : ""}`}
+                          className="mt-auto inline-flex min-h-[44px] items-center justify-center rounded-xl bg-[var(--cta-primary-hover)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--cta-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
+                        >
+                          View details
+                        </Link>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            )}
           </div>
         )}
 
@@ -703,8 +773,8 @@ const SearchPage = () => {
                       )}
                       <p className="text-sm text-text-muted">per night</p>
                       <p className="text-xs text-text-muted">
-                        {/* TASK-1869: Sept 2025 GST reform — 5% for ≤₹7,500/night, 12% above */}
-                        {(() => { const gstMult = unit.pricePerNight > 7500 ? 1.12 : 1.05; const pct = unit.pricePerNight > 7500 ? 12 : 5; return `Est. total: ${formatDisplayCurrency(Math.round(unit.pricePerNight * gstMult))} (incl. ${pct}% GST)`; })()}
+                        {/* TASK-1869 / TASK-1451: Sept 2025 GST reform — 5% for ≤₹7,500/night, 18% above */}
+                        {(() => { const gstMult = unit.pricePerNight > 7500 ? 1.18 : 1.05; const pct = unit.pricePerNight > 7500 ? 18 : 5; return `Est. total: ${formatDisplayCurrency(Math.round(unit.pricePerNight * gstMult))} (incl. ${pct}% GST)`; })()}
                       </p>
                       {longStay && (
                         <p className="text-sm font-semibold text-cta-primary">
