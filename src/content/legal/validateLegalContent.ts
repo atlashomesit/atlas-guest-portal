@@ -86,7 +86,6 @@ export const runLegalValidation = () => {
 if (import.meta.url === new URL(import.meta.url).href && typeof process !== "undefined") {
   try {
     runLegalValidation();
-    console.log("Legal content validation passed.");
   } catch (error) {
     console.error(String(error));
     process.exit(1);
