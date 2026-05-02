@@ -581,6 +581,10 @@ useEffect(() => {
           name: data.property_name,
           coverPhotoUrl: Array.isArray(data.property_img) ? data.property_img[0] : undefined,
           location: data.property_location,
+          pricePerNight:
+              typeof data.property_price === "number" && data.property_price > 0
+                  ? data.property_price
+                  : undefined,
       });
       updateBooking({ listingDetailPath: path });
   }
