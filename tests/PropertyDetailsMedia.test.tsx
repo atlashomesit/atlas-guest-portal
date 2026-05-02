@@ -83,6 +83,32 @@ vi.mock("@fancyapps/ui", () => ({
   },
 }));
 
+vi.mock("@/hooks/useTenantListings", () => ({
+  useTenantListings: () => ({
+    listings: [],
+    properties: [
+      {
+        id: 101,
+        listingId: 101,
+        property_name: "Test Property",
+        property_location: "Test City",
+        property_img: [
+          "https://cdn.example.com/photo1.jpg",
+          "https://cdn.example.com/photo2.jpg",
+          "https://cdn.example.com/photo3.jpg",
+        ],
+        property_amenities: [{ amenities_icon: "wifi" }],
+        property_description: "A cozy place to stay.",
+        property_rating: 4.7,
+        property_reviews: 12,
+        property_price: 1000,
+      },
+    ],
+    state: "success" as const,
+    refetch: vi.fn(),
+  }),
+}));
+
 import Homepage_PropertyDetails from "@/components/homepage_components/homepage_Propertydetails/Homepage_PropertyDetails";
 
 describe("Homepage_PropertyDetails gallery", () => {
