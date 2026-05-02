@@ -566,6 +566,8 @@ const BecomeHost = () => {
             max={10}
             value={estimatorRooms}
             onChange={(e) => setEstimatorRooms(Number(e.target.value))}
+            aria-label="Number of rooms"
+            aria-valuetext={`${estimatorRooms} ${estimatorRooms === 1 ? "room" : "rooms"}`}
             className="w-full accent-blue-600"
           />
           <div
@@ -580,6 +582,8 @@ const BecomeHost = () => {
             style={{
               background: "linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)",
             }}
+            aria-live="polite"
+            aria-atomic="true"
           >
             <p className="text-sm" style={{ color: "#475569" }}>
               Estimated monthly earnings

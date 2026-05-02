@@ -353,7 +353,7 @@ const SearchPage = () => {
         {/* Filter bar */}
         <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-border-subtle bg-bg-surface px-4 py-3 shadow-sm">
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-text-muted" htmlFor="filter-min-price">Min price / night</label>
+            <label className="text-sm font-medium text-text-muted" htmlFor="filter-min-price">Min price / night</label>
             <input
               id="filter-min-price"
               type="number"
@@ -365,7 +365,7 @@ const SearchPage = () => {
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-text-muted" htmlFor="filter-max-price">Max price / night</label>
+            <label className="text-sm font-medium text-text-muted" htmlFor="filter-max-price">Max price / night</label>
             <input
               id="filter-max-price"
               type="number"
@@ -377,7 +377,7 @@ const SearchPage = () => {
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-text-muted" htmlFor="filter-guests">Guests</label>
+            <label className="text-sm font-medium text-text-muted" htmlFor="filter-guests">Guests</label>
             <input
               id="filter-guests"
               type="number"

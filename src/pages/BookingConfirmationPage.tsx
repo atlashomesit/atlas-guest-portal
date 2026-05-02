@@ -752,7 +752,7 @@ export default function BookingConfirmationPage() {
                     onChange={(e) => setCancelReason(e.target.value)}
                     rows={2}
                     placeholder="e.g., change of plans, emergency…"
-                    className="mt-1 w-full rounded-md border border-red-200 px-3 py-2 text-sm bg-white"
+                    className="mt-1 w-full rounded-md border border-red-200 px-3 py-3 text-base bg-white"
                   />
                 </label>
                 <div className="flex gap-3">
