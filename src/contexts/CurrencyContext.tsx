@@ -34,15 +34,6 @@ interface CurrencyContextValue {
 
 const CurrencyContext = createContext<CurrencyContextValue | null>(null);
 
-const CURRENCY_SYMBOLS: Record<SupportedCurrency, string> = {
-  INR: '₹',
-  USD: '$',
-  EUR: '€',
-  GBP: '£',
-  AUD: 'A$',
-  SGD: 'S$',
-};
-
 const INTL_LOCALES: Record<SupportedCurrency, string> = {
   INR: 'en-IN',
   USD: 'en-US',
