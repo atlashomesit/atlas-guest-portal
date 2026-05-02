@@ -11,6 +11,7 @@ import OptimizedImage from "../components/ui/OptimizedImage";
 import OwnerShareBadge from "../components/OwnerShareBadge"; // TASK-1705
 import DirectDiscountBanner from "../components/DirectDiscountBanner"; // TASK-1708
 import ReviewSummary from "../components/ReviewSummary"; // TASK-1716
+import LongStayCalculator from "../components/LongStayCalculator"; // TASK-1739
 import { filterGuestImageUrls, sanitizeGuestImageUrl } from "../utils/guestImageUrl";
 import { compareAtlasHomesBuildingOrder } from "../utils/atlasHomesBuildingOrder";
 import { buildApiUrl, getApiHeaders } from "../api/client";
@@ -710,6 +711,14 @@ const SearchPage = () => {
                           from {formatDisplayCurrency(unit.pricePerNight * 30)}/month
                         </p>
                       )}
+                      {/* TASK-1739: LOS discount calculator — only shows when tiers are configured */}
+                      <LongStayCalculator
+                        pricePerNight={unit.pricePerNight}
+                        tier1MinNights={unit.losDiscountMinNights}
+                        tier1Percent={unit.losDiscountPercent}
+                        tier2MinNights={unit.losDiscount2MinNights}
+                        tier2Percent={unit.losDiscount2Percent}
+                      />
                     </div>
                     <div className="flex flex-col gap-1 text-right text-xs text-text-muted">
                       {unit.amenities.map((amenity, index) => (
