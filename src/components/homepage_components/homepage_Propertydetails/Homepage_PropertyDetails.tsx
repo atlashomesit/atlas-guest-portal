@@ -36,10 +36,13 @@ import SEO from '../../SEO';
 import { buildApiUrl, getApiHeaders } from '../../../api/client';
 import { addRecentlyViewed, isFavorite, toggleFavorite } from '../../../utils/guestHistory';
 import { formatCurrency, formatHumanDate } from '../../../utils/formatting';
+import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
 
 import { Fancybox } from "@fancyapps/ui";
 import "@fancyapps/ui/dist/fancybox/fancybox.css";
 
+/** TASK-1294: illustrative uplift for “typical OTA” guest all-in (fees vary by site). */
+const OTA_ILLUSTRATIVE_MARKUP_PCT = 17;
 
 interface PropertyAmenity {
     amenities_icon: string;
@@ -237,6 +240,24 @@ const PropertyDetails = () => {
             return null;
         }
     }, [data, unitType]);
+
+    const dailyPricing = useDailyPricingSummary();
+    const listingNumericForPricing = Number(resolvedListingId ?? data?.listingId ?? NaN);
+    const dailyPricingRow = useMemo(() => {
+        if (!Number.isFinite(listingNumericForPricing) || listingNumericForPricing <= 0) return undefined;
+        return dailyPricing.data?.listings?.find((l) => l.listingId === listingNumericForPricing);
+    }, [dailyPricing.data?.listings, listingNumericForPricing]);
+
+    const directBookingNightly = useMemo(() => {
+        const fromApi = dailyPricingRow?.finalAmount;
+        if (fromApi != null && Number(fromApi) > 0) return Math.round(Number(fromApi));
+        return nightlyPrice?.finalNightlyPrice ?? 0;
+    }, [dailyPricingRow?.finalAmount, nightlyPrice?.finalNightlyPrice]);
+
+    const illustrativeOtaNightly = useMemo(() => {
+        if (directBookingNightly <= 0) return 0;
+        return Math.round(directBookingNightly * (1 + OTA_ILLUSTRATIVE_MARKUP_PCT / 100));
+    }, [directBookingNightly]);
 
     useEffect(() => {
         const lookupId = data?.listingId ?? location.state?.property?.listingId ?? listingIdParam;
@@ -698,6 +719,88 @@ useEffect(() => {
         return name.charAt(0).toUpperCase() + name.slice(1);
     };
 
+    /** TASK-1357: aggregateRating + Review JSON-LD (before conditional returns — Rules of Hooks). */
+    const propertyJsonLd = useMemo(() => {
+        if (!data) return undefined;
+        const pageUrlForLd = typeof window !== 'undefined' ? window.location.href : '';
+        const primaryImageForLd = filterGuestImageUrls(data.property_img ?? [])[0];
+        const apiRev = listingReviewsFromApi;
+        const useApiRatings = Boolean(apiRev && !apiRev.loading && apiRev.totalCount > 0 && apiRev.averageRating > 0);
+        const ratingValue = useApiRatings ? apiRev!.averageRating : (data.property_rating || 0);
+        const reviewCount = useApiRatings ? apiRev!.totalCount : (data.property_reviews || 0);
+        const reviewNodes = (apiRev?.reviews ?? [])
+            .filter((r) => Number(r.rating) >= 1 && Number(r.rating) <= 5)
+            .slice(0, 8)
+            .map((r) => ({
+                '@type': 'Review',
+                author: { '@type': 'Person', name: (r.guestName || 'Guest').trim().slice(0, 80) || 'Guest' },
+                reviewRating: { '@type': 'Rating', ratingValue: r.rating, bestRating: 5, worstRating: 1 },
+                reviewBody: String(r.body || r.title || '').trim().slice(0, 800),
+                datePublished: r.createdAt,
+            }))
+            .filter((node) => node.reviewBody.length > 0);
+
+        const displayNightly = directBookingNightly > 0 ? directBookingNightly : (nightlyPrice?.finalNightlyPrice ?? 0);
+
+        return [
+            {
+                '@context': 'https://schema.org',
+                '@type': 'LodgingBusiness',
+                name: data.property_name,
+                description: data.property_description?.slice(0, 300),
+                image: primaryImageForLd,
+                url: pageUrlForLd,
+                address: {
+                    '@type': 'PostalAddress',
+                    addressLocality: data.property_location || 'Hyderabad',
+                    addressRegion: 'Telangana',
+                    addressCountry: 'IN',
+                },
+                aggregateRating:
+                    ratingValue > 0 && reviewCount > 0
+                        ? {
+                              '@type': 'AggregateRating',
+                              ratingValue,
+                              reviewCount,
+                          }
+                        : undefined,
+                review: reviewNodes.length > 0 ? reviewNodes : undefined,
+                ...(displayNightly > 0
+                    ? {
+                          priceRange: `INR ${displayNightly}/night`,
+                          makesOffer: {
+                              '@type': 'Offer',
+                              priceCurrency: 'INR',
+                              price: displayNightly,
+                              availability: 'https://schema.org/InStock',
+                          },
+                      }
+                    : {}),
+            },
+            ...(Array.isArray(data.property_policy_details) && data.property_policy_details.length > 0
+                ? [
+                      {
+                          '@context': 'https://schema.org',
+                          '@type': 'FAQPage',
+                          mainEntity: data.property_policy_details
+                              .filter((p: any) => p?.type && p?.value)
+                              .slice(0, 6)
+                              .map((p: any) => ({
+                                  '@type': 'Question',
+                                  name: String(p.type),
+                                  acceptedAnswer: { '@type': 'Answer', text: String(p.value) },
+                              })),
+                      },
+                  ]
+                : []),
+        ];
+    }, [
+        data,
+        listingReviewsFromApi,
+        directBookingNightly,
+        nightlyPrice?.finalNightlyPrice,
+    ]);
+
     if (!data && !notFound) {
         return <PropertyDetailsSkeleton />;
     }
@@ -738,50 +841,6 @@ useEffect(() => {
     const pageUrl = typeof window !== 'undefined' ? window.location.href : '';
     const galleryUrls = filterGuestImageUrls(data?.property_img ?? []);
     const primaryImage = galleryUrls[0];
-
-    const propertyJsonLd = data ? [
-        {
-        "@context": "https://schema.org",
-        "@type": "LodgingBusiness",
-        name: data.property_name,
-        description: data.property_description?.slice(0, 300),
-        image: primaryImage,
-        url: pageUrl,
-        address: {
-            "@type": "PostalAddress",
-            addressLocality: data.property_location || "Hyderabad",
-            addressRegion: "Telangana",
-            addressCountry: "IN",
-        },
-        aggregateRating: data.property_rating ? {
-            "@type": "AggregateRating",
-            ratingValue: data.property_rating,
-            reviewCount: data.property_reviews || 0,
-        } : undefined,
-        ...(nightlyPrice?.finalNightlyPrice ? {
-            priceRange: `INR ${nightlyPrice.finalNightlyPrice}/night`,
-            makesOffer: {
-                "@type": "Offer",
-                priceCurrency: "INR",
-                price: nightlyPrice.finalNightlyPrice,
-                availability: "https://schema.org/InStock",
-            },
-        } : {}),
-        },
-        // FAQPage: reuse "Things to know" snippets where available for richer search results.
-        ...(Array.isArray(data.property_policy_details) && data.property_policy_details.length > 0 ? [{
-            "@context": "https://schema.org",
-            "@type": "FAQPage",
-            mainEntity: data.property_policy_details
-                .filter((p: any) => p?.type && p?.value)
-                .slice(0, 6)
-                .map((p: any) => ({
-                    "@type": "Question",
-                    name: String(p.type),
-                    acceptedAnswer: { "@type": "Answer", text: String(p.value) }
-                }))
-        }] : [])
-    ] : undefined;
 
     return (
         <>
@@ -856,6 +915,34 @@ useEffect(() => {
                         )}
                     </div>
                 </div>
+
+                {directBookingNightly > 0 && illustrativeOtaNightly > 0 && (
+                    <div
+                        className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50/85 px-4 py-3 text-sm text-emerald-950"
+                        data-testid="listing-ota-comparison-card"
+                        role="note"
+                    >
+                        <p className="font-semibold text-emerald-950">Book direct — typically better value</p>
+                        <p className="mt-1 text-emerald-900/95">
+                            From{' '}
+                            <span className="font-semibold tabular-nums">
+                                {formatCurrency(directBookingNightly, { maximumFractionDigits: 0 })}
+                            </span>{' '}
+                            per night on our site
+                            {illustrativeOtaNightly > directBookingNightly ? (
+                                <>
+                                    {' '}
+                                    — major booking platforms often show similar stays around{' '}
+                                    <span className="font-semibold tabular-nums">
+                                        {formatCurrency(illustrativeOtaNightly, { maximumFractionDigits: 0 })}
+                                    </span>{' '}
+                                    or higher after guest fees (illustrative).
+                                </>
+                            ) : null}
+                        </p>
+                        <p className="mt-1 text-xs text-emerald-800/90">Estimate only; OTA pricing varies by dates and promotions.</p>
+                    </div>
+                )}
 
                 {/* Social sharing — minimal, does not distract from booking CTA */}
                 <div className="flex items-center gap-3 mt-2 flex-wrap">
