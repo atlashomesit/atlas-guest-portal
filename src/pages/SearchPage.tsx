@@ -8,6 +8,8 @@ import { useCurrency } from "../contexts/CurrencyContext";
 import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 import SkeletonCard from "../components/apartments/SkeletonCard";
 import OptimizedImage from "../components/ui/OptimizedImage";
+import OwnerShareBadge from "../components/OwnerShareBadge"; // TASK-1705
+import DirectDiscountBanner from "../components/DirectDiscountBanner"; // TASK-1708
 import { filterGuestImageUrls, sanitizeGuestImageUrl } from "../utils/guestImageUrl";
 import { compareAtlasHomesBuildingOrder } from "../utils/atlasHomesBuildingOrder";
 import { buildApiUrl, getApiHeaders } from "../api/client";
@@ -425,6 +427,9 @@ const SearchPage = () => {
           ))}
         </div>
 
+        {/* TASK-1708: Direct booking discount nudge — shows for direct traffic only */}
+        <DirectDiscountBanner />
+
         {!isLoading && apiListings === null && listings.length > 0 && (
           <div className="rounded-xl border border-support-warning/40 bg-support-warning/10 px-4 py-3 text-support-warning">
             Limited results — showing cached data. Search may be temporarily unavailable.
@@ -529,6 +534,8 @@ const SearchPage = () => {
                       {unit.location}
                     </span>
                   </div>
+                  {/* TASK-1705: Owner-share trust badge */}
+                  <OwnerShareBadge nightlyPrice={unit.pricePerNight} className="self-start" />
                   <div className="flex items-center justify-between gap-4">
                     <div className="space-y-1">
                       <p className="text-2xl font-bold text-text-primary" data-testid="guest-listing-nightly-price">{formatDisplayCurrency(unit.pricePerNight)}</p>

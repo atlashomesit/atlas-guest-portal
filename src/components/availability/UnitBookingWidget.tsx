@@ -332,6 +332,17 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     }
   }, []);
 
+  // TASK-1708: Auto-fill promo code from ?promo= URL param (e.g. ?promo=DIRECT5 from DirectDiscountBanner CTA)
+  useEffect(() => {
+    try {
+      const url = new URL(window.location.href);
+      const promo = (url.searchParams.get('promo') || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 32);
+      if (promo) setPromoCode(promo);
+    } catch {
+      // no-op
+    }
+  }, []);
+
   // Hydrate widget from booking context (e.g. ?checkIn=&checkOut=&guests= from property URL)
   useEffect(() => {
     const ci = booking.checkIn;
