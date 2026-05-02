@@ -187,6 +187,8 @@ const PropertyDetails = () => {
     const [availabilityPrefetched, setAvailabilityPrefetched] = useState(false);
     const [fav, setFav] = useState(false);
     const [similarFromApi, setSimilarFromApi] = useState<null | { loading: boolean; items: any[] }>(null);
+    /** TASK-1726: host response time badge text (e.g. "Replies in <1h"). */
+    const [responseTimeBadge, setResponseTimeBadge] = useState<string | null>(null);
     /** AMN-001: amenity master code→label map */
     const [amenityMaster, setAmenityMaster] = useState<Map<string, string>>(new Map());
 
@@ -210,6 +212,18 @@ const PropertyDetails = () => {
                     if (code && label) map.set(code.toLowerCase(), label);
                 });
                 setAmenityMaster(map);
+            })
+            .catch(() => { /* non-critical */ });
+        return () => { active = false; };
+    }, []);
+
+    // TASK-1726: Fetch host response time badge once per listing load
+    useEffect(() => {
+        let active = true;
+        fetch(buildApiUrl('/listings/response-time'), { headers: getApiHeaders() })
+            .then((r) => r.ok ? r.json() : Promise.reject())
+            .then((body: { badgeText?: string | null }) => {
+                if (active && body?.badgeText) setResponseTimeBadge(body.badgeText);
             })
             .catch(() => { /* non-critical */ });
         return () => { active = false; };
@@ -1410,7 +1424,7 @@ useEffect(() => {
                                         Managed by Atlas Homestays
                                     </p>
                                     <p className="text-xs text-text-muted">
-                                        24/7 WhatsApp support · Typically replies within 1 hour
+                                        24/7 WhatsApp support{responseTimeBadge ? ` · ${responseTimeBadge}` : " · Typically replies within 1 hour"}
                                     </p>
                                 </div>
                             </div>
