@@ -460,7 +460,7 @@ const BecomeHost = () => {
       // Surface the real reason so the user can act on it (vs. "Something went wrong").
       const message = err instanceof Error && err.message
         ? err.message
-        : "Something went wrong. Please try again.";
+        : "We could not complete registration. Try again or contact support@atlashomestays.com.";
       toast.error(message);
       setSubmitStatus("error");
     }

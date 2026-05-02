@@ -4,6 +4,7 @@ import SEO from "../components/SEO";
 import { buildApiUrl, getApiHeaders } from "../api/client";
 import { sanitizeGuestImageUrl } from "../utils/guestImageUrl";
 import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
+import { messageFromApiResponse } from "../utils/serverErrorFromResponse";
 
 interface ReviewEligibility {
   bookingId: number;
@@ -127,7 +128,7 @@ export default function ReviewSubmitPage() {
     fetch(url, { headers: { Accept: "application/json", ...getApiHeaders() } })
       .then(async (res) => {
         if (res.status === 404) throw new Error("Review link not found. Please use the link from your message.");
-        if (!res.ok) throw new Error("Unable to load review details. Please try again.");
+        if (!res.ok) throw new Error(await messageFromApiResponse(res));
         return res.json() as Promise<ReviewEligibility>;
       })
       .then(setEligibility)
@@ -159,8 +160,7 @@ export default function ReviewSubmitPage() {
           body: fd,
         });
         if (!res.ok) {
-          const data = (await res.json().catch(() => ({}))) as { error?: string };
-          throw new Error(data?.error ?? "Could not upload photo. Please try again.");
+          throw new Error(await messageFromApiResponse(res));
         }
         const data = (await res.json()) as { url?: string };
         if (data.url) additions.push(data.url);
@@ -213,7 +213,7 @@ export default function ReviewSubmitPage() {
         const data = await res.json() as { error?: string };
         throw new Error(data?.error ?? "Could not submit review. Please try again.");
       }
-      if (!res.ok) throw new Error("Failed to submit review. Please try again.");
+      if (!res.ok) throw new Error(await messageFromApiResponse(res));
 
       setSubmitted(true);
     } catch (err: unknown) {

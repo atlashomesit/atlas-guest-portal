@@ -4,6 +4,7 @@ import SEO from "../components/SEO";
 import { buildApiUrl, getApiHeaders } from "../api/client";
 import { getRuntimeConfig, hasRuntimeConfig } from "../runtime-config";
 import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
+import { messageFromApiResponse } from "../utils/serverErrorFromResponse";
 
 /** Guest summary API returns ISO dates or formatted strings (e.g. "Sat, 3 May 2026") — normalize for ICS. */
 function summaryDisplayDateToIso(displayDate: string): string {
@@ -122,7 +123,7 @@ export default function BookingConfirmationPage() {
     })
       .then(async (res) => {
         if (res.status === 404) throw new Error("Booking not found. Please check your confirmation email for the correct link.");
-        if (!res.ok) throw new Error("Unable to load booking details. Please try again.");
+        if (!res.ok) throw new Error(await messageFromApiResponse(res));
         return res.json() as Promise<BookingSummary>;
       })
       .then(setBooking)
@@ -246,7 +247,7 @@ export default function BookingConfirmationPage() {
         headers: { "Content-Type": "application/json", ...getApiHeaders() },
         body: JSON.stringify({ subscriptionJson: JSON.stringify(sub.toJSON()) }),
       });
-      if (!res.ok) throw new Error("Unable to save notification preference.");
+      if (!res.ok) throw new Error(await messageFromApiResponse(res));
       setPushState("done");
       setPushMessage("Notifications enabled. We'll send important booking updates.");
     } catch (e) {
@@ -282,8 +283,7 @@ export default function BookingConfirmationPage() {
         },
       );
       if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || "Could not submit request.");
+        throw new Error(await messageFromApiResponse(res));
       }
       setModMessage("Request submitted. Our team will review and contact you.");
       setModCheckin("");
@@ -316,8 +316,7 @@ export default function BookingConfirmationPage() {
         return;
       }
       if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || "Could not submit request.");
+        throw new Error(await messageFromApiResponse(res));
       }
       setCancelRequested(true);
       setCancelMessage("");

@@ -3,6 +3,7 @@ import { useSearchParams, Link } from "react-router-dom";
 import SEO from "../components/SEO";
 import { buildApiUrl, getApiHeaders } from "../api/client";
 import { toast } from "react-toastify";
+import { messageFromApiResponse } from "../utils/serverErrorFromResponse";
 
 interface GuestProfile {
   id: number;
@@ -38,7 +39,7 @@ export default function ProfilePage() {
     fetch(url, { headers: { Accept: "application/json", ...getApiHeaders() } })
       .then(async (res) => {
         if (res.status === 404) throw new Error("Profile link not found. Please use the link from your booking confirmation.");
-        if (!res.ok) throw new Error("Unable to load your profile. Please try again.");
+        if (!res.ok) throw new Error(await messageFromApiResponse(res));
         return res.json() as Promise<GuestProfile>;
       })
       .then((p) => {
@@ -77,7 +78,7 @@ export default function ProfilePage() {
         const data = await res.json() as { error?: string };
         throw new Error(data?.error ?? "Could not update profile.");
       }
-      if (!res.ok) throw new Error("Failed to update profile. Please try again.");
+      if (!res.ok) throw new Error(await messageFromApiResponse(res));
       const updated = await res.json() as GuestProfile;
       setProfile(updated);
       toast.success("Profile updated.");

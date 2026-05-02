@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import SEO from "../components/SEO";
 import { buildApiUrl, getApiHeaders } from "../api/client";
+import { messageFromApiResponse } from "../utils/serverErrorFromResponse";
 
 interface BookingItem {
   id: number;
@@ -44,7 +45,7 @@ export default function MyBookingsPage() {
     fetch(url, { headers: { Accept: "application/json", ...getApiHeaders() } })
       .then(async (res) => {
         if (res.status === 404) throw new Error("No bookings found. Please use the link from your booking confirmation.");
-        if (!res.ok) throw new Error("Unable to load your bookings. Please try again.");
+        if (!res.ok) throw new Error(await messageFromApiResponse(res));
         return res.json() as Promise<BookingItem[]>;
       })
       .then((data) => setBookings(Array.isArray(data) ? data : []))

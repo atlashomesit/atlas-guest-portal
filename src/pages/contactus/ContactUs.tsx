@@ -57,10 +57,22 @@ const ContactUs = () => {
                 body: JSON.stringify(formData),
             });
 
-            const data = await response.json();
+            const data = (await response.json().catch(() => ({}))) as Record<string, unknown>;
 
             if (!response.ok) {
-                const message = data?.message || "We couldn't send your message right now.";
+                // Hardening for BUG-ONBOARD-1 (incident 2026-05-02). See atlas-e2e/docs/incidents/2026-05-02-property-registration-failure.md
+                const fieldErrors = data?.errors && typeof data.errors === "object"
+                    ? Object.values(data.errors as Record<string, string[]>).flat().filter(Boolean).join(" ")
+                    : "";
+                const serverMsg = (typeof data?.message === "string" && data.message.trim())
+                    || (typeof data?.error === "string" && data.error.trim())
+                    || fieldErrors
+                    || (typeof data?.title === "string" && data.title.trim())
+                    || "";
+                const fallback = response.status >= 500
+                    ? `Our servers hit an unexpected error (${response.status}). Try again or contact support@atlashomestays.com.`
+                    : `Request failed (HTTP ${response.status}). Please check your input and try again.`;
+                const message = serverMsg || fallback;
                 toast.error(message);
                 setStatusMessage({
                     type: "error",

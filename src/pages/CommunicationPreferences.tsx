@@ -1,6 +1,7 @@
 import React from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { buildApiUrl } from "@/api/client";
+import { messageFromApiResponse } from "@/utils/serverErrorFromResponse";
 
 /**
  * Landing page after one-click unsubscribe from marketing email (API redirects here).
@@ -62,7 +63,7 @@ export default function CommunicationPreferences() {
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify(form),
       });
-      if (!res.ok) throw new Error("Could not save preferences.");
+      if (!res.ok) throw new Error(await messageFromApiResponse(res));
       setSaved(true);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Could not save preferences.");
