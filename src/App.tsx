@@ -157,6 +157,7 @@ function AppWrapper() {
           <Route path="/profile" element={withBoundary(<ProfilePage />, "profile-route")} />
           <Route path="/my-bookings" element={withBoundary(<MyBookingsPage />, "my-bookings-route")} />
           <Route path="/favorites" element={withBoundary(<FavoritesPage />, "favorites-route")} />
+          <Route path="/saved" element={withBoundary(<Navigate to="/favorites" replace />, "saved-alias-route")} />
           <Route path="/recent" element={withBoundary(<RecentlyViewedPage />, "recent-route")} />
           <Route path="/become-a-host" element={withBoundary(<BecomeHost />, "become-host-route")} />
           <Route path="/property_LocationDetails/:id" element={withBoundary(<Homepage_LocationDetails />, "location-details-route")} />

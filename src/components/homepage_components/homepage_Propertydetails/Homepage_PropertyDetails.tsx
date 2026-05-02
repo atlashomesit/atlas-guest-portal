@@ -28,6 +28,7 @@ import { filterGuestImageUrls, sanitizeGuestImageUrl } from '../../../utils/gues
 import type { ListingDetail, PublicListing } from '../../../api/listingClient';
 import {
     fetchListingById,
+    fetchListingContact,
     fetchListingPhotos,
     parseMaxGuestsFromPayload,
     resolveStaticMaxGuests,
@@ -37,6 +38,7 @@ import { buildApiUrl, getApiHeaders } from '../../../api/client';
 import { addRecentlyViewed, isFavorite, toggleFavorite } from '../../../utils/guestHistory';
 import { formatCurrency, formatHumanDate } from '../../../utils/formatting';
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
+import GuestAssistant from '../../GuestAssistant'; // TASK-1728
 
 import { Fancybox } from "@fancyapps/ui";
 import "@fancyapps/ui/dist/fancybox/fancybox.css";
@@ -186,6 +188,8 @@ const PropertyDetails = () => {
     const [availabilityPrefetched, setAvailabilityPrefetched] = useState(false);
     const [fav, setFav] = useState(false);
     const [similarFromApi, setSimilarFromApi] = useState<null | { loading: boolean; items: any[] }>(null);
+    /** TASK-1726: host response time badge text (e.g. "Replies in <1h"). */
+    const [responseTimeBadge, setResponseTimeBadge] = useState<string | null>(null);
     /** AMN-001: amenity master code→label map */
     const [amenityMaster, setAmenityMaster] = useState<Map<string, string>>(new Map());
 
@@ -209,6 +213,18 @@ const PropertyDetails = () => {
                     if (code && label) map.set(code.toLowerCase(), label);
                 });
                 setAmenityMaster(map);
+            })
+            .catch(() => { /* non-critical */ });
+        return () => { active = false; };
+    }, []);
+
+    // TASK-1726: Fetch host response time badge once per listing load
+    useEffect(() => {
+        let active = true;
+        fetch(buildApiUrl('/listings/response-time'), { headers: getApiHeaders() })
+            .then((r) => r.ok ? r.json() : Promise.reject())
+            .then((body: { badgeText?: string | null }) => {
+                if (active && body?.badgeText) setResponseTimeBadge(body.badgeText);
             })
             .catch(() => { /* non-critical */ });
         return () => { active = false; };
@@ -337,6 +353,33 @@ const PropertyDetails = () => {
             .catch(() => {});
         return () => ac.abort();
     }, [resolvedListingId, data?.listingId, data?.maxGuests]);
+
+    /** TASK-1466: deep links e.g. `/homes/.../123?bookingId=1&t=...` load host phone without exposing it on public catalog. */
+    const bookingIdForContact = searchParams.get('bookingId');
+    const contactToken = searchParams.get('t');
+    const lastListingContactKeyRef = React.useRef<string>('');
+    useEffect(() => {
+        if (!data) return;
+        const bid = Number(bookingIdForContact);
+        const tok = contactToken?.trim() ?? '';
+        const lid = Number(resolvedListingId ?? data.listingId ?? NaN);
+        if (!Number.isFinite(bid) || bid <= 0 || !tok || !Number.isFinite(lid) || lid <= 0) return;
+        const dedupeKey = `${lid}:${bid}:${tok}`;
+        if (lastListingContactKeyRef.current === dedupeKey) return;
+        const ac = new AbortController();
+        void fetchListingContact(lid, bid, tok, ac.signal)
+            .then((c) => {
+                const phone = c?.hostPhone?.trim();
+                if (!phone || ac.signal.aborted) return;
+                setData((prev) => {
+                    if (!prev) return prev;
+                    lastListingContactKeyRef.current = dedupeKey;
+                    return { ...prev, hostPhone: phone };
+                });
+            })
+            .catch(() => {});
+        return () => ac.abort();
+    }, [bookingIdForContact, contactToken, resolvedListingId, data]);
 
     useEffect(() => {
         const lid = resolvedListingId;
@@ -991,8 +1034,9 @@ useEffect(() => {
         <img
           src={galleryUrls[0]}
           alt={data?.property_name ? `${data.property_name} photo` : "Main property photo"}
-          loading="lazy"
+          loading="eager"
           decoding="async"
+          fetchPriority="high"
           sizes="(min-width: 1024px) 50vw, 100vw"
           className="w-full h-full object-cover"
         />
@@ -1409,7 +1453,7 @@ useEffect(() => {
                                         Managed by Atlas Homestays
                                     </p>
                                     <p className="text-xs text-text-muted">
-                                        24/7 WhatsApp support · Typically replies within 1 hour
+                                        24/7 WhatsApp support{responseTimeBadge ? ` · ${responseTimeBadge}` : " · Typically replies within 1 hour"}
                                     </p>
                                 </div>
                             </div>
@@ -1527,6 +1571,9 @@ useEffect(() => {
             </div>
         </section>
 
+        {/* TASK-1728: Guest Assistant FAQ widget — floating bottom-left */}
+        <GuestAssistant listingId={resolvedListingId ?? data?.listingId ?? null} />
+
         {/* Mobile fixed Reserve CTA - visible only below md breakpoint */}
         {data && (
           <div
@@ -1543,7 +1590,8 @@ useEffect(() => {
               type="button"
               className="rounded-xl bg-cta-primary px-6 py-2.5 text-sm font-semibold text-white shadow-sm"
               onClick={() => {
-                const widget = document.querySelector('[data-testid="booking-name"]');
+                // TASK-1861: was 'booking-name' which doesn't exist; 'guest-booking-form' is the actual form root testid
+                const widget = document.querySelector('[data-testid="guest-booking-form"]');
                 widget?.scrollIntoView({ behavior: 'smooth', block: 'center' });
               }}
             >

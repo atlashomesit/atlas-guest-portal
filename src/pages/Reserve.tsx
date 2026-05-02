@@ -43,13 +43,13 @@ const Reserve = () => {
       <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6 space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <p className="text-sm text-text-muted">Property</p>
+            <p className="text-base text-text-muted">Property</p>
             <p className="text-lg font-semibold text-text-primary">
               {booking.propertyName ?? 'Not selected'}
             </p>
           </div>
           <div>
-            <p className="text-sm text-text-muted">Guests</p>
+            <p className="text-base text-text-muted">Guests</p>
             <p className="text-lg font-semibold text-text-primary">{booking.guests}</p>
           </div>
           <div>
@@ -57,7 +57,7 @@ const Reserve = () => {
             <p className="text-lg font-semibold text-text-primary">{formatHumanDate(booking.checkIn)}</p>
           </div>
           <div>
-            <p className="text-sm text-text-muted">Check-out</p>
+            <p className="text-base text-text-muted">Check-out</p>
             <p className="text-lg font-semibold text-text-primary">{formatHumanDate(booking.checkOut)}</p>
           </div>
         </div>
@@ -84,7 +84,7 @@ const Reserve = () => {
             Go to payment
           </Button>
         </div>
-        <p className="text-xs text-text-muted">
+        <p className="text-sm text-text-muted">
           You will be taken to the property page to complete your secure payment via Razorpay.
         </p>
       </div>

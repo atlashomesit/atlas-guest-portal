@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { FaHeart, FaRegHeart } from 'react-icons/fa';
 import { buildApiUrl } from '@/api/client';
+import { formatCurrency } from '@/utils/formatting'; // TASK-1872
+import { getFavoriteIds, toggleFavorite } from '@/utils/guestHistory'; // TASK-1873
+import OptimizedImage from '@/components/ui/OptimizedImage'; // TASK-1874
+import SkeletonCard from '@/components/apartments/SkeletonCard'; // TASK-1875
+import SEO from '@/components/SEO'; // TASK-1876
 
 type MarketplaceItem = {
   id: number;
@@ -13,6 +19,9 @@ type MarketplaceItem = {
   maxGuests: number;
   coverImageUrl?: string;
   slug: string;
+  // TASK-1873: rating + reviewCount for parity with ListingCard
+  rating?: number | null;
+  reviewCount?: number | null;
 };
 
 type ApiResponse = { items: MarketplaceItem[]; total: number; page: number; pageSize: number };
@@ -22,6 +31,9 @@ export default function MarketplaceHomepage() {
   const [query, setQuery] = useState('');
   const [items, setItems] = useState<MarketplaceItem[]>([]);
   const [loading, setLoading] = useState(true);
+  // TASK-1873: save-heart state keyed by listing id
+  const [favEpoch, setFavEpoch] = useState(0);
+  const favIds = useMemo(() => new Set(getFavoriteIds()), [favEpoch]);
 
   const apiPath = useMemo(() => {
     const p = new URLSearchParams();
@@ -53,6 +65,11 @@ export default function MarketplaceHomepage() {
 
   return (
     <section className="mx-auto w-full max-w-6xl px-4 py-8" data-testid="marketplace-homepage">
+      {/* TASK-1876: SEO meta for marketplace homepage */}
+      <SEO
+        title="Atlas Stays Marketplace — Verified homes & rooms across India"
+        description="Discover homes and rooms across verified hosts on Atlas Stays. Direct booking, no platform fee."
+      />
       <h1 className="text-3xl font-bold text-text-primary">Atlas Stays Marketplace</h1>
       <p className="mt-2 text-text-body">Discover homes and rooms across verified hosts.</p>
 
@@ -77,23 +94,95 @@ export default function MarketplaceHomepage() {
       </div>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3" data-testid="marketplace-grid">
-        {loading && <div>Loading listings...</div>}
+        {/* TASK-1875: skeleton cards while loading */}
+        {loading && Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
+
         {!loading &&
-          items.map((item) => (
-            <article key={item.id} className="rounded-2xl border border-border p-4" data-testid="marketplace-card">
-              {item.coverImageUrl ? <img src={item.coverImageUrl} alt="" className="mb-3 h-40 w-full rounded-xl object-cover" /> : null}
-              <div className="text-xs uppercase tracking-wide text-text-muted">{item.tenantName}</div>
-              <h2 className="mt-1 text-lg font-semibold text-text-primary">{item.title}</h2>
-              <p className="mt-1 text-sm text-text-body">{item.city || 'Unknown city'}</p>
-              <p className="mt-1 text-sm text-text-body">Max guests: {item.maxGuests}</p>
-              <p className="mt-1 font-semibold text-text-primary">INR {item.pricePerNight}/night</p>
-              <Link className="mt-3 inline-block rounded-lg bg-black px-3 py-2 text-sm text-white" to={`/${item.slug}`}>
-                View details
-              </Link>
-            </article>
-          ))}
+          items.map((item) => {
+            // TASK-1869/1873: GST — 5% for ≤₹7,500/night, 18% above (Sept 2025 reform)
+            const gstRate = item.pricePerNight > 7500 ? 1.18 : 1.05;
+            const gstPct = item.pricePerNight > 7500 ? 18 : 5;
+            const estTotal = Math.round(item.pricePerNight * 2 * gstRate);
+            const isFav = favIds.has(item.id);
+
+            return (
+              <article
+                key={item.id}
+                className="relative flex flex-col overflow-hidden rounded-2xl border border-border bg-bg-surface shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
+                data-testid="marketplace-card"
+              >
+                {/* TASK-1874: OptimizedImage replaces raw <img> */}
+                <div className="h-40 w-full bg-gradient-to-br from-bg-muted to-bg-surface">
+                  <OptimizedImage
+                    src={item.coverImageUrl ?? ''}
+                    alt={item.title || 'Listing photo'}
+                    className="h-full w-full object-cover"
+                    wrapperClassName="h-full"
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                  />
+                </div>
+
+                {/* TASK-1873: save heart */}
+                <button
+                  type="button"
+                  aria-label={isFav ? 'Remove from saved' : 'Save listing'}
+                  className="absolute right-2 top-2 z-10 rounded-full bg-bg-surface/95 p-2 shadow border border-border-subtle hover:opacity-90 transition-opacity"
+                  onClick={() => {
+                    toggleFavorite(item.id);
+                    setFavEpoch((e) => e + 1);
+                  }}
+                >
+                  {isFav
+                    ? <FaHeart className="h-4 w-4 text-red-500" aria-hidden />
+                    : <FaRegHeart className="h-4 w-4 text-text-muted" aria-hidden />}
+                </button>
+
+                <div className="flex flex-1 flex-col gap-2 p-4">
+                  <div className="text-xs uppercase tracking-wide text-text-muted">{item.tenantName}</div>
+                  <h2 className="text-base font-semibold text-text-primary leading-snug">{item.title}</h2>
+
+                  {/* TASK-1873: neighborhood/city chip */}
+                  {item.city && (
+                    <span className="w-fit rounded-full bg-bg-muted px-2.5 py-0.5 text-xs font-medium text-text-secondary">
+                      {item.city}
+                    </span>
+                  )}
+
+                  <p className="text-sm text-text-body">Sleeps up to {item.maxGuests} guests</p>
+
+                  {/* TASK-1873: rating row */}
+                  {item.rating != null && item.rating > 0 && (
+                    <p className="text-sm font-medium text-accent-primary">
+                      {'★'.repeat(Math.round(item.rating))}
+                      <span className="ml-1 text-text-muted">{item.rating.toFixed(1)}</span>
+                      {item.reviewCount != null && item.reviewCount > 0 && (
+                        <span className="ml-1 text-text-muted">({item.reviewCount})</span>
+                      )}
+                    </p>
+                  )}
+
+                  {/* TASK-1872: formatCurrency replaces raw 'INR X' */}
+                  <p className="text-xl font-bold text-text-primary">
+                    {formatCurrency(item.pricePerNight, { maximumFractionDigits: 0 })}
+                    <span className="ml-1 text-sm font-normal text-text-muted">/ night</span>
+                  </p>
+
+                  {/* TASK-1873: GST-inclusive estimate */}
+                  <p className="text-xs text-text-muted">
+                    Est. total: {formatCurrency(estTotal, { maximumFractionDigits: 0 })} (incl. {gstPct}% GST, 2 nights)
+                  </p>
+
+                  <Link
+                    className="mt-auto inline-flex min-h-[40px] items-center justify-center rounded-xl bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 transition-colors"
+                    to={`/${item.slug}`}
+                  >
+                    View details
+                  </Link>
+                </div>
+              </article>
+            );
+          })}
       </div>
     </section>
   );
 }
-

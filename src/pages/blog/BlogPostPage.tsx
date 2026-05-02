@@ -54,7 +54,7 @@ const BlogPostPage = () => {
           <Link to="/blog" className="text-primary font-semibold">
             Back to Blog
           </Link>
-          <p className="text-sm uppercase tracking-[0.18em] text-primary font-semibold">
+          <p className="text-base uppercase tracking-[0.18em] text-primary font-semibold">
             {post.category === "guest-guides" ? "Guest Guides" : "Hospitality Tech & AI"}
           </p>
           <h1 className="text-3xl md:text-4xl font-bold text-text-primary">{post.title}</h1>

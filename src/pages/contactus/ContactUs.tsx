@@ -186,7 +186,7 @@ const ContactUs = () => {
                     )}
                     <form onSubmit={handleSubmit} className="space-y-4 mt-4">
                         <div className="space-y-1">
-                            <label htmlFor="name" className="text-sm font-semibold text-text-primary">Name</label>
+                            <label htmlFor="name" className="text-base font-semibold text-text-primary">Name</label>
                             <Input
                                 id="name"
                                 type="text"
@@ -198,7 +198,7 @@ const ContactUs = () => {
                             />
                         </div>
                         <div className="space-y-1">
-                            <label htmlFor="email" className="text-sm font-semibold text-text-primary">Email</label>
+                            <label htmlFor="email" className="text-base font-semibold text-text-primary">Email</label>
                             <Input
                                 id="email"
                                 type="email"
@@ -222,7 +222,7 @@ const ContactUs = () => {
                             />
                         </div>
                         <div className="space-y-1">
-                            <label htmlFor="destination" className="text-sm font-semibold text-text-primary">Destination</label>
+                            <label htmlFor="destination" className="text-base font-semibold text-text-primary">Destination</label>
                             <Input
                                 as="select"
                                 id="destination"

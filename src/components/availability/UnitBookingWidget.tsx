@@ -223,6 +223,8 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [referralMessage, setReferralMessage] = useState<string | null>(null);
   const [promoCode, setPromoCode] = useState('');
   const [appliedPromoCode, setAppliedPromoCode] = useState<string | null>(null);
+  // TASK-1710: DPDP WhatsApp marketing opt-in — unchecked by default
+  const [whatsappMarketingOptIn, setWhatsappMarketingOptIn] = useState(false);
   const [appliedPromoDiscount, setAppliedPromoDiscount] = useState(0);
   const [promoMessage, setPromoMessage] = useState<string | null>(null);
   // TASK-171: add-on services for this listing
@@ -822,8 +824,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
   // ---------- Fee calculations ----------
 
-  // GST = 5% on discounted price
-  const gstAmount = 0;
+  // TASK-1871: GST is all-inclusive in the listed nightly rate (baked into breakdownPrice).
+  // The dead `gstAmount = 0` + misleading comment + never-rendering row have been removed.
+  // Header reads "All-inclusive rate · GST included" to match.
 
   // When API has loaded: use API price (or calendar sum). When API has not loaded: use 0.
   const hasSelectedRange = Boolean(dateRange.startDate && dateRange.endDate);
@@ -834,10 +837,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         ? Math.round(effectiveDailyPricing.actualPrice * (hasSelectedRange ? priceDetails.nights : 1))
         : 0;
   const convenienceFeePercent = calendarConvenienceFeePercent != null ? calendarConvenienceFeePercent / 100 : 0;
-  const subtotalForConvenience = priceDetails.total + gstAmount;
-  const _convenienceFee = Math.round(subtotalForConvenience * convenienceFeePercent);
-  const breakdownSubtotalForConvenience = breakdownPrice + gstAmount;
-  const breakdownConvenienceFee = Math.round(breakdownSubtotalForConvenience * convenienceFeePercent);
+  const _convenienceFee = Math.round(priceDetails.total * convenienceFeePercent);
+  const breakdownConvenienceFee = Math.round(breakdownPrice * convenienceFeePercent);
   const referralDiscountApplied = Math.max(0, appliedReferralDiscount || 0);
   const promoDiscountApplied = Math.max(0, appliedPromoDiscount || 0);
   // TASK-171: compute add-ons subtotal from guest selections
@@ -845,7 +846,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     const qty = selectedAddOns[ao.addOnServiceId] ?? 0;
     return sum + (qty > 0 ? ao.price * qty : 0);
   }, 0);
-  const breakdownFinalTotal = Math.max(1, breakdownPrice + gstAmount + breakdownConvenienceFee - referralDiscountApplied - promoDiscountApplied + addOnsTotal);
+  const breakdownFinalTotal = Math.max(1, breakdownPrice + breakdownConvenienceFee - referralDiscountApplied - promoDiscountApplied + addOnsTotal);
 
   const finalTotal =
     hasSelectedRange && selectedRangeTotalFromCalendar != null
@@ -1191,6 +1192,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             phoneDialCode,
             clampNationalDigits(formData.phone, getGuestDialOption(phoneDialCode).maxDigits)
           ),
+          // TASK-1710: DPDP WhatsApp opt-in — only true when guest explicitly checks the box
+          marketingWhatsAppOptIn: whatsappMarketingOptIn,
         }
       };
 
@@ -1765,7 +1768,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           {priceDetails.extraGuests > 0 && priceDetails.nights > 0 && (
             <p>{priceDetails.extraGuests} {priceDetails.extraGuests === 1 ? 'extra guest' : 'extra guests'} × {displayPrice(priceDetails.extraGuestsFee / priceDetails.nights / priceDetails.extraGuests)}/night</p>
           )}
-          <p className="text-xs">Includes all taxes and fees</p>
+          <p className="text-xs">All-inclusive rate · GST included</p>
         </div>
       </div>
 
@@ -1990,15 +1993,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                 <span className="text-right">-{displayPrice(losDiscountAmount)}</span>
               </div>
             )}
-            {gstAmount > 0 && (
-              <div className="grid grid-cols-[140px_12px_1fr]">
-                <span>GST (5%)</span>
-                <span>:</span>
-                <span className="text-right">
-                  {displayPrice(gstAmount)}
-                </span>
-              </div>
-            )}
+            {/* TASK-1871: GST row removed — all-inclusive rate, no separate GST line */}
             <div className="grid grid-cols-[140px_12px_1fr]">
               <span>Convenience fee{convenienceFeePctLabel > 0 ? ` (${convenienceFeePctLabel}%)` : ''}</span>
               <span>:</span>
@@ -2062,13 +2057,13 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                   {ao.description && <p className="text-xs text-text-muted truncate">{ao.description}</p>}
                   <p className="text-xs text-text-secondary">{displayPrice(ao.price)} / {ao.priceType.replace('_', ' ')}</p>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-1 shrink-0">
                   {qty > 0 && (
                     <>
                       <button
                         type="button"
                         onClick={() => setSelectedAddOns(prev => ({ ...prev, [ao.addOnServiceId]: Math.max(0, (prev[ao.addOnServiceId] ?? 0) - 1) }))}
-                        className="w-7 h-7 rounded-full border border-border-strong text-text-primary flex items-center justify-center text-base leading-none"
+                        className="w-11 h-11 rounded-full border border-border-strong text-text-primary flex items-center justify-center text-base leading-none"
                         aria-label={`Remove one ${ao.name}`}
                       >−</button>
                       <span className="text-sm font-medium w-4 text-center">{qty}</span>
@@ -2077,7 +2072,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                   <button
                     type="button"
                     onClick={() => setSelectedAddOns(prev => ({ ...prev, [ao.addOnServiceId]: (prev[ao.addOnServiceId] ?? 0) + 1 }))}
-                    className="w-7 h-7 rounded-full border border-border-strong text-text-primary flex items-center justify-center text-base leading-none"
+                    className="w-11 h-11 rounded-full border border-border-strong text-text-primary flex items-center justify-center text-base leading-none"
                     aria-label={`Add ${ao.name}`}
                   >+</button>
                 </div>
@@ -2315,6 +2310,19 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               {consentError}
             </p>
           ) : null}
+          {/* TASK-1710: DPDP-compliant WhatsApp marketing opt-in — unchecked by default */}
+          <label className="flex items-start gap-3 cursor-pointer text-sm text-text-muted mt-2">
+            <input
+              type="checkbox"
+              name="whatsappMarketingOptIn"
+              checked={whatsappMarketingOptIn}
+              onChange={(e) => setWhatsappMarketingOptIn(e.target.checked)}
+              disabled={isBookingDisabled}
+              className="mt-1 h-4 w-4 shrink-0 rounded border-border-strong text-cta-primary focus:ring-cta-primary"
+              aria-label="Send me deals and exclusive offers on WhatsApp (optional)"
+            />
+            <span>Send me exclusive deals and offers on WhatsApp <em className="not-italic text-text-muted">(optional)</em></span>
+          </label>
         </div>
       </div>
 
@@ -2331,9 +2339,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
       {!isBookingDisabled && (
         <div className="flex items-center gap-2 flex-wrap justify-center py-1">
-          <img src="/icons/upi.svg" alt="UPI" className="h-5" />
-          <img src="/icons/visa.svg" alt="Visa" className="h-4" />
-          <img src="/icons/rupay.svg" alt="RuPay" className="h-4" />
+          <img src="/icons/upi.svg" alt="UPI" className="h-5" loading="lazy" decoding="async" />
+          <img src="/icons/visa.svg" alt="Visa" className="h-4" loading="lazy" decoding="async" />
+          <img src="/icons/rupay.svg" alt="RuPay" className="h-4" loading="lazy" decoding="async" />
           <span className="text-xs text-text-muted">Secured by Razorpay · UPI / Visa / RuPay</span>
         </div>
       )}

@@ -70,7 +70,15 @@ export default function MyBookingsPage() {
           <div className="text-4xl">📋</div>
           <h1 className="text-xl font-bold text-text-primary">Bookings not found</h1>
           <p className="text-sm text-text-secondary">{error}</p>
-          <Link to="/" className="inline-block mt-2 text-sm text-brand-primary underline underline-offset-2">Return to homepage</Link>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-base font-medium px-4 py-3 hover:opacity-95 transition-opacity"
+            data-testid="my-bookings-retry"
+          >
+            Try again
+          </button>
+          <Link to="/" className="inline-block text-sm text-brand-primary underline underline-offset-2">Return to homepage</Link>
         </div>
       </div>
     );
@@ -86,8 +94,14 @@ export default function MyBookingsPage() {
         </div>
 
         {bookings.length === 0 ? (
-          <div className="text-center py-12 space-y-2">
+          <div className="text-center py-12 space-y-4">
             <p className="text-text-secondary text-sm">No bookings found.</p>
+            <Link to="/" className="btn-chip inline-block">
+              Browse our homes
+            </Link>
+            <p className="text-text-secondary text-xs max-w-md mx-auto">
+              Looking for a booking made by someone else? Contact them for the confirmation link.
+            </p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -101,14 +115,14 @@ export default function MyBookingsPage() {
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="space-y-0.5">
-                      <p className="text-sm font-semibold text-text-primary">{b.listingName}</p>
-                      <p className="text-xs text-text-muted">{b.propertyName}</p>
+                      <p className="text-base font-semibold text-text-primary">{b.listingName}</p>
+                      <p className="text-sm text-text-muted">{b.propertyName}</p>
                     </div>
                     <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${statusClass}`}>
                       {b.status}
                     </span>
                   </div>
-                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary">
+                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-text-secondary">
                     <span>{b.checkinDate} → {b.checkoutDate}</span>
                     <span className="font-mono text-text-muted">#{b.bookingRef}</span>
                     <span className="ml-auto font-medium text-text-primary">₹{Number(b.totalAmount).toLocaleString("en-IN")}</span>

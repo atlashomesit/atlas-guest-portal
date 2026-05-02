@@ -1,4 +1,6 @@
 import { formatDisplayNumber } from '../config/contact';
+import { getTenantContext } from '../tenant/tenantContext';
+import { getTenantOverrides } from '../tenant/tenantOverrides'; // TASK-1878
 
 export type FaqHighlight = {
   id: string;
@@ -6,7 +8,20 @@ export type FaqHighlight = {
   answer: string;
 };
 
+/**
+ * Returns FAQ entries for the current tenant.
+ * TASK-1878: if tenantOverrides.faq is set for the resolved slug, that takes
+ * precedence over the Atlas-Penthouse defaults below.
+ */
 export function getFaqHighlights(): FaqHighlight[] {
+  // TASK-1878: tenant override check
+  const slug = getTenantContext()?.slug;
+  const overrides = getTenantOverrides(slug);
+  if (overrides.faq && overrides.faq.length > 0) {
+    return overrides.faq;
+  }
+
+  // Atlas-Penthouse defaults
   const businessPhone = formatDisplayNumber("business");
   const ownerPhone = formatDisplayNumber("owner");
 
@@ -49,4 +64,3 @@ export function getFaqHighlights(): FaqHighlight[] {
     },
   ];
 }
-

@@ -172,7 +172,7 @@ const AboutPage = () => (
           </div>
         </div>
         <figure className="bg-gradient-to-br from-primary/10 via-cta-primary/10 to-secondary/10 rounded-2xl p-4 border border-border-subtle">
-          <img src={stayIllustration} alt="Apartment interior with warm lighting" className="w-full rounded-xl shadow-level2" />
+          <img src={stayIllustration} alt="Apartment interior with warm lighting" className="w-full rounded-xl shadow-level2" loading="lazy" decoding="async" />
           <figcaption className="sr-only">Illustration of a modern homestay with warm lighting and layered textures.</figcaption>
         </figure>
       </section>
@@ -192,14 +192,14 @@ const AboutPage = () => (
                 </div>
                 <div className="space-y-1">
                   <h3 className="font-semibold text-text-primary">{title}</h3>
-                  <p className="text-sm text-text-muted leading-relaxed">{description}</p>
+                  <p className="text-base text-text-muted leading-relaxed">{description}</p>
                 </div>
               </article>
             ))}
           </div>
         </div>
         <figure className="bg-bg-surface border border-border-subtle rounded-2xl p-4 shadow-level1">
-          <img src={serviceIllustration} alt="Concierge illustration" className="w-full rounded-xl" />
+          <img src={serviceIllustration} alt="Concierge illustration" className="w-full rounded-xl" loading="lazy" decoding="async" />
           <figcaption className="sr-only">Illustration of concierge-style support, messaging, and guided stays.</figcaption>
         </figure>
       </section>
@@ -230,10 +230,10 @@ const AboutPage = () => (
                 </div>
                 <div>
                   <h3 className="font-semibold text-text-primary">{name}</h3>
-                  <p className="text-sm text-text-muted">{title}</p>
+                  <p className="text-base text-text-muted">{title}</p>
                 </div>
               </div>
-              <p className="text-sm text-text-muted leading-relaxed">{focus}</p>
+              <p className="text-base text-text-muted leading-relaxed">{focus}</p>
             </article>
           ))}
         </div>
@@ -260,7 +260,7 @@ const AboutPage = () => (
                 <Icon className="w-5 h-5" />
               </div>
               <h3 className="font-semibold text-text-primary mb-1">{title}</h3>
-              <p className="text-sm text-text-muted leading-relaxed">{description}</p>
+              <p className="text-base text-text-muted leading-relaxed">{description}</p>
             </article>
           ))}
         </div>

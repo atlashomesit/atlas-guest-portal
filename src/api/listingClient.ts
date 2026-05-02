@@ -45,7 +45,7 @@ export type PublicListing = {
   coverPhotoUrl?: string | null;
   photoUrls?: string[];
   timezoneId?: string;
-  /** TASK-355: On-site contact phone for WhatsApp CTA. */
+  /** Pre-booking: not returned by API (TASK-1466). Filled from `fetchListingContact` when `bookingId`+`t` are known. */
   hostPhone?: string | null;
   /** TASK-543: Property-level aggregate rating shown on search cards. */
   propertyRating?: number | null;
@@ -63,6 +63,13 @@ export type PublicListing = {
   losDiscount2MinNights?: number | null;
   /** TASK-1695: LOS auto-discount tier 2 — discount percent (null = disabled). */
   losDiscount2Percent?: number | null;
+  /** TASK-1725: UTC ISO string when Atlas team verified listing photos. Null = not verified. */
+  photosVerifiedAt?: string | null;
+  /** TASK-1727: True when the tenant has a registered GSTIN — shown as trust badge on listing cards. */
+  isGstRegistered?: boolean;
+  /** TASK-1457: Property coordinates from API (null when unset). */
+  latitude?: number | null;
+  longitude?: number | null;
 };
 
 function normalizePublicListing(payload: Record<string, unknown>): PublicListing {
@@ -71,6 +78,12 @@ function normalizePublicListing(payload: Record<string, unknown>): PublicListing
   const rawRate = payload.baseNightlyRate;
   const photos = payload.photoUrls;
   const minStay = payload.minStay != null ? Number(payload.minStay) : null;
+  const rawLat = payload.latitude ?? payload.Latitude;
+  const rawLng = payload.longitude ?? payload.Longitude;
+  const latitude =
+    rawLat == null || rawLat === '' ? null : Number(rawLat);
+  const longitude =
+    rawLng == null || rawLng === '' ? null : Number(rawLng);
   return {
     id: Number.isFinite(id) ? id : 0,
     propertyId:
@@ -126,6 +139,9 @@ function normalizePublicListing(payload: Record<string, unknown>): PublicListing
       payload.losDiscount2MinNights != null ? Number(payload.losDiscount2MinNights) : null,
     losDiscount2Percent:
       payload.losDiscount2Percent != null ? Number(payload.losDiscount2Percent) : null,
+    isGstRegistered: Boolean(payload.isGstRegistered), // TASK-1727
+    latitude: Number.isFinite(latitude) ? latitude : null,
+    longitude: Number.isFinite(longitude) ? longitude : null,
   };
 }
 
@@ -141,6 +157,34 @@ const coercePublicListingsPayload = (payload: unknown): Record<string, unknown>[
   }
   return [];
 };
+
+/** TASK-1466: host contact after booking — requires same `t` nonce as guest booking APIs. */
+export type ListingContact = {
+  hostPhone?: string | null;
+  hostEmail?: string | null;
+  hostName?: string;
+};
+
+export async function fetchListingContact(
+  listingId: number,
+  bookingId: number,
+  token: string,
+  signal?: AbortSignal,
+): Promise<ListingContact | null> {
+  if (!Number.isFinite(listingId) || listingId <= 0 || !Number.isFinite(bookingId) || bookingId <= 0) return null;
+  const t = token.trim();
+  if (!t) return null;
+  const q = new URLSearchParams({ bookingId: String(bookingId), t });
+  const response = await fetch(buildApiUrl(`/api/listings/${listingId}/contact?${q}`), {
+    signal,
+    headers: getApiHeaders(),
+  });
+  if (response.status === 401 || response.status === 404) return null;
+  if (!response.ok) {
+    throw new Error(`Listing contact request failed with status ${response.status}`);
+  }
+  return (await response.json()) as ListingContact;
+}
 
 export const fetchPublicListings = async (signal?: AbortSignal): Promise<PublicListing[]> => {
   const response = await fetch(buildApiUrl(PUBLIC_LISTINGS_ENDPOINT), {

@@ -5,12 +5,15 @@ import {
   setCookieConsent,
   type CookieConsentRecord,
 } from "../utils/cookieConsent";
+import { getTenantContext } from "../tenant/tenantContext";
+import { getTenantOverrides } from "../tenant/tenantOverrides"; // TASK-1877
 
 // DPDP-compliant cookie consent banner.
 // - Appears only when there is no stored choice (accepted OR rejected).
 // - Accept and Reject are given equal visual weight.
 // - Rejecting does NOT block access to any part of the site.
 // - Clicking the X (close without choice) is NOT treated as consent — banner re-appears next page.
+// - TASK-1877: banner copy + privacy link are tenant-aware for white-label subdomains.
 const CookieConsentBanner = () => {
   const [record, setRecord] = useState<CookieConsentRecord | null>(() => {
     // SSR-safe default: no record. We re-read in useEffect after mount.
@@ -35,6 +38,18 @@ const CookieConsentBanner = () => {
   const onAccept = () => setRecord(setCookieConsent("accepted"));
   const onReject = () => setRecord(setCookieConsent("rejected"));
 
+  // TASK-1877: resolve per-tenant banner copy and privacy link
+  const tenantSlug = getTenantContext()?.slug;
+  const tenantOverrides = getTenantOverrides(tenantSlug);
+  const cookieBannerOverride = tenantOverrides.cookieBanner;
+
+  const bannerText = cookieBannerOverride?.text ??
+    "We use strictly necessary cookies to make this site work, and optional analytics cookies " +
+    "to understand how it is used. Under India’s DPDP Act 2023 we ask for your consent " +
+    "before loading anything non-essential. Read our";
+  const privacyUrl = cookieBannerOverride?.privacyUrl ?? "/privacy";
+  const privacyLinkLabel = cookieBannerOverride?.privacyLinkLabel ?? "privacy notice";
+
   return (
     <div
       role="dialog"
@@ -50,11 +65,9 @@ const CookieConsentBanner = () => {
               Your privacy choice
             </h2>
             <p id="cookie-consent-desc" className="text-sm text-text-muted">
-              We use strictly necessary cookies to make this site work, and optional analytics cookies
-              to understand how it is used. Under India&rsquo;s DPDP Act 2023 we ask for your consent
-              before loading anything non-essential. Read our{" "}
-              <Link to="/privacy" className="text-primary underline font-semibold">
-                privacy notice
+              {bannerText}{" "}
+              <Link to={privacyUrl} className="text-primary underline font-semibold">
+                {privacyLinkLabel}
               </Link>{" "}
               for details. You can change your choice any time.
             </p>
