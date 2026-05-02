@@ -35,13 +35,16 @@ import Navbar from "./Navbar";
 import { trackEvent } from "../../../utils/analytics";
 import { homes } from "../../../content/homes";
 import { BookingProvider } from "../../../contexts/BookingContext";
+import { CurrencyProvider } from "../../../contexts/CurrencyContext";
 
 const renderNavbar = (initialEntries: string[] = ["/"]) => {
   render(
     <MemoryRouter initialEntries={initialEntries}>
-      <BookingProvider>
-        <Navbar />
-      </BookingProvider>
+      <CurrencyProvider>
+        <BookingProvider>
+          <Navbar />
+        </BookingProvider>
+      </CurrencyProvider>
     </MemoryRouter>,
   );
 };

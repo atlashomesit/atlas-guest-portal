@@ -4,6 +4,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { propertyData } from "../data";
 import { fetchPublicListings, type PublicListing } from "../api/listingClient";
 import { formatCurrency, parseDate } from "../utils/formatting";
+import { useCurrency } from "../contexts/CurrencyContext";
 import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 import SkeletonCard from "../components/apartments/SkeletonCard";
 import OptimizedImage from "../components/ui/OptimizedImage";
@@ -83,6 +84,7 @@ function apiToNormalized(listings: PublicListing[]): NormalizedListing[] {
 }
 
 const SearchPage = () => {
+  const { format: formatDisplayCurrency, formatINR, isConverted } = useCurrency();
   const [searchParams, setSearchParams] = useSearchParams();
   const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
   const [isLoading, setIsLoading] = useState(true);
@@ -398,14 +400,17 @@ const SearchPage = () => {
                   </div>
                   <div className="flex items-center justify-between gap-4">
                     <div className="space-y-1">
-                      <p className="text-2xl font-bold text-text-primary" data-testid="guest-listing-nightly-price">{formatCurrency(unit.pricePerNight)}</p>
+                      <p className="text-2xl font-bold text-text-primary" data-testid="guest-listing-nightly-price">{formatDisplayCurrency(unit.pricePerNight)}</p>
+                      {isConverted && (
+                        <p className="text-xs text-text-muted">{formatINR(unit.pricePerNight)} on payment</p>
+                      )}
                       <p className="text-sm text-text-muted">per night</p>
                       <p className="text-xs text-text-muted">
-                        Est. total: {formatCurrency(Math.round(unit.pricePerNight * 1.12))} (incl. 12% GST)
+                        Est. total: {formatDisplayCurrency(Math.round(unit.pricePerNight * 1.12))} (incl. 12% GST)
                       </p>
                       {longStay && (
                         <p className="text-sm font-semibold text-cta-primary">
-                          from {formatCurrency(unit.pricePerNight * 30)}/month
+                          from {formatDisplayCurrency(unit.pricePerNight * 30)}/month
                         </p>
                       )}
                     </div>
