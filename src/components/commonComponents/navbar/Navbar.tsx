@@ -10,6 +10,7 @@ import { getTenantContext } from '../../../tenant/tenantContext';
 import { getTenantOverrides } from '../../../tenant/tenantOverrides';
 import { formatDisplayNumber, getTelLink } from '../../../config/contact';
 import { trackEvent } from '../../../utils/analytics';
+import { getFavoriteIds } from '../../../utils/guestHistory';
 import { homes as defaultHomes } from '../../../content/homes';
 import { useBooking } from '../../../contexts/BookingContext';
 import { usePropertyListings } from '../../../hooks/usePropertyListings';
@@ -34,6 +35,7 @@ const Navbar = () => {
   const [isHomesOpen, setIsHomesOpen] = useState(false);
   const [isHomesMobileOpen, setIsHomesMobileOpen] = useState(false);
   const [ctaStatus, setCtaStatus] = useState<'idle' | 'navigating' | 'scrolling'>('idle');
+  const [savedCount, setSavedCount] = useState(0);
 
   const homesDropdownRef = useRef<HTMLDivElement | null>(null);
 
@@ -43,9 +45,19 @@ const Navbar = () => {
 
   const telLink = getTelLink();
 
-  /* =========================
-     NAVBAR SCROLL EFFECT
-  ========================= */
+  /* Saved count badge (TASK-1458) — updates on navigation + same-tab toggles */
+  useEffect(() => {
+    const syncSaved = () => setSavedCount(getFavoriteIds().length);
+    syncSaved();
+    window.addEventListener('storage', syncSaved);
+    window.addEventListener('atlas-favorites-changed', syncSaved);
+    return () => {
+      window.removeEventListener('storage', syncSaved);
+      window.removeEventListener('atlas-favorites-changed', syncSaved);
+    };
+  }, [location.pathname]);
+
+  /* Navbar scroll blur */
   useEffect(() => {
     const onScroll = () => {
       const navbar = document.getElementById('navbar_container');
@@ -284,6 +296,25 @@ const Navbar = () => {
 
           <CurrencySelector />
 
+          <NavLink
+            to="/favorites"
+            className={navLinkClass}
+            data-testid="navbar-saved-link"
+          >
+            <span className="inline-flex items-center gap-1.5">
+              Saved
+              {savedCount > 0 ? (
+                <span
+                  className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-cta-primary px-1 text-[10px] font-bold leading-none text-white"
+                  data-testid="navbar-saved-count"
+                  aria-label={`${savedCount} saved listings`}
+                >
+                  {savedCount > 99 ? '99+' : savedCount}
+                </span>
+              ) : null}
+            </span>
+          </NavLink>
+
           <button
             type="button"
             className="book-now"
@@ -368,6 +399,20 @@ const Navbar = () => {
             </a>
 
             <CurrencySelector />
+
+            <NavLink
+              to="/favorites"
+              onClick={closeMobile}
+              className="block py-2 font-semibold"
+              data-testid="navbar-saved-link-mobile"
+            >
+              Saved
+              {savedCount > 0 ? (
+                <span className="ml-2 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-cta-primary px-1 text-[10px] font-bold text-white">
+                  {savedCount > 99 ? '99+' : savedCount}
+                </span>
+              ) : null}
+            </NavLink>
 
             <button
               type="button"

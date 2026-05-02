@@ -15,6 +15,7 @@ import LongStayCalculator from "../components/LongStayCalculator"; // TASK-1739
 import { filterGuestImageUrls, sanitizeGuestImageUrl } from "../utils/guestImageUrl";
 import { compareAtlasHomesBuildingOrder } from "../utils/atlasHomesBuildingOrder";
 import { buildApiUrl, getApiHeaders } from "../api/client";
+import RecentlyViewedStrip from "../components/RecentlyViewedStrip";
 
 const ITEMS_PER_PAGE = 12;
 
@@ -405,6 +406,103 @@ const SearchPage = () => {
     }, { replace: true });
   };
 
+  /** TASK-1456: removable chips + count badge (one chip per logical filter). */
+  const activeFilterChips = useMemo(() => {
+    type Chip = { key: string; label: string; onRemove: () => void };
+    const chips: Chip[] = [];
+    const del = (key: string) => {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete(key);
+        return next;
+      }, { replace: true });
+    };
+    if (minPrice != null && maxPrice != null) {
+      chips.push({
+        key: "priceRange",
+        label: `₹${minPrice.toLocaleString("en-IN")}–₹${maxPrice.toLocaleString("en-IN")}/night`,
+        onRemove: () => {
+          setSearchParams((prev) => {
+            const next = new URLSearchParams(prev);
+            next.delete("minPrice");
+            next.delete("maxPrice");
+            return next;
+          }, { replace: true });
+        },
+      });
+    } else {
+      if (minPrice != null) {
+        chips.push({
+          key: "minPrice",
+          label: `Min ₹${minPrice.toLocaleString("en-IN")}/night`,
+          onRemove: () => del("minPrice"),
+        });
+      }
+      if (maxPrice != null) {
+        chips.push({
+          key: "maxPrice",
+          label: `Max ₹${maxPrice.toLocaleString("en-IN")}/night`,
+          onRemove: () => del("maxPrice"),
+        });
+      }
+    }
+    if (guests != null) {
+      chips.push({
+        key: "guests",
+        label: `${guests} guest${guests === 1 ? "" : "s"}`,
+        onRemove: () => del("guests"),
+      });
+    }
+    for (const a of selectedAmenities) {
+      if (!a) continue;
+      chips.push({
+        key: `amenity:${a}`,
+        label: a,
+        onRemove: () => {
+          setSearchParams((prev) => {
+            const next = new URLSearchParams(prev);
+            const current = (next.get("amenities") || "").split(",").filter(Boolean);
+            const rest = current.filter((x) => x !== a);
+            if (rest.length) next.set("amenities", rest.join(","));
+            else next.delete("amenities");
+            return next;
+          }, { replace: true });
+        },
+      });
+    }
+    if (remoteWork) {
+      chips.push({ key: "remoteWork", label: "Remote work friendly", onRemove: () => del("remoteWork") });
+    }
+    if (longStay) {
+      chips.push({ key: "longStay", label: "Long stay (7+ nights)", onRemove: () => del("longStay") });
+    }
+    if (availableNow) {
+      chips.push({ key: "availableNow", label: "Available tonight", onRemove: () => del("availableNow") });
+    }
+    if (nomadWifi) {
+      chips.push({ key: "nomadWifi", label: "WiFi 50+ Mbps", onRemove: () => del("nomadWifi") });
+    }
+    if (nomadWorkspace) {
+      chips.push({ key: "nomadWorkspace", label: "Dedicated workspace", onRemove: () => del("nomadWorkspace") });
+    }
+    if (monthlyStay) {
+      chips.push({ key: "monthlyStay", label: "30+ nights min stay", onRemove: () => del("monthlyStay") });
+    }
+    return chips;
+  }, [
+    availableNow,
+    guests,
+    longStay,
+    maxPrice,
+    minPrice,
+    monthlyStay,
+    nomadWifi,
+    nomadWorkspace,
+    remoteWork,
+    selectedAmenities,
+    setSearchParams,
+  ]);
+
   const visibleUnits = sortedUnits.slice(0, visibleCount);
   const hasMore = visibleCount < sortedUnits.length;
   const showEmptyState = !isLoading && !hasInvalidDates && sortedUnits.length === 0;
@@ -431,6 +529,45 @@ const SearchPage = () => {
             Browse all homes. Filter by price, guests and amenities below.
           </p>
         </header>
+
+        <RecentlyViewedStrip />
+
+        {/* TASK-1456: filter surface label + active count badge */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-semibold text-text-primary">Filters</span>
+          {activeFilterChips.length > 0 ? (
+            <span
+              className="inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded-full bg-cta-primary px-2 text-xs font-bold text-white"
+              data-testid="search-active-filter-badge"
+              aria-label={`${activeFilterChips.length} active filters`}
+            >
+              {activeFilterChips.length}
+            </span>
+          ) : null}
+        </div>
+        {activeFilterChips.length > 0 ? (
+          <ul
+            className="m-0 flex list-none flex-wrap gap-2 p-0"
+            data-testid="search-active-filter-chips"
+            aria-label="Active filters"
+          >
+            {activeFilterChips.map((c) => (
+              <li key={c.key} className="contents">
+                <button
+                  type="button"
+                  onClick={c.onRemove}
+                  aria-label={`Remove filter ${c.label}`}
+                  className="inline-flex max-w-full items-center gap-1 rounded-full border border-border-subtle bg-bg-surface px-3 py-1.5 text-sm font-medium text-text-primary shadow-sm hover:border-support-error hover:text-support-error focus:outline-none focus:ring-2 focus:ring-cta-primary"
+                >
+                  <span className="truncate">{c.label}</span>
+                  <span className="shrink-0 text-base leading-none" aria-hidden>
+                    ×
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
 
         {/* Filter bar */}
         <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-border-subtle bg-bg-surface px-4 py-3 shadow-sm">

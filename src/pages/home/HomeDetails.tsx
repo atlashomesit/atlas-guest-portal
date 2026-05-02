@@ -13,6 +13,7 @@ import { CONTACT } from "../../config/contact";
 import { getTenantContext } from "../../tenant/tenantContext";
 import { getTenantOverrides } from "../../tenant/tenantOverrides";
 import { usePropertyListings } from "../../hooks/usePropertyListings";
+import { addRecentlyViewed } from "../../utils/guestHistory";
 
 const UnitBookingWidget = lazy(() => import("../../components/availability/UnitBookingWidget"));
 
@@ -70,8 +71,9 @@ const HomeDetails = () => {
     title: apiRoom.title,
     href: apiRoom.href,
     slug: apiRoom.title.toLowerCase().replace(/_/g, '-'),
-    images: [],
+    images: [] as string[],
     maxGuests: 2,
+    listingId: Number(apiRoom.roomNo),
   } : homes.find((item) => item.roomNo === roomNo);
 
   const { updateBooking } = useBooking();
@@ -80,6 +82,19 @@ const HomeDetails = () => {
     if (!room) return;
     updateBooking({ listingDetailPath: room.href });
   }, [room, updateBooking]);
+
+  /** TASK-1459: record listing view for Recently viewed strip. */
+  useEffect(() => {
+    if (!room) return;
+    const lid = "listingId" in room && typeof room.listingId === "number" ? room.listingId : Number(roomNo);
+    if (!Number.isFinite(lid) || lid <= 0) return;
+    addRecentlyViewed({
+      listingId: lid,
+      path: room.href,
+      name: room.title,
+      coverPhotoUrl: room.images?.[0],
+    });
+  }, [room, roomNo]);
 
   const primaryImage = room?.images?.[0] ?? fallbackImage;
 
