@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import SEO from "../components/SEO";
 import { buildApiUrl, getApiHeaders } from "../api/client";
+import { sanitizeGuestImageUrl } from "../utils/guestImageUrl";
 import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 
 interface ReviewEligibility {
@@ -110,6 +111,10 @@ export default function ReviewSubmitPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [subRatings, setSubRatings] = useState<Record<SubKey, number>>(emptySubRatings);
   const [subHover, setSubHover] = useState<Record<SubKey, number>>(emptySubRatings);
+  /** TASK-1890: URLs from POST /api/reviews/upload-photo (max 3). */
+  const [photoUrls, setPhotoUrls] = useState<string[]>([]);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!bookingId || !token) {
@@ -129,6 +134,46 @@ export default function ReviewSubmitPage() {
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
   }, [bookingId, token]);
+
+  const handlePhotoPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    e.target.value = "";
+    if (!files?.length || !bookingId || !token) return;
+    setPhotoError(null);
+    setPhotoBusy(true);
+    try {
+      const additions: string[] = [];
+      for (const file of Array.from(files)) {
+        if (photoUrls.length + additions.length >= 3) break;
+        if (file.size > 5 * 1024 * 1024) {
+          setPhotoError("Each photo must be 5 MB or smaller.");
+          continue;
+        }
+        const fd = new FormData();
+        fd.append("bookingId", String(bookingId));
+        fd.append("bookingToken", token);
+        fd.append("file", file);
+        const res = await fetch(buildApiUrl("/api/reviews/upload-photo"), {
+          method: "POST",
+          headers: { Accept: "application/json", ...getApiHeaders() },
+          body: fd,
+        });
+        if (!res.ok) {
+          const data = (await res.json().catch(() => ({}))) as { error?: string };
+          throw new Error(data?.error ?? "Could not upload photo. Please try again.");
+        }
+        const data = (await res.json()) as { url?: string };
+        if (data.url) additions.push(data.url);
+      }
+      if (additions.length > 0) {
+        setPhotoUrls((prev) => [...prev, ...additions].slice(0, 3));
+      }
+    } catch (err: unknown) {
+      setPhotoError((err as Error).message);
+    } finally {
+      setPhotoBusy(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -159,6 +204,7 @@ export default function ReviewSubmitPage() {
             checkin: subRatings.checkin,
             communication: subRatings.communication,
           },
+          ...(photoUrls.length > 0 ? { photoUrls } : {}),
         }),
       });
 
@@ -336,6 +382,44 @@ export default function ReviewSubmitPage() {
               className="w-full rounded-xl border border-border-subtle bg-bg-surface px-4 py-2.5 text-base text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary resize-none"
             />
             <p className="text-xs text-text-muted text-right">{body.length}/1000</p>
+          </div>
+
+          <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3">
+            <p className="text-sm font-medium text-text-primary">Photos <span className="text-text-muted font-normal">(optional, max 3)</span></p>
+            <p className="text-xs text-text-secondary">JPEG, PNG, WebP, or GIF — up to 5 MB each. Help future guests see what your stay looked like.</p>
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              multiple
+              disabled={photoBusy || photoUrls.length >= 3}
+              data-testid="review-photo-input"
+              onChange={handlePhotoPick}
+              className="block w-full text-sm text-text-secondary file:mr-3 file:rounded-lg file:border-0 file:bg-brand-primary file:px-3 file:py-2 file:text-sm file:font-medium file:text-white disabled:opacity-50"
+            />
+            {photoBusy && <p className="text-xs text-text-muted">Uploading&hellip;</p>}
+            {photoError && <p className="text-xs text-support-error">{photoError}</p>}
+            {photoUrls.length > 0 && (
+              <div className="flex gap-2 flex-wrap">
+                {photoUrls.map((u, idx) => {
+                  const safe = sanitizeGuestImageUrl(u);
+                  return (
+                    <div key={`${u}-${idx}`} className="relative w-20 h-20 rounded-lg overflow-hidden border border-border-subtle bg-bg-muted shrink-0">
+                      {safe ? (
+                        <img src={safe} alt="" className="w-full h-full object-cover" />
+                      ) : null}
+                      <button
+                        type="button"
+                        aria-label="Remove photo"
+                        className="absolute top-1 right-1 rounded-full bg-black/60 text-white text-xs px-1.5 py-0.5 hover:bg-black/80"
+                        onClick={() => setPhotoUrls((prev) => prev.filter((_, i) => i !== idx))}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {submitError && (

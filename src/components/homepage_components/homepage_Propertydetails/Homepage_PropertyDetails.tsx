@@ -191,7 +191,7 @@ const PropertyDetails = () => {
         loading: boolean;
         averageRating: number;
         totalCount: number;
-        reviews: { id: number; guestName?: string | null; rating: number; title?: string | null; body?: string | null; createdAt: string; hostResponse?: string | null; hostResponseAt?: string | null }[];
+        reviews: { id: number; guestName?: string | null; rating: number; title?: string | null; body?: string | null; createdAt: string; hostResponse?: string | null; hostResponseAt?: string | null; photoUrls?: string[] | null }[];
     }>(null);
 
     // AMN-001: Fetch amenity master list once on mount
@@ -343,7 +343,7 @@ const PropertyDetails = () => {
                 const j = (await res.json()) as {
                     averageRating?: number;
                     totalCount?: number;
-                    reviews?: { id: number; guestName?: string | null; rating: number; title?: string | null; body?: string | null; createdAt: string; hostResponse?: string | null; hostResponseAt?: string | null }[];
+                    reviews?: { id: number; guestName?: string | null; rating: number; title?: string | null; body?: string | null; createdAt: string; hostResponse?: string | null; hostResponseAt?: string | null; photoUrls?: string[] | null }[];
                 };
                 if (ac.signal.aborted) return;
                 setListingReviewsFromApi({
@@ -1178,6 +1178,25 @@ useEffect(() => {
                                                 </div>
                                                 {r.title && <p className="text-sm font-medium text-text-primary mb-1">{r.title}</p>}
                                                 {r.body && <p className="text-sm text-text-muted italic">"{r.body}"</p>}
+                                                {filterGuestImageUrls(r.photoUrls ?? []).length > 0 && (
+                                                    <div className="flex gap-1.5 mt-2 flex-wrap">
+                                                        {filterGuestImageUrls(r.photoUrls ?? []).slice(0, 3).map((src) => {
+                                                            const safe = sanitizeGuestImageUrl(src);
+                                                            if (!safe) return null;
+                                                            return (
+                                                                <a
+                                                                    key={src}
+                                                                    href={safe}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="block w-14 h-14 rounded-lg overflow-hidden border border-border-subtle bg-bg-muted shrink-0"
+                                                                >
+                                                                    <img src={safe} alt="" className="w-full h-full object-cover" loading="lazy" />
+                                                                </a>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                )}
                                                 {r.hostResponse && (
                                                     <div className="mt-2 pl-3 border-l-2 border-accent-primary/40">
                                                         <p className="text-xs text-text-muted font-medium mb-0.5">Owner's response:</p>
