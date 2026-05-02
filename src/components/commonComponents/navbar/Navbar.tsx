@@ -13,12 +13,15 @@ import { trackEvent } from '../../../utils/analytics';
 import { homes as defaultHomes } from '../../../content/homes';
 import { useBooking } from '../../../contexts/BookingContext';
 import { usePropertyListings } from '../../../hooks/usePropertyListings';
+import CurrencySelector from '../../CurrencySelector';
 
 const Navbar = () => {
   const tenant = getTenantContext();
   const overrides = getTenantOverrides(tenant?.slug);
   const logoSrc = tenant?.logoUrl ?? LOGO_URL;
-  const brandName = tenant?.name ?? 'Atlas Homestays';
+  const brandName = overrides.hideAtlasHomesBranding
+    ? (tenant?.name?.trim() ?? '')
+    : (tenant?.name ?? 'Atlas Homestays');
   const showLogo = !overrides.hideLogo;
   const showListProperty = !overrides.hideListProperty;
 
@@ -182,7 +185,7 @@ const Navbar = () => {
                 className="navbar-logo"
               />
             )}
-            <span className="navbar-logo-text">{brandName}</span>
+            {brandName ? <span className="navbar-logo-text">{brandName}</span> : null}
           </Link>
 
           {/* Mobile Menu Button - Only visible on mobile */}
@@ -279,6 +282,8 @@ const Navbar = () => {
             <span>{formatDisplayNumber()}</span>
           </a>
 
+          <CurrencySelector />
+
           <button
             type="button"
             className="book-now"
@@ -361,6 +366,8 @@ const Navbar = () => {
               <IoIosCall />
               <span>{formatDisplayNumber()}</span>
             </a>
+
+            <CurrencySelector />
 
             <button
               type="button"

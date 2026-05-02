@@ -1,7 +1,7 @@
 import CommonBanner from "../../components/commonComponents/banner/CommonBanner";
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { formatDisplayNumber, getTelLink, getWhatsAppLink } from "../../config/contact";
+import { formatDisplayNumber, getContactEmail, getTelLink, getWhatsAppLink } from "../../config/contact";
 import { ctaNav } from "../../config/navigation";
 import { Card } from "../../components/ui/Card";
 import { Typography } from "../../components/ui/Typography";
@@ -11,6 +11,7 @@ import { buildApiUrl, getApiHeaders } from "../../api/client";
 import ErrorBoundary from "../../components/ErrorBoundary";
 import { toast } from "react-toastify";
 import { logUserAction, reportError } from "../../lib/monitoring";
+import { getTenantContext } from "../../tenant/tenantContext";
 
 type StatusMessage = {
     type: "info" | "success" | "error";
@@ -18,6 +19,8 @@ type StatusMessage = {
 };
 
 const ContactUs = () => {
+    const contactEmail = getContactEmail();
+    const tenantLabel = getTenantContext()?.name?.trim() || "us";
 
     const [formData, setFormData] = useState({
         name: "",
@@ -111,7 +114,7 @@ const ContactUs = () => {
                         <div className="flex flex-wrap gap-3">
                             <a
                                 href={getWhatsAppLink()}
-                                aria-label={`Contact Atlas on WhatsApp at ${formatDisplayNumber()}`}
+                                aria-label={`Contact ${tenantLabel} on WhatsApp at ${formatDisplayNumber()}`}
                                 className="inline-flex items-center justify-center gap-2 rounded-full bg-cta-secondary text-[var(--text-contrast)] px-4 py-3 font-semibold shadow-level1 hover:shadow-level2 transition"
                                 target="_blank"
                                 rel="noopener noreferrer"
@@ -120,14 +123,18 @@ const ContactUs = () => {
                             </a>
                             <a
                                 href={getTelLink()}
-                                aria-label={`Call Atlas at ${formatDisplayNumber()}`}
+                                aria-label={`Call ${tenantLabel} at ${formatDisplayNumber()}`}
                                 className="inline-flex items-center justify-center gap-2 rounded-full bg-cta-primary text-[var(--text-contrast)] px-4 py-3 font-semibold shadow-level1 hover:shadow-level2 transition"
                             >
                                 Call {formatDisplayNumber()}
                             </a>
                         </div>
                         <Typography variant="muted">
-                            Prefer email? Reach us at <a className="text-accent-primary font-semibold" href="mailto:atlashomeskphb@gmail.com">atlashomeskphb@gmail.com</a>.
+                            Prefer email? Reach us at{" "}
+                            <a className="text-accent-primary font-semibold" href={`mailto:${contactEmail}`}>
+                                {contactEmail}
+                            </a>
+                            .
                         </Typography>
                     </div>
 
@@ -148,7 +155,9 @@ const ContactUs = () => {
                             </div>
                             <div>
                                 <Typography variant="muted">Email</Typography>
-                                <a className="font-semibold text-lg text-primary" href="mailto:atlashomeskphb@gmail.com">atlashomeskphb@gmail.com</a>
+                                <a className="font-semibold text-lg text-primary" href={`mailto:${contactEmail}`}>
+                                    {contactEmail}
+                                </a>
                             </div>
                         </div>
                         <Typography variant="muted">Owner contact is reserved for escalations; reach out on the business line first for the fastest help.</Typography>
@@ -257,7 +266,7 @@ const ContactUs = () => {
                         <Link to="/policies" aria-label="Read our guest policies" className="px-4 py-3 rounded-xl border border-border-subtle bg-bg-surface hover:border-cta-primary font-semibold text-text-primary transition">Policies</Link>
                         <Link to="/faq" aria-label="Frequently asked questions" className="px-4 py-3 rounded-xl border border-border-subtle bg-bg-surface hover:border-cta-primary font-semibold text-text-primary transition">FAQs</Link>
                         <Link to="/terms" aria-label="Read our terms and conditions" className="px-4 py-3 rounded-xl border border-border-subtle bg-bg-surface hover:border-cta-primary font-semibold text-text-primary transition">Terms</Link>
-                        <Link to={ctaNav.to} aria-label="Book a stay at Atlas Homestays" className="px-4 py-3 rounded-xl border border-border-subtle bg-bg-surface hover:border-cta-primary font-semibold text-text-primary transition">Book now</Link>
+                        <Link to={ctaNav.to} aria-label={`Book a stay with ${tenantLabel}`} className="px-4 py-3 rounded-xl border border-border-subtle bg-bg-surface hover:border-cta-primary font-semibold text-text-primary transition">Book now</Link>
                     </div>
                     <div className="bg-bg-surface border border-dashed border-cta-primary/30 rounded-xl p-4 text-sm text-text-muted">
                         Prefer a quick response? WhatsApp us on {formatDisplayNumber()} for booking confirmations.

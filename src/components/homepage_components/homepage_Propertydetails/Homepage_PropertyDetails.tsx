@@ -11,7 +11,7 @@ import { FaCcMastercard, FaLocationDot } from "react-icons/fa6";
 import { FaStar } from "react-icons/fa";
 import { X, ChevronRight, Clock, KeyRound } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { propertyData, propertyImages } from '../../../data.ts';
+import { propertyData } from '../../../data.ts';
 import { getUnitPolicy } from '../../../config/policyConfig';
 import { inlinePolicySnippets } from '../../../content/terms';
 import Subheading from '../../commonComponents/subheading/Subheading';
@@ -26,15 +26,23 @@ import { useListingPhotosFromApi } from '../../../contexts/ListingPhotosContext'
 import { resolveListing } from '../../../utils/listingResolver';
 import { filterGuestImageUrls, sanitizeGuestImageUrl } from '../../../utils/guestImageUrl';
 import type { ListingDetail, PublicListing } from '../../../api/listingClient';
-import { fetchListingById, parseMaxGuestsFromPayload, resolveStaticMaxGuests } from '../../../api/listingClient';
+import {
+    fetchListingById,
+    fetchListingPhotos,
+    parseMaxGuestsFromPayload,
+    resolveStaticMaxGuests,
+} from '../../../api/listingClient';
 import SEO from '../../SEO';
 import { buildApiUrl, getApiHeaders } from '../../../api/client';
 import { addRecentlyViewed, isFavorite, toggleFavorite } from '../../../utils/guestHistory';
 import { formatCurrency, formatHumanDate } from '../../../utils/formatting';
+import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
 
 import { Fancybox } from "@fancyapps/ui";
 import "@fancyapps/ui/dist/fancybox/fancybox.css";
 
+/** TASK-1294: illustrative uplift for “typical OTA” guest all-in (fees vary by site). */
+const OTA_ILLUSTRATIVE_MARKUP_PCT = 17;
 
 interface PropertyAmenity {
     amenities_icon: string;
@@ -137,6 +145,10 @@ interface Property {
     amenityCodes?: string[];
     /** TASK-355: host/on-site contact phone for WhatsApp CTA */
     hostPhone?: string | null;
+    /** Street-level address from API (TASK-1896); may be null if host chose not to expose pre-booking */
+    propertyAddress?: string | null;
+    /** Legacy / alternate JSON key for same */
+    property_address?: string | null;
 }
 
 const PropertyDetails = () => {
@@ -182,7 +194,7 @@ const PropertyDetails = () => {
         loading: boolean;
         averageRating: number;
         totalCount: number;
-        reviews: { id: number; guestName?: string | null; rating: number; title?: string | null; body?: string | null; createdAt: string; hostResponse?: string | null; hostResponseAt?: string | null }[];
+        reviews: { id: number; guestName?: string | null; rating: number; title?: string | null; body?: string | null; createdAt: string; hostResponse?: string | null; hostResponseAt?: string | null; photoUrls?: string[] | null }[];
     }>(null);
 
     // AMN-001: Fetch amenity master list once on mount
@@ -228,6 +240,24 @@ const PropertyDetails = () => {
             return null;
         }
     }, [data, unitType]);
+
+    const dailyPricing = useDailyPricingSummary();
+    const listingNumericForPricing = Number(resolvedListingId ?? data?.listingId ?? NaN);
+    const dailyPricingRow = useMemo(() => {
+        if (!Number.isFinite(listingNumericForPricing) || listingNumericForPricing <= 0) return undefined;
+        return dailyPricing.data?.listings?.find((l) => l.listingId === listingNumericForPricing);
+    }, [dailyPricing.data?.listings, listingNumericForPricing]);
+
+    const directBookingNightly = useMemo(() => {
+        const fromApi = dailyPricingRow?.finalAmount;
+        if (fromApi != null && Number(fromApi) > 0) return Math.round(Number(fromApi));
+        return nightlyPrice?.finalNightlyPrice ?? 0;
+    }, [dailyPricingRow?.finalAmount, nightlyPrice?.finalNightlyPrice]);
+
+    const illustrativeOtaNightly = useMemo(() => {
+        if (directBookingNightly <= 0) return 0;
+        return Math.round(directBookingNightly * (1 + OTA_ILLUSTRATIVE_MARKUP_PCT / 100));
+    }, [directBookingNightly]);
 
     useEffect(() => {
         const lookupId = data?.listingId ?? location.state?.property?.listingId ?? listingIdParam;
@@ -334,7 +364,7 @@ const PropertyDetails = () => {
                 const j = (await res.json()) as {
                     averageRating?: number;
                     totalCount?: number;
-                    reviews?: { id: number; guestName?: string | null; rating: number; title?: string | null; body?: string | null; createdAt: string; hostResponse?: string | null; hostResponseAt?: string | null }[];
+                    reviews?: { id: number; guestName?: string | null; rating: number; title?: string | null; body?: string | null; createdAt: string; hostResponse?: string | null; hostResponseAt?: string | null; photoUrls?: string[] | null }[];
                 };
                 if (ac.signal.aborted) return;
                 setListingReviewsFromApi({
@@ -399,8 +429,7 @@ const PropertyDetails = () => {
         if (foundByUnitSlug) {
             const lid = Number(foundByUnitSlug.listingId);
             const apiUrls = getUrlsForListingId(Number.isFinite(lid) ? lid : undefined);
-            const staticImgs = propertyImages[String(foundByUnitSlug.id)] || [];
-            const images = filterGuestImageUrls(apiUrls && apiUrls.length > 0 ? apiUrls : staticImgs);
+            const images = filterGuestImageUrls(apiUrls && apiUrls.length > 0 ? apiUrls : []);
             setData({
                 ...foundByUnitSlug,
                 property_neighborhoods: Array.isArray(foundByUnitSlug.property_neighborhoods)
@@ -421,8 +450,7 @@ const PropertyDetails = () => {
             if (foundById) {
                 const lid = Number(foundById.listingId);
                 const apiUrls = getUrlsForListingId(Number.isFinite(lid) ? lid : undefined);
-                const staticImgs = propertyImages[String(foundById.id)] || [];
-                const images = filterGuestImageUrls(apiUrls && apiUrls.length > 0 ? apiUrls : staticImgs);
+                const images = filterGuestImageUrls(apiUrls && apiUrls.length > 0 ? apiUrls : []);
                 setData({
                     ...foundById,
                     property_neighborhoods: Array.isArray(foundById.property_neighborhoods)
@@ -442,8 +470,7 @@ const PropertyDetails = () => {
             const fromNav = Array.isArray(navGallery) && navGallery.length > 0 ? navGallery : undefined;
             const lid = Number(prop.listingId);
             const apiUrls = getUrlsForListingId(Number.isFinite(lid) ? lid : undefined);
-            const staticImgs = propertyImages[String(prop.id)] || [];
-            const images = filterGuestImageUrls(fromNav ?? (apiUrls && apiUrls.length > 0 ? apiUrls : staticImgs));
+            const images = filterGuestImageUrls(fromNav ?? (apiUrls && apiUrls.length > 0 ? apiUrls : []));
             setData({
                 ...prop,
                 property_neighborhoods: Array.isArray(prop.property_neighborhoods)
@@ -468,7 +495,7 @@ const PropertyDetails = () => {
             const controller = new AbortController();
             let cancelled = false;
             resolveListing(String(listingIdParam), controller.signal)
-                .then((apiListing: ListingDetail | null) => {
+                .then(async (apiListing: ListingDetail | null) => {
                     if (cancelled || !apiListing) {
                         if (import.meta.env.DEV && !cancelled) {
                              
@@ -488,9 +515,23 @@ const PropertyDetails = () => {
                     );
                     const photoCount = Number((apiListing as Record<string, unknown>).photoCount) || 0;
                     const pub = apiListing as unknown as Partial<PublicListing>;
+                    const rawAddr =
+                        (apiListing as Record<string, unknown>).propertyAddress ??
+                        (apiListing as Record<string, unknown>).property_address;
+                    const streetFromApi =
+                        typeof rawAddr === 'string' && rawAddr.trim() ? rawAddr.trim() : null;
+                    const listingNumericId = Number(apiListing.id) || listingId;
+                    let fromPhotos: string[] = [];
+                    try {
+                        fromPhotos = filterGuestImageUrls(
+                            await fetchListingPhotos(listingNumericId, controller.signal),
+                        );
+                    } catch {
+                        /* use DTO fields */
+                    }
                     const mapped: Property = {
-                        id: Number(apiListing.id) || listingId,
-                        listingId: Number(apiListing.id) || listingId,
+                        id: listingNumericId,
+                        listingId: listingNumericId,
                         property_name: (apiListing.name as string) ?? `Listing ${apiListing.id}`,
                         property_img: photoUrlsList.length > 0 ? photoUrlsList : (coverUrl ? [coverUrl] : []),
                         property_location: (apiListing as Record<string, unknown>).property_location as string ?? 'Location not specified',
@@ -521,13 +562,18 @@ const PropertyDetails = () => {
                             }
                             return undefined;
                         })(),
+                        propertyAddress:
+                            streetFromApi ??
+                            (typeof pub.propertyAddress === 'string' && pub.propertyAddress.trim()
+                                ? pub.propertyAddress.trim()
+                                : null),
                     };
-                    const fromApi =
+                    const fromDto =
                         photoUrlsList.length > 0 ? photoUrlsList : (coverUrl ? [coverUrl] : []);
-                    const staticImages = propertyImages[String(mapped.id)] ?? propertyImages[String(apiListing.id)];
                     const images = filterGuestImageUrls(
-                        fromApi.length > 0 ? fromApi : (staticImages ?? mapped.property_img ?? []),
+                        fromPhotos.length > 0 ? fromPhotos : fromDto,
                     );
+                    if (cancelled) return;
                     setData({ ...mapped, property_img: images });
                 })
                 .catch(() => {
@@ -556,6 +602,10 @@ useEffect(() => {
           name: data.property_name,
           coverPhotoUrl: Array.isArray(data.property_img) ? data.property_img[0] : undefined,
           location: data.property_location,
+          pricePerNight:
+              typeof data.property_price === "number" && data.property_price > 0
+                  ? data.property_price
+                  : undefined,
       });
       updateBooking({ listingDetailPath: path });
   }
@@ -669,6 +719,88 @@ useEffect(() => {
         return name.charAt(0).toUpperCase() + name.slice(1);
     };
 
+    /** TASK-1357: aggregateRating + Review JSON-LD (before conditional returns — Rules of Hooks). */
+    const propertyJsonLd = useMemo(() => {
+        if (!data) return undefined;
+        const pageUrlForLd = typeof window !== 'undefined' ? window.location.href : '';
+        const primaryImageForLd = filterGuestImageUrls(data.property_img ?? [])[0];
+        const apiRev = listingReviewsFromApi;
+        const useApiRatings = Boolean(apiRev && !apiRev.loading && apiRev.totalCount > 0 && apiRev.averageRating > 0);
+        const ratingValue = useApiRatings ? apiRev!.averageRating : (data.property_rating || 0);
+        const reviewCount = useApiRatings ? apiRev!.totalCount : (data.property_reviews || 0);
+        const reviewNodes = (apiRev?.reviews ?? [])
+            .filter((r) => Number(r.rating) >= 1 && Number(r.rating) <= 5)
+            .slice(0, 8)
+            .map((r) => ({
+                '@type': 'Review',
+                author: { '@type': 'Person', name: (r.guestName || 'Guest').trim().slice(0, 80) || 'Guest' },
+                reviewRating: { '@type': 'Rating', ratingValue: r.rating, bestRating: 5, worstRating: 1 },
+                reviewBody: String(r.body || r.title || '').trim().slice(0, 800),
+                datePublished: r.createdAt,
+            }))
+            .filter((node) => node.reviewBody.length > 0);
+
+        const displayNightly = directBookingNightly > 0 ? directBookingNightly : (nightlyPrice?.finalNightlyPrice ?? 0);
+
+        return [
+            {
+                '@context': 'https://schema.org',
+                '@type': 'LodgingBusiness',
+                name: data.property_name,
+                description: data.property_description?.slice(0, 300),
+                image: primaryImageForLd,
+                url: pageUrlForLd,
+                address: {
+                    '@type': 'PostalAddress',
+                    addressLocality: data.property_location || 'Hyderabad',
+                    addressRegion: 'Telangana',
+                    addressCountry: 'IN',
+                },
+                aggregateRating:
+                    ratingValue > 0 && reviewCount > 0
+                        ? {
+                              '@type': 'AggregateRating',
+                              ratingValue,
+                              reviewCount,
+                          }
+                        : undefined,
+                review: reviewNodes.length > 0 ? reviewNodes : undefined,
+                ...(displayNightly > 0
+                    ? {
+                          priceRange: `INR ${displayNightly}/night`,
+                          makesOffer: {
+                              '@type': 'Offer',
+                              priceCurrency: 'INR',
+                              price: displayNightly,
+                              availability: 'https://schema.org/InStock',
+                          },
+                      }
+                    : {}),
+            },
+            ...(Array.isArray(data.property_policy_details) && data.property_policy_details.length > 0
+                ? [
+                      {
+                          '@context': 'https://schema.org',
+                          '@type': 'FAQPage',
+                          mainEntity: data.property_policy_details
+                              .filter((p: any) => p?.type && p?.value)
+                              .slice(0, 6)
+                              .map((p: any) => ({
+                                  '@type': 'Question',
+                                  name: String(p.type),
+                                  acceptedAnswer: { '@type': 'Answer', text: String(p.value) },
+                              })),
+                      },
+                  ]
+                : []),
+        ];
+    }, [
+        data,
+        listingReviewsFromApi,
+        directBookingNightly,
+        nightlyPrice?.finalNightlyPrice,
+    ]);
+
     if (!data && !notFound) {
         return <PropertyDetailsSkeleton />;
     }
@@ -709,50 +841,6 @@ useEffect(() => {
     const pageUrl = typeof window !== 'undefined' ? window.location.href : '';
     const galleryUrls = filterGuestImageUrls(data?.property_img ?? []);
     const primaryImage = galleryUrls[0];
-
-    const propertyJsonLd = data ? [
-        {
-        "@context": "https://schema.org",
-        "@type": "LodgingBusiness",
-        name: data.property_name,
-        description: data.property_description?.slice(0, 300),
-        image: primaryImage,
-        url: pageUrl,
-        address: {
-            "@type": "PostalAddress",
-            addressLocality: data.property_location || "Hyderabad",
-            addressRegion: "Telangana",
-            addressCountry: "IN",
-        },
-        aggregateRating: data.property_rating ? {
-            "@type": "AggregateRating",
-            ratingValue: data.property_rating,
-            reviewCount: data.property_reviews || 0,
-        } : undefined,
-        ...(nightlyPrice?.finalNightlyPrice ? {
-            priceRange: `INR ${nightlyPrice.finalNightlyPrice}/night`,
-            makesOffer: {
-                "@type": "Offer",
-                priceCurrency: "INR",
-                price: nightlyPrice.finalNightlyPrice,
-                availability: "https://schema.org/InStock",
-            },
-        } : {}),
-        },
-        // FAQPage: reuse "Things to know" snippets where available for richer search results.
-        ...(Array.isArray(data.property_policy_details) && data.property_policy_details.length > 0 ? [{
-            "@context": "https://schema.org",
-            "@type": "FAQPage",
-            mainEntity: data.property_policy_details
-                .filter((p: any) => p?.type && p?.value)
-                .slice(0, 6)
-                .map((p: any) => ({
-                    "@type": "Question",
-                    name: String(p.type),
-                    acceptedAnswer: { "@type": "Answer", text: String(p.value) }
-                }))
-        }] : [])
-    ] : undefined;
 
     return (
         <>
@@ -806,6 +894,14 @@ useEffect(() => {
                             ))}
                         </div>
                     )}
+                    {(data?.propertyAddress || data?.property_address) && (
+                        <p
+                            className="text-sm text-text-muted mt-1"
+                            data-testid="property-street-address"
+                        >
+                            {String(data.propertyAddress || data.property_address).trim()}
+                        </p>
+                    )}
                     <div className="mt-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3 text-sm text-text-muted">
                         <div className="flex items-center gap-2 font-semibold text-text-primary">
                             <FaStar className="text-accent-primary" />
@@ -819,6 +915,34 @@ useEffect(() => {
                         )}
                     </div>
                 </div>
+
+                {directBookingNightly > 0 && illustrativeOtaNightly > 0 && (
+                    <div
+                        className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50/85 px-4 py-3 text-sm text-emerald-950"
+                        data-testid="listing-ota-comparison-card"
+                        role="note"
+                    >
+                        <p className="font-semibold text-emerald-950">Book direct — typically better value</p>
+                        <p className="mt-1 text-emerald-900/95">
+                            From{' '}
+                            <span className="font-semibold tabular-nums">
+                                {formatCurrency(directBookingNightly, { maximumFractionDigits: 0 })}
+                            </span>{' '}
+                            per night on our site
+                            {illustrativeOtaNightly > directBookingNightly ? (
+                                <>
+                                    {' '}
+                                    — major booking platforms often show similar stays around{' '}
+                                    <span className="font-semibold tabular-nums">
+                                        {formatCurrency(illustrativeOtaNightly, { maximumFractionDigits: 0 })}
+                                    </span>{' '}
+                                    or higher after guest fees (illustrative).
+                                </>
+                            ) : null}
+                        </p>
+                        <p className="mt-1 text-xs text-emerald-800/90">Estimate only; OTA pricing varies by dates and promotions.</p>
+                    </div>
+                )}
 
                 {/* Social sharing — minimal, does not distract from booking CTA */}
                 <div className="flex items-center gap-3 mt-2 flex-wrap">
@@ -1141,6 +1265,25 @@ useEffect(() => {
                                                 </div>
                                                 {r.title && <p className="text-sm font-medium text-text-primary mb-1">{r.title}</p>}
                                                 {r.body && <p className="text-sm text-text-muted italic">"{r.body}"</p>}
+                                                {filterGuestImageUrls(r.photoUrls ?? []).length > 0 && (
+                                                    <div className="flex gap-1.5 mt-2 flex-wrap">
+                                                        {filterGuestImageUrls(r.photoUrls ?? []).slice(0, 3).map((src) => {
+                                                            const safe = sanitizeGuestImageUrl(src);
+                                                            if (!safe) return null;
+                                                            return (
+                                                                <a
+                                                                    key={src}
+                                                                    href={safe}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="block w-14 h-14 rounded-lg overflow-hidden border border-border-subtle bg-bg-muted shrink-0"
+                                                                >
+                                                                    <img src={safe} alt="" className="w-full h-full object-cover" loading="lazy" />
+                                                                </a>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                )}
                                                 {r.hostResponse && (
                                                     <div className="mt-2 pl-3 border-l-2 border-accent-primary/40">
                                                         <p className="text-xs text-text-muted font-medium mb-0.5">Owner's response:</p>

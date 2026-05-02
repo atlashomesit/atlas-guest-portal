@@ -1,7 +1,6 @@
 import Slider from "../../components/homepage_components/slider/Slider";
 import HomePage_Locations from "../../components/homepage_components/homepage_locations/HomePage_Locations";
-import { useEffect } from "react";
-import { propertyImages } from "../../data";
+import { useEffect, useMemo } from "react";
 import { getTenantPropertyData } from "../../utils/propertyDataUtils";
 import { getFaqHighlights } from "../../content/faqHighlights";
 import { trackEvent } from "../../utils/analytics";
@@ -12,37 +11,59 @@ import FooterCtaStrip from "../../components/home/FooterCtaStrip";
 import SEO from "../../components/SEO";
 import { LOGO_URL } from "../../config/branding";
 import { sanitizeGuestImageUrl } from "../../utils/guestImageUrl";
-import { CONTACT } from "../../config/contact";
+import { CONTACT, getContactEmail } from "../../config/contact";
 import {
     enableFooterMiniCtaAboveFooter,
 } from "../../config/homepageUxFlags";
 import { useBooking } from "../../contexts/BookingContext";
-import { useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import FaqHighlights from "../../components/faq/FaqHighlights";
 import pricingConfig from "../../config/pricing.config";
 import { getEffectiveDiscountPercent } from "../../utils/pricing";
+import { getTenantContext } from "../../tenant/tenantContext";
+import { getTenantOverrides } from "../../tenant/tenantOverrides";
 
 const Home = () => {
     const { pendingScrollTarget, setPendingScrollTarget } = useBooking();
     const location = useLocation();
     const propertyData = getTenantPropertyData();
-    const primaryOgImage = sanitizeGuestImageUrl(propertyImages["101"]?.[0]) ?? LOGO_URL;
+    const tenant = getTenantContext();
+    const overrides = getTenantOverrides(tenant?.slug);
+    const schemaBrandName =
+        overrides.hideAtlasHomesBranding && tenant?.name?.trim() ? tenant.name.trim() : "Atlas Homestays";
+    const schemaLogo = overrides.hideLogo ? undefined : sanitizeGuestImageUrl(tenant?.logoUrl) ?? LOGO_URL;
+    const contactEmail = getContactEmail();
     const penthouse = propertyData.find((property) => property.id === 501);
-    const penthouseCover = sanitizeGuestImageUrl(propertyImages["501"]?.[0]);
+    const room101Cover = sanitizeGuestImageUrl(propertyData.find((property) => property.id === 101)?.property_img?.[0]);
+    const primaryOgImage = room101Cover ?? (!overrides.hideLogo ? LOGO_URL : undefined);
+    const penthouseCover = sanitizeGuestImageUrl(penthouse?.property_img?.[0]) ?? (!overrides.hideLogo ? LOGO_URL : undefined);
     const effectiveDiscountPercent = getEffectiveDiscountPercent();
+    /** TASK-1293: marketplace shows by default; white-label opts in with directBookingPromo.enabled */
+    const showDirectBookingPromo =
+        overrides.directBookingPromo?.enabled === true ||
+        (!overrides.hideAtlasHomesBranding && overrides.directBookingPromo?.enabled !== false);
+    const directPromoHeadline =
+        overrides.directBookingPromo?.headline?.trim() ||
+        (effectiveDiscountPercent > 0
+            ? `Book direct — save up to ${Math.round(effectiveDiscountPercent)}% vs typical booking sites`
+            : "Book direct — best rates on our official site");
+    const directPromoSub =
+        overrides.directBookingPromo?.subline?.trim() ||
+        "Pay with UPI or cards via Razorpay. Your price is guaranteed at checkout.";
     const penthouseOfferPrice = Math.round(
         pricingConfig.baseNightlyPriceByUnitType.penthouse *
             (1 - effectiveDiscountPercent / 100),
     );
 
     const faqHighlights = getFaqHighlights();
-    const homepageJsonLd = [
+    const homepageJsonLd = useMemo(
+        () => [
         {
             "@context": "https://schema.org",
             "@type": "Organization",
-            name: "Atlas Homestays",
+            name: schemaBrandName,
             url: "https://atlashomestays.com/",
-            logo: LOGO_URL,
+            ...(schemaLogo ? { logo: schemaLogo } : {}),
             description:
                 "Serviced apartments in Hyderabad designed for business travel, family trips, and extended stays.",
             sameAs: [
@@ -64,14 +85,14 @@ const Home = () => {
         {
             "@context": "https://schema.org",
             "@type": ["LodgingBusiness", "Hotel"],
-            name: "Atlas Homestays",
+            name: schemaBrandName,
             url: "https://atlashomestays.com/",
-            logo: LOGO_URL,
+            ...(schemaLogo ? { logo: schemaLogo } : {}),
             description:
                 "Serviced apartments in KPHB, Hyderabad with Wi-Fi, parking, and responsive support for business and family stays.",
             slogan: "Best price on our website",
             telephone: `+91-${CONTACT.business.phone}`,
-            email: "atlashomeskphb@gmail.com",
+            email: contactEmail,
             address: {
                 "@type": "PostalAddress",
                 streetAddress: "KPHB, Kukatpally",
@@ -98,7 +119,7 @@ const Home = () => {
                     "@type": "Apartment",
                     name: "Atlas Penthouse 501",
                     description: penthouse?.property_description,
-                    image: penthouseCover ?? LOGO_URL,
+                    ...(penthouseCover ? { image: penthouseCover } : {}),
                     address: {
                         "@type": "PostalAddress",
                         streetAddress: "KPHB, Kukatpally",
@@ -174,7 +195,19 @@ const Home = () => {
                 acceptedAnswer: { "@type": "Answer", text: item.answer },
             })),
         },
-    ];
+    ],
+        [
+            contactEmail,
+            faqHighlights,
+            penthouse?.property_description,
+            penthouse?.property_rating,
+            penthouse?.property_reviews,
+            penthouseCover,
+            penthouseOfferPrice,
+            schemaBrandName,
+            schemaLogo,
+        ],
+    );
 
     useEffect(() => {
         trackEvent("home_view", { surface: "home", listings: propertyData.length });
@@ -199,8 +232,16 @@ const Home = () => {
     return (
         <>
             <SEO
-                title="Atlas Homestays | Serviced apartments in Hyderabad"
-                description="Book serviced apartments in Hyderabad with business-ready amenities, flexible stays, and attentive on-call support from Atlas Homestays."
+                title={
+                    overrides.hideAtlasHomesBranding && tenant?.name?.trim()
+                        ? `${tenant.name.trim()} | Book your stay`
+                        : "Atlas Homestays | Serviced apartments in Hyderabad"
+                }
+                description={
+                    overrides.hideAtlasHomesBranding && tenant?.name?.trim()
+                        ? `Book your stay with ${tenant.name.trim()}. Questions? Call ${CONTACT.business.phone} or email ${contactEmail}.`
+                        : "Book serviced apartments in Hyderabad with business-ready amenities, flexible stays, and attentive on-call support from Atlas Homestays."
+                }
                 image={primaryOgImage}
                 url="https://atlashomestays.com/"
                 twitterCard="summary_large_image"
@@ -208,6 +249,25 @@ const Home = () => {
                 jsonLd={homepageJsonLd}
             />
             <section className="relative font-roboto select-none">
+                {showDirectBookingPromo ? (
+                    <div
+                        className="border-b border-emerald-900/40 bg-emerald-950 px-4 py-2.5 text-center text-emerald-50"
+                        data-testid="home-direct-booking-promo"
+                        role="region"
+                        aria-label="Direct booking savings"
+                    >
+                        <p className="text-sm font-semibold tracking-tight sm:text-base">{directPromoHeadline}</p>
+                        <p className="mt-0.5 text-xs text-emerald-100/95 sm:text-sm">{directPromoSub}</p>
+                        <Link
+                            to="/"
+                            state={{ scrollTo: "search-form" }}
+                            className="mt-1 inline-block text-xs font-medium text-emerald-200 underline underline-offset-2 hover:text-white sm:text-sm"
+                            data-testid="home-direct-booking-promo-dates"
+                        >
+                            Pick dates →
+                        </Link>
+                    </div>
+                ) : null}
                 <div className="w-full h-fit relative ">
                     <Slider />
                 </div>

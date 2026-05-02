@@ -3,9 +3,34 @@ import { useParams, useSearchParams, Link } from "react-router-dom";
 import SEO from "../components/SEO";
 import { buildApiUrl, getApiHeaders } from "../api/client";
 import { getRuntimeConfig, hasRuntimeConfig } from "../runtime-config";
+import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
+
+/** Guest summary API returns ISO dates or formatted strings (e.g. "Sat, 3 May 2026") — normalize for ICS. */
+function summaryDisplayDateToIso(displayDate: string): string {
+  const t = displayDate.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
+  const d = new Date(t);
+  if (!Number.isNaN(d.getTime())) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+  return t;
+}
+
+function listingTimeToIcsHHMM(t: string | undefined, fallback: string): string {
+  if (!t?.trim()) return fallback;
+  const s = t.trim();
+  const m = s.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  if (m) return `${m[1].padStart(2, "0")}:${m[2]}`;
+  return fallback;
+}
 
 interface BookingSummary {
   bookingId: number;
+  /** Omitted on very old API responses; pre-arrival link hidden if missing. */
+  listingId?: number;
   guestId?: number;
   guestName: string;
   propertyName: string;
@@ -26,6 +51,12 @@ interface BookingSummary {
   hasGstInvoice?: boolean;
   gstInvoiceNumber?: string | null;
   gstInvoiceTotal?: number | null;
+  /** TASK-1888: server-computed; show pre-arrival checklist when true. */
+  preArrivalBriefingVisible?: boolean;
+  hoursUntilCheckin?: number;
+  checkInTime?: string;
+  checkOutTime?: string;
+  nearbyLandmarks?: string[];
 }
 
 const statusLabel: Record<string, { label: string; color: string }> = {
@@ -76,6 +107,7 @@ export default function BookingConfirmationPage() {
   const [cancelMessage, setCancelMessage] = useState<string>("");
   const [cancelRequested, setCancelRequested] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [copyRefFeedback, setCopyRefFeedback] = useState(false);
 
   useEffect(() => {
     if (!bookingId || !token) {
@@ -140,6 +172,8 @@ export default function BookingConfirmationPage() {
   const whatsappUrl = `https://wa.me/${whatsappDigits}?text=${whatsappText}`;
   const supportsPush = typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window;
   const canRequestModification = !isCancelled && !!token;
+  const modDatesInvalid =
+    Boolean(modCheckin && modCheckout && modCheckout.length >= 10 && modCheckin.length >= 10 && modCheckout <= modCheckin);
 
   // TASK-333: Generate and download ICS calendar event for check-in
   function downloadCalendar() {
@@ -150,8 +184,12 @@ export default function BookingConfirmationPage() {
       // Store as floating time (no timezone conversion needed — IST local)
       return `${y}${m}${d}T${h}${min}00`;
     };
-    const checkin = formatIcsDate(booking.checkinDate, "14:00");
-    const checkout = formatIcsDate(booking.checkoutDate, "12:00");
+    const cinIso = summaryDisplayDateToIso(booking.checkinDate);
+    const coutIso = summaryDisplayDateToIso(booking.checkoutDate);
+    const cinTime = listingTimeToIcsHHMM(booking.checkInTime, "14:00");
+    const coutTime = listingTimeToIcsHHMM(booking.checkOutTime, "12:00");
+    const checkin = formatIcsDate(cinIso, cinTime);
+    const checkout = formatIcsDate(coutIso, coutTime);
     const uid = `atlas-booking-${booking.bookingId}@atlashomestays.com`;
     const ics = [
       "BEGIN:VCALENDAR",
@@ -224,6 +262,10 @@ export default function BookingConfirmationPage() {
       setModMessage("Please enter both check-in and check-out dates.");
       return;
     }
+    if (modCheckout <= modCheckin) {
+      setModMessage("Check-out must be after check-in.");
+      return;
+    }
     setModSubmitting(true);
     try {
       const res = await fetch(
@@ -278,7 +320,7 @@ export default function BookingConfirmationPage() {
         throw new Error(text || "Could not submit request.");
       }
       setCancelRequested(true);
-      setCancelMessage("Cancellation request submitted. Our team will review and contact you within 24 hours.");
+      setCancelMessage("");
       setShowCancelConfirm(false);
     } catch (e) {
       setCancelMessage(e instanceof Error ? e.message : "Could not submit request. Please contact us.");
@@ -301,9 +343,28 @@ export default function BookingConfirmationPage() {
             <h1 className="text-2xl font-bold text-text-primary">Your Booking</h1>
             <StatusBadge status={booking.status} />
           </div>
-          <p className="text-sm text-text-secondary">
-            Ref&nbsp;<span className="font-mono font-semibold text-text-primary" data-testid="booking-reference">#{booking.bookingId}</span>
-            &nbsp;&middot;&nbsp;{booking.listingName !== booking.propertyName ? booking.listingName : booking.propertyName}
+          <p className="text-sm text-text-secondary flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span>
+              Ref&nbsp;<span className="font-mono font-semibold text-text-primary" data-testid="booking-reference">#{booking.bookingId}</span>
+            </span>
+            <button
+              type="button"
+              data-testid="booking-reference-copy"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(String(booking.bookingId));
+                  setCopyRefFeedback(true);
+                  window.setTimeout(() => setCopyRefFeedback(false), 2000);
+                } catch {
+                  setCopyRefFeedback(false);
+                }
+              }}
+              className="text-xs font-medium text-brand-primary underline underline-offset-2 rounded px-1 py-0.5 hover:bg-brand-primary/5"
+            >
+              {copyRefFeedback ? "Copied!" : "Copy ID"}
+            </button>
+            <span className="hidden sm:inline">&middot;</span>
+            <span>{booking.listingName !== booking.propertyName ? booking.listingName : booking.propertyName}</span>
           </p>
           {booking.guestName ? (
             <p className="text-sm text-text-secondary" data-testid="confirmation-guest-name">
@@ -436,6 +497,99 @@ export default function BookingConfirmationPage() {
           </div>
         )}
 
+        {/* TASK-1888: pre-arrival briefing (confirmed stays within 72h) */}
+        {!isCancelled && booking.preArrivalBriefingVisible && (
+          <section
+            className="rounded-2xl border border-amber-200/80 bg-amber-50/50 p-5 space-y-4"
+            data-testid="pre-arrival-briefing"
+            aria-label="Before you arrive"
+          >
+            <h2 className="text-sm font-semibold text-text-primary">Before you arrive</h2>
+            <p className="text-xs text-text-secondary leading-relaxed">
+              You are checking in soon. Here is a quick reference for your stay — save this page or add to calendar below.
+            </p>
+            <div className="space-y-0 divide-y divide-amber-200/60 border-t border-amber-200/60 -mx-5 px-5">
+              {(booking.checkInTime || booking.checkOutTime) && (
+                <div className="flex flex-col gap-0.5 py-3">
+                  <span className="text-xs text-text-muted uppercase tracking-wider font-medium">Check-in &amp; check-out times</span>
+                  <span className="text-sm text-text-primary">
+                    {booking.checkInTime
+                      ? <>Check-in from <span className="font-semibold">{booking.checkInTime}</span></>
+                      : "Check-in time: your host will confirm (see WhatsApp or instructions)."}
+                    {booking.checkOutTime ? (
+                      <span className="block mt-1 text-text-secondary">
+                        Check-out by <span className="font-medium text-text-primary">{booking.checkOutTime}</span>
+                      </span>
+                    ) : null}
+                  </span>
+                </div>
+              )}
+              {booking.propertyAddress ? (
+                <div className="flex flex-col gap-1.5 py-3">
+                  <span className="text-xs text-text-muted uppercase tracking-wider font-medium">Address</span>
+                  <p className="text-sm text-text-primary whitespace-pre-wrap">{booking.propertyAddress}</p>
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(booking.propertyAddress)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-brand-primary font-medium underline underline-offset-2 w-fit"
+                    data-testid="pre-arrival-open-maps"
+                  >
+                    Open in Google Maps
+                  </a>
+                </div>
+              ) : null}
+              <div className="py-3">
+                <span className="text-xs text-text-muted uppercase tracking-wider font-medium">Host WhatsApp</span>
+                <p className="text-sm text-text-secondary mt-1">Questions before you arrive? Message the property team.</p>
+                <a
+                  href={whatsappUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex mt-2 items-center justify-center rounded-lg bg-[#25D366] text-white text-sm font-medium px-4 py-2.5 hover:opacity-95 transition-opacity"
+                  data-testid="pre-arrival-whatsapp"
+                >
+                  Chat on WhatsApp
+                </a>
+              </div>
+              {booking.wifiVisible && (booking.wifiName || booking.wifiPassword) && (
+                <div className="py-3">
+                  <span className="text-xs text-text-muted uppercase tracking-wider font-medium">WiFi</span>
+                  <p className="text-sm text-text-primary mt-1">
+                    {booking.wifiName ? (
+                      <>Network <span className="font-mono font-semibold">{booking.wifiName}</span></>
+                    ) : (
+                      "Network name is in the WiFi section above."
+                    )}
+                    {booking.wifiPassword ? (
+                      <span className="block text-text-secondary text-xs mt-0.5">Password: see WiFi card above.</span>
+                    ) : null}
+                  </p>
+                </div>
+              )}
+              {Array.isArray(booking.nearbyLandmarks) && booking.nearbyLandmarks.length > 0 && (
+                <div className="py-3">
+                  <span className="text-xs text-text-muted uppercase tracking-wider font-medium">Nearby landmarks</span>
+                  <ul className="mt-2 list-disc pl-5 text-sm text-text-primary space-y-1">
+                    {booking.nearbyLandmarks.map((line, i) => (
+                      <li key={`${i}-${line}`}>{line}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+            {booking.listingId != null && booking.listingId > 0 && (
+              <Link
+                to={buildHomeUnitPath(getPropertySlug({ property_name: booking.propertyName }), booking.listingId)}
+                className="inline-flex text-sm text-brand-primary font-medium underline underline-offset-2"
+                data-testid="pre-arrival-view-listing"
+              >
+                View full listing &amp; photos
+              </Link>
+            )}
+          </section>
+        )}
+
         {/* What happens next */}
         {!isCancelled && (
           <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5">
@@ -553,10 +707,16 @@ export default function BookingConfirmationPage() {
                 <textarea value={modNote} onChange={(e) => setModNote(e.target.value)} rows={3} className="mt-1 w-full rounded-md border border-border-subtle px-3 py-2.5 text-base" />
               </label>
             </div>
+            {modDatesInvalid ? (
+              <p className="text-xs text-red-600" role="alert" data-testid="mod-request-date-error">
+                Check-out must be after check-in.
+              </p>
+            ) : null}
             <button
               onClick={submitModificationRequest}
-              disabled={modSubmitting}
+              disabled={modSubmitting || modDatesInvalid}
               className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-3.5 disabled:opacity-50"
+              data-testid="mod-request-submit"
             >
               {modSubmitting ? "Submitting..." : "Submit request"}
             </button>
@@ -569,8 +729,11 @@ export default function BookingConfirmationPage() {
           <div className="rounded-2xl border border-red-100 bg-red-50/40 p-5 space-y-3">
             <h2 className="text-sm font-semibold text-red-800">Request cancellation</h2>
             <p className="text-sm text-red-700">
-              Cancellations are subject to our cancellation policy. Submitting a request does not
-              automatically cancel your booking — our team will review it and contact you within 24 hours.
+              Cancellations are subject to our{" "}
+              <Link to="/policies#cancellation-refunds" className="font-semibold text-red-900 underline underline-offset-2">
+                cancellation &amp; refund policy
+              </Link>
+              . Submitting a request does not automatically cancel your booking — our team will review it and contact you within 24 hours.
             </p>
             {!showCancelConfirm ? (
               <button
@@ -618,8 +781,29 @@ export default function BookingConfirmationPage() {
           </div>
         )}
         {cancelRequested && (
-          <div className="rounded-2xl border border-green-200 bg-green-50/60 p-4 text-sm text-green-800">
-            ✅ Cancellation request received. We'll contact you within 24 hours.
+          <div className="rounded-2xl border border-green-200 bg-green-50/60 p-4 text-sm text-green-800 space-y-2">
+            <p>✅ Cancellation request received. We&apos;ll contact you within 24 hours.</p>
+            <Link
+              to="/policies#cancellation-refunds"
+              className="inline-block text-brand-primary font-medium underline underline-offset-2 text-sm"
+              data-testid="cancellation-refund-policy-link"
+            >
+              Read refund policy
+            </Link>
+          </div>
+        )}
+
+        {!isCancelled && (
+          <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-2">
+            <h2 className="text-sm font-semibold text-text-primary">Explore more stays</h2>
+            <p className="text-sm text-text-secondary">Atlas homes across India — same secure checkout.</p>
+            <Link
+              to="/search"
+              className="inline-flex text-sm font-medium text-brand-primary underline underline-offset-2"
+              data-testid="confirmation-explore-search"
+            >
+              Browse all homes →
+            </Link>
           </div>
         )}
 

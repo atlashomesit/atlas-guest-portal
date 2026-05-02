@@ -6,6 +6,8 @@ import ErrorLayout from "../components/ErrorLayout";
 import ListingCard from "../components/apartments/ListingCard";
 import ListingFilters from "../components/apartments/ListingFilters";
 import { LOGO_URL } from "../config/branding";
+import { getTenantContext } from "../tenant/tenantContext";
+import { getTenantOverrides } from "../tenant/tenantOverrides";
 import type { Listing } from "../data/listings";
 import { useTenantListings } from "../hooks/useTenantListings";
 import { trackEvent } from "../utils/analytics";
@@ -196,7 +198,8 @@ const sanitizeProperties = (propertiesInput: unknown): PropertyRecord[] => {
           : inferUnitType(safeProperty);
 
       if (!safeProperty.property_img || safeProperty.property_img.length === 0) {
-        safeProperty.property_img = [LOGO_URL];
+        const hideLogo = getTenantOverrides(getTenantContext()?.slug).hideLogo;
+        safeProperty.property_img = hideLogo ? [""] : [LOGO_URL];
       }
 
       return safeProperty;
@@ -217,6 +220,9 @@ export const Apartments = () => {
     state: fetchState,
     refetch: fetchData,
   } = useTenantListings();
+
+  const tenant = getTenantContext();
+  const tenantOverrides = getTenantOverrides(tenant?.slug);
 
   const safeListings = React.useMemo(() => sanitizeListings(listingsSource), [listingsSource]);
   const safeProperties = React.useMemo(() => sanitizeProperties(propertiesSource), [propertiesSource]);
@@ -333,21 +339,21 @@ export const Apartments = () => {
             hasWifi: deriveAmenityFlag(property, "wifi"),
             hasParking: deriveAmenityFlag(property, "park"),
             petFriendly: derivePetFriendly(property),
-            image: images?.[0] || LOGO_URL,
+            image: images?.[0] ?? (getTenantOverrides(getTenantContext()?.slug).hideLogo ? "" : LOGO_URL),
             property,
           };
         } catch (error) {
           console.error(`Error processing listing ${listing.id}:`, error);
           return null;
         }
-      }).filter((item): item is CombinedListing => item !== null && item.price > 0 && item.image);
+      }).filter((item): item is CombinedListing => item !== null && item.price > 0);
 
       return merged;
     } catch (error) {
       console.error('Error creating listings:', error);
       return [];
     }
-  }, [computeNightlyPrice, safeListings, safeProperties]);
+  }, [computeNightlyPrice, safeListings, safeProperties, tenant?.slug]);
 
   const filteredListings = React.useMemo(() => {
     let result = listings.filter(
@@ -471,7 +477,13 @@ export const Apartments = () => {
     <div className="bg-bg-muted py-10">
       <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 md:px-8">
         <header className="space-y-2">
-          <p className="text-sm font-semibold uppercase tracking-wide text-primary">Atlas Homestays</p>
+          {tenantOverrides.hideAtlasHomesBranding ? (
+            tenant?.name?.trim() ? (
+              <p className="text-sm font-semibold uppercase tracking-wide text-primary">{tenant.name.trim()}</p>
+            ) : null
+          ) : (
+            <p className="text-sm font-semibold uppercase tracking-wide text-primary">Atlas Homestays</p>
+          )}
           <h1 className="text-3xl font-bold text-text-primary sm:text-4xl">Hyderabad serviced apartments</h1>
           <p className="max-w-3xl text-base text-text-muted">
             Discover beautifully furnished homes tailored for extended stays, business travel, and weekend getaways.

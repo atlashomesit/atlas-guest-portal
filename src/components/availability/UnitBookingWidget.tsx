@@ -16,6 +16,13 @@ import { getIstStartOfDay } from '@/utils/date';
 import { calculateNights, formatNightCount, formatDateInTimezone } from '@/utils/dateHelpers';
 import { doesRangeIntersectBlocked, toISODate } from '@/utils/dateRange';
 import { formatCurrency, formatHumanDate } from '@/utils/formatting';
+import {
+  clampNationalDigits,
+  getGuestDialOption,
+  GUEST_DIAL_OPTIONS,
+  toGuestPhoneE164,
+  toRazorpayContactDigits,
+} from '@/utils/guestPhoneDial';
 import { calculateNightlyPrice, inferUnitType } from '@/utils/pricing';
 import priceDisplayConfig from '@/config/priceDisplay.config';
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
@@ -188,6 +195,8 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [minStayNights] = useState(1);
   const minAdvanceDays = 0;
   const effectiveMaxGuests = maxGuests;
+  /** TASK-1881: E.164 country code for phone; national digits in formData.phone */
+  const [phoneDialCode, setPhoneDialCode] = useState(() => GUEST_DIAL_OPTIONS[0].code);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -202,6 +211,10 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     email: '',
     phone: ''
   });
+  useEffect(() => {
+    const dial = getGuestDialOption(phoneDialCode);
+    setFormData((prev) => ({ ...prev, phone: clampNationalDigits(prev.phone, dial.maxDigits) }));
+  }, [phoneDialCode]);
   const [guestConsentAccepted, setGuestConsentAccepted] = useState(false);
   const [consentError, setConsentError] = useState('');
   const [referralCode, setReferralCode] = useState('');
@@ -319,6 +332,17 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     }
   }, []);
 
+  // TASK-1708: Auto-fill promo code from ?promo= URL param (e.g. ?promo=DIRECT5 from DirectDiscountBanner CTA)
+  useEffect(() => {
+    try {
+      const url = new URL(window.location.href);
+      const promo = (url.searchParams.get('promo') || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 32);
+      if (promo) setPromoCode(promo);
+    } catch {
+      // no-op
+    }
+  }, []);
+
   // Hydrate widget from booking context (e.g. ?checkIn=&checkOut=&guests= from property URL)
   useEffect(() => {
     const ci = booking.checkIn;
@@ -414,10 +438,13 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         setBlockedSet(newBlockedDates);
         setDateStatusMap(newDateStatusMap);
         setBookedDates(Array.from(newBlockedDates).map(date => new Date(date)));
+        const hasTurnover = Array.from(newDateStatusMap.values()).some((s) => s === 'Turnover');
         setStatusMessage(
-          newBlockedDates.size > 0
-            ? 'Some dates are unavailable due to existing bookings.'
-            : 'All dates shown are available to book.'
+          hasTurnover
+            ? 'Orange nights are turnover cleaning windows — they remain bookable. Grey is blocked or on hold.'
+            : newBlockedDates.size > 0
+              ? 'Grey dates are blocked or on hold and cannot be selected.'
+              : 'All dates shown are available to book.'
         );
       } catch (error) {
         // Silently handle expected errors: 404, CORS, cancelled requests
@@ -866,12 +893,13 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       isValid = false;
     }
 
-    const normalizedPhone = formData.phone.replace(/\D/g, '').slice(-10);
-    if (!normalizedPhone) {
+    const dial = getGuestDialOption(phoneDialCode);
+    const national = clampNationalDigits(formData.phone, dial.maxDigits);
+    if (!national) {
       errors.phone = 'Phone number is required';
       isValid = false;
-    } else if (!/^\d{10}$/.test(normalizedPhone)) {
-      errors.phone = 'Enter a valid 10-digit Indian mobile number';
+    } else if (!dial.validate(national)) {
+      errors.phone = dial.invalidMessage;
       isValid = false;
     }
 
@@ -889,9 +917,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     if (name === 'phone') {
-      // IND-003: Indian phone input behavior (accept +91/spacing, store last 10 digits).
-      const normalizedPhone = value.replace(/\D/g, '').slice(-10);
-      setFormData(prev => ({ ...prev, phone: normalizedPhone }));
+      const dial = getGuestDialOption(phoneDialCode);
+      const national = clampNationalDigits(value, dial.maxDigits);
+      setFormData(prev => ({ ...prev, phone: national }));
       return;
     }
     if (name === 'notes' && value.length > 500) {
@@ -1159,7 +1187,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         guestInfo: {
           name: formData.name.trim(),
           email: formData.email.trim(),
-          phone: formData.phone.trim().replace(/\D/g, '').substring(0, 10)
+          phone: toGuestPhoneE164(
+            phoneDialCode,
+            clampNationalDigits(formData.phone, getGuestDialOption(phoneDialCode).maxDigits)
+          ),
         }
       };
 
@@ -1228,7 +1259,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             prefill: {
               name: formData.name.trim(),
               email: formData.email.trim(),
-              contact: formData.phone.trim().replace(/\D/g, '').substring(0, 10)
+              contact: toRazorpayContactDigits(
+                phoneDialCode,
+                clampNationalDigits(formData.phone, getGuestDialOption(phoneDialCode).maxDigits)
+              ),
             },
             theme: {
               color: '#2563eb'
@@ -1674,7 +1708,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           <span className="text-sm font-semibold rounded-full bg-[color:color-mix(in_srgb,var(--cta-primary)_18%,transparent)] px-3 py-1 text-[color:color-mix(in_srgb,var(--cta-primary)_80%,transparent)]">
             Best price on our website
           </span>
-          <span className="text-xs text-text-muted">Limited-time deal</span>
+          {effectiveDailyPricing && effectiveDailyPricing.globalDiscountPercent > 0 ? (
+            <span className="text-xs font-medium text-[color:color-mix(in_srgb,var(--cta-primary)_75%,transparent)]">
+              Save {Math.round(effectiveDailyPricing.globalDiscountPercent)}% — discount applied
+            </span>
+          ) : null}
         </div>
         <div className="flex flex-col gap-0.5">
           {dailyPricingLoading && (
@@ -1748,7 +1786,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               Select your check-out date (minimum one night after check-in).
             </p>
           )}
-          <p className="text-xs text-text-secondary">Some dates are unavailable due to existing bookings.</p>
+          <p className="text-xs text-text-secondary">
+            Grey: blocked or on hold (not selectable). Orange: turnover cleaning — those nights stay bookable.
+          </p>
           <button
             id="unit-booking-dates"
             ref={calendarButtonRef}
@@ -2108,24 +2148,40 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           <label className="text-sm font-medium text-text-primary" htmlFor="phone">
             Phone Number *
           </label>
-          <div className={`flex items-center rounded-xl border ${formErrors.phone ? 'border-support-error' : 'border-border-strong'} bg-bg-muted px-3`}>
-            <span className="pr-2 text-text-muted select-none">+91</span>
+          <div
+            className={`flex min-h-[52px] items-stretch overflow-hidden rounded-xl border ${formErrors.phone ? 'border-support-error' : 'border-border-strong'} bg-bg-muted`}
+          >
+            <select
+              id="phone-country"
+              aria-label="Country calling code"
+              value={phoneDialCode}
+              onChange={(e) => setPhoneDialCode(e.target.value)}
+              disabled={isBookingDisabled}
+              className="shrink-0 max-w-[118px] border-0 border-r border-border-strong bg-transparent py-3 pl-3 pr-1 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-inset focus:ring-cta-primary"
+              data-testid="guest-booking-phone-dial"
+            >
+              {GUEST_DIAL_OPTIONS.map((o) => (
+                <option key={o.code} value={o.code}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
             <input
               type="tel"
               id="phone"
               name="phone"
               inputMode="numeric"
-              pattern="[0-9]{10}"
+              autoComplete="tel-national"
               value={formData.phone}
               onChange={handleInputChange}
               disabled={isBookingDisabled}
-              className="w-full bg-transparent py-3 text-text-primary focus:outline-none"
-              placeholder="9876543210"
-              maxLength={10}
+              className="min-w-0 flex-1 bg-transparent px-3 py-3 text-text-primary focus:outline-none"
+              placeholder={getGuestDialOption(phoneDialCode).placeholder}
+              maxLength={getGuestDialOption(phoneDialCode).maxDigits}
               data-testid="guest-booking-phone"
             />
           </div>
-          <p className="text-xs text-text-muted">Indian mobile number (10 digits)</p>
+          <p className="text-xs text-text-muted">{getGuestDialOption(phoneDialCode).hint}</p>
           {formErrors.phone && (
             <p className="text-sm text-support-error" role="alert">
               {formErrors.phone}
@@ -2273,6 +2329,15 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         </div>
       )}
 
+      {!isBookingDisabled && (
+        <div className="flex items-center gap-2 flex-wrap justify-center py-1">
+          <img src="/icons/upi.svg" alt="UPI" className="h-5" />
+          <img src="/icons/visa.svg" alt="Visa" className="h-4" />
+          <img src="/icons/rupay.svg" alt="RuPay" className="h-4" />
+          <span className="text-xs text-text-muted">Secured by Razorpay · UPI / Visa / RuPay</span>
+        </div>
+      )}
+
       <Button
         type="submit"
         fullWidth
@@ -2290,14 +2355,6 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       >
         {isBookingDisabled ? 'Unavailable' : isSubmitting || isLoading ? 'Processing...' : 'Book Now'}
       </Button>
-      {!isBookingDisabled && (
-        <div className="flex items-center gap-2 mt-2 flex-wrap justify-center">
-          <img src="/icons/upi.svg" alt="UPI" className="h-5" />
-          <img src="/icons/visa.svg" alt="Visa" className="h-4" />
-          <img src="/icons/rupay.svg" alt="RuPay" className="h-4" />
-          <span className="text-xs text-text-muted">Secured by Razorpay</span>
-        </div>
-      )}
     </form>
     </>
   );

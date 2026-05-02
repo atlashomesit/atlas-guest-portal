@@ -25,9 +25,18 @@ export type TenantContactOverrides = {
   email?: string;
 };
 
+export type TenantDirectBookingPromo = {
+  /** When false, strip is hidden even on marketplace theme. */
+  enabled?: boolean;
+  headline?: string;
+  subline?: string;
+};
+
 export type TenantOverrides = {
-  /** Hide the logo image in the navbar/footer. */
+  /** Hide the logo image in the navbar/footer/subheading. */
   hideLogo?: boolean;
+  /** Hide default "Atlas Homes" / Atlas Homestays copy where we show a listing brand row. */
+  hideAtlasHomesBranding?: boolean;
   /** Hide the "List your property" CTA in the header (desktop + mobile). */
   hideListProperty?: boolean;
   /** Override the "Our Homes" dropdown contents. */
@@ -36,6 +45,8 @@ export type TenantOverrides = {
   contact?: TenantContactOverrides;
   /** Listings API endpoint URL (e.g., https://api.example.com/listings/public). */
   listingsApiUrl?: string;
+  /** TASK-1293: homepage strip above hero (direct booking value prop). */
+  directBookingPromo?: TenantDirectBookingPromo;
 };
 
 const STAR_GUEST_HOUSE_HOMES: TenantHomeLink[] = [
@@ -62,6 +73,8 @@ const STAR_GUEST_HOUSE_HOMES: TenantHomeLink[] = [
 
 const TENANT_OVERRIDES: Record<string, TenantOverrides> = {
   starguesthouse: {
+    hideLogo: true,
+    hideAtlasHomesBranding: true,
     hideListProperty: true,
     homes: STAR_GUEST_HOUSE_HOMES,
     contact: {

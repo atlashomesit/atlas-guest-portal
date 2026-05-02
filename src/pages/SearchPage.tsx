@@ -3,12 +3,16 @@ import { Link, useSearchParams } from "react-router-dom";
 
 import { propertyData } from "../data";
 import { fetchPublicListings, type PublicListing } from "../api/listingClient";
-import { formatCurrency, parseDate } from "../utils/formatting";
+import { parseDate } from "../utils/formatting";
+import { useCurrency } from "../contexts/CurrencyContext";
 import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 import SkeletonCard from "../components/apartments/SkeletonCard";
 import OptimizedImage from "../components/ui/OptimizedImage";
+import OwnerShareBadge from "../components/OwnerShareBadge"; // TASK-1705
+import DirectDiscountBanner from "../components/DirectDiscountBanner"; // TASK-1708
 import { filterGuestImageUrls, sanitizeGuestImageUrl } from "../utils/guestImageUrl";
 import { compareAtlasHomesBuildingOrder } from "../utils/atlasHomesBuildingOrder";
+import { buildApiUrl, getApiHeaders } from "../api/client";
 
 const ITEMS_PER_PAGE = 12;
 
@@ -24,6 +28,14 @@ type NormalizedListing = {
   canonicalPath: string;
   property?: unknown;
   rating?: number;
+  /** TASK-1695: LOS auto-discount tier 1 minimum nights (null = not configured). */
+  losDiscountMinNights?: number | null;
+  /** TASK-1695: LOS auto-discount tier 1 percent. */
+  losDiscountPercent?: number | null;
+  /** TASK-1695: LOS auto-discount tier 2 minimum nights. */
+  losDiscount2MinNights?: number | null;
+  /** TASK-1695: LOS auto-discount tier 2 percent. */
+  losDiscount2Percent?: number | null;
 };
 
 function buildStaticListings(): NormalizedListing[] {
@@ -77,12 +89,17 @@ function apiToNormalized(listings: PublicListing[]): NormalizedListing[] {
         amenities: [],
         canonicalPath,
         rating: l.propertyRating ?? undefined,
+        losDiscountMinNights: l.losDiscountMinNights ?? null,
+        losDiscountPercent: l.losDiscountPercent ?? null,
+        losDiscount2MinNights: l.losDiscount2MinNights ?? null,
+        losDiscount2Percent: l.losDiscount2Percent ?? null,
       };
     })
     .filter((l) => l.numericId > 0);
 }
 
 const SearchPage = () => {
+  const { format: formatDisplayCurrency, formatINR, isConverted } = useCurrency();
   const [searchParams, setSearchParams] = useSearchParams();
   const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
   const [isLoading, setIsLoading] = useState(true);
@@ -115,16 +132,88 @@ const SearchPage = () => {
   const maxPrice = Number(searchParams.get("maxPrice")) || null;
   const remoteWork = searchParams.get("remoteWork") === "true";
   const longStay = searchParams.get("longStay") === "true";
+  /** TASK-1297: filter to listings with inventory for tonight (IST). */
+  const availableNow = searchParams.get("availableNow") === "true";
   const amenitiesParam = searchParams.get("amenities") || "";
   const selectedAmenities = amenitiesParam ? amenitiesParam.split(",") : [];
 
   const hasInvalidDates = Boolean(checkIn && checkOut && checkOut <= checkIn);
-  const hasActiveFilters = Boolean(minPrice || maxPrice || remoteWork || longStay || selectedAmenities.length > 0);
+  const hasActiveFilters = Boolean(
+    minPrice || maxPrice || remoteWork || longStay || availableNow || selectedAmenities.length > 0,
+  );
+
+  const [tonightAvailableIds, setTonightAvailableIds] = useState<Set<number> | null>(null);
+  const [tonightProbeLoading, setTonightProbeLoading] = useState(false);
 
   const listings = useMemo(
     () => apiListings ?? buildStaticListings(),
     [apiListings],
   );
+
+  useEffect(() => {
+    if (!availableNow) {
+      setTonightAvailableIds(null);
+      setTonightProbeLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const ids = [...new Set(listings.map((u) => u.numericId))].filter((id) => id > 0).slice(0, 40);
+    if (ids.length === 0) {
+      setTonightAvailableIds(new Set());
+      setTonightProbeLoading(false);
+      return;
+    }
+
+    setTonightProbeLoading(true);
+    setTonightAvailableIds(null);
+    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
+
+    const probeOne = async (id: number): Promise<boolean> => {
+      try {
+        const url = buildApiUrl(
+          `/availability/listing-availability?listingId=${id}&startDate=${encodeURIComponent(today)}&months=1`,
+        );
+        const res = await fetch(url, {
+          signal: controller.signal,
+          headers: { Accept: "application/json", ...getApiHeaders() },
+        });
+        if (!res.ok) return false;
+        const j = (await res.json()) as {
+          availability?: { date?: string; Date?: string; status?: string; Status?: string; inventory?: number; Inventory?: number }[];
+          Availability?: { date?: string; Date?: string; status?: string; Status?: string; inventory?: number; Inventory?: number }[];
+        };
+        const days = j.availability ?? j.Availability ?? [];
+        const row = days.find((d) => (d.date ?? d.Date) === today);
+        if (!row) return false;
+        const st = String(row.status ?? row.Status ?? "").toLowerCase();
+        const inv = Number(row.inventory ?? row.Inventory ?? 0);
+        if (st === "blocked" || st === "hold") return false;
+        return inv > 0 || st === "available" || st === "turnover";
+      } catch {
+        return false;
+      }
+    };
+
+    void (async () => {
+      const ok = new Set<number>();
+      const batch = 8;
+      for (let i = 0; i < ids.length; i += batch) {
+        if (controller.signal.aborted) return;
+        const slice = ids.slice(i, i + batch);
+        const flags = await Promise.all(slice.map(async (id) => ((await probeOne(id)) ? id : -1)));
+        for (const x of flags) {
+          if (x > 0) ok.add(x);
+        }
+      }
+      if (!controller.signal.aborted) {
+        setTonightAvailableIds(ok);
+        setTonightProbeLoading(false);
+      }
+    })();
+
+    return () => controller.abort();
+  }, [availableNow, listings]);
 
   const hasAmenity = (unit: NormalizedListing, amenity: string): boolean => {
     const amenityIcons = (unit.amenities || []).map(a => (a.amenities_icon || "").toLowerCase());
@@ -160,13 +249,29 @@ const SearchPage = () => {
         const hasAllSelectedAmenities = selectedAmenities.every(amenity => hasAmenity(unit, amenity));
         if (!hasAllSelectedAmenities) return false;
       }
+      if (availableNow) {
+        if (tonightProbeLoading || tonightAvailableIds === null) return false;
+        if (!tonightAvailableIds.has(unit.numericId)) return false;
+      }
       return true;
     });
-  }, [guests, hasInvalidDates, listings, longStay, minPrice, maxPrice, remoteWork, selectedAmenities]);
+  }, [
+    availableNow,
+    guests,
+    hasInvalidDates,
+    listings,
+    longStay,
+    maxPrice,
+    minPrice,
+    remoteWork,
+    selectedAmenities,
+    tonightAvailableIds,
+    tonightProbeLoading,
+  ]);
 
   useEffect(() => {
     setVisibleCount(ITEMS_PER_PAGE);
-  }, [guests, hasInvalidDates, longStay, minPrice, maxPrice, remoteWork, selectedAmenities]);
+  }, [availableNow, guests, hasInvalidDates, longStay, minPrice, maxPrice, remoteWork, selectedAmenities, tonightProbeLoading]);
 
   const updateParam = (key: string, value: string) => {
     setSearchParams((prev) => {
@@ -190,6 +295,9 @@ const SearchPage = () => {
       next.delete("minPrice");
       next.delete("maxPrice");
       next.delete("amenities");
+      next.delete("remoteWork");
+      next.delete("longStay");
+      next.delete("availableNow");
       return next;
     }, { replace: true });
   };
@@ -270,9 +378,24 @@ const SearchPage = () => {
             />
             <span className="text-text-primary">Long stay (7+ nights)</span>
           </label>
+          <label className="flex items-center gap-2 rounded-lg border border-border-subtle bg-bg-muted px-3 py-2 text-sm">
+            <input
+              type="checkbox"
+              id="filter-available-tonight"
+              checked={availableNow}
+              onChange={(e) => updateParam("availableNow", e.target.checked ? "true" : "")}
+              className="cursor-pointer"
+              data-testid="search-filter-available-tonight"
+            />
+            <span className="text-text-primary">Available tonight</span>
+          </label>
           <div className="ml-auto flex items-end gap-3">
             {!isLoading && (
-              <span className="text-sm text-text-muted">{filteredUnits.length} {filteredUnits.length === 1 ? "property" : "properties"} found</span>
+              <span className="text-sm text-text-muted">
+                {availableNow && tonightProbeLoading
+                  ? "Checking tonight's availability..."
+                  : `${filteredUnits.length} ${filteredUnits.length === 1 ? "property" : "properties"} found`}
+              </span>
             )}
             {hasActiveFilters && (
               <button
@@ -303,6 +426,9 @@ const SearchPage = () => {
             </button>
           ))}
         </div>
+
+        {/* TASK-1708: Direct booking discount nudge — shows for direct traffic only */}
+        <DirectDiscountBanner />
 
         {!isLoading && apiListings === null && listings.length > 0 && (
           <div className="rounded-xl border border-support-warning/40 bg-support-warning/10 px-4 py-3 text-support-warning">
@@ -385,6 +511,18 @@ const SearchPage = () => {
                             💼 Co-working desk
                           </span>
                         )}
+                        {/* TASK-1695: LOS discount badge — show highest configured tier */}
+                        {unit.losDiscount2MinNights != null && unit.losDiscount2MinNights > 0 &&
+                          unit.losDiscount2Percent != null && unit.losDiscount2Percent > 0 ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700">
+                            🏷️ Stay {unit.losDiscount2MinNights}+ nights — {unit.losDiscount2Percent}% off
+                          </span>
+                        ) : unit.losDiscountMinNights != null && unit.losDiscountMinNights > 0 &&
+                          unit.losDiscountPercent != null && unit.losDiscountPercent > 0 ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700">
+                            🏷️ Stay {unit.losDiscountMinNights}+ nights — {unit.losDiscountPercent}% off
+                          </span>
+                        ) : null}
                       </div>
                       {unit.rating != null && unit.rating > 0 && (
                         <p className="mt-0.5 text-sm text-accent-primary font-medium">
@@ -396,16 +534,21 @@ const SearchPage = () => {
                       {unit.location}
                     </span>
                   </div>
+                  {/* TASK-1705: Owner-share trust badge */}
+                  <OwnerShareBadge nightlyPrice={unit.pricePerNight} className="self-start" />
                   <div className="flex items-center justify-between gap-4">
                     <div className="space-y-1">
-                      <p className="text-2xl font-bold text-text-primary" data-testid="guest-listing-nightly-price">{formatCurrency(unit.pricePerNight)}</p>
+                      <p className="text-2xl font-bold text-text-primary" data-testid="guest-listing-nightly-price">{formatDisplayCurrency(unit.pricePerNight)}</p>
+                      {isConverted && (
+                        <p className="text-xs text-text-muted">{formatINR(unit.pricePerNight)} on payment</p>
+                      )}
                       <p className="text-sm text-text-muted">per night</p>
                       <p className="text-xs text-text-muted">
-                        Est. total: {formatCurrency(Math.round(unit.pricePerNight * 1.12))} (incl. 12% GST)
+                        Est. total: {formatDisplayCurrency(Math.round(unit.pricePerNight * 1.12))} (incl. 12% GST)
                       </p>
                       {longStay && (
                         <p className="text-sm font-semibold text-cta-primary">
-                          from {formatCurrency(unit.pricePerNight * 30)}/month
+                          from {formatDisplayCurrency(unit.pricePerNight * 30)}/month
                         </p>
                       )}
                     </div>
