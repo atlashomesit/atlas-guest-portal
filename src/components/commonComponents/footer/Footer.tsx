@@ -54,7 +54,7 @@ const Footer = () => {
             <div className='max-w-luxury mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-12'>
                 <div className='flex flex-col gap-4 items-center lg:items-start'>
                     {showLogo && (
-                        <img className='w-32 md:w-24 rounded-md' src={logoSrc} alt="" aria-hidden />
+                        <img className='w-32 md:w-24 rounded-md' src={logoSrc} alt="" aria-hidden loading="lazy" decoding="async" />
                     )}
                     <p className='text-sm text-[var(--footer-link)]'>{footerTagline}</p>
                     <div className='flex text-lg gap-6 text-[color:var(--footer-link)]'>

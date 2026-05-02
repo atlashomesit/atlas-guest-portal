@@ -99,9 +99,9 @@ export default function MarketplaceHomepage() {
 
         {!loading &&
           items.map((item) => {
-            // TASK-1869/1873: correct GST rate — 5% for ≤₹7,500/night, 12% above (Sept 2025 reform)
-            const gstRate = item.pricePerNight > 7500 ? 1.12 : 1.05;
-            const gstPct = item.pricePerNight > 7500 ? 12 : 5;
+            // TASK-1869/1873: GST — 5% for ≤₹7,500/night, 18% above (Sept 2025 reform)
+            const gstRate = item.pricePerNight > 7500 ? 1.18 : 1.05;
+            const gstPct = item.pricePerNight > 7500 ? 18 : 5;
             const estTotal = Math.round(item.pricePerNight * 2 * gstRate);
             const isFav = favIds.has(item.id);
 

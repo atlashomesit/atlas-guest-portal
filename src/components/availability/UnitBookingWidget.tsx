@@ -2339,9 +2339,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
       {!isBookingDisabled && (
         <div className="flex items-center gap-2 flex-wrap justify-center py-1">
-          <img src="/icons/upi.svg" alt="UPI" className="h-5" />
-          <img src="/icons/visa.svg" alt="Visa" className="h-4" />
-          <img src="/icons/rupay.svg" alt="RuPay" className="h-4" />
+          <img src="/icons/upi.svg" alt="UPI" className="h-5" loading="lazy" decoding="async" />
+          <img src="/icons/visa.svg" alt="Visa" className="h-4" loading="lazy" decoding="async" />
+          <img src="/icons/rupay.svg" alt="RuPay" className="h-4" loading="lazy" decoding="async" />
           <span className="text-xs text-text-muted">Secured by Razorpay · UPI / Visa / RuPay</span>
         </div>
       )}

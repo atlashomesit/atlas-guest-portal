@@ -10,7 +10,7 @@ const CommonBanner: React.FC<CommonBannerProps> = ({ image, PageName }) => {
         <section className=''>
             <div className='relative h-[70vh] w-full'>
                 {image
-                    ? <img className='h-full w-full object-cover' src={image} alt="Banner" />
+                    ? <img className='h-full w-full object-cover' src={image} alt="Banner" loading="eager" decoding="async" fetchPriority="high" />
                     : <div className='h-full w-full bg-gradient-to-br from-slate-100 to-slate-200' />
                 }
             </div>

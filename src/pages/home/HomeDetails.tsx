@@ -82,6 +82,21 @@ const HomeDetails = () => {
   }, [room, updateBooking]);
 
   const primaryImage = room?.images?.[0] ?? fallbackImage;
+
+  /** TASK-1453: LCP preload for hero photo (no react-helmet-async — inject once per navigation). */
+  useEffect(() => {
+    if (!room || !primaryImage) return;
+    const link = document.createElement("link");
+    link.rel = "preload";
+    link.as = "image";
+    link.href = primaryImage;
+    link.setAttribute("fetchpriority", "high");
+    link.setAttribute("data-atlas-home-lcp", "1");
+    document.head.appendChild(link);
+    return () => {
+      link.remove();
+    };
+  }, [room, primaryImage]);
   const highlights = room?.highlights?.length ? room.highlights : defaultHomeHighlights;
 
   if (!room) {
@@ -114,7 +129,9 @@ const HomeDetails = () => {
             src={primaryImage}
             alt={room.title}
             className="w-full h-80 object-cover rounded-2xl shadow-level1"
-            loading="lazy"
+            loading="eager"
+            decoding="async"
+            fetchPriority="high"
           />
           {room.images && room.images.length > 1 && (
             <div className="flex gap-2 mt-3">
@@ -125,6 +142,7 @@ const HomeDetails = () => {
                   alt={`${room.title} photo ${idx + 1}`}
                   className="h-20 w-24 flex-shrink-0 rounded-lg object-cover"
                   loading="lazy"
+                  decoding="async"
                 />
               ))}
             </div>

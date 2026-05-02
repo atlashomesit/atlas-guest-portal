@@ -405,7 +405,7 @@ export default function ReviewSubmitPage() {
                   return (
                     <div key={`${u}-${idx}`} className="relative w-20 h-20 rounded-lg overflow-hidden border border-border-subtle bg-bg-muted shrink-0">
                       {safe ? (
-                        <img src={safe} alt="" className="w-full h-full object-cover" />
+                        <img src={safe} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
                       ) : null}
                       <button
                         type="button"
