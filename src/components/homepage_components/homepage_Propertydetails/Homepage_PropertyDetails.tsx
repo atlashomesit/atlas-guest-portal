@@ -28,6 +28,7 @@ import { filterGuestImageUrls, sanitizeGuestImageUrl } from '../../../utils/gues
 import type { ListingDetail, PublicListing } from '../../../api/listingClient';
 import {
     fetchListingById,
+    fetchListingContact,
     fetchListingPhotos,
     parseMaxGuestsFromPayload,
     resolveStaticMaxGuests,
@@ -352,6 +353,33 @@ const PropertyDetails = () => {
             .catch(() => {});
         return () => ac.abort();
     }, [resolvedListingId, data?.listingId, data?.maxGuests]);
+
+    /** TASK-1466: deep links e.g. `/homes/.../123?bookingId=1&t=...` load host phone without exposing it on public catalog. */
+    const bookingIdForContact = searchParams.get('bookingId');
+    const contactToken = searchParams.get('t');
+    const lastListingContactKeyRef = React.useRef<string>('');
+    useEffect(() => {
+        if (!data) return;
+        const bid = Number(bookingIdForContact);
+        const tok = contactToken?.trim() ?? '';
+        const lid = Number(resolvedListingId ?? data.listingId ?? NaN);
+        if (!Number.isFinite(bid) || bid <= 0 || !tok || !Number.isFinite(lid) || lid <= 0) return;
+        const dedupeKey = `${lid}:${bid}:${tok}`;
+        if (lastListingContactKeyRef.current === dedupeKey) return;
+        const ac = new AbortController();
+        void fetchListingContact(lid, bid, tok, ac.signal)
+            .then((c) => {
+                const phone = c?.hostPhone?.trim();
+                if (!phone || ac.signal.aborted) return;
+                setData((prev) => {
+                    if (!prev) return prev;
+                    lastListingContactKeyRef.current = dedupeKey;
+                    return { ...prev, hostPhone: phone };
+                });
+            })
+            .catch(() => {});
+        return () => ac.abort();
+    }, [bookingIdForContact, contactToken, resolvedListingId, data]);
 
     useEffect(() => {
         const lid = resolvedListingId;
