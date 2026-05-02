@@ -136,6 +136,8 @@ const SearchPage = () => {
   const availableNow = searchParams.get("availableNow") === "true";
   const amenitiesParam = searchParams.get("amenities") || "";
   const selectedAmenities = amenitiesParam ? amenitiesParam.split(",") : [];
+  /** TASK-1714: sort order — default "recommended" (Atlas building/floor order). */
+  const sortBy = searchParams.get("sortBy") || "recommended";
 
   const hasInvalidDates = Boolean(checkIn && checkOut && checkOut <= checkIn);
   const hasActiveFilters = Boolean(
@@ -269,9 +271,21 @@ const SearchPage = () => {
     tonightProbeLoading,
   ]);
 
+  /** TASK-1714: Apply chosen sort order on top of filtered results. */
+  const sortedUnits = useMemo(() => {
+    const s = [...filteredUnits];
+    switch (sortBy) {
+      case "price_asc":   return s.sort((a, b) => a.pricePerNight - b.pricePerNight);
+      case "price_desc":  return s.sort((a, b) => b.pricePerNight - a.pricePerNight);
+      case "rating_desc": return s.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+      case "newest":      return s.sort((a, b) => b.numericId - a.numericId);
+      default:            return s; // "recommended" — preserve Atlas weighting
+    }
+  }, [filteredUnits, sortBy]);
+
   useEffect(() => {
     setVisibleCount(ITEMS_PER_PAGE);
-  }, [availableNow, guests, hasInvalidDates, longStay, minPrice, maxPrice, remoteWork, selectedAmenities, tonightProbeLoading]);
+  }, [availableNow, guests, hasInvalidDates, longStay, minPrice, maxPrice, remoteWork, selectedAmenities, sortBy, tonightProbeLoading]);
 
   const updateParam = (key: string, value: string) => {
     setSearchParams((prev) => {
@@ -302,9 +316,9 @@ const SearchPage = () => {
     }, { replace: true });
   };
 
-  const visibleUnits = filteredUnits.slice(0, visibleCount);
-  const hasMore = visibleCount < filteredUnits.length;
-  const showEmptyState = !isLoading && !hasInvalidDates && filteredUnits.length === 0;
+  const visibleUnits = sortedUnits.slice(0, visibleCount);
+  const hasMore = visibleCount < sortedUnits.length;
+  const showEmptyState = !isLoading && !hasInvalidDates && sortedUnits.length === 0;
   const queryString = searchParams.toString();
 
   return (
@@ -425,6 +439,23 @@ const SearchPage = () => {
               {amenity}
             </button>
           ))}
+        </div>
+
+        {/* TASK-1714: Sort controls */}
+        <div className="flex items-center justify-end gap-2">
+          <label className="text-sm text-text-muted" htmlFor="sort-by">Sort:</label>
+          <select
+            id="sort-by"
+            value={sortBy}
+            onChange={(e) => updateParam("sortBy", e.target.value === "recommended" ? "" : e.target.value)}
+            className="rounded-lg border border-border-subtle bg-bg-surface px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-cta-primary"
+          >
+            <option value="recommended">Recommended</option>
+            <option value="price_asc">Price: low to high</option>
+            <option value="price_desc">Price: high to low</option>
+            <option value="rating_desc">Highest rated</option>
+            <option value="newest">Newest</option>
+          </select>
         </div>
 
         {/* TASK-1708: Direct booking discount nudge — shows for direct traffic only */}
