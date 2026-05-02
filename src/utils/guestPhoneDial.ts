@@ -72,7 +72,6 @@ export function clampNationalDigits(raw: string, maxDigits: number): string {
 
 /** Full number for API / guest record (E.164). */
 export function toGuestPhoneE164(dialCode: string, nationalDigits: string): string {
-  const opt = getGuestDialOption(dialCode);
   const dc = dialCode.startsWith('+') ? dialCode.slice(1) : dialCode.replace(/\D/g, '');
   return `+${dc}${nationalDigits}`;
 }

@@ -126,7 +126,6 @@ export const CurrencyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const rate = rates[currency];
       if (!rate) return formatINR(inrAmount); // fall back if rate not loaded yet
       const converted = inrAmount * rate;
-      const sym = CURRENCY_SYMBOLS[currency] ?? currency;
       const locale = INTL_LOCALES[currency] ?? 'en-US';
       const formatted = new Intl.NumberFormat(locale, {
         style: 'currency',

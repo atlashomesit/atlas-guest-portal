@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 
 import { propertyData } from "../data";
 import { fetchPublicListings, type PublicListing } from "../api/listingClient";
-import { formatCurrency, parseDate } from "../utils/formatting";
+import { parseDate } from "../utils/formatting";
 import { useCurrency } from "../contexts/CurrencyContext";
 import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 import SkeletonCard from "../components/apartments/SkeletonCard";
