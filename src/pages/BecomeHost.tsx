@@ -435,6 +435,9 @@ const BecomeHost = () => {
       if (data?.tenantId) {
         localStorage.setItem('auth_tenant_id', String(data.tenantId));
       }
+      if (typeof data?.userId === 'number') {
+        localStorage.setItem('onboarding_user_id', String(data.userId));
+      }
       localStorage.setItem('onboarding_user_email', contact.email.trim());
 
       setSubmitStatus("success");
