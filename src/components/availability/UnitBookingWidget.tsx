@@ -824,8 +824,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
   // ---------- Fee calculations ----------
 
-  // GST = 5% on discounted price
-  const gstAmount = 0;
+  // TASK-1871: GST is all-inclusive in the listed nightly rate (baked into breakdownPrice).
+  // The dead `gstAmount = 0` + misleading comment + never-rendering row have been removed.
+  // Header reads "All-inclusive rate · GST included" to match.
 
   // When API has loaded: use API price (or calendar sum). When API has not loaded: use 0.
   const hasSelectedRange = Boolean(dateRange.startDate && dateRange.endDate);
@@ -836,10 +837,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         ? Math.round(effectiveDailyPricing.actualPrice * (hasSelectedRange ? priceDetails.nights : 1))
         : 0;
   const convenienceFeePercent = calendarConvenienceFeePercent != null ? calendarConvenienceFeePercent / 100 : 0;
-  const subtotalForConvenience = priceDetails.total + gstAmount;
-  const _convenienceFee = Math.round(subtotalForConvenience * convenienceFeePercent);
-  const breakdownSubtotalForConvenience = breakdownPrice + gstAmount;
-  const breakdownConvenienceFee = Math.round(breakdownSubtotalForConvenience * convenienceFeePercent);
+  const _convenienceFee = Math.round(priceDetails.total * convenienceFeePercent);
+  const breakdownConvenienceFee = Math.round(breakdownPrice * convenienceFeePercent);
   const referralDiscountApplied = Math.max(0, appliedReferralDiscount || 0);
   const promoDiscountApplied = Math.max(0, appliedPromoDiscount || 0);
   // TASK-171: compute add-ons subtotal from guest selections
@@ -847,7 +846,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     const qty = selectedAddOns[ao.addOnServiceId] ?? 0;
     return sum + (qty > 0 ? ao.price * qty : 0);
   }, 0);
-  const breakdownFinalTotal = Math.max(1, breakdownPrice + gstAmount + breakdownConvenienceFee - referralDiscountApplied - promoDiscountApplied + addOnsTotal);
+  const breakdownFinalTotal = Math.max(1, breakdownPrice + breakdownConvenienceFee - referralDiscountApplied - promoDiscountApplied + addOnsTotal);
 
   const finalTotal =
     hasSelectedRange && selectedRangeTotalFromCalendar != null
@@ -1769,7 +1768,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           {priceDetails.extraGuests > 0 && priceDetails.nights > 0 && (
             <p>{priceDetails.extraGuests} {priceDetails.extraGuests === 1 ? 'extra guest' : 'extra guests'} × {displayPrice(priceDetails.extraGuestsFee / priceDetails.nights / priceDetails.extraGuests)}/night</p>
           )}
-          <p className="text-xs">Includes all taxes and fees</p>
+          <p className="text-xs">All-inclusive rate · GST included</p>
         </div>
       </div>
 
@@ -1994,15 +1993,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                 <span className="text-right">-{displayPrice(losDiscountAmount)}</span>
               </div>
             )}
-            {gstAmount > 0 && (
-              <div className="grid grid-cols-[140px_12px_1fr]">
-                <span>GST (5%)</span>
-                <span>:</span>
-                <span className="text-right">
-                  {displayPrice(gstAmount)}
-                </span>
-              </div>
-            )}
+            {/* TASK-1871: GST row removed — all-inclusive rate, no separate GST line */}
             <div className="grid grid-cols-[140px_12px_1fr]">
               <span>Convenience fee{convenienceFeePctLabel > 0 ? ` (${convenienceFeePctLabel}%)` : ''}</span>
               <span>:</span>
