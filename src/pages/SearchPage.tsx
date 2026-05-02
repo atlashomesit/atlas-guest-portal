@@ -149,10 +149,15 @@ const SearchPage = () => {
   const selectedAmenities = amenitiesParam ? amenitiesParam.split(",") : [];
   /** TASK-1714: sort order — default "recommended" (Atlas building/floor order). */
   const sortBy = searchParams.get("sortBy") || "recommended";
+  /** TASK-1738: Digital nomad filter chips. */
+  const nomadWifi = searchParams.get("nomadWifi") === "true";       // WiFi 50+ Mbps
+  const nomadWorkspace = searchParams.get("nomadWorkspace") === "true"; // dedicated workspace
+  const monthlyStay = searchParams.get("monthlyStay") === "true";   // 30+ nights min stay
 
   const hasInvalidDates = Boolean(checkIn && checkOut && checkOut <= checkIn);
   const hasActiveFilters = Boolean(
-    minPrice || maxPrice || remoteWork || longStay || availableNow || selectedAmenities.length > 0,
+    minPrice || maxPrice || remoteWork || longStay || availableNow || selectedAmenities.length > 0
+    || nomadWifi || nomadWorkspace || monthlyStay,
   );
 
   const [tonightAvailableIds, setTonightAvailableIds] = useState<Set<number> | null>(null);
@@ -258,6 +263,18 @@ const SearchPage = () => {
         const minStay = unit.minStay ?? 1;
         if (minStay < 7) return false;
       }
+      // TASK-1738: Digital nomad filters.
+      if (nomadWifi) {
+        if (((unit as any).wifiSpeedMbps ?? 0) < 50) return false;
+      }
+      if (nomadWorkspace) {
+        const hasWorkspace = hasAmenity(unit, "Workspace") || hasAmenity(unit, "Desk") || (unit as any).hasCoworkingDesk;
+        if (!hasWorkspace) return false;
+      }
+      if (monthlyStay) {
+        const minStay = unit.minStay ?? 1;
+        if (minStay < 30) return false;
+      }
       // Filter by selected amenities
       if (selectedAmenities.length > 0) {
         const hasAllSelectedAmenities = selectedAmenities.every(amenity => hasAmenity(unit, amenity));
@@ -277,6 +294,9 @@ const SearchPage = () => {
     longStay,
     maxPrice,
     minPrice,
+    monthlyStay,
+    nomadWifi,
+    nomadWorkspace,
     remoteWork,
     selectedAmenities,
     tonightAvailableIds,
@@ -297,7 +317,7 @@ const SearchPage = () => {
 
   useEffect(() => {
     setVisibleCount(ITEMS_PER_PAGE);
-  }, [availableNow, guests, hasInvalidDates, longStay, minPrice, maxPrice, remoteWork, selectedAmenities, sortBy, tonightProbeLoading]);
+  }, [availableNow, guests, hasInvalidDates, longStay, minPrice, maxPrice, monthlyStay, nomadWifi, nomadWorkspace, remoteWork, selectedAmenities, sortBy, tonightProbeLoading]);
 
   const updateParam = (key: string, value: string) => {
     setSearchParams((prev) => {
@@ -324,6 +344,10 @@ const SearchPage = () => {
       next.delete("remoteWork");
       next.delete("longStay");
       next.delete("availableNow");
+      // TASK-1738: clear digital nomad filters
+      next.delete("nomadWifi");
+      next.delete("nomadWorkspace");
+      next.delete("monthlyStay");
       return next;
     }, { replace: true });
   };
@@ -454,6 +478,30 @@ const SearchPage = () => {
               } focus:outline-none focus:ring-2 focus:ring-cta-primary focus:ring-offset-2`}
             >
               {amenity}
+            </button>
+          ))}
+        </div>
+
+        {/* TASK-1738: Digital nomad filter chips */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-text-muted uppercase tracking-wide">Digital nomad:</span>
+          {[
+            { label: "📶 WiFi 50+ Mbps", param: "nomadWifi",    active: nomadWifi },
+            { label: "💻 Workspace",      param: "nomadWorkspace", active: nomadWorkspace },
+            { label: "📅 7+ nights",      param: "longStay",    active: longStay },
+            { label: "🗓️ 30+ nights",     param: "monthlyStay", active: monthlyStay },
+          ].map(({ label, param, active }) => (
+            <button
+              key={param}
+              onClick={() => updateParam(param, active ? "" : "true")}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors min-h-11 ${
+                active
+                  ? "bg-emerald-600 text-white border border-emerald-600"
+                  : "bg-bg-surface border border-border-subtle text-text-primary hover:border-emerald-500"
+              } focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2`}
+              aria-pressed={active}
+            >
+              {label}
             </button>
           ))}
         </div>
