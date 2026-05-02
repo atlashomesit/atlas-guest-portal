@@ -10,6 +10,7 @@ import SkeletonCard from "../components/apartments/SkeletonCard";
 import OptimizedImage from "../components/ui/OptimizedImage";
 import OwnerShareBadge from "../components/OwnerShareBadge"; // TASK-1705
 import DirectDiscountBanner from "../components/DirectDiscountBanner"; // TASK-1708
+import ReviewSummary from "../components/ReviewSummary"; // TASK-1716
 import { filterGuestImageUrls, sanitizeGuestImageUrl } from "../utils/guestImageUrl";
 import { compareAtlasHomesBuildingOrder } from "../utils/atlasHomesBuildingOrder";
 import { buildApiUrl, getApiHeaders } from "../api/client";
@@ -684,6 +685,8 @@ const SearchPage = () => {
                           {"★".repeat(Math.round(unit.rating))}<span className="text-text-muted ml-1">{unit.rating.toFixed(1)}</span>
                         </p>
                       )}
+                      {/* TASK-1716: keyword-bucketed sentiment summary */}
+                      <ReviewSummary listingId={unit.numericId} />
                     </div>
                     <span className="rounded-full bg-bg-muted px-3 py-1 text-xs font-semibold text-text-primary">
                       {unit.location}
