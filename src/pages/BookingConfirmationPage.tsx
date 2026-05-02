@@ -3,9 +3,12 @@ import { useParams, useSearchParams, Link } from "react-router-dom";
 import SEO from "../components/SEO";
 import { buildApiUrl, getApiHeaders } from "../api/client";
 import { getRuntimeConfig, hasRuntimeConfig } from "../runtime-config";
+import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 
 interface BookingSummary {
   bookingId: number;
+  /** Omitted on very old API responses; pre-arrival link hidden if missing. */
+  listingId?: number;
   guestId?: number;
   guestName: string;
   propertyName: string;
@@ -26,6 +29,12 @@ interface BookingSummary {
   hasGstInvoice?: boolean;
   gstInvoiceNumber?: string | null;
   gstInvoiceTotal?: number | null;
+  /** TASK-1888: server-computed; show pre-arrival checklist when true. */
+  preArrivalBriefingVisible?: boolean;
+  hoursUntilCheckin?: number;
+  checkInTime?: string;
+  checkOutTime?: string;
+  nearbyLandmarks?: string[];
 }
 
 const statusLabel: Record<string, { label: string; color: string }> = {
@@ -434,6 +443,99 @@ export default function BookingConfirmationPage() {
             <h2 className="text-sm font-semibold text-text-primary mb-1">📶 WiFi</h2>
             <p className="text-sm text-text-secondary">WiFi details will be available here 48 hours before check-in.</p>
           </div>
+        )}
+
+        {/* TASK-1888: pre-arrival briefing (confirmed stays within 72h) */}
+        {!isCancelled && booking.preArrivalBriefingVisible && (
+          <section
+            className="rounded-2xl border border-amber-200/80 bg-amber-50/50 p-5 space-y-4"
+            data-testid="pre-arrival-briefing"
+            aria-label="Before you arrive"
+          >
+            <h2 className="text-sm font-semibold text-text-primary">Before you arrive</h2>
+            <p className="text-xs text-text-secondary leading-relaxed">
+              You are checking in soon. Here is a quick reference for your stay — save this page or add to calendar below.
+            </p>
+            <div className="space-y-0 divide-y divide-amber-200/60 border-t border-amber-200/60 -mx-5 px-5">
+              {(booking.checkInTime || booking.checkOutTime) && (
+                <div className="flex flex-col gap-0.5 py-3">
+                  <span className="text-xs text-text-muted uppercase tracking-wider font-medium">Check-in &amp; check-out times</span>
+                  <span className="text-sm text-text-primary">
+                    {booking.checkInTime
+                      ? <>Check-in from <span className="font-semibold">{booking.checkInTime}</span></>
+                      : "Check-in time: your host will confirm (see WhatsApp or instructions)."}
+                    {booking.checkOutTime ? (
+                      <span className="block mt-1 text-text-secondary">
+                        Check-out by <span className="font-medium text-text-primary">{booking.checkOutTime}</span>
+                      </span>
+                    ) : null}
+                  </span>
+                </div>
+              )}
+              {booking.propertyAddress ? (
+                <div className="flex flex-col gap-1.5 py-3">
+                  <span className="text-xs text-text-muted uppercase tracking-wider font-medium">Address</span>
+                  <p className="text-sm text-text-primary whitespace-pre-wrap">{booking.propertyAddress}</p>
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(booking.propertyAddress)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-brand-primary font-medium underline underline-offset-2 w-fit"
+                    data-testid="pre-arrival-open-maps"
+                  >
+                    Open in Google Maps
+                  </a>
+                </div>
+              ) : null}
+              <div className="py-3">
+                <span className="text-xs text-text-muted uppercase tracking-wider font-medium">Host WhatsApp</span>
+                <p className="text-sm text-text-secondary mt-1">Questions before you arrive? Message the property team.</p>
+                <a
+                  href={whatsappUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex mt-2 items-center justify-center rounded-lg bg-[#25D366] text-white text-sm font-medium px-4 py-2.5 hover:opacity-95 transition-opacity"
+                  data-testid="pre-arrival-whatsapp"
+                >
+                  Chat on WhatsApp
+                </a>
+              </div>
+              {booking.wifiVisible && (booking.wifiName || booking.wifiPassword) && (
+                <div className="py-3">
+                  <span className="text-xs text-text-muted uppercase tracking-wider font-medium">WiFi</span>
+                  <p className="text-sm text-text-primary mt-1">
+                    {booking.wifiName ? (
+                      <>Network <span className="font-mono font-semibold">{booking.wifiName}</span></>
+                    ) : (
+                      "Network name is in the WiFi section above."
+                    )}
+                    {booking.wifiPassword ? (
+                      <span className="block text-text-secondary text-xs mt-0.5">Password: see WiFi card above.</span>
+                    ) : null}
+                  </p>
+                </div>
+              )}
+              {Array.isArray(booking.nearbyLandmarks) && booking.nearbyLandmarks.length > 0 && (
+                <div className="py-3">
+                  <span className="text-xs text-text-muted uppercase tracking-wider font-medium">Nearby landmarks</span>
+                  <ul className="mt-2 list-disc pl-5 text-sm text-text-primary space-y-1">
+                    {booking.nearbyLandmarks.map((line, i) => (
+                      <li key={`${i}-${line}`}>{line}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+            {booking.listingId != null && booking.listingId > 0 && (
+              <Link
+                to={buildHomeUnitPath(getPropertySlug({ property_name: booking.propertyName }), booking.listingId)}
+                className="inline-flex text-sm text-brand-primary font-medium underline underline-offset-2"
+                data-testid="pre-arrival-view-listing"
+              >
+                View full listing &amp; photos
+              </Link>
+            )}
+          </section>
         )}
 
         {/* What happens next */}
