@@ -578,6 +578,47 @@ exports[`Hero date picker > captures a stable mobile viewport snapshot > date-pi
         Range selected: 1 night
       </div>
       <div
+        aria-label="Quick date presets"
+        class="mx-5 mb-3 flex flex-wrap gap-1.5"
+        role="group"
+      >
+        <button
+          class="rounded-full px-3 py-1 text-xs font-medium transition-colors
+              cursor-pointer bg-white text-slate-600 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 hover:text-slate-800 hover:ring-slate-400 active:bg-slate-100"
+          type="button"
+        >
+          Tonight
+        </button>
+        <button
+          class="rounded-full px-3 py-1 text-xs font-medium transition-colors
+              cursor-pointer bg-white text-slate-600 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 hover:text-slate-800 hover:ring-slate-400 active:bg-slate-100"
+          type="button"
+        >
+          This weekend
+        </button>
+        <button
+          class="rounded-full px-3 py-1 text-xs font-medium transition-colors
+              cursor-pointer bg-white text-slate-600 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 hover:text-slate-800 hover:ring-slate-400 active:bg-slate-100"
+          type="button"
+        >
+          Next weekend
+        </button>
+        <button
+          class="rounded-full px-3 py-1 text-xs font-medium transition-colors
+              cursor-pointer bg-white text-slate-600 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 hover:text-slate-800 hover:ring-slate-400 active:bg-slate-100"
+          type="button"
+        >
+          This week
+        </button>
+        <button
+          class="rounded-full px-3 py-1 text-xs font-medium transition-colors
+              cursor-pointer bg-white text-slate-600 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 hover:text-slate-800 hover:ring-slate-400 active:bg-slate-100"
+          type="button"
+        >
+          Next month
+        </button>
+      </div>
+      <div
         class="relative"
       >
         <div

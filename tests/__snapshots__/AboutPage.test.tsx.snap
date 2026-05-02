@@ -259,7 +259,7 @@ exports[`AboutPage > matches the snapshot 1`] = `
                 Thoughtful arrivals
               </h3>
               <p
-                class="text-sm text-text-muted leading-relaxed"
+                class="text-base text-text-muted leading-relaxed"
               >
                 48-hour pre-arrival walkthroughs, fresh linens, and climate-ready rooms before every check-in.
               </p>
@@ -307,7 +307,7 @@ exports[`AboutPage > matches the snapshot 1`] = `
                 Comfort-first stays
               </h3>
               <p
-                class="text-sm text-text-muted leading-relaxed"
+                class="text-base text-text-muted leading-relaxed"
               >
                 Queen beds with hotel-grade mattresses, stocked kitchens, and work-friendly layouts in every home.
               </p>
@@ -351,7 +351,7 @@ exports[`AboutPage > matches the snapshot 1`] = `
                 Local support, always
               </h3>
               <p
-                class="text-sm text-text-muted leading-relaxed"
+                class="text-base text-text-muted leading-relaxed"
               >
                 On-the-ground hosts with response times under 10 minutes for anything from Wi‑Fi resets to dinner reservations.
               </p>
@@ -395,7 +395,7 @@ exports[`AboutPage > matches the snapshot 1`] = `
                 Cleanliness without compromise
               </h3>
               <p
-                class="text-sm text-text-muted leading-relaxed"
+                class="text-base text-text-muted leading-relaxed"
               >
                 CDC-aligned cleaning checklists, double inspections, and eco-friendly supplies in rotation.
               </p>
@@ -499,14 +499,14 @@ exports[`AboutPage > matches the snapshot 1`] = `
                 Aisha Rao
               </h3>
               <p
-                class="text-sm text-text-muted"
+                class="text-base text-text-muted"
               >
                 Guest Experience Lead
               </p>
             </div>
           </div>
           <p
-            class="text-sm text-text-muted leading-relaxed"
+            class="text-base text-text-muted leading-relaxed"
           >
             Designs arrival rituals, accessibility checklists, and empathetic support scripts for our hosts.
           </p>
@@ -530,14 +530,14 @@ exports[`AboutPage > matches the snapshot 1`] = `
                 Luis Mendoza
               </h3>
               <p
-                class="text-sm text-text-muted"
+                class="text-base text-text-muted"
               >
                 Operations Strategist
               </p>
             </div>
           </div>
           <p
-            class="text-sm text-text-muted leading-relaxed"
+            class="text-base text-text-muted leading-relaxed"
           >
             Coordinates local partners, 24/7 maintenance coverage, and quality audits across every city we serve.
           </p>
@@ -561,14 +561,14 @@ exports[`AboutPage > matches the snapshot 1`] = `
                 Nihar Mehta
               </h3>
               <p
-                class="text-sm text-text-muted"
+                class="text-base text-text-muted"
               >
                 Hospitality Technologist
               </p>
             </div>
           </div>
           <p
-            class="text-sm text-text-muted leading-relaxed"
+            class="text-base text-text-muted leading-relaxed"
           >
             Builds the digital tools that keep housekeeping, concierge, and guest messaging in perfect sync.
           </p>
@@ -661,7 +661,7 @@ exports[`AboutPage > matches the snapshot 1`] = `
             Verified & insured
           </h3>
           <p
-            class="text-sm text-text-muted leading-relaxed"
+            class="text-base text-text-muted leading-relaxed"
           >
             Licensed homestays with verified owners and comprehensive guest insurance on every booking.
           </p>
@@ -696,7 +696,7 @@ exports[`AboutPage > matches the snapshot 1`] = `
             Guest-first policies
           </h3>
           <p
-            class="text-sm text-text-muted leading-relaxed"
+            class="text-base text-text-muted leading-relaxed"
           >
             Clear cancellation, transparent pricing, and no surprise fees—ever.
           </p>
@@ -748,7 +748,7 @@ exports[`AboutPage > matches the snapshot 1`] = `
             Recognized hosts
           </h3>
           <p
-            class="text-sm text-text-muted leading-relaxed"
+            class="text-base text-text-muted leading-relaxed"
           >
             Consistently rated 4.8★+ across partner platforms and recurring corporate stays.
           </p>
@@ -794,7 +794,7 @@ exports[`AboutPage > matches the snapshot 1`] = `
             Security-led design
           </h3>
           <p
-            class="text-sm text-text-muted leading-relaxed"
+            class="text-base text-text-muted leading-relaxed"
           >
             Smart locks, privacy-safe monitoring, and secure payments keep every stay protected.
           </p>
