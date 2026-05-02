@@ -57,7 +57,11 @@ vi.mock("@/data", () => ({
       listingId: 101,
       property_name: "Test Property",
       property_location: "Test City",
-      property_img: ["main.jpg", "thumb1.jpg", "thumb2.jpg", "thumb3.jpg", "thumb4.jpg", "thumb5.jpg"],
+      property_img: [
+        "https://cdn.example.com/photo1.jpg",
+        "https://cdn.example.com/photo2.jpg",
+        "https://cdn.example.com/photo3.jpg",
+      ],
       property_amenities: [{ amenities_icon: "wifi" }],
       property_description: "A cozy place to stay.",
       property_nearplaces: ["Place One"],
@@ -69,7 +73,6 @@ vi.mock("@/data", () => ({
       property_price: 1000,
     },
   ],
-  propertyImages: { "101": ["main.jpg", "thumb1.jpg", "thumb2.jpg", "thumb3.jpg", "thumb4.jpg"] },
 }));
 
 vi.mock("@fancyapps/ui", () => ({
