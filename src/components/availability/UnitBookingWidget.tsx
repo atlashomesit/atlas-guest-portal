@@ -2066,13 +2066,13 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                   {ao.description && <p className="text-xs text-text-muted truncate">{ao.description}</p>}
                   <p className="text-xs text-text-secondary">{displayPrice(ao.price)} / {ao.priceType.replace('_', ' ')}</p>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-1 shrink-0">
                   {qty > 0 && (
                     <>
                       <button
                         type="button"
                         onClick={() => setSelectedAddOns(prev => ({ ...prev, [ao.addOnServiceId]: Math.max(0, (prev[ao.addOnServiceId] ?? 0) - 1) }))}
-                        className="w-7 h-7 rounded-full border border-border-strong text-text-primary flex items-center justify-center text-base leading-none"
+                        className="w-11 h-11 rounded-full border border-border-strong text-text-primary flex items-center justify-center text-base leading-none"
                         aria-label={`Remove one ${ao.name}`}
                       >−</button>
                       <span className="text-sm font-medium w-4 text-center">{qty}</span>
@@ -2081,7 +2081,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                   <button
                     type="button"
                     onClick={() => setSelectedAddOns(prev => ({ ...prev, [ao.addOnServiceId]: (prev[ao.addOnServiceId] ?? 0) + 1 }))}
-                    className="w-7 h-7 rounded-full border border-border-strong text-text-primary flex items-center justify-center text-base leading-none"
+                    className="w-11 h-11 rounded-full border border-border-strong text-text-primary flex items-center justify-center text-base leading-none"
                     aria-label={`Add ${ao.name}`}
                   >+</button>
                 </div>
