@@ -411,8 +411,19 @@ const BecomeHost = () => {
       });
 
       if (!res.ok) {
+        // BUG-ONBOARD-1 prevention: surface the server's actual error so the user can self-recover
+        // (e.g. "An account with this email already exists. Please login instead.") instead of the
+        // generic "Something went wrong" toast that left a customer abandoned on 2026-05-02.
         const body = await res.json().catch(() => null);
-        throw new Error(body?.message || "Onboarding request failed.");
+        // ASP.NET Core ProblemDetails for ModelState validation puts field errors in `errors`.
+        const fieldErrors = body?.errors && typeof body.errors === "object"
+          ? Object.values(body.errors as Record<string, string[]>).flat().filter(Boolean).join(" ")
+          : "";
+        const serverMsg = body?.message || body?.error || fieldErrors || body?.title;
+        const fallback = res.status >= 500
+          ? `Our servers hit an unexpected error (${res.status}). Please try again in a minute, or contact support@atlashomestays.com.`
+          : `Registration failed (HTTP ${res.status}). Please check your details and try again.`;
+        throw new Error(serverMsg || fallback);
       }
 
       // TASK-764: store propertyId so SetupWizard can PUT the existing draft
@@ -446,7 +457,11 @@ const BecomeHost = () => {
       logUserAction("onboarding_started", { status: "success", feature: "become-host", propertyId: data?.propertyId });
     } catch (err) {
       reportError(err, { feature: "become-host-submit" });
-      toast.error("Something went wrong. Please try again.");
+      // Surface the real reason so the user can act on it (vs. "Something went wrong").
+      const message = err instanceof Error && err.message
+        ? err.message
+        : "Something went wrong. Please try again.";
+      toast.error(message);
       setSubmitStatus("error");
     }
   };
