@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useCallback } from "react";
+import { lazy, Suspense, useMemo, useState, useEffect, useCallback } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { propertyData } from "../data";
@@ -16,8 +16,12 @@ import { filterGuestImageUrls, sanitizeGuestImageUrl } from "../utils/guestImage
 import { compareAtlasHomesBuildingOrder } from "../utils/atlasHomesBuildingOrder";
 import { buildApiUrl, getApiHeaders } from "../api/client";
 import RecentlyViewedStrip from "../components/RecentlyViewedStrip";
+import { fallbackCoordsForListing, hasMapCoords } from "../utils/mapCoords";
+
+const SearchResultsMap = lazy(() => import("../components/search/SearchResultsMap"));
 
 const ITEMS_PER_PAGE = 12;
+const MAP_MARKER_CAP = 100;
 
 type NormalizedListing = {
   id: string;
@@ -43,6 +47,9 @@ type NormalizedListing = {
   losDiscount2Percent?: number | null;
   /** TASK-1725: True when Atlas team has verified photos for this listing. */
   hasVerifiedPhotos?: boolean;
+  /** TASK-1457: Map pin coordinates (API or static fallback). */
+  latitude?: number | null;
+  longitude?: number | null;
 };
 
 function buildStaticListings(): NormalizedListing[] {
@@ -54,6 +61,7 @@ function buildStaticListings(): NormalizedListing[] {
       if (!Number.isFinite(id) || id <= 0) return null;
       const propertySlug = getPropertySlug(property);
       const canonicalPath = buildHomeUnitPath(propertySlug, id);
+      const pin = fallbackCoordsForListing(id);
 
       return {
         id: `${propertySlug}-${id}`,
@@ -67,6 +75,8 @@ function buildStaticListings(): NormalizedListing[] {
         canonicalPath,
         property,
         rating: property.property_rating ?? undefined,
+        latitude: pin.lat,
+        longitude: pin.lng,
       };
     })
     .filter((l): l is NonNullable<typeof l> => l !== null);
@@ -104,6 +114,8 @@ function apiToNormalized(listings: PublicListing[]): NormalizedListing[] {
         losDiscount2MinNights: l.losDiscount2MinNights ?? null,
         losDiscount2Percent: l.losDiscount2Percent ?? null,
         hasVerifiedPhotos: l.photosVerifiedAt != null,
+        latitude: l.latitude ?? null,
+        longitude: l.longitude ?? null,
       };
     })
     .filter((l) => l.numericId > 0);
@@ -156,6 +168,8 @@ const SearchPage = () => {
   const nomadWifi = searchParams.get("nomadWifi") === "true";       // WiFi 50+ Mbps
   const nomadWorkspace = searchParams.get("nomadWorkspace") === "true"; // dedicated workspace
   const monthlyStay = searchParams.get("monthlyStay") === "true";   // 30+ nights min stay
+  /** TASK-1457: list vs map layout for search results. */
+  const mapView = searchParams.get("view") === "map";
 
   const hasInvalidDates = Boolean(checkIn && checkOut && checkOut <= checkIn);
   /** TASK-1451: include guests so "Clear filters" resets guest count too. */
@@ -370,7 +384,7 @@ const SearchPage = () => {
 
   useEffect(() => {
     setVisibleCount(ITEMS_PER_PAGE);
-  }, [availableNow, guests, hasInvalidDates, longStay, minPrice, maxPrice, monthlyStay, nomadWifi, nomadWorkspace, remoteWork, selectedAmenities, sortBy, tonightProbeLoading]);
+  }, [availableNow, guests, hasInvalidDates, longStay, mapView, minPrice, maxPrice, monthlyStay, nomadWifi, nomadWorkspace, remoteWork, selectedAmenities, sortBy, tonightProbeLoading]);
 
   const updateParam = (key: string, value: string) => {
     setSearchParams((prev) => {
@@ -507,6 +521,29 @@ const SearchPage = () => {
   const hasMore = visibleCount < sortedUnits.length;
   const showEmptyState = !isLoading && !hasInvalidDates && sortedUnits.length === 0;
   const queryString = searchParams.toString();
+  const querySuffix = queryString ? `?${queryString}` : "";
+  const approximatePinHint = useMemo(
+    () => apiListings != null && apiListings.some((u) => !hasMapCoords(u.latitude, u.longitude)),
+    [apiListings],
+  );
+  const mapUnits = useMemo(
+    () =>
+      sortedUnits.slice(0, MAP_MARKER_CAP).map((u) => {
+        const exact = hasMapCoords(u.latitude, u.longitude);
+        const pin = exact
+          ? { lat: u.latitude as number, lng: u.longitude as number }
+          : fallbackCoordsForListing(u.numericId);
+        return {
+          numericId: u.numericId,
+          title: u.title,
+          pricePerNight: u.pricePerNight,
+          canonicalPath: u.canonicalPath,
+          latitude: pin.lat,
+          longitude: pin.lng,
+        };
+      }),
+    [sortedUnits],
+  );
   /** TASK-1451: first three catalog listings as "you might also like" (same pool as `fetchPublicListings`; no extra round-trip). */
   const emptyStateSuggestions = useMemo(
     () => (listings.length > 0 ? listings.slice(0, 3) : []),
@@ -704,21 +741,51 @@ const SearchPage = () => {
           ))}
         </div>
 
-        {/* TASK-1714: Sort controls */}
-        <div className="flex items-center justify-end gap-2">
-          <label className="text-sm text-text-muted" htmlFor="sort-by">Sort:</label>
-          <select
-            id="sort-by"
-            value={sortBy}
-            onChange={(e) => updateParam("sortBy", e.target.value === "recommended" ? "" : e.target.value)}
-            className="rounded-lg border border-border-subtle bg-bg-surface px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-cta-primary"
+        {/* TASK-1457: list/map toggle · TASK-1714: sort */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div
+            className="inline-flex rounded-xl border border-border-subtle bg-bg-surface p-1 shadow-sm"
+            role="group"
+            aria-label="Result layout"
           >
-            <option value="recommended">Recommended</option>
-            <option value="price_asc">Price: low to high</option>
-            <option value="price_desc">Price: high to low</option>
-            <option value="rating_desc">Highest rated</option>
-            <option value="newest">Newest</option>
-          </select>
+            <button
+              type="button"
+              aria-pressed={!mapView}
+              onClick={() => updateParam("view", "")}
+              className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+                !mapView ? "bg-cta-primary text-[var(--text-contrast)]" : "text-text-primary hover:bg-bg-muted"
+              }`}
+              data-testid="search-view-list"
+            >
+              List
+            </button>
+            <button
+              type="button"
+              aria-pressed={mapView}
+              onClick={() => updateParam("view", "map")}
+              className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+                mapView ? "bg-cta-primary text-[var(--text-contrast)]" : "text-text-primary hover:bg-bg-muted"
+              }`}
+              data-testid="search-view-map"
+            >
+              Map
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-text-muted" htmlFor="sort-by">Sort:</label>
+            <select
+              id="sort-by"
+              value={sortBy}
+              onChange={(e) => updateParam("sortBy", e.target.value === "recommended" ? "" : e.target.value)}
+              className="rounded-lg border border-border-subtle bg-bg-surface px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-cta-primary"
+            >
+              <option value="recommended">Recommended</option>
+              <option value="price_asc">Price: low to high</option>
+              <option value="price_desc">Price: high to low</option>
+              <option value="rating_desc">Highest rated</option>
+              <option value="newest">Newest</option>
+            </select>
+          </div>
         </div>
 
         {/* TASK-1708: Direct booking discount nudge — shows for direct traffic only */}
@@ -803,7 +870,7 @@ const SearchPage = () => {
                         <p className="text-sm text-text-muted">{unit.location}</p>
                         <p className="text-lg font-bold text-text-primary">{formatDisplayCurrency(unit.pricePerNight)}<span className="text-sm font-normal text-text-muted"> / night</span></p>
                         <Link
-                          to={`${unit.canonicalPath}${queryString ? `?${queryString}` : ""}`}
+                          to={`${unit.canonicalPath}${querySuffix}`}
                           className="mt-auto inline-flex min-h-[44px] items-center justify-center rounded-xl bg-[var(--cta-primary-hover)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--cta-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
                         >
                           View details
@@ -830,7 +897,55 @@ const SearchPage = () => {
           </section>
         )}
 
-        {!isLoading && !showEmptyState && !hasInvalidDates && (
+        {!isLoading && !showEmptyState && !hasInvalidDates && mapView && (
+          <div className="flex flex-col gap-3">
+            <Suspense
+              fallback={
+                <div
+                  className="flex min-h-[50vh] items-center justify-center rounded-2xl border border-border-subtle bg-bg-surface text-text-muted"
+                  data-testid="search-map-suspense"
+                >
+                  Loading map…
+                </div>
+              }
+            >
+              <SearchResultsMap
+                units={mapUnits}
+                formatPrice={formatDisplayCurrency}
+                querySuffix={querySuffix}
+                approximatePinHint={approximatePinHint}
+              />
+            </Suspense>
+            {/* TASK-1457: quick-scroll listing strip on small screens (map is primary). */}
+            <div
+              className="flex gap-3 overflow-x-auto pb-1 md:hidden"
+              data-testid="search-map-mobile-strip"
+              aria-label="Matching homes"
+            >
+              {sortedUnits.slice(0, 16).map((unit) => (
+                <Link
+                  key={`map-strip-${unit.id}`}
+                  to={`${unit.canonicalPath}${querySuffix}`}
+                  className="flex w-28 shrink-0 flex-col gap-1 rounded-xl border border-border-subtle bg-bg-surface p-2 shadow-sm"
+                >
+                  <div className="h-16 w-full overflow-hidden rounded-lg bg-bg-muted">
+                    <OptimizedImage
+                      src={unit.imageUrl}
+                      alt={unit.title ?? "Listing"}
+                      className="h-full w-full object-cover"
+                      wrapperClassName="h-full"
+                      sizes="112px"
+                    />
+                  </div>
+                  <p className="line-clamp-2 text-xs font-medium text-text-primary">{unit.title}</p>
+                  <p className="text-xs font-semibold text-cta-primary">{formatDisplayCurrency(unit.pricePerNight)}</p>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {!isLoading && !showEmptyState && !hasInvalidDates && !mapView && (
           <section
             className="grid gap-6 sm:grid-cols-2"
             data-testid="guest-search-results"
@@ -935,7 +1050,7 @@ const SearchPage = () => {
                       ))}
                     </div>
                     <Link
-                      to={`${unit.canonicalPath}${queryString ? `?${queryString}` : ""}`}
+                      to={`${unit.canonicalPath}${querySuffix}`}
                       className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl bg-[var(--cta-primary-hover)] px-4 py-2 text-sm font-semibold text-white shadow hover:bg-[var(--cta-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
                     >
                       View details
