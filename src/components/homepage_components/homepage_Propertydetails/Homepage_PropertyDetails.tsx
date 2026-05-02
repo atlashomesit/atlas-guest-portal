@@ -1561,7 +1561,8 @@ useEffect(() => {
               type="button"
               className="rounded-xl bg-cta-primary px-6 py-2.5 text-sm font-semibold text-white shadow-sm"
               onClick={() => {
-                const widget = document.querySelector('[data-testid="booking-name"]');
+                // TASK-1861: was 'booking-name' which doesn't exist; 'guest-booking-form' is the actual form root testid
+                const widget = document.querySelector('[data-testid="guest-booking-form"]');
                 widget?.scrollIntoView({ behavior: 'smooth', block: 'center' });
               }}
             >

@@ -28,6 +28,8 @@ type NormalizedListing = {
   canonicalPath: string;
   property?: unknown;
   rating?: number;
+  /** TASK-1025/TASK-1866: Minimum stay in nights (null = no minimum / 1 night). */
+  minStay?: number | null;
   /** TASK-1695: LOS auto-discount tier 1 minimum nights (null = not configured). */
   losDiscountMinNights?: number | null;
   /** TASK-1695: LOS auto-discount tier 1 percent. */
@@ -88,9 +90,12 @@ function apiToNormalized(listings: PublicListing[]): NormalizedListing[] {
         maxGuests: l.maxGuests,
         imageUrl:
           filterGuestImageUrls(l.photoUrls ?? [])[0] ?? sanitizeGuestImageUrl(l.coverPhotoUrl) ?? "",
-        amenities: [],
+        // TASK-1868: map amenityCodes to amenities_icon objects when API exposes them; empty until API adds the field
+        amenities: ((l as unknown as { amenityCodes?: string[] }).amenityCodes ?? []).map((code) => ({ amenities_icon: code })),
         canonicalPath,
         rating: l.propertyRating ?? undefined,
+        // TASK-1866: map minStay so long-stay filter works on API listings
+        minStay: l.minStay ?? null,
         losDiscountMinNights: l.losDiscountMinNights ?? null,
         losDiscountPercent: l.losDiscountPercent ?? null,
         losDiscount2MinNights: l.losDiscount2MinNights ?? null,
@@ -107,15 +112,18 @@ const SearchPage = () => {
   const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
   const [isLoading, setIsLoading] = useState(true);
   const [apiListings, setApiListings] = useState<NormalizedListing[] | null>(null);
+  // TASK-1867: track real API errors separately; null apiListings on 0-listing response is not an error
+  const [apiError, setApiError] = useState(false);
 
   const loadFromApi = useCallback(async (signal: AbortSignal) => {
+    setApiError(false);
     try {
       const data = await fetchPublicListings(signal);
-      if (data.length > 0) {
-        setApiListings(apiToNormalized(data));
-      }
+      // TASK-1867: always set apiListings (even empty array) so 0-listing response doesn't look like an error
+      setApiListings(apiToNormalized(data));
     } catch {
-      // API failed — static fallback is used automatically
+      // API failed — static fallback is used automatically; flag for honest banner
+      setApiError(true);
     }
   }, []);
 
@@ -244,9 +252,10 @@ const SearchPage = () => {
         const isRemoteWorkFriendly = (unit as any).hasCoworkingDesk || ((unit as any).wifiSpeedMbps ?? 0) >= 25;
         if (!isRemoteWorkFriendly) return false;
       }
-      // TASK-1025: Filter by long-stay (7+ night minimum)
+      // TASK-1025/TASK-1866: Filter by long-stay (7+ night minimum).
+      // minStay is now typed on NormalizedListing; apiToNormalized maps l.minStay so API listings work.
       if (longStay) {
-        const minStay = (unit as any).minStay ?? 1;
+        const minStay = unit.minStay ?? 1;
         if (minStay < 7) return false;
       }
       // Filter by selected amenities
@@ -329,10 +338,15 @@ const SearchPage = () => {
       <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 md:px-8">
         <header className="space-y-2">
           <p className="text-sm font-semibold uppercase tracking-wide text-text-muted">Search results</p>
-          <h1 className="text-3xl font-bold text-text-primary sm:text-4xl">Available apartments</h1>
+          {/* TASK-1864: dynamic h1 — only say "homes for your dates" when dates are actually set */}
+          <h1 className="text-3xl font-bold text-text-primary sm:text-4xl">
+            {checkIn && checkOut
+              ? `${filteredUnits.length} ${filteredUnits.length === 1 ? "home" : "homes"} for your dates`
+              : "Atlas Homestays"}
+          </h1>
+          {/* TASK-1863: honest subtitle — don't promise date filtering until availability pre-filter ships (TASK-1865) */}
           <p className="max-w-3xl text-base text-text-body">
-            Browse apartments using the filters from the homepage hero. Results are based on your dates and guest count when
-            provided.
+            Browse all homes. Filter by price, guests and amenities below.
           </p>
         </header>
 
@@ -464,7 +478,8 @@ const SearchPage = () => {
         {/* TASK-1708: Direct booking discount nudge — shows for direct traffic only */}
         <DirectDiscountBanner />
 
-        {!isLoading && apiListings === null && listings.length > 0 && (
+        {/* TASK-1867: only show banner on a real fetch error, not when API returns 0 listings */}
+        {!isLoading && apiError && listings.length > 0 && (
           <div className="rounded-xl border border-support-warning/40 bg-support-warning/10 px-4 py-3 text-support-warning">
             Limited results — showing cached data. Search may be temporarily unavailable.
           </div>
