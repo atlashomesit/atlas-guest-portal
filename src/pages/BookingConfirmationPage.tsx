@@ -774,7 +774,7 @@ export default function BookingConfirmationPage() {
               </div>
             )}
             {cancelMessage && (
-              <p className={`text-xs font-medium ${cancelMessage.includes("submitted") ? "text-green-700" : "text-red-700"}`}>
+              <p className={`text-sm font-medium ${cancelMessage.includes("submitted") ? "text-green-700" : "text-red-700"}`}>
                 {cancelMessage}
               </p>
             )}

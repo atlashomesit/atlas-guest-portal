@@ -115,14 +115,14 @@ export default function MyBookingsPage() {
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="space-y-0.5">
-                      <p className="text-sm font-semibold text-text-primary">{b.listingName}</p>
-                      <p className="text-xs text-text-muted">{b.propertyName}</p>
+                      <p className="text-base font-semibold text-text-primary">{b.listingName}</p>
+                      <p className="text-sm text-text-muted">{b.propertyName}</p>
                     </div>
                     <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${statusClass}`}>
                       {b.status}
                     </span>
                   </div>
-                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary">
+                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-text-secondary">
                     <span>{b.checkinDate} → {b.checkoutDate}</span>
                     <span className="font-mono text-text-muted">#{b.bookingRef}</span>
                     <span className="ml-auto font-medium text-text-primary">₹{Number(b.totalAmount).toLocaleString("en-IN")}</span>

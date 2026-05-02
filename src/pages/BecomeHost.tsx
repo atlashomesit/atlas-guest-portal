@@ -548,7 +548,7 @@ const BecomeHost = () => {
           >
             How much could you earn?
           </h2>
-          <p className="text-sm mb-6" style={{ color: "#64748b" }}>
+          <p className="text-base mb-6" style={{ color: "#64748b" }}>
             Properties in your area earn{" "}
             <strong style={{ color: "var(--cta-primary, #2563eb)" }}>
               ₹45,000 – ₹1,20,000/month
@@ -571,7 +571,7 @@ const BecomeHost = () => {
             className="w-full accent-blue-600"
           />
           <div
-            className="flex justify-between text-xs mt-1 mb-4"
+            className="flex justify-between text-sm mt-1 mb-4"
             style={{ color: "#94a3b8" }}
           >
             <span>1 room</span>
@@ -594,7 +594,7 @@ const BecomeHost = () => {
             >
               ₹{formatINR(estimatorRooms * 15000)} – ₹{formatINR(estimatorRooms * 40000)}
             </p>
-            <p className="text-xs mt-2" style={{ color: "#94a3b8" }}>
+            <p className="text-sm mt-2" style={{ color: "#94a3b8" }}>
               Based on average occupancy for properties using Atlas PMS
             </p>
           </div>

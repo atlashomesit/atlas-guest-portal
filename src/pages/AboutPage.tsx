@@ -192,7 +192,7 @@ const AboutPage = () => (
                 </div>
                 <div className="space-y-1">
                   <h3 className="font-semibold text-text-primary">{title}</h3>
-                  <p className="text-sm text-text-muted leading-relaxed">{description}</p>
+                  <p className="text-base text-text-muted leading-relaxed">{description}</p>
                 </div>
               </article>
             ))}
@@ -230,10 +230,10 @@ const AboutPage = () => (
                 </div>
                 <div>
                   <h3 className="font-semibold text-text-primary">{name}</h3>
-                  <p className="text-sm text-text-muted">{title}</p>
+                  <p className="text-base text-text-muted">{title}</p>
                 </div>
               </div>
-              <p className="text-sm text-text-muted leading-relaxed">{focus}</p>
+              <p className="text-base text-text-muted leading-relaxed">{focus}</p>
             </article>
           ))}
         </div>
@@ -260,7 +260,7 @@ const AboutPage = () => (
                 <Icon className="w-5 h-5" />
               </div>
               <h3 className="font-semibold text-text-primary mb-1">{title}</h3>
-              <p className="text-sm text-text-muted leading-relaxed">{description}</p>
+              <p className="text-base text-text-muted leading-relaxed">{description}</p>
             </article>
           ))}
         </div>
