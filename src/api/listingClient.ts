@@ -63,6 +63,8 @@ export type PublicListing = {
   losDiscount2MinNights?: number | null;
   /** TASK-1695: LOS auto-discount tier 2 — discount percent (null = disabled). */
   losDiscount2Percent?: number | null;
+  /** TASK-1725: UTC ISO string when Atlas team verified listing photos. Null = not verified. */
+  photosVerifiedAt?: string | null;
 };
 
 function normalizePublicListing(payload: Record<string, unknown>): PublicListing {

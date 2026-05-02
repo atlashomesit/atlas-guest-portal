@@ -36,6 +36,8 @@ type NormalizedListing = {
   losDiscount2MinNights?: number | null;
   /** TASK-1695: LOS auto-discount tier 2 percent. */
   losDiscount2Percent?: number | null;
+  /** TASK-1725: True when Atlas team has verified photos for this listing. */
+  hasVerifiedPhotos?: boolean;
 };
 
 function buildStaticListings(): NormalizedListing[] {
@@ -93,6 +95,7 @@ function apiToNormalized(listings: PublicListing[]): NormalizedListing[] {
         losDiscountPercent: l.losDiscountPercent ?? null,
         losDiscount2MinNights: l.losDiscount2MinNights ?? null,
         losDiscount2Percent: l.losDiscount2Percent ?? null,
+        hasVerifiedPhotos: l.photosVerifiedAt != null,
       };
     })
     .filter((l) => l.numericId > 0);
@@ -540,6 +543,12 @@ const SearchPage = () => {
                         {(unit as any).hasCoworkingDesk && (
                           <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700">
                             💼 Co-working desk
+                          </span>
+                        )}
+                        {/* TASK-1725: Atlas-verified photos badge */}
+                        {unit.hasVerifiedPhotos && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700">
+                            ✅ Verified photos
                           </span>
                         )}
                         {/* TASK-1695: LOS discount badge — show highest configured tier */}
