@@ -1,16 +1,19 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import SEO from "../components/SEO";
 import { fetchPublicListings } from "../api/listingClient";
-import { getRecentlyViewed } from "../utils/guestHistory";
+import { clearRecentlyViewed, getRecentlyViewed } from "../utils/guestHistory";
 import { formatCurrency } from "../utils/formatting";
 
 export default function RecentlyViewedPage() {
-  const items = useMemo(() => getRecentlyViewed(), []);
+  const [items, setItems] = useState(() => getRecentlyViewed());
   const [liveNightlyByListingId, setLiveNightlyByListingId] = useState<Record<number, number>>({});
 
   useEffect(() => {
-    if (items.length === 0) return;
+    if (items.length === 0) {
+      setLiveNightlyByListingId({});
+      return;
+    }
     const ac = new AbortController();
     fetchPublicListings(ac.signal)
       .then((list) => {
@@ -27,13 +30,29 @@ export default function RecentlyViewedPage() {
         /* keep cards; chips hidden without live prices */
       });
     return () => ac.abort();
-  }, [items.length]);
+  }, [items]);
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-6">
       <SEO title="Recently viewed | Atlas Homestays" description="Homes you viewed recently on Atlas Homestays." />
       <div className="flex items-baseline justify-between gap-2 flex-wrap">
-        <h1 className="text-2xl font-bold text-text-primary">Recently viewed</h1>
+        <div className="flex items-baseline gap-3 flex-wrap">
+          <h1 className="text-2xl font-bold text-text-primary">Recently viewed</h1>
+          {items.length > 0 ? (
+            <button
+              type="button"
+              data-testid="recently-viewed-clear-history"
+              className="text-sm text-text-muted hover:text-text-primary underline underline-offset-2"
+              onClick={() => {
+                clearRecentlyViewed();
+                setItems([]);
+                setLiveNightlyByListingId({});
+              }}
+            >
+              Clear history
+            </button>
+          ) : null}
+        </div>
         <Link to="/" className="text-sm text-brand-primary underline underline-offset-2">
           Back to home
         </Link>

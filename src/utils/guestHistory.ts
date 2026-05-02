@@ -33,6 +33,14 @@ export function getRecentlyViewed(): GuestListingHistoryItem[] {
   return Array.isArray(list) ? list : [];
 }
 
+export function clearRecentlyViewed(): void {
+  try {
+    localStorage.removeItem(RECENT_KEY);
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
 export function getFavoriteIds(): number[] {
   const ids = safeParse<number[]>(localStorage.getItem(FAV_KEY)) ?? [];
   return Array.isArray(ids) ? ids.filter((n) => Number.isFinite(n)) : [];
