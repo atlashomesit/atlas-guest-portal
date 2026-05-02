@@ -15,6 +15,10 @@ import LongStayCalculator from "../components/LongStayCalculator"; // TASK-1739
 import { filterGuestImageUrls, sanitizeGuestImageUrl } from "../utils/guestImageUrl";
 import { compareAtlasHomesBuildingOrder } from "../utils/atlasHomesBuildingOrder";
 import { buildApiUrl, getApiHeaders } from "../api/client";
+import {
+  fetchAvailabilitySummary,
+  type ListingAvailabilitySummary,
+} from "../api/availabilitySummaryClient";
 import RecentlyViewedStrip from "../components/RecentlyViewedStrip";
 import { fallbackCoordsForListing, hasMapCoords } from "../utils/mapCoords";
 
@@ -121,6 +125,30 @@ function apiToNormalized(listings: PublicListing[]): NormalizedListing[] {
     .filter((l) => l.numericId > 0);
 }
 
+/** TASK-1460: compact label + colors for listing card availability chip. */
+function availabilityChip(
+  sum: ListingAvailabilitySummary | undefined,
+): { label: string; className: string } | null {
+  if (!sum) return null;
+  if (sum.isAvailableTonight) {
+    return {
+      label: "Available now",
+      className: "bg-emerald-100 text-emerald-800",
+    };
+  }
+  if (sum.nextAvailableDate) {
+    const d = new Date(`${sum.nextAvailableDate}T12:00:00`);
+    const label = Number.isNaN(d.getTime())
+      ? "Check dates"
+      : `From ${d.toLocaleDateString("en-IN", { month: "short", day: "numeric" })}`;
+    return { label, className: "bg-sky-100 text-sky-900" };
+  }
+  if (sum.percentBookedNext30Days >= 75) {
+    return { label: "Limited availability", className: "bg-amber-100 text-amber-900" };
+  }
+  return null;
+}
+
 const SearchPage = () => {
   const { format: formatDisplayCurrency, formatINR, isConverted } = useCurrency();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -172,6 +200,7 @@ const SearchPage = () => {
   const mapView = searchParams.get("view") === "map";
 
   const hasInvalidDates = Boolean(checkIn && checkOut && checkOut <= checkIn);
+  const explicitDateSearch = Boolean(checkIn && checkOut);
   /** TASK-1451: include guests so "Clear filters" resets guest count too. */
   const hasActiveFilters = Boolean(
     minPrice || maxPrice || remoteWork || longStay || availableNow || selectedAmenities.length > 0
@@ -183,6 +212,9 @@ const SearchPage = () => {
   // TASK-1865: batch availability check for checkIn+checkOut dates
   const [dateAvailableIds, setDateAvailableIds] = useState<Set<number> | null>(null);
   const [dateAvailLoading, setDateAvailLoading] = useState(false);
+  /** TASK-1460: batch availability hints for cards when guest has not set explicit date search. */
+  const [availabilityById, setAvailabilityById] = useState<Record<number, ListingAvailabilitySummary>>({});
+  const [availabilityFetchDone, setAvailabilityFetchDone] = useState(false);
 
   const listings = useMemo(
     () => apiListings ?? buildStaticListings(),
@@ -385,6 +417,33 @@ const SearchPage = () => {
   useEffect(() => {
     setVisibleCount(ITEMS_PER_PAGE);
   }, [availableNow, guests, hasInvalidDates, longStay, mapView, minPrice, maxPrice, monthlyStay, nomadWifi, nomadWorkspace, remoteWork, selectedAmenities, sortBy, tonightProbeLoading]);
+
+  useEffect(() => {
+    if (isLoading || hasInvalidDates || explicitDateSearch) {
+      if (explicitDateSearch || hasInvalidDates) setAvailabilityById({});
+      setAvailabilityFetchDone(explicitDateSearch || hasInvalidDates);
+      return;
+    }
+    const ids = sortedUnits.map((u) => u.numericId).filter((id) => id > 0).slice(0, 48);
+    if (ids.length === 0) {
+      setAvailabilityById({});
+      setAvailabilityFetchDone(true);
+      return;
+    }
+    setAvailabilityFetchDone(false);
+    const c = new AbortController();
+    fetchAvailabilitySummary(ids, c.signal)
+      .then((rows) => {
+        const next: Record<number, ListingAvailabilitySummary> = {};
+        for (const r of rows) next[r.listingId] = r;
+        setAvailabilityById(next);
+      })
+      .catch(() => setAvailabilityById({}))
+      .finally(() => {
+        if (!c.signal.aborted) setAvailabilityFetchDone(true);
+      });
+    return () => c.abort();
+  }, [sortedUnits, isLoading, hasInvalidDates, explicitDateSearch]);
 
   const updateParam = (key: string, value: string) => {
     setSearchParams((prev) => {
@@ -966,6 +1025,22 @@ const SearchPage = () => {
                     wrapperClassName="h-full"
                     sizes="(max-width: 640px) 100vw, 50vw"
                   />
+                </div>
+                {/* TASK-1460: reserve chip row so layout does not jump when summary loads */}
+                <div className="min-h-7 px-5 pt-3" data-testid="search-listing-availability-slot">
+                  {!explicitDateSearch ? (() => {
+                    const chip = availabilityChip(availabilityById[unit.numericId]);
+                    return chip ? (
+                      <span
+                        className={`inline-flex max-w-full items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${chip.className}`}
+                        data-testid="search-listing-availability-chip"
+                      >
+                        {chip.label}
+                      </span>
+                    ) : !availabilityFetchDone ? (
+                      <span className="inline-block h-5 w-16 animate-pulse rounded-full bg-bg-muted" aria-hidden />
+                    ) : null;
+                  })() : null}
                 </div>
                 <div className="flex flex-1 flex-col gap-3 p-5">
                   <div className="flex items-start justify-between gap-3">

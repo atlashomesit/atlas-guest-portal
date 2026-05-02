@@ -24,6 +24,7 @@ import {
   toRazorpayContactDigits,
 } from '@/utils/guestPhoneDial';
 import { calculateNightlyPrice, inferUnitType } from '@/utils/pricing';
+import { mapRazorpayFailureCode } from '@/utils/razorpayGuestErrors';
 import priceDisplayConfig from '@/config/priceDisplay.config';
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
 import { fetchCalendarPricing, fetchPricingBreakdown } from '@/api/pricingClient';
@@ -51,6 +52,8 @@ interface UnitBookingWidgetProps {
 }
 
 const PENDING_PAYMENT_KEY = 'atlas_pending_razorpay_order';
+/** TASK-1468: browser-local last UPI VPA for Razorpay prefill (also persisted server-side on Guests when verify returns it). */
+const LAST_UPI_VPA_KEY = 'atlas_last_upi_vpa';
 
 /** COMP-001: keep in sync with Atlas.Api.Constants.GuestConsentConstants.DisplayText */
 const GUEST_DATA_CONSENT_LABEL =
@@ -231,6 +234,8 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [availableAddOns, setAvailableAddOns] = useState<Array<{ addOnServiceId: number; name: string; description?: string | null; price: number; priceType: string }>>([]);
   const [selectedAddOns, setSelectedAddOns] = useState<Record<number, number>>({}); // addOnServiceId -> quantity (0 = not selected)
   const [paymentStatus, setPaymentStatus] = useState<'success' | 'failed' | null>(null);
+  /** TASK-1469: Razorpay `payment.failed` metadata for richer failure UI. */
+  const [razorpayFailure, setRazorpayFailure] = useState<{ code: string; description: string } | null>(null);
   const [bookingDetails, setBookingDetails] = useState<{
     bookingId: string;
     bookingToken?: string;
@@ -972,10 +977,18 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       }
 
       const requestData = {
-        bookingId: paymentData.bookingId,
+        bookingId: Number(paymentData.bookingId),
         razorpayOrderId: paymentData.razorpay_order_id,
         razorpayPaymentId: paymentData.razorpay_payment_id,
-        razorpaySignature: paymentData.razorpay_signature
+        razorpaySignature: paymentData.razorpay_signature,
+        guestInfo: {
+          name: formData.name.trim(),
+          email: formData.email.trim(),
+          phone: toGuestPhoneE164(
+            phoneDialCode,
+            clampNationalDigits(formData.phone, getGuestDialOption(phoneDialCode).maxDigits),
+          ),
+        },
       };
 
       const response = await axios.post(buildApiUrl('/api/Razorpay/verify'), requestData, {
@@ -989,6 +1002,14 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       
       if (response.data.success) {
         setStatusMessage('Payment successful! Your booking is confirmed.');
+        const vpa = typeof response.data.lastUpiVpa === 'string' ? response.data.lastUpiVpa.trim() : '';
+        if (vpa) {
+          try {
+            localStorage.setItem(LAST_UPI_VPA_KEY, vpa);
+          } catch {
+            /* ignore quota / private mode */
+          }
+        }
       } else {
         throw new Error(response.data.message || 'Payment verification failed');
       }
@@ -1240,6 +1261,13 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         try {
           let paymentCompleted = false; // Track if payment handler was called
 
+          let lastUpiVpaPrefill = '';
+          try {
+            lastUpiVpaPrefill = localStorage.getItem(LAST_UPI_VPA_KEY)?.trim() ?? '';
+          } catch {
+            /* ignore */
+          }
+
           const handleRazorpayClose = () => {
             if (paymentCompleted) return;
             paymentCompleted = true; // Prevent double-reset from ondismiss + close event
@@ -1248,6 +1276,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             setIsSubmitting(false);
             setIsLoading(false);
             setPaymentStatus(null);
+            setRazorpayFailure(null);
             setFormError('Payment was cancelled. You can try booking again.');
             toast.info('Payment cancelled. You can try booking again.');
           };
@@ -1266,6 +1295,13 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                 phoneDialCode,
                 clampNationalDigits(formData.phone, getGuestDialOption(phoneDialCode).maxDigits)
               ),
+              method: 'upi',
+              ...(lastUpiVpaPrefill ? { vpa: lastUpiVpaPrefill } : {}),
+            },
+            config: {
+              display: {
+                sequence: ['block.upi', 'block.card', 'block.netbanking', 'block.wallet'],
+              },
             },
             theme: {
               color: '#2563eb'
@@ -1335,12 +1371,15 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           };
 
           const rzp = new window.Razorpay(options);
-          rzp.on('payment.failed', (response: { error?: { description?: string } }) => {
+          rzp.on('payment.failed', (response: { error?: { code?: string; description?: string } }) => {
             paymentCompleted = true; // Payment attempt was made
             void abandonPaymentPendingCheckout(bookingId, bookingToken);
             localStorage.removeItem(PENDING_PAYMENT_KEY);
+            const code = String(response?.error?.code ?? '');
+            const description = String(response?.error?.description ?? '');
+            setRazorpayFailure({ code, description });
             setPaymentStatus('failed');
-            setFormError(`Payment failed: ${response.error?.description || 'Unknown error'}`);
+            setFormError(mapRazorpayFailureCode(code, description));
             setIsSubmitting(false);
             setIsLoading(false);
           });
@@ -1372,10 +1411,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
   const closePaymentPopup = useCallback(() => {
     setPaymentStatus(null);
+    setRazorpayFailure(null);
   }, []);
 
   const handleRetryPayment = useCallback(() => {
     setPaymentStatus(null);
+    setRazorpayFailure(null);
     setFormError(null);
     setIsSubmitting(false);
     setIsLoading(false);
@@ -1402,8 +1443,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   // Auto-close timers in parent so they are not reset by inner component re-mounts
   useEffect(() => {
     if (paymentStatus === 'failed') {
-      const t = window.setTimeout(() => setPaymentStatus(null), 3000);
-      return () => window.clearTimeout(t);
+      // TASK-1469: keep failure dialog until the guest dismisses or retries (no auto-dismiss).
+      return undefined;
     }
     if (paymentStatus === 'success') {
       const t = window.setTimeout(() => setPaymentStatus(null), 6000);
@@ -1615,9 +1656,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Payment Could Not Be Processed</h2>
             </div>
 
-            {/* Primary Message */}
+            {/* Primary Message (TASK-1469: Razorpay code → friendly copy) */}
             <p className="text-center text-gray-700 mb-6">
-              We're sorry, but your payment didn't go through. Please try again or use a different payment method.
+              {mapRazorpayFailureCode(razorpayFailure?.code, razorpayFailure?.description)}
             </p>
 
             {/* Possible Reasons Section */}
