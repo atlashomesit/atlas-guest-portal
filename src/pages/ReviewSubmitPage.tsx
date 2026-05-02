@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import SEO from "../components/SEO";
 import { buildApiUrl, getApiHeaders } from "../api/client";
+import { sanitizeGuestImageUrl } from "../utils/guestImageUrl";
+import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 
 interface ReviewEligibility {
   bookingId: number;
@@ -40,6 +42,56 @@ const ratingLabels: Record<number, string> = {
   5: "Excellent",
 };
 
+type SubKey = "cleanliness" | "value" | "checkin" | "communication";
+
+const SUB_CATEGORY_ROWS: { key: SubKey; label: string }[] = [
+  { key: "cleanliness", label: "Cleanliness" },
+  { key: "value", label: "Value" },
+  { key: "checkin", label: "Check-in" },
+  { key: "communication", label: "Host communication" },
+];
+
+function SubcategoryStars({
+  label,
+  value,
+  hover,
+  onHover,
+  onPick,
+}: {
+  label: string;
+  value: number;
+  hover: number;
+  onHover: (v: number) => void;
+  onPick: (v: number) => void;
+}) {
+  const active = hover || value;
+  return (
+    <div className="space-y-2">
+      <p className="text-sm font-medium text-text-primary">{label}</p>
+      <div className="flex gap-1">
+        {[1, 2, 3, 4, 5].map((v) => (
+          <StarButton
+            key={v}
+            value={v}
+            selected={v <= value}
+            hovered={v <= hover}
+            onHover={onHover}
+            onClick={onPick}
+          />
+        ))}
+      </div>
+      {active > 0 && <p className="text-xs font-semibold text-amber-600">{ratingLabels[active]}</p>}
+    </div>
+  );
+}
+
+const emptySubRatings = (): Record<SubKey, number> => ({
+  cleanliness: 0,
+  value: 0,
+  checkin: 0,
+  communication: 0,
+});
+
 export default function ReviewSubmitPage() {
   const { bookingId } = useParams<{ bookingId: string }>();
   const [searchParams] = useSearchParams();
@@ -57,6 +109,12 @@ export default function ReviewSubmitPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [subRatings, setSubRatings] = useState<Record<SubKey, number>>(emptySubRatings);
+  const [subHover, setSubHover] = useState<Record<SubKey, number>>(emptySubRatings);
+  /** TASK-1890: URLs from POST /api/reviews/upload-photo (max 3). */
+  const [photoUrls, setPhotoUrls] = useState<string[]>([]);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!bookingId || !token) {
@@ -77,10 +135,54 @@ export default function ReviewSubmitPage() {
       .finally(() => setLoading(false));
   }, [bookingId, token]);
 
+  const handlePhotoPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    e.target.value = "";
+    if (!files?.length || !bookingId || !token) return;
+    setPhotoError(null);
+    setPhotoBusy(true);
+    try {
+      const additions: string[] = [];
+      for (const file of Array.from(files)) {
+        if (photoUrls.length + additions.length >= 3) break;
+        if (file.size > 5 * 1024 * 1024) {
+          setPhotoError("Each photo must be 5 MB or smaller.");
+          continue;
+        }
+        const fd = new FormData();
+        fd.append("bookingId", String(bookingId));
+        fd.append("bookingToken", token);
+        fd.append("file", file);
+        const res = await fetch(buildApiUrl("/api/reviews/upload-photo"), {
+          method: "POST",
+          headers: { Accept: "application/json", ...getApiHeaders() },
+          body: fd,
+        });
+        if (!res.ok) {
+          const data = (await res.json().catch(() => ({}))) as { error?: string };
+          throw new Error(data?.error ?? "Could not upload photo. Please try again.");
+        }
+        const data = (await res.json()) as { url?: string };
+        if (data.url) additions.push(data.url);
+      }
+      if (additions.length > 0) {
+        setPhotoUrls((prev) => [...prev, ...additions].slice(0, 3));
+      }
+    } catch (err: unknown) {
+      setPhotoError((err as Error).message);
+    } finally {
+      setPhotoBusy(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (rating === 0) { setSubmitError("Please select a star rating."); return; }
     if (!body.trim()) { setSubmitError("Please share a bit about your stay."); return; }
+    if (SUB_CATEGORY_ROWS.some(({ key }) => subRatings[key] < 1)) {
+      setSubmitError("Please rate cleanliness, value, check-in, and host communication.");
+      return;
+    }
 
     setSubmitting(true);
     setSubmitError(null);
@@ -90,7 +192,20 @@ export default function ReviewSubmitPage() {
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json", ...getApiHeaders() },
-        body: JSON.stringify({ bookingId: Number(bookingId), rating, title: title.trim() || undefined, body: body.trim(), bookingToken: token }),
+        body: JSON.stringify({
+          bookingId: Number(bookingId),
+          rating,
+          title: title.trim() || undefined,
+          body: body.trim(),
+          bookingToken: token,
+          ratings: {
+            cleanliness: subRatings.cleanliness,
+            value: subRatings.value,
+            checkin: subRatings.checkin,
+            communication: subRatings.communication,
+          },
+          ...(photoUrls.length > 0 ? { photoUrls } : {}),
+        }),
       });
 
       if (res.status === 409) throw new Error("You have already submitted a review for this stay.");
@@ -160,7 +275,21 @@ export default function ReviewSubmitPage() {
               ? `Your feedback about ${eligibility.propertyName} means a lot. We hope to welcome you back soon!`
               : "You have already submitted a review for this stay. Thank you!"}
           </p>
-          <Link to="/" className="inline-block mt-2 text-sm text-brand-primary underline underline-offset-2">Return to homepage</Link>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-2 flex-wrap">
+            <Link
+              to={buildHomeUnitPath(getPropertySlug({ property_name: eligibility.propertyName }), eligibility.listingId)}
+              data-testid="review-success-view-property"
+              className="inline-block text-sm font-medium text-brand-primary underline underline-offset-2"
+            >
+              View {eligibility.propertyName}
+            </Link>
+            <span className="hidden sm:inline text-text-muted text-sm" aria-hidden>
+              ·
+            </span>
+            <Link to="/" className="inline-block text-sm text-brand-primary underline underline-offset-2">
+              Return to homepage
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -204,6 +333,23 @@ export default function ReviewSubmitPage() {
             )}
           </div>
 
+          <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-5">
+            <p className="text-sm font-medium text-text-primary">Rate specific aspects</p>
+            <div className="space-y-5 divide-y divide-border-subtle">
+              {SUB_CATEGORY_ROWS.map(({ key, label }) => (
+                <div key={key} className="pt-5 first:pt-0">
+                  <SubcategoryStars
+                    label={label}
+                    value={subRatings[key]}
+                    hover={subHover[key]}
+                    onHover={(v) => setSubHover((h) => ({ ...h, [key]: v }))}
+                    onPick={(v) => setSubRatings((s) => ({ ...s, [key]: v }))}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Title */}
           <div className="space-y-1.5">
             <label htmlFor="review-title" className="text-sm font-medium text-text-primary">
@@ -236,6 +382,44 @@ export default function ReviewSubmitPage() {
               className="w-full rounded-xl border border-border-subtle bg-bg-surface px-4 py-2.5 text-base text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary resize-none"
             />
             <p className="text-xs text-text-muted text-right">{body.length}/1000</p>
+          </div>
+
+          <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3">
+            <p className="text-sm font-medium text-text-primary">Photos <span className="text-text-muted font-normal">(optional, max 3)</span></p>
+            <p className="text-xs text-text-secondary">JPEG, PNG, WebP, or GIF — up to 5 MB each. Help future guests see what your stay looked like.</p>
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              multiple
+              disabled={photoBusy || photoUrls.length >= 3}
+              data-testid="review-photo-input"
+              onChange={handlePhotoPick}
+              className="block w-full text-sm text-text-secondary file:mr-3 file:rounded-lg file:border-0 file:bg-brand-primary file:px-3 file:py-2 file:text-sm file:font-medium file:text-white disabled:opacity-50"
+            />
+            {photoBusy && <p className="text-xs text-text-muted">Uploading&hellip;</p>}
+            {photoError && <p className="text-xs text-support-error">{photoError}</p>}
+            {photoUrls.length > 0 && (
+              <div className="flex gap-2 flex-wrap">
+                {photoUrls.map((u, idx) => {
+                  const safe = sanitizeGuestImageUrl(u);
+                  return (
+                    <div key={`${u}-${idx}`} className="relative w-20 h-20 rounded-lg overflow-hidden border border-border-subtle bg-bg-muted shrink-0">
+                      {safe ? (
+                        <img src={safe} alt="" className="w-full h-full object-cover" />
+                      ) : null}
+                      <button
+                        type="button"
+                        aria-label="Remove photo"
+                        className="absolute top-1 right-1 rounded-full bg-black/60 text-white text-xs px-1.5 py-0.5 hover:bg-black/80"
+                        onClick={() => setPhotoUrls((prev) => prev.filter((_, i) => i !== idx))}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {submitError && (

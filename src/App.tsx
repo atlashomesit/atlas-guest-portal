@@ -8,6 +8,7 @@ import ErrorBoundary from "./components/ErrorBoundary"
 import { ToastContainer } from "react-toastify"
 import { BookingProvider } from "./contexts/BookingContext"
 import { ListingPhotosProvider } from "./contexts/ListingPhotosContext"
+import { CurrencyProvider } from "./contexts/CurrencyContext"
 import { trackEvent } from "./utils/analytics"
 import { isMarketplaceMode } from "./tenant/tenantResolver"
 
@@ -175,13 +176,15 @@ function AppWrapper() {
 
 function App() {
   return (
-    <BookingProvider>
-      <ListingPhotosProvider>
-        <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-          <AppWrapper />
-        </Router>
-      </ListingPhotosProvider>
-    </BookingProvider>
+    <CurrencyProvider>
+      <BookingProvider>
+        <ListingPhotosProvider>
+          <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+            <AppWrapper />
+          </Router>
+        </ListingPhotosProvider>
+      </BookingProvider>
+    </CurrencyProvider>
   );
 }
 

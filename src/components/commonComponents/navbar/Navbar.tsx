@@ -13,6 +13,7 @@ import { trackEvent } from '../../../utils/analytics';
 import { homes as defaultHomes } from '../../../content/homes';
 import { useBooking } from '../../../contexts/BookingContext';
 import { usePropertyListings } from '../../../hooks/usePropertyListings';
+import CurrencySelector from '../../CurrencySelector';
 
 const Navbar = () => {
   const tenant = getTenantContext();
@@ -281,6 +282,8 @@ const Navbar = () => {
             <span>{formatDisplayNumber()}</span>
           </a>
 
+          <CurrencySelector />
+
           <button
             type="button"
             className="book-now"
@@ -363,6 +366,8 @@ const Navbar = () => {
               <IoIosCall />
               <span>{formatDisplayNumber()}</span>
             </a>
+
+            <CurrencySelector />
 
             <button
               type="button"

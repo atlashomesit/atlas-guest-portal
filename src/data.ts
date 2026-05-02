@@ -36,6 +36,7 @@ Central air-conditioning with smart zoning, 1 Gbps fiber internet (dual ISP), in
 video intercom, dedicated concierge desk, and bi-weekly housekeeping with on-demand butler service. Guests enjoy access to a
 private bar setup, wine chiller, Nespresso machine, washer-dryer, ironing station, board games, and curated library.`,
         property_location: "Hyderabad, Telangana",
+        propertyAddress: "Plot 7, Mindspace, Madhapur, Hyderabad — sample street line",
         property_neighborhoods: ["Hitech City"],
         property_reviews: 128,
         property_rating: 4.95,
