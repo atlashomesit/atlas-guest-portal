@@ -138,7 +138,7 @@ const GalleryPage = () => {
               <label className="w-full md:w-56">
                 <span className="text-sm text-text-muted">Filter by property</span>
                 <select
-                  className="mt-1 w-full rounded-lg border border-border-subtle bg-bg-muted px-3 py-2 text-text-primary focus:border-primary focus:outline-none"
+                  className="mt-1 min-h-[44px] w-full rounded-lg border border-border-subtle bg-bg-muted px-3 py-2 text-base text-text-primary focus:border-primary focus:outline-none"
                   value={propertyFilter}
                   onChange={(event) => setPropertyFilter(event.target.value)}
                 >
@@ -163,7 +163,7 @@ const GalleryPage = () => {
                 <input
                   type="search"
                   placeholder="Search by location or name"
-                  className="mt-1 w-full rounded-lg border border-border-subtle bg-bg-muted px-3 py-2 text-text-primary focus:border-primary focus:outline-none"
+                  className="mt-1 min-h-[44px] w-full rounded-lg border border-border-subtle bg-bg-muted px-3 py-2 text-base text-text-primary focus:border-primary focus:outline-none"
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
                 />
