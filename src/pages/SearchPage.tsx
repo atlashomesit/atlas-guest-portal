@@ -25,6 +25,14 @@ type NormalizedListing = {
   canonicalPath: string;
   property?: unknown;
   rating?: number;
+  /** TASK-1695: LOS auto-discount tier 1 minimum nights (null = not configured). */
+  losDiscountMinNights?: number | null;
+  /** TASK-1695: LOS auto-discount tier 1 percent. */
+  losDiscountPercent?: number | null;
+  /** TASK-1695: LOS auto-discount tier 2 minimum nights. */
+  losDiscount2MinNights?: number | null;
+  /** TASK-1695: LOS auto-discount tier 2 percent. */
+  losDiscount2Percent?: number | null;
 };
 
 function buildStaticListings(): NormalizedListing[] {
@@ -78,6 +86,10 @@ function apiToNormalized(listings: PublicListing[]): NormalizedListing[] {
         amenities: [],
         canonicalPath,
         rating: l.propertyRating ?? undefined,
+        losDiscountMinNights: l.losDiscountMinNights ?? null,
+        losDiscountPercent: l.losDiscountPercent ?? null,
+        losDiscount2MinNights: l.losDiscount2MinNights ?? null,
+        losDiscount2Percent: l.losDiscount2Percent ?? null,
       };
     })
     .filter((l) => l.numericId > 0);
@@ -387,6 +399,18 @@ const SearchPage = () => {
                             💼 Co-working desk
                           </span>
                         )}
+                        {/* TASK-1695: LOS discount badge — show highest configured tier */}
+                        {unit.losDiscount2MinNights != null && unit.losDiscount2MinNights > 0 &&
+                          unit.losDiscount2Percent != null && unit.losDiscount2Percent > 0 ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700">
+                            🏷️ Stay {unit.losDiscount2MinNights}+ nights — {unit.losDiscount2Percent}% off
+                          </span>
+                        ) : unit.losDiscountMinNights != null && unit.losDiscountMinNights > 0 &&
+                          unit.losDiscountPercent != null && unit.losDiscountPercent > 0 ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700">
+                            🏷️ Stay {unit.losDiscountMinNights}+ nights — {unit.losDiscountPercent}% off
+                          </span>
+                        ) : null}
                       </div>
                       {unit.rating != null && unit.rating > 0 && (
                         <p className="mt-0.5 text-sm text-accent-primary font-medium">

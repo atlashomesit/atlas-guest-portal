@@ -55,6 +55,14 @@ export type PublicListing = {
   hasCoworkingDesk?: boolean;
   /** TASK-1025: Minimum stay requirement in nights. */
   minStay?: number | null;
+  /** TASK-1695: LOS auto-discount tier 1 — minimum nights threshold (null = disabled). */
+  losDiscountMinNights?: number | null;
+  /** TASK-1695: LOS auto-discount tier 1 — discount percent (null = disabled). */
+  losDiscountPercent?: number | null;
+  /** TASK-1695: LOS auto-discount tier 2 — minimum nights threshold (null = disabled). */
+  losDiscount2MinNights?: number | null;
+  /** TASK-1695: LOS auto-discount tier 2 — discount percent (null = disabled). */
+  losDiscount2Percent?: number | null;
 };
 
 function normalizePublicListing(payload: Record<string, unknown>): PublicListing {
@@ -110,6 +118,14 @@ function normalizePublicListing(payload: Record<string, unknown>): PublicListing
         : Number(payload.wifiSpeedMbps),
     hasCoworkingDesk: Boolean(payload.hasCoworkingDesk),
     minStay: Number.isFinite(minStay) && minStay > 0 ? minStay : null,
+    losDiscountMinNights:
+      payload.losDiscountMinNights != null ? Number(payload.losDiscountMinNights) : null,
+    losDiscountPercent:
+      payload.losDiscountPercent != null ? Number(payload.losDiscountPercent) : null,
+    losDiscount2MinNights:
+      payload.losDiscount2MinNights != null ? Number(payload.losDiscount2MinNights) : null,
+    losDiscount2Percent:
+      payload.losDiscount2Percent != null ? Number(payload.losDiscount2Percent) : null,
   };
 }
 
