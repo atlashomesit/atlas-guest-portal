@@ -223,6 +223,8 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [referralMessage, setReferralMessage] = useState<string | null>(null);
   const [promoCode, setPromoCode] = useState('');
   const [appliedPromoCode, setAppliedPromoCode] = useState<string | null>(null);
+  // TASK-1710: DPDP WhatsApp marketing opt-in — unchecked by default
+  const [whatsappMarketingOptIn, setWhatsappMarketingOptIn] = useState(false);
   const [appliedPromoDiscount, setAppliedPromoDiscount] = useState(0);
   const [promoMessage, setPromoMessage] = useState<string | null>(null);
   // TASK-171: add-on services for this listing
@@ -1191,6 +1193,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             phoneDialCode,
             clampNationalDigits(formData.phone, getGuestDialOption(phoneDialCode).maxDigits)
           ),
+          // TASK-1710: DPDP WhatsApp opt-in — only true when guest explicitly checks the box
+          marketingWhatsAppOptIn: whatsappMarketingOptIn,
         }
       };
 
@@ -2315,6 +2319,19 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               {consentError}
             </p>
           ) : null}
+          {/* TASK-1710: DPDP-compliant WhatsApp marketing opt-in — unchecked by default */}
+          <label className="flex items-start gap-3 cursor-pointer text-sm text-text-muted mt-2">
+            <input
+              type="checkbox"
+              name="whatsappMarketingOptIn"
+              checked={whatsappMarketingOptIn}
+              onChange={(e) => setWhatsappMarketingOptIn(e.target.checked)}
+              disabled={isBookingDisabled}
+              className="mt-1 h-4 w-4 shrink-0 rounded border-border-strong text-cta-primary focus:ring-cta-primary"
+              aria-label="Send me deals and exclusive offers on WhatsApp (optional)"
+            />
+            <span>Send me exclusive deals and offers on WhatsApp <em className="not-italic text-text-muted">(optional)</em></span>
+          </label>
         </div>
       </div>
 
