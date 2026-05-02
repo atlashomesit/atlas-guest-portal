@@ -3,6 +3,7 @@ import { Bath, BedDouble, Car, PawPrint, Snowflake, Users, Wifi } from "lucide-r
 import { priceDisplayConfig } from "../../config/priceDisplay.config";
 import { type NightlyPriceBreakdown } from "../../utils/pricing";
 import OptimizedImage from "../ui/OptimizedImage";
+import OwnerShareBadge from "../OwnerShareBadge"; // TASK-1705
 
 type ListingCardProps = {
   id: string;
@@ -233,6 +234,8 @@ const ListingCard: React.FC<ListingCardProps> = ({
                   <span className="inline-flex items-center gap-1 rounded-full bg-bg-surface px-2 py-1">No hidden fees</span>
                   <span className="inline-flex items-center gap-1 rounded-full bg-bg-surface px-2 py-1">Secure Razorpay payments</span>
                   <span className="inline-flex items-center gap-1 rounded-full bg-bg-surface px-2 py-1">Avg. rating {ratingSnippet}</span>
+                  {/* TASK-1705: Owner-share trust badge */}
+                  <OwnerShareBadge nightlyPrice={finalPrice} />
                 </div>
                 {rating <= 0 && (
                   <p className="mt-1 text-[11px] font-normal text-text-muted">Avg. rating placeholder until live reviews sync.</p>

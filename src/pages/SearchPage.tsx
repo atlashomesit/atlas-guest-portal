@@ -8,6 +8,7 @@ import { useCurrency } from "../contexts/CurrencyContext";
 import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 import SkeletonCard from "../components/apartments/SkeletonCard";
 import OptimizedImage from "../components/ui/OptimizedImage";
+import OwnerShareBadge from "../components/OwnerShareBadge"; // TASK-1705
 import { filterGuestImageUrls, sanitizeGuestImageUrl } from "../utils/guestImageUrl";
 import { compareAtlasHomesBuildingOrder } from "../utils/atlasHomesBuildingOrder";
 import { buildApiUrl, getApiHeaders } from "../api/client";
@@ -529,6 +530,8 @@ const SearchPage = () => {
                       {unit.location}
                     </span>
                   </div>
+                  {/* TASK-1705: Owner-share trust badge */}
+                  <OwnerShareBadge nightlyPrice={unit.pricePerNight} className="self-start" />
                   <div className="flex items-center justify-between gap-4">
                     <div className="space-y-1">
                       <p className="text-2xl font-bold text-text-primary" data-testid="guest-listing-nightly-price">{formatDisplayCurrency(unit.pricePerNight)}</p>
