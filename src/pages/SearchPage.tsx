@@ -647,7 +647,8 @@ const SearchPage = () => {
                       )}
                       <p className="text-sm text-text-muted">per night</p>
                       <p className="text-xs text-text-muted">
-                        Est. total: {formatDisplayCurrency(Math.round(unit.pricePerNight * 1.12))} (incl. 12% GST)
+                        {/* TASK-1869: Sept 2025 GST reform — 5% for ≤₹7,500/night, 12% above */}
+                        {(() => { const gstMult = unit.pricePerNight > 7500 ? 1.12 : 1.05; const pct = unit.pricePerNight > 7500 ? 12 : 5; return `Est. total: ${formatDisplayCurrency(Math.round(unit.pricePerNight * gstMult))} (incl. ${pct}% GST)`; })()}
                       </p>
                       {longStay && (
                         <p className="text-sm font-semibold text-cta-primary">
