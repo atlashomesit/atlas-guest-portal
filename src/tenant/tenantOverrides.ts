@@ -32,6 +32,15 @@ export type TenantDirectBookingPromo = {
   subline?: string;
 };
 
+export type TenantCookieBanner = {
+  /** Full consent text shown in the banner body. */
+  text: string;
+  /** URL to the tenant's privacy notice. */
+  privacyUrl: string;
+  /** Label for the privacy notice link (default: "privacy notice"). */
+  privacyLinkLabel?: string;
+};
+
 export type TenantOverrides = {
   /** Hide the logo image in the navbar/footer/subheading. */
   hideLogo?: boolean;
@@ -47,6 +56,8 @@ export type TenantOverrides = {
   listingsApiUrl?: string;
   /** TASK-1293: homepage strip above hero (direct booking value prop). */
   directBookingPromo?: TenantDirectBookingPromo;
+  /** TASK-1877: white-label cookie banner copy + privacy link override. */
+  cookieBanner?: TenantCookieBanner;
 };
 
 const STAR_GUEST_HOUSE_HOMES: TenantHomeLink[] = [
@@ -82,6 +93,15 @@ const TENANT_OVERRIDES: Record<string, TenantOverrides> = {
       ownerPhone: '7799779192',
       whatsappPhone: '7799779192',
       email: 'starguesthousekondapur@gmail.com',
+    },
+    // TASK-1877: white-label cookie banner with tenant-specific copy + privacy link
+    cookieBanner: {
+      text:
+        'We use strictly necessary cookies to make this site work, and optional analytics cookies ' +
+        "to understand how it's used. Under India's DPDP Act 2023 we ask for your consent before " +
+        'loading anything non-essential. Read our',
+      privacyUrl: '/privacy',
+      privacyLinkLabel: 'privacy notice',
     },
   },
 };

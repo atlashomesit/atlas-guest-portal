@@ -6,6 +6,7 @@ import { formatCurrency } from '@/utils/formatting'; // TASK-1872
 import { getFavoriteIds, toggleFavorite } from '@/utils/guestHistory'; // TASK-1873
 import OptimizedImage from '@/components/ui/OptimizedImage'; // TASK-1874
 import SkeletonCard from '@/components/apartments/SkeletonCard'; // TASK-1875
+import SEO from '@/components/SEO'; // TASK-1876
 
 type MarketplaceItem = {
   id: number;
@@ -64,6 +65,11 @@ export default function MarketplaceHomepage() {
 
   return (
     <section className="mx-auto w-full max-w-6xl px-4 py-8" data-testid="marketplace-homepage">
+      {/* TASK-1876: SEO meta for marketplace homepage */}
+      <SEO
+        title="Atlas Stays Marketplace — Verified homes & rooms across India"
+        description="Discover homes and rooms across verified hosts on Atlas Stays. Direct booking, no platform fee."
+      />
       <h1 className="text-3xl font-bold text-text-primary">Atlas Stays Marketplace</h1>
       <p className="mt-2 text-text-body">Discover homes and rooms across verified hosts.</p>
 
