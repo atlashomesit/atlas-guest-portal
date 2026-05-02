@@ -37,6 +37,7 @@ import { buildApiUrl, getApiHeaders } from '../../../api/client';
 import { addRecentlyViewed, isFavorite, toggleFavorite } from '../../../utils/guestHistory';
 import { formatCurrency, formatHumanDate } from '../../../utils/formatting';
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
+import GuestAssistant from '../../GuestAssistant'; // TASK-1728
 
 import { Fancybox } from "@fancyapps/ui";
 import "@fancyapps/ui/dist/fancybox/fancybox.css";
@@ -1526,6 +1527,9 @@ useEffect(() => {
                 )}
             </div>
         </section>
+
+        {/* TASK-1728: Guest Assistant FAQ widget — floating bottom-left */}
+        <GuestAssistant listingId={resolvedListingId ?? data?.listingId ?? null} />
 
         {/* Mobile fixed Reserve CTA - visible only below md breakpoint */}
         {data && (
