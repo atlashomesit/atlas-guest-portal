@@ -41,6 +41,56 @@ const ratingLabels: Record<number, string> = {
   5: "Excellent",
 };
 
+type SubKey = "cleanliness" | "value" | "checkin" | "communication";
+
+const SUB_CATEGORY_ROWS: { key: SubKey; label: string }[] = [
+  { key: "cleanliness", label: "Cleanliness" },
+  { key: "value", label: "Value" },
+  { key: "checkin", label: "Check-in" },
+  { key: "communication", label: "Host communication" },
+];
+
+function SubcategoryStars({
+  label,
+  value,
+  hover,
+  onHover,
+  onPick,
+}: {
+  label: string;
+  value: number;
+  hover: number;
+  onHover: (v: number) => void;
+  onPick: (v: number) => void;
+}) {
+  const active = hover || value;
+  return (
+    <div className="space-y-2">
+      <p className="text-sm font-medium text-text-primary">{label}</p>
+      <div className="flex gap-1">
+        {[1, 2, 3, 4, 5].map((v) => (
+          <StarButton
+            key={v}
+            value={v}
+            selected={v <= value}
+            hovered={v <= hover}
+            onHover={onHover}
+            onClick={onPick}
+          />
+        ))}
+      </div>
+      {active > 0 && <p className="text-xs font-semibold text-amber-600">{ratingLabels[active]}</p>}
+    </div>
+  );
+}
+
+const emptySubRatings = (): Record<SubKey, number> => ({
+  cleanliness: 0,
+  value: 0,
+  checkin: 0,
+  communication: 0,
+});
+
 export default function ReviewSubmitPage() {
   const { bookingId } = useParams<{ bookingId: string }>();
   const [searchParams] = useSearchParams();
@@ -58,6 +108,8 @@ export default function ReviewSubmitPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [subRatings, setSubRatings] = useState<Record<SubKey, number>>(emptySubRatings);
+  const [subHover, setSubHover] = useState<Record<SubKey, number>>(emptySubRatings);
 
   useEffect(() => {
     if (!bookingId || !token) {
@@ -82,6 +134,10 @@ export default function ReviewSubmitPage() {
     e.preventDefault();
     if (rating === 0) { setSubmitError("Please select a star rating."); return; }
     if (!body.trim()) { setSubmitError("Please share a bit about your stay."); return; }
+    if (SUB_CATEGORY_ROWS.some(({ key }) => subRatings[key] < 1)) {
+      setSubmitError("Please rate cleanliness, value, check-in, and host communication.");
+      return;
+    }
 
     setSubmitting(true);
     setSubmitError(null);
@@ -91,7 +147,19 @@ export default function ReviewSubmitPage() {
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json", ...getApiHeaders() },
-        body: JSON.stringify({ bookingId: Number(bookingId), rating, title: title.trim() || undefined, body: body.trim(), bookingToken: token }),
+        body: JSON.stringify({
+          bookingId: Number(bookingId),
+          rating,
+          title: title.trim() || undefined,
+          body: body.trim(),
+          bookingToken: token,
+          ratings: {
+            cleanliness: subRatings.cleanliness,
+            value: subRatings.value,
+            checkin: subRatings.checkin,
+            communication: subRatings.communication,
+          },
+        }),
       });
 
       if (res.status === 409) throw new Error("You have already submitted a review for this stay.");
@@ -217,6 +285,23 @@ export default function ReviewSubmitPage() {
             {activeRating > 0 && (
               <p className="text-sm font-semibold text-amber-600">{ratingLabels[activeRating]}</p>
             )}
+          </div>
+
+          <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-5">
+            <p className="text-sm font-medium text-text-primary">Rate specific aspects</p>
+            <div className="space-y-5 divide-y divide-border-subtle">
+              {SUB_CATEGORY_ROWS.map(({ key, label }) => (
+                <div key={key} className="pt-5 first:pt-0">
+                  <SubcategoryStars
+                    label={label}
+                    value={subRatings[key]}
+                    hover={subHover[key]}
+                    onHover={(v) => setSubHover((h) => ({ ...h, [key]: v }))}
+                    onPick={(v) => setSubRatings((s) => ({ ...s, [key]: v }))}
+                  />
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* Title */}
