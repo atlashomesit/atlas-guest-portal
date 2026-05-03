@@ -9,7 +9,7 @@ import { LiaNewspaper } from "react-icons/lia";
 import { MdOutlineEmojiFoodBeverage, MdOutlineLocalLaundryService, MdOutlineDone } from "react-icons/md";
 import { FaCcMastercard, FaLocationDot } from "react-icons/fa6";
 import { FaStar } from "react-icons/fa";
-import { X, ChevronRight, Clock, KeyRound } from 'lucide-react';
+import { X, ChevronRight, Clock, KeyRound, Bookmark, Share2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { propertyData } from '../../../data.ts';
 import { getUnitPolicy } from '../../../config/policyConfig';
@@ -451,6 +451,15 @@ const PropertyDetails = () => {
         })();
         return () => ac.abort();
     }, [resolvedListingId]);
+
+    /** TASK-2068: hero quote only from live API reviews (never static marketing snippets). */
+    const heroReviewQuote = useMemo(() => {
+        const api = listingReviewsFromApi;
+        if (!api || api.loading || api.reviews.length === 0) return null;
+        const r = api.reviews[0];
+        const text = String(r.body || r.title || '').trim();
+        return text ? text.slice(0, 280) : null;
+    }, [listingReviewsFromApi]);
 
     useEffect(() => {
         setNotFound(false);
@@ -955,9 +964,44 @@ useEffect(() => {
                     </div>
                 )}
 
-                {/* Property Header */}
+                {/* Property Header — TASK-2093: Save/Share in header next to title */}
                 <div className="">
-                    <h1 className="text-2xl sm:text-3xl font-semibold mb-2 capitalize text-text-primary">{data?.property_name}</h1>
+                    <div className="mb-2 flex flex-wrap items-start justify-between gap-3">
+                        <h1 className="min-w-0 flex-1 text-2xl sm:text-3xl font-semibold capitalize text-text-primary">
+                            {data?.property_name}
+                        </h1>
+                        <div className="flex shrink-0 items-center gap-1">
+                            <button
+                                type="button"
+                                className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border-subtle bg-bg-muted text-text-primary hover:opacity-90"
+                                onClick={() => {
+                                    const lid = Number(resolvedListingId ?? data?.listingId ?? listingId);
+                                    if (!Number.isFinite(lid) || lid <= 0) return;
+                                    setFav(toggleFavorite(lid));
+                                }}
+                                aria-label={fav ? 'Remove from saved' : 'Save listing'}
+                            >
+                                <Bookmark className={`h-5 w-5 ${fav ? 'fill-cta-primary text-cta-primary' : ''}`} strokeWidth={1.75} />
+                            </button>
+                            <button
+                                type="button"
+                                className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border-subtle bg-bg-muted text-text-primary hover:opacity-90"
+                                onClick={() => {
+                                    const url = window.location.href;
+                                    const text = `Check out ${data?.property_name ?? 'this home'} on Atlas Homestays`;
+                                    const share = async () => {
+                                        const nav: any = navigator;
+                                        if (nav?.share) return nav.share({ title: document.title, text, url });
+                                        window.open(`https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`, '_blank', 'noopener,noreferrer');
+                                    };
+                                    void share();
+                                }}
+                                aria-label="Share property"
+                            >
+                                <Share2 className="h-5 w-5" strokeWidth={1.75} />
+                            </button>
+                        </div>
+                    </div>
                     <div className="flex items-center text-text-muted">
                         <FaLocationDot className="mr-2 text-sm" />
                         <span className="text-sm sm:text-base">{data?.property_location || 'Location not available'}</span>
@@ -991,40 +1035,12 @@ useEffect(() => {
                             <span>{(data?.property_rating || 0).toFixed(2)}</span>
                             <span className="text-text-muted">• {data?.property_reviews || 0} reviews</span>
                         </div>
-                        {data?.property_review_snippets?.[0] && (
+                        {heroReviewQuote && (
                             <p className="sm:pl-3 sm:border-l sm:border-border-subtle sm:ml-3 text-text-muted italic">
-                                "{data.property_review_snippets?.[0] || 'No reviews available'}"
+                                &ldquo;{heroReviewQuote}
+                                {heroReviewQuote.length >= 280 ? '…' : ''}&rdquo;
                             </p>
                         )}
-                    </div>
-                    <div className="mt-3 flex items-center gap-2 flex-wrap">
-                        <button
-                            type="button"
-                            className="px-3 py-1.5 rounded-lg border border-border-subtle bg-bg-muted text-sm font-medium text-text-primary hover:opacity-90"
-                            onClick={() => {
-                                const lid = Number(resolvedListingId ?? data?.listingId ?? listingId);
-                                if (!Number.isFinite(lid) || lid <= 0) return;
-                                setFav(toggleFavorite(lid));
-                            }}
-                        >
-                            {fav ? '♥ Saved' : '♡ Save'}
-                        </button>
-                        <button
-                            type="button"
-                            className="px-3 py-1.5 rounded-lg border border-border-subtle bg-bg-muted text-sm font-medium text-text-primary hover:opacity-90"
-                            onClick={() => {
-                                const url = window.location.href;
-                                const text = `Check out ${data?.property_name ?? 'this home'} on Atlas Homestays`;
-                                const share = async () => {
-                                    const nav: any = navigator;
-                                    if (nav?.share) return nav.share({ title: document.title, text, url });
-                                    window.open(`https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`, '_blank', 'noopener,noreferrer');
-                                };
-                                void share();
-                            }}
-                        >
-                            Share
-                        </button>
                     </div>
                 </div>
 
@@ -1295,7 +1311,6 @@ useEffect(() => {
                             // TASK-2068: suppress static snippets when API has confirmed 0 real reviews
                             const apiLoaded = api != null && !api.loading;
                             const showStatic = !showApi && !apiLoaded && data && data.property_reviews > 0;
-                            const showNewListingChip = apiLoaded && !showApi;
                             if (api?.loading && !showStatic) return (
                                 <div className="pb-8 border-b border-border-subtle">
                                     <div className="h-7 w-40 animate-pulse rounded bg-bg-muted mb-4" />
@@ -1315,13 +1330,8 @@ useEffect(() => {
                                     </div>
                                 </div>
                             );
-                            if (!showApi && !showStatic && !showNewListingChip) return null;
-                            if (showNewListingChip && !showApi && !showStatic) return (
-                                <div className="pb-8 border-b border-border-subtle">
-                                    <h2 className="text-xl sm:text-2xl font-semibold mb-4 text-text-primary">Guest Reviews</h2>
-                                    <span className="rounded-full bg-bg-muted px-2.5 py-1 text-xs text-text-muted">New listing — be the first to review</span>
-                                </div>
-                            );
+                            // TASK-2068: API loaded with 0 reviews — no fabricated snippets or empty-state marketing block
+                            if (!showApi && !showStatic) return null;
                             const rating = showApi ? api!.averageRating : data!.property_rating;
                             const count = showApi ? api!.totalCount : data!.property_reviews;
                             return (
