@@ -11,6 +11,7 @@ import { buildApiUrl, getApiHeaders } from "../../api/client";
 import ErrorBoundary from "../../components/ErrorBoundary";
 import { toast } from "react-toastify";
 import { logUserAction, reportError } from "../../lib/monitoring";
+import { messageFromApiResponse } from "../../utils/serverErrorFromResponse";
 import { getTenantContext } from "../../tenant/tenantContext";
 
 type StatusMessage = {
@@ -57,22 +58,9 @@ const ContactUs = () => {
                 body: JSON.stringify(formData),
             });
 
-            const data = (await response.json().catch(() => ({}))) as Record<string, unknown>;
-
             if (!response.ok) {
-                // Hardening for BUG-ONBOARD-1 (incident 2026-05-02). See atlas-e2e/docs/incidents/2026-05-02-property-registration-failure.md
-                const fieldErrors = data?.errors && typeof data.errors === "object"
-                    ? Object.values(data.errors as Record<string, string[]>).flat().filter(Boolean).join(" ")
-                    : "";
-                const serverMsg = (typeof data?.message === "string" && data.message.trim())
-                    || (typeof data?.error === "string" && data.error.trim())
-                    || fieldErrors
-                    || (typeof data?.title === "string" && data.title.trim())
-                    || "";
-                const fallback = response.status >= 500
-                    ? `Our servers hit an unexpected error (${response.status}). Try again or contact support@atlashomestays.com.`
-                    : `Request failed (HTTP ${response.status}). Please check your input and try again.`;
-                const message = serverMsg || fallback;
+                const message = await messageFromApiResponse(response);
+                const data = (await response.json().catch(() => ({}))) as Record<string, unknown>;
                 toast.error(message);
                 setStatusMessage({
                     type: "error",
@@ -81,6 +69,8 @@ const ContactUs = () => {
                 logUserAction("contact_form_submitted", { status: "failed", feature: "contact-form" });
                 return;
             }
+
+            const data = (await response.json().catch(() => ({}))) as Record<string, unknown>;
 
             logUserAction("contact_form_submitted", { status: "success", feature: "contact-form" });
             if (data?.queued) {
@@ -97,10 +87,14 @@ const ContactUs = () => {
             setFormData({ name: "", email: "", contactnumber: "", destination: "", description: "" });
         } catch (error) {
             reportError(error, { feature: "contact-form" });
-            toast.error("We couldn't send your message right now. Please try again or call us.");
+            const message =
+                error instanceof Error && error.message
+                    ? error.message
+                    : "We couldn't send your message right now. Please try again or call us.";
+            toast.error(message);
             setStatusMessage({
                 type: "error",
-                text: "Failed to send message. Please try again or contact us through phone or WhatsApp.",
+                text: `${message} Please try again or contact us through phone or WhatsApp.`,
             });
         }
     };

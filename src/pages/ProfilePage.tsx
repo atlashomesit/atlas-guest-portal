@@ -75,15 +75,18 @@ export default function ProfilePage() {
         }),
       });
       if (res.status === 400) {
-        const data = await res.json() as { error?: string };
-        throw new Error(data?.error ?? "Could not update profile.");
+        throw new Error(await messageFromApiResponse(res));
       }
       if (!res.ok) throw new Error(await messageFromApiResponse(res));
       const updated = await res.json() as GuestProfile;
       setProfile(updated);
       toast.success("Profile updated.");
     } catch (err: unknown) {
-      toast.error((err as Error).message);
+      const message =
+        err instanceof Error && err.message
+          ? err.message
+          : "Could not update profile. Try again.";
+      toast.error(message);
     } finally {
       setSaving(false);
     }

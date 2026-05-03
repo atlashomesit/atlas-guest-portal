@@ -48,12 +48,16 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
       setUserEmail('');
       setUserPhone('');
       setTermsAccepted(false);
-    } catch {
-      setPaymentStatus({ 
-        state: 'failure', 
-        reason: 'Failed to process booking. Please try again.' 
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error && err.message
+          ? err.message
+          : 'Failed to submit booking. Please try again.';
+      setPaymentStatus({
+        state: 'failure',
+        reason: message,
       });
-      toast.error('Failed to submit booking. Please try again.');
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }

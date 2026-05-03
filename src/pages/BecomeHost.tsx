@@ -6,6 +6,7 @@ import { Input } from "../components/ui/Input";
 import { Button } from "../components/ui/Button";
 import { toast } from "react-toastify";
 import { buildApiUrl, getApiHeaders } from "../api/client";
+import { messageFromApiResponse } from "../utils/serverErrorFromResponse";
 import { logUserAction, reportError } from "../lib/monitoring";
 
 const PROPERTY_TYPES = [
@@ -359,8 +360,7 @@ const BecomeHost = () => {
       });
 
       if (!res.ok) {
-        const body = await res.json().catch(() => null);
-        throw new Error(body?.message || "Prefill request failed.");
+        throw new Error(await messageFromApiResponse(res));
       }
 
       const data = await res.json();
@@ -377,7 +377,11 @@ const BecomeHost = () => {
       logUserAction("onboarding_airbnb_prefill", { status: "success", feature: "become-host" });
     } catch (err) {
       reportError(err, { feature: "become-host-airbnb-prefill" });
-      toast.error("Could not import listing. You can still fill in details manually.");
+      const message =
+        err instanceof Error && err.message
+          ? err.message
+          : "Could not import listing. You can still fill in details manually.";
+      toast.error(message);
       setAirbnb((prev) => ({ ...prev, loading: false }));
     }
   };
