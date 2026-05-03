@@ -703,6 +703,7 @@ export default function BookingConfirmationPage() {
             <h2 className="text-sm font-semibold text-text-primary">Add to your calendar</h2>
             <p className="text-sm text-text-secondary">Save your check-in date and property details to your phone calendar.</p>
             <button
+              type="button"
               onClick={downloadCalendar}
               className="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-3 hover:bg-brand-primary/5 transition-colors"
               aria-label="Download calendar event for your stay"
@@ -717,6 +718,7 @@ export default function BookingConfirmationPage() {
             <h2 className="text-sm font-semibold text-text-primary">Trip updates</h2>
             <p className="text-sm text-text-secondary">Get instant alerts on your booking status and check-in reminders.</p>
             <button
+              type="button"
               onClick={subscribePush}
               disabled={pushState === "loading" || !supportsPush}
               className="inline-flex items-center justify-center rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-3 disabled:opacity-50"
@@ -758,6 +760,7 @@ export default function BookingConfirmationPage() {
               </p>
             ) : null}
             <button
+              type="button"
               onClick={submitModificationRequest}
               disabled={modSubmitting || modDatesInvalid}
               className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-3.5 disabled:opacity-50"
@@ -782,6 +785,7 @@ export default function BookingConfirmationPage() {
             </p>
             {!showCancelConfirm ? (
               <button
+                type="button"
                 onClick={() => setShowCancelConfirm(true)}
                 className="inline-flex items-center justify-center rounded-lg border border-red-400 text-red-700 text-sm font-medium px-4 py-3 hover:bg-red-100 transition-colors"
                 data-testid="request-cancellation-btn"
@@ -802,6 +806,7 @@ export default function BookingConfirmationPage() {
                 </label>
                 <div className="flex gap-3">
                   <button
+                    type="button"
                     onClick={submitCancellationRequest}
                     disabled={cancelSubmitting}
                     className="inline-flex items-center justify-center rounded-lg bg-red-600 text-white text-base font-medium px-4 py-3 disabled:opacity-50 hover:bg-red-700 transition-colors"
@@ -810,6 +815,7 @@ export default function BookingConfirmationPage() {
                     {cancelSubmitting ? "Submitting…" : "Confirm request"}
                   </button>
                   <button
+                    type="button"
                     onClick={() => setShowCancelConfirm(false)}
                     className="inline-flex items-center justify-center rounded-lg border border-gray-300 text-gray-700 text-base font-medium px-4 py-3 hover:bg-gray-50 transition-colors"
                   >
