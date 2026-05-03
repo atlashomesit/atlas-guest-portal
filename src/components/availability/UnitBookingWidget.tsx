@@ -16,6 +16,7 @@ import { getIstStartOfDay } from '@/utils/date';
 import { calculateNights, formatNightCount, formatDateInTimezone } from '@/utils/dateHelpers';
 import { doesRangeIntersectBlocked, toISODate } from '@/utils/dateRange';
 import { formatCurrency, formatHumanDate } from '@/utils/formatting';
+import { HelpCircle } from 'lucide-react';
 import {
   clampNationalDigits,
   getGuestDialOption,
@@ -228,6 +229,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [referralMessage, setReferralMessage] = useState<string | null>(null);
   const [promoCode, setPromoCode] = useState('');
   const [appliedPromoCode, setAppliedPromoCode] = useState<string | null>(null);
+  const [promoValidating, setPromoValidating] = useState(false);
   // TASK-1710: DPDP WhatsApp marketing opt-in — unchecked by default
   const [whatsappMarketingOptIn, setWhatsappMarketingOptIn] = useState(false);
   const [appliedPromoDiscount, setAppliedPromoDiscount] = useState(0);
@@ -1061,6 +1063,29 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     return null; // No available date found
   }, [dateStatusMap, blockedSet]);
 
+  // TASK-2074: inline promo validation on blur — calls existing [AllowAnonymous] endpoint
+  const handlePromoBlur = async () => {
+    const code = promoCode.trim();
+    if (!code || !listingId) return;
+    setPromoValidating(true);
+    setPromoMessage(null);
+    try {
+      const res = await fetch(buildApiUrl('/api/promo-codes/validate'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getApiHeaders() },
+        body: JSON.stringify({ code, listingId: Number(listingId), subtotal: priceDetails.total }),
+      });
+      if (!res.ok) { setPromoMessage('Could not validate code — try again.'); return; }
+      const data = (await res.json()) as { valid: boolean; message: string; discountAmount?: number };
+      setPromoMessage(data.message);
+      if (data.valid) setAppliedPromoCode(code);
+    } catch {
+      setPromoMessage('Could not validate code — check your connection.');
+    } finally {
+      setPromoValidating(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -1776,7 +1801,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
       <div className="space-y-1">
         <p className="text-sm uppercase tracking-[0.12em] text-text-muted font-semibold">Reserve</p>
-        <h3 className="text-xl sm:text-2xl font-semibold text-text-primary"></h3>
+        {listingName && <h3 className="text-xl sm:text-2xl font-semibold text-text-primary">{listingName}</h3>}
         <p className="text-text-secondary text-sm">Choose your dates to confirm availability for this apartment.</p>
       </div>
       {isBookingDisabled && (
@@ -2079,7 +2104,14 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             )}
             {/* TASK-1871: GST row removed — all-inclusive rate, no separate GST line */}
             <div className="grid grid-cols-[140px_12px_1fr]">
-              <span>Convenience fee{convenienceFeePctLabel > 0 ? ` (${convenienceFeePctLabel}%)` : ''}</span>
+              <span className="inline-flex items-center gap-1">
+                Convenience fee{convenienceFeePctLabel > 0 ? ` (${convenienceFeePctLabel}%)` : ''}
+                <HelpCircle
+                  className="h-3 w-3 cursor-help text-text-muted"
+                  aria-label="Includes payment-gateway and platform handling charges. Razorpay charges this directly."
+                  title="Includes payment-gateway and platform handling charges. Razorpay charges this directly."
+                />
+              </span>
               <span>:</span>
               <span className="text-right">
                 {displayPrice(breakdownConvenienceFee)}

@@ -146,8 +146,8 @@ export default function ReviewSubmitPage() {
       const additions: string[] = [];
       for (const file of Array.from(files)) {
         if (photoUrls.length + additions.length >= 3) break;
-        if (file.size > 5 * 1024 * 1024) {
-          setPhotoError("Each photo must be 5 MB or smaller.");
+        if (file.size > 16 * 1024 * 1024) {
+          setPhotoError(`"${file.name}" is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Please use a photo under 16 MB.`);
           continue;
         }
         const fd = new FormData();

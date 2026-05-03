@@ -1292,7 +1292,10 @@ useEffect(() => {
                         {(() => {
                             const api = listingReviewsFromApi;
                             const showApi = api && !api.loading && api.totalCount > 0;
-                            const showStatic = !showApi && data && data.property_reviews > 0;
+                            // TASK-2068: suppress static snippets when API has confirmed 0 real reviews
+                            const apiLoaded = api != null && !api.loading;
+                            const showStatic = !showApi && !apiLoaded && data && data.property_reviews > 0;
+                            const showNewListingChip = apiLoaded && !showApi;
                             if (api?.loading && !showStatic) return (
                                 <div className="pb-8 border-b border-border-subtle">
                                     <div className="h-7 w-40 animate-pulse rounded bg-bg-muted mb-4" />
@@ -1312,7 +1315,13 @@ useEffect(() => {
                                     </div>
                                 </div>
                             );
-                            if (!showApi && !showStatic) return null;
+                            if (!showApi && !showStatic && !showNewListingChip) return null;
+                            if (showNewListingChip && !showApi && !showStatic) return (
+                                <div className="pb-8 border-b border-border-subtle">
+                                    <h2 className="text-xl sm:text-2xl font-semibold mb-4 text-text-primary">Guest Reviews</h2>
+                                    <span className="rounded-full bg-bg-muted px-2.5 py-1 text-xs text-text-muted">New listing — be the first to review</span>
+                                </div>
+                            );
                             const rating = showApi ? api!.averageRating : data!.property_rating;
                             const count = showApi ? api!.totalCount : data!.property_reviews;
                             return (

@@ -68,6 +68,8 @@ interface BookingSummary {
   checkoutDateIso?: string;
   propertyLatitude?: number;
   propertyLongitude?: number;
+  /** TASK-1254: Booking reference for self check-in flow (ExternalReservationId or ATL-{id} fallback). */
+  bookingRef?: string;
 }
 
 const statusLabel: Record<string, { label: string; color: string }> = {
@@ -456,6 +458,9 @@ export default function BookingConfirmationPage() {
             <p className="text-sm text-center text-text-secondary max-w-xs">
               Show this to the host on arrival
             </p>
+            <p className="text-xs text-center text-support-error/80 max-w-xs">
+              Don't share this QR publicly — anyone who scans it can access your booking details.
+            </p>
           </div>
         )}
 
@@ -662,6 +667,22 @@ export default function BookingConfirmationPage() {
               </Link>
             )}
           </section>
+        )}
+
+        {/* TASK-1254: Self check-in card — visible within 48h of check-in (same window as WiFi) */}
+        {!isCancelled && booking.wifiVisible && booking.bookingRef &&
+          (booking.status === 'Confirmed' || booking.status === 'CheckedIn') && (
+          <Link
+            to={`/check-in/${encodeURIComponent(booking.bookingRef)}`}
+            data-testid="self-checkin-link"
+            className="flex items-center justify-between gap-4 rounded-2xl border border-brand-primary/40 bg-brand-primary/5 p-5 hover:bg-brand-primary/10 transition-colors"
+          >
+            <div className="space-y-0.5">
+              <p className="text-sm font-semibold text-text-primary">Self check-in</p>
+              <p className="text-xs text-text-secondary">Skip the queue — submit your ID and sign house rules online before you arrive.</p>
+            </div>
+            <span className="shrink-0 text-brand-primary text-lg" aria-hidden>→</span>
+          </Link>
         )}
 
         {/* TASK-2082: PWA install nudge — only within 72h of check-in, only when prompt is available */}
