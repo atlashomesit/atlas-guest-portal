@@ -196,6 +196,24 @@ export default function BookingConfirmationPage() {
       .finally(() => setLoading(false));
   }, [bookingId, token]);
 
+  const modCheckinError = useMemo(() => {
+    if (modCheckin.length < 10) return "";
+    const todayIst = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
+    if (modCheckin < todayIst) return "Check-in cannot be a past date";
+    return "";
+  }, [modCheckin]);
+
+  const modCheckoutError = useMemo(() => {
+    if (modCheckout.length < 10 || modCheckin.length < 10) return "";
+    if (modCheckout <= modCheckin) return "Check-out must be after check-in";
+    const a = new Date(`${modCheckin}T12:00:00`).getTime();
+    const b = new Date(`${modCheckout}T12:00:00`).getTime();
+    if (Number.isNaN(a) || Number.isNaN(b)) return "";
+    const nights = (b - a) / 86400000;
+    if (nights < 1) return "Minimum stay is 1 night (check-out must be the day after check-in or later).";
+    return "";
+  }, [modCheckin, modCheckout]);
+
   if (loading) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
@@ -241,24 +259,6 @@ export default function BookingConfirmationPage() {
   const whatsappUrl = `https://wa.me/${whatsappDigits}?text=${whatsappText}`;
   const supportsPush = typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window;
   const canRequestModification = !isCancelled && !!token;
-
-  const modCheckinError = useMemo(() => {
-    if (modCheckin.length < 10) return "";
-    const todayIst = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
-    if (modCheckin < todayIst) return "Check-in cannot be a past date";
-    return "";
-  }, [modCheckin]);
-
-  const modCheckoutError = useMemo(() => {
-    if (modCheckout.length < 10 || modCheckin.length < 10) return "";
-    if (modCheckout <= modCheckin) return "Check-out must be after check-in";
-    const a = new Date(`${modCheckin}T12:00:00`).getTime();
-    const b = new Date(`${modCheckout}T12:00:00`).getTime();
-    if (Number.isNaN(a) || Number.isNaN(b)) return "";
-    const nights = (b - a) / 86400000;
-    if (nights < 1) return "Minimum stay is 1 night (check-out must be the day after check-in or later).";
-    return "";
-  }, [modCheckin, modCheckout]);
 
   const modDatesInvalid = Boolean(modCheckinError || modCheckoutError);
 
