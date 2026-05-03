@@ -153,6 +153,20 @@ interface Property {
     property_address?: string | null;
 }
 
+/** Avoid `new Date(x).toISOString()` on invalid URL params — throws RangeError and trips the route error boundary. */
+function isoFromUrlDateParam(value: string | null): string | undefined {
+    if (value == null) return undefined;
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+    const d = new Date(trimmed);
+    if (!Number.isFinite(d.getTime())) return undefined;
+    try {
+        return d.toISOString();
+    } catch {
+        return undefined;
+    }
+}
+
 const PropertyDetails = () => {
     const location = useLocation();
     const { propertySlug: propertySlugParam, unitSlug: unitSlugParam, id: legacyIdParam } = useParams();
@@ -244,20 +258,21 @@ const PropertyDetails = () => {
         return () => { active = false; };
     }, []);
 
-    // Hydrate booking context from URL search params (passed from SearchPage)
+    // Hydrate booking context from URL search params (passed from SearchPage or deep-link tests).
     useEffect(() => {
-        const checkIn = searchParams.get('checkIn');
-        const checkOut = searchParams.get('checkOut');
-        const guests = Number(searchParams.get('guests')) || null;
-        if (checkIn || checkOut || guests) {
+        const checkInIso = isoFromUrlDateParam(searchParams.get('checkIn'));
+        const checkOutIso = isoFromUrlDateParam(searchParams.get('checkOut'));
+        const guestsRaw = searchParams.get('guests');
+        const guestsParsed = guestsRaw != null && guestsRaw.trim() !== '' ? Number(guestsRaw) : NaN;
+        const guests = Number.isFinite(guestsParsed) && guestsParsed > 0 ? guestsParsed : null;
+        if (checkInIso || checkOutIso || guests) {
             updateBooking({
-                ...(checkIn ? { checkIn: new Date(checkIn).toISOString() } : {}),
-                ...(checkOut ? { checkOut: new Date(checkOut).toISOString() } : {}),
+                ...(checkInIso ? { checkIn: checkInIso } : {}),
+                ...(checkOutIso ? { checkOut: checkOutIso } : {}),
                 ...(guests ? { guests } : {}),
             });
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [searchParams, updateBooking]);
     const nightlyPrice = useMemo(() => {
         if (!data) return null;
         try {

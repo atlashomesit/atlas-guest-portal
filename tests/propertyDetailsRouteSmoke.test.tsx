@@ -122,4 +122,38 @@ describe("PropertyDetails route smoke", () => {
     });
     expect(screen.getByText(/Atlas Homes Room 301/i)).toBeInTheDocument();
   });
+
+  it("does not trip error boundary when URL has invalid checkIn (malformed query must not throw)", async () => {
+    render(
+      <MemoryRouter
+        initialEntries={["/homes/atlas-homes-room-202/4?checkIn=not-a-date&checkOut=2026-06-10&guests=2"]}
+      >
+        <Routes>
+          <Route path="/homes/:propertySlug/:unitSlug" element={<Homepage_PropertyDetails />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByText(/We couldn't load this page/i)).not.toBeInTheDocument();
+    });
+    expect(screen.getByText(/Atlas Homes Room 202/i)).toBeInTheDocument();
+  });
+
+  it("renders with valid checkIn/checkOut query params", async () => {
+    render(
+      <MemoryRouter
+        initialEntries={["/homes/atlas-homes-room-202/4?checkIn=2026-06-01&checkOut=2026-06-05&guests=2"]}
+      >
+        <Routes>
+          <Route path="/homes/:propertySlug/:unitSlug" element={<Homepage_PropertyDetails />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByText(/We couldn't load this page/i)).not.toBeInTheDocument();
+    });
+    expect(screen.getByText(/Atlas Homes Room 202/i)).toBeInTheDocument();
+  });
 });
