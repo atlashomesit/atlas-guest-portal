@@ -1861,7 +1861,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             </p>
           )}
           <p className="text-xs text-text-secondary">
-            Grey: blocked or on hold (not selectable). Orange: turnover cleaning — those nights stay bookable.
+            Grey: blocked. Orange: on hold (not selectable). Green: turnover cleaning (still bookable).
           </p>
           <button
             id="unit-booking-dates"

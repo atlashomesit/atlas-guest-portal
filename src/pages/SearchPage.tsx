@@ -211,7 +211,8 @@ const SearchPage = () => {
   /** TASK-1451: include guests so "Clear filters" resets guest count too. */
   const hasActiveFilters = Boolean(
     minPrice || maxPrice || remoteWork || longStay || availableNow || selectedAmenities.length > 0
-    || nomadWifi || nomadWorkspace || monthlyStay || guests != null,
+    || nomadWifi || nomadWorkspace || monthlyStay || guests != null
+    || sortBy !== "recommended" || mapView,
   );
 
   const [tonightAvailableIds, setTonightAvailableIds] = useState<Set<number> | null>(null);
@@ -482,6 +483,8 @@ const SearchPage = () => {
       next.delete("nomadWifi");
       next.delete("nomadWorkspace");
       next.delete("monthlyStay");
+      next.delete("sortBy");
+      next.delete("view");
       return next;
     }, { replace: true });
   };
@@ -731,6 +734,7 @@ const SearchPage = () => {
             />
             <span className="text-text-primary">Long stay (7+ nights)</span>
           </label>
+          {(!checkIn || !checkOut) && (
           <label className="flex items-center gap-2 rounded-lg border border-border-subtle bg-bg-muted px-3 py-2 text-sm">
             <input
               type="checkbox"
@@ -742,6 +746,7 @@ const SearchPage = () => {
             />
             <span className="text-text-primary">Available tonight</span>
           </label>
+          )}
           <div className="ml-auto flex items-end gap-3">
             {!isLoading && (
               <span className="text-sm text-text-muted">

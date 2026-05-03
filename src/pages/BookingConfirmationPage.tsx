@@ -800,9 +800,11 @@ export default function BookingConfirmationPage() {
                     value={cancelReason}
                     onChange={(e) => setCancelReason(e.target.value)}
                     rows={2}
+                    maxLength={500}
                     placeholder="e.g., change of plans, emergency…"
                     className="mt-1 w-full rounded-md border border-red-200 px-3 py-3 text-base bg-white"
                   />
+                  <p className="text-xs text-text-muted">{cancelReason.length}/500</p>
                 </label>
                 <div className="flex gap-3">
                   <button
