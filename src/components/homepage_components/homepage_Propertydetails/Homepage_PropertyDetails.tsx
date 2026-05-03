@@ -1491,18 +1491,36 @@ useEffect(() => {
                             </button>
                         </div>
 
-                        {/* Location Map */}
+                        {/* Location Map — TASK-1677: fallback when embed URL missing */}
                         <div className="">
                             <h2 className="text-xl sm:text-2xl font-semibold mb-4 text-text-primary">Where you'll be</h2>
                             <div className="rounded-lg overflow-hidden border border-border-subtle">
-                                <iframe
-                                    src={data?.property_mapSrc || ''}
-                                    className="w-full h-64 sm:h-96"
-                                    loading="lazy"
-                                    allowFullScreen
-                                    referrerPolicy="no-referrer-when-downgrade"
-                                    title="Property Location"
-                                ></iframe>
+                                {mapSrcTrimmed ? (
+                                    <iframe
+                                        src={mapSrcTrimmed}
+                                        className="w-full h-64 sm:h-96"
+                                        loading="lazy"
+                                        allowFullScreen
+                                        referrerPolicy="no-referrer-when-downgrade"
+                                        title="Property Location"
+                                    />
+                                ) : (
+                                    <div className="flex min-h-[16rem] flex-col items-center justify-center gap-3 bg-bg-muted px-4 py-8 text-center sm:min-h-[24rem]">
+                                        <p className="text-lg text-text-primary">
+                                            📍 {mapSearchQuery || (data?.property_location ?? "Location on map")}
+                                        </p>
+                                        {mapSearchQuery ? (
+                                            <a
+                                                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapSearchQuery)}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-sm font-semibold text-accent-primary underline underline-offset-2"
+                                            >
+                                                View on Google Maps →
+                                            </a>
+                                        ) : null}
+                                    </div>
+                                )}
                             </div>
                             <p className="mt-4 text-text-muted text-sm sm:text-base">
                                 {data?.property_location || 'Location information not available'}
