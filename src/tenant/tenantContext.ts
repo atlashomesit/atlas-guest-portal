@@ -21,6 +21,8 @@ export interface TenantInfo {
   brandColor?: string;
   isMarketplaceRoot?: boolean;
   category?: string;
+  /** TASK-1727: true when the tenant has a valid GSTIN on file. */
+  isGstVerified?: boolean;
 }
 
 let tenantInfo: TenantInfo | null = null;
@@ -76,6 +78,7 @@ export async function resolveFromDomain(apiBaseUrl: string, domain: string): Pro
       category: data.category ?? undefined,
       isMarketplaceRoot,
       brandColor: data.primaryColor ?? undefined, // backward compat
+      isGstVerified: Boolean(data.isGstVerified), // TASK-1727
     };
     return tenantInfo;
   } catch (error) {
