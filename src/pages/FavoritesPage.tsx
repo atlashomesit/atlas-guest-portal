@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { FaHeart } from "react-icons/fa";
 import SEO from "../components/SEO";
 import { fetchPublicListings, type PublicListing } from "../api/listingClient";
@@ -12,6 +12,14 @@ export default function FavoritesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [favEpoch, setFavEpoch] = useState(0);
+  // TASK-1299: Wishlist share — copy link to clipboard
+  const [shareState, setShareState] = useState<"idle" | "copied">("idle");
+  const [searchParams] = useSearchParams();
+  const sharedWishlistIds = useMemo(() => {
+    const token = searchParams.get("wishlist");
+    if (!token) return null;
+    try { return atob(token).split(",").map(Number).filter(Boolean); } catch { return null; }
+  }, [searchParams]);
 
   // TASK-1709: reminder email capture
   const [reminderEmail, setReminderEmail] = useState("");
@@ -52,7 +60,10 @@ export default function FavoritesPage() {
   const favIds = useMemo(() => new Set(getFavoriteIds()), [favEpoch]);
   const recent = useMemo(() => getRecentlyViewed(), []);
 
-  const favorites = useMemo(() => all.filter((l) => favIds.has(l.id)), [all, favIds]);
+  const favorites = useMemo(() => {
+    if (sharedWishlistIds) return all.filter((l) => sharedWishlistIds.includes(l.id));
+    return all.filter((l) => favIds.has(l.id));
+  }, [all, favIds, sharedWishlistIds]);
 
   const handleReminderSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,14 +92,53 @@ export default function FavoritesPage() {
   const listingPath = (l: PublicListing) =>
     buildHomeUnitPath(getPropertySlug({ name: l.name, property_name: l.propertyName }), l.id);
 
+  // TASK-1299: encode saved IDs into shareable URL (no backend needed)
+  const handleShareWishlist = () => {
+    const ids = getFavoriteIds();
+    if (!ids.length) return;
+    const token = btoa(ids.join(","));
+    const shareUrl = `${window.location.origin}/favorites?wishlist=${encodeURIComponent(token)}`;
+    const waText = `Check out these Atlas Homestays I saved! ${shareUrl}`;
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(waText)}`;
+    if (navigator.share) {
+      navigator.share({ title: "My Atlas Homestays Wishlist", url: shareUrl }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        setShareState("copied");
+        setTimeout(() => setShareState("idle"), 2500);
+      }).catch(() => {
+        window.open(whatsappUrl, "_blank", "noopener");
+      });
+    }
+  };
+
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-6">
       <SEO title="Saved homes | Atlas Homestays" description="Your saved Atlas Homestays listings." />
+      {/* TASK-1299: Shared wishlist banner */}
+      {sharedWishlistIds && (
+        <div className="rounded-xl border border-brand-primary/30 bg-brand-primary/5 px-4 py-3 text-sm text-text-primary">
+          👥 Someone shared their wishlist with you — {sharedWishlistIds.length} saved home{sharedWishlistIds.length !== 1 ? "s" : ""}.
+          <Link to="/favorites" className="ml-2 text-brand-primary underline underline-offset-2">View your own wishlist</Link>
+        </div>
+      )}
       <div className="flex items-baseline justify-between gap-2 flex-wrap">
         <h1 className="text-2xl font-bold text-text-primary">Saved homes</h1>
-        <Link to="/" className="text-sm text-brand-primary underline underline-offset-2">
-          Back to home
-        </Link>
+        <div className="flex items-center gap-3">
+          {/* TASK-1299: Share wishlist via WhatsApp / native share / clipboard */}
+          {favorites.length > 0 && (
+            <button
+              type="button"
+              onClick={handleShareWishlist}
+              className="text-sm font-medium text-brand-primary border border-brand-primary rounded-lg px-3 py-1.5 hover:bg-brand-primary/5 transition-colors"
+            >
+              {shareState === "copied" ? "✓ Link copied!" : "Share wishlist"}
+            </button>
+          )}
+          <Link to="/" className="text-sm text-brand-primary underline underline-offset-2">
+            Back to home
+          </Link>
+        </div>
       </div>
 
       {loading ? (

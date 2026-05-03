@@ -183,6 +183,7 @@ export default function ReviewSubmitPage() {
     if (rating === 0) { setSubmitError("Please select a star rating."); return; }
     if (!body.trim()) { setSubmitError("Please share a bit about your stay."); return; }
     if (bodyLen < 20) { setSubmitError("Please write at least 20 characters."); return; }
+    if (bodyLen > 500) { setSubmitError("Review text must be 500 characters or fewer."); return; }
     if (SUB_CATEGORY_ROWS.some(({ key }) => subRatings[key] < 1)) {
       setSubmitError("Please rate cleanliness, value, check-in, and host communication.");
       return;
@@ -383,7 +384,7 @@ export default function ReviewSubmitPage() {
               className={`w-full rounded-xl border bg-bg-surface px-4 py-2.5 text-base text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary resize-none ${bodyTooShort ? "border-support-error" : "border-border-subtle"}`}
             />
             <p className="text-xs text-text-muted">
-              {body.length}/20 minimum · {body.length}/500 maximum
+              {bodyLen}/20 minimum · {body.length}/500 maximum
             </p>
             {bodyTooShort ? (
               <p className="text-xs text-support-error" role="alert">

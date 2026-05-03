@@ -12,7 +12,6 @@ import { FaStar } from "react-icons/fa";
 import { X, ChevronRight, Clock, KeyRound, Bookmark, Share2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { propertyData } from '../../../data.ts';
-import { getExplicitUnitPolicy } from '../../../config/policyConfig';
 import { inlinePolicySnippets } from '../../../content/terms';
 import Subheading from '../../commonComponents/subheading/Subheading';
 import UnitBookingWidget from '../../availability/UnitBookingWidget';
@@ -143,6 +142,8 @@ interface Property {
     /** G3-002: from API listing when available */
     checkInTime?: string;
     checkOutTime?: string;
+    /** TASK-1676: nested policy times from listing DTO when present */
+    unitPolicy?: { checkInTime?: string | null; checkOutTime?: string | null };
     /** AMN-001: amenity codes from API (e.g. ["wifi","ac","parking"]) */
     amenityCodes?: string[];
     /** TASK-355: host/on-site contact phone for WhatsApp CTA */
@@ -652,6 +653,17 @@ const PropertyDetails = () => {
                         maxGuests: parseMaxGuestsFromPayload(apiListing as Record<string, unknown>),
                         checkInTime: pub.checkInTime?.trim() || undefined,
                         checkOutTime: pub.checkOutTime?.trim() || undefined,
+                        unitPolicy: (() => {
+                          const raw = (apiListing as Record<string, unknown>).unitPolicy;
+                          if (!raw || typeof raw !== "object") return undefined;
+                          const o = raw as Record<string, unknown>;
+                          const cin = o.checkInTime ?? o.CheckInTime;
+                          const cout = o.checkOutTime ?? o.CheckOutTime;
+                          return {
+                            checkInTime: typeof cin === "string" ? cin : null,
+                            checkOutTime: typeof cout === "string" ? cout : null,
+                          };
+                        })(),
                         hostPhone: (() => {
                             const raw = (apiListing as Record<string, unknown>).hostPhone ?? (apiListing as Record<string, unknown>).contactPhone;
                             return typeof raw === 'string' && raw.trim() ? raw.trim() : null;
@@ -946,11 +958,10 @@ useEffect(() => {
         );
     }
 
-    const explicitUnitPolicy = getExplicitUnitPolicy(data?.id);
     const resolvedCheckInTime =
-      (data?.checkInTime?.trim()) || explicitUnitPolicy?.checkIn || null;
+      data?.checkInTime?.trim() || data?.unitPolicy?.checkInTime?.trim() || null;
     const resolvedCheckOutTime =
-      (data?.checkOutTime?.trim()) || explicitUnitPolicy?.checkOut || null;
+      data?.checkOutTime?.trim() || data?.unitPolicy?.checkOutTime?.trim() || null;
     const cancellationPolicyText = (() => {
         const policies = data?.property_policy_details ?? [];
         const fromListingPolicy = policies.find((p) =>

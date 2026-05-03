@@ -120,7 +120,7 @@ export default function SearchResultsMap({ units, formatPrice, querySuffix }: Se
                       to={`${u.canonicalPath}${querySuffix}`}
                       className="inline-block font-medium text-cta-primary underline"
                     >
-                      View details
+                      View home
                     </Link>
                   </div>
                 </Popup>

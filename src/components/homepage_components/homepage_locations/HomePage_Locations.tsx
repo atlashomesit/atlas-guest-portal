@@ -451,7 +451,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
                   onClick={() => handleNavigate(heroModel)}
                   className="property-card__button inline-flex items-center justify-center rounded-full border border-border-subtle px-5 py-3 text-sm font-semibold text-text-primary transition hover:border-[color:var(--cta-primary)] hover:text-[color:var(--cta-primary)]"
                 >
-                  View details
+                  View home
                 </button>
               </div>
             </div>
@@ -577,7 +577,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
                         }}
                         className="property-card__button inline-flex items-center justify-center rounded-full border border-border-subtle px-5 py-3 text-sm font-semibold text-text-primary transition hover:border-[color:var(--cta-primary)] hover:text-[color:var(--cta-primary)]"
                       >
-                        View details
+                        View home
                       </Link>
                     </div>
                   </div>

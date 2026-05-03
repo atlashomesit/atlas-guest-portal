@@ -176,7 +176,7 @@ export default function MarketplaceHomepage() {
                     className="mt-auto inline-flex min-h-[40px] items-center justify-center rounded-xl bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 transition-colors"
                     to={`/${item.slug}`}
                   >
-                    View details
+                    View home
                   </Link>
                 </div>
               </article>
