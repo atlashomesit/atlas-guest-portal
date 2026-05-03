@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
+import { QRCodeSVG } from "qrcode.react"; // TASK-1476
 import SEO from "../components/SEO";
 import { buildApiUrl, getApiHeaders } from "../api/client";
 import { getRuntimeConfig, hasRuntimeConfig } from "../runtime-config";
@@ -410,6 +411,23 @@ export default function BookingConfirmationPage() {
             </span>
           </div>
         </div>
+
+        {/* TASK-1476: QR check-in code — guests can scan on arrival to confirm identity */}
+        {!isCancelled && token && (
+          <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-5 flex flex-col items-center gap-3" data-testid="confirmation-qr-section">
+            <QRCodeSVG
+              value={`${window.location.origin}/booking/${bookingId}?t=${encodeURIComponent(token)}`}
+              size={180}
+              bgColor="#ffffff"
+              fgColor="#0F172A"
+              level="M"
+              aria-label={`QR code for booking #${bookingId}`}
+            />
+            <p className="text-sm text-center text-text-secondary max-w-xs">
+              Show this to the host on arrival
+            </p>
+          </div>
+        )}
 
         {/* GST invoice (token-gated PDF) */}
         {!isCancelled && booking.hasGstInvoice && pdfUrl && (
