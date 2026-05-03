@@ -1698,7 +1698,21 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                   Contact host on WhatsApp
                 </a>
               ) : (
-                <p>Contact property directly.</p>
+                // TASK-2067: actionable fallback when host phone unknown
+                <div className="flex flex-col gap-2">
+                  <a
+                    href="tel:+917032493290"
+                    className="inline-flex items-center justify-center rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    📞 Call +91 7032 493 290
+                  </a>
+                  <a
+                    href="mailto:atlashomeskphb@gmail.com"
+                    className="inline-flex items-center justify-center rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    ✉️ Email support
+                  </a>
+                </div>
               )}
             </div>
 

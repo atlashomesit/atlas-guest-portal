@@ -145,26 +145,7 @@ const Home = () => {
                         ratingValue: penthouse?.property_rating,
                         reviewCount: penthouse?.property_reviews,
                     },
-                    review: [
-                        {
-                            "@type": "Review",
-                            reviewBody: "Spacious penthouse with reliable Wi-Fi and quick support during our workation.",
-                            reviewRating: { "@type": "Rating", ratingValue: 5 },
-                            author: { "@type": "Person", name: "Aparna" },
-                        },
-                        {
-                            "@type": "Review",
-                            reviewBody: "Loved the rooftop views and the smooth self check-in at Atlas Penthouse 501.",
-                            reviewRating: { "@type": "Rating", ratingValue: 5 },
-                            author: { "@type": "Person", name: "Ravi" },
-                        },
-                        {
-                            "@type": "Review",
-                            reviewBody: "Clean, modern interiors with plenty of space for our family of five.",
-                            reviewRating: { "@type": "Rating", ratingValue: 4.8 },
-                            author: { "@type": "Person", name: "Shruti" },
-                        },
-                    ],
+                    // TASK-2064: fabricated review array removed — violates Google Structured Data Guidelines and ASCI 2025
                     offers: {
                         "@type": "Offer",
                         name: "Atlas Penthouse 501 direct offer",

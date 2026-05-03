@@ -6,7 +6,7 @@ interface FomoBarProps {
   workerUrl?: string;
 }
 
-/** Seeded pseudo-count: same listing/day gives a stable but non-zero number between 2 and 9 */
+/** Seeded pseudo-count: only used in dev/local when no worker URL is set. Never shown in prod. */
 function seededCount(listingId: number): number {
   const day = Math.floor(Date.now() / 86_400_000);
   const seed = ((listingId * 9301 + day * 49297) % 1000) / 1000;
@@ -42,7 +42,8 @@ export default function FomoBar({ listingId, workerUrl }: FomoBarProps) {
           }
         } catch { /* fall through to seeded */ }
       }
-      if (!cancelled) setCount(seededCount(listingId));
+      // TASK-2065: seeded fallback only in dev — prod shows nothing when no worker URL
+      if (!cancelled && import.meta.env.DEV) setCount(seededCount(listingId));
     }
 
     fetchCount();
