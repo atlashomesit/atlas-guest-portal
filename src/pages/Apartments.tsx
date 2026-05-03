@@ -63,6 +63,8 @@ type CombinedListing = {
   petFriendly: boolean;
   image: string;
   property: PropertyRecord;
+  /** TASK-1360: ISO date of most recent checkout within 30 days. */
+  lastBookedAt?: string | null;
 };
 
 const derivePropertyType = (name?: string): string => {
@@ -341,6 +343,7 @@ export const Apartments = () => {
             petFriendly: derivePetFriendly(property),
             image: images?.[0] ?? (getTenantOverrides(getTenantContext()?.slug).hideLogo ? "" : LOGO_URL),
             property,
+            lastBookedAt: property.lastBookedAt ?? null, // TASK-1360
           };
         } catch (error) {
           console.error(`Error processing listing ${listing.id}:`, error);
@@ -578,6 +581,7 @@ export const Apartments = () => {
                   hasWifi={listing.hasWifi}
                   hasParking={listing.hasParking}
                   petFriendly={listing.petFriendly}
+                  lastBookedAt={listing.lastBookedAt ?? undefined}
                   onClick={() => handleNavigate(listing.property)}
                 />
               ))}

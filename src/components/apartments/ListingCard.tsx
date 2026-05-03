@@ -21,6 +21,8 @@ type ListingCardProps = {
   hasWifi?: boolean;
   hasParking?: boolean;
   petFriendly: boolean;
+  /** TASK-1360: ISO date of most recent checkout within 30 days for social-proof badge. */
+  lastBookedAt?: string | null;
   onClick?: () => void;
 };
 
@@ -47,8 +49,18 @@ const ListingCard: React.FC<ListingCardProps> = ({
   hasWifi,
   hasParking,
   petFriendly,
+  lastBookedAt,
   onClick,
 }) => {
+  // TASK-1360: Compute "Last booked X days ago" label
+  const lastBookedLabel = useMemo(() => {
+    if (!lastBookedAt) return null;
+    const days = Math.round((Date.now() - new Date(lastBookedAt).getTime()) / (1000 * 60 * 60 * 24));
+    if (days <= 0) return "Booked today";
+    if (days === 1) return "Booked yesterday";
+    if (days <= 30) return `Last booked ${days} days ago`;
+    return null;
+  }, [lastBookedAt]);
   const finalPrice = pricingBreakdown?.finalNightlyPrice ?? price;
   const originalPrice = pricingBreakdown?.baseNightlyPrice ?? price;
   const ratingSnippet = rating > 0 ? `${rating.toFixed(2)} / 5` : "Rating updates soon";
@@ -165,6 +177,13 @@ const ListingCard: React.FC<ListingCardProps> = ({
             <span className="text-text-muted">({reviews.toLocaleString()})</span>
           </div>
         </div>
+
+        {/* TASK-1360: Last-booked social-proof badge */}
+        {lastBookedLabel && (
+          <span className="inline-flex items-center gap-1 self-start rounded-full bg-green-50 border border-green-200 px-2.5 py-0.5 text-xs font-medium text-green-700">
+            🔥 {lastBookedLabel}
+          </span>
+        )}
 
         {quickFacts.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 text-xs text-text-primary sm:text-sm">

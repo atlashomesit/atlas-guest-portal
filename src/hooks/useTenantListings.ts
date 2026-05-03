@@ -20,6 +20,8 @@ export type TenantPropertyRecord = {
   property_img?: string[];
   property_amenities?: { amenities_icon: string; name: string }[];
   property_policy_details?: { type: string; value: string }[];
+  /** TASK-1360: ISO date of most recent checkout within 30 days (for social proof badge). */
+  lastBookedAt?: string | null;
 };
 
 export type TenantListingsState = "idle" | "loading" | "error" | "success";
@@ -80,6 +82,7 @@ const mapDtoToProperty = (dto: PublicListing, photosFromEndpoint: string[]): Ten
     property_img: photoUrls,
     property_amenities: local?.property_amenities ?? [],
     property_policy_details: local?.property_policy_details ?? [],
+    lastBookedAt: dto.lastBookedAt ?? null, // TASK-1360
   };
 };
 

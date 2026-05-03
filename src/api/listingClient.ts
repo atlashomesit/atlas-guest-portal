@@ -67,6 +67,8 @@ export type PublicListing = {
   photosVerifiedAt?: string | null;
   /** TASK-1727: True when the tenant has a registered GSTIN — shown as trust badge on listing cards. */
   isGstRegistered?: boolean;
+  /** TASK-1360: ISO date string of most recent checkout within 30 days, or null. */
+  lastBookedAt?: string | null;
   /** TASK-1457: Property coordinates from API (null when unset). */
   latitude?: number | null;
   longitude?: number | null;
@@ -140,6 +142,7 @@ function normalizePublicListing(payload: Record<string, unknown>): PublicListing
     losDiscount2Percent:
       payload.losDiscount2Percent != null ? Number(payload.losDiscount2Percent) : null,
     isGstRegistered: Boolean(payload.isGstRegistered), // TASK-1727
+    lastBookedAt: typeof payload.lastBookedAt === 'string' ? payload.lastBookedAt : null, // TASK-1360
     latitude: Number.isFinite(latitude) ? latitude : null,
     longitude: Number.isFinite(longitude) ? longitude : null,
   };
