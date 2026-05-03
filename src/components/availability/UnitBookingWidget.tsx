@@ -1352,6 +1352,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                 
                 // Set payment status to success to show popup
                 setPaymentStatus('success');
+
+                // TASK-1709: store guest email/name so toggleFavorite can sync saved listings.
+                try {
+                  localStorage.setItem("atlas_guest_email", formData.email.trim());
+                  if (formData.name.trim()) localStorage.setItem("atlas_guest_name", formData.name.trim());
+                } catch { /* ignore quota / private mode */ }
                 
                 // Update booking context on success
                 updateBooking({

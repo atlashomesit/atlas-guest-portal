@@ -73,6 +73,8 @@ export type PublicListing = {
   /** TASK-1457: Property coordinates from API (null when unset). */
   latitude?: number | null;
   longitude?: number | null;
+  /** TASK-2076: Total number of verified reviews. Null when no reviews yet. */
+  reviewCount?: number | null;
 };
 
 function normalizePublicListing(payload: Record<string, unknown>): PublicListing {
@@ -146,6 +148,7 @@ function normalizePublicListing(payload: Record<string, unknown>): PublicListing
     lastBookedAt: typeof payload.lastBookedAt === 'string' ? payload.lastBookedAt : null, // TASK-1360
     latitude: Number.isFinite(latitude) ? latitude : null,
     longitude: Number.isFinite(longitude) ? longitude : null,
+    reviewCount: payload.reviewCount != null ? Number(payload.reviewCount) : null,
   };
 }
 

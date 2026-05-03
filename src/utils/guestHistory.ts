@@ -1,3 +1,5 @@
+import { buildApiUrl, getApiHeaders } from "../api/client";
+
 const RECENT_KEY = "atlas_recent_listings_v1";
 const FAV_KEY = "atlas_favorites_v1";
 
@@ -83,10 +85,11 @@ export function toggleFavorite(listingId: number): boolean {
     try {
       const email = localStorage.getItem("atlas_guest_email");
       if (email) {
-        fetch("/api/saved-listings", {
+        const guestName = localStorage.getItem("atlas_guest_name") ?? undefined;
+        fetch(buildApiUrl("/api/saved-listings"), {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ guestEmail: email, listingId }),
+          headers: { "Content-Type": "application/json", ...getApiHeaders() },
+          body: JSON.stringify({ guestEmail: email, guestName, listingId }),
         }).catch(() => { /* non-critical — fire and forget */ });
       }
     } catch { /* ignore */ }

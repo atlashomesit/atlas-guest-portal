@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react"; // TASK-1476
 import SEO from "../components/SEO";
@@ -119,6 +119,20 @@ export default function BookingConfirmationPage() {
   const [cancelRequested, setCancelRequested] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [copyRefFeedback, setCopyRefFeedback] = useState(false);
+  const [pwaInstallDismissed, setPwaInstallDismissed] = useState(() => {
+    try { return localStorage.getItem("atlas_guest_pwa_install_dismissed_v1") === "1"; } catch { return false; }
+  });
+  const pwaInstallPromptRef = useRef<any>(null);
+
+  const isIos = typeof navigator !== "undefined" && /iPhone|iPad|iPod/.test(navigator.userAgent);
+  const isStandalone = typeof window !== "undefined" && window.matchMedia("(display-mode: standalone)").matches;
+  const isIosNonPwa = isIos && !isStandalone;
+
+  useEffect(() => {
+    const handler = (e: Event) => { e.preventDefault(); pwaInstallPromptRef.current = e; };
+    window.addEventListener("beforeinstallprompt", handler);
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, []);
 
   useEffect(() => {
     if (!bookingId || !token) {
@@ -649,6 +663,36 @@ export default function BookingConfirmationPage() {
           </section>
         )}
 
+        {/* TASK-2082: PWA install nudge — only within 72h of check-in, only when prompt is available */}
+        {!isCancelled && booking.preArrivalBriefingVisible && !pwaInstallDismissed && !isIosNonPwa && (
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-border-subtle bg-bg-muted/60 px-4 py-3 text-sm">
+            <span>📱 Save Atlas to your home screen for quick access during your stay</span>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-xs font-medium px-3 py-1.5 hover:opacity-90 transition-opacity"
+                onClick={() => {
+                  if (pwaInstallPromptRef.current) {
+                    pwaInstallPromptRef.current.prompt();
+                  }
+                }}
+              >
+                Install
+              </button>
+              <button
+                type="button"
+                className="text-xs text-text-muted underline underline-offset-2 hover:text-text-primary"
+                onClick={() => {
+                  try { localStorage.setItem("atlas_guest_pwa_install_dismissed_v1", "1"); } catch { /* ignore */ }
+                  setPwaInstallDismissed(true);
+                }}
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* What happens next */}
         {!isCancelled && (
           <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5">
@@ -731,21 +775,28 @@ export default function BookingConfirmationPage() {
           <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3">
             <h2 className="text-sm font-semibold text-text-primary">Trip updates</h2>
             <p className="text-sm text-text-secondary">Get instant alerts on your booking status and check-in reminders.</p>
-            <button
-              type="button"
-              onClick={subscribePush}
-              disabled={pushState === "loading" || !supportsPush}
-              className="inline-flex items-center justify-center rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-3 disabled:opacity-50"
-            >
-              {pushState === "loading" ? "Enabling..." : "Enable notifications"}
-            </button>
-            {pushMessage ? <p className={`text-xs ${pushState === "error" ? "text-red-600" : "text-green-700"}`}>{pushMessage}</p> : null}
-            {pushState === "error" && (pushMessage.includes("denied") || pushMessage.includes("not supported") || pushMessage.includes("not configured")) && (
-              <p className="text-xs text-text-muted mt-1">
-                {/iPhone|iPad|iPod/.test(navigator.userAgent)
-                  ? "On iOS Safari: Settings → Safari → Notifications → Allow for this site. Or try Chrome on iOS."
-                  : "Try a different browser (Chrome or Firefox) if notifications are blocked."}
+            {isIosNonPwa ? (
+              <p className="text-sm text-text-secondary">
+                To receive trip alerts on iPhone, add Atlas to your home screen first: Safari → Share (
+                <span aria-hidden>⎙</span>) → Add to Home Screen. Then re-open from the home screen icon.
               </p>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={subscribePush}
+                  disabled={pushState === "loading" || !supportsPush}
+                  className="inline-flex items-center justify-center rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-3 disabled:opacity-50"
+                >
+                  {pushState === "loading" ? "Enabling..." : "Enable notifications"}
+                </button>
+                {pushMessage ? <p className={`text-xs ${pushState === "error" ? "text-red-600" : "text-green-700"}`}>{pushMessage}</p> : null}
+                {pushState === "error" && (pushMessage.includes("denied") || pushMessage.includes("not supported") || pushMessage.includes("not configured")) && (
+                  <p className="text-xs text-text-muted mt-1">
+                    Try a different browser (Chrome or Firefox) if notifications are blocked.
+                  </p>
+                )}
+              </>
             )}
           </div>
         )}

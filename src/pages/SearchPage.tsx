@@ -117,7 +117,7 @@ function apiToNormalized(listings: PublicListing[]): NormalizedListing[] {
         amenities: ((l as unknown as { amenityCodes?: string[] }).amenityCodes ?? []).map((code) => ({ amenities_icon: code })),
         canonicalPath,
         rating: l.propertyRating ?? undefined,
-        reviewCount: (l as unknown as { reviewCount?: number }).reviewCount ?? null,
+        reviewCount: l.reviewCount ?? null,
         // TASK-1866: map minStay so long-stay filter works on API listings
         minStay: l.minStay ?? null,
         losDiscountMinNights: l.losDiscountMinNights ?? null,
@@ -1105,6 +1105,9 @@ const SearchPage = () => {
                       {unit.rating != null && unit.rating > 0 && (
                         <p className="mt-0.5 text-sm text-accent-primary font-medium">
                           {"★".repeat(Math.round(unit.rating))}<span className="text-text-muted ml-1">{unit.rating.toFixed(1)}</span>
+                          {unit.reviewCount != null && unit.reviewCount > 0 && (
+                            <span className="text-text-muted ml-1 text-xs">({unit.reviewCount})</span>
+                          )}
                         </p>
                       )}
                       {/* TASK-1716: keyword-bucketed sentiment summary */}
