@@ -30,6 +30,7 @@ import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
 import { fetchCalendarPricing, fetchPricingBreakdown } from '@/api/pricingClient';
 import { useListingPhotosFromApi } from '@/contexts/ListingPhotosContext';
 import OptimizedImage from '@/components/ui/OptimizedImage';
+import FomoBar from '@/components/FomoBar';
 
 declare global {
   interface Window {
@@ -1736,6 +1737,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             loading="lazy"
           />
         </div>
+      )}
+
+      {listingId != null && Number(listingId) > 0 && (
+        <FomoBar listingId={Number(listingId)} />
       )}
 
       <div className="space-y-1">
