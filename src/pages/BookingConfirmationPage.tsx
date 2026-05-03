@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react"; // TASK-1476
 import SEO from "../components/SEO";
+import WeatherWidget from "../components/WeatherWidget";
 import { buildApiUrl, getApiHeaders } from "../api/client";
 import { getRuntimeConfig, hasRuntimeConfig } from "../runtime-config";
 import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
@@ -61,6 +62,11 @@ interface BookingSummary {
   nearbyLandmarks?: string[];
   /** TASK-1296: guest referral code (e.g. FRIEND42) for the WhatsApp share button. */
   guestReferralCode?: string;
+  /** TASK-1490: ISO dates + coordinates for Open-Meteo weather widget. */
+  checkinDateIso?: string;
+  checkoutDateIso?: string;
+  propertyLatitude?: number;
+  propertyLongitude?: number;
 }
 
 const statusLabel: Record<string, { label: string; color: string }> = {
@@ -431,6 +437,17 @@ export default function BookingConfirmationPage() {
               Show this to the host on arrival
             </p>
           </div>
+        )}
+
+        {/* TASK-1490: Weather forecast for stay dates */}
+        {!isCancelled && booking.propertyLatitude != null && booking.propertyLongitude != null &&
+          booking.checkinDateIso && booking.checkoutDateIso && (
+          <WeatherWidget
+            lat={booking.propertyLatitude}
+            lng={booking.propertyLongitude}
+            fromDate={booking.checkinDateIso}
+            toDate={booking.checkoutDateIso}
+          />
         )}
 
         {/* GST invoice (token-gated PDF) */}
