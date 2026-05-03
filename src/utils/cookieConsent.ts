@@ -56,10 +56,14 @@ export function setCookieConsent(choice: CookieConsentChoice): CookieConsentReco
   return record;
 }
 
+/** TASK-1946: DPDP banner v2 key (plain string: all | necessary). */
+const ATLAS_COOKIE_CONSENT_V2 = "atlas_cookie_consent";
+
 export function resetCookieConsent(): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.removeItem(COOKIE_CONSENT_STORAGE_KEY);
+    window.localStorage.removeItem(ATLAS_COOKIE_CONSENT_V2);
     window.dispatchEvent(new CustomEvent("atlas:cookie-consent-changed", { detail: null }));
   } catch {
     // ignore
@@ -67,5 +71,14 @@ export function resetCookieConsent(): void {
 }
 
 export function hasAcceptedCookies(): boolean {
+  if (typeof window !== "undefined") {
+    try {
+      const v2 = window.localStorage.getItem(ATLAS_COOKIE_CONSENT_V2);
+      if (v2 === "all") return true;
+      if (v2 === "necessary") return false;
+    } catch {
+      /* ignore */
+    }
+  }
   return getCookieConsent()?.choice === "accepted";
 }

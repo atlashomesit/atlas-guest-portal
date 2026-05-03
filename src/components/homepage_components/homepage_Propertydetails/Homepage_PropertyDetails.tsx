@@ -12,7 +12,7 @@ import { FaStar } from "react-icons/fa";
 import { X, ChevronRight, Clock, KeyRound, Bookmark, Share2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { propertyData } from '../../../data.ts';
-import { getUnitPolicy } from '../../../config/policyConfig';
+import { getExplicitUnitPolicy } from '../../../config/policyConfig';
 import { inlinePolicySnippets } from '../../../content/terms';
 import Subheading from '../../commonComponents/subheading/Subheading';
 import UnitBookingWidget from '../../availability/UnitBookingWidget';
@@ -151,6 +151,27 @@ interface Property {
     propertyAddress?: string | null;
     /** Legacy / alternate JSON key for same */
     property_address?: string | null;
+    /** TASK-1359: YouTube / Vimeo virtual tour URL */
+    virtualTourUrl?: string | null;
+}
+
+/** TASK-1359: Convert YouTube/Vimeo watch URL to embed URL, or return null if unrecognised. */
+function toEmbedUrl(url: string): string | null {
+    try {
+        const u = new URL(url);
+        // YouTube: https://www.youtube.com/watch?v=ID or https://youtu.be/ID
+        if (u.hostname === 'youtu.be') return `https://www.youtube.com/embed/${u.pathname.slice(1)}`;
+        if (u.hostname.includes('youtube.com')) {
+            const v = u.searchParams.get('v');
+            return v ? `https://www.youtube.com/embed/${v}` : null;
+        }
+        // Vimeo: https://vimeo.com/ID
+        if (u.hostname === 'vimeo.com') {
+            const id = u.pathname.slice(1).split('/')[0];
+            return id ? `https://player.vimeo.com/video/${id}` : null;
+        }
+        return null;
+    } catch { return null; }
 }
 
 /** Avoid `new Date(x).toISOString()` on invalid URL params — throws RangeError and trips the route error boundary. */
@@ -648,6 +669,10 @@ const PropertyDetails = () => {
                             (typeof pub.propertyAddress === 'string' && pub.propertyAddress.trim()
                                 ? pub.propertyAddress.trim()
                                 : null),
+                        virtualTourUrl: (() => {
+                            const raw = (apiListing as Record<string, unknown>).virtualTourUrl;
+                            return typeof raw === 'string' && raw.trim() ? raw.trim() : null;
+                        })(),
                     };
                     const fromDto =
                         photoUrlsList.length > 0 ? photoUrlsList : (coverUrl ? [coverUrl] : []);
@@ -921,7 +946,11 @@ useEffect(() => {
         );
     }
 
-    const unitPolicy = getUnitPolicy(data?.id);
+    const explicitUnitPolicy = getExplicitUnitPolicy(data?.id);
+    const resolvedCheckInTime =
+      (data?.checkInTime?.trim()) || explicitUnitPolicy?.checkIn || null;
+    const resolvedCheckOutTime =
+      (data?.checkOutTime?.trim()) || explicitUnitPolicy?.checkOut || null;
     const cancellationPolicyText = (() => {
         const policies = data?.property_policy_details ?? [];
         const fromListingPolicy = policies.find((p) =>
@@ -933,6 +962,14 @@ useEffect(() => {
     const pageUrl = typeof window !== 'undefined' ? window.location.href : '';
     const galleryUrls = filterGuestImageUrls(data?.property_img ?? []);
     const primaryImage = galleryUrls[0];
+    const mapSrcTrimmed = (data?.property_mapSrc ?? "").trim();
+    const locationParts = (data?.property_location ?? "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+    const mapCity = locationParts[0] ?? "";
+    const mapState = locationParts.slice(1).join(", ");
+    const mapSearchQuery = [mapCity, mapState].filter(Boolean).join(", ");
 
     return (
         <>
@@ -1097,18 +1134,35 @@ useEffect(() => {
                     </button>
                 </div>
 
-                {/* Check-in / check-out times — shown prominently before gallery */}
-                {(data?.checkInTime || data?.checkOutTime) && (
-                    <div className="flex flex-wrap gap-4 text-sm font-medium mt-1 mb-2">
-                        <div className="flex items-center gap-1.5 text-text-primary">
-                            <KeyRound className="w-4 h-4 text-accent-primary flex-shrink-0" />
-                            <span>Check-in from <strong>{data.checkInTime?.trim() || 'Flexible'}</strong></span>
-                        </div>
-                        <div className="flex items-center gap-1.5 text-text-primary">
-                            <Clock className="w-4 h-4 text-accent-primary flex-shrink-0" />
-                            <span>Checkout by <strong>{data.checkOutTime?.trim() || 'Flexible'}</strong></span>
-                        </div>
+                {/* Check-in / check-out times — TASK-1676: API / explicit unit policy only; else contact host */}
+                <div className="flex flex-wrap gap-4 text-sm font-medium mt-1 mb-2">
+                    <div className="flex items-center gap-1.5 text-text-primary">
+                        <KeyRound className="w-4 h-4 text-accent-primary flex-shrink-0" />
+                        <span>
+                            Check-in from{' '}
+                            <strong>{resolvedCheckInTime ?? 'Contact host for check-in time'}</strong>
+                        </span>
                     </div>
+                    <div className="flex items-center gap-1.5 text-text-primary">
+                        <Clock className="w-4 h-4 text-accent-primary flex-shrink-0" />
+                        <span>
+                            Checkout by{' '}
+                            <strong>{resolvedCheckOutTime ?? 'Contact host for check-out time'}</strong>
+                        </span>
+                    </div>
+                </div>
+
+                {/* TASK-1359: Virtual tour video embed (YouTube/Vimeo) */}
+                {data?.virtualTourUrl && toEmbedUrl(data.virtualTourUrl) && (
+                  <div className="mb-4 rounded-xl overflow-hidden aspect-video w-full shadow-level1">
+                    <iframe
+                      src={toEmbedUrl(data.virtualTourUrl)!}
+                      title="Virtual property tour"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                      className="w-full h-full border-0"
+                    />
+                  </div>
                 )}
 
                 {/* Image Gallery — Azure blob URLs are skipped (409); API/static must serve reachable images */}
@@ -1224,7 +1278,8 @@ useEffect(() => {
                                                 <p className="text-text-muted text-sm">Check-in / Check-out</p>
                                             </div>
                                             <p className="font-medium text-text-primary">
-                                                Check-in {data.checkInTime?.trim() || unitPolicy?.checkIn || '2:00 PM'} · Check-out {data.checkOutTime?.trim() || unitPolicy?.checkOut || '11:00 AM'}
+                                                Check-in {resolvedCheckInTime ?? 'Contact host for check-in time'} · Check-out{' '}
+                                                {resolvedCheckOutTime ?? 'Contact host for check-out time'}
                                             </p>
                                             <a className="text-sm text-accent-primary underline" href="/terms#check-in-check-out">View terms</a>
                                         </div>

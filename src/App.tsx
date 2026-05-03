@@ -44,7 +44,7 @@ const MyBookingsPage = React.lazy(() => import("./pages/MyBookingsPage"))
 const FavoritesPage = React.lazy(() => import("./pages/FavoritesPage"))
 const RecentlyViewedPage = React.lazy(() => import("./pages/RecentlyViewedPage"))
 const PrivacyPolicyPage = React.lazy(() => import("./pages/PrivacyPolicyPage"))
-const CookieConsentBanner = React.lazy(() => import("./components/CookieConsentBanner"))
+const CookieConsent = React.lazy(() => import("./components/CookieConsent"))
 const PageNotFound = React.lazy(() => import("./pages/pagenotfound/PageNotFound"))
 
 function LazyFallback() {
@@ -172,7 +172,7 @@ function AppWrapper() {
       </ErrorBoundary>
       <Suspense fallback={null}><SupportWidget /></Suspense>
       <Footer />
-      <Suspense fallback={null}><CookieConsentBanner /></Suspense>
+      <Suspense fallback={null}><CookieConsent /></Suspense>
       <ToastContainer position="top-right" newestOnTop pauseOnFocusLoss={false} />
     </>
   );
