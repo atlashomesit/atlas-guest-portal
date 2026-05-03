@@ -1473,7 +1473,7 @@ useEffect(() => {
                                         Managed by Atlas Homestays
                                     </p>
                                     <p className="text-xs text-text-muted">
-                                        24/7 WhatsApp support{responseTimeBadge ? ` · ${responseTimeBadge}` : " · Typically replies within 1 hour"}
+                                        24/7 WhatsApp support{responseTimeBadge ? ` · ${responseTimeBadge}` : " · Local team based in Hyderabad. WhatsApp-first support."}
                                     </p>
                                     {reviewReplyRateBadge && (
                                         <p className="text-xs text-green-700 font-medium mt-0.5">

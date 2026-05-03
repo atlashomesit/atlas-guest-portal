@@ -56,6 +56,8 @@ type NormalizedListing = {
   /** TASK-1457: Map pin coordinates (API or static fallback). */
   latitude?: number | null;
   longitude?: number | null;
+  /** TASK-2076: number of verified reviews — shown as (N) next to ★ rating. */
+  reviewCount?: number | null;
 };
 
 function buildStaticListings(): NormalizedListing[] {
@@ -81,6 +83,7 @@ function buildStaticListings(): NormalizedListing[] {
         canonicalPath,
         property,
         rating: property.property_rating ?? undefined,
+        reviewCount: (property as unknown as { property_reviews?: number }).property_reviews ?? null,
         latitude: pin.lat,
         longitude: pin.lng,
       };
@@ -113,6 +116,7 @@ function apiToNormalized(listings: PublicListing[]): NormalizedListing[] {
         amenities: ((l as unknown as { amenityCodes?: string[] }).amenityCodes ?? []).map((code) => ({ amenities_icon: code })),
         canonicalPath,
         rating: l.propertyRating ?? undefined,
+        reviewCount: (l as unknown as { reviewCount?: number }).reviewCount ?? null,
         // TASK-1866: map minStay so long-stay filter works on API listings
         minStay: l.minStay ?? null,
         losDiscountMinNights: l.losDiscountMinNights ?? null,
@@ -668,8 +672,8 @@ const SearchPage = () => {
           </ul>
         ) : null}
 
-        {/* Filter bar */}
-        <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-border-subtle bg-bg-surface px-4 py-3 shadow-sm">
+        {/* Filter bar — TASK-2075: sticky so it stays visible after scrolling past 8+ listings */}
+        <div className="sticky top-16 z-10 flex flex-wrap items-end gap-3 rounded-2xl border border-border-subtle bg-bg-surface px-4 py-3 shadow-sm">
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium text-text-muted" htmlFor="filter-min-price">Min price / night</label>
             <input
@@ -1114,7 +1118,15 @@ const SearchPage = () => {
                       </p>
                       {longStay && (
                         <p className="text-sm font-semibold text-cta-primary">
-                          from {formatDisplayCurrency(unit.pricePerNight * 30)}/month
+                          {/* TASK-2077: apply LOS discount to monthly estimate when tier is configured */}
+                          {(() => {
+                            const discountPct = unit.losDiscount2Percent ?? unit.losDiscountPercent ?? 0;
+                            const base = unit.pricePerNight * 30;
+                            const discounted = discountPct > 0 ? Math.round(base * (1 - discountPct / 100)) : base;
+                            return discountPct > 0
+                              ? `from ${formatDisplayCurrency(discounted)}/month with long-stay discount`
+                              : `from ${formatDisplayCurrency(base)}/month`;
+                          })()}
                         </p>
                       )}
                       {/* TASK-1739: LOS discount calculator — only shows when tiers are configured */}
