@@ -31,7 +31,8 @@ export default function SelfCheckIn() {
   const [step, setStep] = useState<Step>(urlRef ? "auth" : "auth");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [idFile, setIdFile] = useState<File | null>(null);
+  const [govtIdType, setGovtIdType] = useState("");
+  const [govtIdNumber, setGovtIdNumber] = useState("");
   const [rulesAccepted, setRulesAccepted] = useState(false);
   const [alreadySigned, setAlreadySigned] = useState(false);
 
@@ -79,6 +80,8 @@ export default function SelfCheckIn() {
           lastName: lastName.trim(),
           idDocumentUrl: null,
           houseRulesAccepted: rulesAccepted,
+          govtIdType: govtIdType || null,
+          govtIdNumber: govtIdNumber.trim() || null,
         }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -188,35 +191,38 @@ export default function SelfCheckIn() {
           </div>
         )}
 
-        {/* ── Step: ID Upload ────────────────────────────────────── */}
+        {/* ── Step: ID ───────────────────────────────────────────── */}
         {step === "id-upload" && (
           <div className="rounded-2xl border border-border-subtle bg-bg-surface p-6 shadow-level1">
-            <h2 className="text-xl font-bold text-text-primary mb-1">Photo ID</h2>
+            <h2 className="text-xl font-bold text-text-primary mb-1">Government ID</h2>
             <p className="text-text-secondary text-sm mb-5">
-              Upload a photo of your Aadhaar, passport, or driver's license. This keeps both you and the host safe.
+              Your ID number helps the host verify your stay. Only the last 4 digits are stored.
               <span className="block mt-1 text-text-muted">(Optional — you can skip this step)</span>
             </p>
 
-            <label className="block cursor-pointer">
-              <input
-                type="file"
-                accept="image/*,application/pdf"
-                className="hidden"
-                onChange={e => setIdFile(e.target.files?.[0] ?? null)}
-              />
-              <div className={`rounded-xl border-2 border-dashed p-8 text-center transition ${idFile ? "border-brand-primary bg-brand-primary/5" : "border-border-subtle bg-bg-page hover:border-brand-primary"}`}>
-                {idFile ? (
-                  <p className="text-sm font-medium text-brand-primary">✓ {idFile.name}</p>
-                ) : (
-                  <>
-                    <p className="text-2xl mb-2">🪪</p>
-                    <p className="text-sm text-text-secondary">Tap to upload ID photo</p>
-                  </>
-                )}
-              </div>
-            </label>
+            <label className="block text-sm font-medium text-text-primary mb-1">ID type</label>
+            <select
+              className="w-full rounded-lg border border-border-subtle px-4 py-2.5 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-brand-primary bg-white"
+              value={govtIdType}
+              onChange={e => setGovtIdType(e.target.value)}
+            >
+              <option value="">Select ID type</option>
+              <option value="Aadhaar">Aadhaar</option>
+              <option value="PAN">PAN</option>
+              <option value="Passport">Passport</option>
+              <option value="DrivingLicence">Driving Licence</option>
+            </select>
 
-            <div className="flex gap-3 mt-5">
+            <label className="block text-sm font-medium text-text-primary mb-1">ID number</label>
+            <input
+              type="text"
+              className="w-full rounded-lg border border-border-subtle px-4 py-2.5 text-sm mb-5 focus:outline-none focus:ring-2 focus:ring-brand-primary"
+              placeholder="Enter your ID number"
+              value={govtIdNumber}
+              onChange={e => setGovtIdNumber(e.target.value)}
+            />
+
+            <div className="flex gap-3">
               <button
                 onClick={() => setStep("house-rules")}
                 className="flex-1 rounded-xl border border-border-subtle py-3 text-sm font-medium text-text-secondary hover:border-brand-primary transition"
