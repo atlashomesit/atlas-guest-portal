@@ -1,16 +1,25 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { FaHeart } from "react-icons/fa";
 import SEO from "../components/SEO";
 import { fetchPublicListings, type PublicListing } from "../api/listingClient";
 import { getFavoriteIds, getRecentlyViewed, toggleFavorite } from "../utils/guestHistory";
 import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
+import { buildApiUrl, getApiHeaders } from "../api/client";
 
 export default function FavoritesPage() {
   const [all, setAll] = useState<PublicListing[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [favEpoch, setFavEpoch] = useState(0);
+
+  // TASK-1709: reminder email capture
+  const [reminderEmail, setReminderEmail] = useState("");
+  const [reminderState, setReminderState] = useState<"idle" | "busy" | "done" | "error">("idle");
+  const [hasStoredEmail, setHasStoredEmail] = useState(() => {
+    try { return !!localStorage.getItem("atlas_guest_email"); } catch { return false; }
+  });
+  const reminderInputRef = useRef<HTMLInputElement>(null);
 
   const loadListings = React.useCallback(() => {
     let cancelled = false;
@@ -44,6 +53,30 @@ export default function FavoritesPage() {
   const recent = useMemo(() => getRecentlyViewed(), []);
 
   const favorites = useMemo(() => all.filter((l) => favIds.has(l.id)), [all, favIds]);
+
+  const handleReminderSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const email = reminderEmail.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
+    setReminderState("busy");
+    try {
+      const ids = getFavoriteIds();
+      await Promise.all(
+        ids.map((listingId) =>
+          fetch(buildApiUrl("/api/saved-listings"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...getApiHeaders() },
+            body: JSON.stringify({ guestEmail: email, listingId }),
+          })
+        )
+      );
+      localStorage.setItem("atlas_guest_email", email);
+      setHasStoredEmail(true);
+      setReminderState("done");
+    } catch {
+      setReminderState("error");
+    }
+  };
 
   const listingPath = (l: PublicListing) =>
     buildHomeUnitPath(getPropertySlug({ name: l.name, property_name: l.propertyName }), l.id);
@@ -87,6 +120,40 @@ export default function FavoritesPage() {
           )}
         </div>
       ) : (
+        <>
+        {/* TASK-1709: email capture for saved-listing T+7 reminders */}
+        {!hasStoredEmail && favorites.length > 0 && reminderState !== "done" && (
+          <div className="rounded-2xl border border-brand-primary/30 bg-brand-primary/5 p-4">
+            <p className="text-sm font-medium text-text-primary mb-1">Get reminded about these homes</p>
+            <p className="text-xs text-text-secondary mb-3">
+              Enter your email and we'll send you a one-time reminder in 7 days if you haven't booked yet.
+            </p>
+            <form onSubmit={handleReminderSubmit} className="flex gap-2 flex-wrap">
+              <input
+                ref={reminderInputRef}
+                type="email"
+                required
+                placeholder="your@email.com"
+                value={reminderEmail}
+                onChange={(e) => setReminderEmail(e.target.value)}
+                className="flex-1 min-w-0 rounded-lg border border-border-subtle px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary"
+              />
+              <button
+                type="submit"
+                disabled={reminderState === "busy"}
+                className="rounded-lg bg-brand-primary px-4 py-2 text-sm font-semibold text-white hover:opacity-90 transition disabled:opacity-50"
+              >
+                {reminderState === "busy" ? "Saving…" : "Remind me"}
+              </button>
+            </form>
+            {reminderState === "error" && (
+              <p className="text-xs text-red-600 mt-2">Couldn't save your email. Please try again.</p>
+            )}
+          </div>
+        )}
+        {reminderState === "done" && (
+          <p className="text-sm text-green-700 font-medium">✓ We'll remind you in 7 days if you haven't booked.</p>
+        )}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {favorites.map((l) => {
             const path = listingPath(l);
@@ -138,6 +205,7 @@ export default function FavoritesPage() {
             );
           })}
         </div>
+        </>
       )}
     </div>
   );

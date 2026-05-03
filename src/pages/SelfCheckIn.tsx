@@ -38,7 +38,7 @@ export default function SelfCheckIn() {
   const stepIndex: Record<Step, number> = {
     auth: 0, summary: 1, "id-upload": 2, "house-rules": 3, done: 4,
   };
-  const currentStepNum = stepIndex[step];
+  const _currentStepNum = stepIndex[step];
 
   const handleVerify = async () => {
     if (!bookingRef.trim() || !lastName.trim()) {

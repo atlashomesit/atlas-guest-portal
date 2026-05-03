@@ -119,6 +119,7 @@ export default function BookingConfirmationPage() {
   const [cancelRequested, setCancelRequested] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [copyRefFeedback, setCopyRefFeedback] = useState(false);
+  const [shareLanguage, setShareLanguage] = useState<"en" | "hi" | "te">("en");
   const [pwaInstallDismissed, setPwaInstallDismissed] = useState(() => {
     try { return localStorage.getItem("atlas_guest_pwa_install_dismissed_v1") === "1"; } catch { return false; }
   });
@@ -944,10 +945,27 @@ export default function BookingConfirmationPage() {
                 {booking.guestReferralCode}
               </span>
             </div>
+            <div className="flex items-center gap-2 text-sm">
+              <label className="text-text-muted shrink-0" htmlFor="referral-lang">Share in:</label>
+              <select
+                id="referral-lang"
+                value={shareLanguage}
+                onChange={(e) => setShareLanguage(e.target.value as "en" | "hi" | "te")}
+                className="rounded-lg border border-border-subtle bg-bg-surface px-2 py-1 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-primary"
+              >
+                <option value="en">English</option>
+                <option value="hi">हिन्दी</option>
+                <option value="te">తెలుగు</option>
+              </select>
+            </div>
             <a
-              href={encodeURI(
-                `https://wa.me/?text=I loved my stay at ${booking.propertyName}! 🏠✨ Book via Atlas Homestays and use code ${booking.guestReferralCode} for ₹500 off your first booking: https://www.atlashomestays.com/search`
-              )}
+              href={`https://wa.me/?text=${encodeURIComponent(
+                shareLanguage === "hi"
+                  ? `मैंने ${booking.propertyName} में अपना प्रवास बेहद पसंद किया! 🏠✨ Atlas Homestays पर बुक करें और कोड ${booking.guestReferralCode} से ₹500 की छूट पाएं: https://www.atlashomestays.com/search`
+                  : shareLanguage === "te"
+                  ? `${booking.propertyName}లో నా స్టే చాలా బాగుంది! 🏠✨ Atlas Homestays లో బుక్ చేసుకోండి మరియు ${booking.guestReferralCode} కోడ్ ఉపయోగించి ₹500 డిస్కౌంట్ పొందండి: https://www.atlashomestays.com/search`
+                  : `I loved my stay at ${booking.propertyName}! 🏠✨ Book via Atlas Homestays and use code ${booking.guestReferralCode} for ₹500 off your first booking: https://www.atlashomestays.com/search`
+              )}`}
               target="_blank"
               rel="noopener noreferrer"
               data-testid="referral-share-whatsapp"
