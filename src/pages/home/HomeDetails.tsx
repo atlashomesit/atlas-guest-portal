@@ -1,5 +1,6 @@
 import { Link, useParams } from "react-router-dom";
-import { Suspense, lazy, useEffect } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
+import { apiFetch } from "@/lib/http";
 import type { LucideIcon } from "lucide-react";
 import {
   Wifi, Snowflake, Tv, Car, UtensilsCrossed, WashingMachine,
@@ -40,6 +41,34 @@ const AMENITY_MAP: AmenityDef[] = [
   { icon: Users,          keywords: ["concierge", "reception", "support"] },
 ];
 
+interface ListingReview {
+  id: number;
+  guestName?: string | null;
+  rating: number;
+  title?: string | null;
+  body?: string | null;
+  createdAt: string;
+  hostResponse?: string | null;
+  isVerifiedStay: boolean;
+}
+
+interface ListingReviewsResponse {
+  totalCount: number;
+  averageRating: number;
+  reviews: ListingReview[];
+}
+
+function StarRating({ rating, size = "sm" }: { rating: number; size?: "sm" | "lg" }) {
+  const cls = size === "lg" ? "text-xl" : "text-sm";
+  return (
+    <span className={cls} aria-label={`${rating} out of 5 stars`}>
+      {Array.from({ length: 5 }, (_, i) => (
+        <span key={i} className={i < Math.round(rating) ? "text-amber-400" : "text-gray-300"}>★</span>
+      ))}
+    </span>
+  );
+}
+
 function resolveIcon(label: string): LucideIcon {
   const lower = label.toLowerCase();
   for (const { icon, keywords } of AMENITY_MAP) {
@@ -78,11 +107,21 @@ const HomeDetails = () => {
   } : homes.find((item) => item.roomNo === roomNo);
 
   const { updateBooking } = useBooking();
+  const [reviewsData, setReviewsData] = useState<ListingReviewsResponse | null>(null);
 
   useEffect(() => {
     if (!room) return;
     updateBooking({ listingDetailPath: room.href });
   }, [room, updateBooking]);
+
+  useEffect(() => {
+    const listingId = Number(roomNo);
+    if (!Number.isFinite(listingId) || listingId <= 0) return;
+    apiFetch(`/api/listings/${listingId}/reviews`)
+      .then((res) => res.json() as Promise<ListingReviewsResponse>)
+      .then(setReviewsData)
+      .catch(() => { /* reviews are non-critical */ });
+  }, [roomNo]);
 
   /** TASK-1480: track listing view event on mount. */
   useEffect(() => {
@@ -233,6 +272,50 @@ const HomeDetails = () => {
           ))}
         </div>
       </div>
+
+      {/* Reviews section */}
+      {reviewsData && reviewsData.totalCount > 0 && (
+        <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5">
+          <div className="flex items-center gap-3 mb-4">
+            <h2 className="text-lg font-semibold text-text-primary">Guest reviews</h2>
+            <div className="flex items-center gap-1.5">
+              <StarRating rating={reviewsData.averageRating} size="lg" />
+              <span className="text-base font-semibold text-text-primary">{reviewsData.averageRating.toFixed(1)}</span>
+              <span className="text-sm text-text-secondary">({reviewsData.totalCount})</span>
+            </div>
+          </div>
+          <div className="flex flex-col gap-4">
+            {reviewsData.reviews.slice(0, 6).map((r) => (
+              <div key={r.id} className="border-t border-border-subtle pt-4 first:border-t-0 first:pt-0">
+                <div className="flex items-start justify-between gap-2 mb-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-semibold text-text-primary">{r.guestName ?? "Guest"}</span>
+                    {r.isVerifiedStay && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700 border border-green-200">
+                        <CheckCircle2 size={11} /> Verified stay
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <StarRating rating={r.rating} />
+                    <span className="text-xs text-text-secondary">
+                      {new Date(r.createdAt).toLocaleDateString("en-IN", { month: "short", year: "numeric" })}
+                    </span>
+                  </div>
+                </div>
+                {r.title && <p className="text-sm font-medium text-text-primary mb-0.5">{r.title}</p>}
+                {r.body && <p className="text-sm text-text-secondary leading-relaxed">{r.body}</p>}
+                {r.hostResponse && (
+                  <div className="mt-2 rounded-xl bg-bg-card border border-border-subtle p-3">
+                    <p className="text-xs font-semibold text-text-primary mb-0.5">Host response</p>
+                    <p className="text-xs text-text-secondary leading-relaxed">{r.hostResponse}</p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Booking widget */}
       <Suspense fallback={
