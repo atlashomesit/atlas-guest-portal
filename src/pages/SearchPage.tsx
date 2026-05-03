@@ -879,7 +879,7 @@ const SearchPage = () => {
           </div>
         )}
 
-        {showEmptyState && (
+        {showEmptyState && !mapView && (
           <div className="flex flex-col gap-8">
             <div
               className="rounded-2xl border border-border-subtle bg-bg-surface px-4 py-8 text-center shadow-sm sm:px-8"
@@ -974,25 +974,32 @@ const SearchPage = () => {
           </section>
         )}
 
-        {!isLoading && !showEmptyState && !hasInvalidDates && mapView && (
+        {!isLoading && !hasInvalidDates && mapView && (
           <div className="flex flex-col gap-3">
-            <Suspense
-              fallback={
-                <div
-                  className="flex min-h-[50vh] items-center justify-center rounded-2xl border border-border-subtle bg-bg-surface text-text-muted"
-                  data-testid="search-map-suspense"
-                >
-                  Loading map…
+            <div className="relative">
+              {showEmptyState && (
+                <div className="absolute inset-x-0 top-4 z-10 mx-auto w-fit rounded-xl border border-border-subtle bg-bg-surface/95 px-4 py-3 text-sm text-text-secondary shadow-md text-center">
+                  No matches in this area — try wider search or clear filters
                 </div>
-              }
-            >
-              <SearchResultsMap
-                units={mapUnits}
-                formatPrice={formatDisplayCurrency}
-                querySuffix={querySuffix}
-                approximatePinHint={approximatePinHint}
-              />
-            </Suspense>
+              )}
+              <Suspense
+                fallback={
+                  <div
+                    className="flex min-h-[50vh] items-center justify-center rounded-2xl border border-border-subtle bg-bg-surface text-text-muted"
+                    data-testid="search-map-suspense"
+                  >
+                    Loading map…
+                  </div>
+                }
+              >
+                <SearchResultsMap
+                  units={mapUnits}
+                  formatPrice={formatDisplayCurrency}
+                  querySuffix={querySuffix}
+                  approximatePinHint={approximatePinHint}
+                />
+              </Suspense>
+            </div>
             {/* TASK-1457: quick-scroll listing strip on small screens (map is primary). */}
             <div
               className="flex gap-3 overflow-x-auto pb-1 md:hidden"
