@@ -109,6 +109,8 @@ const HomeDetails = () => {
   const { updateBooking } = useBooking();
   const [reviewsData, setReviewsData] = useState<ListingReviewsResponse | null>(null);
 
+  const highlights = room?.highlights?.length ? room.highlights : defaultHomeHighlights;
+
   useEffect(() => {
     if (!room) return;
     updateBooking({ listingDetailPath: room.href });
@@ -201,7 +203,6 @@ const HomeDetails = () => {
       link.remove();
     };
   }, [room, primaryImage]);
-  const highlights = room?.highlights?.length ? room.highlights : defaultHomeHighlights;
 
   if (!room) {
     return (
