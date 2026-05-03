@@ -875,17 +875,15 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         ? effectiveDailyPricing.actualPrice
         : 0;
 
-  const gstSlabPercent = useMemo(() => {
-    const nightly = perNightForDisplay > 0 ? perNightForDisplay : (effectiveDailyPricing?.actualPrice ?? 0);
-    return nightly > 7500 ? 12 : 5;
-  }, [perNightForDisplay, effectiveDailyPricing?.actualPrice]);
+  /** TASK-1645: slab from average nightly room tariff for the selected stay (≤₹7,500 → 5%, else 12%). */
+  const gstSlabPercent =
+    hasSelectedRange && perNightForDisplay > 0 ? (perNightForDisplay <= 7500 ? 5 : 12) : null;
 
-  /** GST component of room fare when slab applies (inclusive-of-GST base). */
-  const gstLineAmount = useMemo(() => {
-    if (!hasSelectedRange || breakdownPrice <= 0) return 0;
-    const raw = Math.round((breakdownPrice * gstSlabPercent) / (100 + gstSlabPercent));
-    return Math.max(1, raw);
-  }, [hasSelectedRange, breakdownPrice, gstSlabPercent]);
+  /** GST component of room fare (tax-inclusive extraction). */
+  const gstLineAmount =
+    gstSlabPercent != null && breakdownPrice > 0
+      ? Math.max(1, Math.round((breakdownPrice * gstSlabPercent) / (100 + gstSlabPercent)))
+      : 0;
 
   /** Format price; show ₹0 when 0 (e.g. when API not loaded or API returned 0). */
   const displayPrice = (n: number) =>
@@ -1884,8 +1882,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             <p>{priceDetails.extraGuests} {priceDetails.extraGuests === 1 ? 'extra guest' : 'extra guests'} × {displayPrice(priceDetails.extraGuestsFee / priceDetails.nights / priceDetails.extraGuests)}/night</p>
           )}
           <p className="text-xs text-text-muted">
-            {hasSelectedRange && dateRange.startDate && dateRange.endDate
-              ? 'Includes all taxes and fees'
+            {selectedRangeTotalFromCalendar != null && dateRange.startDate && dateRange.endDate
+              ? 'Includes all taxes and fees.'
               : 'Select dates to see price with taxes.'}
           </p>
         </div>
@@ -2028,8 +2026,18 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                       ? 'text-gray-400'
                       : 'text-black';
 
+                const dayStatusLabel =
+                  status === 'Turnover'
+                    ? 'Turnover'
+                    : status === 'Blocked' || status === 'Hold' || (isBlocked && !status)
+                      ? 'Unavailable'
+                      : undefined;
+
                 return (
-                  <div className="unit-booking-day-cell grid h-full w-full min-h-0 overflow-hidden box-border p-0.5">
+                  <div
+                    className="unit-booking-day-cell grid h-full w-full min-h-0 overflow-hidden box-border p-0.5"
+                    title={dayStatusLabel}
+                  >
                     {status && statusBg && (
                       <div className={`absolute inset-0 rounded-lg ${statusBg}`} style={{ margin: '2px' }} aria-hidden />
                     )}
@@ -2094,7 +2102,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                 {displayPrice(breakdownPrice)}
               </span>
             </div>
-            {hasSelectedRange && breakdownPrice > 0 && (
+            {gstSlabPercent != null && breakdownPrice > 0 && gstLineAmount > 0 && (
               <div className="grid grid-cols-[140px_12px_1fr] text-text-secondary">
                 <span>GST {gstSlabPercent}%</span>
                 <span>:</span>
