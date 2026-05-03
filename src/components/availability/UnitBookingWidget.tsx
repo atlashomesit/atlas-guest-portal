@@ -31,6 +31,7 @@ import { fetchCalendarPricing, fetchPricingBreakdown } from '@/api/pricingClient
 import { useListingPhotosFromApi } from '@/contexts/ListingPhotosContext';
 import OptimizedImage from '@/components/ui/OptimizedImage';
 import FomoBar from '@/components/FomoBar';
+import { track } from '@/lib/events'; // TASK-1480
 
 declare global {
   interface Window {
@@ -729,6 +730,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   setDateRange(next);
   // Auto-close calendar when both dates are selected
   setOpenCalendar(false);
+  // TASK-1480: funnel event when both dates are selected
+  if (next.startDate && next.endDate && listingId != null) {
+    track('select_dates', Number(listingId));
+  }
 };
 
 
@@ -1169,6 +1174,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     setFormError(null);
     setStatusMessage(null);
     setPaymentAttemptCount((c) => c + 1);
+    // TASK-1480: start_checkout = user passed validation + clicked submit
+    track('start_checkout', numericListingId);
+    // TASK-1480: enter_contact = contact info filled in (email/name present)
+    if (formData.name.trim() && formData.email.trim()) track('enter_contact', numericListingId);
 
     try {
       // 1. Create booking draft
@@ -1387,6 +1396,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           // Fallback for modal close (ondismiss may not fire in all scenarios)
           rzp.on('close', handleRazorpayClose);
 
+          // TASK-1480: payment_init = Razorpay modal is about to open
+          track('payment_init', numericListingId);
           rzp.open();
         } catch (error) {
           console.error('Error initializing Razorpay:', error);

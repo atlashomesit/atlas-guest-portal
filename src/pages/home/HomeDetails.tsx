@@ -14,6 +14,7 @@ import { getTenantContext } from "../../tenant/tenantContext";
 import { getTenantOverrides } from "../../tenant/tenantOverrides";
 import { usePropertyListings } from "../../hooks/usePropertyListings";
 import { addRecentlyViewed } from "../../utils/guestHistory";
+import { track } from "../../lib/events";
 
 const UnitBookingWidget = lazy(() => import("../../components/availability/UnitBookingWidget"));
 
@@ -82,6 +83,13 @@ const HomeDetails = () => {
     if (!room) return;
     updateBooking({ listingDetailPath: room.href });
   }, [room, updateBooking]);
+
+  /** TASK-1480: track listing view event on mount. */
+  useEffect(() => {
+    if (!room) return;
+    const listingId = Number(room.roomNo);
+    if (Number.isFinite(listingId) && listingId > 0) track('view_listing', listingId);
+  }, [room]);
 
   /** TASK-1477: inject LodgingBusiness JSON-LD for SEO. */
   useEffect(() => {

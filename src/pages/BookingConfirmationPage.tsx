@@ -3,6 +3,7 @@ import { useParams, useSearchParams, Link } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react"; // TASK-1476
 import SEO from "../components/SEO";
 import WeatherWidget from "../components/WeatherWidget";
+import { track } from "../lib/events";
 import { buildApiUrl, getApiHeaders } from "../api/client";
 import { getRuntimeConfig, hasRuntimeConfig } from "../runtime-config";
 import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
@@ -135,7 +136,11 @@ export default function BookingConfirmationPage() {
         if (!res.ok) throw new Error(await messageFromApiResponse(res));
         return res.json() as Promise<BookingSummary>;
       })
-      .then(setBooking)
+      .then((b) => {
+        setBooking(b);
+        // TASK-1480: confirmed = guest views booking confirmation page
+        track('confirmed', b.listingId);
+      })
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
   }, [bookingId, token]);
