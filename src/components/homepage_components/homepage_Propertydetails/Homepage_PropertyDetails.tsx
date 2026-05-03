@@ -190,6 +190,8 @@ const PropertyDetails = () => {
     const [similarFromApi, setSimilarFromApi] = useState<null | { loading: boolean; items: any[] }>(null);
     /** TASK-1726: host response time badge text (e.g. "Replies in <1h"). */
     const [responseTimeBadge, setResponseTimeBadge] = useState<string | null>(null);
+    /** TASK-1312: review reply-rate badge text (e.g. "Replies to 95% of reviews"). */
+    const [reviewReplyRateBadge, setReviewReplyRateBadge] = useState<string | null>(null);
     /** AMN-001: amenity master code→label map */
     const [amenityMaster, setAmenityMaster] = useState<Map<string, string>>(new Map());
 
@@ -225,6 +227,18 @@ const PropertyDetails = () => {
             .then((r) => r.ok ? r.json() : Promise.reject())
             .then((body: { badgeText?: string | null }) => {
                 if (active && body?.badgeText) setResponseTimeBadge(body.badgeText);
+            })
+            .catch(() => { /* non-critical */ });
+        return () => { active = false; };
+    }, []);
+
+    // TASK-1312: Fetch review reply-rate badge once per listing load
+    useEffect(() => {
+        let active = true;
+        fetch(buildApiUrl('/listings/review-reply-rate'), { headers: getApiHeaders() })
+            .then((r) => r.ok ? r.json() : Promise.reject())
+            .then((body: { badgeText?: string | null }) => {
+                if (active && body?.badgeText) setReviewReplyRateBadge(body.badgeText);
             })
             .catch(() => { /* non-critical */ });
         return () => { active = false; };
@@ -1461,6 +1475,11 @@ useEffect(() => {
                                     <p className="text-xs text-text-muted">
                                         24/7 WhatsApp support{responseTimeBadge ? ` · ${responseTimeBadge}` : " · Typically replies within 1 hour"}
                                     </p>
+                                    {reviewReplyRateBadge && (
+                                        <p className="text-xs text-green-700 font-medium mt-0.5">
+                                            ✓ {reviewReplyRateBadge} within 48h
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                             {(() => {
