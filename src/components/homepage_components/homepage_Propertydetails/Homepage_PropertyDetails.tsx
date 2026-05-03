@@ -198,7 +198,7 @@ const PropertyDetails = () => {
         loading: boolean;
         averageRating: number;
         totalCount: number;
-        reviews: { id: number; guestName?: string | null; rating: number; title?: string | null; body?: string | null; createdAt: string; hostResponse?: string | null; hostResponseAt?: string | null; photoUrls?: string[] | null }[];
+        reviews: { id: number; guestName?: string | null; rating: number; title?: string | null; body?: string | null; createdAt: string; hostResponse?: string | null; hostResponseAt?: string | null; photoUrls?: string[] | null; isVerifiedStay?: boolean }[];
     }>(null);
 
     // AMN-001: Fetch amenity master list once on mount
@@ -407,7 +407,7 @@ const PropertyDetails = () => {
                 const j = (await res.json()) as {
                     averageRating?: number;
                     totalCount?: number;
-                    reviews?: { id: number; guestName?: string | null; rating: number; title?: string | null; body?: string | null; createdAt: string; hostResponse?: string | null; hostResponseAt?: string | null; photoUrls?: string[] | null }[];
+                    reviews?: { id: number; guestName?: string | null; rating: number; title?: string | null; body?: string | null; createdAt: string; hostResponse?: string | null; hostResponseAt?: string | null; photoUrls?: string[] | null; isVerifiedStay?: boolean }[];
                 };
                 if (ac.signal.aborted) return;
                 setListingReviewsFromApi({
@@ -1292,7 +1292,7 @@ useEffect(() => {
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                         {api!.reviews.slice(0, 6).map((r) => (
                                             <div key={r.id} className="p-4 rounded-xl bg-bg-muted border border-border-subtle">
-                                                <div className="flex items-center gap-2 mb-1">
+                                                <div className="flex items-center gap-2 mb-1 flex-wrap">
                                                     <span className="text-sm font-semibold text-text-primary">{r.guestName ?? 'Guest'}</span>
                                                     <span className="text-xs text-text-muted">
                                                         {formatHumanDate(r.createdAt, {
@@ -1301,6 +1301,12 @@ useEffect(() => {
                                                             options: { day: '2-digit', month: 'short', year: 'numeric' },
                                                         })}
                                                     </span>
+                                                    {/* TASK-1311: Verified Stay badge */}
+                                                    {r.isVerifiedStay && (
+                                                        <span className="inline-flex items-center gap-0.5 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded-full px-2 py-0.5">
+                                                            ✓ Verified Stay
+                                                        </span>
+                                                    )}
                                                 </div>
                                                 <div className="flex gap-0.5 mb-2">
                                                     {Array.from({ length: 5 }).map((_, i) => (
