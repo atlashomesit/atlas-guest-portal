@@ -59,7 +59,7 @@ function AmenityChip({ label }: { label: string }) {
 
 const HomeDetails = () => {
   const { roomNo } = useParams<{ roomNo: string }>();
-  const { homes: apiHomes } = usePropertyListings();
+  const { homes: apiHomes, listingsById } = usePropertyListings();
   const tenantOverrides = getTenantOverrides(getTenantContext()?.slug);
 
   // First try to find in API data (by listing ID)
@@ -82,6 +82,48 @@ const HomeDetails = () => {
     if (!room) return;
     updateBooking({ listingDetailPath: room.href });
   }, [room, updateBooking]);
+
+  /** TASK-1477: inject LodgingBusiness JSON-LD for SEO. */
+  useEffect(() => {
+    if (!room) return;
+    const apiListing = listingsById[room.roomNo ?? ""];
+    const amenities = (highlights ?? []).slice(0, 20);
+    const images = room.images?.length ? room.images : (apiListing?.photoUrls ?? []);
+    const schema: Record<string, unknown> = {
+      "@context": "https://schema.org",
+      "@type": "LodgingBusiness",
+      name: room.title,
+      ...(room.tagline ? { description: room.tagline } : {}),
+      ...(images.length ? { image: images } : {}),
+      ...(apiListing?.propertyAddress ? {
+        address: {
+          "@type": "PostalAddress",
+          streetAddress: apiListing.propertyAddress,
+          addressCountry: "IN",
+        },
+      } : {}),
+      ...((apiListing?.latitude != null && apiListing?.longitude != null) ? {
+        geo: {
+          "@type": "GeoCoordinates",
+          latitude: apiListing.latitude,
+          longitude: apiListing.longitude,
+        },
+      } : {}),
+      ...(apiListing?.baseNightlyRate != null ? {
+        priceRange: `₹${Math.round(apiListing.baseNightlyRate)}+`,
+      } : {}),
+      amenityFeature: amenities.map((a) => ({
+        "@type": "LocationFeatureSpecification",
+        name: a,
+      })),
+    };
+    const script = document.createElement("script");
+    script.type = "application/ld+json";
+    script.setAttribute("data-atlas-jsonld", "home-details");
+    script.textContent = JSON.stringify(schema);
+    document.head.appendChild(script);
+    return () => { script.remove(); };
+  }, [room, highlights, listingsById]);
 
   /** TASK-1459: record listing view for Recently viewed strip. */
   useEffect(() => {
