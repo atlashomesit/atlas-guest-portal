@@ -256,9 +256,6 @@ const ListingCard: React.FC<ListingCardProps> = ({
                   {/* TASK-1705: Owner-share trust badge */}
                   <OwnerShareBadge nightlyPrice={finalPrice} />
                 </div>
-                {rating <= 0 && (
-                  <p className="mt-1 text-[11px] font-normal text-text-muted">Avg. rating placeholder until live reviews sync.</p>
-                )}
               </div>
               <button
                 type="button"
