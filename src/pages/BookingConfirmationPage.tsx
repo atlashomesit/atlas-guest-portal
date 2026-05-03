@@ -70,6 +70,8 @@ interface BookingSummary {
   propertyLongitude?: number;
   /** TASK-1254: Booking reference for self check-in flow (ExternalReservationId or ATL-{id} fallback). */
   bookingRef?: string;
+  /** TASK-2071: ISO 639-1 language code from guest profile. Null defaults to "en". */
+  preferredLanguage?: string | null;
 }
 
 const statusLabel: Record<string, { label: string; color: string }> = {
@@ -97,6 +99,38 @@ function InfoRow({ label, value, mono }: { label: string; value: string; mono?: 
     </div>
   );
 }
+
+// TASK-2071: pre-arrival UI strings by language
+const PRE_ARRIVAL_STRINGS: Record<string, {
+  heading: string; intro: string; checkinLabel: string; addressLabel: string;
+  hostLabel: string; hostDesc: string; chatBtn: string; wifiLabel: string;
+  landmarksLabel: string; viewListing: string; t1Hint: (date: string) => string; t1Fallback: string;
+}> = {
+  en: {
+    heading: "Before you arrive", intro: "You are checking in soon. Here is a quick reference for your stay — save this page or add to calendar below.",
+    checkinLabel: "Check-in & check-out times", addressLabel: "Address", hostLabel: "Host WhatsApp",
+    hostDesc: "Questions before you arrive? Message the property team.", chatBtn: "Chat on WhatsApp",
+    wifiLabel: "WiFi", landmarksLabel: "Nearby landmarks", viewListing: "View full listing & photos",
+    t1Hint: (d) => `🏠 WhatsApp reminder with check-in instructions will be sent on ${d}.`,
+    t1Fallback: "🏠 WhatsApp reminder with check-in instructions will be sent the day before your stay.",
+  },
+  hi: {
+    heading: "आगमन से पहले", intro: "आप जल्द ही चेक-इन कर रहे हैं। यहाँ आपके प्रवास का त्वरित संदर्भ है — यह पृष्ठ सहेजें या नीचे कैलेंडर में जोड़ें।",
+    checkinLabel: "चेक-इन और चेक-आउट का समय", addressLabel: "पता", hostLabel: "होस्ट WhatsApp",
+    hostDesc: "आगमन से पहले प्रश्न हैं? संपत्ति टीम को संदेश करें।", chatBtn: "WhatsApp पर चैट करें",
+    wifiLabel: "WiFi", landmarksLabel: "नज़दीकी स्थान", viewListing: "पूरी लिस्टिंग और फ़ोटो देखें",
+    t1Hint: (d) => `🏠 WhatsApp रिमाइंडर चेक-इन निर्देशों के साथ ${d} को भेजा जाएगा।`,
+    t1Fallback: "🏠 आपके प्रवास के एक दिन पहले WhatsApp रिमाइंडर भेजा जाएगा।",
+  },
+  te: {
+    heading: "రాక ముందు", intro: "మీరు త్వరలో చెక్-ఇన్ చేస్తున్నారు. ఇది మీ వసతికి త్వరిత సూచన — ఈ పేజీని సేవ్ చేయండి లేదా క్రింద క్యాలెండర్‌కు జోడించండి।",
+    checkinLabel: "చెక్-ఇన్ మరియు చెక్-అవుట్ సమయాలు", addressLabel: "చిరునామా", hostLabel: "హోస్ట్ WhatsApp",
+    hostDesc: "రాకముందు ప్రశ్నలు ఉన్నాయా? ఆస్తి బృందాన్ని సందేశించండి।", chatBtn: "WhatsApp లో చాట్ చేయండి",
+    wifiLabel: "WiFi", landmarksLabel: "సమీప ప్రదేశాలు", viewListing: "పూర్తి లిస్టింగ్ & ఫోటోలు చూడండి",
+    t1Hint: (d) => `🏠 చెక్-ఇన్ సూచనలతో WhatsApp రిమైండర్ ${d}న పంపబడుతుంది।`,
+    t1Fallback: "🏠 మీ వసతికి ముందు రోజు WhatsApp రిమైండర్ పంపబడుతుంది।",
+  },
+};
 
 export default function BookingConfirmationPage() {
   const { bookingId } = useParams<{ bookingId: string }>();
@@ -197,6 +231,9 @@ export default function BookingConfirmationPage() {
   }
 
   const isCancelled = booking.status === "Cancelled";
+  // TASK-2071: pick language strings from guest profile preference
+  const langCode = (booking.preferredLanguage ?? "en").toLowerCase();
+  const pa = PRE_ARRIVAL_STRINGS[langCode] ?? PRE_ARRIVAL_STRINGS.en;
   const hostPhone = booking.propertyPhone?.trim() || "+917032493290";
   const hostPhoneDigits = hostPhone.replace(/[^\d+]/g, "");
   const whatsappDigits = hostPhoneDigits.replace(/^\+/, "");
@@ -583,14 +620,12 @@ export default function BookingConfirmationPage() {
             data-testid="pre-arrival-briefing"
             aria-label="Before you arrive"
           >
-            <h2 className="text-sm font-semibold text-text-primary">Before you arrive</h2>
-            <p className="text-xs text-text-secondary leading-relaxed">
-              You are checking in soon. Here is a quick reference for your stay — save this page or add to calendar below.
-            </p>
+            <h2 className="text-sm font-semibold text-text-primary">{pa.heading}</h2>
+            <p className="text-xs text-text-secondary leading-relaxed">{pa.intro}</p>
             <div className="space-y-0 divide-y divide-amber-200/60 border-t border-amber-200/60 -mx-5 px-5">
               {(booking.checkInTime || booking.checkOutTime) && (
                 <div className="flex flex-col gap-0.5 py-3">
-                  <span className="text-xs text-text-muted uppercase tracking-wider font-medium">Check-in &amp; check-out times</span>
+                  <span className="text-xs text-text-muted uppercase tracking-wider font-medium">{pa.checkinLabel}</span>
                   <span className="text-sm text-text-primary">
                     {booking.checkInTime
                       ? <>Check-in from <span className="font-semibold">{booking.checkInTime}</span></>
@@ -605,7 +640,7 @@ export default function BookingConfirmationPage() {
               )}
               {booking.propertyAddress ? (
                 <div className="flex flex-col gap-1.5 py-3">
-                  <span className="text-xs text-text-muted uppercase tracking-wider font-medium">Address</span>
+                  <span className="text-xs text-text-muted uppercase tracking-wider font-medium">{pa.addressLabel}</span>
                   <p className="text-sm text-text-primary whitespace-pre-wrap">{booking.propertyAddress}</p>
                   <a
                     href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(booking.propertyAddress)}`}
@@ -619,8 +654,8 @@ export default function BookingConfirmationPage() {
                 </div>
               ) : null}
               <div className="py-3">
-                <span className="text-xs text-text-muted uppercase tracking-wider font-medium">Host WhatsApp</span>
-                <p className="text-sm text-text-secondary mt-1">Questions before you arrive? Message the property team.</p>
+                <span className="text-xs text-text-muted uppercase tracking-wider font-medium">{pa.hostLabel}</span>
+                <p className="text-sm text-text-secondary mt-1">{pa.hostDesc}</p>
                 <a
                   href={whatsappUrl}
                   target="_blank"
@@ -628,12 +663,12 @@ export default function BookingConfirmationPage() {
                   className="inline-flex mt-2 items-center justify-center rounded-lg bg-[#25D366] text-white text-sm font-medium px-4 py-2.5 hover:opacity-95 transition-opacity"
                   data-testid="pre-arrival-whatsapp"
                 >
-                  Chat on WhatsApp
+                  {pa.chatBtn}
                 </a>
               </div>
               {booking.wifiVisible && (booking.wifiName || booking.wifiPassword) && (
                 <div className="py-3">
-                  <span className="text-xs text-text-muted uppercase tracking-wider font-medium">WiFi</span>
+                  <span className="text-xs text-text-muted uppercase tracking-wider font-medium">{pa.wifiLabel}</span>
                   <p className="text-sm text-text-primary mt-1">
                     {booking.wifiName ? (
                       <>Network <span className="font-mono font-semibold">{booking.wifiName}</span></>
@@ -648,7 +683,7 @@ export default function BookingConfirmationPage() {
               )}
               {Array.isArray(booking.nearbyLandmarks) && booking.nearbyLandmarks.length > 0 && (
                 <div className="py-3">
-                  <span className="text-xs text-text-muted uppercase tracking-wider font-medium">Nearby landmarks</span>
+                  <span className="text-xs text-text-muted uppercase tracking-wider font-medium">{pa.landmarksLabel}</span>
                   <ul className="mt-2 list-disc pl-5 text-sm text-text-primary space-y-1">
                     {booking.nearbyLandmarks.map((line, i) => (
                       <li key={`${i}-${line}`}>{line}</li>
@@ -663,7 +698,7 @@ export default function BookingConfirmationPage() {
                 className="inline-flex items-center justify-center rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-2 hover:bg-brand-primary/5 transition-colors"
                 data-testid="pre-arrival-view-listing"
               >
-                View full listing &amp; photos
+                {pa.viewListing}
               </Link>
             )}
           </section>
@@ -723,7 +758,7 @@ export default function BookingConfirmationPage() {
               <p>✅ Booking confirmed now.</p>
               <p>📱 SMS and WhatsApp confirmation should arrive shortly.</p>
               <p data-testid="confirmation-t-minus-1">
-                {/* TASK-546: Explicit T-1 WhatsApp reminder date */}
+                {/* TASK-546 + TASK-2071: Explicit T-1 WhatsApp reminder date, language-aware */}
                 {(() => {
                   try {
                     const checkinDate = new Date(booking.checkinDate);
@@ -734,12 +769,12 @@ export default function BookingConfirmationPage() {
                         month: "short",
                         year: "numeric",
                       });
-                      return `🏠 WhatsApp reminder with check-in instructions will be sent on ${formatted}.`;
+                      return pa.t1Hint(formatted);
                     }
                   } catch {
                     /* fall through */
                   }
-                  return "🏠 WhatsApp reminder with check-in instructions will be sent the day before your stay.";
+                  return pa.t1Fallback;
                 })()}
               </p>
               <p>
