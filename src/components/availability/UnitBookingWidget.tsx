@@ -2332,17 +2332,19 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             id="promo-code"
             name="promoCode"
             value={promoCode}
-            onChange={(e) => setPromoCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 32))}
+            onChange={(e) => { setPromoCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 32)); setPromoMessage(null); setAppliedPromoCode(null); }}
+            onBlur={handlePromoBlur}
             disabled={isBookingDisabled || isSubmitting || isLoading}
             className="w-full rounded-xl border border-border-strong bg-bg-muted px-4 py-3 text-text-primary focus:outline-none focus:ring-2 focus:ring-cta-primary"
             placeholder="Enter promo code"
             data-testid="guest-booking-promo"
           />
-          {promoMessage ? (
-            <p className={`text-xs ${appliedPromoDiscount > 0 ? 'text-green-700' : 'text-text-muted'}`}>
-              {promoMessage}{appliedPromoCode ? ` (${appliedPromoCode})` : ''}
+          {promoValidating && <p className="text-xs text-text-muted">Validating…</p>}
+          {!promoValidating && promoMessage && (
+            <p className={`text-xs ${appliedPromoCode ? 'text-green-700' : 'text-support-error'}`}>
+              {appliedPromoCode ? '✓ ' : '✗ '}{promoMessage}
             </p>
-          ) : null}
+          )}
         </div>
 
         {/* TASK-782: Guest nationality for Indian police homestay reporting. India is pre-selected; Other is free-text via Notes. */}
