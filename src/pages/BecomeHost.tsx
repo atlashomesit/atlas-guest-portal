@@ -415,19 +415,8 @@ const BecomeHost = () => {
       });
 
       if (!res.ok) {
-        // BUG-ONBOARD-1 prevention: surface the server's actual error so the user can self-recover
-        // (e.g. "An account with this email already exists. Please login instead.") instead of the
-        // generic "Something went wrong" toast that left a customer abandoned on 2026-05-02.
-        const body = await res.json().catch(() => null);
-        // ASP.NET Core ProblemDetails for ModelState validation puts field errors in `errors`.
-        const fieldErrors = body?.errors && typeof body.errors === "object"
-          ? Object.values(body.errors as Record<string, string[]>).flat().filter(Boolean).join(" ")
-          : "";
-        const serverMsg = body?.message || body?.error || fieldErrors || body?.title;
-        const fallback = res.status >= 500
-          ? `Our servers hit an unexpected error (${res.status}). Please try again in a minute, or contact support@atlashomestays.com.`
-          : `Registration failed (HTTP ${res.status}). Please check your details and try again.`;
-        throw new Error(serverMsg || fallback);
+        // BUG-ONBOARD-1: surface server ProblemDetails / ModelState via messageFromApiResponse.
+        throw new Error(await messageFromApiResponse(res));
       }
 
       // TASK-764: store propertyId so SetupWizard can PUT the existing draft
@@ -1153,9 +1142,11 @@ class BecomeHostErrorBoundary extends React.Component<
           <div style={styles.container}>
             <Card>
               <div style={{ textAlign: "center", padding: "40px 20px" }}>
-                <Typography variant="h2">Something went wrong</Typography>
+                <Typography variant="h2">We couldn&apos;t load host onboarding</Typography>
                 <Typography variant="subtitle" className="mt-2">
-                  We hit an unexpected error loading host onboarding.
+                  {this.state.error?.message?.trim()
+                    ? this.state.error.message
+                    : "We hit an unexpected error. Try again or return home."}
                 </Typography>
                 <div style={{ marginTop: 24, display: "flex", gap: 12, justifyContent: "center" }}>
                   <Button onClick={() => window.location.reload()}>Try again</Button>

@@ -255,7 +255,11 @@ export default function BookingConfirmationPage() {
       setPushMessage("Notifications enabled. We'll send important booking updates.");
     } catch (e) {
       setPushState("error");
-      setPushMessage(e instanceof Error ? e.message : "Failed to enable notifications.");
+      setPushMessage(
+        e instanceof Error && e.message
+          ? e.message
+          : "Notifications could not be enabled. Try again or use another browser.",
+      );
     }
   }
 

@@ -52,7 +52,7 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
       const message =
         err instanceof Error && err.message
           ? err.message
-          : 'Failed to submit booking. Please try again.';
+          : 'Could not submit booking. Please try again.';
       setPaymentStatus({
         state: 'failure',
         reason: message,

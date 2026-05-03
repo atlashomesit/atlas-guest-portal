@@ -30,7 +30,7 @@ export default function CommunicationPreferences() {
       headers: { Accept: "application/json" },
     })
       .then(async (res) => {
-        if (!res.ok) throw new Error("Invalid or expired preferences link.");
+        if (!res.ok) throw new Error(await messageFromApiResponse(res));
         return res.json();
       })
       .then((data) => {
@@ -44,7 +44,11 @@ export default function CommunicationPreferences() {
       })
       .catch((e: unknown) => {
         if (cancelled) return;
-        setError(e instanceof Error ? e.message : "Failed to load preferences.");
+        setError(
+          e instanceof Error && e.message
+            ? e.message
+            : "Could not load preferences. Use the link from your email.",
+        );
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

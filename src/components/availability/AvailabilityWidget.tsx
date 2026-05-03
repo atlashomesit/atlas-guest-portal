@@ -124,7 +124,11 @@ const useBlockedDates = (
       })
       .catch((fetchError) => {
         if (cancelled) return;
-        setError(fetchError instanceof Error ? fetchError.message : 'Failed to load availability');
+        setError(
+          fetchError instanceof Error && fetchError.message
+            ? fetchError.message
+            : 'Could not load availability. Please refresh.',
+        );
         setBlockedDates([]);
       })
       .finally(() => {
