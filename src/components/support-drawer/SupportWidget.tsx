@@ -213,7 +213,10 @@ const SupportWidgetContent = () => {
           ) : null}
 
           {enableChatbotPlaceholder ? (
-            <ChatbotPlaceholder enableHideUnfinishedChatbot={enableHideUnfinishedChatbot} />
+            <ChatbotPlaceholder
+              enableHideUnfinishedChatbot={enableHideUnfinishedChatbot}
+              listingId={listingId}
+            />
           ) : null}
         </div>
       </>

@@ -38,7 +38,7 @@ export default function GuestAssistant({ listingId }: GuestAssistantProps) {
     if (!listingId || isNaN(Number(listingId))) return;
     setLoading(true);
     setFetchErrorMessage(null);
-    const url = buildApiUrl(`/listings/${Number(listingId)}/faq`);
+    const url = buildApiUrl(`/api/public/listings/${Number(listingId)}/faq`);
     fetch(url, { headers: getApiHeaders() })
       .then(async (r) => {
         if (!r.ok) throw new Error(await messageFromApiResponse(r));
