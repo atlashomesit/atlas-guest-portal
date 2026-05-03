@@ -114,7 +114,7 @@ const PrivacyPage = () => {
                   <button
                     type="button"
                     onClick={() => toggle(section.id)}
-                    className="text-sm font-semibold px-3 py-2 rounded-full border border-border-subtle hover:border-cta-primary text-primary self-start"
+                    className="min-h-11 text-base font-semibold px-4 py-3 rounded-full border border-border-subtle hover:border-cta-primary text-primary self-start"
                     aria-expanded={open.has(section.id)}
                     aria-controls={`${section.id}-details`}
                   >

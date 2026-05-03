@@ -36,6 +36,7 @@ const SupportWidget = React.lazy(() => import("./components/support/SupportWidge
 const Reserve = React.lazy(() => import("./pages/Reserve"))
 const BecomeHost = React.lazy(() => import("./pages/BecomeHost"))
 const BookingConfirmationPage = React.lazy(() => import("./pages/BookingConfirmationPage"))
+const SelfCheckIn = React.lazy(() => import("./pages/SelfCheckIn")) // TASK-1254
 const ReviewSubmitPage = React.lazy(() => import("./pages/ReviewSubmitPage"))
 const CommunicationPreferences = React.lazy(() => import("./pages/CommunicationPreferences"))
 const ProfilePage = React.lazy(() => import("./pages/ProfilePage"))
@@ -43,7 +44,7 @@ const MyBookingsPage = React.lazy(() => import("./pages/MyBookingsPage"))
 const FavoritesPage = React.lazy(() => import("./pages/FavoritesPage"))
 const RecentlyViewedPage = React.lazy(() => import("./pages/RecentlyViewedPage"))
 const PrivacyPolicyPage = React.lazy(() => import("./pages/PrivacyPolicyPage"))
-const CookieConsentBanner = React.lazy(() => import("./components/CookieConsentBanner"))
+const CookieConsent = React.lazy(() => import("./components/CookieConsent"))
 const PageNotFound = React.lazy(() => import("./pages/pagenotfound/PageNotFound"))
 
 function LazyFallback() {
@@ -151,6 +152,8 @@ function AppWrapper() {
           <Route path="/properties/:id" element={withBoundary(<Suspense fallback={<PropertyDetailsLazyFallback />}><LegacyPropertyRedirect /></Suspense>, "property-details-modern-redirect-route")} />
           <Route path="/reserve" element={withBoundary(<Reserve />, "reserve-route")} />
           <Route path="/booking/:bookingId" element={withBoundary(<BookingConfirmationPage />, "booking-confirmation-route")} />
+          <Route path="/check-in/:bookingRef" element={withBoundary(<SelfCheckIn />, "self-checkin-route")} />
+          <Route path="/check-in" element={withBoundary(<SelfCheckIn />, "self-checkin-noparam-route")} />
           <Route path="/review/:bookingId" element={withBoundary(<ReviewSubmitPage />, "review-submit-route")} />
           <Route path="/communication-preferences" element={withBoundary(<CommunicationPreferences />, "communication-preferences-route")} />
           <Route path="/preferences/:guestToken" element={withBoundary(<CommunicationPreferences />, "communication-preferences-token-route")} />
@@ -169,7 +172,7 @@ function AppWrapper() {
       </ErrorBoundary>
       <Suspense fallback={null}><SupportWidget /></Suspense>
       <Footer />
-      <Suspense fallback={null}><CookieConsentBanner /></Suspense>
+      <Suspense fallback={null}><CookieConsent /></Suspense>
       <ToastContainer position="top-right" newestOnTop pauseOnFocusLoss={false} />
     </>
   );

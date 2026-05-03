@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { fetchPublicListings } from '../api/listingClient';
+import { fetchPublicListings, type PublicListing } from '../api/listingClient';
 import { getTenantContext } from '../tenant/tenantContext';
 import { buildHomeUnitPath, getPropertySlug } from '../utils/navigation';
 
@@ -11,6 +11,8 @@ export type HomeLink = {
 
 export type PropertyListingsState = {
   homes: HomeLink[];
+  /** Full API listing objects, keyed by listing id string. Available for components needing rich data (e.g. JSON-LD). */
+  listingsById: Record<string, PublicListing>;
   isLoading: boolean;
   /** True when the API request failed and static tenant/default homes are shown instead. */
   usedFallback: boolean;
@@ -34,6 +36,7 @@ function mapPublicListingToHomeLink(listing: {
 
 export function usePropertyListings(): PropertyListingsState {
   const [homes, setHomes] = useState<HomeLink[]>([]);
+  const [listingsById, setListingsById] = useState<Record<string, PublicListing>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [usedFallback, setUsedFallback] = useState(false);
   const tenant = getTenantContext();
@@ -47,10 +50,14 @@ export function usePropertyListings(): PropertyListingsState {
         const mapped = listings.map(mapPublicListingToHomeLink);
         mapped.sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: 'base' }));
         setHomes(mapped);
+        const byId: Record<string, PublicListing> = {};
+        for (const l of listings) byId[String(l.id)] = l;
+        setListingsById(byId);
       } catch (error) {
         console.warn('Error fetching listings:', error);
         setUsedFallback(true);
         setHomes([]);
+        setListingsById({});
       } finally {
         setIsLoading(false);
       }
@@ -59,5 +66,5 @@ export function usePropertyListings(): PropertyListingsState {
     void load();
   }, [tenant?.slug]);
 
-  return { homes, isLoading, usedFallback };
+  return { homes, listingsById, isLoading, usedFallback };
 }

@@ -253,6 +253,10 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
     const specialLabel = priceDisplayConfig.specialPricingLabels[dateKey];
     const apiListingId = model.property?.listingId ?? model.listing.id;
     const todayBreakdown = getListingPricing(apiListingId);
+    const showLimitedTimeDeal =
+      (model.property?.losDiscountPercent ?? 0) > 0 ||
+      (model.property?.losDiscount2Percent ?? 0) > 0 ||
+      (model.property?.lastMinuteDiscountPercent ?? 0) > 0;
 
     return (
       <div className="flex flex-col gap-1">
@@ -260,7 +264,9 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
           <span className="text-sm font-semibold rounded-full bg-[color:color-mix(in_srgb,var(--cta-primary)_18%,transparent)] px-3 py-1 text-[color:color-mix(in_srgb,var(--cta-primary)_80%,transparent)]">
             {priceDisplayConfig.discount.primaryBadgeLabel}
           </span>
-          <span className="text-xs text-text-muted">{priceDisplayConfig.discount.secondaryBadgeLabel}</span>
+          {showLimitedTimeDeal ? (
+            <span className="text-xs text-text-muted">{priceDisplayConfig.discount.secondaryBadgeLabel}</span>
+          ) : null}
         </div>
         {dailyPricingLoading && (
           <span className="text-sm text-text-muted">Loading price…</span>
@@ -445,7 +451,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
                   onClick={() => handleNavigate(heroModel)}
                   className="property-card__button inline-flex items-center justify-center rounded-full border border-border-subtle px-5 py-3 text-sm font-semibold text-text-primary transition hover:border-[color:var(--cta-primary)] hover:text-[color:var(--cta-primary)]"
                 >
-                  View details
+                  View home
                 </button>
               </div>
             </div>
@@ -571,7 +577,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
                         }}
                         className="property-card__button inline-flex items-center justify-center rounded-full border border-border-subtle px-5 py-3 text-sm font-semibold text-text-primary transition hover:border-[color:var(--cta-primary)] hover:text-[color:var(--cta-primary)]"
                       >
-                        View details
+                        View home
                       </Link>
                     </div>
                   </div>

@@ -1,153 +1,85 @@
-// BookingCard.tsx
+// BookingCard.tsx — date-search widget used on location listing pages.
+// Replaces the earlier stub (which threw in PROD and showed fake booking IDs).
 import { useState } from 'react';
-import { toast } from 'react-toastify';
+import { useNavigate } from 'react-router-dom';
 
 interface BookingCardProps {
-  propertyId: number;
+  propertyId?: number;
   supportPadding?: boolean;
 }
 
+const today = () => new Date().toISOString().slice(0, 10);
+const tomorrow = () => {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return d.toISOString().slice(0, 10);
+};
+
 const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = false }) => {
+  const navigate = useNavigate();
+  const [checkin, setCheckin] = useState(today());
+  const [checkout, setCheckout] = useState(tomorrow());
+  const [guests, setGuests] = useState(1);
 
-  const [paymentStatus, setPaymentStatus] = useState<{
-    state: 'idle' | 'success' | 'failure';
-    paymentId?: string;
-    bookingId?: string;
-    reason?: string;
-  }>({ state: 'idle' });
-
-  const [userEmail, setUserEmail] = useState<string>('');
-  const [userPhone, setUserPhone] = useState<string>('');
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [termsAccepted, setTermsAccepted] = useState<boolean>(false);
-
-  const handleSubmit = async () => {
-    if (!userEmail || !userPhone) {
-      toast.error('Please fill in all required fields');
-      return;
-    }
-
-    if (!termsAccepted) {
-      toast.error('Please accept the terms and conditions');
-      return;
-    }
-
-    setIsLoading(true);
-    
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setPaymentStatus({ 
-        state: 'success',
-        bookingId: 'BK' + Math.random().toString(36).substr(2, 8).toUpperCase()
-      });
-      
-      toast.success('Booking submitted successfully!');
-      // Reset form after successful submission
-      setUserEmail('');
-      setUserPhone('');
-      setTermsAccepted(false);
-    } catch {
-      setPaymentStatus({ 
-        state: 'failure', 
-        reason: 'Failed to process booking. Please try again.' 
-      });
-      toast.error('Failed to submit booking. Please try again.');
-    } finally {
-      setIsLoading(false);
+  const handleSearch = () => {
+    const params = new URLSearchParams({
+      checkin,
+      checkout,
+      guests: String(guests),
+    });
+    if (propertyId) {
+      navigate(`/homes/${propertyId}?${params.toString()}`);
+    } else {
+      navigate(`/?${params.toString()}#our-homes`);
     }
   };
-
-  if (import.meta.env.PROD) {
-    throw new Error('BookingCard stub: remove this component before shipping to production');
-  }
 
   return (
     <div
       id="booking-form"
       data-property-id={propertyId}
-      className={`mx-auto w-full max-w-6xl p-6 bg-white shadow-lg rounded-2xl ${supportPadding ? 'my-8' : ''}`}
+      className={`mx-auto w-full max-w-3xl p-5 bg-white shadow-lg rounded-2xl ${supportPadding ? 'my-8' : ''}`}
     >
-      <div className="space-y-6">
-        <h2 className="text-2xl font-bold text-gray-800">Book Your Stay</h2>
-        
-        <div className="space-y-4">
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-              Email Address <span className="text-red-500">*</span>
-            </label>
-            <input
-              id="email"
-              type="email"
-              value={userEmail}
-              onChange={(e) => setUserEmail(e.target.value)}
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Enter your email"
-              required
-            />
-          </div>
-          
-          <div>
-            <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
-              Phone Number <span className="text-red-500">*</span>
-            </label>
-            <input
-              id="phone"
-              type="tel"
-              value={userPhone}
-              onChange={(e) => setUserPhone(e.target.value)}
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Enter your phone number"
-              required
-            />
-          </div>
-          
-          <div className="flex items-start">
-            <div className="flex items-center h-5">
-              <input
-                id="terms"
-                type="checkbox"
-                checked={termsAccepted}
-                onChange={(e) => setTermsAccepted(e.target.checked)}
-                className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                required
-              />
-            </div>
-            <div className="ml-3 text-sm">
-              <label htmlFor="terms" className="font-medium text-gray-700">
-                I agree to the terms and conditions
-              </label>
-              <p className="text-gray-500">By booking, you agree to our terms of service and privacy policy.</p>
-            </div>
-          </div>
-          
-          <div className="pt-2">
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={isLoading}
-              className={`w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
-            >
-              {isLoading ? 'Processing...' : 'Book Now'}
-            </button>
-          </div>
-          
-          {paymentStatus.state === 'success' && (
-            <div className="mt-4 p-4 bg-green-50 text-green-700 rounded-lg">
-              <p className="font-medium">Booking successful!</p>
-              <p className="text-sm">Your booking ID: {paymentStatus.bookingId}</p>
-              <p className="text-sm mt-2">We've sent a confirmation to your email.</p>
-            </div>
-          )}
-          
-          {paymentStatus.state === 'failure' && (
-            <div className="mt-4 p-4 bg-red-50 text-red-700 rounded-lg">
-              <p className="font-medium">Booking failed</p>
-              <p className="text-sm">{paymentStatus.reason || 'Please try again later.'}</p>
-            </div>
-          )}
+      <h2 className="text-xl font-bold text-gray-800 mb-4">Find your stay</h2>
+      <div className="flex flex-col sm:flex-row gap-3 items-end">
+        <div className="flex-1">
+          <label className="block text-xs font-medium text-gray-600 mb-1">Check-in</label>
+          <input
+            type="date"
+            value={checkin}
+            min={today()}
+            onChange={(e) => setCheckin(e.target.value)}
+            className="w-full p-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
         </div>
+        <div className="flex-1">
+          <label className="block text-xs font-medium text-gray-600 mb-1">Check-out</label>
+          <input
+            type="date"
+            value={checkout}
+            min={checkin || today()}
+            onChange={(e) => setCheckout(e.target.value)}
+            className="w-full p-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
+        <div className="w-28">
+          <label className="block text-xs font-medium text-gray-600 mb-1">Guests</label>
+          <input
+            type="number"
+            value={guests}
+            min={1}
+            max={10}
+            onChange={(e) => setGuests(Math.max(1, parseInt(e.target.value) || 1))}
+            className="w-full p-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
+        <button
+          type="button"
+          onClick={handleSearch}
+          className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+        >
+          Search
+        </button>
       </div>
     </div>
   );

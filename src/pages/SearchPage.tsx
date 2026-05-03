@@ -1,5 +1,6 @@
-import { lazy, Suspense, useMemo, useState, useEffect, useCallback } from "react";
+import { lazy, Suspense, useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { AlertTriangle } from "lucide-react";
 
 import { propertyData } from "../data";
 import { fetchPublicListings, type PublicListing } from "../api/listingClient";
@@ -49,11 +50,17 @@ type NormalizedListing = {
   losDiscount2MinNights?: number | null;
   /** TASK-1695: LOS auto-discount tier 2 percent. */
   losDiscount2Percent?: number | null;
+  /** TASK-1649: last-minute discount rule percent from API (optional). */
+  lastMinuteDiscountPercent?: number | null;
   /** TASK-1725: True when Atlas team has verified photos for this listing. */
   hasVerifiedPhotos?: boolean;
+  /** TASK-1727: True when the tenant has a valid GSTIN on file. */
+  isGstRegistered?: boolean;
   /** TASK-1457: Map pin coordinates (API or static fallback). */
   latitude?: number | null;
   longitude?: number | null;
+  /** TASK-2076: number of verified reviews — shown as (N) next to ★ rating. */
+  reviewCount?: number | null;
 };
 
 function buildStaticListings(): NormalizedListing[] {
@@ -79,6 +86,7 @@ function buildStaticListings(): NormalizedListing[] {
         canonicalPath,
         property,
         rating: property.property_rating ?? undefined,
+        reviewCount: (property as unknown as { property_reviews?: number }).property_reviews ?? null,
         latitude: pin.lat,
         longitude: pin.lng,
       };
@@ -111,13 +119,17 @@ function apiToNormalized(listings: PublicListing[]): NormalizedListing[] {
         amenities: ((l as unknown as { amenityCodes?: string[] }).amenityCodes ?? []).map((code) => ({ amenities_icon: code })),
         canonicalPath,
         rating: l.propertyRating ?? undefined,
+        reviewCount: l.reviewCount ?? null,
         // TASK-1866: map minStay so long-stay filter works on API listings
         minStay: l.minStay ?? null,
         losDiscountMinNights: l.losDiscountMinNights ?? null,
         losDiscountPercent: l.losDiscountPercent ?? null,
         losDiscount2MinNights: l.losDiscount2MinNights ?? null,
         losDiscount2Percent: l.losDiscount2Percent ?? null,
+        lastMinuteDiscountPercent:
+          (l as unknown as { lastMinuteDiscountPercent?: number | null }).lastMinuteDiscountPercent ?? null,
         hasVerifiedPhotos: l.photosVerifiedAt != null,
+        isGstRegistered: l.isGstRegistered ?? false,
         latitude: l.latitude ?? null,
         longitude: l.longitude ?? null,
       };
@@ -204,14 +216,16 @@ const SearchPage = () => {
   /** TASK-1451: include guests so "Clear filters" resets guest count too. */
   const hasActiveFilters = Boolean(
     minPrice || maxPrice || remoteWork || longStay || availableNow || selectedAmenities.length > 0
-    || nomadWifi || nomadWorkspace || monthlyStay || guests != null,
+    || nomadWifi || nomadWorkspace || monthlyStay || guests != null
+    || sortBy !== "recommended" || mapView,
   );
 
   const [tonightAvailableIds, setTonightAvailableIds] = useState<Set<number> | null>(null);
   const [tonightProbeLoading, setTonightProbeLoading] = useState(false);
-  // TASK-1865: batch availability check for checkIn+checkOut dates
+  // TASK-1865 / TASK-1648: batch (or public availability) check for checkIn+checkOut dates + per-date-pair cache
   const [dateAvailableIds, setDateAvailableIds] = useState<Set<number> | null>(null);
   const [dateAvailLoading, setDateAvailLoading] = useState(false);
+  const dateAvailCacheRef = useRef<Map<string, Set<number>>>(new Map());
   /** TASK-1460: batch availability hints for cards when guest has not set explicit date search. */
   const [availabilityById, setAvailabilityById] = useState<Record<number, ListingAvailabilitySummary>>({});
   const [availabilityFetchDone, setAvailabilityFetchDone] = useState(false);
@@ -286,7 +300,7 @@ const SearchPage = () => {
     return () => controller.abort();
   }, [availableNow, listings]);
 
-  // TASK-1865: When checkIn+checkOut set, call batch availability endpoint to get available listing IDs
+  // TASK-1648: GET /api/public/listings/availability?checkIn&checkOut when present, else batch; cache by date pair; fail-open
   useEffect(() => {
     if (!checkIn || !checkOut || hasInvalidDates) {
       setDateAvailableIds(null);
@@ -295,28 +309,66 @@ const SearchPage = () => {
     }
     const startStr = checkIn.toISOString().slice(0, 10);
     const endStr = checkOut.toISOString().slice(0, 10);
+    const cacheKey = `${startStr}|${endStr}`;
+    if (dateAvailCacheRef.current.has(cacheKey)) {
+      setDateAvailableIds(new Set(dateAvailCacheRef.current.get(cacheKey)!));
+      setDateAvailLoading(false);
+      return;
+    }
+
     const controller = new AbortController();
     setDateAvailLoading(true);
     setDateAvailableIds(null);
 
-    fetch(buildApiUrl(`/api/public/listings/availability-batch?startDate=${startStr}&endDate=${endStr}`), {
-      signal: controller.signal,
-      headers: { Accept: "application/json", ...getApiHeaders() },
-    })
-      .then((res) => res.ok ? res.json() : Promise.reject(res.status))
-      .then((data: { availableListingIds?: number[] }) => {
-        if (!controller.signal.aborted) {
-          setDateAvailableIds(new Set(data.availableListingIds ?? []));
-          setDateAvailLoading(false);
+    const parseIds = (payload: unknown): number[] | undefined => {
+      if (!payload || typeof payload !== "object") return undefined;
+      const o = payload as Record<string, unknown>;
+      const raw =
+        o.listingIds ??
+        o.availableListingIds ??
+        o.ListingIds ??
+        o.AvailableListingIds;
+      if (!Array.isArray(raw)) return undefined;
+      return raw.map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0);
+    };
+
+    const headers = { Accept: "application/json", ...getApiHeaders() } as Record<string, string>;
+
+    void (async () => {
+      try {
+        const primary = buildApiUrl(
+          `/api/public/listings/availability?checkIn=${encodeURIComponent(startStr)}&checkOut=${encodeURIComponent(endStr)}`,
+        );
+        let listingIds: number[] | undefined;
+        const resPrimary = await fetch(primary, { signal: controller.signal, headers });
+        if (resPrimary.ok) {
+          listingIds = parseIds(await resPrimary.json());
+        } else {
+          const batchUrl = buildApiUrl(
+            `/api/public/listings/availability-batch?startDate=${encodeURIComponent(startStr)}&endDate=${encodeURIComponent(endStr)}`,
+          );
+          const resBatch = await fetch(batchUrl, { signal: controller.signal, headers });
+          if (resBatch.ok) {
+            const data = (await resBatch.json()) as { availableListingIds?: number[] };
+            listingIds = data.availableListingIds ?? parseIds(data);
+          }
         }
-      })
-      .catch(() => {
-        // On failure, don't block — show all listings with "not confirmed" badge
+        if (controller.signal.aborted) return;
+        if (listingIds != null) {
+          const next = new Set(listingIds);
+          dateAvailCacheRef.current.set(cacheKey, next);
+          setDateAvailableIds(next);
+        } else {
+          setDateAvailableIds(null);
+        }
+      } catch {
         if (!controller.signal.aborted) {
           setDateAvailableIds(null);
-          setDateAvailLoading(false);
         }
-      });
+      } finally {
+        if (!controller.signal.aborted) setDateAvailLoading(false);
+      }
+    })();
 
     return () => controller.abort();
   }, [checkIn, checkOut, hasInvalidDates]);
@@ -475,6 +527,8 @@ const SearchPage = () => {
       next.delete("nomadWifi");
       next.delete("nomadWorkspace");
       next.delete("monthlyStay");
+      next.delete("sortBy");
+      next.delete("view");
       return next;
     }, { replace: true });
   };
@@ -579,6 +633,9 @@ const SearchPage = () => {
   const visibleUnits = sortedUnits.slice(0, visibleCount);
   const hasMore = visibleCount < sortedUnits.length;
   const showEmptyState = !isLoading && !hasInvalidDates && sortedUnits.length === 0;
+  /** TASK-1648: skeleton while public availability resolves for selected dates (list view). */
+  const showDateAvailabilitySkeleton =
+    explicitDateSearch && !hasInvalidDates && dateAvailLoading && !isLoading && !mapView;
   const queryString = searchParams.toString();
   const querySuffix = queryString ? `?${queryString}` : "";
   const approximatePinHint = useMemo(
@@ -620,9 +677,10 @@ const SearchPage = () => {
               ? `${filteredUnits.length} ${filteredUnits.length === 1 ? "home" : "homes"} for your dates`
               : "Atlas Homestays"}
           </h1>
-          {/* TASK-1863: honest subtitle — don't promise date filtering until availability pre-filter ships (TASK-1865) */}
           <p className="max-w-3xl text-base text-text-body">
-            Browse all homes. Filter by price, guests and amenities below.
+            {checkIn && checkOut && !hasInvalidDates
+              ? "Homes below are filtered to those available for your dates when our live check succeeds. You can still refine with price, guests, and amenities."
+              : "Browse all homes. Filter by price, guests and amenities below."}
           </p>
         </header>
 
@@ -665,8 +723,8 @@ const SearchPage = () => {
           </ul>
         ) : null}
 
-        {/* Filter bar */}
-        <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-border-subtle bg-bg-surface px-4 py-3 shadow-sm">
+        {/* Filter bar — TASK-2075: sticky so it stays visible after scrolling past 8+ listings */}
+        <div className="sticky top-16 z-10 flex flex-wrap items-end gap-3 rounded-2xl border border-border-subtle bg-bg-surface px-4 py-3 shadow-sm">
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium text-text-muted" htmlFor="filter-min-price">Min price / night</label>
             <input
@@ -676,7 +734,7 @@ const SearchPage = () => {
               placeholder="₹ Any"
               value={minPrice ?? ""}
               onChange={(e) => updateParam("minPrice", e.target.value)}
-              className="w-32 rounded-lg border border-border-subtle bg-bg-muted px-3 py-2 text-base text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-cta-primary"
+              className="min-h-11 w-32 rounded-lg border border-border-subtle bg-bg-muted px-3 py-2 text-base text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-cta-primary"
             />
           </div>
           <div className="flex flex-col gap-1">
@@ -688,7 +746,7 @@ const SearchPage = () => {
               placeholder="₹ Any"
               value={maxPrice ?? ""}
               onChange={(e) => updateParam("maxPrice", e.target.value)}
-              className="w-32 rounded-lg border border-border-subtle bg-bg-muted px-3 py-2 text-base text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-cta-primary"
+              className="min-h-11 w-32 rounded-lg border border-border-subtle bg-bg-muted px-3 py-2 text-base text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-cta-primary"
             />
           </div>
           <div className="flex flex-col gap-1">
@@ -701,7 +759,7 @@ const SearchPage = () => {
               placeholder="Any"
               value={guests ?? ""}
               onChange={(e) => updateParam("guests", e.target.value)}
-              className="w-24 rounded-lg border border-border-subtle bg-bg-muted px-3 py-2 text-base text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-cta-primary"
+              className="min-h-11 w-24 rounded-lg border border-border-subtle bg-bg-muted px-3 py-2 text-base text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-cta-primary"
             />
           </div>
           <label className="flex items-center gap-2 rounded-lg border border-border-subtle bg-bg-muted px-3 py-2 text-sm">
@@ -724,6 +782,7 @@ const SearchPage = () => {
             />
             <span className="text-text-primary">Long stay (7+ nights)</span>
           </label>
+          {(!checkIn || !checkOut) && (
           <label className="flex items-center gap-2 rounded-lg border border-border-subtle bg-bg-muted px-3 py-2 text-sm">
             <input
               type="checkbox"
@@ -735,6 +794,7 @@ const SearchPage = () => {
             />
             <span className="text-text-primary">Available tonight</span>
           </label>
+          )}
           <div className="ml-auto flex items-end gap-3">
             {!isLoading && (
               <span className="text-sm text-text-muted">
@@ -743,6 +803,8 @@ const SearchPage = () => {
                   ? "Checking availability for your dates…"
                   : availableNow && tonightProbeLoading
                   ? "Checking tonight's availability..."
+                  : filteredUnits.length === 0 && hasActiveFilters
+                  ? "No properties match your filters"
                   : `${filteredUnits.length} ${filteredUnits.length === 1 ? "property" : "properties"} found`}
               </span>
             )}
@@ -750,7 +812,7 @@ const SearchPage = () => {
               <button
                 type="button"
                 onClick={clearFilters}
-                className="rounded-lg border border-border-subtle px-3 py-3 text-xs font-medium text-text-muted hover:bg-bg-muted focus:outline-none"
+                className="min-h-11 rounded-lg border border-border-subtle px-4 py-3 text-sm font-medium text-text-muted hover:bg-bg-muted focus:outline-none"
               >
                 Clear filters
               </button>
@@ -838,7 +900,7 @@ const SearchPage = () => {
               onChange={(e) => updateParam("sortBy", e.target.value === "recommended" ? "" : e.target.value)}
               className="rounded-lg border border-border-subtle bg-bg-surface px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-cta-primary"
             >
-              <option value="recommended">Recommended</option>
+              <option value="recommended" title="Sorted by Atlas building/floor preference">Recommended</option>
               <option value="price_asc">Price: low to high</option>
               <option value="price_desc">Price: high to low</option>
               <option value="rating_desc">Highest rated</option>
@@ -850,10 +912,27 @@ const SearchPage = () => {
         {/* TASK-1708: Direct booking discount nudge — shows for direct traffic only */}
         <DirectDiscountBanner />
 
+        {/* TASK-1648: skeleton while resolving date-based availability */}
+        {explicitDateSearch && !hasInvalidDates && dateAvailLoading && !mapView && (
+          <section
+            className="grid gap-6 sm:grid-cols-2"
+            data-testid="search-date-availability-skeleton"
+            aria-busy="true"
+            aria-label="Checking availability for your dates"
+          >
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={`avail-sk-${i}`} className={i >= 4 ? "hidden sm:block" : ""}>
+                <SkeletonCard />
+              </div>
+            ))}
+          </section>
+        )}
+
         {/* TASK-1867: only show banner on a real fetch error, not when API returns 0 listings */}
         {!isLoading && apiError && listings.length > 0 && (
-          <div className="rounded-xl border border-support-warning/40 bg-support-warning/10 px-4 py-3 text-support-warning">
-            Limited results — showing cached data. Search may be temporarily unavailable.
+          <div className="flex items-center gap-3 rounded-xl border border-support-warning/40 bg-support-warning/10 px-4 py-3 text-support-warning">
+            <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
+            <span>Live availability check failed. Showing cached results — call +91 7032 493 290 to confirm before booking.</span>
           </div>
         )}
 
@@ -863,7 +942,7 @@ const SearchPage = () => {
           </div>
         )}
 
-        {showEmptyState && (
+        {showEmptyState && !mapView && (
           <div className="flex flex-col gap-8">
             <div
               className="rounded-2xl border border-border-subtle bg-bg-surface px-4 py-8 text-center shadow-sm sm:px-8"
@@ -932,7 +1011,7 @@ const SearchPage = () => {
                           to={`${unit.canonicalPath}${querySuffix}`}
                           className="mt-auto inline-flex min-h-[44px] items-center justify-center rounded-xl bg-[var(--cta-primary-hover)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--cta-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
                         >
-                          View details
+                          View home
                         </Link>
                       </div>
                     </article>
@@ -950,31 +1029,40 @@ const SearchPage = () => {
             aria-busy="true"
             aria-label="Loading search results"
           >
-            {Array.from({ length: 6 }).map((_, i) => (
-              <SkeletonCard key={i} />
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className={i >= 4 ? "hidden sm:block" : ""}>
+                <SkeletonCard />
+              </div>
             ))}
           </section>
         )}
 
-        {!isLoading && !showEmptyState && !hasInvalidDates && mapView && (
+        {!isLoading && !(explicitDateSearch && dateAvailLoading) && !hasInvalidDates && mapView && (
           <div className="flex flex-col gap-3">
-            <Suspense
-              fallback={
-                <div
-                  className="flex min-h-[50vh] items-center justify-center rounded-2xl border border-border-subtle bg-bg-surface text-text-muted"
-                  data-testid="search-map-suspense"
-                >
-                  Loading map…
+            <div className="relative">
+              {showEmptyState && (
+                <div className="absolute inset-x-0 top-4 z-10 mx-auto w-fit rounded-xl border border-border-subtle bg-bg-surface/95 px-4 py-3 text-sm text-text-secondary shadow-md text-center">
+                  No matches in this area — try wider search or clear filters
                 </div>
-              }
-            >
-              <SearchResultsMap
-                units={mapUnits}
-                formatPrice={formatDisplayCurrency}
-                querySuffix={querySuffix}
-                approximatePinHint={approximatePinHint}
-              />
-            </Suspense>
+              )}
+              <Suspense
+                fallback={
+                  <div
+                    className="flex min-h-[50vh] items-center justify-center rounded-2xl border border-border-subtle bg-bg-surface text-text-muted"
+                    data-testid="search-map-suspense"
+                  >
+                    Loading map…
+                  </div>
+                }
+              >
+                <SearchResultsMap
+                  units={mapUnits}
+                  formatPrice={formatDisplayCurrency}
+                  querySuffix={querySuffix}
+                  approximatePinHint={approximatePinHint}
+                />
+              </Suspense>
+            </div>
             {/* TASK-1457: quick-scroll listing strip on small screens (map is primary). */}
             <div
               className="flex gap-3 overflow-x-auto pb-1 md:hidden"
@@ -1004,7 +1092,22 @@ const SearchPage = () => {
           </div>
         )}
 
-        {!isLoading && !showEmptyState && !hasInvalidDates && !mapView && (
+        {showDateAvailabilitySkeleton && (
+          <section
+            className="grid gap-6 sm:grid-cols-2"
+            data-testid="search-date-availability-skeleton"
+            aria-busy="true"
+            aria-label="Checking availability for your dates"
+          >
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={`avail-skel-${i}`} className={i >= 4 ? "hidden sm:block" : ""}>
+                <SkeletonCard />
+              </div>
+            ))}
+          </section>
+        )}
+
+        {!isLoading && !showDateAvailabilitySkeleton && !showEmptyState && !hasInvalidDates && !mapView && (
           <section
             className="grid gap-6 sm:grid-cols-2"
             data-testid="guest-search-results"
@@ -1065,6 +1168,12 @@ const SearchPage = () => {
                             ✅ Verified photos
                           </span>
                         )}
+                        {/* TASK-1727: GST registered badge */}
+                        {unit.isGstRegistered && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 border border-blue-200">
+                            🧾 GST Reg.
+                          </span>
+                        )}
                         {/* TASK-1695: LOS discount badge — show highest configured tier */}
                         {unit.losDiscount2MinNights != null && unit.losDiscount2MinNights > 0 &&
                           unit.losDiscount2Percent != null && unit.losDiscount2Percent > 0 ? (
@@ -1081,6 +1190,9 @@ const SearchPage = () => {
                       {unit.rating != null && unit.rating > 0 && (
                         <p className="mt-0.5 text-sm text-accent-primary font-medium">
                           {"★".repeat(Math.round(unit.rating))}<span className="text-text-muted ml-1">{unit.rating.toFixed(1)}</span>
+                          {unit.reviewCount != null && unit.reviewCount > 0 && (
+                            <span className="text-text-muted ml-1 text-xs">({unit.reviewCount})</span>
+                          )}
                         </p>
                       )}
                       {/* TASK-1716: keyword-bucketed sentiment summary */}
@@ -1101,11 +1213,19 @@ const SearchPage = () => {
                       <p className="text-sm text-text-muted">per night</p>
                       <p className="text-xs text-text-muted">
                         {/* TASK-1869 / TASK-1451: Sept 2025 GST reform — 5% for ≤₹7,500/night, 18% above */}
-                        {(() => { const gstMult = unit.pricePerNight > 7500 ? 1.18 : 1.05; const pct = unit.pricePerNight > 7500 ? 18 : 5; return `Est. total: ${formatDisplayCurrency(Math.round(unit.pricePerNight * gstMult))} (incl. ${pct}% GST)`; })()}
+                        {(() => { const gstMult = unit.pricePerNight > 7500 ? 1.12 : 1.05; const pct = unit.pricePerNight > 7500 ? 12 : 5; return `Est. total: ${formatDisplayCurrency(Math.round(unit.pricePerNight * gstMult))} (incl. ${pct}% GST)`; })()}
                       </p>
                       {longStay && (
                         <p className="text-sm font-semibold text-cta-primary">
-                          from {formatDisplayCurrency(unit.pricePerNight * 30)}/month
+                          {/* TASK-2077: apply LOS discount to monthly estimate when tier is configured */}
+                          {(() => {
+                            const discountPct = unit.losDiscount2Percent ?? unit.losDiscountPercent ?? 0;
+                            const base = unit.pricePerNight * 30;
+                            const discounted = discountPct > 0 ? Math.round(base * (1 - discountPct / 100)) : base;
+                            return discountPct > 0
+                              ? `from ${formatDisplayCurrency(discounted)}/month with long-stay discount`
+                              : `from ${formatDisplayCurrency(base)}/month`;
+                          })()}
                         </p>
                       )}
                       {/* TASK-1739: LOS discount calculator — only shows when tiers are configured */}
@@ -1128,7 +1248,7 @@ const SearchPage = () => {
                       to={`${unit.canonicalPath}${querySuffix}`}
                       className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl bg-[var(--cta-primary-hover)] px-4 py-2 text-sm font-semibold text-white shadow hover:bg-[var(--cta-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
                     >
-                      View details
+                      View home
                     </Link>
                   </div>
                 </div>

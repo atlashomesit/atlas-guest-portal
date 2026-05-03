@@ -28,17 +28,17 @@ vi.mock("@/contexts/BookingContext", () => ({
 }));
 
 describe("BookingCard", () => {
-  it("renders booking form with email, phone, and Book Now", () => {
+  it("renders date search strip with Search and property id", () => {
     render(
       <MemoryRouter>
         <BookingCard propertyId={101} />
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("heading", { name: /book your stay/i })).toBeInTheDocument();
-    expect(screen.getByLabelText(/email address/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/phone number/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^book now$/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /find your stay/i })).toBeInTheDocument();
+    expect(screen.getByText("Check-in")).toBeInTheDocument();
+    expect(document.querySelectorAll("input[type=\"date\"]").length).toBe(2);
+    expect(screen.getByRole("button", { name: /^search$/i })).toBeInTheDocument();
     expect(document.getElementById("booking-form")).toHaveAttribute("data-property-id", "101");
   });
 });

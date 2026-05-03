@@ -24,3 +24,10 @@ export const getUnitPolicy = (unitId: string | number | undefined): UnitPolicy =
   const key = String(unitId);
   return unitPolicies[key] || DEFAULT_UNIT_POLICY;
 };
+
+/** Only returns a policy when this unit id has an explicit row (not the global default). */
+export function getExplicitUnitPolicy(unitId: string | number | undefined): UnitPolicy | undefined {
+  if (unitId == null) return undefined;
+  const key = String(unitId);
+  return unitPolicies[key];
+}

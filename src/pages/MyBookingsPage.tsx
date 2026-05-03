@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import SEO from "../components/SEO";
 import { buildApiUrl, getApiHeaders } from "../api/client";
+import { messageFromApiResponse } from "../utils/serverErrorFromResponse";
+import { getContactEmail } from "../config/contact";
 
 interface BookingItem {
   id: number;
@@ -44,7 +46,7 @@ export default function MyBookingsPage() {
     fetch(url, { headers: { Accept: "application/json", ...getApiHeaders() } })
       .then(async (res) => {
         if (res.status === 404) throw new Error("No bookings found. Please use the link from your booking confirmation.");
-        if (!res.ok) throw new Error("Unable to load your bookings. Please try again.");
+        if (!res.ok) throw new Error(await messageFromApiResponse(res));
         return res.json() as Promise<BookingItem[]>;
       })
       .then((data) => setBookings(Array.isArray(data) ? data : []))
@@ -78,7 +80,17 @@ export default function MyBookingsPage() {
           >
             Try again
           </button>
-          <Link to="/" className="inline-block text-sm text-brand-primary underline underline-offset-2">Return to homepage</Link>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center items-stretch">
+            <a
+              href={`mailto:${getContactEmail()}?subject=${encodeURIComponent("Atlas booking history link")}`}
+              className="inline-flex items-center justify-center rounded-lg border border-border-subtle bg-bg-surface text-text-primary text-base font-medium px-4 py-3 hover:bg-bg-muted transition-colors"
+            >
+              Email support
+            </a>
+            <Link to="/" className="inline-flex items-center justify-center text-base text-brand-primary underline underline-offset-2 px-2 py-3">
+              Return to homepage
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -100,7 +112,12 @@ export default function MyBookingsPage() {
               Browse our homes
             </Link>
             <p className="text-text-secondary text-xs max-w-md mx-auto">
-              Looking for a booking made by someone else? Contact them for the confirmation link.
+              Bookings are linked to the email or phone used during checkout. If you booked with a different contact, open the confirmation link from that email or WhatsApp message instead.
+            </p>
+            <p className="text-text-secondary text-xs max-w-md mx-auto">
+              Need help? Call us at{" "}
+              <a href="tel:+917032493290" className="underline underline-offset-2 text-brand-primary">+91 7032 493 290</a>{" "}
+              to locate a booking by reference number.
             </p>
           </div>
         ) : (

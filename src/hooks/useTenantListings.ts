@@ -20,6 +20,12 @@ export type TenantPropertyRecord = {
   property_img?: string[];
   property_amenities?: { amenities_icon: string; name: string }[];
   property_policy_details?: { type: string; value: string }[];
+  /** TASK-1360: ISO date of most recent checkout within 30 days (for social proof badge). */
+  lastBookedAt?: string | null;
+  /** TASK-1649: discount rule percents from public listings API (0 when absent). */
+  losDiscountPercent?: number | null;
+  losDiscount2Percent?: number | null;
+  lastMinuteDiscountPercent?: number | null;
 };
 
 export type TenantListingsState = "idle" | "loading" | "error" | "success";
@@ -28,6 +34,8 @@ export type UseTenantListings = {
   listings: Listing[];
   properties: TenantPropertyRecord[];
   state: TenantListingsState;
+  /** When `state === "error"`, message from API or network (if available). */
+  fetchErrorMessage: string | null;
   refetch: () => Promise<void>;
 };
 
@@ -80,6 +88,10 @@ const mapDtoToProperty = (dto: PublicListing, photosFromEndpoint: string[]): Ten
     property_img: photoUrls,
     property_amenities: local?.property_amenities ?? [],
     property_policy_details: local?.property_policy_details ?? [],
+    lastBookedAt: dto.lastBookedAt ?? null, // TASK-1360
+    losDiscountPercent: dto.losDiscountPercent ?? null,
+    losDiscount2Percent: dto.losDiscount2Percent ?? null,
+    lastMinuteDiscountPercent: dto.lastMinuteDiscountPercent ?? null,
   };
 };
 
@@ -110,6 +122,7 @@ export function useTenantListings(): UseTenantListings {
     properties: FALLBACK_PROPERTIES,
   });
   const [state, setState] = useState<TenantListingsState>("idle");
+  const [fetchErrorMessage, setFetchErrorMessage] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const refetch = useCallback(async () => {
@@ -117,6 +130,7 @@ export function useTenantListings(): UseTenantListings {
     const controller = new AbortController();
     abortRef.current = controller;
     setState("loading");
+    setFetchErrorMessage(null);
 
     try {
       const dtos = await fetchPublicListings(controller.signal);
@@ -149,6 +163,11 @@ export function useTenantListings(): UseTenantListings {
     } catch (error) {
       if (controller.signal.aborted) return;
       console.warn("[useTenantListings] failed; falling back to bundled data", error);
+      setFetchErrorMessage(
+        error instanceof Error && error.message
+          ? error.message
+          : "We're having trouble loading apartments right now. Please try again.",
+      );
       setState("error");
     }
   }, []);
@@ -160,5 +179,5 @@ export function useTenantListings(): UseTenantListings {
     };
   }, [refetch]);
 
-  return { listings: data.listings, properties: data.properties, state, refetch };
+  return { listings: data.listings, properties: data.properties, state, fetchErrorMessage, refetch };
 }

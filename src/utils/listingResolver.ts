@@ -1,5 +1,6 @@
 import type { ListingDetail } from '../api/listingClient';
 import { buildApiUrl, getApiHeaders } from '@/api/client';
+import { messageFromApiResponse } from '@/utils/serverErrorFromResponse';
 
 const normalizeListingPayload = (
   payload: Record<string, unknown>,
@@ -76,9 +77,9 @@ export const resolveListing = async (
       }
 
       if (response.status !== 404) {
-        const errorText = await response.text().catch(() => 'No error details');
-        console.error(`[resolveListing] API Error (${response.status}):`, errorText);
-        return { listing: null, error: new Error(`Listing request failed with status ${response.status}: ${errorText}`) };
+        const msg = await messageFromApiResponse(response);
+        console.error(`[resolveListing] API Error (${response.status}):`, msg);
+        return { listing: null, error: new Error(msg) };
       }
     } catch (error) {
       if (isAbortLikeError(error, signal)) {
@@ -93,11 +94,11 @@ export const resolveListing = async (
       const listResponse = await fetch(listEndpoint, { signal, headers });
 
       if (!listResponse.ok) {
-        const errorText = await listResponse.text().catch(() => 'No error details');
-        console.error('[resolveListing] Failed to fetch public listings:', errorText);
+        const msg = await messageFromApiResponse(listResponse);
+        console.error('[resolveListing] Failed to fetch public listings:', msg);
         return {
           listing: null,
-          error: new Error(`Failed to fetch listings: ${listResponse.status} ${errorText}`),
+          error: new Error(msg),
         };
       }
 

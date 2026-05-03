@@ -5,9 +5,13 @@ import AtlasChat from './AtlasChat';
 
 type ChatbotPlaceholderProps = {
   enableHideUnfinishedChatbot?: boolean;
+  listingId?: string | null;
 };
 
-const ChatbotPlaceholder = ({ enableHideUnfinishedChatbot = false }: ChatbotPlaceholderProps) => {
+const ChatbotPlaceholder = ({
+  enableHideUnfinishedChatbot = false,
+  listingId = null,
+}: ChatbotPlaceholderProps) => {
   const [isChatOpen, setIsChatOpen] = useState(false);
 
   const toggleChat = (e?: React.MouseEvent) => {
@@ -40,7 +44,7 @@ const ChatbotPlaceholder = ({ enableHideUnfinishedChatbot = false }: ChatbotPlac
             </div>
           </div>
         </div>
-        {isChatOpen && <AtlasChat onClose={closeChat} />}
+        {isChatOpen && <AtlasChat listingId={listingId} onClose={closeChat} />}
     </>
     );
   }
@@ -79,7 +83,7 @@ const ChatbotPlaceholder = ({ enableHideUnfinishedChatbot = false }: ChatbotPlac
           />
         </div>
       </div>
-      {isChatOpen && <AtlasChat />}
+      {isChatOpen && <AtlasChat listingId={listingId} />}
     </>
   );
 };

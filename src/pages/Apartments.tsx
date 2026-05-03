@@ -63,6 +63,8 @@ type CombinedListing = {
   petFriendly: boolean;
   image: string;
   property: PropertyRecord;
+  /** TASK-1360: ISO date of most recent checkout within 30 days. */
+  lastBookedAt?: string | null;
 };
 
 const derivePropertyType = (name?: string): string => {
@@ -218,6 +220,7 @@ export const Apartments = () => {
     listings: listingsSource,
     properties: propertiesSource,
     state: fetchState,
+    fetchErrorMessage,
     refetch: fetchData,
   } = useTenantListings();
 
@@ -341,6 +344,7 @@ export const Apartments = () => {
             petFriendly: derivePetFriendly(property),
             image: images?.[0] ?? (getTenantOverrides(getTenantContext()?.slug).hideLogo ? "" : LOGO_URL),
             property,
+            lastBookedAt: property.lastBookedAt ?? null, // TASK-1360
           };
         } catch (error) {
           console.error(`Error processing listing ${listing.id}:`, error);
@@ -464,7 +468,10 @@ export const Apartments = () => {
         <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 md:px-8">
           <ErrorLayout
             title="We couldn’t load this page"
-            description="We’re having trouble loading apartments right now. Please try again."
+            description={
+              fetchErrorMessage?.trim() ||
+              "We're having trouble loading apartments right now. Please try again."
+            }
             primaryAction={{ label: "Try again", onClick: fetchData, disabled: fetchState === "loading" }}
             secondaryAction={{ label: "Back to home", href: "/" }}
           />
@@ -578,6 +585,7 @@ export const Apartments = () => {
                   hasWifi={listing.hasWifi}
                   hasParking={listing.hasParking}
                   petFriendly={listing.petFriendly}
+                  lastBookedAt={listing.lastBookedAt ?? undefined}
                   onClick={() => handleNavigate(listing.property)}
                 />
               ))}

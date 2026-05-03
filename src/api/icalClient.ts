@@ -1,4 +1,5 @@
 import { buildApiUrl, getApiHeaders } from '@/api/client';
+import { messageFromApiResponse } from '@/utils/serverErrorFromResponse';
 
 export type ICalSyncStatus = {
   syncStatus: 'pending' | 'syncing' | 'completed' | 'failed';
@@ -13,7 +14,7 @@ export async function fetchICalSyncStatus(signal?: AbortSignal): Promise<ICalSyn
   const response = await fetch(url, { signal, headers: getApiHeaders() });
 
   if (!response.ok) {
-    throw new Error(`iCal sync status request failed with status ${response.status}`);
+    throw new Error(await messageFromApiResponse(response));
   }
 
   return (await response.json()) as ICalSyncStatus;

@@ -21,6 +21,8 @@ type ListingCardProps = {
   hasWifi?: boolean;
   hasParking?: boolean;
   petFriendly: boolean;
+  /** TASK-1360: ISO date of most recent checkout within 30 days for social-proof badge. */
+  lastBookedAt?: string | null;
   onClick?: () => void;
 };
 
@@ -47,8 +49,18 @@ const ListingCard: React.FC<ListingCardProps> = ({
   hasWifi,
   hasParking,
   petFriendly,
+  lastBookedAt,
   onClick,
 }) => {
+  // TASK-1360: Compute "Last booked X days ago" label
+  const lastBookedLabel = useMemo(() => {
+    if (!lastBookedAt) return null;
+    const days = Math.round((Date.now() - new Date(lastBookedAt).getTime()) / (1000 * 60 * 60 * 24));
+    if (days <= 0) return "Booked today";
+    if (days === 1) return "Booked yesterday";
+    if (days <= 30) return `Last booked ${days} days ago`;
+    return null;
+  }, [lastBookedAt]);
   const finalPrice = pricingBreakdown?.finalNightlyPrice ?? price;
   const originalPrice = pricingBreakdown?.baseNightlyPrice ?? price;
   const ratingSnippet = rating > 0 ? `${rating.toFixed(2)} / 5` : "Rating updates soon";
@@ -166,6 +178,13 @@ const ListingCard: React.FC<ListingCardProps> = ({
           </div>
         </div>
 
+        {/* TASK-1360: Last-booked social-proof badge */}
+        {lastBookedLabel && (
+          <span className="inline-flex items-center gap-1 self-start rounded-full bg-green-50 border border-green-200 px-2.5 py-0.5 text-xs font-medium text-green-700">
+            🔥 {lastBookedLabel}
+          </span>
+        )}
+
         {quickFacts.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 text-xs text-text-primary sm:text-sm">
             {quickFacts.map((fact, index) => (
@@ -195,9 +214,9 @@ const ListingCard: React.FC<ListingCardProps> = ({
                     <span className="ml-1 text-sm font-semibold text-text-muted">/ night</span>
                   </div>
                 </div>
-                {/* TASK-1870: Sept 2025 GST — 5% for ≤₹7,500/night, 18% above */}
+                {/* TASK-1645: Indian accommodation GST — 5% for ≤₹7,500/night, 12% above */}
                 <span className="text-xs text-text-muted">
-                  {(() => { const gstMult = finalPrice > 7500 ? 1.18 : 1.05; const pct = finalPrice > 7500 ? 18 : 5; return `${formatCurrency(Math.round(finalPrice * 2 * gstMult))} est. total incl. ${pct}% GST (2 nights)`; })()}
+                  {(() => { const gstMult = finalPrice > 7500 ? 1.12 : 1.05; const pct = finalPrice > 7500 ? 12 : 5; return `${formatCurrency(Math.round(finalPrice * 2 * gstMult))} est. total incl. ${pct}% GST (2 nights)`; })()}
                 </span>
                 {showDiscount && savingsAmount > 0 && (
                   <span className="text-xs font-semibold text-cta-primary">
@@ -237,9 +256,6 @@ const ListingCard: React.FC<ListingCardProps> = ({
                   {/* TASK-1705: Owner-share trust badge */}
                   <OwnerShareBadge nightlyPrice={finalPrice} />
                 </div>
-                {rating <= 0 && (
-                  <p className="mt-1 text-[11px] font-normal text-text-muted">Avg. rating placeholder until live reviews sync.</p>
-                )}
               </div>
               <button
                 type="button"

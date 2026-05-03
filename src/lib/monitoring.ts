@@ -185,6 +185,7 @@ const buildPayload = (message: string, level: MonitoringLevel, error?: Error, co
   breadcrumbs: mapBreadcrumbs(),
 });
 
+// Hardening for BUG-ONBOARD-1 (incident 2026-05-02): errors reach Sentry when DSN is set. See atlas-e2e/docs/incidents/2026-05-02-property-registration-failure.md
 export const reportError = (error: unknown, context?: MonitoringContext & { level?: MonitoringLevel }) => {
   const normalizedError = normalizeError(error);
   const level = context?.level ?? 'error';

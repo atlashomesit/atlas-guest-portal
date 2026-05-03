@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import SEO from "../components/SEO";
 import { buildApiUrl, getApiHeaders } from "../api/client";
 import { sanitizeGuestImageUrl } from "../utils/guestImageUrl";
 import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
+import { messageFromApiResponse } from "../utils/serverErrorFromResponse";
 
 interface ReviewEligibility {
   bookingId: number;
@@ -127,7 +128,7 @@ export default function ReviewSubmitPage() {
     fetch(url, { headers: { Accept: "application/json", ...getApiHeaders() } })
       .then(async (res) => {
         if (res.status === 404) throw new Error("Review link not found. Please use the link from your message.");
-        if (!res.ok) throw new Error("Unable to load review details. Please try again.");
+        if (!res.ok) throw new Error(await messageFromApiResponse(res));
         return res.json() as Promise<ReviewEligibility>;
       })
       .then(setEligibility)
@@ -145,8 +146,8 @@ export default function ReviewSubmitPage() {
       const additions: string[] = [];
       for (const file of Array.from(files)) {
         if (photoUrls.length + additions.length >= 3) break;
-        if (file.size > 5 * 1024 * 1024) {
-          setPhotoError("Each photo must be 5 MB or smaller.");
+        if (file.size > 16 * 1024 * 1024) {
+          setPhotoError(`"${file.name}" is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Please use a photo under 16 MB.`);
           continue;
         }
         const fd = new FormData();
@@ -159,8 +160,7 @@ export default function ReviewSubmitPage() {
           body: fd,
         });
         if (!res.ok) {
-          const data = (await res.json().catch(() => ({}))) as { error?: string };
-          throw new Error(data?.error ?? "Could not upload photo. Please try again.");
+          throw new Error(await messageFromApiResponse(res));
         }
         const data = (await res.json()) as { url?: string };
         if (data.url) additions.push(data.url);
@@ -175,10 +175,15 @@ export default function ReviewSubmitPage() {
     }
   };
 
+  const bodyLen = body.trim().length;
+  const bodyTooShort = useMemo(() => bodyLen > 0 && bodyLen < 20, [bodyLen]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (rating === 0) { setSubmitError("Please select a star rating."); return; }
     if (!body.trim()) { setSubmitError("Please share a bit about your stay."); return; }
+    if (bodyLen < 20) { setSubmitError("Please write at least 20 characters."); return; }
+    if (bodyLen > 500) { setSubmitError("Review text must be 500 characters or fewer."); return; }
     if (SUB_CATEGORY_ROWS.some(({ key }) => subRatings[key] < 1)) {
       setSubmitError("Please rate cleanliness, value, check-in, and host communication.");
       return;
@@ -209,11 +214,7 @@ export default function ReviewSubmitPage() {
       });
 
       if (res.status === 409) throw new Error("You have already submitted a review for this stay.");
-      if (res.status === 400) {
-        const data = await res.json() as { error?: string };
-        throw new Error(data?.error ?? "Could not submit review. Please try again.");
-      }
-      if (!res.ok) throw new Error("Failed to submit review. Please try again.");
+      if (!res.ok) throw new Error(await messageFromApiResponse(res));
 
       setSubmitted(true);
     } catch (err: unknown) {
@@ -377,11 +378,19 @@ export default function ReviewSubmitPage() {
               onChange={(e) => setBody(e.target.value)}
               placeholder="Tell us about the property, cleanliness, host responsiveness, check-in experience…"
               rows={5}
-              maxLength={1000}
+              maxLength={500}
               required
-              className="w-full rounded-xl border border-border-subtle bg-bg-surface px-4 py-2.5 text-base text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary resize-none"
+              aria-invalid={bodyTooShort || bodyLen > 500}
+              className={`w-full rounded-xl border bg-bg-surface px-4 py-2.5 text-base text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary resize-none ${bodyTooShort ? "border-support-error" : "border-border-subtle"}`}
             />
-            <p className="text-xs text-text-muted text-right">{body.length}/1000</p>
+            <p className="text-xs text-text-muted">
+              {bodyLen}/20 minimum · {body.length}/500 maximum
+            </p>
+            {bodyTooShort ? (
+              <p className="text-xs text-support-error" role="alert">
+                Please write at least 20 characters.
+              </p>
+            ) : null}
           </div>
 
           <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3">

@@ -1,5 +1,5 @@
 import { describe, expect, vi, beforeEach, afterEach, it } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { act, ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import BookingCard from './BookingCard';
@@ -131,22 +131,20 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('BookingCard (current simple form)', () => {
-  it('renders Book Your Stay form with email, phone, terms and Book Now', async () => {
+describe('BookingCard (date search strip)', () => {
+  it('renders Find your stay with dates, guests, and Search', async () => {
     await renderCard();
-    expect(screen.getByRole('heading', { name: /book your stay/i })).toBeInTheDocument();
-    expect(screen.getByLabelText(/email address/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/phone number/i)).toBeInTheDocument();
-    expect(screen.getByRole('checkbox', { name: /I agree to the terms/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /book now/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /find your stay/i })).toBeInTheDocument();
+    expect(screen.getByText('Check-in')).toBeInTheDocument();
+    expect(screen.getByText('Check-out')).toBeInTheDocument();
+    expect(screen.getByText('Guests')).toBeInTheDocument();
+    expect(document.querySelectorAll('input[type="date"]').length).toBe(2);
+    expect(screen.getByRole('button', { name: /^search$/i })).toBeInTheDocument();
   });
 
-  it('enables Book Now when email, phone and terms are filled', async () => {
+  it('Search button is enabled with default dates', async () => {
     await renderCard();
-    fireEvent.change(screen.getByLabelText(/email address/i), { target: { value: 'guest@example.com' } });
-    fireEvent.change(screen.getByLabelText(/phone number/i), { target: { value: '9999999999' } });
-    fireEvent.click(screen.getByRole('checkbox', { name: /I agree to the terms/i }));
-    const bookNow = screen.getByRole('button', { name: /book now/i });
-    expect(bookNow).toBeEnabled();
+    const search = screen.getByRole('button', { name: /^search$/i });
+    expect(search).toBeEnabled();
   });
 });

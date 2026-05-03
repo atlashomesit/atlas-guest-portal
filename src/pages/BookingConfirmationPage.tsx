@@ -1,9 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
+import { QRCodeSVG } from "qrcode.react"; // TASK-1476
 import SEO from "../components/SEO";
+import WeatherWidget from "../components/WeatherWidget";
+import { track } from "../lib/events";
 import { buildApiUrl, getApiHeaders } from "../api/client";
 import { getRuntimeConfig, hasRuntimeConfig } from "../runtime-config";
 import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
+import { messageFromApiResponse } from "../utils/serverErrorFromResponse";
 
 /** Guest summary API returns ISO dates or formatted strings (e.g. "Sat, 3 May 2026") — normalize for ICS. */
 function summaryDisplayDateToIso(displayDate: string): string {
@@ -57,6 +61,17 @@ interface BookingSummary {
   checkInTime?: string;
   checkOutTime?: string;
   nearbyLandmarks?: string[];
+  /** TASK-1296: guest referral code (e.g. FRIEND42) for the WhatsApp share button. */
+  guestReferralCode?: string;
+  /** TASK-1490: ISO dates + coordinates for Open-Meteo weather widget. */
+  checkinDateIso?: string;
+  checkoutDateIso?: string;
+  propertyLatitude?: number;
+  propertyLongitude?: number;
+  /** TASK-1254: Booking reference for self check-in flow (ExternalReservationId or ATL-{id} fallback). */
+  bookingRef?: string;
+  /** TASK-2071: ISO 639-1 language code from guest profile. Null defaults to "en". */
+  preferredLanguage?: string | null;
 }
 
 const statusLabel: Record<string, { label: string; color: string }> = {
@@ -85,6 +100,38 @@ function InfoRow({ label, value, mono }: { label: string; value: string; mono?: 
   );
 }
 
+// TASK-2071: pre-arrival UI strings by language
+const PRE_ARRIVAL_STRINGS: Record<string, {
+  heading: string; intro: string; checkinLabel: string; addressLabel: string;
+  hostLabel: string; hostDesc: string; chatBtn: string; wifiLabel: string;
+  landmarksLabel: string; viewListing: string; t1Hint: (date: string) => string; t1Fallback: string;
+}> = {
+  en: {
+    heading: "Before you arrive", intro: "You are checking in soon. Here is a quick reference for your stay — save this page or add to calendar below.",
+    checkinLabel: "Check-in & check-out times", addressLabel: "Address", hostLabel: "Host WhatsApp",
+    hostDesc: "Questions before you arrive? Message the property team.", chatBtn: "Chat on WhatsApp",
+    wifiLabel: "WiFi", landmarksLabel: "Nearby landmarks", viewListing: "View full listing & photos",
+    t1Hint: (d) => `🏠 WhatsApp reminder with check-in instructions will be sent on ${d}.`,
+    t1Fallback: "🏠 WhatsApp reminder with check-in instructions will be sent the day before your stay.",
+  },
+  hi: {
+    heading: "आगमन से पहले", intro: "आप जल्द ही चेक-इन कर रहे हैं। यहाँ आपके प्रवास का त्वरित संदर्भ है — यह पृष्ठ सहेजें या नीचे कैलेंडर में जोड़ें।",
+    checkinLabel: "चेक-इन और चेक-आउट का समय", addressLabel: "पता", hostLabel: "होस्ट WhatsApp",
+    hostDesc: "आगमन से पहले प्रश्न हैं? संपत्ति टीम को संदेश करें।", chatBtn: "WhatsApp पर चैट करें",
+    wifiLabel: "WiFi", landmarksLabel: "नज़दीकी स्थान", viewListing: "पूरी लिस्टिंग और फ़ोटो देखें",
+    t1Hint: (d) => `🏠 WhatsApp रिमाइंडर चेक-इन निर्देशों के साथ ${d} को भेजा जाएगा।`,
+    t1Fallback: "🏠 आपके प्रवास के एक दिन पहले WhatsApp रिमाइंडर भेजा जाएगा।",
+  },
+  te: {
+    heading: "రాక ముందు", intro: "మీరు త్వరలో చెక్-ఇన్ చేస్తున్నారు. ఇది మీ వసతికి త్వరిత సూచన — ఈ పేజీని సేవ్ చేయండి లేదా క్రింద క్యాలెండర్‌కు జోడించండి।",
+    checkinLabel: "చెక్-ఇన్ మరియు చెక్-అవుట్ సమయాలు", addressLabel: "చిరునామా", hostLabel: "హోస్ట్ WhatsApp",
+    hostDesc: "రాకముందు ప్రశ్నలు ఉన్నాయా? ఆస్తి బృందాన్ని సందేశించండి।", chatBtn: "WhatsApp లో చాట్ చేయండి",
+    wifiLabel: "WiFi", landmarksLabel: "సమీప ప్రదేశాలు", viewListing: "పూర్తి లిస్టింగ్ & ఫోటోలు చూడండి",
+    t1Hint: (d) => `🏠 చెక్-ఇన్ సూచనలతో WhatsApp రిమైండర్ ${d}న పంపబడుతుంది।`,
+    t1Fallback: "🏠 మీ వసతికి ముందు రోజు WhatsApp రిమైండర్ పంపబడుతుంది।",
+  },
+};
+
 export default function BookingConfirmationPage() {
   const { bookingId } = useParams<{ bookingId: string }>();
   const [searchParams] = useSearchParams();
@@ -108,6 +155,21 @@ export default function BookingConfirmationPage() {
   const [cancelRequested, setCancelRequested] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [copyRefFeedback, setCopyRefFeedback] = useState(false);
+  const [shareLanguage, setShareLanguage] = useState<"en" | "hi" | "te">("en");
+  const [pwaInstallDismissed, setPwaInstallDismissed] = useState(() => {
+    try { return localStorage.getItem("atlas_guest_pwa_install_dismissed_v1") === "1"; } catch { return false; }
+  });
+  const pwaInstallPromptRef = useRef<any>(null);
+
+  const isIos = typeof navigator !== "undefined" && /iPhone|iPad|iPod/.test(navigator.userAgent);
+  const isStandalone = typeof window !== "undefined" && window.matchMedia("(display-mode: standalone)").matches;
+  const isIosNonPwa = isIos && !isStandalone;
+
+  useEffect(() => {
+    const handler = (e: Event) => { e.preventDefault(); pwaInstallPromptRef.current = e; };
+    window.addEventListener("beforeinstallprompt", handler);
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, []);
 
   useEffect(() => {
     if (!bookingId || !token) {
@@ -122,13 +184,35 @@ export default function BookingConfirmationPage() {
     })
       .then(async (res) => {
         if (res.status === 404) throw new Error("Booking not found. Please check your confirmation email for the correct link.");
-        if (!res.ok) throw new Error("Unable to load booking details. Please try again.");
+        if (!res.ok) throw new Error(await messageFromApiResponse(res));
         return res.json() as Promise<BookingSummary>;
       })
-      .then(setBooking)
+      .then((b) => {
+        setBooking(b);
+        // TASK-1480: confirmed = guest views booking confirmation page
+        track('confirmed', b.listingId);
+      })
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
   }, [bookingId, token]);
+
+  const modCheckinError = useMemo(() => {
+    if (modCheckin.length < 10) return "";
+    const todayIst = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
+    if (modCheckin < todayIst) return "Check-in cannot be a past date";
+    return "";
+  }, [modCheckin]);
+
+  const modCheckoutError = useMemo(() => {
+    if (modCheckout.length < 10 || modCheckin.length < 10) return "";
+    if (modCheckout <= modCheckin) return "Check-out must be after check-in";
+    const a = new Date(`${modCheckin}T12:00:00`).getTime();
+    const b = new Date(`${modCheckout}T12:00:00`).getTime();
+    if (Number.isNaN(a) || Number.isNaN(b)) return "";
+    const nights = (b - a) / 86400000;
+    if (nights < 1) return "Minimum stay is 1 night (check-out must be the day after check-in or later).";
+    return "";
+  }, [modCheckin, modCheckout]);
 
   if (loading) {
     return (
@@ -165,6 +249,9 @@ export default function BookingConfirmationPage() {
   }
 
   const isCancelled = booking.status === "Cancelled";
+  // TASK-2071: pick language strings from guest profile preference
+  const langCode = (booking.preferredLanguage ?? "en").toLowerCase();
+  const pa = PRE_ARRIVAL_STRINGS[langCode] ?? PRE_ARRIVAL_STRINGS.en;
   const hostPhone = booking.propertyPhone?.trim() || "+917032493290";
   const hostPhoneDigits = hostPhone.replace(/[^\d+]/g, "");
   const whatsappDigits = hostPhoneDigits.replace(/^\+/, "");
@@ -172,8 +259,8 @@ export default function BookingConfirmationPage() {
   const whatsappUrl = `https://wa.me/${whatsappDigits}?text=${whatsappText}`;
   const supportsPush = typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window;
   const canRequestModification = !isCancelled && !!token;
-  const modDatesInvalid =
-    Boolean(modCheckin && modCheckout && modCheckout.length >= 10 && modCheckin.length >= 10 && modCheckout <= modCheckin);
+
+  const modDatesInvalid = Boolean(modCheckinError || modCheckoutError);
 
   // TASK-333: Generate and download ICS calendar event for check-in
   function downloadCalendar() {
@@ -246,12 +333,16 @@ export default function BookingConfirmationPage() {
         headers: { "Content-Type": "application/json", ...getApiHeaders() },
         body: JSON.stringify({ subscriptionJson: JSON.stringify(sub.toJSON()) }),
       });
-      if (!res.ok) throw new Error("Unable to save notification preference.");
+      if (!res.ok) throw new Error(await messageFromApiResponse(res));
       setPushState("done");
       setPushMessage("Notifications enabled. We'll send important booking updates.");
     } catch (e) {
       setPushState("error");
-      setPushMessage(e instanceof Error ? e.message : "Failed to enable notifications.");
+      setPushMessage(
+        e instanceof Error && e.message
+          ? e.message
+          : "Notifications could not be enabled. Try again or use another browser.",
+      );
     }
   }
 
@@ -262,8 +353,8 @@ export default function BookingConfirmationPage() {
       setModMessage("Please enter both check-in and check-out dates.");
       return;
     }
-    if (modCheckout <= modCheckin) {
-      setModMessage("Check-out must be after check-in.");
+    if (modCheckinError || modCheckoutError) {
+      setModMessage(modCheckinError || modCheckoutError);
       return;
     }
     setModSubmitting(true);
@@ -282,8 +373,7 @@ export default function BookingConfirmationPage() {
         },
       );
       if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || "Could not submit request.");
+        throw new Error(await messageFromApiResponse(res));
       }
       setModMessage("Request submitted. Our team will review and contact you.");
       setModCheckin("");
@@ -316,8 +406,7 @@ export default function BookingConfirmationPage() {
         return;
       }
       if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || "Could not submit request.");
+        throw new Error(await messageFromApiResponse(res));
       }
       setCancelRequested(true);
       setCancelMessage("");
@@ -410,54 +499,99 @@ export default function BookingConfirmationPage() {
           </div>
         </div>
 
-        {/* GST invoice (token-gated PDF) */}
-        {!isCancelled && booking.hasGstInvoice && pdfUrl && (
-          <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3">
-            <h2 className="text-sm font-semibold text-text-primary">GST invoice</h2>
-            <p className="text-xs text-text-secondary leading-relaxed">
-              Accommodation is billed under SAC&nbsp;9963 (hotel and similar accommodation services) as applicable for Indian GST.
+        {/* TASK-1476: QR check-in code — guests can scan on arrival to confirm identity */}
+        {!isCancelled && token && (
+          <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-5 flex flex-col items-center gap-3" data-testid="confirmation-qr-section">
+            <QRCodeSVG
+              value={`${window.location.origin}/booking/${bookingId}?t=${encodeURIComponent(token)}`}
+              size={180}
+              bgColor="#ffffff"
+              fgColor="#0F172A"
+              level="M"
+              aria-label={`QR code for booking #${bookingId}`}
+            />
+            <p className="text-sm text-center text-text-secondary max-w-xs">
+              Show this to the host on arrival
             </p>
-            <div className="space-y-0 divide-y divide-border-subtle border-t border-border-subtle -mx-5 px-5">
-              {booking.gstInvoiceNumber && (
-                <InfoRow label="Invoice number" value={booking.gstInvoiceNumber} mono />
-              )}
-              {booking.gstInvoiceTotal != null && (
-                <div className="flex flex-col gap-0.5 py-3 border-b border-border-subtle last:border-0">
-                  <span className="text-xs text-text-muted uppercase tracking-wider font-medium">Invoice total (incl. GST)</span>
-                  <span className="text-sm font-semibold text-text-primary">
-                    {booking.currency}&nbsp;{booking.gstInvoiceTotal.toLocaleString("en-IN")}
-                  </span>
-                </div>
-              )}
-            </div>
-            <a
-              href={pdfUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              data-testid="download-invoice-btn"
-              className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-3.5 hover:opacity-95 transition-opacity"
-            >
-              Download invoice (PDF)
-            </a>
+            <p className="text-xs text-center text-support-error/80 max-w-xs">
+              Don't share this QR publicly — anyone who scans it can access your booking details.
+            </p>
           </div>
         )}
 
-        {/* Booking confirmation voucher (printable arrival document) */}
-        {!isCancelled && voucherUrl && (
+        {/* TASK-1490: Weather forecast for stay dates */}
+        {!isCancelled && booking.propertyLatitude != null && booking.propertyLongitude != null &&
+          booking.checkinDateIso && booking.checkoutDateIso && (
+          <WeatherWidget
+            lat={booking.propertyLatitude}
+            lng={booking.propertyLongitude}
+            fromDate={booking.checkinDateIso}
+            toDate={booking.checkoutDateIso}
+          />
+        )}
+
+        {/* TASK-2091: placeholder while invoice is being generated */}
+        {!isCancelled && booking.status === 'Confirmed' && !booking.hasGstInvoice && (
           <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3">
-            <h2 className="text-sm font-semibold text-text-primary">Booking confirmation voucher</h2>
-            <p className="text-xs text-text-secondary leading-relaxed">
-              Print or share this confirmation as your proof of booking. Present it during check-in.
+            <h2 className="text-sm font-semibold text-text-primary">GST invoice</h2>
+            <p className="text-sm text-text-secondary">
+              GST invoice will be available within 1 hour. Refresh this page to access it.
             </p>
-            <a
-              href={voucherUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              data-testid="download-voucher-btn"
-              className="inline-flex items-center justify-center rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-3.5 hover:bg-brand-primary/5 transition-colors"
-            >
-              Download voucher (PDF)
-            </a>
+            <p className="text-xs text-text-muted">
+              Accommodation is billed under SAC&nbsp;9963 (hotel and similar accommodation services) as applicable for Indian GST.
+            </p>
+          </div>
+        )}
+
+        {/* Documents: GST invoice + booking voucher grouped */}
+        {!isCancelled && ((booking.hasGstInvoice && pdfUrl) || voucherUrl) && (
+          <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-4">
+            <h2 className="text-sm font-semibold text-text-primary">Documents</h2>
+            {booking.hasGstInvoice && pdfUrl && (
+              <div className="space-y-3">
+                <p className="text-xs text-text-secondary leading-relaxed">
+                  Accommodation is billed under SAC&nbsp;9963 (hotel and similar accommodation services) as applicable for Indian GST.
+                </p>
+                <div className="space-y-0 divide-y divide-border-subtle border-t border-border-subtle -mx-5 px-5">
+                  {booking.gstInvoiceNumber && (
+                    <InfoRow label="Invoice number" value={booking.gstInvoiceNumber} mono />
+                  )}
+                  {booking.gstInvoiceTotal != null && (
+                    <div className="flex flex-col gap-0.5 py-3 border-b border-border-subtle last:border-0">
+                      <span className="text-xs text-text-muted uppercase tracking-wider font-medium">Invoice total (incl. GST)</span>
+                      <span className="text-sm font-semibold text-text-primary">
+                        {booking.currency}&nbsp;{booking.gstInvoiceTotal.toLocaleString("en-IN")}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                <a
+                  href={pdfUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  data-testid="download-invoice-btn"
+                  className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-3.5 hover:opacity-95 transition-opacity"
+                >
+                  Download GST invoice (PDF)
+                </a>
+              </div>
+            )}
+            {voucherUrl && (
+              <div className={`space-y-2 ${booking.hasGstInvoice && pdfUrl ? "pt-4 border-t border-border-subtle" : ""}`}>
+                <p className="text-xs text-text-secondary leading-relaxed">
+                  Booking confirmation voucher — print or share as proof of booking. Present it during check-in.
+                </p>
+                <a
+                  href={voucherUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  data-testid="download-voucher-btn"
+                  className="inline-flex items-center justify-center rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-3.5 hover:bg-brand-primary/5 transition-colors"
+                >
+                  Download voucher (PDF, ~80 KB)
+                </a>
+              </div>
+            )}
           </div>
         )}
 
@@ -504,14 +638,12 @@ export default function BookingConfirmationPage() {
             data-testid="pre-arrival-briefing"
             aria-label="Before you arrive"
           >
-            <h2 className="text-sm font-semibold text-text-primary">Before you arrive</h2>
-            <p className="text-xs text-text-secondary leading-relaxed">
-              You are checking in soon. Here is a quick reference for your stay — save this page or add to calendar below.
-            </p>
+            <h2 className="text-sm font-semibold text-text-primary">{pa.heading}</h2>
+            <p className="text-xs text-text-secondary leading-relaxed">{pa.intro}</p>
             <div className="space-y-0 divide-y divide-amber-200/60 border-t border-amber-200/60 -mx-5 px-5">
               {(booking.checkInTime || booking.checkOutTime) && (
                 <div className="flex flex-col gap-0.5 py-3">
-                  <span className="text-xs text-text-muted uppercase tracking-wider font-medium">Check-in &amp; check-out times</span>
+                  <span className="text-xs text-text-muted uppercase tracking-wider font-medium">{pa.checkinLabel}</span>
                   <span className="text-sm text-text-primary">
                     {booking.checkInTime
                       ? <>Check-in from <span className="font-semibold">{booking.checkInTime}</span></>
@@ -526,7 +658,7 @@ export default function BookingConfirmationPage() {
               )}
               {booking.propertyAddress ? (
                 <div className="flex flex-col gap-1.5 py-3">
-                  <span className="text-xs text-text-muted uppercase tracking-wider font-medium">Address</span>
+                  <span className="text-xs text-text-muted uppercase tracking-wider font-medium">{pa.addressLabel}</span>
                   <p className="text-sm text-text-primary whitespace-pre-wrap">{booking.propertyAddress}</p>
                   <a
                     href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(booking.propertyAddress)}`}
@@ -540,8 +672,8 @@ export default function BookingConfirmationPage() {
                 </div>
               ) : null}
               <div className="py-3">
-                <span className="text-xs text-text-muted uppercase tracking-wider font-medium">Host WhatsApp</span>
-                <p className="text-sm text-text-secondary mt-1">Questions before you arrive? Message the property team.</p>
+                <span className="text-xs text-text-muted uppercase tracking-wider font-medium">{pa.hostLabel}</span>
+                <p className="text-sm text-text-secondary mt-1">{pa.hostDesc}</p>
                 <a
                   href={whatsappUrl}
                   target="_blank"
@@ -549,12 +681,12 @@ export default function BookingConfirmationPage() {
                   className="inline-flex mt-2 items-center justify-center rounded-lg bg-[#25D366] text-white text-sm font-medium px-4 py-2.5 hover:opacity-95 transition-opacity"
                   data-testid="pre-arrival-whatsapp"
                 >
-                  Chat on WhatsApp
+                  {pa.chatBtn}
                 </a>
               </div>
               {booking.wifiVisible && (booking.wifiName || booking.wifiPassword) && (
                 <div className="py-3">
-                  <span className="text-xs text-text-muted uppercase tracking-wider font-medium">WiFi</span>
+                  <span className="text-xs text-text-muted uppercase tracking-wider font-medium">{pa.wifiLabel}</span>
                   <p className="text-sm text-text-primary mt-1">
                     {booking.wifiName ? (
                       <>Network <span className="font-mono font-semibold">{booking.wifiName}</span></>
@@ -569,7 +701,7 @@ export default function BookingConfirmationPage() {
               )}
               {Array.isArray(booking.nearbyLandmarks) && booking.nearbyLandmarks.length > 0 && (
                 <div className="py-3">
-                  <span className="text-xs text-text-muted uppercase tracking-wider font-medium">Nearby landmarks</span>
+                  <span className="text-xs text-text-muted uppercase tracking-wider font-medium">{pa.landmarksLabel}</span>
                   <ul className="mt-2 list-disc pl-5 text-sm text-text-primary space-y-1">
                     {booking.nearbyLandmarks.map((line, i) => (
                       <li key={`${i}-${line}`}>{line}</li>
@@ -581,13 +713,59 @@ export default function BookingConfirmationPage() {
             {booking.listingId != null && booking.listingId > 0 && (
               <Link
                 to={buildHomeUnitPath(getPropertySlug({ property_name: booking.propertyName }), booking.listingId)}
-                className="inline-flex text-sm text-brand-primary font-medium underline underline-offset-2"
+                className="inline-flex items-center justify-center rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-2 hover:bg-brand-primary/5 transition-colors"
                 data-testid="pre-arrival-view-listing"
               >
-                View full listing &amp; photos
+                {pa.viewListing}
               </Link>
             )}
           </section>
+        )}
+
+        {/* TASK-1254: Self check-in card — visible within 48h of check-in (same window as WiFi) */}
+        {!isCancelled && booking.wifiVisible && booking.bookingRef &&
+          (booking.status === 'Confirmed' || booking.status === 'CheckedIn') && (
+          <Link
+            to={`/check-in/${encodeURIComponent(booking.bookingRef)}`}
+            data-testid="self-checkin-link"
+            className="flex items-center justify-between gap-4 rounded-2xl border border-brand-primary/40 bg-brand-primary/5 p-5 hover:bg-brand-primary/10 transition-colors"
+          >
+            <div className="space-y-0.5">
+              <p className="text-sm font-semibold text-text-primary">Self check-in</p>
+              <p className="text-xs text-text-secondary">Skip the queue — submit your ID and sign house rules online before you arrive.</p>
+            </div>
+            <span className="shrink-0 text-brand-primary text-lg" aria-hidden>→</span>
+          </Link>
+        )}
+
+        {/* TASK-2082: PWA install nudge — only within 72h of check-in, only when prompt is available */}
+        {!isCancelled && booking.preArrivalBriefingVisible && !pwaInstallDismissed && !isIosNonPwa && (
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-border-subtle bg-bg-muted/60 px-4 py-3 text-sm">
+            <span>📱 Save Atlas to your home screen for quick access during your stay</span>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-xs font-medium px-3 py-1.5 hover:opacity-90 transition-opacity"
+                onClick={() => {
+                  if (pwaInstallPromptRef.current) {
+                    pwaInstallPromptRef.current.prompt();
+                  }
+                }}
+              >
+                Install
+              </button>
+              <button
+                type="button"
+                className="text-xs text-text-muted underline underline-offset-2 hover:text-text-primary"
+                onClick={() => {
+                  try { localStorage.setItem("atlas_guest_pwa_install_dismissed_v1", "1"); } catch { /* ignore */ }
+                  setPwaInstallDismissed(true);
+                }}
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
         )}
 
         {/* What happens next */}
@@ -598,7 +776,7 @@ export default function BookingConfirmationPage() {
               <p>✅ Booking confirmed now.</p>
               <p>📱 SMS and WhatsApp confirmation should arrive shortly.</p>
               <p data-testid="confirmation-t-minus-1">
-                {/* TASK-546: Explicit T-1 WhatsApp reminder date */}
+                {/* TASK-546 + TASK-2071: Explicit T-1 WhatsApp reminder date, language-aware */}
                 {(() => {
                   try {
                     const checkinDate = new Date(booking.checkinDate);
@@ -609,12 +787,12 @@ export default function BookingConfirmationPage() {
                         month: "short",
                         year: "numeric",
                       });
-                      return `🏠 WhatsApp reminder with check-in instructions will be sent on ${formatted}.`;
+                      return pa.t1Hint(formatted);
                     }
                   } catch {
                     /* fall through */
                   }
-                  return "🏠 WhatsApp reminder with check-in instructions will be sent the day before your stay.";
+                  return pa.t1Fallback;
                 })()}
               </p>
               <p>
@@ -658,6 +836,7 @@ export default function BookingConfirmationPage() {
             <h2 className="text-sm font-semibold text-text-primary">Add to your calendar</h2>
             <p className="text-sm text-text-secondary">Save your check-in date and property details to your phone calendar.</p>
             <button
+              type="button"
               onClick={downloadCalendar}
               className="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-3 hover:bg-brand-primary/5 transition-colors"
               aria-label="Download calendar event for your stay"
@@ -671,14 +850,29 @@ export default function BookingConfirmationPage() {
           <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3">
             <h2 className="text-sm font-semibold text-text-primary">Trip updates</h2>
             <p className="text-sm text-text-secondary">Get instant alerts on your booking status and check-in reminders.</p>
-            <button
-              onClick={subscribePush}
-              disabled={pushState === "loading" || !supportsPush}
-              className="inline-flex items-center justify-center rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-3 disabled:opacity-50"
-            >
-              {pushState === "loading" ? "Enabling..." : "Enable notifications"}
-            </button>
-            {pushMessage ? <p className={`text-xs ${pushState === "error" ? "text-red-600" : "text-green-700"}`}>{pushMessage}</p> : null}
+            {isIosNonPwa ? (
+              <p className="text-sm text-text-secondary">
+                To receive trip alerts on iPhone, add Atlas to your home screen first: Safari → Share (
+                <span aria-hidden>⎙</span>) → Add to Home Screen. Then re-open from the home screen icon.
+              </p>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={subscribePush}
+                  disabled={pushState === "loading" || !supportsPush}
+                  className="inline-flex items-center justify-center rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-3 disabled:opacity-50"
+                >
+                  {pushState === "loading" ? "Enabling..." : "Enable notifications"}
+                </button>
+                {pushMessage ? <p className={`text-xs ${pushState === "error" ? "text-red-600" : "text-green-700"}`}>{pushMessage}</p> : null}
+                {pushState === "error" && (pushMessage.includes("denied") || pushMessage.includes("not supported") || pushMessage.includes("not configured")) && (
+                  <p className="text-xs text-text-muted mt-1">
+                    Try a different browser (Chrome or Firefox) if notifications are blocked.
+                  </p>
+                )}
+              </>
+            )}
           </div>
         )}
 
@@ -692,11 +886,33 @@ export default function BookingConfirmationPage() {
                   iOS Safari auto-zoom on focus. */}
               <label className="text-sm text-text-secondary">
                 New check-in
-                <input type="date" value={modCheckin} onChange={(e) => setModCheckin(e.target.value)} className="mt-1 w-full rounded-md border border-border-subtle px-3 py-3 text-base" />
+                <input
+                  type="date"
+                  value={modCheckin}
+                  onChange={(e) => setModCheckin(e.target.value)}
+                  aria-invalid={Boolean(modCheckinError)}
+                  className={`mt-1 w-full rounded-md border px-3 py-3 text-base ${modCheckinError ? "border-support-error" : "border-border-subtle"}`}
+                />
+                {modCheckinError ? (
+                  <p className="mt-1 text-xs text-support-error" role="alert">
+                    {modCheckinError}
+                  </p>
+                ) : null}
               </label>
               <label className="text-sm text-text-secondary">
                 New check-out
-                <input type="date" value={modCheckout} onChange={(e) => setModCheckout(e.target.value)} className="mt-1 w-full rounded-md border border-border-subtle px-3 py-3 text-base" />
+                <input
+                  type="date"
+                  value={modCheckout}
+                  onChange={(e) => setModCheckout(e.target.value)}
+                  aria-invalid={Boolean(modCheckoutError)}
+                  className={`mt-1 w-full rounded-md border px-3 py-3 text-base ${modCheckoutError ? "border-support-error" : "border-border-subtle"}`}
+                />
+                {modCheckoutError ? (
+                  <p className="mt-1 text-xs text-support-error" role="alert">
+                    {modCheckoutError}
+                  </p>
+                ) : null}
               </label>
               <label className="text-sm text-text-secondary sm:col-span-2">
                 Guest count (optional)
@@ -707,12 +923,8 @@ export default function BookingConfirmationPage() {
                 <textarea value={modNote} onChange={(e) => setModNote(e.target.value)} rows={3} className="mt-1 w-full rounded-md border border-border-subtle px-3 py-2.5 text-base" />
               </label>
             </div>
-            {modDatesInvalid ? (
-              <p className="text-xs text-red-600" role="alert" data-testid="mod-request-date-error">
-                Check-out must be after check-in.
-              </p>
-            ) : null}
             <button
+              type="button"
               onClick={submitModificationRequest}
               disabled={modSubmitting || modDatesInvalid}
               className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-3.5 disabled:opacity-50"
@@ -737,6 +949,7 @@ export default function BookingConfirmationPage() {
             </p>
             {!showCancelConfirm ? (
               <button
+                type="button"
                 onClick={() => setShowCancelConfirm(true)}
                 className="inline-flex items-center justify-center rounded-lg border border-red-400 text-red-700 text-sm font-medium px-4 py-3 hover:bg-red-100 transition-colors"
                 data-testid="request-cancellation-btn"
@@ -751,12 +964,15 @@ export default function BookingConfirmationPage() {
                     value={cancelReason}
                     onChange={(e) => setCancelReason(e.target.value)}
                     rows={2}
+                    maxLength={500}
                     placeholder="e.g., change of plans, emergency…"
                     className="mt-1 w-full rounded-md border border-red-200 px-3 py-3 text-base bg-white"
                   />
+                  <p className="text-xs text-text-muted">{cancelReason.length}/500</p>
                 </label>
                 <div className="flex gap-3">
                   <button
+                    type="button"
                     onClick={submitCancellationRequest}
                     disabled={cancelSubmitting}
                     className="inline-flex items-center justify-center rounded-lg bg-red-600 text-white text-base font-medium px-4 py-3 disabled:opacity-50 hover:bg-red-700 transition-colors"
@@ -765,6 +981,7 @@ export default function BookingConfirmationPage() {
                     {cancelSubmitting ? "Submitting…" : "Confirm request"}
                   </button>
                   <button
+                    type="button"
                     onClick={() => setShowCancelConfirm(false)}
                     className="inline-flex items-center justify-center rounded-lg border border-gray-300 text-gray-700 text-base font-medium px-4 py-3 hover:bg-gray-50 transition-colors"
                   >
@@ -804,6 +1021,49 @@ export default function BookingConfirmationPage() {
             >
               Browse all homes →
             </Link>
+          </div>
+        )}
+
+        {/* TASK-1296: Guest referral share via WhatsApp */}
+        {!isCancelled && booking.guestReferralCode && (
+          <div className="rounded-2xl border border-green-200 bg-green-50/40 p-5 space-y-3">
+            <h2 className="text-sm font-semibold text-text-primary">Give friends ₹500 off</h2>
+            <p className="text-sm text-text-secondary">
+              Share your code and your friends get ₹500 off their first Atlas Homestays booking.
+            </p>
+            <div className="flex items-center gap-2 bg-white border border-green-200 rounded-lg px-3 py-2 w-fit">
+              <span className="text-base font-mono font-bold text-text-primary tracking-widest" data-testid="referral-code">
+                {booking.guestReferralCode}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <label className="text-text-muted shrink-0" htmlFor="referral-lang">Share in:</label>
+              <select
+                id="referral-lang"
+                value={shareLanguage}
+                onChange={(e) => setShareLanguage(e.target.value as "en" | "hi" | "te")}
+                className="rounded-lg border border-border-subtle bg-bg-surface px-2 py-1 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-primary"
+              >
+                <option value="en">English</option>
+                <option value="hi">हिन्दी</option>
+                <option value="te">తెలుగు</option>
+              </select>
+            </div>
+            <a
+              href={`https://wa.me/?text=${encodeURIComponent(
+                shareLanguage === "hi"
+                  ? `मैंने ${booking.propertyName} में अपना प्रवास बेहद पसंद किया! 🏠✨ Atlas Homestays पर बुक करें और कोड ${booking.guestReferralCode} से ₹500 की छूट पाएं: https://www.atlashomestays.com/search`
+                  : shareLanguage === "te"
+                  ? `${booking.propertyName}లో నా స్టే చాలా బాగుంది! 🏠✨ Atlas Homestays లో బుక్ చేసుకోండి మరియు ${booking.guestReferralCode} కోడ్ ఉపయోగించి ₹500 డిస్కౌంట్ పొందండి: https://www.atlashomestays.com/search`
+                  : `I loved my stay at ${booking.propertyName}! 🏠✨ Book via Atlas Homestays and use code ${booking.guestReferralCode} for ₹500 off your first booking: https://www.atlashomestays.com/search`
+              )}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="referral-share-whatsapp"
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#25D366] text-white text-sm font-medium px-4 py-3 hover:opacity-95 transition-opacity"
+            >
+              Share on WhatsApp
+            </a>
           </div>
         )}
 

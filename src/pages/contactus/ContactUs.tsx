@@ -11,6 +11,7 @@ import { buildApiUrl, getApiHeaders } from "../../api/client";
 import ErrorBoundary from "../../components/ErrorBoundary";
 import { toast } from "react-toastify";
 import { logUserAction, reportError } from "../../lib/monitoring";
+import { messageFromApiResponse } from "../../utils/serverErrorFromResponse";
 import { getTenantContext } from "../../tenant/tenantContext";
 
 type StatusMessage = {
@@ -57,10 +58,9 @@ const ContactUs = () => {
                 body: JSON.stringify(formData),
             });
 
-            const data = await response.json();
-
             if (!response.ok) {
-                const message = data?.message || "We couldn't send your message right now.";
+                const message = await messageFromApiResponse(response);
+                const data = (await response.json().catch(() => ({}))) as Record<string, unknown>;
                 toast.error(message);
                 setStatusMessage({
                     type: "error",
@@ -69,6 +69,8 @@ const ContactUs = () => {
                 logUserAction("contact_form_submitted", { status: "failed", feature: "contact-form" });
                 return;
             }
+
+            const data = (await response.json().catch(() => ({}))) as Record<string, unknown>;
 
             logUserAction("contact_form_submitted", { status: "success", feature: "contact-form" });
             if (data?.queued) {
@@ -85,10 +87,14 @@ const ContactUs = () => {
             setFormData({ name: "", email: "", contactnumber: "", destination: "", description: "" });
         } catch (error) {
             reportError(error, { feature: "contact-form" });
-            toast.error("We couldn't send your message right now. Please try again or call us.");
+            const message =
+                error instanceof Error && error.message
+                    ? error.message
+                    : "We couldn't send your message right now. Please try again or call us.";
+            toast.error(message);
             setStatusMessage({
                 type: "error",
-                text: "Failed to send message. Please try again or contact us through phone or WhatsApp.",
+                text: `${message} Please try again or contact us through phone or WhatsApp.`,
             });
         }
     };

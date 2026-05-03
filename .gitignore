@@ -10,5 +10,6 @@ dist/
 # Local dev logs
 *.log
 
-# Wrangler Pages Functions build output
+# Wrangler Pages Functions build output (regenerate via wrangler / CI; do not commit)
 _worker.bundle/
+_worker.bundle

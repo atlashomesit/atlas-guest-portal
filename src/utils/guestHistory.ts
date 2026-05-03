@@ -1,3 +1,5 @@
+import { buildApiUrl, getApiHeaders } from "../api/client";
+
 const RECENT_KEY = "atlas_recent_listings_v1";
 const FAV_KEY = "atlas_favorites_v1";
 
@@ -38,6 +40,17 @@ export function getRecentlyViewed(): GuestListingHistoryItem[] {
   return Array.isArray(list) ? list : [];
 }
 
+export function removeRecentlyViewed(listingId: number): void {
+  const list = safeParse<GuestListingHistoryItem[]>(localStorage.getItem(RECENT_KEY)) ?? [];
+  const next = list.filter((x) => x.listingId !== listingId);
+  localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+  try {
+    window.dispatchEvent(new CustomEvent("atlas-recently-viewed-changed"));
+  } catch {
+    /* non-browser */
+  }
+}
+
 export function clearRecentlyViewed(): void {
   try {
     localStorage.removeItem(RECENT_KEY);
@@ -57,14 +70,29 @@ export function isFavorite(listingId: number): boolean {
 
 export function toggleFavorite(listingId: number): boolean {
   const ids = new Set(getFavoriteIds());
-  if (ids.has(listingId)) ids.delete(listingId);
-  else ids.add(listingId);
+  const adding = !ids.has(listingId);
+  if (adding) ids.add(listingId);
+  else ids.delete(listingId);
   const next = Array.from(ids).filter((n) => Number.isFinite(n) && n > 0).slice(0, 200);
   localStorage.setItem(FAV_KEY, JSON.stringify(next));
   try {
     window.dispatchEvent(new CustomEvent("atlas-favorites-changed"));
   } catch {
     /* non-browser */
+  }
+  // TASK-1709: persist save to backend if we have the guest's email (from previous booking).
+  if (adding) {
+    try {
+      const email = localStorage.getItem("atlas_guest_email");
+      if (email) {
+        const guestName = localStorage.getItem("atlas_guest_name") ?? undefined;
+        fetch(buildApiUrl("/api/saved-listings"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...getApiHeaders() },
+          body: JSON.stringify({ guestEmail: email, guestName, listingId }),
+        }).catch(() => { /* non-critical — fire and forget */ });
+      }
+    } catch { /* ignore */ }
   }
   return next.includes(listingId);
 }

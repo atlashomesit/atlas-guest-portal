@@ -1,4 +1,5 @@
 import { buildApiUrl, getApiHeaders } from '@/api/client';
+import { messageFromApiResponse } from '@/utils/serverErrorFromResponse';
 
 export type AvailabilityNightlyRate = {
   date: string;
@@ -43,7 +44,7 @@ export const fetchAvailability = async ({
   const response = await fetch(url.toString(), { signal, headers: getApiHeaders() });
 
   if (!response.ok) {
-    throw new Error(`Availability request failed with status ${response.status}`);
+    throw new Error(await messageFromApiResponse(response));
   }
 
   return (await response.json()) as AvailabilityResponse;

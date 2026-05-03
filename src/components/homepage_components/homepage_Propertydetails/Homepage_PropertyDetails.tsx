@@ -9,10 +9,9 @@ import { LiaNewspaper } from "react-icons/lia";
 import { MdOutlineEmojiFoodBeverage, MdOutlineLocalLaundryService, MdOutlineDone } from "react-icons/md";
 import { FaCcMastercard, FaLocationDot } from "react-icons/fa6";
 import { FaStar } from "react-icons/fa";
-import { X, ChevronRight, Clock, KeyRound } from 'lucide-react';
+import { X, ChevronRight, Clock, KeyRound, Bookmark, Share2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { propertyData } from '../../../data.ts';
-import { getUnitPolicy } from '../../../config/policyConfig';
 import { inlinePolicySnippets } from '../../../content/terms';
 import Subheading from '../../commonComponents/subheading/Subheading';
 import UnitBookingWidget from '../../availability/UnitBookingWidget';
@@ -143,6 +142,8 @@ interface Property {
     /** G3-002: from API listing when available */
     checkInTime?: string;
     checkOutTime?: string;
+    /** TASK-1676: nested policy times from listing DTO when present */
+    unitPolicy?: { checkInTime?: string | null; checkOutTime?: string | null };
     /** AMN-001: amenity codes from API (e.g. ["wifi","ac","parking"]) */
     amenityCodes?: string[];
     /** TASK-355: host/on-site contact phone for WhatsApp CTA */
@@ -151,6 +152,41 @@ interface Property {
     propertyAddress?: string | null;
     /** Legacy / alternate JSON key for same */
     property_address?: string | null;
+    /** TASK-1359: YouTube / Vimeo virtual tour URL */
+    virtualTourUrl?: string | null;
+}
+
+/** TASK-1359: Convert YouTube/Vimeo watch URL to embed URL, or return null if unrecognised. */
+function toEmbedUrl(url: string): string | null {
+    try {
+        const u = new URL(url);
+        // YouTube: https://www.youtube.com/watch?v=ID or https://youtu.be/ID
+        if (u.hostname === 'youtu.be') return `https://www.youtube.com/embed/${u.pathname.slice(1)}`;
+        if (u.hostname.includes('youtube.com')) {
+            const v = u.searchParams.get('v');
+            return v ? `https://www.youtube.com/embed/${v}` : null;
+        }
+        // Vimeo: https://vimeo.com/ID
+        if (u.hostname === 'vimeo.com') {
+            const id = u.pathname.slice(1).split('/')[0];
+            return id ? `https://player.vimeo.com/video/${id}` : null;
+        }
+        return null;
+    } catch { return null; }
+}
+
+/** Avoid `new Date(x).toISOString()` on invalid URL params — throws RangeError and trips the route error boundary. */
+function isoFromUrlDateParam(value: string | null): string | undefined {
+    if (value == null) return undefined;
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+    const d = new Date(trimmed);
+    if (!Number.isFinite(d.getTime())) return undefined;
+    try {
+        return d.toISOString();
+    } catch {
+        return undefined;
+    }
 }
 
 const PropertyDetails = () => {
@@ -190,6 +226,8 @@ const PropertyDetails = () => {
     const [similarFromApi, setSimilarFromApi] = useState<null | { loading: boolean; items: any[] }>(null);
     /** TASK-1726: host response time badge text (e.g. "Replies in <1h"). */
     const [responseTimeBadge, setResponseTimeBadge] = useState<string | null>(null);
+    /** TASK-1312: review reply-rate badge text (e.g. "Replies to 95% of reviews"). */
+    const [reviewReplyRateBadge, setReviewReplyRateBadge] = useState<string | null>(null);
     /** AMN-001: amenity master code→label map */
     const [amenityMaster, setAmenityMaster] = useState<Map<string, string>>(new Map());
 
@@ -198,7 +236,7 @@ const PropertyDetails = () => {
         loading: boolean;
         averageRating: number;
         totalCount: number;
-        reviews: { id: number; guestName?: string | null; rating: number; title?: string | null; body?: string | null; createdAt: string; hostResponse?: string | null; hostResponseAt?: string | null; photoUrls?: string[] | null }[];
+        reviews: { id: number; guestName?: string | null; rating: number; title?: string | null; body?: string | null; createdAt: string; hostResponse?: string | null; hostResponseAt?: string | null; photoUrls?: string[] | null; isVerifiedStay?: boolean }[];
     }>(null);
 
     // AMN-001: Fetch amenity master list once on mount
@@ -230,20 +268,33 @@ const PropertyDetails = () => {
         return () => { active = false; };
     }, []);
 
-    // Hydrate booking context from URL search params (passed from SearchPage)
+    // TASK-1312: Fetch review reply-rate badge once per listing load
     useEffect(() => {
-        const checkIn = searchParams.get('checkIn');
-        const checkOut = searchParams.get('checkOut');
-        const guests = Number(searchParams.get('guests')) || null;
-        if (checkIn || checkOut || guests) {
+        let active = true;
+        fetch(buildApiUrl('/listings/review-reply-rate'), { headers: getApiHeaders() })
+            .then((r) => r.ok ? r.json() : Promise.reject())
+            .then((body: { badgeText?: string | null }) => {
+                if (active && body?.badgeText) setReviewReplyRateBadge(body.badgeText);
+            })
+            .catch(() => { /* non-critical */ });
+        return () => { active = false; };
+    }, []);
+
+    // Hydrate booking context from URL search params (passed from SearchPage or deep-link tests).
+    useEffect(() => {
+        const checkInIso = isoFromUrlDateParam(searchParams.get('checkIn'));
+        const checkOutIso = isoFromUrlDateParam(searchParams.get('checkOut'));
+        const guestsRaw = searchParams.get('guests');
+        const guestsParsed = guestsRaw != null && guestsRaw.trim() !== '' ? Number(guestsRaw) : NaN;
+        const guests = Number.isFinite(guestsParsed) && guestsParsed > 0 ? guestsParsed : null;
+        if (checkInIso || checkOutIso || guests) {
             updateBooking({
-                ...(checkIn ? { checkIn: new Date(checkIn).toISOString() } : {}),
-                ...(checkOut ? { checkOut: new Date(checkOut).toISOString() } : {}),
+                ...(checkInIso ? { checkIn: checkInIso } : {}),
+                ...(checkOutIso ? { checkOut: checkOutIso } : {}),
                 ...(guests ? { guests } : {}),
             });
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [searchParams, updateBooking]);
     const nightlyPrice = useMemo(() => {
         if (!data) return null;
         try {
@@ -407,7 +458,7 @@ const PropertyDetails = () => {
                 const j = (await res.json()) as {
                     averageRating?: number;
                     totalCount?: number;
-                    reviews?: { id: number; guestName?: string | null; rating: number; title?: string | null; body?: string | null; createdAt: string; hostResponse?: string | null; hostResponseAt?: string | null; photoUrls?: string[] | null }[];
+                    reviews?: { id: number; guestName?: string | null; rating: number; title?: string | null; body?: string | null; createdAt: string; hostResponse?: string | null; hostResponseAt?: string | null; photoUrls?: string[] | null; isVerifiedStay?: boolean }[];
                 };
                 if (ac.signal.aborted) return;
                 setListingReviewsFromApi({
@@ -422,6 +473,15 @@ const PropertyDetails = () => {
         })();
         return () => ac.abort();
     }, [resolvedListingId]);
+
+    /** TASK-2068: hero quote only from live API reviews (never static marketing snippets). */
+    const heroReviewQuote = useMemo(() => {
+        const api = listingReviewsFromApi;
+        if (!api || api.loading || api.reviews.length === 0) return null;
+        const r = api.reviews[0];
+        const text = String(r.body || r.title || '').trim();
+        return text ? text.slice(0, 280) : null;
+    }, [listingReviewsFromApi]);
 
     useEffect(() => {
         setNotFound(false);
@@ -593,6 +653,17 @@ const PropertyDetails = () => {
                         maxGuests: parseMaxGuestsFromPayload(apiListing as Record<string, unknown>),
                         checkInTime: pub.checkInTime?.trim() || undefined,
                         checkOutTime: pub.checkOutTime?.trim() || undefined,
+                        unitPolicy: (() => {
+                          const raw = (apiListing as Record<string, unknown>).unitPolicy;
+                          if (!raw || typeof raw !== "object") return undefined;
+                          const o = raw as Record<string, unknown>;
+                          const cin = o.checkInTime ?? o.CheckInTime;
+                          const cout = o.checkOutTime ?? o.CheckOutTime;
+                          return {
+                            checkInTime: typeof cin === "string" ? cin : null,
+                            checkOutTime: typeof cout === "string" ? cout : null,
+                          };
+                        })(),
                         hostPhone: (() => {
                             const raw = (apiListing as Record<string, unknown>).hostPhone ?? (apiListing as Record<string, unknown>).contactPhone;
                             return typeof raw === 'string' && raw.trim() ? raw.trim() : null;
@@ -610,6 +681,10 @@ const PropertyDetails = () => {
                             (typeof pub.propertyAddress === 'string' && pub.propertyAddress.trim()
                                 ? pub.propertyAddress.trim()
                                 : null),
+                        virtualTourUrl: (() => {
+                            const raw = (apiListing as Record<string, unknown>).virtualTourUrl;
+                            return typeof raw === 'string' && raw.trim() ? raw.trim() : null;
+                        })(),
                     };
                     const fromDto =
                         photoUrlsList.length > 0 ? photoUrlsList : (coverUrl ? [coverUrl] : []);
@@ -836,6 +911,17 @@ useEffect(() => {
                       },
                   ]
                 : []),
+            ...(reviewCount === 0
+                ? [
+                      {
+                          '@context': 'https://schema.org',
+                          '@type': 'Place',
+                          name: data.property_name,
+                          description: data.property_description?.slice(0, 300),
+                          url: pageUrlForLd,
+                      },
+                  ]
+                : []),
         ];
     }, [
         data,
@@ -872,7 +958,10 @@ useEffect(() => {
         );
     }
 
-    const unitPolicy = getUnitPolicy(data?.id);
+    const resolvedCheckInTime =
+      data?.checkInTime?.trim() || data?.unitPolicy?.checkInTime?.trim() || null;
+    const resolvedCheckOutTime =
+      data?.checkOutTime?.trim() || data?.unitPolicy?.checkOutTime?.trim() || null;
     const cancellationPolicyText = (() => {
         const policies = data?.property_policy_details ?? [];
         const fromListingPolicy = policies.find((p) =>
@@ -884,6 +973,14 @@ useEffect(() => {
     const pageUrl = typeof window !== 'undefined' ? window.location.href : '';
     const galleryUrls = filterGuestImageUrls(data?.property_img ?? []);
     const primaryImage = galleryUrls[0];
+    const mapSrcTrimmed = (data?.property_mapSrc ?? "").trim();
+    const locationParts = (data?.property_location ?? "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+    const mapCity = locationParts[0] ?? "";
+    const mapState = locationParts.slice(1).join(", ");
+    const mapSearchQuery = [mapCity, mapState].filter(Boolean).join(", ");
 
     return (
         <>
@@ -915,9 +1012,44 @@ useEffect(() => {
                     </div>
                 )}
 
-                {/* Property Header */}
+                {/* Property Header — TASK-2093: Save/Share in header next to title */}
                 <div className="">
-                    <h1 className="text-2xl sm:text-3xl font-semibold mb-2 capitalize text-text-primary">{data?.property_name}</h1>
+                    <div className="mb-2 flex flex-wrap items-start justify-between gap-3">
+                        <h1 className="min-w-0 flex-1 text-2xl sm:text-3xl font-semibold capitalize text-text-primary">
+                            {data?.property_name}
+                        </h1>
+                        <div className="flex shrink-0 items-center gap-1">
+                            <button
+                                type="button"
+                                className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border-subtle bg-bg-muted text-text-primary hover:opacity-90"
+                                onClick={() => {
+                                    const lid = Number(resolvedListingId ?? data?.listingId ?? listingId);
+                                    if (!Number.isFinite(lid) || lid <= 0) return;
+                                    setFav(toggleFavorite(lid));
+                                }}
+                                aria-label={fav ? 'Remove from saved' : 'Save listing'}
+                            >
+                                <Bookmark className={`h-5 w-5 ${fav ? 'fill-cta-primary text-cta-primary' : ''}`} strokeWidth={1.75} />
+                            </button>
+                            <button
+                                type="button"
+                                className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border-subtle bg-bg-muted text-text-primary hover:opacity-90"
+                                onClick={() => {
+                                    const url = window.location.href;
+                                    const text = `Check out ${data?.property_name ?? 'this home'} on Atlas Homestays`;
+                                    const share = async () => {
+                                        const nav: any = navigator;
+                                        if (nav?.share) return nav.share({ title: document.title, text, url });
+                                        window.open(`https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`, '_blank', 'noopener,noreferrer');
+                                    };
+                                    void share();
+                                }}
+                                aria-label="Share property"
+                            >
+                                <Share2 className="h-5 w-5" strokeWidth={1.75} />
+                            </button>
+                        </div>
+                    </div>
                     <div className="flex items-center text-text-muted">
                         <FaLocationDot className="mr-2 text-sm" />
                         <span className="text-sm sm:text-base">{data?.property_location || 'Location not available'}</span>
@@ -951,9 +1083,10 @@ useEffect(() => {
                             <span>{(data?.property_rating || 0).toFixed(2)}</span>
                             <span className="text-text-muted">• {data?.property_reviews || 0} reviews</span>
                         </div>
-                        {data?.property_review_snippets?.[0] && (
+                        {heroReviewQuote && (
                             <p className="sm:pl-3 sm:border-l sm:border-border-subtle sm:ml-3 text-text-muted italic">
-                                "{data.property_review_snippets?.[0] || 'No reviews available'}"
+                                &ldquo;{heroReviewQuote}
+                                {heroReviewQuote.length >= 280 ? '…' : ''}&rdquo;
                             </p>
                         )}
                     </div>
@@ -1012,18 +1145,35 @@ useEffect(() => {
                     </button>
                 </div>
 
-                {/* Check-in / check-out times — shown prominently before gallery */}
-                {(data?.checkInTime || data?.checkOutTime) && (
-                    <div className="flex flex-wrap gap-4 text-sm font-medium mt-1 mb-2">
-                        <div className="flex items-center gap-1.5 text-text-primary">
-                            <KeyRound className="w-4 h-4 text-accent-primary flex-shrink-0" />
-                            <span>Check-in from <strong>{data.checkInTime?.trim() || 'Flexible'}</strong></span>
-                        </div>
-                        <div className="flex items-center gap-1.5 text-text-primary">
-                            <Clock className="w-4 h-4 text-accent-primary flex-shrink-0" />
-                            <span>Checkout by <strong>{data.checkOutTime?.trim() || 'Flexible'}</strong></span>
-                        </div>
+                {/* Check-in / check-out times — TASK-1676: API / explicit unit policy only; else contact host */}
+                <div className="flex flex-wrap gap-4 text-sm font-medium mt-1 mb-2">
+                    <div className="flex items-center gap-1.5 text-text-primary">
+                        <KeyRound className="w-4 h-4 text-accent-primary flex-shrink-0" />
+                        <span>
+                            Check-in from{' '}
+                            <strong>{resolvedCheckInTime ?? 'Contact host for check-in time'}</strong>
+                        </span>
                     </div>
+                    <div className="flex items-center gap-1.5 text-text-primary">
+                        <Clock className="w-4 h-4 text-accent-primary flex-shrink-0" />
+                        <span>
+                            Checkout by{' '}
+                            <strong>{resolvedCheckOutTime ?? 'Contact host for check-out time'}</strong>
+                        </span>
+                    </div>
+                </div>
+
+                {/* TASK-1359: Virtual tour video embed (YouTube/Vimeo) */}
+                {data?.virtualTourUrl && toEmbedUrl(data.virtualTourUrl) && (
+                  <div className="mb-4 rounded-xl overflow-hidden aspect-video w-full shadow-level1">
+                    <iframe
+                      src={toEmbedUrl(data.virtualTourUrl)!}
+                      title="Virtual property tour"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                      className="w-full h-full border-0"
+                    />
+                  </div>
                 )}
 
                 {/* Image Gallery — Azure blob URLs are skipped (409); API/static must serve reachable images */}
@@ -1132,36 +1282,6 @@ useEffect(() => {
                             <div className="border border-border-subtle rounded-lg overflow-hidden shadow-level1 bg-bg-surface">
                                 <div className="bg-bg-surface p-6">
                                     <h2 className="text-xl sm:text-2xl font-semibold mb-6 text-text-primary">Things to know</h2>
-                                    <div className="flex items-center gap-2 mb-4 flex-wrap">
-                                        <button
-                                            type="button"
-                                            className="px-3 py-1.5 rounded-lg border border-border-subtle bg-bg-muted text-sm font-medium text-text-primary hover:opacity-90"
-                                            onClick={() => {
-                                                const lid = Number(resolvedListingId ?? data?.listingId ?? listingId);
-                                                if (!Number.isFinite(lid) || lid <= 0) return;
-                                                setFav(toggleFavorite(lid));
-                                            }}
-                                        >
-                                            {fav ? '♥ Saved' : '♡ Save'}
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className="px-3 py-1.5 rounded-lg border border-border-subtle bg-bg-muted text-sm font-medium text-text-primary hover:opacity-90"
-                                            onClick={() => {
-                                                const url = window.location.href;
-                                                const text = `Check out ${data?.property_name ?? 'this home'} on Atlas Homestays`;
-                                                const share = async () => {
-                                                    // Web Share API on mobile; otherwise open WhatsApp in a new tab.
-                                                    const nav: any = navigator;
-                                                    if (nav?.share) return nav.share({ title: document.title, text, url });
-                                                    window.open(`https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`, '_blank', 'noopener,noreferrer');
-                                                };
-                                                void share();
-                                            }}
-                                        >
-                                            Share
-                                        </button>
-                                    </div>
                                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
                                         <div className="p-4 border border-border-subtle rounded-lg bg-bg-muted">
                                             <div className="flex items-center gap-2 mb-1">
@@ -1169,7 +1289,8 @@ useEffect(() => {
                                                 <p className="text-text-muted text-sm">Check-in / Check-out</p>
                                             </div>
                                             <p className="font-medium text-text-primary">
-                                                Check-in {data.checkInTime?.trim() || unitPolicy?.checkIn || '2:00 PM'} · Check-out {data.checkOutTime?.trim() || unitPolicy?.checkOut || '11:00 AM'}
+                                                Check-in {resolvedCheckInTime ?? 'Contact host for check-in time'} · Check-out{' '}
+                                                {resolvedCheckOutTime ?? 'Contact host for check-out time'}
                                             </p>
                                             <a className="text-sm text-accent-primary underline" href="/terms#check-in-check-out">View terms</a>
                                         </div>
@@ -1253,7 +1374,9 @@ useEffect(() => {
                         {(() => {
                             const api = listingReviewsFromApi;
                             const showApi = api && !api.loading && api.totalCount > 0;
-                            const showStatic = !showApi && data && data.property_reviews > 0;
+                            // TASK-2068: suppress static snippets when API has confirmed 0 real reviews
+                            const apiLoaded = api != null && !api.loading;
+                            const showStatic = !showApi && !apiLoaded && data && data.property_reviews > 0;
                             if (api?.loading && !showStatic) return (
                                 <div className="pb-8 border-b border-border-subtle">
                                     <div className="h-7 w-40 animate-pulse rounded bg-bg-muted mb-4" />
@@ -1273,6 +1396,7 @@ useEffect(() => {
                                     </div>
                                 </div>
                             );
+                            // TASK-2068: API loaded with 0 reviews — no fabricated snippets or empty-state marketing block
                             if (!showApi && !showStatic) return null;
                             const rating = showApi ? api!.averageRating : data!.property_rating;
                             const count = showApi ? api!.totalCount : data!.property_reviews;
@@ -1292,7 +1416,7 @@ useEffect(() => {
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                         {api!.reviews.slice(0, 6).map((r) => (
                                             <div key={r.id} className="p-4 rounded-xl bg-bg-muted border border-border-subtle">
-                                                <div className="flex items-center gap-2 mb-1">
+                                                <div className="flex items-center gap-2 mb-1 flex-wrap">
                                                     <span className="text-sm font-semibold text-text-primary">{r.guestName ?? 'Guest'}</span>
                                                     <span className="text-xs text-text-muted">
                                                         {formatHumanDate(r.createdAt, {
@@ -1301,6 +1425,12 @@ useEffect(() => {
                                                             options: { day: '2-digit', month: 'short', year: 'numeric' },
                                                         })}
                                                     </span>
+                                                    {/* TASK-1311: Verified Stay badge */}
+                                                    {r.isVerifiedStay && (
+                                                        <span className="inline-flex items-center gap-0.5 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded-full px-2 py-0.5">
+                                                            ✓ Verified Stay
+                                                        </span>
+                                                    )}
                                                 </div>
                                                 <div className="flex gap-0.5 mb-2">
                                                     {Array.from({ length: 5 }).map((_, i) => (
@@ -1372,18 +1502,36 @@ useEffect(() => {
                             </button>
                         </div>
 
-                        {/* Location Map */}
+                        {/* Location Map — TASK-1677: fallback when embed URL missing */}
                         <div className="">
                             <h2 className="text-xl sm:text-2xl font-semibold mb-4 text-text-primary">Where you'll be</h2>
                             <div className="rounded-lg overflow-hidden border border-border-subtle">
-                                <iframe
-                                    src={data?.property_mapSrc || ''}
-                                    className="w-full h-64 sm:h-96"
-                                    loading="lazy"
-                                    allowFullScreen
-                                    referrerPolicy="no-referrer-when-downgrade"
-                                    title="Property Location"
-                                ></iframe>
+                                {mapSrcTrimmed ? (
+                                    <iframe
+                                        src={mapSrcTrimmed}
+                                        className="w-full h-64 sm:h-96"
+                                        loading="lazy"
+                                        allowFullScreen
+                                        referrerPolicy="no-referrer-when-downgrade"
+                                        title="Property Location"
+                                    />
+                                ) : (
+                                    <div className="flex min-h-[16rem] flex-col items-center justify-center gap-3 bg-bg-muted px-4 py-8 text-center sm:min-h-[24rem]">
+                                        <p className="text-lg text-text-primary">
+                                            📍 {mapSearchQuery || (data?.property_location ?? "Location on map")}
+                                        </p>
+                                        {mapSearchQuery ? (
+                                            <a
+                                                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapSearchQuery)}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-sm font-semibold text-accent-primary underline underline-offset-2"
+                                            >
+                                                View on Google Maps →
+                                            </a>
+                                        ) : null}
+                                    </div>
+                                )}
                             </div>
                             <p className="mt-4 text-text-muted text-sm sm:text-base">
                                 {data?.property_location || 'Location information not available'}
@@ -1453,8 +1601,13 @@ useEffect(() => {
                                         Managed by Atlas Homestays
                                     </p>
                                     <p className="text-xs text-text-muted">
-                                        24/7 WhatsApp support{responseTimeBadge ? ` · ${responseTimeBadge}` : " · Typically replies within 1 hour"}
+                                        24/7 WhatsApp support{responseTimeBadge ? ` · ${responseTimeBadge}` : " · Local team based in Hyderabad. WhatsApp-first support."}
                                     </p>
+                                    {reviewReplyRateBadge && (
+                                        <p className="text-xs text-green-700 font-medium mt-0.5">
+                                            ✓ {reviewReplyRateBadge} within 48h
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                             {(() => {

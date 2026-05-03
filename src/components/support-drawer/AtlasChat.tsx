@@ -1,12 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, Mic, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import { buildApiUrl, getApiHeaders } from '@/api/client';
+import { messageFromApiResponse } from '@/utils/serverErrorFromResponse';
 
 type AtlasChatProps = {
   onClose?: (e: React.MouseEvent) => void;
+  /** When set (e.g. on listing detail), FAQ-backed chat can match property questions. */
+  listingId?: string | null;
 };
 
-const AtlasChat = ({ onClose }: AtlasChatProps) => {
+const AtlasChat = ({ onClose, listingId = null }: AtlasChatProps) => {
   const [isOpen, setIsOpen] = useState(true); // 🔴 control visibility
   const [messages, setMessages] = useState([
     { role: 'assistant', content: 'Welcome to Atlas Homestays. How can I help you today?' }
@@ -14,9 +18,6 @@ const AtlasChat = ({ onClose }: AtlasChatProps) => {
   const [input, setInput] = useState('');
   const [isListening, setIsListening] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
-
-const API_URL = import.meta.env.VITE_CHAT_API_URL;
-const AUTH_KEY = import.meta.env.VITE_ATLAS_AUTH_KEY;
 
   const handleSend = async (overrideInput?: string) => {
     const text = overrideInput || input;
@@ -26,22 +27,35 @@ const AUTH_KEY = import.meta.env.VITE_ATLAS_AUTH_KEY;
     setInput('');
 
     try {
-      const res = await fetch(`${API_URL}/chat`, {
+      const listingNum =
+        listingId != null && listingId !== '' && !Number.isNaN(Number(listingId))
+          ? Number(listingId)
+          : null;
+      const res = await fetch(buildApiUrl('/api/public/chat'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Atlas-Auth-Key': AUTH_KEY
+          ...getApiHeaders(),
         },
-        body: JSON.stringify({ message: text })
+        body: JSON.stringify({ listingId: listingNum, message: text }),
       });
 
-      const data = await res.json();
-      setMessages(prev => [...prev, { role: 'assistant', content: data.reply }]);
-    } catch {
-      setMessages(prev => [
-        ...prev,
-        { role: 'assistant', content: 'Server not responding. Please try again.' }
-      ]);
+      if (!res.ok) {
+        throw new Error(await messageFromApiResponse(res));
+      }
+
+      const data = (await res.json()) as { reply?: string };
+      const reply =
+        typeof data.reply === 'string' && data.reply.trim()
+          ? data.reply.trim()
+          : 'No reply from the assistant. Please try again.';
+      setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error && err.message
+          ? err.message
+          : 'We could not reach the chat service. Please check your connection and try again.';
+      setMessages(prev => [...prev, { role: 'assistant', content: message }]);
     }
   };
 

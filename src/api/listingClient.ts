@@ -1,4 +1,5 @@
 import { buildApiUrl, getApiHeaders } from '@/api/client';
+import { messageFromApiResponse } from '@/utils/serverErrorFromResponse';
 
 /** Parse maxGuests from listing JSON (camelCase or PascalCase). Returns undefined if missing/invalid. */
 export function parseMaxGuestsFromPayload(payload: Record<string, unknown>): number | undefined {
@@ -63,13 +64,19 @@ export type PublicListing = {
   losDiscount2MinNights?: number | null;
   /** TASK-1695: LOS auto-discount tier 2 — discount percent (null = disabled). */
   losDiscount2Percent?: number | null;
+  /** Optional last-minute discount percent when API exposes it (TASK-1649). */
+  lastMinuteDiscountPercent?: number | null;
   /** TASK-1725: UTC ISO string when Atlas team verified listing photos. Null = not verified. */
   photosVerifiedAt?: string | null;
   /** TASK-1727: True when the tenant has a registered GSTIN — shown as trust badge on listing cards. */
   isGstRegistered?: boolean;
+  /** TASK-1360: ISO date string of most recent checkout within 30 days, or null. */
+  lastBookedAt?: string | null;
   /** TASK-1457: Property coordinates from API (null when unset). */
   latitude?: number | null;
   longitude?: number | null;
+  /** TASK-2076: Total number of verified reviews. Null when no reviews yet. */
+  reviewCount?: number | null;
 };
 
 function normalizePublicListing(payload: Record<string, unknown>): PublicListing {
@@ -139,9 +146,13 @@ function normalizePublicListing(payload: Record<string, unknown>): PublicListing
       payload.losDiscount2MinNights != null ? Number(payload.losDiscount2MinNights) : null,
     losDiscount2Percent:
       payload.losDiscount2Percent != null ? Number(payload.losDiscount2Percent) : null,
+    lastMinuteDiscountPercent:
+      payload.lastMinuteDiscountPercent != null ? Number(payload.lastMinuteDiscountPercent) : null,
     isGstRegistered: Boolean(payload.isGstRegistered), // TASK-1727
+    lastBookedAt: typeof payload.lastBookedAt === 'string' ? payload.lastBookedAt : null, // TASK-1360
     latitude: Number.isFinite(latitude) ? latitude : null,
     longitude: Number.isFinite(longitude) ? longitude : null,
+    reviewCount: payload.reviewCount != null ? Number(payload.reviewCount) : null,
   };
 }
 
@@ -181,7 +192,7 @@ export async function fetchListingContact(
   });
   if (response.status === 401 || response.status === 404) return null;
   if (!response.ok) {
-    throw new Error(`Listing contact request failed with status ${response.status}`);
+    throw new Error(await messageFromApiResponse(response));
   }
   return (await response.json()) as ListingContact;
 }
@@ -193,7 +204,7 @@ export const fetchPublicListings = async (signal?: AbortSignal): Promise<PublicL
   });
 
   if (!response.ok) {
-    throw new Error(`Public listings request failed with status ${response.status}`);
+    throw new Error(await messageFromApiResponse(response));
   }
 
   const payload = (await response.json()) as unknown;
@@ -253,7 +264,7 @@ export async function fetchListingPhotos(
   }
 
   if (!response.ok) {
-    throw new Error(`Listing photos request failed with status ${response.status}`);
+    throw new Error(await messageFromApiResponse(response));
   }
 
   const payload = (await response.json()) as unknown;
@@ -270,7 +281,7 @@ export const fetchListingById = async (
   });
 
   if (!response.ok) {
-    throw new Error(`Listing request failed with status ${response.status}`);
+    throw new Error(await messageFromApiResponse(response));
   }
 
   const payload = (await response.json()) as Record<string, unknown>;

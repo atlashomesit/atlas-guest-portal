@@ -6,6 +6,7 @@ import { Input } from "../components/ui/Input";
 import { Button } from "../components/ui/Button";
 import { toast } from "react-toastify";
 import { buildApiUrl, getApiHeaders } from "../api/client";
+import { messageFromApiResponse } from "../utils/serverErrorFromResponse";
 import { logUserAction, reportError } from "../lib/monitoring";
 
 const PROPERTY_TYPES = [
@@ -359,8 +360,7 @@ const BecomeHost = () => {
       });
 
       if (!res.ok) {
-        const body = await res.json().catch(() => null);
-        throw new Error(body?.message || "Prefill request failed.");
+        throw new Error(await messageFromApiResponse(res));
       }
 
       const data = await res.json();
@@ -377,7 +377,11 @@ const BecomeHost = () => {
       logUserAction("onboarding_airbnb_prefill", { status: "success", feature: "become-host" });
     } catch (err) {
       reportError(err, { feature: "become-host-airbnb-prefill" });
-      toast.error("Could not import listing. You can still fill in details manually.");
+      const message =
+        err instanceof Error && err.message
+          ? err.message
+          : "Could not import listing. You can still fill in details manually.";
+      toast.error(message);
       setAirbnb((prev) => ({ ...prev, loading: false }));
     }
   };
@@ -411,8 +415,8 @@ const BecomeHost = () => {
       });
 
       if (!res.ok) {
-        const body = await res.json().catch(() => null);
-        throw new Error(body?.message || "Onboarding request failed.");
+        // BUG-ONBOARD-1: surface server ProblemDetails / ModelState via messageFromApiResponse.
+        throw new Error(await messageFromApiResponse(res));
       }
 
       // TASK-764: store propertyId so SetupWizard can PUT the existing draft
@@ -446,7 +450,11 @@ const BecomeHost = () => {
       logUserAction("onboarding_started", { status: "success", feature: "become-host", propertyId: data?.propertyId });
     } catch (err) {
       reportError(err, { feature: "become-host-submit" });
-      toast.error("Something went wrong. Please try again.");
+      // Surface the real reason so the user can act on it (vs. "Something went wrong").
+      const message = err instanceof Error && err.message
+        ? err.message
+        : "We could not complete registration. Try again or contact support@atlashomestays.com.";
+      toast.error(message);
       setSubmitStatus("error");
     }
   };
@@ -1134,9 +1142,11 @@ class BecomeHostErrorBoundary extends React.Component<
           <div style={styles.container}>
             <Card>
               <div style={{ textAlign: "center", padding: "40px 20px" }}>
-                <Typography variant="h2">Something went wrong</Typography>
+                <Typography variant="h2">We couldn&apos;t load host onboarding</Typography>
                 <Typography variant="subtitle" className="mt-2">
-                  We hit an unexpected error loading host onboarding.
+                  {this.state.error?.message?.trim()
+                    ? this.state.error.message
+                    : "We hit an unexpected error. Try again or return home."}
                 </Typography>
                 <div style={{ marginTop: 24, display: "flex", gap: 12, justifyContent: "center" }}>
                   <Button onClick={() => window.location.reload()}>Try again</Button>

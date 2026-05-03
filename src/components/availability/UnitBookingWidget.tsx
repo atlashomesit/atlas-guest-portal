@@ -16,6 +16,7 @@ import { getIstStartOfDay } from '@/utils/date';
 import { calculateNights, formatNightCount, formatDateInTimezone } from '@/utils/dateHelpers';
 import { doesRangeIntersectBlocked, toISODate } from '@/utils/dateRange';
 import { formatCurrency, formatHumanDate } from '@/utils/formatting';
+import { HelpCircle } from 'lucide-react';
 import {
   clampNationalDigits,
   getGuestDialOption,
@@ -30,6 +31,8 @@ import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
 import { fetchCalendarPricing, fetchPricingBreakdown } from '@/api/pricingClient';
 import { useListingPhotosFromApi } from '@/contexts/ListingPhotosContext';
 import OptimizedImage from '@/components/ui/OptimizedImage';
+import FomoBar from '@/components/FomoBar';
+import { track } from '@/lib/events'; // TASK-1480
 
 declare global {
   interface Window {
@@ -226,6 +229,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [referralMessage, setReferralMessage] = useState<string | null>(null);
   const [promoCode, setPromoCode] = useState('');
   const [appliedPromoCode, setAppliedPromoCode] = useState<string | null>(null);
+  const [promoValidating, setPromoValidating] = useState(false);
   // TASK-1710: DPDP WhatsApp marketing opt-in — unchecked by default
   const [whatsappMarketingOptIn, setWhatsappMarketingOptIn] = useState(false);
   const [appliedPromoDiscount, setAppliedPromoDiscount] = useState(0);
@@ -448,9 +452,9 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         const hasTurnover = Array.from(newDateStatusMap.values()).some((s) => s === 'Turnover');
         setStatusMessage(
           hasTurnover
-            ? 'Orange nights are turnover cleaning windows — they remain bookable. Grey is blocked or on hold.'
+            ? 'Light grey “Turnover” nights are cleaning windows — still bookable. Striped grey is unavailable (blocked or on hold).'
             : newBlockedDates.size > 0
-              ? 'Grey dates are blocked or on hold and cannot be selected.'
+              ? 'Striped grey dates are unavailable (blocked or on hold) and cannot be selected.'
               : 'All dates shown are available to book.'
         );
       } catch (error) {
@@ -728,6 +732,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   setDateRange(next);
   // Auto-close calendar when both dates are selected
   setOpenCalendar(false);
+  // TASK-1480: funnel event when both dates are selected
+  if (next.startDate && next.endDate && listingId != null) {
+    track('select_dates', Number(listingId));
+  }
 };
 
 
@@ -829,9 +837,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
   // ---------- Fee calculations ----------
 
-  // TASK-1871: GST is all-inclusive in the listed nightly rate (baked into breakdownPrice).
-  // The dead `gstAmount = 0` + misleading comment + never-rendering row have been removed.
-  // Header reads "All-inclusive rate · GST included" to match.
+  // TASK-1645: Indian accommodation GST slab on effective nightly rate (5% ≤₹7,500/night, 12% above).
+  // Room fare in breakdown is GST-inclusive; we show extracted GST for transparency.
 
   // When API has loaded: use API price (or calendar sum). When API has not loaded: use 0.
   const hasSelectedRange = Boolean(dateRange.startDate && dateRange.endDate);
@@ -867,6 +874,16 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       : effectiveDailyPricing != null
         ? effectiveDailyPricing.actualPrice
         : 0;
+
+  /** TASK-1645: slab from average nightly room tariff for the selected stay (≤₹7,500 → 5%, else 12%). */
+  const gstSlabPercent =
+    hasSelectedRange && perNightForDisplay > 0 ? (perNightForDisplay <= 7500 ? 5 : 12) : null;
+
+  /** GST component of room fare (tax-inclusive extraction). */
+  const gstLineAmount =
+    gstSlabPercent != null && breakdownPrice > 0
+      ? Math.max(1, Math.round((breakdownPrice * gstSlabPercent) / (100 + gstSlabPercent)))
+      : 0;
 
   /** Format price; show ₹0 when 0 (e.g. when API not loaded or API returned 0). */
   const displayPrice = (n: number) =>
@@ -1055,6 +1072,29 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     return null; // No available date found
   }, [dateStatusMap, blockedSet]);
 
+  // TASK-2074: inline promo validation on blur — calls existing [AllowAnonymous] endpoint
+  const handlePromoBlur = async () => {
+    const code = promoCode.trim();
+    if (!code || !listingId) return;
+    setPromoValidating(true);
+    setPromoMessage(null);
+    try {
+      const res = await fetch(buildApiUrl('/api/promo-codes/validate'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getApiHeaders() },
+        body: JSON.stringify({ code, listingId: Number(listingId), subtotal: priceDetails.total }),
+      });
+      if (!res.ok) { setPromoMessage('Could not validate code — try again.'); return; }
+      const data = (await res.json()) as { valid: boolean; message: string; discountAmount?: number };
+      setPromoMessage(data.message);
+      if (data.valid) setAppliedPromoCode(code);
+    } catch {
+      setPromoMessage('Could not validate code — check your connection.');
+    } finally {
+      setPromoValidating(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -1168,6 +1208,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     setFormError(null);
     setStatusMessage(null);
     setPaymentAttemptCount((c) => c + 1);
+    // TASK-1480: start_checkout = user passed validation + clicked submit
+    track('start_checkout', numericListingId);
+    // TASK-1480: enter_contact = contact info filled in (email/name present)
+    if (formData.name.trim() && formData.email.trim()) track('enter_contact', numericListingId);
 
     try {
       // 1. Create booking draft
@@ -1342,6 +1386,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                 
                 // Set payment status to success to show popup
                 setPaymentStatus('success');
+
+                // TASK-1709: store guest email/name so toggleFavorite can sync saved listings.
+                try {
+                  localStorage.setItem("atlas_guest_email", formData.email.trim());
+                  if (formData.name.trim()) localStorage.setItem("atlas_guest_name", formData.name.trim());
+                } catch { /* ignore quota / private mode */ }
                 
                 // Update booking context on success
                 updateBooking({
@@ -1386,6 +1436,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           // Fallback for modal close (ondismiss may not fire in all scenarios)
           rzp.on('close', handleRazorpayClose);
 
+          // TASK-1480: payment_init = Razorpay modal is about to open
+          track('payment_init', numericListingId);
           rzp.open();
         } catch (error) {
           console.error('Error initializing Razorpay:', error);
@@ -1697,7 +1749,21 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                   Contact host on WhatsApp
                 </a>
               ) : (
-                <p>Contact property directly.</p>
+                // TASK-2067: actionable fallback when host phone unknown
+                <div className="flex flex-col gap-2">
+                  <a
+                    href="tel:+917032493290"
+                    className="inline-flex items-center justify-center rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    📞 Call +91 7032 493 290
+                  </a>
+                  <a
+                    href="mailto:atlashomeskphb@gmail.com"
+                    className="inline-flex items-center justify-center rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    ✉️ Email support
+                  </a>
+                </div>
               )}
             </div>
 
@@ -1738,9 +1804,13 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         </div>
       )}
 
+      {listingId != null && Number(listingId) > 0 && (
+        <FomoBar listingId={Number(listingId)} />
+      )}
+
       <div className="space-y-1">
         <p className="text-sm uppercase tracking-[0.12em] text-text-muted font-semibold">Reserve</p>
-        <h3 className="text-xl sm:text-2xl font-semibold text-text-primary"></h3>
+        {listingName && <h3 className="text-xl sm:text-2xl font-semibold text-text-primary">{listingName}</h3>}
         <p className="text-text-secondary text-sm">Choose your dates to confirm availability for this apartment.</p>
       </div>
       {isBookingDisabled && (
@@ -1749,9 +1819,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
       <div className="flex flex-col gap-1">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-sm font-semibold rounded-full bg-[color:color-mix(in_srgb,var(--cta-primary)_18%,transparent)] px-3 py-1 text-[color:color-mix(in_srgb,var(--cta-primary)_80%,transparent)]">
-            Best price on our website
-          </span>
+          {effectiveDailyPricing && effectiveDailyPricing.globalDiscountPercent > 0 && (
+            <span className="text-sm font-semibold rounded-full bg-[color:color-mix(in_srgb,var(--cta-primary)_18%,transparent)] px-3 py-1 text-[color:color-mix(in_srgb,var(--cta-primary)_80%,transparent)]">
+              Best price on our website
+            </span>
+          )}
           {effectiveDailyPricing && effectiveDailyPricing.globalDiscountPercent > 0 ? (
             <span className="text-xs font-medium text-[color:color-mix(in_srgb,var(--cta-primary)_75%,transparent)]">
               Save {Math.round(effectiveDailyPricing.globalDiscountPercent)}% — discount applied
@@ -1805,11 +1877,15 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           )}
         </div>
         <div className="text-sm text-text-muted space-y-1 mt-1">
-          <p>{priceDetails.nights} {priceDetails.nights === 1 ? 'night' : 'nights'} × {displayPrice(perNightForDisplay)}</p>
+          <p className="whitespace-nowrap overflow-hidden text-ellipsis">{priceDetails.nights} {priceDetails.nights === 1 ? 'night' : 'nights'} × {displayPrice(perNightForDisplay)}</p>
           {priceDetails.extraGuests > 0 && priceDetails.nights > 0 && (
             <p>{priceDetails.extraGuests} {priceDetails.extraGuests === 1 ? 'extra guest' : 'extra guests'} × {displayPrice(priceDetails.extraGuestsFee / priceDetails.nights / priceDetails.extraGuests)}/night</p>
           )}
-          <p className="text-xs">All-inclusive rate · GST included</p>
+          <p className="text-xs text-text-muted">
+            {selectedRangeTotalFromCalendar != null && dateRange.startDate && dateRange.endDate
+              ? 'Includes all taxes and fees.'
+              : 'Select dates to see price with taxes.'}
+          </p>
         </div>
       </div>
 
@@ -1831,7 +1907,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             </p>
           )}
           <p className="text-xs text-text-secondary">
-            Grey: blocked or on hold (not selectable). Orange: turnover cleaning — those nights stay bookable.
+            <span className="mr-2 inline-block rounded bg-gray-100 px-1.5 py-0.5 text-gray-500">Turnover</span>
+            cleaning window (still bookable).
+            <span className="mx-2 inline-block bg-[repeating-linear-gradient(-45deg,#d1d5db,#d1d5db_3px,#e5e7eb_3px,#e5e7eb_6px)] px-2 py-0.5 text-gray-700">
+              Unavailable
+            </span>
+            blocked or on hold (not selectable).
           </p>
           <button
             id="unit-booking-dates"
@@ -1923,10 +2004,14 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                 const priceText = isPastDate ? '—' : (calendarPricingLoading ? '…' : formatCalendarPrice(price));
 
                 let statusBg = '';
-                if (status === 'Blocked') statusBg = 'bg-red-500/20';
-                else if (status === 'Hold') statusBg = 'bg-orange-500/20';
-                else if (status === 'Turnover') statusBg = 'bg-emerald-500/15';
-                else if (status === 'Available') statusBg = 'bg-green-500/15';
+                if (status === 'Turnover') {
+                  statusBg = 'bg-gray-100';
+                } else if (status === 'Blocked' || status === 'Hold' || (isBlocked && !status)) {
+                  statusBg =
+                    'bg-[repeating-linear-gradient(-45deg,#d1d5db,#d1d5db_4px,#e5e7eb_4px,#e5e7eb_8px)]';
+                } else if (status === 'Available') {
+                  statusBg = 'bg-green-500/15';
+                }
 
                 const selectionClasses = isRangeStart || isRangeEnd
                   ? 'bg-[var(--cta-primary)] text-white shadow-sm'
@@ -1935,14 +2020,24 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                     : '';
                 const disabledClasses = isDisabled
                   ? 'text-gray-400 cursor-not-allowed opacity-60'
-                  : status === 'Blocked' || (isBlocked && !status)
-                    ? 'text-red-600/90 cursor-not-allowed'
-                    : status === 'Hold'
-                      ? 'text-orange-600/90 cursor-not-allowed'
+                  : status === 'Blocked' || status === 'Hold' || (isBlocked && !status)
+                    ? 'text-gray-700 cursor-not-allowed'
+                    : status === 'Turnover'
+                      ? 'text-gray-400'
                       : 'text-black';
 
+                const dayStatusLabel =
+                  status === 'Turnover'
+                    ? 'Turnover'
+                    : status === 'Blocked' || status === 'Hold' || (isBlocked && !status)
+                      ? 'Unavailable'
+                      : undefined;
+
                 return (
-                  <div className="unit-booking-day-cell grid h-full w-full min-h-0 overflow-hidden box-border p-0.5">
+                  <div
+                    className="unit-booking-day-cell grid h-full w-full min-h-0 overflow-hidden box-border p-0.5"
+                    title={dayStatusLabel}
+                  >
                     {status && statusBg && (
                       <div className={`absolute inset-0 rounded-lg ${statusBg}`} style={{ margin: '2px' }} aria-hidden />
                     )}
@@ -2007,6 +2102,13 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                 {displayPrice(breakdownPrice)}
               </span>
             </div>
+            {gstSlabPercent != null && breakdownPrice > 0 && gstLineAmount > 0 && (
+              <div className="grid grid-cols-[140px_12px_1fr] text-text-secondary">
+                <span>GST {gstSlabPercent}%</span>
+                <span>:</span>
+                <span className="text-right">{displayPrice(gstLineAmount)}</span>
+              </div>
+            )}
             {priceDetails.extraGuestsFee > 0 && (
               <div className="grid grid-cols-[140px_12px_1fr]">
                 <span>Extra guest fee</span>
@@ -2025,18 +2127,29 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             )}
             {/* TASK-571: long-stay discount row */}
             {losDiscountAmount > 0 && (
-              <div className="grid grid-cols-[140px_12px_1fr] text-green-700">
-                <span>
-                  Long-stay discount
-                  {losDiscountPercent > 0 ? ` (−${Math.round(losDiscountPercent)}%)` : ''}
-                </span>
-                <span>:</span>
-                <span className="text-right">-{displayPrice(losDiscountAmount)}</span>
-              </div>
+              <>
+                <div className="grid grid-cols-[140px_12px_1fr] text-green-700">
+                  <span>
+                    Long-stay discount
+                    {losDiscountPercent > 0 ? ` (−${Math.round(losDiscountPercent)}%)` : ''}
+                  </span>
+                  <span>:</span>
+                  <span className="text-right">-{displayPrice(losDiscountAmount)}</span>
+                </div>
+                {priceDetails.nights > 0 && (
+                  <p className="text-xs text-text-muted text-right">≈ {displayPrice(Math.round(losDiscountAmount / priceDetails.nights))}/night off</p>
+                )}
+              </>
             )}
-            {/* TASK-1871: GST row removed — all-inclusive rate, no separate GST line */}
             <div className="grid grid-cols-[140px_12px_1fr]">
-              <span>Convenience fee{convenienceFeePctLabel > 0 ? ` (${convenienceFeePctLabel}%)` : ''}</span>
+              <span className="inline-flex items-center gap-1">
+                Convenience fee{convenienceFeePctLabel > 0 ? ` (${convenienceFeePctLabel}%)` : ''}
+                <HelpCircle
+                  className="h-3 w-3 cursor-help text-text-muted"
+                  aria-label="Includes payment-gateway and platform handling charges. Razorpay charges this directly."
+                  title="Includes payment-gateway and platform handling charges. Razorpay charges this directly."
+                />
+              </span>
               <span>:</span>
               <span className="text-right">
                 {displayPrice(breakdownConvenienceFee)}
@@ -2193,7 +2306,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               value={phoneDialCode}
               onChange={(e) => setPhoneDialCode(e.target.value)}
               disabled={isBookingDisabled}
-              className="shrink-0 max-w-[118px] border-0 border-r border-border-strong bg-transparent py-3 pl-3 pr-1 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-inset focus:ring-cta-primary"
+              className="shrink-0 max-w-[10.5rem] border-0 border-r border-border-strong bg-transparent py-3 pl-2 pr-1 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-inset focus:ring-cta-primary"
               data-testid="guest-booking-phone-dial"
             >
               {GUEST_DIAL_OPTIONS.map((o) => (
@@ -2257,17 +2370,19 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             id="promo-code"
             name="promoCode"
             value={promoCode}
-            onChange={(e) => setPromoCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 32))}
+            onChange={(e) => { setPromoCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 32)); setPromoMessage(null); setAppliedPromoCode(null); }}
+            onBlur={handlePromoBlur}
             disabled={isBookingDisabled || isSubmitting || isLoading}
             className="w-full rounded-xl border border-border-strong bg-bg-muted px-4 py-3 text-text-primary focus:outline-none focus:ring-2 focus:ring-cta-primary"
             placeholder="Enter promo code"
             data-testid="guest-booking-promo"
           />
-          {promoMessage ? (
-            <p className={`text-xs ${appliedPromoDiscount > 0 ? 'text-green-700' : 'text-text-muted'}`}>
-              {promoMessage}{appliedPromoCode ? ` (${appliedPromoCode})` : ''}
+          {promoValidating && <p className="text-xs text-text-muted">Validating…</p>}
+          {!promoValidating && promoMessage && (
+            <p className={`text-xs ${appliedPromoCode ? 'text-green-700' : 'text-support-error'}`}>
+              {appliedPromoCode ? '✓ ' : '✗ '}{promoMessage}
             </p>
-          ) : null}
+          )}
         </div>
 
         {/* TASK-782: Guest nationality for Indian police homestay reporting. India is pre-selected; Other is free-text via Notes. */}
@@ -2286,18 +2401,27 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           >
             <option value="India">India</option>
             <option value="Australia">Australia</option>
+            <option value="Bangladesh">Bangladesh</option>
+            <option value="Bhutan">Bhutan</option>
             <option value="Canada">Canada</option>
             <option value="China">China</option>
             <option value="France">France</option>
             <option value="Germany">Germany</option>
+            <option value="Indonesia">Indonesia</option>
             <option value="Japan">Japan</option>
             <option value="Malaysia">Malaysia</option>
+            <option value="Maldives">Maldives</option>
             <option value="Nepal">Nepal</option>
+            <option value="Pakistan">Pakistan</option>
+            <option value="Philippines">Philippines</option>
             <option value="Singapore">Singapore</option>
+            <option value="South Korea">South Korea</option>
             <option value="Sri Lanka">Sri Lanka</option>
+            <option value="Thailand">Thailand</option>
             <option value="UAE">UAE</option>
             <option value="UK">UK</option>
             <option value="USA">USA</option>
+            <option value="Vietnam">Vietnam</option>
             <option value="Other">Other</option>
           </select>
           <p className="text-xs text-text-muted">Required by Indian police homestay guest-record rules.</p>
@@ -2339,11 +2463,15 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               aria-invalid={Boolean(consentError)}
             />
             <span>
-              {GUEST_DATA_CONSENT_LABEL}{' '}
+              I agree to Atlas processing my data for this booking —{' '}
               <Link to="/privacy" className="text-cta-primary underline underline-offset-2 hover:opacity-90">
-                View Privacy Policy
+                see Privacy Policy
               </Link>
-              .
+              .{' '}
+              <details className="inline">
+                <summary className="cursor-pointer text-cta-primary underline underline-offset-2 text-xs">Show details</summary>
+                <span className="text-xs text-text-muted block mt-1">{GUEST_DATA_CONSENT_LABEL}</span>
+              </details>
             </span>
           </label>
           {consentError ? (
@@ -2402,7 +2530,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         className={isSubmitting || isLoading ? 'opacity-75' : ''}
         data-testid="guest-booking-submit"
       >
-        {isBookingDisabled ? 'Unavailable' : isSubmitting || isLoading ? 'Processing...' : 'Book Now'}
+        {isBookingDisabled ? 'Unavailable' : isSubmitting || isLoading ? 'Processing…' : 'Book Now'}
       </Button>
     </form>
     </>
