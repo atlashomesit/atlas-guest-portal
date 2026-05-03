@@ -39,7 +39,7 @@ export function applyTenantBranding(tenant: TenantInfo): void {
     document.title = tenant.name;
   }
 
-  // 2. Primary color — apply to CSS RGB variables used by Tailwind
+  // 2. Primary color — apply to CSS RGB variables used by Tailwind and CSS custom props
   if (tenant.primaryColor) {
     const rgbStr = hexToRgbString(tenant.primaryColor);
     if (rgbStr) {
@@ -50,10 +50,18 @@ export function applyTenantBranding(tenant: TenantInfo): void {
       root.style.setProperty('--accent-primary', tenant.primaryColor);
       // Also set --color-primary for any components using it directly
       root.style.setProperty('--color-primary', tenant.primaryColor);
+      // TASK-1688: --brand-primary used in navbar.css and other white-label components
+      root.style.setProperty('--brand-primary', tenant.primaryColor);
+      root.style.setProperty('--brand-soft', `rgba(${rgbStr.replace(/ /g, ',')},0.12)`);
     }
   }
 
-  // 3. Favicon
+  // 3a. Logo URL — set as CSS variable for components that reference it
+  if (tenant.logoUrl) {
+    document.documentElement.style.setProperty('--brand-logo-url', `url("${tenant.logoUrl}")`);
+  }
+
+  // 4. Favicon
   if (tenant.faviconUrl) {
     let link = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
     if (!link) {
