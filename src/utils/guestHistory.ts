@@ -38,6 +38,17 @@ export function getRecentlyViewed(): GuestListingHistoryItem[] {
   return Array.isArray(list) ? list : [];
 }
 
+export function removeRecentlyViewed(listingId: number): void {
+  const list = safeParse<GuestListingHistoryItem[]>(localStorage.getItem(RECENT_KEY)) ?? [];
+  const next = list.filter((x) => x.listingId !== listingId);
+  localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+  try {
+    window.dispatchEvent(new CustomEvent("atlas-recently-viewed-changed"));
+  } catch {
+    /* non-browser */
+  }
+}
+
 export function clearRecentlyViewed(): void {
   try {
     localStorage.removeItem(RECENT_KEY);

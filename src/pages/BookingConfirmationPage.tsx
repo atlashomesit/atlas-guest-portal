@@ -455,54 +455,68 @@ export default function BookingConfirmationPage() {
           />
         )}
 
-        {/* GST invoice (token-gated PDF) */}
-        {!isCancelled && booking.hasGstInvoice && pdfUrl && (
+        {/* TASK-2091: placeholder while invoice is being generated */}
+        {!isCancelled && booking.status === 'Confirmed' && !booking.hasGstInvoice && (
           <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3">
             <h2 className="text-sm font-semibold text-text-primary">GST invoice</h2>
-            <p className="text-xs text-text-secondary leading-relaxed">
+            <p className="text-sm text-text-secondary">
+              GST invoice will be available within 1 hour. Refresh this page to access it.
+            </p>
+            <p className="text-xs text-text-muted">
               Accommodation is billed under SAC&nbsp;9963 (hotel and similar accommodation services) as applicable for Indian GST.
             </p>
-            <div className="space-y-0 divide-y divide-border-subtle border-t border-border-subtle -mx-5 px-5">
-              {booking.gstInvoiceNumber && (
-                <InfoRow label="Invoice number" value={booking.gstInvoiceNumber} mono />
-              )}
-              {booking.gstInvoiceTotal != null && (
-                <div className="flex flex-col gap-0.5 py-3 border-b border-border-subtle last:border-0">
-                  <span className="text-xs text-text-muted uppercase tracking-wider font-medium">Invoice total (incl. GST)</span>
-                  <span className="text-sm font-semibold text-text-primary">
-                    {booking.currency}&nbsp;{booking.gstInvoiceTotal.toLocaleString("en-IN")}
-                  </span>
-                </div>
-              )}
-            </div>
-            <a
-              href={pdfUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              data-testid="download-invoice-btn"
-              className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-3.5 hover:opacity-95 transition-opacity"
-            >
-              Download invoice (PDF)
-            </a>
           </div>
         )}
 
-        {/* Booking confirmation voucher (printable arrival document) */}
-        {!isCancelled && voucherUrl && (
-          <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3">
-            <h2 className="text-sm font-semibold text-text-primary">Booking confirmation voucher</h2>
-            <p className="text-xs text-text-secondary leading-relaxed">
-              Print or share this confirmation as your proof of booking. Present it during check-in.
-            </p>
-            <a
-              href={voucherUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              data-testid="download-voucher-btn"
-              className="inline-flex items-center justify-center rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-3.5 hover:bg-brand-primary/5 transition-colors"
-            >
-              Download voucher (PDF)
-            </a>
+        {/* Documents: GST invoice + booking voucher grouped */}
+        {!isCancelled && ((booking.hasGstInvoice && pdfUrl) || voucherUrl) && (
+          <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-4">
+            <h2 className="text-sm font-semibold text-text-primary">Documents</h2>
+            {booking.hasGstInvoice && pdfUrl && (
+              <div className="space-y-3">
+                <p className="text-xs text-text-secondary leading-relaxed">
+                  Accommodation is billed under SAC&nbsp;9963 (hotel and similar accommodation services) as applicable for Indian GST.
+                </p>
+                <div className="space-y-0 divide-y divide-border-subtle border-t border-border-subtle -mx-5 px-5">
+                  {booking.gstInvoiceNumber && (
+                    <InfoRow label="Invoice number" value={booking.gstInvoiceNumber} mono />
+                  )}
+                  {booking.gstInvoiceTotal != null && (
+                    <div className="flex flex-col gap-0.5 py-3 border-b border-border-subtle last:border-0">
+                      <span className="text-xs text-text-muted uppercase tracking-wider font-medium">Invoice total (incl. GST)</span>
+                      <span className="text-sm font-semibold text-text-primary">
+                        {booking.currency}&nbsp;{booking.gstInvoiceTotal.toLocaleString("en-IN")}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                <a
+                  href={pdfUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  data-testid="download-invoice-btn"
+                  className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-3.5 hover:opacity-95 transition-opacity"
+                >
+                  Download GST invoice (PDF)
+                </a>
+              </div>
+            )}
+            {voucherUrl && (
+              <div className={`space-y-2 ${booking.hasGstInvoice && pdfUrl ? "pt-4 border-t border-border-subtle" : ""}`}>
+                <p className="text-xs text-text-secondary leading-relaxed">
+                  Booking confirmation voucher — print or share as proof of booking. Present it during check-in.
+                </p>
+                <a
+                  href={voucherUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  data-testid="download-voucher-btn"
+                  className="inline-flex items-center justify-center rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-3.5 hover:bg-brand-primary/5 transition-colors"
+                >
+                  Download voucher (PDF, ~80 KB)
+                </a>
+              </div>
+            )}
           </div>
         )}
 
@@ -626,7 +640,7 @@ export default function BookingConfirmationPage() {
             {booking.listingId != null && booking.listingId > 0 && (
               <Link
                 to={buildHomeUnitPath(getPropertySlug({ property_name: booking.propertyName }), booking.listingId)}
-                className="inline-flex text-sm text-brand-primary font-medium underline underline-offset-2"
+                className="inline-flex items-center justify-center rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-2 hover:bg-brand-primary/5 transition-colors"
                 data-testid="pre-arrival-view-listing"
               >
                 View full listing &amp; photos
@@ -726,6 +740,13 @@ export default function BookingConfirmationPage() {
               {pushState === "loading" ? "Enabling..." : "Enable notifications"}
             </button>
             {pushMessage ? <p className={`text-xs ${pushState === "error" ? "text-red-600" : "text-green-700"}`}>{pushMessage}</p> : null}
+            {pushState === "error" && (pushMessage.includes("denied") || pushMessage.includes("not supported") || pushMessage.includes("not configured")) && (
+              <p className="text-xs text-text-muted mt-1">
+                {/iPhone|iPad|iPod/.test(navigator.userAgent)
+                  ? "On iOS Safari: Settings → Safari → Notifications → Allow for this site. Or try Chrome on iOS."
+                  : "Try a different browser (Chrome or Firefox) if notifications are blocked."}
+              </p>
+            )}
           </div>
         )}
 

@@ -1,5 +1,6 @@
 import { lazy, Suspense, useMemo, useState, useEffect, useCallback } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { AlertTriangle } from "lucide-react";
 
 import { propertyData } from "../data";
 import { fetchPublicListings, type PublicListing } from "../api/listingClient";
@@ -755,6 +756,8 @@ const SearchPage = () => {
                   ? "Checking availability for your dates…"
                   : availableNow && tonightProbeLoading
                   ? "Checking tonight's availability..."
+                  : filteredUnits.length === 0 && hasActiveFilters
+                  ? "No properties match your filters"
                   : `${filteredUnits.length} ${filteredUnits.length === 1 ? "property" : "properties"} found`}
               </span>
             )}
@@ -850,7 +853,7 @@ const SearchPage = () => {
               onChange={(e) => updateParam("sortBy", e.target.value === "recommended" ? "" : e.target.value)}
               className="rounded-lg border border-border-subtle bg-bg-surface px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-cta-primary"
             >
-              <option value="recommended">Recommended</option>
+              <option value="recommended" title="Sorted by Atlas building/floor preference">Recommended</option>
               <option value="price_asc">Price: low to high</option>
               <option value="price_desc">Price: high to low</option>
               <option value="rating_desc">Highest rated</option>
@@ -864,8 +867,9 @@ const SearchPage = () => {
 
         {/* TASK-1867: only show banner on a real fetch error, not when API returns 0 listings */}
         {!isLoading && apiError && listings.length > 0 && (
-          <div className="rounded-xl border border-support-warning/40 bg-support-warning/10 px-4 py-3 text-support-warning">
-            Limited results — showing cached data. Search may be temporarily unavailable.
+          <div className="flex items-center gap-3 rounded-xl border border-support-warning/40 bg-support-warning/10 px-4 py-3 text-support-warning">
+            <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
+            <span>Live availability check failed. Showing cached results — call +91 7032 493 290 to confirm before booking.</span>
           </div>
         )}
 
@@ -962,8 +966,10 @@ const SearchPage = () => {
             aria-busy="true"
             aria-label="Loading search results"
           >
-            {Array.from({ length: 6 }).map((_, i) => (
-              <SkeletonCard key={i} />
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className={i >= 4 ? "hidden sm:block" : ""}>
+                <SkeletonCard />
+              </div>
             ))}
           </section>
         )}

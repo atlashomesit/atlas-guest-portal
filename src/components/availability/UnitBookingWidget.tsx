@@ -1779,9 +1779,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
       <div className="flex flex-col gap-1">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-sm font-semibold rounded-full bg-[color:color-mix(in_srgb,var(--cta-primary)_18%,transparent)] px-3 py-1 text-[color:color-mix(in_srgb,var(--cta-primary)_80%,transparent)]">
-            Best price on our website
-          </span>
+          {effectiveDailyPricing && effectiveDailyPricing.globalDiscountPercent > 0 && (
+            <span className="text-sm font-semibold rounded-full bg-[color:color-mix(in_srgb,var(--cta-primary)_18%,transparent)] px-3 py-1 text-[color:color-mix(in_srgb,var(--cta-primary)_80%,transparent)]">
+              Best price on our website
+            </span>
+          )}
           {effectiveDailyPricing && effectiveDailyPricing.globalDiscountPercent > 0 ? (
             <span className="text-xs font-medium text-[color:color-mix(in_srgb,var(--cta-primary)_75%,transparent)]">
               Save {Math.round(effectiveDailyPricing.globalDiscountPercent)}% — discount applied
@@ -1835,7 +1837,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           )}
         </div>
         <div className="text-sm text-text-muted space-y-1 mt-1">
-          <p>{priceDetails.nights} {priceDetails.nights === 1 ? 'night' : 'nights'} × {displayPrice(perNightForDisplay)}</p>
+          <p className="whitespace-nowrap overflow-hidden text-ellipsis">{priceDetails.nights} {priceDetails.nights === 1 ? 'night' : 'nights'} × {displayPrice(perNightForDisplay)}</p>
           {priceDetails.extraGuests > 0 && priceDetails.nights > 0 && (
             <p>{priceDetails.extraGuests} {priceDetails.extraGuests === 1 ? 'extra guest' : 'extra guests'} × {displayPrice(priceDetails.extraGuestsFee / priceDetails.nights / priceDetails.extraGuests)}/night</p>
           )}
@@ -2055,14 +2057,19 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             )}
             {/* TASK-571: long-stay discount row */}
             {losDiscountAmount > 0 && (
-              <div className="grid grid-cols-[140px_12px_1fr] text-green-700">
-                <span>
-                  Long-stay discount
-                  {losDiscountPercent > 0 ? ` (−${Math.round(losDiscountPercent)}%)` : ''}
-                </span>
-                <span>:</span>
-                <span className="text-right">-{displayPrice(losDiscountAmount)}</span>
-              </div>
+              <>
+                <div className="grid grid-cols-[140px_12px_1fr] text-green-700">
+                  <span>
+                    Long-stay discount
+                    {losDiscountPercent > 0 ? ` (−${Math.round(losDiscountPercent)}%)` : ''}
+                  </span>
+                  <span>:</span>
+                  <span className="text-right">-{displayPrice(losDiscountAmount)}</span>
+                </div>
+                {priceDetails.nights > 0 && (
+                  <p className="text-xs text-text-muted text-right">≈ {displayPrice(Math.round(losDiscountAmount / priceDetails.nights))}/night off</p>
+                )}
+              </>
             )}
             {/* TASK-1871: GST row removed — all-inclusive rate, no separate GST line */}
             <div className="grid grid-cols-[140px_12px_1fr]">
@@ -2316,18 +2323,27 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           >
             <option value="India">India</option>
             <option value="Australia">Australia</option>
+            <option value="Bangladesh">Bangladesh</option>
+            <option value="Bhutan">Bhutan</option>
             <option value="Canada">Canada</option>
             <option value="China">China</option>
             <option value="France">France</option>
             <option value="Germany">Germany</option>
+            <option value="Indonesia">Indonesia</option>
             <option value="Japan">Japan</option>
             <option value="Malaysia">Malaysia</option>
+            <option value="Maldives">Maldives</option>
             <option value="Nepal">Nepal</option>
+            <option value="Pakistan">Pakistan</option>
+            <option value="Philippines">Philippines</option>
             <option value="Singapore">Singapore</option>
+            <option value="South Korea">South Korea</option>
             <option value="Sri Lanka">Sri Lanka</option>
+            <option value="Thailand">Thailand</option>
             <option value="UAE">UAE</option>
             <option value="UK">UK</option>
             <option value="USA">USA</option>
+            <option value="Vietnam">Vietnam</option>
             <option value="Other">Other</option>
           </select>
           <p className="text-xs text-text-muted">Required by Indian police homestay guest-record rules.</p>
@@ -2369,11 +2385,15 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               aria-invalid={Boolean(consentError)}
             />
             <span>
-              {GUEST_DATA_CONSENT_LABEL}{' '}
+              I agree to Atlas processing my data for this booking —{' '}
               <Link to="/privacy" className="text-cta-primary underline underline-offset-2 hover:opacity-90">
-                View Privacy Policy
+                see Privacy Policy
               </Link>
-              .
+              .{' '}
+              <details className="inline">
+                <summary className="cursor-pointer text-cta-primary underline underline-offset-2 text-xs">Show details</summary>
+                <span className="text-xs text-text-muted block mt-1">{GUEST_DATA_CONSENT_LABEL}</span>
+              </details>
             </span>
           </label>
           {consentError ? (
@@ -2432,7 +2452,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         className={isSubmitting || isLoading ? 'opacity-75' : ''}
         data-testid="guest-booking-submit"
       >
-        {isBookingDisabled ? 'Unavailable' : isSubmitting || isLoading ? 'Processing...' : 'Book Now'}
+        {isBookingDisabled ? 'Unavailable' : isSubmitting || isLoading ? 'Processing…' : 'Book Now'}
       </Button>
     </form>
     </>

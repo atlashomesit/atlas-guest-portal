@@ -865,6 +865,17 @@ useEffect(() => {
                       },
                   ]
                 : []),
+            ...(reviewCount === 0
+                ? [
+                      {
+                          '@context': 'https://schema.org',
+                          '@type': 'Place',
+                          name: data.property_name,
+                          description: data.property_description?.slice(0, 300),
+                          url: pageUrlForLd,
+                      },
+                  ]
+                : []),
         ];
     }, [
         data,
@@ -985,6 +996,35 @@ useEffect(() => {
                                 "{data.property_review_snippets?.[0] || 'No reviews available'}"
                             </p>
                         )}
+                    </div>
+                    <div className="mt-3 flex items-center gap-2 flex-wrap">
+                        <button
+                            type="button"
+                            className="px-3 py-1.5 rounded-lg border border-border-subtle bg-bg-muted text-sm font-medium text-text-primary hover:opacity-90"
+                            onClick={() => {
+                                const lid = Number(resolvedListingId ?? data?.listingId ?? listingId);
+                                if (!Number.isFinite(lid) || lid <= 0) return;
+                                setFav(toggleFavorite(lid));
+                            }}
+                        >
+                            {fav ? '♥ Saved' : '♡ Save'}
+                        </button>
+                        <button
+                            type="button"
+                            className="px-3 py-1.5 rounded-lg border border-border-subtle bg-bg-muted text-sm font-medium text-text-primary hover:opacity-90"
+                            onClick={() => {
+                                const url = window.location.href;
+                                const text = `Check out ${data?.property_name ?? 'this home'} on Atlas Homestays`;
+                                const share = async () => {
+                                    const nav: any = navigator;
+                                    if (nav?.share) return nav.share({ title: document.title, text, url });
+                                    window.open(`https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`, '_blank', 'noopener,noreferrer');
+                                };
+                                void share();
+                            }}
+                        >
+                            Share
+                        </button>
                     </div>
                 </div>
 
@@ -1161,36 +1201,6 @@ useEffect(() => {
                             <div className="border border-border-subtle rounded-lg overflow-hidden shadow-level1 bg-bg-surface">
                                 <div className="bg-bg-surface p-6">
                                     <h2 className="text-xl sm:text-2xl font-semibold mb-6 text-text-primary">Things to know</h2>
-                                    <div className="flex items-center gap-2 mb-4 flex-wrap">
-                                        <button
-                                            type="button"
-                                            className="px-3 py-1.5 rounded-lg border border-border-subtle bg-bg-muted text-sm font-medium text-text-primary hover:opacity-90"
-                                            onClick={() => {
-                                                const lid = Number(resolvedListingId ?? data?.listingId ?? listingId);
-                                                if (!Number.isFinite(lid) || lid <= 0) return;
-                                                setFav(toggleFavorite(lid));
-                                            }}
-                                        >
-                                            {fav ? '♥ Saved' : '♡ Save'}
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className="px-3 py-1.5 rounded-lg border border-border-subtle bg-bg-muted text-sm font-medium text-text-primary hover:opacity-90"
-                                            onClick={() => {
-                                                const url = window.location.href;
-                                                const text = `Check out ${data?.property_name ?? 'this home'} on Atlas Homestays`;
-                                                const share = async () => {
-                                                    // Web Share API on mobile; otherwise open WhatsApp in a new tab.
-                                                    const nav: any = navigator;
-                                                    if (nav?.share) return nav.share({ title: document.title, text, url });
-                                                    window.open(`https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`, '_blank', 'noopener,noreferrer');
-                                                };
-                                                void share();
-                                            }}
-                                        >
-                                            Share
-                                        </button>
-                                    </div>
                                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
                                         <div className="p-4 border border-border-subtle rounded-lg bg-bg-muted">
                                             <div className="flex items-center gap-2 mb-1">

@@ -4,7 +4,7 @@
 
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { getRecentlyViewed, type GuestListingHistoryItem } from "../utils/guestHistory";
+import { getRecentlyViewed, removeRecentlyViewed, type GuestListingHistoryItem } from "../utils/guestHistory";
 import OptimizedImage from "./ui/OptimizedImage";
 
 const DISPLAY_CAP = 8;
@@ -45,27 +45,39 @@ export default function RecentlyViewedStrip() {
         role="list"
       >
         {items.map((it) => (
-          <Link
+          <div
             key={`${it.listingId}-${it.viewedAtUtc}`}
-            to={it.path}
             role="listitem"
-            className="flex w-[140px] shrink-0 snap-start flex-col overflow-hidden rounded-xl border border-border-subtle bg-bg-muted transition hover:border-cta-primary sm:w-auto"
+            className="relative w-[140px] shrink-0 snap-start sm:w-auto"
           >
-            <div className="aspect-[4/3] w-full bg-bg-muted">
-              {it.coverPhotoUrl ? (
-                <OptimizedImage
-                  src={it.coverPhotoUrl}
-                  alt=""
-                  className="h-full w-full object-cover"
-                  wrapperClassName="h-full"
-                  sizes="140px"
-                />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center text-xs text-text-muted">No photo</div>
-              )}
-            </div>
-            <div className="line-clamp-2 p-2 text-xs font-medium text-text-primary">{it.name ?? `Listing ${it.listingId}`}</div>
-          </Link>
+            <Link
+              to={it.path}
+              className="flex flex-col overflow-hidden rounded-xl border border-border-subtle bg-bg-muted transition hover:border-cta-primary"
+            >
+              <div className="aspect-[4/3] w-full bg-bg-muted">
+                {it.coverPhotoUrl ? (
+                  <OptimizedImage
+                    src={it.coverPhotoUrl}
+                    alt=""
+                    className="h-full w-full object-cover"
+                    wrapperClassName="h-full"
+                    sizes="140px"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-xs text-text-muted">No photo</div>
+                )}
+              </div>
+              <div className="line-clamp-2 p-2 text-xs font-medium text-text-primary">{it.name ?? `Listing ${it.listingId}`}</div>
+            </Link>
+            <button
+              type="button"
+              onClick={() => removeRecentlyViewed(it.listingId)}
+              className="absolute right-1 top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-black/40 text-white text-xs leading-none hover:bg-black/60"
+              aria-label={`Remove ${it.name ?? 'this listing'} from recently viewed`}
+            >
+              ×
+            </button>
+          </div>
         ))}
       </div>
     </section>

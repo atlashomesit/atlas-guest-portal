@@ -112,7 +112,12 @@ export default function MyBookingsPage() {
               Browse our homes
             </Link>
             <p className="text-text-secondary text-xs max-w-md mx-auto">
-              Looking for a booking made by someone else? Contact them for the confirmation link.
+              Bookings are linked to the email or phone used during checkout. If you booked with a different contact, open the confirmation link from that email or WhatsApp message instead.
+            </p>
+            <p className="text-text-secondary text-xs max-w-md mx-auto">
+              Need help? Call us at{" "}
+              <a href="tel:+917032493290" className="underline underline-offset-2 text-brand-primary">+91 7032 493 290</a>{" "}
+              to locate a booking by reference number.
             </p>
           </div>
         ) : (
