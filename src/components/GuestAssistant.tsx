@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { X, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { buildApiUrl, getApiHeaders } from '../api/client';
+import { messageFromApiResponse } from '../utils/serverErrorFromResponse';
 
 interface FaqEntry {
   q: string;
@@ -28,7 +29,7 @@ export default function GuestAssistant({ listingId }: GuestAssistantProps) {
   const [faqs, setFaqs] = useState<FaqEntry[]>([]);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
-  const [fetchError, setFetchError] = useState(false);
+  const [fetchErrorMessage, setFetchErrorMessage] = useState<string | null>(null);
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -36,13 +37,20 @@ export default function GuestAssistant({ listingId }: GuestAssistantProps) {
   useEffect(() => {
     if (!listingId || isNaN(Number(listingId))) return;
     setLoading(true);
-    setFetchError(false);
+    setFetchErrorMessage(null);
     const url = buildApiUrl(`/listings/${Number(listingId)}/faq`);
     fetch(url, { headers: getApiHeaders() })
-      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+      .then(async (r) => {
+        if (!r.ok) throw new Error(await messageFromApiResponse(r));
+        return r.json() as Promise<unknown>;
+      })
       .then((data: unknown) => setFaqs(Array.isArray(data) ? (data as FaqEntry[]) : []))
-      .catch(() => {
-        setFetchError(true);
+      .catch((err: unknown) => {
+        setFetchErrorMessage(
+          err instanceof Error && err.message
+            ? err.message
+            : "Couldn't load FAQs. Please try again later.",
+        );
         setFaqs([]);
       })
       .finally(() => setLoading(false));
@@ -77,7 +85,7 @@ export default function GuestAssistant({ listingId }: GuestAssistantProps) {
   if (!listingId || isNaN(Number(listingId))) return null;
 
   // Don't render trigger if no FAQs and not loading (avoids empty panel)
-  if (!loading && !fetchError && faqs.length === 0) return null;
+  if (!loading && !fetchErrorMessage && faqs.length === 0) return null;
 
   return (
     <>
@@ -186,20 +194,18 @@ export default function GuestAssistant({ listingId }: GuestAssistantProps) {
                 </div>
               )}
 
-              {fetchError && !loading && (
-                <p className="py-8 text-center text-sm text-text-muted">
-                  Couldn&apos;t load FAQs. Please try again later.
-                </p>
+              {fetchErrorMessage && !loading && (
+                <p className="py-8 text-center text-sm text-text-muted">{fetchErrorMessage}</p>
               )}
 
-              {!loading && !fetchError && filtered.length === 0 && (
+              {!loading && !fetchErrorMessage && filtered.length === 0 && (
                 <p className="py-8 text-center text-sm text-text-muted">
                   {query.trim() ? 'No matching questions found.' : 'No FAQs for this listing yet.'}
                 </p>
               )}
 
               {!loading &&
-                !fetchError &&
+                !fetchErrorMessage &&
                 filtered.map((entry, i) => (
                   <div
                     key={i}

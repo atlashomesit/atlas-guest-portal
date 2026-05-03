@@ -30,6 +30,8 @@ export type UseTenantListings = {
   listings: Listing[];
   properties: TenantPropertyRecord[];
   state: TenantListingsState;
+  /** When `state === "error"`, message from API or network (if available). */
+  fetchErrorMessage: string | null;
   refetch: () => Promise<void>;
 };
 
@@ -113,6 +115,7 @@ export function useTenantListings(): UseTenantListings {
     properties: FALLBACK_PROPERTIES,
   });
   const [state, setState] = useState<TenantListingsState>("idle");
+  const [fetchErrorMessage, setFetchErrorMessage] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const refetch = useCallback(async () => {
@@ -120,6 +123,7 @@ export function useTenantListings(): UseTenantListings {
     const controller = new AbortController();
     abortRef.current = controller;
     setState("loading");
+    setFetchErrorMessage(null);
 
     try {
       const dtos = await fetchPublicListings(controller.signal);
@@ -152,6 +156,11 @@ export function useTenantListings(): UseTenantListings {
     } catch (error) {
       if (controller.signal.aborted) return;
       console.warn("[useTenantListings] failed; falling back to bundled data", error);
+      setFetchErrorMessage(
+        error instanceof Error && error.message
+          ? error.message
+          : "We're having trouble loading apartments right now. Please try again.",
+      );
       setState("error");
     }
   }, []);
@@ -163,5 +172,5 @@ export function useTenantListings(): UseTenantListings {
     };
   }, [refetch]);
 
-  return { listings: data.listings, properties: data.properties, state, refetch };
+  return { listings: data.listings, properties: data.properties, state, fetchErrorMessage, refetch };
 }

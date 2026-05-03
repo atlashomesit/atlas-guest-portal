@@ -20,10 +20,14 @@ export default function FavoritesPage() {
       .then((list) => {
         if (!cancelled) setAll(list);
       })
-      .catch(() => {
+      .catch((err: unknown) => {
         if (!cancelled) {
           setAll([]);
-          setError("We couldn’t load saved homes right now. Please try again.");
+          const message =
+            err instanceof Error && err.message
+              ? err.message
+              : "We couldn't load saved homes right now. Please try again.";
+          setError(message);
         }
       })
       .finally(() => {

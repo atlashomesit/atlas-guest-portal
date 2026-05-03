@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, Mic, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import { messageFromApiResponse } from '@/utils/serverErrorFromResponse';
 
 type AtlasChatProps = {
   onClose?: (e: React.MouseEvent) => void;
@@ -35,13 +36,22 @@ const AUTH_KEY = import.meta.env.VITE_ATLAS_AUTH_KEY;
         body: JSON.stringify({ message: text })
       });
 
-      const data = await res.json();
-      setMessages(prev => [...prev, { role: 'assistant', content: data.reply }]);
-    } catch {
-      setMessages(prev => [
-        ...prev,
-        { role: 'assistant', content: 'Server not responding. Please try again.' }
-      ]);
+      if (!res.ok) {
+        throw new Error(await messageFromApiResponse(res));
+      }
+
+      const data = (await res.json()) as { reply?: string };
+      const reply =
+        typeof data.reply === 'string' && data.reply.trim()
+          ? data.reply.trim()
+          : 'No reply from the assistant. Please try again.';
+      setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error && err.message
+          ? err.message
+          : 'We could not reach the chat service. Please check your connection and try again.';
+      setMessages(prev => [...prev, { role: 'assistant', content: message }]);
     }
   };
 

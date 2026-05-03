@@ -209,10 +209,6 @@ export default function ReviewSubmitPage() {
       });
 
       if (res.status === 409) throw new Error("You have already submitted a review for this stay.");
-      if (res.status === 400) {
-        const data = await res.json() as { error?: string };
-        throw new Error(data?.error ?? "Could not submit review. Please try again.");
-      }
       if (!res.ok) throw new Error(await messageFromApiResponse(res));
 
       setSubmitted(true);

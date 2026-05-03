@@ -1,4 +1,5 @@
 import { buildApiUrl, getApiHeaders } from '@/api/client';
+import { messageFromApiResponse } from '@/utils/serverErrorFromResponse';
 
 export type BookingConfirmation = {
   id?: number;
@@ -27,7 +28,7 @@ export async function fetchBookingByReference(
 
   if (response.status === 404) return null;
   if (!response.ok) {
-    throw new Error(`Booking fetch failed with status ${response.status}`);
+    throw new Error(await messageFromApiResponse(response));
   }
 
   return (await response.json()) as BookingConfirmation;

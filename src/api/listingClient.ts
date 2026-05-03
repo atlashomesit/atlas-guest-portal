@@ -1,4 +1,5 @@
 import { buildApiUrl, getApiHeaders } from '@/api/client';
+import { messageFromApiResponse } from '@/utils/serverErrorFromResponse';
 
 /** Parse maxGuests from listing JSON (camelCase or PascalCase). Returns undefined if missing/invalid. */
 export function parseMaxGuestsFromPayload(payload: Record<string, unknown>): number | undefined {
@@ -184,7 +185,7 @@ export async function fetchListingContact(
   });
   if (response.status === 401 || response.status === 404) return null;
   if (!response.ok) {
-    throw new Error(`Listing contact request failed with status ${response.status}`);
+    throw new Error(await messageFromApiResponse(response));
   }
   return (await response.json()) as ListingContact;
 }
@@ -196,7 +197,7 @@ export const fetchPublicListings = async (signal?: AbortSignal): Promise<PublicL
   });
 
   if (!response.ok) {
-    throw new Error(`Public listings request failed with status ${response.status}`);
+    throw new Error(await messageFromApiResponse(response));
   }
 
   const payload = (await response.json()) as unknown;
@@ -256,7 +257,7 @@ export async function fetchListingPhotos(
   }
 
   if (!response.ok) {
-    throw new Error(`Listing photos request failed with status ${response.status}`);
+    throw new Error(await messageFromApiResponse(response));
   }
 
   const payload = (await response.json()) as unknown;
@@ -273,7 +274,7 @@ export const fetchListingById = async (
   });
 
   if (!response.ok) {
-    throw new Error(`Listing request failed with status ${response.status}`);
+    throw new Error(await messageFromApiResponse(response));
   }
 
   const payload = (await response.json()) as Record<string, unknown>;
