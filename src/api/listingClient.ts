@@ -64,6 +64,8 @@ export type PublicListing = {
   losDiscount2MinNights?: number | null;
   /** TASK-1695: LOS auto-discount tier 2 — discount percent (null = disabled). */
   losDiscount2Percent?: number | null;
+  /** Optional last-minute discount percent when API exposes it (TASK-1649). */
+  lastMinuteDiscountPercent?: number | null;
   /** TASK-1725: UTC ISO string when Atlas team verified listing photos. Null = not verified. */
   photosVerifiedAt?: string | null;
   /** TASK-1727: True when the tenant has a registered GSTIN — shown as trust badge on listing cards. */
@@ -144,6 +146,8 @@ function normalizePublicListing(payload: Record<string, unknown>): PublicListing
       payload.losDiscount2MinNights != null ? Number(payload.losDiscount2MinNights) : null,
     losDiscount2Percent:
       payload.losDiscount2Percent != null ? Number(payload.losDiscount2Percent) : null,
+    lastMinuteDiscountPercent:
+      payload.lastMinuteDiscountPercent != null ? Number(payload.lastMinuteDiscountPercent) : null,
     isGstRegistered: Boolean(payload.isGstRegistered), // TASK-1727
     lastBookedAt: typeof payload.lastBookedAt === 'string' ? payload.lastBookedAt : null, // TASK-1360
     latitude: Number.isFinite(latitude) ? latitude : null,

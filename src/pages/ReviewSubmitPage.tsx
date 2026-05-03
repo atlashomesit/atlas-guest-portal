@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import SEO from "../components/SEO";
 import { buildApiUrl, getApiHeaders } from "../api/client";
@@ -175,10 +175,14 @@ export default function ReviewSubmitPage() {
     }
   };
 
+  const bodyLen = body.trim().length;
+  const bodyTooShort = useMemo(() => bodyLen > 0 && bodyLen < 20, [bodyLen]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (rating === 0) { setSubmitError("Please select a star rating."); return; }
     if (!body.trim()) { setSubmitError("Please share a bit about your stay."); return; }
+    if (bodyLen < 20) { setSubmitError("Please write at least 20 characters."); return; }
     if (SUB_CATEGORY_ROWS.some(({ key }) => subRatings[key] < 1)) {
       setSubmitError("Please rate cleanliness, value, check-in, and host communication.");
       return;
@@ -373,11 +377,19 @@ export default function ReviewSubmitPage() {
               onChange={(e) => setBody(e.target.value)}
               placeholder="Tell us about the property, cleanliness, host responsiveness, check-in experience…"
               rows={5}
-              maxLength={1000}
+              maxLength={500}
               required
-              className="w-full rounded-xl border border-border-subtle bg-bg-surface px-4 py-2.5 text-base text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary resize-none"
+              aria-invalid={bodyTooShort || bodyLen > 500}
+              className={`w-full rounded-xl border bg-bg-surface px-4 py-2.5 text-base text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary resize-none ${bodyTooShort ? "border-support-error" : "border-border-subtle"}`}
             />
-            <p className="text-xs text-text-muted text-right">{body.length}/1000</p>
+            <p className="text-xs text-text-muted">
+              {body.length}/20 minimum · {body.length}/500 maximum
+            </p>
+            {bodyTooShort ? (
+              <p className="text-xs text-support-error" role="alert">
+                Please write at least 20 characters.
+              </p>
+            ) : null}
           </div>
 
           <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3">

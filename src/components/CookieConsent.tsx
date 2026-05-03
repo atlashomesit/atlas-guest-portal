@@ -50,9 +50,9 @@ const CookieConsent = () => {
       role="dialog"
       aria-labelledby="atlas-cookie-consent-title"
       aria-live="polite"
-      className="fixed inset-x-0 bottom-0 z-[9999] border-t border-border-subtle bg-white px-4 py-3 shadow-lg"
+      className="fixed inset-x-0 bottom-0 z-[9999] flex items-center justify-between gap-3 border-t border-border-subtle bg-white px-4 py-3 shadow-lg"
     >
-      <div className="mx-auto flex max-w-5xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p id="atlas-cookie-consent-title" className="text-sm text-text-primary">
           We use cookies for essential site features and, with your consent, analytics. Choose how we may use optional
           cookies under India&apos;s DPDP Act.

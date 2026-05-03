@@ -22,6 +22,10 @@ export type TenantPropertyRecord = {
   property_policy_details?: { type: string; value: string }[];
   /** TASK-1360: ISO date of most recent checkout within 30 days (for social proof badge). */
   lastBookedAt?: string | null;
+  /** TASK-1649: discount rule percents from public listings API (0 when absent). */
+  losDiscountPercent?: number | null;
+  losDiscount2Percent?: number | null;
+  lastMinuteDiscountPercent?: number | null;
 };
 
 export type TenantListingsState = "idle" | "loading" | "error" | "success";
@@ -85,6 +89,9 @@ const mapDtoToProperty = (dto: PublicListing, photosFromEndpoint: string[]): Ten
     property_amenities: local?.property_amenities ?? [],
     property_policy_details: local?.property_policy_details ?? [],
     lastBookedAt: dto.lastBookedAt ?? null, // TASK-1360
+    losDiscountPercent: dto.losDiscountPercent ?? null,
+    losDiscount2Percent: dto.losDiscount2Percent ?? null,
+    lastMinuteDiscountPercent: dto.lastMinuteDiscountPercent ?? null,
   };
 };
 

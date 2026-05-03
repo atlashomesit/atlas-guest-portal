@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useState, useEffect, useCallback } from "react";
+import { lazy, Suspense, useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { AlertTriangle } from "lucide-react";
 
@@ -50,6 +50,8 @@ type NormalizedListing = {
   losDiscount2MinNights?: number | null;
   /** TASK-1695: LOS auto-discount tier 2 percent. */
   losDiscount2Percent?: number | null;
+  /** TASK-1649: last-minute discount rule percent from API (optional). */
+  lastMinuteDiscountPercent?: number | null;
   /** TASK-1725: True when Atlas team has verified photos for this listing. */
   hasVerifiedPhotos?: boolean;
   /** TASK-1727: True when the tenant has a valid GSTIN on file. */
@@ -124,6 +126,8 @@ function apiToNormalized(listings: PublicListing[]): NormalizedListing[] {
         losDiscountPercent: l.losDiscountPercent ?? null,
         losDiscount2MinNights: l.losDiscount2MinNights ?? null,
         losDiscount2Percent: l.losDiscount2Percent ?? null,
+        lastMinuteDiscountPercent:
+          (l as unknown as { lastMinuteDiscountPercent?: number | null }).lastMinuteDiscountPercent ?? null,
         hasVerifiedPhotos: l.photosVerifiedAt != null,
         isGstRegistered: l.isGstRegistered ?? false,
         latitude: l.latitude ?? null,
@@ -218,9 +222,10 @@ const SearchPage = () => {
 
   const [tonightAvailableIds, setTonightAvailableIds] = useState<Set<number> | null>(null);
   const [tonightProbeLoading, setTonightProbeLoading] = useState(false);
-  // TASK-1865: batch availability check for checkIn+checkOut dates
+  // TASK-1865 / TASK-1648: batch (or public availability) check for checkIn+checkOut dates + per-date-pair cache
   const [dateAvailableIds, setDateAvailableIds] = useState<Set<number> | null>(null);
   const [dateAvailLoading, setDateAvailLoading] = useState(false);
+  const dateAvailCacheRef = useRef<Map<string, Set<number>>>(new Map());
   /** TASK-1460: batch availability hints for cards when guest has not set explicit date search. */
   const [availabilityById, setAvailabilityById] = useState<Record<number, ListingAvailabilitySummary>>({});
   const [availabilityFetchDone, setAvailabilityFetchDone] = useState(false);
@@ -295,7 +300,7 @@ const SearchPage = () => {
     return () => controller.abort();
   }, [availableNow, listings]);
 
-  // TASK-1865: When checkIn+checkOut set, call batch availability endpoint to get available listing IDs
+  // TASK-1648: GET /api/public/listings/availability?checkIn&checkOut when present, else batch; cache by date pair; fail-open
   useEffect(() => {
     if (!checkIn || !checkOut || hasInvalidDates) {
       setDateAvailableIds(null);
@@ -304,28 +309,66 @@ const SearchPage = () => {
     }
     const startStr = checkIn.toISOString().slice(0, 10);
     const endStr = checkOut.toISOString().slice(0, 10);
+    const cacheKey = `${startStr}|${endStr}`;
+    if (dateAvailCacheRef.current.has(cacheKey)) {
+      setDateAvailableIds(new Set(dateAvailCacheRef.current.get(cacheKey)!));
+      setDateAvailLoading(false);
+      return;
+    }
+
     const controller = new AbortController();
     setDateAvailLoading(true);
     setDateAvailableIds(null);
 
-    fetch(buildApiUrl(`/api/public/listings/availability-batch?startDate=${startStr}&endDate=${endStr}`), {
-      signal: controller.signal,
-      headers: { Accept: "application/json", ...getApiHeaders() },
-    })
-      .then((res) => res.ok ? res.json() : Promise.reject(res.status))
-      .then((data: { availableListingIds?: number[] }) => {
-        if (!controller.signal.aborted) {
-          setDateAvailableIds(new Set(data.availableListingIds ?? []));
-          setDateAvailLoading(false);
+    const parseIds = (payload: unknown): number[] | undefined => {
+      if (!payload || typeof payload !== "object") return undefined;
+      const o = payload as Record<string, unknown>;
+      const raw =
+        o.listingIds ??
+        o.availableListingIds ??
+        o.ListingIds ??
+        o.AvailableListingIds;
+      if (!Array.isArray(raw)) return undefined;
+      return raw.map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0);
+    };
+
+    const headers = { Accept: "application/json", ...getApiHeaders() } as Record<string, string>;
+
+    void (async () => {
+      try {
+        const primary = buildApiUrl(
+          `/api/public/listings/availability?checkIn=${encodeURIComponent(startStr)}&checkOut=${encodeURIComponent(endStr)}`,
+        );
+        let listingIds: number[] | undefined;
+        const resPrimary = await fetch(primary, { signal: controller.signal, headers });
+        if (resPrimary.ok) {
+          listingIds = parseIds(await resPrimary.json());
+        } else {
+          const batchUrl = buildApiUrl(
+            `/api/public/listings/availability-batch?startDate=${encodeURIComponent(startStr)}&endDate=${encodeURIComponent(endStr)}`,
+          );
+          const resBatch = await fetch(batchUrl, { signal: controller.signal, headers });
+          if (resBatch.ok) {
+            const data = (await resBatch.json()) as { availableListingIds?: number[] };
+            listingIds = data.availableListingIds ?? parseIds(data);
+          }
         }
-      })
-      .catch(() => {
-        // On failure, don't block — show all listings with "not confirmed" badge
+        if (controller.signal.aborted) return;
+        if (listingIds != null) {
+          const next = new Set(listingIds);
+          dateAvailCacheRef.current.set(cacheKey, next);
+          setDateAvailableIds(next);
+        } else {
+          setDateAvailableIds(null);
+        }
+      } catch {
         if (!controller.signal.aborted) {
           setDateAvailableIds(null);
-          setDateAvailLoading(false);
         }
-      });
+      } finally {
+        if (!controller.signal.aborted) setDateAvailLoading(false);
+      }
+    })();
 
     return () => controller.abort();
   }, [checkIn, checkOut, hasInvalidDates]);
@@ -590,6 +633,9 @@ const SearchPage = () => {
   const visibleUnits = sortedUnits.slice(0, visibleCount);
   const hasMore = visibleCount < sortedUnits.length;
   const showEmptyState = !isLoading && !hasInvalidDates && sortedUnits.length === 0;
+  /** TASK-1648: skeleton while public availability resolves for selected dates (list view). */
+  const showDateAvailabilitySkeleton =
+    explicitDateSearch && !hasInvalidDates && dateAvailLoading && !isLoading && !mapView;
   const queryString = searchParams.toString();
   const querySuffix = queryString ? `?${queryString}` : "";
   const approximatePinHint = useMemo(
@@ -631,9 +677,10 @@ const SearchPage = () => {
               ? `${filteredUnits.length} ${filteredUnits.length === 1 ? "home" : "homes"} for your dates`
               : "Atlas Homestays"}
           </h1>
-          {/* TASK-1863: honest subtitle — don't promise date filtering until availability pre-filter ships (TASK-1865) */}
           <p className="max-w-3xl text-base text-text-body">
-            Browse all homes. Filter by price, guests and amenities below.
+            {checkIn && checkOut && !hasInvalidDates
+              ? "Homes below are filtered to those available for your dates when our live check succeeds. You can still refine with price, guests, and amenities."
+              : "Browse all homes. Filter by price, guests and amenities below."}
           </p>
         </header>
 
@@ -865,6 +912,22 @@ const SearchPage = () => {
         {/* TASK-1708: Direct booking discount nudge — shows for direct traffic only */}
         <DirectDiscountBanner />
 
+        {/* TASK-1648: skeleton while resolving date-based availability */}
+        {explicitDateSearch && !hasInvalidDates && dateAvailLoading && !mapView && (
+          <section
+            className="grid gap-6 sm:grid-cols-2"
+            data-testid="search-date-availability-skeleton"
+            aria-busy="true"
+            aria-label="Checking availability for your dates"
+          >
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={`avail-sk-${i}`} className={i >= 4 ? "hidden sm:block" : ""}>
+                <SkeletonCard />
+              </div>
+            ))}
+          </section>
+        )}
+
         {/* TASK-1867: only show banner on a real fetch error, not when API returns 0 listings */}
         {!isLoading && apiError && listings.length > 0 && (
           <div className="flex items-center gap-3 rounded-xl border border-support-warning/40 bg-support-warning/10 px-4 py-3 text-support-warning">
@@ -948,7 +1011,7 @@ const SearchPage = () => {
                           to={`${unit.canonicalPath}${querySuffix}`}
                           className="mt-auto inline-flex min-h-[44px] items-center justify-center rounded-xl bg-[var(--cta-primary-hover)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--cta-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
                         >
-                          View details
+                          View home
                         </Link>
                       </div>
                     </article>
@@ -974,7 +1037,7 @@ const SearchPage = () => {
           </section>
         )}
 
-        {!isLoading && !hasInvalidDates && mapView && (
+        {!isLoading && !(explicitDateSearch && dateAvailLoading) && !hasInvalidDates && mapView && (
           <div className="flex flex-col gap-3">
             <div className="relative">
               {showEmptyState && (
@@ -1029,7 +1092,22 @@ const SearchPage = () => {
           </div>
         )}
 
-        {!isLoading && !showEmptyState && !hasInvalidDates && !mapView && (
+        {showDateAvailabilitySkeleton && (
+          <section
+            className="grid gap-6 sm:grid-cols-2"
+            data-testid="search-date-availability-skeleton"
+            aria-busy="true"
+            aria-label="Checking availability for your dates"
+          >
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={`avail-skel-${i}`} className={i >= 4 ? "hidden sm:block" : ""}>
+                <SkeletonCard />
+              </div>
+            ))}
+          </section>
+        )}
+
+        {!isLoading && !showDateAvailabilitySkeleton && !showEmptyState && !hasInvalidDates && !mapView && (
           <section
             className="grid gap-6 sm:grid-cols-2"
             data-testid="guest-search-results"
@@ -1135,7 +1213,7 @@ const SearchPage = () => {
                       <p className="text-sm text-text-muted">per night</p>
                       <p className="text-xs text-text-muted">
                         {/* TASK-1869 / TASK-1451: Sept 2025 GST reform — 5% for ≤₹7,500/night, 18% above */}
-                        {(() => { const gstMult = unit.pricePerNight > 7500 ? 1.18 : 1.05; const pct = unit.pricePerNight > 7500 ? 18 : 5; return `Est. total: ${formatDisplayCurrency(Math.round(unit.pricePerNight * gstMult))} (incl. ${pct}% GST)`; })()}
+                        {(() => { const gstMult = unit.pricePerNight > 7500 ? 1.12 : 1.05; const pct = unit.pricePerNight > 7500 ? 12 : 5; return `Est. total: ${formatDisplayCurrency(Math.round(unit.pricePerNight * gstMult))} (incl. ${pct}% GST)`; })()}
                       </p>
                       {longStay && (
                         <p className="text-sm font-semibold text-cta-primary">
@@ -1170,7 +1248,7 @@ const SearchPage = () => {
                       to={`${unit.canonicalPath}${querySuffix}`}
                       className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl bg-[var(--cta-primary-hover)] px-4 py-2 text-sm font-semibold text-white shadow hover:bg-[var(--cta-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
                     >
-                      View details
+                      View home
                     </Link>
                   </div>
                 </div>

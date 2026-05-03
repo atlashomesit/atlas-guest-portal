@@ -214,9 +214,9 @@ const ListingCard: React.FC<ListingCardProps> = ({
                     <span className="ml-1 text-sm font-semibold text-text-muted">/ night</span>
                   </div>
                 </div>
-                {/* TASK-1870: Sept 2025 GST — 5% for ≤₹7,500/night, 18% above */}
+                {/* TASK-1645: Indian accommodation GST — 5% for ≤₹7,500/night, 12% above */}
                 <span className="text-xs text-text-muted">
-                  {(() => { const gstMult = finalPrice > 7500 ? 1.18 : 1.05; const pct = finalPrice > 7500 ? 18 : 5; return `${formatCurrency(Math.round(finalPrice * 2 * gstMult))} est. total incl. ${pct}% GST (2 nights)`; })()}
+                  {(() => { const gstMult = finalPrice > 7500 ? 1.12 : 1.05; const pct = finalPrice > 7500 ? 12 : 5; return `${formatCurrency(Math.round(finalPrice * 2 * gstMult))} est. total incl. ${pct}% GST (2 nights)`; })()}
                 </span>
                 {showDiscount && savingsAmount > 0 && (
                   <span className="text-xs font-semibold text-cta-primary">

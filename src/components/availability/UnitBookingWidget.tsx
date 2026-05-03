@@ -452,9 +452,9 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         const hasTurnover = Array.from(newDateStatusMap.values()).some((s) => s === 'Turnover');
         setStatusMessage(
           hasTurnover
-            ? 'Orange nights are turnover cleaning windows — they remain bookable. Grey is blocked or on hold.'
+            ? 'Light grey “Turnover” nights are cleaning windows — still bookable. Striped grey is unavailable (blocked or on hold).'
             : newBlockedDates.size > 0
-              ? 'Grey dates are blocked or on hold and cannot be selected.'
+              ? 'Striped grey dates are unavailable (blocked or on hold) and cannot be selected.'
               : 'All dates shown are available to book.'
         );
       } catch (error) {
@@ -837,9 +837,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
   // ---------- Fee calculations ----------
 
-  // TASK-1871: GST is all-inclusive in the listed nightly rate (baked into breakdownPrice).
-  // The dead `gstAmount = 0` + misleading comment + never-rendering row have been removed.
-  // Header reads "All-inclusive rate · GST included" to match.
+  // TASK-1645: Indian accommodation GST slab on effective nightly rate (5% ≤₹7,500/night, 12% above).
+  // Room fare in breakdown is GST-inclusive; we show extracted GST for transparency.
 
   // When API has loaded: use API price (or calendar sum). When API has not loaded: use 0.
   const hasSelectedRange = Boolean(dateRange.startDate && dateRange.endDate);
@@ -875,6 +874,18 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       : effectiveDailyPricing != null
         ? effectiveDailyPricing.actualPrice
         : 0;
+
+  const gstSlabPercent = useMemo(() => {
+    const nightly = perNightForDisplay > 0 ? perNightForDisplay : (effectiveDailyPricing?.actualPrice ?? 0);
+    return nightly > 7500 ? 12 : 5;
+  }, [perNightForDisplay, effectiveDailyPricing?.actualPrice]);
+
+  /** GST component of room fare when slab applies (inclusive-of-GST base). */
+  const gstLineAmount = useMemo(() => {
+    if (!hasSelectedRange || breakdownPrice <= 0) return 0;
+    const raw = Math.round((breakdownPrice * gstSlabPercent) / (100 + gstSlabPercent));
+    return Math.max(1, raw);
+  }, [hasSelectedRange, breakdownPrice, gstSlabPercent]);
 
   /** Format price; show ₹0 when 0 (e.g. when API not loaded or API returned 0). */
   const displayPrice = (n: number) =>
@@ -1872,7 +1883,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           {priceDetails.extraGuests > 0 && priceDetails.nights > 0 && (
             <p>{priceDetails.extraGuests} {priceDetails.extraGuests === 1 ? 'extra guest' : 'extra guests'} × {displayPrice(priceDetails.extraGuestsFee / priceDetails.nights / priceDetails.extraGuests)}/night</p>
           )}
-          <p className="text-xs">All-inclusive rate · GST included</p>
+          <p className="text-xs text-text-muted">
+            {hasSelectedRange && dateRange.startDate && dateRange.endDate
+              ? 'Includes all taxes and fees'
+              : 'Select dates to see price with taxes.'}
+          </p>
         </div>
       </div>
 
@@ -1894,7 +1909,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             </p>
           )}
           <p className="text-xs text-text-secondary">
-            Grey: blocked. Orange: on hold (not selectable). Green: turnover cleaning (still bookable).
+            <span className="mr-2 inline-block rounded bg-gray-100 px-1.5 py-0.5 text-gray-500">Turnover</span>
+            cleaning window (still bookable).
+            <span className="mx-2 inline-block bg-[repeating-linear-gradient(-45deg,#d1d5db,#d1d5db_3px,#e5e7eb_3px,#e5e7eb_6px)] px-2 py-0.5 text-gray-700">
+              Unavailable
+            </span>
+            blocked or on hold (not selectable).
           </p>
           <button
             id="unit-booking-dates"
@@ -1986,10 +2006,14 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                 const priceText = isPastDate ? '—' : (calendarPricingLoading ? '…' : formatCalendarPrice(price));
 
                 let statusBg = '';
-                if (status === 'Blocked') statusBg = 'bg-red-500/20';
-                else if (status === 'Hold') statusBg = 'bg-orange-500/20';
-                else if (status === 'Turnover') statusBg = 'bg-emerald-500/15';
-                else if (status === 'Available') statusBg = 'bg-green-500/15';
+                if (status === 'Turnover') {
+                  statusBg = 'bg-gray-100';
+                } else if (status === 'Blocked' || status === 'Hold' || (isBlocked && !status)) {
+                  statusBg =
+                    'bg-[repeating-linear-gradient(-45deg,#d1d5db,#d1d5db_4px,#e5e7eb_4px,#e5e7eb_8px)]';
+                } else if (status === 'Available') {
+                  statusBg = 'bg-green-500/15';
+                }
 
                 const selectionClasses = isRangeStart || isRangeEnd
                   ? 'bg-[var(--cta-primary)] text-white shadow-sm'
@@ -1998,10 +2022,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                     : '';
                 const disabledClasses = isDisabled
                   ? 'text-gray-400 cursor-not-allowed opacity-60'
-                  : status === 'Blocked' || (isBlocked && !status)
-                    ? 'text-red-600/90 cursor-not-allowed'
-                    : status === 'Hold'
-                      ? 'text-orange-600/90 cursor-not-allowed'
+                  : status === 'Blocked' || status === 'Hold' || (isBlocked && !status)
+                    ? 'text-gray-700 cursor-not-allowed'
+                    : status === 'Turnover'
+                      ? 'text-gray-400'
                       : 'text-black';
 
                 return (
@@ -2070,6 +2094,13 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                 {displayPrice(breakdownPrice)}
               </span>
             </div>
+            {hasSelectedRange && breakdownPrice > 0 && (
+              <div className="grid grid-cols-[140px_12px_1fr] text-text-secondary">
+                <span>GST {gstSlabPercent}%</span>
+                <span>:</span>
+                <span className="text-right">{displayPrice(gstLineAmount)}</span>
+              </div>
+            )}
             {priceDetails.extraGuestsFee > 0 && (
               <div className="grid grid-cols-[140px_12px_1fr]">
                 <span>Extra guest fee</span>
@@ -2102,7 +2133,6 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                 )}
               </>
             )}
-            {/* TASK-1871: GST row removed — all-inclusive rate, no separate GST line */}
             <div className="grid grid-cols-[140px_12px_1fr]">
               <span className="inline-flex items-center gap-1">
                 Convenience fee{convenienceFeePctLabel > 0 ? ` (${convenienceFeePctLabel}%)` : ''}
@@ -2268,7 +2298,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               value={phoneDialCode}
               onChange={(e) => setPhoneDialCode(e.target.value)}
               disabled={isBookingDisabled}
-              className="shrink-0 max-w-[118px] border-0 border-r border-border-strong bg-transparent py-3 pl-3 pr-1 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-inset focus:ring-cta-primary"
+              className="shrink-0 max-w-[10.5rem] border-0 border-r border-border-strong bg-transparent py-3 pl-2 pr-1 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-inset focus:ring-cta-primary"
               data-testid="guest-booking-phone-dial"
             >
               {GUEST_DIAL_OPTIONS.map((o) => (

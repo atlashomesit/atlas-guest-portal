@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react"; // TASK-1476
 import SEO from "../components/SEO";
@@ -241,8 +241,26 @@ export default function BookingConfirmationPage() {
   const whatsappUrl = `https://wa.me/${whatsappDigits}?text=${whatsappText}`;
   const supportsPush = typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window;
   const canRequestModification = !isCancelled && !!token;
-  const modDatesInvalid =
-    Boolean(modCheckin && modCheckout && modCheckout.length >= 10 && modCheckin.length >= 10 && modCheckout <= modCheckin);
+
+  const modCheckinError = useMemo(() => {
+    if (modCheckin.length < 10) return "";
+    const todayIst = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
+    if (modCheckin < todayIst) return "Check-in cannot be a past date";
+    return "";
+  }, [modCheckin]);
+
+  const modCheckoutError = useMemo(() => {
+    if (modCheckout.length < 10 || modCheckin.length < 10) return "";
+    if (modCheckout <= modCheckin) return "Check-out must be after check-in";
+    const a = new Date(`${modCheckin}T12:00:00`).getTime();
+    const b = new Date(`${modCheckout}T12:00:00`).getTime();
+    if (Number.isNaN(a) || Number.isNaN(b)) return "";
+    const nights = (b - a) / 86400000;
+    if (nights < 1) return "Minimum stay is 1 night (check-out must be the day after check-in or later).";
+    return "";
+  }, [modCheckin, modCheckout]);
+
+  const modDatesInvalid = Boolean(modCheckinError || modCheckoutError);
 
   // TASK-333: Generate and download ICS calendar event for check-in
   function downloadCalendar() {
@@ -335,8 +353,8 @@ export default function BookingConfirmationPage() {
       setModMessage("Please enter both check-in and check-out dates.");
       return;
     }
-    if (modCheckout <= modCheckin) {
-      setModMessage("Check-out must be after check-in.");
+    if (modCheckinError || modCheckoutError) {
+      setModMessage(modCheckinError || modCheckoutError);
       return;
     }
     setModSubmitting(true);
@@ -868,11 +886,33 @@ export default function BookingConfirmationPage() {
                   iOS Safari auto-zoom on focus. */}
               <label className="text-sm text-text-secondary">
                 New check-in
-                <input type="date" value={modCheckin} onChange={(e) => setModCheckin(e.target.value)} className="mt-1 w-full rounded-md border border-border-subtle px-3 py-3 text-base" />
+                <input
+                  type="date"
+                  value={modCheckin}
+                  onChange={(e) => setModCheckin(e.target.value)}
+                  aria-invalid={Boolean(modCheckinError)}
+                  className={`mt-1 w-full rounded-md border px-3 py-3 text-base ${modCheckinError ? "border-support-error" : "border-border-subtle"}`}
+                />
+                {modCheckinError ? (
+                  <p className="mt-1 text-xs text-support-error" role="alert">
+                    {modCheckinError}
+                  </p>
+                ) : null}
               </label>
               <label className="text-sm text-text-secondary">
                 New check-out
-                <input type="date" value={modCheckout} onChange={(e) => setModCheckout(e.target.value)} className="mt-1 w-full rounded-md border border-border-subtle px-3 py-3 text-base" />
+                <input
+                  type="date"
+                  value={modCheckout}
+                  onChange={(e) => setModCheckout(e.target.value)}
+                  aria-invalid={Boolean(modCheckoutError)}
+                  className={`mt-1 w-full rounded-md border px-3 py-3 text-base ${modCheckoutError ? "border-support-error" : "border-border-subtle"}`}
+                />
+                {modCheckoutError ? (
+                  <p className="mt-1 text-xs text-support-error" role="alert">
+                    {modCheckoutError}
+                  </p>
+                ) : null}
               </label>
               <label className="text-sm text-text-secondary sm:col-span-2">
                 Guest count (optional)
@@ -883,11 +923,6 @@ export default function BookingConfirmationPage() {
                 <textarea value={modNote} onChange={(e) => setModNote(e.target.value)} rows={3} className="mt-1 w-full rounded-md border border-border-subtle px-3 py-2.5 text-base" />
               </label>
             </div>
-            {modDatesInvalid ? (
-              <p className="text-xs text-red-600" role="alert" data-testid="mod-request-date-error">
-                Check-out must be after check-in.
-              </p>
-            ) : null}
             <button
               type="button"
               onClick={submitModificationRequest}
