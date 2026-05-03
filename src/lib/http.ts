@@ -1,6 +1,7 @@
 import { getApiBaseUrl } from '@/runtime-config';
 import { getApiHeaders } from '@/api/client';
 import { IS_LOCALHOST } from '@/config/env';
+import { messageFromApiResponse } from '@/utils/serverErrorFromResponse';
 import { logApiError, monitoredFetch } from './monitoring';
 
 const RETRY_LIMIT = 2;
@@ -35,18 +36,15 @@ export async function apiFetch(path: string, init?: RequestInit): Promise<Respon
           await new Promise((r) => setTimeout(r, RETRY_DELAY_MS * attempt));
           continue;
         }
-        let body = '';
-        try { body = await res.text(); } catch {
-          // Ignore error when reading response text
-        }
-        logApiError(new Error(`HTTP ${res.status}`), {
+        const msg = await messageFromApiResponse(res);
+        logApiError(new Error(msg), {
           url,
           status: res.status,
           method: init?.method,
-          responseSnippet: body.slice(0, 200),
+          responseSnippet: msg.slice(0, 200),
           category: 'http',
         });
-        throw new Error(`HTTP ${res.status}: ${body}`);
+        throw new Error(msg);
       }
       return res;
     } catch (error) {

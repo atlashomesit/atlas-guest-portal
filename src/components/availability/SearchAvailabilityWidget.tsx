@@ -5,6 +5,7 @@ import { CalendarRange, ChevronDown, ShieldCheck } from 'lucide-react';
 import { heroWidgetLayoutFlag } from '../../config/abFlags';
 import { getApiBaseUrl } from '../../runtime-config';
 import { getApiHeaders } from '../../api/client';
+import { messageFromApiResponse } from '../../utils/serverErrorFromResponse';
 import { trackEvent } from '../../utils/analytics';
 import { useBooking } from '../../contexts/BookingContext';
 import { AtlasDateRangePicker, type AtlasDateRangePickerValue } from '../date/AtlasDateRangePicker';
@@ -472,22 +473,30 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
         );
 
         if (!response.ok) {
-          throw new Error(`Availability check failed with status ${response.status}`);
+          throw new Error(await messageFromApiResponse(response));
         }
 
         setStatusMessage('Showing available homes for your dates.');
       } else {
         setStatusMessage('Showing all homes while we confirm availability.');
       }
-    } catch (fetchError) {
+    } catch (fetchError: unknown) {
       const durationMs = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - startedAt);
       trackEvent(
         'availability_search_result',
         { surface: 'hero_form', ok: false, status: 'error', durationMs },
         { route: listingSearchRoute },
       );
-      setError('We could not confirm availability right now. Showing all homes instead.');
-      setStatusMessage('Unable to confirm availability right now. Showing all homes.');
+      const message =
+        fetchError instanceof Error && fetchError.message?.trim()
+          ? fetchError.message.trim()
+          : 'We could not confirm availability right now. Showing all homes instead.';
+      setError(message);
+      setStatusMessage(
+        fetchError instanceof Error && fetchError.message?.trim()
+          ? `${fetchError.message.trim()} Showing all homes.`
+          : 'Unable to confirm availability right now. Showing all homes.',
+      );
       console.error('Hero availability check failed:', fetchError);
     } finally {
       if (timeoutId) window.clearTimeout(timeoutId);

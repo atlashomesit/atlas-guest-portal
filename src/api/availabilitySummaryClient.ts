@@ -1,4 +1,5 @@
 import { buildApiUrl, getApiHeaders } from '@/api/client';
+import { messageFromApiResponse } from '@/utils/serverErrorFromResponse';
 
 /** TASK-1460: matches API `ListingAvailabilitySummaryDto` (camelCase JSON). */
 export type ListingAvailabilitySummary = {
@@ -39,7 +40,7 @@ export async function fetchAvailabilitySummary(
   const url = buildApiUrl(`/availability/summary?listingIds=${encodeURIComponent(ids.join(','))}`);
   const res = await fetch(url, { headers: getApiHeaders(), signal });
   if (!res.ok) {
-    throw new Error(`availability summary failed: ${res.status}`);
+    throw new Error(await messageFromApiResponse(res));
   }
   const payload = (await res.json()) as unknown;
   if (!Array.isArray(payload)) return [];

@@ -1,4 +1,5 @@
 import { buildApiUrl, getApiHeaders } from '@/api/client';
+import { messageFromApiResponse } from '@/utils/serverErrorFromResponse';
 
 export type PricingBreakdown = {
   baseAmount?: number;
@@ -85,10 +86,7 @@ export async function fetchPricingBreakdown(
   const response = await fetch(url.toString(), { signal, headers: getApiHeaders() });
 
   if (!response.ok) {
-    const errorMsg = response.status === 400
-      ? `Invalid pricing request: listingId=${params.listingId}, checkIn=${params.checkIn}, checkOut=${params.checkOut}`
-      : `Pricing breakdown failed with status ${response.status}`;
-    throw new Error(errorMsg);
+    throw new Error(await messageFromApiResponse(response));
   }
 
   const data = (await response.json()) as Record<string, unknown>;
@@ -115,7 +113,7 @@ export async function fetchCalendarPricing(
 
   const response = await fetch(url.toString(), { signal, headers: getApiHeaders() });
   if (!response.ok) {
-    throw new Error(`Calendar pricing failed with status ${response.status}`);
+    throw new Error(await messageFromApiResponse(response));
   }
 
   const raw = (await response.json()) as {
@@ -154,7 +152,7 @@ export async function fetchDailySummary(signal?: AbortSignal): Promise<DailyPric
   const response = await fetch(url.toString(), { signal, headers: getApiHeaders() });
 
   if (!response.ok) {
-    throw new Error(`Daily pricing summary failed with status ${response.status}`);
+    throw new Error(await messageFromApiResponse(response));
   }
 
   const raw = (await response.json()) as {

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { buildApiUrl, getApiHeaders } from '../api/client';
+import { messageFromApiResponse } from '../utils/serverErrorFromResponse';
 
 interface DayEntry {
   date: string; // yyyy-MM-dd
@@ -52,12 +53,12 @@ export default function AvailabilityCalendar({ listingId, onDateSelect }: Props)
     url.searchParams.set('from', fromStr);
     url.searchParams.set('to', toStr);
     fetch(url.toString(), { headers: getApiHeaders() })
-      .then((r) => {
+      .then(async (r) => {
         if (!r.ok) {
           if (import.meta.env.DEV) {
             console.warn(`Availability calendar not available for listing ${listingId}:`, r.status);
           }
-          return Promise.reject(new Error(`API returned ${r.status}`));
+          throw new Error(await messageFromApiResponse(r));
         }
         return r.json();
       })
