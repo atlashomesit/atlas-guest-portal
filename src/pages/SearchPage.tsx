@@ -51,6 +51,8 @@ type NormalizedListing = {
   losDiscount2Percent?: number | null;
   /** TASK-1725: True when Atlas team has verified photos for this listing. */
   hasVerifiedPhotos?: boolean;
+  /** TASK-1727: True when the tenant has a valid GSTIN on file. */
+  isGstRegistered?: boolean;
   /** TASK-1457: Map pin coordinates (API or static fallback). */
   latitude?: number | null;
   longitude?: number | null;
@@ -118,6 +120,7 @@ function apiToNormalized(listings: PublicListing[]): NormalizedListing[] {
         losDiscount2MinNights: l.losDiscount2MinNights ?? null,
         losDiscount2Percent: l.losDiscount2Percent ?? null,
         hasVerifiedPhotos: l.photosVerifiedAt != null,
+        isGstRegistered: l.isGstRegistered ?? false,
         latitude: l.latitude ?? null,
         longitude: l.longitude ?? null,
       };
@@ -1063,6 +1066,12 @@ const SearchPage = () => {
                         {unit.hasVerifiedPhotos && (
                           <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700">
                             ✅ Verified photos
+                          </span>
+                        )}
+                        {/* TASK-1727: GST registered badge */}
+                        {unit.isGstRegistered && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 border border-blue-200">
+                            🧾 GST Reg.
                           </span>
                         )}
                         {/* TASK-1695: LOS discount badge — show highest configured tier */}
