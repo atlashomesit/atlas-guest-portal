@@ -676,7 +676,7 @@ const SearchPage = () => {
               placeholder="₹ Any"
               value={minPrice ?? ""}
               onChange={(e) => updateParam("minPrice", e.target.value)}
-              className="w-32 rounded-lg border border-border-subtle bg-bg-muted px-3 py-2 text-base text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-cta-primary"
+              className="min-h-11 w-32 rounded-lg border border-border-subtle bg-bg-muted px-3 py-2 text-base text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-cta-primary"
             />
           </div>
           <div className="flex flex-col gap-1">
@@ -688,7 +688,7 @@ const SearchPage = () => {
               placeholder="₹ Any"
               value={maxPrice ?? ""}
               onChange={(e) => updateParam("maxPrice", e.target.value)}
-              className="w-32 rounded-lg border border-border-subtle bg-bg-muted px-3 py-2 text-base text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-cta-primary"
+              className="min-h-11 w-32 rounded-lg border border-border-subtle bg-bg-muted px-3 py-2 text-base text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-cta-primary"
             />
           </div>
           <div className="flex flex-col gap-1">
@@ -701,7 +701,7 @@ const SearchPage = () => {
               placeholder="Any"
               value={guests ?? ""}
               onChange={(e) => updateParam("guests", e.target.value)}
-              className="w-24 rounded-lg border border-border-subtle bg-bg-muted px-3 py-2 text-base text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-cta-primary"
+              className="min-h-11 w-24 rounded-lg border border-border-subtle bg-bg-muted px-3 py-2 text-base text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-cta-primary"
             />
           </div>
           <label className="flex items-center gap-2 rounded-lg border border-border-subtle bg-bg-muted px-3 py-2 text-sm">
@@ -750,7 +750,7 @@ const SearchPage = () => {
               <button
                 type="button"
                 onClick={clearFilters}
-                className="rounded-lg border border-border-subtle px-3 py-3 text-xs font-medium text-text-muted hover:bg-bg-muted focus:outline-none"
+                className="min-h-11 rounded-lg border border-border-subtle px-4 py-3 text-sm font-medium text-text-muted hover:bg-bg-muted focus:outline-none"
               >
                 Clear filters
               </button>

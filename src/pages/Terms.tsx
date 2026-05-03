@@ -47,21 +47,21 @@ const Terms = () => {
             <button
               type="button"
               onClick={() => setOpen(new Set(termsSections.map((section) => section.id)))}
-              className="px-4 py-2 rounded-full border border-border-subtle text-sm font-semibold text-primary hover:border-primary"
+              className="min-h-11 px-5 py-3 rounded-full border border-border-subtle text-base font-semibold text-primary hover:border-primary"
             >
               Expand all
             </button>
             <button
               type="button"
               onClick={() => setOpen(new Set())}
-              className="px-4 py-2 rounded-full border border-border-subtle text-sm font-semibold text-primary hover:border-primary"
+              className="min-h-11 px-5 py-3 rounded-full border border-border-subtle text-base font-semibold text-primary hover:border-primary"
             >
               Collapse all
             </button>
             <button
               type="button"
               onClick={printPage}
-              className="px-4 py-2 rounded-full border border-border-subtle text-sm font-semibold text-text-primary hover:border-border-strong"
+              className="min-h-11 px-5 py-3 rounded-full border border-border-subtle text-base font-semibold text-text-primary hover:border-border-strong"
             >
               Print-friendly view
             </button>
@@ -83,7 +83,7 @@ const Terms = () => {
                   <button
                     type="button"
                     onClick={() => toggle(section.id)}
-                    className="text-sm font-semibold px-3 py-2 rounded-full border border-border-subtle hover:border-cta-primary text-primary"
+                    className="min-h-11 text-base font-semibold px-4 py-3 rounded-full border border-border-subtle hover:border-cta-primary text-primary"
                     aria-expanded={open.has(section.id)}
                     aria-controls={`${section.id}-body`}
                   >

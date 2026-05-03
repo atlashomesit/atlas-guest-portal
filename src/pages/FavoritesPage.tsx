@@ -72,7 +72,7 @@ export default function FavoritesPage() {
           <p className="text-text-secondary">No saved homes yet. Tap “Save” on a listing.</p>
           <Link
             to="/search"
-            className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-5 py-2.5 hover:opacity-95 transition-opacity"
+            className="inline-flex min-h-11 items-center justify-center rounded-lg bg-brand-primary text-white text-base font-medium px-5 py-3 hover:opacity-95 transition-opacity"
           >
             Browse Atlas Homestays
           </Link>

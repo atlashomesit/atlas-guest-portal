@@ -3,6 +3,7 @@ import { useSearchParams, Link } from "react-router-dom";
 import SEO from "../components/SEO";
 import { buildApiUrl, getApiHeaders } from "../api/client";
 import { messageFromApiResponse } from "../utils/serverErrorFromResponse";
+import { getContactEmail } from "../config/contact";
 
 interface BookingItem {
   id: number;
@@ -79,7 +80,17 @@ export default function MyBookingsPage() {
           >
             Try again
           </button>
-          <Link to="/" className="inline-block text-sm text-brand-primary underline underline-offset-2">Return to homepage</Link>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center items-stretch">
+            <a
+              href={`mailto:${getContactEmail()}?subject=${encodeURIComponent("Atlas booking history link")}`}
+              className="inline-flex items-center justify-center rounded-lg border border-border-subtle bg-bg-surface text-text-primary text-base font-medium px-4 py-3 hover:bg-bg-muted transition-colors"
+            >
+              Email support
+            </a>
+            <Link to="/" className="inline-flex items-center justify-center text-base text-brand-primary underline underline-offset-2 px-2 py-3">
+              Return to homepage
+            </Link>
+          </div>
         </div>
       </div>
     );
