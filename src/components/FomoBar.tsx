@@ -35,7 +35,7 @@ export default function FomoBar({ listingId, workerUrl }: FomoBarProps) {
     async function fetchCount() {
       if (cfUrl) {
         try {
-          const res = await fetch(`${cfUrl}/ping?listing=${listingId}&sid=${sessionId}`);
+          const res = await fetch(`${cfUrl}/ping?listing=${listingId}&sid=${sessionId}`, { cache: "no-store" });
           if (res.ok) {
             const json = (await res.json()) as { count?: number };
             if (!cancelled && typeof json.count === "number") { setCount(json.count); return; }

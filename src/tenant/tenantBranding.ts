@@ -6,6 +6,11 @@
 
 import type { TenantInfo } from './tenantContext';
 
+/** Rejects non-hex brand strings from the API so CSS variables are never injected with arbitrary values. */
+function isSafeBrandHex(value: string): boolean {
+  return /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(value.trim());
+}
+
 /** Parse a CSS hex color (#RRGGBB or #RGB) to "R G B" space-separated for CSS vars. */
 function hexToRgbString(hex: string): string | null {
   const clean = hex.replace('#', '');
@@ -40,18 +45,19 @@ export function applyTenantBranding(tenant: TenantInfo): void {
   }
 
   // 2. Primary color — apply to CSS RGB variables used by Tailwind and CSS custom props
-  if (tenant.primaryColor) {
-    const rgbStr = hexToRgbString(tenant.primaryColor);
+  const brandHex = tenant.primaryColor?.trim();
+  if (brandHex && isSafeBrandHex(brandHex)) {
+    const rgbStr = hexToRgbString(brandHex);
     if (rgbStr) {
       const root = document.documentElement;
       root.style.setProperty('--cta-primary-rgb', rgbStr);
       root.style.setProperty('--cta-primary-hover-rgb', darkenRgb(rgbStr));
       root.style.setProperty('--accent-primary-rgb', rgbStr);
-      root.style.setProperty('--accent-primary', tenant.primaryColor);
+      root.style.setProperty('--accent-primary', brandHex);
       // Also set --color-primary for any components using it directly
-      root.style.setProperty('--color-primary', tenant.primaryColor);
+      root.style.setProperty('--color-primary', brandHex);
       // TASK-1688: --brand-primary used in navbar.css and other white-label components
-      root.style.setProperty('--brand-primary', tenant.primaryColor);
+      root.style.setProperty('--brand-primary', brandHex);
       root.style.setProperty('--brand-soft', `rgba(${rgbStr.replace(/ /g, ',')},0.12)`);
     }
   }
