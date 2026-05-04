@@ -69,24 +69,6 @@ export type TenantOverrides = {
   faq?: TenantFaqEntry[];
 };
 
-const STAR_GUEST_HOUSE_HOMES: TenantHomeLink[] = [
-  { roomNo: '303', title: 'Star_Guest_House_303', href: '/homes/star-guest-house-303' },
-  { roomNo: '304', title: 'Star_Guest_House_304', href: '/homes/star-guest-house-304' },
-  { roomNo: '305', title: 'Star_Guest_House_305', href: '/homes/star-guest-house-305' },
-  { roomNo: '306', title: 'Star_Guest_House_306', href: '/homes/star-guest-house-306' },
-  { roomNo: '307', title: 'Star_Guest_House_307', href: '/homes/star-guest-house-307' },
-  { roomNo: '308', title: 'Star_Guest_House_308', href: '/homes/star-guest-house-308' },
-  { roomNo: '203', title: 'Star_Guest_House_203', href: '/homes/star-guest-house-203' },
-  { roomNo: '204', title: 'Star_Guest_House_204', href: '/homes/star-guest-house-204' },
-  { roomNo: '205', title: 'Star_Guest_House_205', href: '/homes/star-guest-house-205' },
-  { roomNo: '206', title: 'Star_Guest_House_206', href: '/homes/star-guest-house-206' },
-  { roomNo: '207', title: 'Star_Guest_House_207', href: '/homes/star-guest-house-207' },
-  { roomNo: '208', title: 'Star_Guest_House_208', href: '/homes/star-guest-house-208' },
-  { roomNo: '108', title: 'Star_Guest_House_108', href: '/homes/star-guest-house-108' },
-  { roomNo: '109', title: 'Star_Guest_House_109', href: '/homes/star-guest-house-109' },
-  { roomNo: '110', title: 'Star_Guest_House_110', href: '/homes/star-guest-house-110' },
-];
-
 const TENANT_OVERRIDES: Record<string, TenantOverrides> = {
   starguesthouse: {
     hideLogo: true,
