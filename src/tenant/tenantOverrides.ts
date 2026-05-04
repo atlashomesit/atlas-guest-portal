@@ -92,7 +92,6 @@ const TENANT_OVERRIDES: Record<string, TenantOverrides> = {
     hideLogo: true,
     hideAtlasHomesBranding: true,
     hideListProperty: true,
-    homes: STAR_GUEST_HOUSE_HOMES,
     contact: {
       businessPhone: '7799779192',
       ownerPhone: '7799779192',
