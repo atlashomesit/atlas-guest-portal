@@ -10,12 +10,10 @@ import { MdOutlineEmojiFoodBeverage, MdOutlineLocalLaundryService, MdOutlineDone
 import { FaCcMastercard, FaLocationDot } from "react-icons/fa6";
 import { FaStar } from "react-icons/fa";
 import { X, ChevronRight, Clock, KeyRound, Bookmark, Share2 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, Suspense, lazy } from 'react';
 import { useTenantListings } from '../../../hooks/useTenantListings';
 import { inlinePolicySnippets } from '../../../content/terms';
 import Subheading from '../../commonComponents/subheading/Subheading';
-import UnitBookingWidget from '../../availability/UnitBookingWidget';
-import AvailabilityCalendar from '../../AvailabilityCalendar';
 import { trackEvent } from '../../../utils/analytics';
 import { Button } from '../../ui/Button';
 import { calculateNightlyPrice, inferUnitType } from '../../../utils/pricing';
@@ -37,10 +35,11 @@ import { buildApiUrl, getApiHeaders } from '../../../api/client';
 import { addRecentlyViewed, isFavorite, toggleFavorite } from '../../../utils/guestHistory';
 import { formatCurrency, formatHumanDate } from '../../../utils/formatting';
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
-import GuestAssistant from '../../GuestAssistant'; // TASK-1728
+import SkeletonCard from '../../apartments/SkeletonCard';
 
-import { Fancybox } from "@fancyapps/ui";
-import "@fancyapps/ui/dist/fancybox/fancybox.css";
+const UnitBookingWidget = lazy(() => import('../../availability/UnitBookingWidget'));
+const AvailabilityCalendar = lazy(() => import('../../AvailabilityCalendar'));
+const GuestAssistant = lazy(() => import('../../GuestAssistant')); // TASK-1728
 
 /** TASK-1294: illustrative uplift for “typical OTA” guest all-in (fees vary by site). */
 const OTA_ILLUSTRATIVE_MARKUP_PCT = 17;
@@ -786,18 +785,38 @@ useEffect(() => {
     useEffect(() => {
         if (!data) return;
 
-        // Fancybox v6 syntax
-        (Fancybox as { bind: (sel: string, opts: object) => void }).bind("[data-fancybox='property-gallery']", {
-            Thumbs: {
-                type: "classic",
-            },
-            Carousel: {
-                transition: "slide",
-            },
-        });
+        const initFancybox = async () => {
+            try {
+                const { Fancybox } = await import("@fancyapps/ui");
 
+                // Load CSS dynamically
+                const link = document.createElement('link');
+                link.rel = 'stylesheet';
+                link.href = 'https://cdn.jsdelivr.net/npm/@fancyapps/ui@5.0/dist/fancybox/fancybox.css';
+                document.head.appendChild(link);
+
+                // Fancybox v6 syntax
+                (Fancybox as { bind: (sel: string, opts: object) => void }).bind("[data-fancybox='property-gallery']", {
+                    Thumbs: {
+                        type: "classic",
+                    },
+                    Carousel: {
+                        transition: "slide",
+                    },
+                });
+
+                return () => {
+                    Fancybox.destroy();
+                    document.head.removeChild(link);
+                };
+            } catch (err) {
+                console.warn('Failed to load Fancybox', err);
+            }
+        };
+
+        const cleanup = initFancybox();
         return () => {
-            Fancybox.destroy();
+            cleanup?.then((fn) => fn?.());
         };
     }, [data]);
 
@@ -1576,14 +1595,16 @@ useEffect(() => {
                             {data.photoCount != null && data.photoCount > 0 && (
                                 <p className="text-sm text-text-muted mb-2" aria-label="Photo count">{data.photoCount} photo{data.photoCount !== 1 ? 's' : ''}</p>
                             )}
-                            <UnitBookingWidget
-                                listingId={resolvedListingId ?? undefined}
-                                propertyId={listingPropertyId ?? undefined}
-                                listingName={data.property_name || 'This property'}
-                                timezoneId={data.timezoneId}
-                                coverPhotoUrl={primaryImage}
-                                maxGuests={data.maxGuests}
-                            />
+                            <Suspense fallback={<SkeletonCard />}>
+                                <UnitBookingWidget
+                                    listingId={resolvedListingId ?? undefined}
+                                    propertyId={listingPropertyId ?? undefined}
+                                    listingName={data.property_name || 'This property'}
+                                    timezoneId={data.timezoneId}
+                                    coverPhotoUrl={primaryImage}
+                                    maxGuests={data.maxGuests}
+                                />
+                            </Suspense>
                             <div className="mt-3 flex flex-wrap gap-2">
                                 <span className="inline-flex items-center gap-1 rounded-full bg-green-50 border border-green-200 px-2.5 py-1 text-xs font-medium text-green-700">
                                     ✓ Verified listing
@@ -1639,13 +1660,17 @@ useEffect(() => {
                                 );
                             })()}
                             {resolvedListingId && (
-                                <AvailabilityCalendar
-                                    listingId={resolvedListingId}
-                                    onDateSelect={(ymd) => {
-                                        const ev = new CustomEvent('atlas:set-checkin', { detail: ymd });
-                                        window.dispatchEvent(ev);
-                                    }}
-                                />
+                                <Suspense fallback={
+                                    <div className="rounded-lg border border-border-subtle bg-bg-surface p-4 animate-pulse h-64" />
+                                }>
+                                    <AvailabilityCalendar
+                                        listingId={resolvedListingId}
+                                        onDateSelect={(ymd) => {
+                                            const ev = new CustomEvent('atlas:set-checkin', { detail: ymd });
+                                            window.dispatchEvent(ev);
+                                        }}
+                                    />
+                                </Suspense>
                             )}
                             {showAvailabilityPlaceholder && (
                                 <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6">
@@ -1732,7 +1757,9 @@ useEffect(() => {
         </section>
 
         {/* TASK-1728: Guest Assistant FAQ widget — floating bottom-left */}
-        <GuestAssistant listingId={resolvedListingId ?? data?.listingId ?? null} />
+        <Suspense fallback={null}>
+            <GuestAssistant listingId={resolvedListingId ?? data?.listingId ?? null} />
+        </Suspense>
 
         {/* Mobile fixed Reserve CTA - visible only below md breakpoint */}
         {data && (
