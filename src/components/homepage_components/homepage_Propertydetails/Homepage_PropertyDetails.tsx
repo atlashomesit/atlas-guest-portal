@@ -404,7 +404,7 @@ const PropertyDetails = () => {
             })
             .catch(() => {});
         return () => ac.abort();
-    }, [resolvedListingId, data?.listingId, data?.maxGuests]);
+    }, [resolvedListingId, data]);
 
     /** TASK-1466: deep links e.g. `/homes/.../123?bookingId=1&t=...` load host phone without exposing it on public catalog. */
     const bookingIdForContact = searchParams.get('bookingId');
@@ -711,7 +711,7 @@ const PropertyDetails = () => {
         }
 
         setNotFound(true);
-    }, [propertySlug, listingIdParam, listingId, location.state, getUrlsForListingId]);
+    }, [propertySlug, listingIdParam, listingId, location.state, getUrlsForListingId, apiProperties]);
 useEffect(() => {
   if (!data?.id) return;
 
@@ -735,7 +735,7 @@ useEffect(() => {
       updateBooking({ listingDetailPath: path });
   }
 
-}, [data?.id, data?.property_name, data?.listingId, listingId, propertySlug, resolvedListingId, setProperty, updateBooking]);
+}, [data, listingId, propertySlug, resolvedListingId, setProperty, updateBooking]);
 
     // Similar listings: GET /listings/{id}/similar
     useEffect(() => {

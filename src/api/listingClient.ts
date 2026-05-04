@@ -382,7 +382,7 @@ export async function fetchListingPhotosPayload(
 }
 
 // Cache for property photos to prevent redundant API calls across hooks
-let photosCachePromises = new Map<number, Promise<ListingPhoto[]>>();
+const photosCachePromises = new Map<number, Promise<ListingPhoto[]>>();
 
 /**
  * GET /listings/{propertyId}/photos — all photos for every listing on that property (typed).

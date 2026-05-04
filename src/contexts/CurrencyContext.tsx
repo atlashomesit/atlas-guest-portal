@@ -142,12 +142,3 @@ export function useCurrency(): CurrencyContextValue {
   if (!ctx) throw new Error('useCurrency must be used within CurrencyProvider');
   return ctx;
 }
-
-export const SUPPORTED_CURRENCIES: Array<{ value: SupportedCurrency; label: string }> = [
-  { value: 'INR', label: '₹ INR' },
-  { value: 'USD', label: '$ USD' },
-  { value: 'EUR', label: '€ EUR' },
-  { value: 'GBP', label: '£ GBP' },
-  { value: 'AUD', label: 'A$ AUD' },
-  { value: 'SGD', label: 'S$ SGD' },
-];
