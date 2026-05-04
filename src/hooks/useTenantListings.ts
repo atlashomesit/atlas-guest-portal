@@ -128,29 +128,13 @@ const mapDtosToData = (
 };
 
 export function useTenantListings(): UseTenantListings {
-  // Initialize fallback data with tenant filtering
   const tenant = getTenantContext();
-  const overrides = getTenantOverrides(tenant?.slug);
-  const tenantAllowedIds = new Set((overrides.homes ?? []).map(h => Number(h.roomNo)));
 
-  const getTenantFilteredFallback = () => {
-    let filtered = FALLBACK_PROPERTIES;
-    if (tenantAllowedIds.size > 0) {
-      filtered = FALLBACK_PROPERTIES.filter(p => tenantAllowedIds.has(Number(p.id)));
-    }
-    return filtered;
-  };
-
-  const getTenantFilteredListings = () => {
-    let filtered = FALLBACK_LISTINGS;
-    if (tenantAllowedIds.size > 0) {
-      filtered = FALLBACK_LISTINGS.filter(l => tenantAllowedIds.has(Number(l.id)));
-    }
-    return filtered;
-  };
-
-  const filteredFallback = getTenantFilteredFallback();
-  const filteredListings = getTenantFilteredListings();
+  // For Star Guest House, don't show fallback (rooms only exist in API)
+  // For other tenants, show all fallback (will be replaced by API data)
+  const isStarGuestHouse = tenant?.slug === 'starguesthouse';
+  const filteredFallback = isStarGuestHouse ? [] : FALLBACK_PROPERTIES;
+  const filteredListings = isStarGuestHouse ? [] : FALLBACK_LISTINGS;
 
   const [data, setData] = useState<{ listings: Listing[]; properties: TenantPropertyRecord[] }>({
     listings: filteredListings,
