@@ -148,6 +148,8 @@ export default function BookingConfirmationPage() {
   const [modNote, setModNote] = useState("");
   const [modSubmitting, setModSubmitting] = useState(false);
   const [modMessage, setModMessage] = useState<string>("");
+  interface ModRequestSummary { id: number; requestedCheckinDateUtc: string; requestedCheckoutDateUtc: string; requestedGuestCount?: number | null; note?: string | null; status: string; decisionNote?: string | null; decisionMadeAtUtc?: string | null; createdAtUtc: string; }
+  const [modRequests, setModRequests] = useState<ModRequestSummary[]>([]);
   // TASK-350: guest self-service cancellation request
   const [cancelReason, setCancelReason] = useState("");
   const [cancelSubmitting, setCancelSubmitting] = useState(false);
@@ -191,6 +193,13 @@ export default function BookingConfirmationPage() {
         setBooking(b);
         // TASK-1480: confirmed = guest views booking confirmation page
         track('confirmed', b.listingId);
+        // Fetch prior modification requests (best-effort, non-blocking)
+        fetch(buildApiUrl(`/api/public/bookings/${bookingId}/modification-requests?t=${encodeURIComponent(token)}`), {
+          headers: { Accept: "application/json", ...getApiHeaders() },
+        })
+          .then((r) => r.ok ? r.json() : Promise.resolve([]))
+          .then((data: unknown) => { if (Array.isArray(data)) setModRequests(data); })
+          .catch(() => {});
       })
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
@@ -259,6 +268,7 @@ export default function BookingConfirmationPage() {
   const whatsappUrl = `https://wa.me/${whatsappDigits}?text=${whatsappText}`;
   const supportsPush = typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window;
   const canRequestModification = !isCancelled && !!token;
+  const hasPendingModRequest = modRequests.some((r) => r.status === "Pending");
 
   const modDatesInvalid = Boolean(modCheckinError || modCheckoutError);
 
@@ -375,6 +385,8 @@ export default function BookingConfirmationPage() {
       if (!res.ok) {
         throw new Error(await messageFromApiResponse(res));
       }
+      const created = await res.json() as ModRequestSummary;
+      setModRequests((prev) => [created, ...prev]);
       setModMessage("Request submitted. Our team will review and contact you.");
       setModCheckin("");
       setModCheckout("");
@@ -876,10 +888,52 @@ export default function BookingConfirmationPage() {
           </div>
         )}
 
+        {canRequestModification && modRequests.length > 0 && (
+          <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3" data-testid="mod-requests-history">
+            <h2 className="text-sm font-semibold text-text-primary">Change requests</h2>
+            <ul className="space-y-2">
+              {modRequests.map((r) => {
+                const isPending = r.status === "Pending";
+                const isApproved = r.status === "Approved";
+                const badgeClass = isPending
+                  ? "bg-yellow-100 text-yellow-800 border-yellow-300"
+                  : isApproved
+                    ? "bg-green-100 text-green-800 border-green-300"
+                    : "bg-gray-100 text-gray-600 border-gray-300";
+                const fmtDate = (iso: string) => new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+                return (
+                  <li key={r.id} className="rounded-lg border border-border-subtle p-3 space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${badgeClass}`} data-testid={`mod-status-${r.id}`}>
+                        {r.status}
+                      </span>
+                      <span className="text-xs text-text-muted">{fmtDate(r.createdAtUtc)}</span>
+                    </div>
+                    <p className="text-xs text-text-secondary">
+                      {fmtDate(r.requestedCheckinDateUtc)} – {fmtDate(r.requestedCheckoutDateUtc)}
+                      {r.requestedGuestCount ? ` · ${r.requestedGuestCount} guests` : ""}
+                    </p>
+                    {r.note && <p className="text-xs text-text-muted">Your note: {r.note}</p>}
+                    {!isPending && r.decisionNote && (
+                      <p className="text-xs text-text-secondary">Host note: {r.decisionNote}</p>
+                    )}
+                    {!isPending && r.decisionMadeAtUtc && (
+                      <p className="text-xs text-text-muted">{r.status} on {fmtDate(r.decisionMadeAtUtc)}</p>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+
         {canRequestModification && (
           <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3">
             <h2 className="text-sm font-semibold text-text-primary">Request booking changes</h2>
-            <p className="text-sm text-text-secondary">Need a different date or guest count? Send a request and we will review it.</p>
+            {hasPendingModRequest
+              ? <p className="text-sm text-yellow-700 bg-yellow-50 rounded-lg px-3 py-2 border border-yellow-200">You have a pending change request. Our team will review it shortly.</p>
+              : <p className="text-sm text-text-secondary">Need a different date or guest count? Send a request and we will review it.</p>
+            }
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {/* TASK-959: bump booking-modification inputs to py-3 so they meet the 48px
                   minimum tap target. Text is already text-base (16px) which prevents the
@@ -926,7 +980,7 @@ export default function BookingConfirmationPage() {
             <button
               type="button"
               onClick={submitModificationRequest}
-              disabled={modSubmitting || modDatesInvalid}
+              disabled={modSubmitting || modDatesInvalid || hasPendingModRequest}
               className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-3.5 disabled:opacity-50"
               data-testid="mod-request-submit"
             >
