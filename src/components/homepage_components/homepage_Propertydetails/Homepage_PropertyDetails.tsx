@@ -625,10 +625,16 @@ const PropertyDetails = () => {
                     const streetFromApi =
                         typeof rawAddr === 'string' && rawAddr.trim() ? rawAddr.trim() : null;
                     const listingNumericId = Number(apiListing.id) || listingId;
+                    const propertyNumericId = Number(
+                        (apiListing as Record<string, unknown>).propertyId ??
+                            (apiListing as Record<string, unknown>).property_id,
+                    );
                     let fromPhotos: string[] = [];
                     try {
                         fromPhotos = filterGuestImageUrls(
-                            await fetchListingPhotos(listingNumericId, controller.signal),
+                            await fetchListingPhotos(propertyNumericId, controller.signal, {
+                                listingId: listingNumericId,
+                            }),
                         );
                     } catch {
                         /* use DTO fields */

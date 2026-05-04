@@ -4,7 +4,7 @@ import { CONTACT } from "./config/contact.ts";
 
 const logo = LOGO_URL;
 
-/** Bundled listing photo URLs removed; UI loads images via GET /listings/:id/photos. */
+/** Bundled listing photo URLs removed; UI loads images via GET /listings/{propertyId}/photos. */
 export const propertyImages: Record<string, string[]> = {};
 
 export const propertyData = [

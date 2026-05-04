@@ -215,7 +215,7 @@ export const fetchPublicListings = async (signal?: AbortSignal): Promise<PublicL
     .filter((row): row is PublicListing => row !== null && row.id > 0);
 };
 
-/** Normalize JSON from GET /listings/:id/photos into ordered URL strings. */
+/** Normalize JSON from GET /listings/{propertyId}/photos into ordered URL strings. */
 export function normalizeListingPhotoResponse(payload: unknown): string[] {
   if (Array.isArray(payload)) {
     if (payload.length === 0) return [];
@@ -247,14 +247,36 @@ export function normalizeListingPhotoResponse(payload: unknown): string[] {
   return [];
 }
 
-/** Guest catalog: GET /listings/{listingId}/photos */
-export async function fetchListingPhotos(
+/**
+ * Same as {@link normalizeListingPhotoResponse}, but when the payload is an array of rows
+ * with `listingId`, keep only one listing's rows ordered by `sortOrder`.
+ */
+export function normalizeListingPhotoResponseForListing(
+  payload: unknown,
   listingId: number,
-  signal?: AbortSignal,
-): Promise<string[]> {
-  if (!Number.isFinite(listingId) || listingId <= 0) return [];
+): string[] {
+  if (!Number.isFinite(listingId) || listingId <= 0) return normalizeListingPhotoResponse(payload);
+  if (!Array.isArray(payload)) return normalizeListingPhotoResponse(payload);
+  const rows = payload.filter(
+    (e) =>
+      e &&
+      typeof e === 'object' &&
+      Number((e as { listingId?: unknown }).listingId) === listingId,
+  ) as Record<string, unknown>[];
+  rows.sort(
+    (a, b) => Number(a.sortOrder ?? a.SortOrder) - Number(b.sortOrder ?? b.SortOrder),
+  );
+  return normalizeListingPhotoResponse(rows);
+}
 
-  const response = await fetch(buildApiUrl(`${LISTING_ENDPOINT}/${listingId}/photos`), {
+/** Raw JSON from GET /listings/{propertyId}/photos (404 → `[]`). Throws on other HTTP errors. */
+export async function fetchListingPhotosPayload(
+  propertyId: number,
+  signal?: AbortSignal,
+): Promise<unknown> {
+  if (!Number.isFinite(propertyId) || propertyId <= 0) return [];
+
+  const response = await fetch(buildApiUrl(`${LISTING_ENDPOINT}/${propertyId}/photos`), {
     signal,
     headers: getApiHeaders(),
   });
@@ -267,7 +289,19 @@ export async function fetchListingPhotos(
     throw new Error(await messageFromApiResponse(response));
   }
 
-  const payload = (await response.json()) as unknown;
+  return response.json();
+}
+
+/** Guest catalog: GET /listings/{propertyId}/photos (optional `listingId` to take one unit's gallery). */
+export async function fetchListingPhotos(
+  propertyId: number,
+  signal?: AbortSignal,
+  options?: { listingId?: number },
+): Promise<string[]> {
+  const payload = await fetchListingPhotosPayload(propertyId, signal);
+  if (options?.listingId != null && options.listingId > 0) {
+    return normalizeListingPhotoResponseForListing(payload, options.listingId);
+  }
   return normalizeListingPhotoResponse(payload);
 }
 

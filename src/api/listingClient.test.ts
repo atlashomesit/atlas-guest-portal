@@ -50,7 +50,7 @@ describe("listingClient", () => {
     expect(calledUrl).not.toContain("/listings/102");
   });
 
-  it("fetchListingPhotos(9) calls GET /listings/9/photos", async () => {
+  it("fetchListingPhotos(9) calls GET /listings/9/photos (property id)", async () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,
       json: async () => [
@@ -67,6 +67,25 @@ describe("listingClient", () => {
     expect(urls).toEqual([
       "https://atlashomestorage.blob.core.windows.net/listing-images/9/cover.jpg",
     ]);
+  });
+
+  it("fetchListingPhotos with listingId filters rows by listingId", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => [
+        { listingId: 1, url: "https://x/a.jpg", sortOrder: 2 },
+        { listingId: 2, url: "https://x/b.jpg", sortOrder: 1 },
+        { listingId: 2, url: "https://x/c.jpg", sortOrder: 2 },
+      ],
+    });
+
+    const urls = await fetchListingPhotos(100, undefined, { listingId: 2 });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${API_BASE}/listings/100/photos`,
+      expect.objectContaining({ headers: expect.any(Object) }),
+    );
+    expect(urls).toEqual(["https://x/b.jpg", "https://x/c.jpg"]);
   });
 
   it("fetchListingPhotos returns [] on 404", async () => {
