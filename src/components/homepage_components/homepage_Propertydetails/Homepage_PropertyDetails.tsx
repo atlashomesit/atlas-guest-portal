@@ -11,7 +11,7 @@ import { FaCcMastercard, FaLocationDot } from "react-icons/fa6";
 import { FaStar } from "react-icons/fa";
 import { X, ChevronRight, Clock, KeyRound, Bookmark, Share2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { propertyData } from '../../../data.ts';
+import { useTenantListings } from '../../../hooks/useTenantListings';
 import { inlinePolicySnippets } from '../../../content/terms';
 import Subheading from '../../commonComponents/subheading/Subheading';
 import UnitBookingWidget from '../../availability/UnitBookingWidget';
@@ -192,6 +192,7 @@ function isoFromUrlDateParam(value: string | null): string | undefined {
 const PropertyDetails = () => {
     const location = useLocation();
     const { propertySlug: propertySlugParam, unitSlug: unitSlugParam, id: legacyIdParam } = useParams();
+    const { properties: apiProperties } = useTenantListings();
 
     const normalizedLegacyParts = (legacyIdParam ?? '').split('-');
     const legacyUnitSlug = normalizedLegacyParts.pop();
@@ -506,7 +507,7 @@ const PropertyDetails = () => {
 
         // 1) Match by listingId (PK from DB/API) — IDs 1–7 etc.
         const foundByListingId = listingIdParam && Number.isFinite(listingId) && listingId > 0
-            ? propertyData.find((item: Property) => Number(item.listingId) === listingId)
+            ? apiProperties.find((item: Property) => Number(item.listingId) === listingId)
             : null;
 
         if (import.meta.env.DEV && listingIdParam) {
@@ -515,7 +516,7 @@ const PropertyDetails = () => {
         }
 
         // 2) Match by unit slug / property name (legacy URLs)
-        const foundByUnitSlug = foundByListingId ?? propertyData.find((item: Property) => {
+        const foundByUnitSlug = foundByListingId ?? apiProperties.find((item: Property) => {
             const idSlug = normalizeSlug(item.id);
             const nameSlug = normalizeSlug(item.property_name);
             const unitMatches = normalizedUnitSlug && (idSlug === normalizedUnitSlug || nameSlug === normalizedUnitSlug);
@@ -549,7 +550,7 @@ const PropertyDetails = () => {
         // If not found by slug, try to find by ID (e.g. unitSlug "7" matches item.id 501)
         const propertyId = normalizedUnitSlug || undefined;
         if (propertyId) {
-            const foundById = propertyData.find((item: Property) => String(item.id) === String(propertyId));
+            const foundById = apiProperties.find((item: Property) => String(item.id) === String(propertyId));
             if (foundById) {
                 const lid = Number(foundById.listingId);
                 const apiUrls = getUrlsForListingId(Number.isFinite(lid) ? lid : undefined);
