@@ -6,3 +6,9 @@ updates:
       interval: "weekly"
     target-branch: "dev"
     open-pull-requests-limit: 5
+    groups:
+      # Group minor + patch bumps into a single weekly PR — major bumps still
+      # get their own PRs so they can be reviewed individually.
+      npm-minor-and-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
