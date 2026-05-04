@@ -3,6 +3,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchListingPhotos, fetchPublicListings, type PublicListing } from "@/api/listingClient";
 import { LISTINGS, type Listing } from "@/data/listings";
 import { propertyData } from "@/data/propertyData";
+import { getTenantContext } from "@/tenant/tenantContext";
+import { getTenantOverrides } from "@/tenant/tenantOverrides";
 
 type LocalProperty = (typeof propertyData)[number];
 
@@ -99,9 +101,18 @@ const mapDtosToData = (
   dtos: PublicListing[],
   photosByListingId: Map<number, string[]>,
 ): { listings: Listing[]; properties: TenantPropertyRecord[] } => {
-  const properties = dtos
+  const tenant = getTenantContext();
+  const overrides = getTenantOverrides(tenant?.slug);
+  const tenantAllowedIds = new Set((overrides.homes ?? []).map(h => Number(h.roomNo)));
+
+  let properties = dtos
     .filter((dto) => dto.id > 0)
     .map((dto) => mapDtoToProperty(dto, photosByListingId.get(dto.id) ?? []));
+
+  // Filter to only tenant-allowed properties if homes list is defined
+  if (tenantAllowedIds.size > 0) {
+    properties = properties.filter(p => tenantAllowedIds.has(Number(p.id)));
+  }
 
   const listings: Listing[] = properties.map((p) => ({
     id: p.id,
