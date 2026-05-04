@@ -63,9 +63,11 @@ export function usePropertyListings(): PropertyListingsState {
         for (const l of filtered) byId[String(l.id)] = l;
         setListingsById(byId);
       } catch (error) {
-        console.warn('Error fetching listings:', error);
+        console.error('Error fetching /listings/public:', error);
         const overrides = getTenantOverrides(tenant?.slug);
-        setUsedFallback(overrides.onlyApiListings !== true);
+        const shouldUseFallback = overrides.onlyApiListings !== true;
+        console.warn(`API failed. Using fallback: ${shouldUseFallback}`);
+        setUsedFallback(shouldUseFallback);
         setHomes([]);
         setListingsById({});
       } finally {

@@ -135,7 +135,7 @@ export type PublicListing = {
 
 function normalizePublicListing(payload: Record<string, unknown>): PublicListing {
   const id = Number(payload.id);
-  const maxGuests = Number(payload.maxGuests ?? 0);
+  const maxGuests = Number(payload.maxGuests ?? payload.MaxGuests ?? 0);
   const rawRate = payload.baseNightlyRate;
   const photos = payload.photoUrls;
   const minStay = payload.minStay != null ? Number(payload.minStay) : null;
@@ -215,9 +215,11 @@ const coercePublicListingsPayload = (payload: unknown): Record<string, unknown>[
     return payload.filter((e): e is Record<string, unknown> => Boolean(e) && typeof e === 'object');
   }
   if (payload && typeof payload === 'object') {
-    const items = (payload as { items?: unknown }).items;
-    if (Array.isArray(items)) {
-      return items.filter((e): e is Record<string, unknown> => Boolean(e) && typeof e === 'object');
+    const obj = payload as Record<string, unknown>;
+    // Try common wrapper properties: items, data, results, value, values
+    const arrayField = obj.items ?? obj.data ?? obj.results ?? obj.value ?? obj.values;
+    if (Array.isArray(arrayField)) {
+      return arrayField.filter((e): e is Record<string, unknown> => Boolean(e) && typeof e === 'object');
     }
   }
   return [];
@@ -251,22 +253,53 @@ export async function fetchListingContact(
   return (await response.json()) as ListingContact;
 }
 
-export const fetchPublicListings = async (signal?: AbortSignal): Promise<PublicListing[]> => {
-  const response = await fetch(buildApiUrl(PUBLIC_LISTINGS_ENDPOINT), {
-    signal,
-    headers: getApiHeaders(),
-  });
+let cachedListings: PublicListing[] | null = null;
+let cachePromise: Promise<PublicListing[]> | null = null;
 
-  if (!response.ok) {
-    throw new Error(await messageFromApiResponse(response));
+export const fetchPublicListings = async (signal?: AbortSignal): Promise<PublicListing[]> => {
+  // Return cached result if available
+  if (cachedListings != null) {
+    console.log('[fetchPublicListings] Returning cached listings');
+    return cachedListings;
   }
 
-  const payload = (await response.json()) as unknown;
-  const rows = coercePublicListingsPayload(payload);
+  // Return existing promise if already fetching
+  if (cachePromise != null) {
+    console.log('[fetchPublicListings] Returning existing fetch promise');
+    return cachePromise;
+  }
 
-  return rows
-    .map((item) => normalizePublicListing(item))
-    .filter((row): row is PublicListing => row !== null && row.id > 0);
+  // Create new fetch promise
+  cachePromise = (async () => {
+    try {
+      const response = await fetch(buildApiUrl(PUBLIC_LISTINGS_ENDPOINT), {
+        signal,
+        headers: getApiHeaders(),
+      });
+
+      if (!response.ok) {
+        throw new Error(await messageFromApiResponse(response));
+      }
+
+      const payload = (await response.json()) as unknown;
+      console.log('[fetchPublicListings] Raw API response:', payload);
+
+      const rows = coercePublicListingsPayload(payload);
+      console.log('[fetchPublicListings] Coerced rows count:', rows.length);
+
+      const result = rows
+        .map((item) => normalizePublicListing(item))
+        .filter((row): row is PublicListing => row !== null && row.id > 0);
+
+      console.log('[fetchPublicListings] Final normalized listings count:', result.length);
+      cachedListings = result;
+      return result;
+    } finally {
+      cachePromise = null;
+    }
+  })();
+
+  return cachePromise;
 };
 
 /** Normalize JSON from GET /listings/{propertyId}/photos into ordered URL strings. */

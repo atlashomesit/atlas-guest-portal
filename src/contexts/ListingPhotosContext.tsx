@@ -24,26 +24,46 @@ export function ListingPhotosProvider({ children }: { children: React.ReactNode 
         if (cancelled) return;
         const next = new Map<number, string[]>();
 
+        // Deduplicate by propertyId to avoid redundant API calls
+        const photosByPropertyId = new Map<number, string[]>();
+        const uniquePropertyIds = [
+          ...new Set(listings.map(l => l.propertyId).filter((id): id is number => id != null && id > 0))
+        ];
+
+        // Fetch photos for each unique property once
         await Promise.all(
-          listings.map(async (l) => {
-            if (l.id <= 0) return;
-            let urls: string[] = [];
+          uniquePropertyIds.map(async (propertyId) => {
             try {
-              const fromPhotos = filterGuestImageUrls(
-                await fetchListingPhotos(l.propertyId ?? 0, undefined, { listingId: l.id }),
+              const urls = filterGuestImageUrls(
+                await fetchListingPhotos(propertyId, undefined),
               );
-              if (fromPhotos.length > 0) urls = fromPhotos;
+              if (urls.length > 0) photosByPropertyId.set(propertyId, urls);
             } catch {
               /* fall back to public DTO fields */
             }
-            if (urls.length === 0) {
-              const ordered = filterGuestImageUrls((l.photoUrls ?? []).filter(Boolean));
-              const cover = sanitizeGuestImageUrl(l.coverPhotoUrl);
-              urls = ordered.length > 0 ? ordered : cover ? [cover] : [];
-            }
-            if (urls.length > 0) next.set(l.id, urls);
           }),
         );
+
+        // Map photos to each listing
+        for (const l of listings) {
+          if (l.id <= 0) continue;
+          let urls: string[] = [];
+          const propertyId = l.propertyId ?? 0;
+
+          // Try photos endpoint first
+          if (propertyId > 0 && photosByPropertyId.has(propertyId)) {
+            const fromPhotos = photosByPropertyId.get(propertyId) ?? [];
+            if (fromPhotos.length > 0) urls = fromPhotos;
+          }
+
+          // Fall back to DTO fields if needed
+          if (urls.length === 0) {
+            const ordered = filterGuestImageUrls((l.photoUrls ?? []).filter(Boolean));
+            const cover = sanitizeGuestImageUrl(l.coverPhotoUrl);
+            urls = ordered.length > 0 ? ordered : cover ? [cover] : [];
+          }
+          if (urls.length > 0) next.set(l.id, urls);
+        }
 
         if (cancelled) return;
         setByListingId(next);
