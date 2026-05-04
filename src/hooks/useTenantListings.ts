@@ -2,6 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   fetchPublicListings,
+  fetchPropertyListingPhotos,
+  listingPhotosToSortedUrls,
+  type ListingPhoto,
   type PublicListing,
 } from "@/api/listingClient";
 import { LISTINGS, type Listing } from "@/data/listings";
@@ -159,11 +162,35 @@ export function useTenantListings(): UseTenantListings {
       const dtos = await fetchPublicListings(controller.signal);
       if (controller.signal.aborted) return;
 
-      // Photos are fetched by global ListingPhotosContext; use DTO photoUrls directly
+      // Fetch photos for each unique property (with caching to avoid redundant calls)
       const photosByListingId = new Map<number, string[]>();
+      const uniquePropertyIds = [
+        ...new Set(
+          dtos
+            .map((d) => d.propertyId)
+            .filter((id): id is number => id != null && id > 0),
+        ),
+      ];
+      const photosByPropertyId = new Map<number, ListingPhoto[]>();
+
+      // Use shared cache if available, otherwise fetch
+      await Promise.all(
+        uniquePropertyIds.map(async (pid) => {
+          try {
+            console.log(`[useTenantListings] Fetching photos for property ${pid}`);
+            const photos = await fetchPropertyListingPhotos(pid, controller.signal);
+            photosByPropertyId.set(pid, photos);
+          } catch (error) {
+            console.warn(`[useTenantListings] Failed to fetch photos for property ${pid}:`, error);
+            /* keep dto.photoUrls / local fallback */
+          }
+        }),
+      );
+
       for (const dto of dtos) {
-        if (dto.id <= 0) continue;
-        const urls = (dto.photoUrls ?? []).filter(Boolean);
+        if (dto.id <= 0 || dto.propertyId == null || dto.propertyId <= 0) continue;
+        const rows = photosByPropertyId.get(dto.propertyId) ?? [];
+        const urls = listingPhotosToSortedUrls(rows, dto.id);
         if (urls.length > 0) photosByListingId.set(dto.id, urls);
       }
       if (controller.signal.aborted) return;

@@ -381,18 +381,39 @@ export async function fetchListingPhotosPayload(
   return response.json();
 }
 
+// Cache for property photos to prevent redundant API calls across hooks
+const photosCachePromises = new Map<number, Promise<ListingPhoto[]>>();
+
 /**
  * GET /listings/{propertyId}/photos — all photos for every listing on that property (typed).
  * Aligns with atlas-api: `feat(listings): GET /listings/{propertyId}/photos returns all units photos`.
  * Rows are ordered by `listingId` then `sortOrder` (same as API).
+ * Results are cached to prevent redundant calls from multiple hooks.
  */
 export async function fetchPropertyListingPhotos(
   propertyId: number,
   signal?: AbortSignal,
 ): Promise<ListingPhoto[]> {
-  const payload = await fetchListingPhotosPayload(propertyId, signal);
-  const rows = parseListingPhotosResponse(payload);
-  return rows.sort((a, b) => a.listingId - b.listingId || a.sortOrder - b.sortOrder);
+  // Return cached promise if already fetching
+  if (photosCachePromises.has(propertyId)) {
+    console.log(`[fetchPropertyListingPhotos] Returning cached promise for property ${propertyId}`);
+    return photosCachePromises.get(propertyId)!;
+  }
+
+  // Create and cache the fetch promise
+  const promise = (async () => {
+    try {
+      const payload = await fetchListingPhotosPayload(propertyId, signal);
+      const rows = parseListingPhotosResponse(payload);
+      return rows.sort((a, b) => a.listingId - b.listingId || a.sortOrder - b.sortOrder);
+    } finally {
+      // Clean up cache after fetch completes
+      photosCachePromises.delete(propertyId);
+    }
+  })();
+
+  photosCachePromises.set(propertyId, promise);
+  return promise;
 }
 
 /**

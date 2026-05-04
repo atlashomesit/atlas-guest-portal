@@ -4,7 +4,8 @@
  */
 
 import React from 'react';
-import { SUPPORTED_CURRENCIES, useCurrency, type SupportedCurrency } from '../contexts/CurrencyContext';
+import { useCurrency, type SupportedCurrency } from '../contexts/CurrencyContext';
+import { SUPPORTED_CURRENCIES } from '../contexts/currencyConstants';
 
 const CurrencySelector: React.FC = () => {
   const { currency, setCurrency } = useCurrency();
