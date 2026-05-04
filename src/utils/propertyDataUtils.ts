@@ -1,6 +1,6 @@
 import { getTenantContext } from '../tenant/tenantContext';
 import { propertyData } from '../data';
-import { getTenantOverrides } from '../tenant/tenantOverrides';
+import { getTenantOverrides, getTenantPublicListingIdAllowlist } from '../tenant/tenantOverrides';
 
 /**
  * @deprecated Use useTenantListings() hook instead to fetch properties from the API.
@@ -14,12 +14,11 @@ export function getTenantPropertyData() {
 
   let filtered = propertyData;
 
-  // Filter to only allowed properties if tenant has a homes list defined
-  if (overrides.homes && overrides.homes.length > 0) {
-    const allowedRoomNos = new Set(overrides.homes.map(home => home.roomNo));
-    filtered = propertyData.filter(property => {
-      const roomNo = String(property.room_no || property.id || '');
-      return allowedRoomNos.has(roomNo);
+  const allowlist = getTenantPublicListingIdAllowlist(overrides);
+  if (allowlist.size > 0) {
+    filtered = propertyData.filter((property) => {
+      const listingId = Number(property.listingId ?? property.id);
+      return Number.isFinite(listingId) && allowlist.has(listingId);
     });
   }
 

@@ -330,7 +330,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
         <Heading title="Our Homes" id="our-homes" />
 
         <div className="grid gap-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch rounded-3xl overflow-hidden shadow-level2 bg-white border border-border-subtle property-card">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch rounded-3xl overflow-hidden shadow-sm bg-white border border-border-subtle property-card">
             <div className="relative h-full">
               <OptimizedImage
                 key={`${heroModel.listing.id}-${activeImageIndex[heroModel.listing.id] ?? 0}`}
@@ -442,7 +442,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
                 <button
                   type="button"
                   onClick={() => handleNavigate(heroModel)}
-                  className="property-card__button inline-flex items-center justify-center rounded-full bg-[color:var(--cta-primary)] px-5 py-3 text-sm font-semibold text-white shadow-level2 transition hover:-translate-y-0.5"
+                  className="property-card__button inline-flex items-center justify-center rounded-full bg-[color:var(--cta-primary)] px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors"
                 >
                   Check availability
                 </button>
@@ -466,7 +466,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
               return (
                 <div
                   key={getItemKey(model.listing, index)}
-                  className="property-card rounded-2xl shadow-level1 bg-white overflow-hidden border border-border-subtle flex flex-col"
+                  className="property-card rounded-2xl shadow-sm bg-white overflow-hidden border border-border-subtle flex flex-col"
                 >
                   <div className="relative h-56">
                     <OptimizedImage
@@ -565,7 +565,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
                       <button
                         type="button"
                         onClick={() => handleNavigate(model)}
-                        className="property-card__button inline-flex items-center justify-center rounded-full bg-[color:var(--cta-primary)] px-5 py-3 text-sm font-semibold text-white shadow-level1 transition hover:-translate-y-0.5"
+                        className="property-card__button inline-flex items-center justify-center rounded-full bg-[color:var(--cta-primary)] px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors"
                       >
                         Book now
                       </button>

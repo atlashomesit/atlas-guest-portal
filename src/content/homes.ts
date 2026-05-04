@@ -83,13 +83,16 @@ const allHomes: Home[] = [
 export function getTenantFilteredHomes(): Home[] {
   const tenant = getTenantContext();
   const overrides = getTenantOverrides(tenant?.slug);
-  const tenantAllowedIds = new Set((overrides.homes ?? []).map(h => String(h.roomNo)));
+  if (overrides.onlyApiListings) {
+    return [];
+  }
+  const tenantAllowedIds = new Set((overrides.homes ?? []).map((h) => String(h.roomNo)));
 
   if (tenantAllowedIds.size === 0) {
     return allHomes;
   }
 
-  return allHomes.filter(h => tenantAllowedIds.has(h.roomNo));
+  return allHomes.filter((h) => tenantAllowedIds.has(h.roomNo));
 }
 
 export const homes: Home[] = allHomes;

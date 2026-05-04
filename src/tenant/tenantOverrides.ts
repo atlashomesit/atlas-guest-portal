@@ -57,6 +57,16 @@ export type TenantOverrides = {
   hideAtlasHomesBranding?: boolean;
   /** Hide the "List your property" CTA in the header (desktop + mobile). */
   hideListProperty?: boolean;
+  /**
+   * When true, search and listing surfaces use only the public listings API — no bundled
+   * `propertyData` fallback if the request fails or returns empty.
+   */
+  onlyApiListings?: boolean;
+  /**
+   * If set, public listing results (search, hooks, homepage API path) are restricted to these
+   * numeric listing IDs. Prefer this over `homes` when labels/routes come entirely from the API.
+   */
+  publicListingIdAllowlist?: number[];
   /** Override the "Our Homes" dropdown contents. */
   homes?: TenantHomeLink[];
   /** Override contact details (phone numbers, email). */
@@ -71,27 +81,11 @@ export type TenantOverrides = {
   faq?: TenantFaqEntry[];
 };
 
-const STAR_GUEST_HOUSE_HOMES: TenantHomeLink[] = [
-  { roomNo: '107', title: 'STAR_GUEST_HOUSE_107', href: '/homes/star-guest-house-107' },
-  { roomNo: '108', title: 'STAR_GUEST_HOUSE_108', href: '/homes/star-guest-house-108' },
-  { roomNo: '109', title: 'STAR_GUEST_HOUSE_109', href: '/homes/star-guest-house-109' },
-  { roomNo: '110', title: 'STAR_GUEST_HOUSE_110', href: '/homes/star-guest-house-110' },
-  { roomNo: '201', title: 'STAR_GUEST_HOUSE_201', href: '/homes/star-guest-house-201' },
-  { roomNo: '202', title: 'STAR_GUEST_HOUSE_202', href: '/homes/star-guest-house-202' },
-  { roomNo: '203', title: 'STAR_GUEST_HOUSE_203', href: '/homes/star-guest-house-203' },
-  { roomNo: '204', title: 'STAR_GUEST_HOUSE_204', href: '/homes/star-guest-house-204' },
-  { roomNo: '205', title: 'STAR_GUEST_HOUSE_205', href: '/homes/star-guest-house-205' },
-  { roomNo: '206', title: 'STAR_GUEST_HOUSE_206', href: '/homes/star-guest-house-206' },
-  { roomNo: '207', title: 'STAR_GUEST_HOUSE_207', href: '/homes/star-guest-house-207' },
-  { roomNo: '208', title: 'STAR_GUEST_HOUSE_208', href: '/homes/star-guest-house-208' },
-  { roomNo: '301', title: 'STAR_GUEST_HOUSE_301', href: '/homes/star-guest-house-301' },
-  { roomNo: '302', title: 'STAR_GUEST_HOUSE_302', href: '/homes/star-guest-house-302' },
-  { roomNo: '303', title: 'STAR_GUEST_HOUSE_303', href: '/homes/star-guest-house-303' },
-  { roomNo: '304', title: 'STAR_GUEST_HOUSE_304', href: '/homes/star-guest-house-304' },
-  { roomNo: '305', title: 'STAR_GUEST_HOUSE_305', href: '/homes/star-guest-house-305' },
-  { roomNo: '306', title: 'STAR_GUEST_HOUSE_306', href: '/homes/star-guest-house-306' },
-  { roomNo: '307', title: 'STAR_GUEST_HOUSE_307', href: '/homes/star-guest-house-307' },
-  { roomNo: '308', title: 'STAR_GUEST_HOUSE_308', href: '/homes/star-guest-house-308' },
+/** Star Guest House public listing IDs (rooms 107–110, 201–208, 301–308). */
+const STAR_GUEST_HOUSE_LISTING_IDS: number[] = [
+  107, 108, 109, 110,
+  201, 202, 203, 204, 205, 206, 207, 208,
+  301, 302, 303, 304, 305, 306, 307, 308,
 ];
 
 const TENANT_OVERRIDES: Record<string, TenantOverrides> = {
@@ -99,7 +93,8 @@ const TENANT_OVERRIDES: Record<string, TenantOverrides> = {
     hideLogo: true,
     hideAtlasHomesBranding: true,
     hideListProperty: true,
-    homes: STAR_GUEST_HOUSE_HOMES,
+    onlyApiListings: true,
+    publicListingIdAllowlist: STAR_GUEST_HOUSE_LISTING_IDS,
     contact: {
       address: 'Shop No 2, 10, opposite Shilpa Park, Kondapur, Hanuman Nagar, Telangana 500084',
       businessPhone: '7799779192',
@@ -159,6 +154,19 @@ const TENANT_OVERRIDES: Record<string, TenantOverrides> = {
 };
 
 const EMPTY_OVERRIDES: TenantOverrides = {};
+
+/** IDs used to filter `fetchPublicListings` for this tenant (API listing `id`). */
+export function getTenantPublicListingIdAllowlist(overrides: TenantOverrides): Set<number> {
+  const explicit = overrides.publicListingIdAllowlist;
+  if (explicit?.length) {
+    return new Set(explicit.filter((n) => Number.isFinite(n) && n > 0));
+  }
+  return new Set(
+    (overrides.homes ?? [])
+      .map((h) => Number(h.roomNo))
+      .filter((n) => Number.isFinite(n) && n > 0),
+  );
+}
 
 export function getTenantOverrides(slug?: string | null): TenantOverrides {
   // Check overrides by slug first
