@@ -24,13 +24,16 @@ export default defineConfig({
     },
     globals: true,
     testTimeout: 30000,
-    // Optimize memory usage in CI environments — sequential test execution
-    threads: process.env.CI ? 1 : 4,
-    maxThreads: process.env.CI ? 1 : 4,
-    minThreads: 1,
+    // Optimize memory usage in CI environments
+    pool: process.env.CI ? "forks" : "forks",
+    poolOptions: {
+      forks: {
+        singleFork: process.env.CI ? true : false,
+      },
+    },
+    minWorkers: 1,
+    maxWorkers: process.env.CI ? 1 : 4,
     isolate: true,
-    isolateTestEnvironment: true,
     hookTimeout: 60000,
-    singleThread: process.env.CI ? true : false,
   },
 });
