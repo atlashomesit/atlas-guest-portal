@@ -122,15 +122,49 @@
   font-family: var(--font-family-base);
   font-size: 0.9375rem;
   font-weight: 400;  color: var(--text-primary);
-  background: none;
+  background: transparent;
   border: none;
+  border-radius: 0;
+  box-shadow: none;
   cursor: pointer;
   position: relative;
   transition: color 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* Undo global `button` premium styles from base.css so Our Homes matches nav links */
+.navbar-center .dropdown-button:hover,
+.navbar-center .dropdown-button:active,
+.navbar-center .dropdown.open .dropdown-button {
+  box-shadow: none;
+  transform: none;
+}
+
 .dropdown-button:hover {
   color: var(--brand-primary);}
+
+/* Same coral underline treatment as `.nav-link` */
+.navbar-center .dropdown-button::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--brand-primary);
+  transform: scaleX(0);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.navbar-center .dropdown:hover .dropdown-button::after,
+.navbar-center .dropdown.open .dropdown-button::after {
+  transform: scaleX(1);
+}
+
+.navbar-center .dropdown-button:focus-visible {
+  outline: none;
+  color: var(--brand-primary);
+  box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.35);
+}
 
 .dropdown-menu {
   position: absolute;

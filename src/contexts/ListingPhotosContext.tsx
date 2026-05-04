@@ -29,7 +29,9 @@ export function ListingPhotosProvider({ children }: { children: React.ReactNode 
             if (l.id <= 0) return;
             let urls: string[] = [];
             try {
-              const fromPhotos = filterGuestImageUrls(await fetchListingPhotos(l.id));
+              const fromPhotos = filterGuestImageUrls(
+                await fetchListingPhotos(l.propertyId ?? 0, undefined, { listingId: l.id }),
+              );
               if (fromPhotos.length > 0) urls = fromPhotos;
             } catch {
               /* fall back to public DTO fields */
