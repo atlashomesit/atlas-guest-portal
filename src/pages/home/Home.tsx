@@ -22,7 +22,6 @@ import { Link, useLocation } from "react-router-dom";
 import FaqHighlights from "../../components/faq/FaqHighlights";
 import pricingConfig from "../../config/pricing.config";
 import { getEffectiveDiscountPercent } from "../../utils/pricing";
-import RecentlyViewedStrip from "../../components/RecentlyViewedStrip";
 
 const Home = () => {
     const { pendingScrollTarget, setPendingScrollTarget } = useBooking();
@@ -252,9 +251,6 @@ const Home = () => {
                 ) : null}
                 <div className="w-full h-fit relative ">
                     <Slider />
-                </div>
-                <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                    <RecentlyViewedStrip />
                 </div>
                 <div>
                     <HomePage_Locations />
