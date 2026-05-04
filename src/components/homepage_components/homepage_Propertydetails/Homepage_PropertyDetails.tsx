@@ -11,6 +11,9 @@ import { FaCcMastercard, FaLocationDot } from "react-icons/fa6";
 import { FaStar } from "react-icons/fa";
 import { X, ChevronRight, Clock, KeyRound, Bookmark, Share2 } from 'lucide-react';
 import { useEffect, useMemo, useState, Suspense, lazy } from 'react';
+import { addDays } from 'date-fns';
+import { getIstStartOfDay } from '../../../utils/date';
+import { toISODate } from '../../../utils/dateRange';
 import { useTenantListings } from '../../../hooks/useTenantListings';
 import { inlinePolicySnippets } from '../../../content/terms';
 import Subheading from '../../commonComponents/subheading/Subheading';
@@ -760,11 +763,10 @@ useEffect(() => {
         if (!Number.isFinite(listingToPrefetch) || listingToPrefetch <= 0 || availabilityPrefetched) return;
 
         const controller = new AbortController();
-        const today = new Date();
-        const from = today.toISOString().slice(0, 10);
-        const toDate = new Date(today);
-        toDate.setDate(toDate.getDate() + 60);
-        const to = toDate.toISOString().slice(0, 10);
+        // Use IST timezone to match UnitBookingWidget (avoid duplicate calls with different date ranges)
+        const today = getIstStartOfDay();
+        const from = toISODate(today);
+        const to = toISODate(addDays(today, 60));
         const url = buildApiUrl(`/api/public/listings/${listingToPrefetch}/availability-calendar?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
         fetch(url, {
             method: 'GET',

@@ -485,8 +485,8 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     return () => {
       isActive = false;
     };
-    // Only refetch when listingId changes; availabilityRange is stable and lastAvailabilityKeyRef prevents duplicate calls
-  }, [listingId, isBookingDisabled]);
+    // availabilityRange is memoized and stable; rely on lastAvailabilityKeyRef deduplication for same requests
+  }, [listingId, isBookingDisabled, availabilityRange]);
 
   // Auto-select next available date if today is blocked or hold
   useEffect(() => {
