@@ -1,6 +1,8 @@
 import { resolveStaticMaxGuests } from "../api/listingClient";
 import { propertyData } from "../data";
 import { filterGuestImageUrls } from "../utils/guestImageUrl";
+import { getTenantContext } from "../tenant/tenantContext";
+import { getTenantOverrides } from "../tenant/tenantOverrides";
 
 export type Home = {
   roomNo: string;
@@ -60,7 +62,7 @@ const buildHome = (roomNo: string, config: HomeConfig = {}): Home => {
 };
 
 /** Same order as Our Homes: penthouse → floor 3 → 2 → 1 */
-export const homes: Home[] = [
+const allHomes: Home[] = [
   buildHome("501", { tagline: "Penthouse retreat with rooftop deck" }),
   buildHome("301", { tagline: "Sunlit duplex with lounge seating" }),
   buildHome("302", { tagline: "Minimal, airy suite for long stays" }),
@@ -77,3 +79,17 @@ export const homes: Home[] = [
   }),
   buildHome("102", { tagline: "Cozy corner suite for work trips" }),
 ];
+
+export function getTenantFilteredHomes(): Home[] {
+  const tenant = getTenantContext();
+  const overrides = getTenantOverrides(tenant?.slug);
+  const tenantAllowedIds = new Set((overrides.homes ?? []).map(h => String(h.roomNo)));
+
+  if (tenantAllowedIds.size === 0) {
+    return allHomes;
+  }
+
+  return allHomes.filter(h => tenantAllowedIds.has(h.roomNo));
+}
+
+export const homes: Home[] = allHomes;

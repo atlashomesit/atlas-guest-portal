@@ -141,10 +141,19 @@ export function useTenantListings(): UseTenantListings {
     return filtered;
   };
 
+  const getTenantFilteredListings = () => {
+    let filtered = FALLBACK_LISTINGS;
+    if (tenantAllowedIds.size > 0) {
+      filtered = FALLBACK_LISTINGS.filter(l => tenantAllowedIds.has(Number(l.id)));
+    }
+    return filtered;
+  };
+
   const filteredFallback = getTenantFilteredFallback();
+  const filteredListings = getTenantFilteredListings();
 
   const [data, setData] = useState<{ listings: Listing[]; properties: TenantPropertyRecord[] }>({
-    listings: FALLBACK_LISTINGS,
+    listings: filteredListings,
     properties: filteredFallback,
   });
   const [state, setState] = useState<TenantListingsState>("idle");

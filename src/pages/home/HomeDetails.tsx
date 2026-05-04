@@ -8,7 +8,7 @@ import {
   ShieldCheck, Sparkles, Users, CheckCircle2,
 } from "lucide-react";
 
-import { homes, defaultHomeHighlights } from "../../content/homes";
+import { getTenantFilteredHomes, defaultHomeHighlights } from "../../content/homes";
 import { useBooking } from "../../contexts/BookingContext";
 import { CONTACT } from "../../config/contact";
 import { getTenantContext } from "../../tenant/tenantContext";
@@ -95,7 +95,8 @@ const HomeDetails = () => {
   // First try to find in API data (by listing ID)
   const apiRoom = apiHomes.find((item) => item.roomNo === roomNo);
 
-  // Fallback to hardcoded homes
+  // Fallback to tenant-filtered homes
+  const filteredHomes = getTenantFilteredHomes();
   const room = apiRoom ? {
     roomNo,
     title: apiRoom.title,
@@ -104,7 +105,7 @@ const HomeDetails = () => {
     images: [] as string[],
     maxGuests: 2,
     listingId: Number(apiRoom.roomNo),
-  } : homes.find((item) => item.roomNo === roomNo);
+  } : filteredHomes.find((item) => item.roomNo === roomNo);
 
   const { updateBooking } = useBooking();
   const [reviewsData, setReviewsData] = useState<ListingReviewsResponse | null>(null);
