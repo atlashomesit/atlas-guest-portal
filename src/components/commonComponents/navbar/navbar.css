@@ -194,7 +194,7 @@
   color: var(--brand-primary);
 }
 
-/* Book Now — gradient-cta pill, bold, hover scale + glow */
+/* Book Now — gradient-cta pill, bold, hover scale */
 .navbar-right .book-now {
   padding: 0.6rem 1.25rem;
   font-family: var(--font-family-base);
@@ -206,13 +206,13 @@
   border-radius: 9999px;
   box-shadow: var(--shadow-level-1);
   cursor: pointer;
-  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
-    box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1);  min-height: 44px;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  min-height: 44px;
 }
 
 .navbar-right .book-now:hover {
   transform: scale(1.03);
-  box-shadow: 0 0 24px rgba(255, 107, 53, 0.25);}
+}
 
 .navbar-right .book-now:focus-visible {
   outline: none;
