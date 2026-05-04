@@ -7,6 +7,8 @@ import { fetchPublicListings, type PublicListing } from "../api/listingClient";
 import { parseDate } from "../utils/formatting";
 import { useCurrency } from "../contexts/CurrencyContext";
 import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
+import { getTenantContext } from "../tenant/tenantContext";
+import { getTenantOverrides } from "../tenant/tenantOverrides";
 import SkeletonCard from "../components/apartments/SkeletonCard";
 import OptimizedImage from "../components/ui/OptimizedImage";
 import OwnerShareBadge from "../components/OwnerShareBadge"; // TASK-1705
@@ -63,8 +65,13 @@ type NormalizedListing = {
   reviewCount?: number | null;
 };
 
-function buildStaticListings(): NormalizedListing[] {
-  return [...propertyData]
+function buildStaticListings(allowedIds?: Set<number>): NormalizedListing[] {
+  let filtered = propertyData;
+  if (allowedIds && allowedIds.size > 0) {
+    filtered = propertyData.filter(p => allowedIds.has(Number(p.id)));
+  }
+
+  return [...filtered]
     .sort((a, b) => compareAtlasHomesBuildingOrder(a.id, b.id))
     .map((property) => {
       const listingId = property.listingId ?? property.id;
@@ -230,9 +237,16 @@ const SearchPage = () => {
   const [availabilityById, setAvailabilityById] = useState<Record<number, ListingAvailabilitySummary>>({});
   const [availabilityFetchDone, setAvailabilityFetchDone] = useState(false);
 
+  const tenant = getTenantContext();
+  const overrides = getTenantOverrides(tenant?.slug);
+  const tenantAllowedIds = useMemo(() => {
+    const allowed = new Set((overrides.homes ?? []).map(h => Number(h.roomNo)));
+    return allowed.size > 0 ? allowed : undefined;
+  }, [overrides.homes]);
+
   const listings = useMemo(
-    () => apiListings ?? buildStaticListings(),
-    [apiListings],
+    () => apiListings ?? buildStaticListings(tenantAllowedIds),
+    [apiListings, tenantAllowedIds],
   );
 
   useEffect(() => {
