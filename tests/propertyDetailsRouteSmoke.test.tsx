@@ -3,7 +3,7 @@
  * Catches regressions like "unitSlug is not defined" that only surface on
  * deep-linked prod routes.
  */
-import React from "react";
+import React, { Suspense } from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
@@ -12,6 +12,16 @@ import Homepage_PropertyDetails from "@/components/homepage_components/homepage_
 vi.mock("@/components/availability/UnitBookingWidget", () => ({
   __esModule: true,
   default: () => <div>Booking Widget</div>,
+}));
+
+vi.mock("@/components/AvailabilityCalendar", () => ({
+  __esModule: true,
+  default: () => <div>Availability Calendar</div>,
+}));
+
+vi.mock("@/components/GuestAssistant", () => ({
+  __esModule: true,
+  default: () => <div>Guest Assistant</div>,
 }));
 
 vi.mock("@/utils/analytics", () => ({ trackEvent: vi.fn() }));
@@ -97,9 +107,11 @@ describe("PropertyDetails route smoke", () => {
   it("renders without ReferenceError on deep-link /homes/atlas-homes-room-202/4", async () => {
     render(
       <MemoryRouter initialEntries={["/homes/atlas-homes-room-202/4"]}>
-        <Routes>
-          <Route path="/homes/:propertySlug/:unitSlug" element={<Homepage_PropertyDetails />} />
-        </Routes>
+        <Suspense fallback={<div>Loading...</div>}>
+          <Routes>
+            <Route path="/homes/:propertySlug/:unitSlug" element={<Homepage_PropertyDetails />} />
+          </Routes>
+        </Suspense>
       </MemoryRouter>,
     );
 
@@ -112,9 +124,11 @@ describe("PropertyDetails route smoke", () => {
   it("renders without ReferenceError on deep-link /homes/atlas-homes-room-301/5", async () => {
     render(
       <MemoryRouter initialEntries={["/homes/atlas-homes-room-301/5"]}>
-        <Routes>
-          <Route path="/homes/:propertySlug/:unitSlug" element={<Homepage_PropertyDetails />} />
-        </Routes>
+        <Suspense fallback={<div>Loading...</div>}>
+          <Routes>
+            <Route path="/homes/:propertySlug/:unitSlug" element={<Homepage_PropertyDetails />} />
+          </Routes>
+        </Suspense>
       </MemoryRouter>,
     );
 

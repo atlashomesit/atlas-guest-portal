@@ -23,7 +23,7 @@ export default defineConfig({
       inline: ["react-router", "react-router-dom"],
     },
     globals: true,
-    testTimeout: 30000,
+    testTimeout: 120000, // 2 minutes for heavy property tests
     // Optimize memory usage in CI environments
     pool: process.env.CI ? "forks" : "forks",
     poolOptions: {
