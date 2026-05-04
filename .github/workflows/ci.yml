@@ -34,7 +34,7 @@ jobs:
       - name: Test
         run: npm test
         env:
-          NODE_OPTIONS: --max-old-space-size=8192
+          NODE_OPTIONS: --max-old-space-size=12288 --disable-warnings
           CI: true
 
       - name: Check bundle for local network access APIs

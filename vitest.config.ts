@@ -30,6 +30,8 @@ export default defineConfig({
       threads: {
         maxThreads: process.env.CI ? 1 : 4,
         minThreads: 1,
+        isolate: true,
+        singleThread: process.env.CI ? true : false,
       },
     },
     isolate: true,
