@@ -13,16 +13,17 @@ cd atlas-e2e; npm run release-gate
 This is the **single pre-commit gate** for all repos. It runs lint, build, unit tests, integration tests, migrations, smoke curls, and Playwright E2E across all four repos. See [atlas-e2e/docs/PROD_READINESS_CHECKLIST.md](../atlas-e2e/docs/PROD_READINESS_CHECKLIST.md) for the full 16-gate DevSecOps mapping.
 
 ## Branching Model
-- Create feature branches from `main` using the convention `feature/<short-description>`.
-- Use `fix/`, `docs/`, or `chore/` prefixes for bug fixes, documentation updates, and tooling work.
+- **Branch from `dev`**, not `main`. `main` is the prod-deploy branch and may only receive commits via a PR from `dev`. See [workspace branch policy](../atlas-e2e/docs/POLICY-BRANCH-AND-DEPLOY.md).
+- Create feature branches from `dev` using the convention `feature/<short-description>`. Use `fix/`, `docs/`, or `chore/` prefixes for bug fixes, documentation updates, and tooling work.
+- The `dev → main` PR is the only path to prod. PRs from any other branch to `main` are auto-rejected by the `enforce-dev-to-main` GitHub Actions workflow.
 
 ## Development Process
-1. **Sync `main`:**
+1. **Sync `dev`:**
    ```bash
-   git checkout main
-   git pull origin main
+   git checkout dev
+   git pull origin dev
    ```
-2. **Create a branch:**
+2. **Create a branch from dev:**
    ```bash
    git checkout -b feature/add-property-carousel
    ```

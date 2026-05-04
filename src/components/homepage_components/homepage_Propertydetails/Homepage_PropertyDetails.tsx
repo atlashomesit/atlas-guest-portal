@@ -214,7 +214,7 @@ const PropertyDetails = () => {
     const [copyLinkLabel, setCopyLinkLabel] = useState<'Copy link' | 'Copied!'>('Copy link');
     const unitType = inferUnitType({ id: data?.id, property_name: data?.property_name });
     const { setProperty, updateBooking } = useBooking();
-    const { getUrlsForListingId } = useListingPhotosFromApi();
+    const { getUrlsForListingId, loaded: photosLoaded } = useListingPhotosFromApi();
     const [searchParams] = useSearchParams();
     // Build a back-to-results link when the user arrived from /search (params preserved in URL by SearchPage)
     const backToResultsHref = useMemo(() => {
@@ -631,15 +631,20 @@ const PropertyDetails = () => {
                         (apiListing as Record<string, unknown>).propertyId ??
                             (apiListing as Record<string, unknown>).property_id,
                     );
-                    let fromPhotos: string[] = [];
-                    try {
-                        fromPhotos = filterGuestImageUrls(
-                            await fetchListingPhotos(propertyNumericId, controller.signal, {
-                                listingId: listingNumericId,
-                            }),
-                        );
-                    } catch {
-                        /* use DTO fields */
+                    // Try to get photos from context cache first to avoid duplicate API calls
+                    let fromPhotos: string[] = getUrlsForListingId(listingNumericId) ?? [];
+
+                    // Only fetch from API if not in context cache (and context is loaded)
+                    if (fromPhotos.length === 0 && photosLoaded) {
+                        try {
+                            fromPhotos = filterGuestImageUrls(
+                                await fetchListingPhotos(propertyNumericId, controller.signal, {
+                                    listingId: listingNumericId,
+                                }),
+                            );
+                        } catch {
+                            /* use DTO fields */
+                        }
                     }
                     const mapped: Property = {
                         id: listingNumericId,
