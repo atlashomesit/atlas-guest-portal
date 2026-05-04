@@ -33,6 +33,7 @@ import { useListingPhotosFromApi } from '@/contexts/ListingPhotosContext';
 import OptimizedImage from '@/components/ui/OptimizedImage';
 import FomoBar from '@/components/FomoBar';
 import { track } from '@/lib/events'; // TASK-1480
+import { getTenantContext } from '@/tenant/tenantContext';
 
 declare global {
   interface Window {
@@ -1333,7 +1334,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             key,
             amount: orderResponse.data.amount,
             currency: orderResponse.data.currency,
-            name: 'Atlas Homestays',
+            name: getTenantContext()?.displayMerchantName ?? getTenantContext()?.name ?? 'Our Property',
             description: `Booking for ${listingName || 'selected property'}`,
             order_id: orderId,
             prefill: {

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Button } from "./ui/Button";
+import { getTenantContext } from "@/tenant/tenantContext";
 
 interface ErrorLayoutAction {
   label: string;
@@ -60,7 +61,7 @@ export const ErrorLayout = ({
     >
       <div className="max-w-2xl space-y-4">
         <header className="space-y-2">
-          <p className="text-sm font-semibold uppercase tracking-wide text-primary">Atlas Homestays</p>
+          <p className="text-sm font-semibold uppercase tracking-wide text-primary">{getTenantContext()?.name ?? 'Our Platform'}</p>
           <h1 className="text-3xl font-bold text-text-primary sm:text-4xl">{title}</h1>
           <p className="text-text-muted text-base sm:text-lg">{description}</p>
         </header>

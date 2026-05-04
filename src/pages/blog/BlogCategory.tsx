@@ -1,3 +1,4 @@
+/* eslint-disable atlas-brand/no-atlas-string-leak -- TODO Task 16: replace with per-tenant content */
 import { Link, useParams } from "react-router-dom";
 import SEO from "../../components/SEO";
 import { blogPosts, BlogCategory as BlogCategoryType } from "../../data/blogPosts";

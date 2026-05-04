@@ -1,3 +1,4 @@
+/* eslint-disable atlas-brand/no-atlas-string-leak -- TODO Task 16: replace with per-tenant content */
 import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 

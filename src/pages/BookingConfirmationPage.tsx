@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { getTenantContext } from "../tenant/tenantContext";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react"; // TASK-1476
 import SEO from "../components/SEO";
@@ -287,11 +288,12 @@ export default function BookingConfirmationPage() {
     const coutTime = listingTimeToIcsHHMM(booking.checkOutTime, "12:00");
     const checkin = formatIcsDate(cinIso, cinTime);
     const checkout = formatIcsDate(coutIso, coutTime);
-    const uid = `atlas-booking-${booking.bookingId}@atlashomestays.com`;
+    const uid = `atlas-booking-${booking.bookingId}@atlashomestays.com`; // eslint-disable-line atlas-brand/no-atlas-string-leak -- iCal UID domain, not user-visible
+    const tenantName = getTenantContext()?.name ?? 'Our Platform';
     const ics = [
       "BEGIN:VCALENDAR",
       "VERSION:2.0",
-      "PRODID:-//Atlas Homestays//BookingConfirmation//EN",
+      `PRODID:-//${tenantName}//BookingConfirmation//EN`,
       "CALSCALE:GREGORIAN",
       "METHOD:PUBLISH",
       "BEGIN:VEVENT",
@@ -1083,7 +1085,7 @@ export default function BookingConfirmationPage() {
           <div className="rounded-2xl border border-green-200 bg-green-50/40 p-5 space-y-3">
             <h2 className="text-sm font-semibold text-text-primary">Give friends ₹500 off</h2>
             <p className="text-sm text-text-secondary">
-              Share your code and your friends get ₹500 off their first Atlas Homestays booking.
+              Share your code and your friends get ₹500 off their first {getTenantContext()?.name ?? 'our platform'} booking.
             </p>
             <div className="flex items-center gap-2 bg-white border border-green-200 rounded-lg px-3 py-2 w-fit">
               <span className="text-base font-mono font-bold text-text-primary tracking-widest" data-testid="referral-code">
@@ -1106,10 +1108,10 @@ export default function BookingConfirmationPage() {
             <a
               href={`https://wa.me/?text=${encodeURIComponent(
                 shareLanguage === "hi"
-                  ? `मैंने ${booking.propertyName} में अपना प्रवास बेहद पसंद किया! 🏠✨ Atlas Homestays पर बुक करें और कोड ${booking.guestReferralCode} से ₹500 की छूट पाएं: https://www.atlashomestays.com/search`
+                  ? `मैंने ${booking.propertyName} में अपना प्रवास बेहद पसंद किया! 🏠✨ ${getTenantContext()?.name ?? 'Our platform'} पर बुक करें और कोड ${booking.guestReferralCode} से ₹500 की छूट पाएं: ${window.location.origin}/search`
                   : shareLanguage === "te"
-                  ? `${booking.propertyName}లో నా స్టే చాలా బాగుంది! 🏠✨ Atlas Homestays లో బుక్ చేసుకోండి మరియు ${booking.guestReferralCode} కోడ్ ఉపయోగించి ₹500 డిస్కౌంట్ పొందండి: https://www.atlashomestays.com/search`
-                  : `I loved my stay at ${booking.propertyName}! 🏠✨ Book via Atlas Homestays and use code ${booking.guestReferralCode} for ₹500 off your first booking: https://www.atlashomestays.com/search`
+                  ? `${booking.propertyName}లో నా స్టే చాలా బాగుంది! 🏠✨ ${getTenantContext()?.name ?? 'Our platform'} లో బుక్ చేసుకోండి మరియు ${booking.guestReferralCode} కోడ్ ఉపయోగించి ₹500 డిస్కౌంట్ పొందండి: ${window.location.origin}/search`
+                  : `I loved my stay at ${booking.propertyName}! 🏠✨ Book via ${getTenantContext()?.name ?? 'our platform'} and use code ${booking.guestReferralCode} for ₹500 off your first booking: ${window.location.origin}/search`
               )}`}
               target="_blank"
               rel="noopener noreferrer"
@@ -1143,7 +1145,7 @@ export default function BookingConfirmationPage() {
             data-testid="confirmation-cta"
             className="text-sm text-text-muted underline underline-offset-2 hover:text-text-primary"
           >
-            ← Back to Atlas Homestays
+            ← Back to {getTenantContext()?.name ?? 'Home'}
           </Link>
         </div>
       </div>

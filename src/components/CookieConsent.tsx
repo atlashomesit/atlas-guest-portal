@@ -7,6 +7,7 @@ export type AtlasCookieConsentLevel = "all" | "necessary";
 function isAtlasPrimaryHostname(): boolean {
   if (typeof window === "undefined") return false;
   const h = window.location.hostname.replace(/^www\./i, "").toLowerCase();
+  // eslint-disable-next-line atlas-brand/no-atlas-string-leak -- domain guard, not user-visible
   return h === "atlashomestays.com" || h === "atlashomes.in";
 }
 
