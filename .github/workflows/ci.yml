@@ -33,6 +33,9 @@ jobs:
 
       - name: Test
         run: npm test
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+          CI: true
 
       - name: Check bundle for local network access APIs
         run: npm run check:local-network
