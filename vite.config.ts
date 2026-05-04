@@ -61,14 +61,53 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id: string) {
-          if (id.includes("node_modules/react") || id.includes("node_modules/react-dom") || id.includes("node_modules/react-router-dom")) {
-            return "vendor";
+          // Core React libraries
+          if (id.includes("node_modules/react-dom") || id.includes("node_modules/react-router-dom")) {
+            return "react-core";
           }
-          if (id.includes("node_modules/axios")) {
-            return "razorpay";
+          if (id.includes("node_modules/react/")) {
+            return "react";
           }
-          if (id.includes("node_modules/lucide-react") || id.includes("node_modules/react-toastify") || id.includes("node_modules/date-fns")) {
-            return "ui";
+
+          // UI libraries
+          if (id.includes("node_modules/@emotion")) {
+            return "emotion";
+          }
+          if (id.includes("node_modules/lucide-react") || id.includes("node_modules/react-icons")) {
+            return "icons";
+          }
+          if (id.includes("node_modules/react-toastify")) {
+            return "toast";
+          }
+
+          // Maps (heavy, only on LocationPage)
+          if (id.includes("node_modules/leaflet") || id.includes("node_modules/react-leaflet")) {
+            return "maps";
+          }
+
+          // Carousel (heavy, only on home/search pages)
+          if (id.includes("node_modules/swiper") || id.includes("node_modules/react-slick") || id.includes("node_modules/slick-carousel")) {
+            return "carousel";
+          }
+
+          // Date/time libraries
+          if (id.includes("node_modules/date-fns") || id.includes("node_modules/luxon") || id.includes("node_modules/react-calendar") || id.includes("node_modules/react-date-range")) {
+            return "datetime";
+          }
+
+          // Payment (heavy, only on checkout)
+          if (id.includes("node_modules/axios") || id.includes("node_modules/qrcode.react")) {
+            return "payment";
+          }
+
+          // Markdown rendering (only on content pages)
+          if (id.includes("node_modules/react-markdown")) {
+            return "markdown";
+          }
+
+          // Framer Motion (animation)
+          if (id.includes("node_modules/framer-motion")) {
+            return "motion";
           }
         },
       },
