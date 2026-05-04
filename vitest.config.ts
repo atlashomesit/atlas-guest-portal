@@ -24,11 +24,11 @@ export default defineConfig({
     },
     globals: true,
     testTimeout: 120000, // 2 minutes for heavy property tests
-    // Optimize memory usage in CI environments — disable worker pool entirely
-    pool: process.env.CI ? "none" : "threads",
-    poolOptions: process.env.CI ? {} : {
+    // Optimize memory usage in CI environments — single-threaded execution
+    pool: "threads",
+    poolOptions: {
       threads: {
-        singleThread: false,
+        singleThread: process.env.CI ? true : false,
       },
     },
     isolate: true,
