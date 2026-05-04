@@ -128,9 +128,24 @@ const mapDtosToData = (
 };
 
 export function useTenantListings(): UseTenantListings {
+  // Initialize fallback data with tenant filtering
+  const tenant = getTenantContext();
+  const overrides = getTenantOverrides(tenant?.slug);
+  const tenantAllowedIds = new Set((overrides.homes ?? []).map(h => Number(h.roomNo)));
+
+  const getTenantFilteredFallback = () => {
+    let filtered = FALLBACK_PROPERTIES;
+    if (tenantAllowedIds.size > 0) {
+      filtered = FALLBACK_PROPERTIES.filter(p => tenantAllowedIds.has(Number(p.id)));
+    }
+    return filtered;
+  };
+
+  const filteredFallback = getTenantFilteredFallback();
+
   const [data, setData] = useState<{ listings: Listing[]; properties: TenantPropertyRecord[] }>({
     listings: FALLBACK_LISTINGS,
-    properties: FALLBACK_PROPERTIES,
+    properties: filteredFallback,
   });
   const [state, setState] = useState<TenantListingsState>("idle");
   const [fetchErrorMessage, setFetchErrorMessage] = useState<string | null>(null);
