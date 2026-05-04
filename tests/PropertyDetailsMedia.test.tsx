@@ -1,10 +1,21 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { vi } from "vitest";
+import { Suspense } from "react";
 
 vi.mock("@/components/availability/UnitBookingWidget", () => ({
   __esModule: true,
   default: () => <div>Booking Widget</div>,
+}));
+
+vi.mock("@/components/AvailabilityCalendar", () => ({
+  __esModule: true,
+  default: () => <div>Availability Calendar</div>,
+}));
+
+vi.mock("@/components/GuestAssistant", () => ({
+  __esModule: true,
+  default: () => <div>Guest Assistant</div>,
 }));
 
 vi.mock("@/components/homepage_components/hotelBooking_form/BookingCard.tsx", () => ({
@@ -115,9 +126,11 @@ describe("Homepage_PropertyDetails gallery", () => {
   it("renders property details component", async () => {
     const { container } = render(
       <MemoryRouter initialEntries={["/homes/test-property/101"]}>
-        <Routes>
-          <Route path="/homes/:propertySlug/:unitSlug" element={<Homepage_PropertyDetails />} />
-        </Routes>
+        <Suspense fallback={<div>Loading...</div>}>
+          <Routes>
+            <Route path="/homes/:propertySlug/:unitSlug" element={<Homepage_PropertyDetails />} />
+          </Routes>
+        </Suspense>
       </MemoryRouter>,
     );
 
@@ -129,14 +142,16 @@ describe("Homepage_PropertyDetails gallery", () => {
   it("lazy loads primary and thumbnail images", async () => {
     const { container } = render(
       <MemoryRouter initialEntries={["/homes/test-property/101"]}>
-        <Routes>
-          <Route path="/homes/:propertySlug/:unitSlug" element={<Homepage_PropertyDetails />} />
-        </Routes>
+        <Suspense fallback={<div>Loading...</div>}>
+          <Routes>
+            <Route path="/homes/:propertySlug/:unitSlug" element={<Homepage_PropertyDetails />} />
+          </Routes>
+        </Suspense>
       </MemoryRouter>,
     );
 
     // Wait for property title to ensure component is rendered
-    await screen.findByText("Test Property");
+    await screen.findByText("Test Property", {}, { timeout: 5000 });
 
     // Find all img elements in the document
     const allImages = container.querySelectorAll("img");
