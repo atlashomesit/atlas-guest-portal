@@ -11,7 +11,7 @@ import { getTenantOverrides } from '../../../tenant/tenantOverrides';
 import { formatDisplayNumber, getTelLink } from '../../../config/contact';
 import { trackEvent } from '../../../utils/analytics';
 import { getFavoriteIds } from '../../../utils/guestHistory';
-import { homes as defaultHomes } from '../../../content/homes';
+import { getTenantFilteredHomes } from '../../../content/homes';
 import { useBooking } from '../../../contexts/BookingContext';
 import { usePropertyListings } from '../../../hooks/usePropertyListings';
 import CurrencySelector from '../../CurrencySelector';
@@ -27,8 +27,9 @@ const Navbar = () => {
   const showListProperty = !overrides.hideListProperty;
 
   const apiListings = usePropertyListings();
+  const defaultFilteredHomes = getTenantFilteredHomes();
   const homesEntries = apiListings.usedFallback
-    ? (overrides.homes ?? defaultHomes)
+    ? (overrides.homes ?? defaultFilteredHomes)
     : apiListings.homes;
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
