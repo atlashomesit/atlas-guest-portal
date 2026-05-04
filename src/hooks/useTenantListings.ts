@@ -133,10 +133,11 @@ export function useTenantListings(): UseTenantListings {
   const overrides = getTenantOverrides(tenant?.slug);
   const tenantAllowedIds = new Set((overrides.homes ?? []).map(h => Number(h.roomNo)));
 
-  // Show all fallback initially (will be replaced by API data)
-  // API results will be filtered by tenant
-  const filteredFallback = FALLBACK_PROPERTIES;
-  const filteredListings = FALLBACK_LISTINGS;
+  // For Star Guest House, don't show fallback (rooms 301-308, 201-208, 107-110 only exist in API)
+  // For other tenants, show all fallback (will be replaced by API data)
+  const isStarGuestHouse = tenant?.slug === 'starguesthouse';
+  const filteredFallback = isStarGuestHouse ? [] : FALLBACK_PROPERTIES;
+  const filteredListings = isStarGuestHouse ? [] : FALLBACK_LISTINGS;
 
   const [data, setData] = useState<{ listings: Listing[]; properties: TenantPropertyRecord[] }>({
     listings: filteredListings,
