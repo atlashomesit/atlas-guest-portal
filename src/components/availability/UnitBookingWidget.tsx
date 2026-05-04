@@ -381,8 +381,8 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   // Availability always starts from today, independent of selected dates
   useEffect(() => {
     if (!listingId || isBookingDisabled) return;
-    
-    // Fetch on mount or when calendar opens (but availabilityRange is independent of selected dates)
+
+    // Fetch on mount only - availability range is recalculated on mount and doesn't need constant refetching
 
     let isActive = true;
 
@@ -485,8 +485,8 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     return () => {
       isActive = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- today stable; run on availability/params change only
-  }, [openCalendar, listingId, availabilityRange.endDate, availabilityRange.startDate, isBookingDisabled]);
+    // Only refetch when listingId changes; availabilityRange is stable and lastAvailabilityKeyRef prevents duplicate calls
+  }, [listingId, isBookingDisabled]);
 
   // Auto-select next available date if today is blocked or hold
   useEffect(() => {
@@ -550,7 +550,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         setCalendarPricingLoading(false);
       });
     return () => controller.abort();
-  }, [listingId, shownDate]);
+  }, [listingId, toISODate(startOfMonth(shownDate))]);
 
   // TASK-571: Fetch long-stay (LOS) discount breakdown when guest selects a valid range.
   useEffect(() => {
@@ -565,11 +565,13 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
       return;
     }
     const controller = new AbortController();
+    const checkInStr = toISODate(dateRange.startDate);
+    const checkOutStr = toISODate(dateRange.endDate);
     fetchPricingBreakdown(
       {
         listingId,
-        checkIn: toISODate(dateRange.startDate),
-        checkOut: toISODate(dateRange.endDate),
+        checkIn: checkInStr,
+        checkOut: checkOutStr,
       },
       controller.signal,
     )
@@ -584,7 +586,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         setLosDiscountPercent(0);
       });
     return () => controller.abort();
-  }, [listingId, dateRange?.startDate, dateRange?.endDate]);
+  }, [listingId, dateRange?.startDate ? toISODate(dateRange.startDate) : null, dateRange?.endDate ? toISODate(dateRange.endDate) : null]);
 
   const isCheckInAllowed = (date: Date) => {
   const iso = toISODate(getIstStartOfDay(date));
