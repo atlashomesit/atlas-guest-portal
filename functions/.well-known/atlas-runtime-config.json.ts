@@ -41,18 +41,18 @@ export const onRequestGet = (context: { env: Env; request: Request }) => {
   const hostname = request.headers.get("host") || "";
   const isStarGuestHouse = hostname.includes("starguesthouse");
 
-  // Select config based on hostname
+  // Select config based on hostname, with fallback logic
   let apiBaseUrl: string;
   let tenantKey: string;
   let environment: string;
 
-  if (isStarGuestHouse && env.SGH_API_BASE_URL) {
-    // Star Guest House specific config
-    apiBaseUrl = (env.SGH_API_BASE_URL ?? "").trim();
+  if (isStarGuestHouse) {
+    // Star Guest House: prefer SGH_API_BASE_URL, fallback to ATLAS_API_BASE_URL
+    apiBaseUrl = (env.SGH_API_BASE_URL ?? env.ATLAS_API_BASE_URL ?? "").trim();
     tenantKey = (env.SGH_TENANT_KEY ?? "starguesthouse").trim();
     environment = (env.ATLAS_ENVIRONMENT ?? "production").trim();
   } else {
-    // Default Atlas config
+    // Atlas Homestays: use ATLAS_API_BASE_URL
     apiBaseUrl = (env.ATLAS_API_BASE_URL ?? "").trim();
     tenantKey = (env.ATLAS_TENANT_KEY ?? "").trim();
     environment = (env.ATLAS_ENVIRONMENT ?? "").trim();
@@ -60,7 +60,7 @@ export const onRequestGet = (context: { env: Env; request: Request }) => {
 
   if (!apiBaseUrl) {
     const errorMsg = isStarGuestHouse
-      ? "SGH_API_BASE_URL is not set in Cloudflare Pages environment variables"
+      ? "SGH_API_BASE_URL or ATLAS_API_BASE_URL is not set in Cloudflare Pages environment variables"
       : "ATLAS_API_BASE_URL is not set in Cloudflare Pages environment variables";
     return new Response(
       JSON.stringify({ error: errorMsg }),

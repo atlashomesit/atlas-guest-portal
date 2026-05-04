@@ -149,6 +149,7 @@ export function useTenantListings(): UseTenantListings {
   const [state, setState] = useState<TenantListingsState>("idle");
   const [fetchErrorMessage, setFetchErrorMessage] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const hasFetchedRef = useRef(false);
 
   const refetch = useCallback(async () => {
     abortRef.current?.abort();
@@ -204,6 +205,8 @@ export function useTenantListings(): UseTenantListings {
   }, []);
 
   useEffect(() => {
+    if (hasFetchedRef.current) return;
+    hasFetchedRef.current = true;
     void refetch();
     return () => {
       abortRef.current?.abort();
