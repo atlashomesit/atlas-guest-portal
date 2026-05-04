@@ -3,7 +3,10 @@ import { clearRuntimeConfig, setRuntimeConfig } from "@/runtime-config";
 import {
   fetchListingById,
   fetchListingPhotos,
+  fetchPropertyListingPhotos,
+  listingPhotosToSortedUrls,
   normalizeListingPhotoResponse,
+  parseListingPhotosResponse,
 } from "./listingClient";
 
 const API_BASE = "https://api.example.com";
@@ -92,6 +95,61 @@ describe("listingClient", () => {
     fetchMock.mockResolvedValueOnce({ ok: false, status: 404 });
 
     await expect(fetchListingPhotos(99)).resolves.toEqual([]);
+  });
+
+  it("fetchPropertyListingPhotos returns typed rows from DTO array", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => [
+        {
+          id: 10,
+          listingId: 2,
+          url: "https://x/b.jpg",
+          originalFileName: "b.jpg",
+          sortOrder: 1,
+          caption: null,
+          isCover: true,
+        },
+        {
+          id: 11,
+          listingId: 1,
+          url: "https://x/a.jpg",
+          originalFileName: "a.jpg",
+          sortOrder: 1,
+          caption: null,
+          isCover: true,
+        },
+      ],
+    });
+
+    const rows = await fetchPropertyListingPhotos(55);
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${API_BASE}/listings/55/photos`,
+      expect.objectContaining({ headers: expect.any(Object) }),
+    );
+    expect(rows.map((r) => r.listingId)).toEqual([1, 2]);
+    expect(rows[0].url).toBe("https://x/a.jpg");
+  });
+});
+
+describe("parseListingPhotosResponse / listingPhotosToSortedUrls", () => {
+  it("parseListingPhotosResponse maps API-shaped rows", () => {
+    const rows = parseListingPhotosResponse([
+      { id: 1, listingId: 9, url: "https://u/1", originalFileName: "a.jpg", sortOrder: 2, caption: "x", isCover: false },
+    ]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ id: 1, listingId: 9, url: "https://u/1", sortOrder: 2 });
+  });
+
+  it("listingPhotosToSortedUrls filters by listingId", () => {
+    const urls = listingPhotosToSortedUrls(
+      [
+        { id: 1, listingId: 2, url: "https://b", originalFileName: null, sortOrder: 2, caption: null, isCover: false },
+        { id: 2, listingId: 2, url: "https://a", originalFileName: null, sortOrder: 1, caption: null, isCover: true },
+      ],
+      2,
+    );
+    expect(urls).toEqual(["https://a", "https://b"]);
   });
 });
 

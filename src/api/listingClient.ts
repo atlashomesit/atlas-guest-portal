@@ -28,6 +28,60 @@ export type ListingDetail = {
 const LISTING_ENDPOINT = '/listings';
 const PUBLIC_LISTINGS_ENDPOINT = '/listings/public';
 
+/**
+ * Matches Atlas API `ListingPhotoDto` from `GET /listings/{propertyId}/photos`
+ * (feat: aggregate all units on a property — each row includes `listingId`).
+ */
+export type ListingPhoto = {
+  id: number;
+  listingId: number;
+  url: string;
+  originalFileName: string | null;
+  sortOrder: number;
+  caption: string | null;
+  isCover: boolean;
+};
+
+/** Parse JSON array from GET /listings/{propertyId}/photos into typed rows (ignores invalid entries). */
+export function parseListingPhotosResponse(payload: unknown): ListingPhoto[] {
+  if (!Array.isArray(payload)) return [];
+  const out: ListingPhoto[] = [];
+  for (const raw of payload) {
+    if (!raw || typeof raw !== 'object' || typeof (raw as { url?: unknown }).url !== 'string') continue;
+    const o = raw as Record<string, unknown>;
+    const listingId = Number(o.listingId ?? o.ListingId);
+    const url = (o.url as string).trim();
+    if (!Number.isFinite(listingId) || listingId <= 0 || !url) continue;
+    const id = Number(o.id ?? o.Id);
+    const sortOrder = Number(o.sortOrder ?? o.SortOrder);
+    const ofn = o.originalFileName ?? o.OriginalFileName;
+    const cap = o.caption ?? o.Caption;
+    out.push({
+      id: Number.isFinite(id) ? id : 0,
+      listingId,
+      url,
+      originalFileName: typeof ofn === 'string' ? ofn : null,
+      sortOrder: Number.isFinite(sortOrder) ? sortOrder : 0,
+      caption: typeof cap === 'string' ? cap : null,
+      isCover: Boolean(o.isCover ?? o.IsCover),
+    });
+  }
+  return out;
+}
+
+/** Ordered URL list from typed photo rows (optional filter to one `listingId`). */
+export function listingPhotosToSortedUrls(photos: ListingPhoto[], listingId?: number): string[] {
+  let rows =
+    listingId != null && listingId > 0 ? photos.filter((p) => p.listingId === listingId) : [...photos];
+  rows = rows.sort(
+    (a, b) =>
+      (listingId != null && listingId > 0
+        ? a.sortOrder - b.sortOrder
+        : a.listingId - b.listingId || a.sortOrder - b.sortOrder),
+  );
+  return rows.map((p) => p.url).filter(Boolean);
+}
+
 /** Shape aligned with API `PublicListingDto` (camelCase JSON). */
 export type PublicListing = {
   id: number;
@@ -256,6 +310,8 @@ export function normalizeListingPhotoResponseForListing(
   listingId: number,
 ): string[] {
   if (!Number.isFinite(listingId) || listingId <= 0) return normalizeListingPhotoResponse(payload);
+  const typed = parseListingPhotosResponse(payload);
+  if (typed.length > 0) return listingPhotosToSortedUrls(typed, listingId);
   if (!Array.isArray(payload)) return normalizeListingPhotoResponse(payload);
   const rows = payload.filter(
     (e) =>
@@ -292,13 +348,35 @@ export async function fetchListingPhotosPayload(
   return response.json();
 }
 
-/** Guest catalog: GET /listings/{propertyId}/photos (optional `listingId` to take one unit's gallery). */
+/**
+ * GET /listings/{propertyId}/photos — all photos for every listing on that property (typed).
+ * Aligns with atlas-api: `feat(listings): GET /listings/{propertyId}/photos returns all units photos`.
+ * Rows are ordered by `listingId` then `sortOrder` (same as API).
+ */
+export async function fetchPropertyListingPhotos(
+  propertyId: number,
+  signal?: AbortSignal,
+): Promise<ListingPhoto[]> {
+  const payload = await fetchListingPhotosPayload(propertyId, signal);
+  const rows = parseListingPhotosResponse(payload);
+  return rows.sort((a, b) => a.listingId - b.listingId || a.sortOrder - b.sortOrder);
+}
+
+/**
+ * Guest catalog: GET /listings/{propertyId}/photos as URL strings.
+ * Pass `listingId` to restrict to one unit when the property has multiple listings.
+ * Falls back to {@link normalizeListingPhotoResponse} for legacy non-DTO payloads (e.g. string[]).
+ */
 export async function fetchListingPhotos(
   propertyId: number,
   signal?: AbortSignal,
   options?: { listingId?: number },
 ): Promise<string[]> {
   const payload = await fetchListingPhotosPayload(propertyId, signal);
+  const typed = parseListingPhotosResponse(payload);
+  if (typed.length > 0) {
+    return listingPhotosToSortedUrls(typed, options?.listingId);
+  }
   if (options?.listingId != null && options.listingId > 0) {
     return normalizeListingPhotoResponseForListing(payload, options.listingId);
   }

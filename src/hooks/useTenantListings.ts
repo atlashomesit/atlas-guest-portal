@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
-  fetchListingPhotosPayload,
+  fetchPropertyListingPhotos,
   fetchPublicListings,
-  normalizeListingPhotoResponseForListing,
+  listingPhotosToSortedUrls,
+  type ListingPhoto,
   type PublicListing,
 } from "@/api/listingClient";
 import { LISTINGS, type Listing } from "@/data/listings";
@@ -168,12 +169,12 @@ export function useTenantListings(): UseTenantListings {
             .filter((id): id is number => id != null && id > 0),
         ),
       ];
-      const payloadByPropertyId = new Map<number, unknown>();
+      const photosByPropertyId = new Map<number, ListingPhoto[]>();
       await Promise.all(
         propertyIds.map(async (pid) => {
           try {
-            const payload = await fetchListingPhotosPayload(pid, controller.signal);
-            payloadByPropertyId.set(pid, payload);
+            const photos = await fetchPropertyListingPhotos(pid, controller.signal);
+            photosByPropertyId.set(pid, photos);
           } catch {
             /* keep dto.photoUrls / local fallback */
           }
@@ -181,8 +182,8 @@ export function useTenantListings(): UseTenantListings {
       );
       for (const dto of dtos) {
         if (dto.id <= 0 || dto.propertyId == null || dto.propertyId <= 0) continue;
-        const raw = payloadByPropertyId.get(dto.propertyId);
-        const urls = normalizeListingPhotoResponseForListing(raw, dto.id);
+        const rows = photosByPropertyId.get(dto.propertyId) ?? [];
+        const urls = listingPhotosToSortedUrls(rows, dto.id);
         if (urls.length > 0) photosByListingId.set(dto.id, urls);
       }
       if (controller.signal.aborted) return;
