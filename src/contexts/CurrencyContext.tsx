@@ -4,6 +4,7 @@
  * Currency selector is for display only — all Razorpay payments are processed in INR.
  * FX rates are fetched from Frankfurter API, cached 12h in localStorage.
  */
+/* eslint-disable react-refresh/only-export-components */
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
