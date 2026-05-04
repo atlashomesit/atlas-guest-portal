@@ -1,7 +1,9 @@
 import Slider from "../../components/homepage_components/slider/Slider";
 import HomePage_Locations from "../../components/homepage_components/homepage_locations/HomePage_Locations";
 import { useEffect, useMemo } from "react";
-import { getTenantPropertyData } from "../../utils/propertyDataUtils";
+import { useTenantListings } from "../../hooks/useTenantListings";
+import { getTenantOverrides } from "../../tenant/tenantOverrides";
+import { getTenantContext } from "../../tenant/tenantContext";
 import { getFaqHighlights } from "../../content/faqHighlights";
 import { trackEvent } from "../../utils/analytics";
 import BannerSecondary from "../../components/home/BannerSecondary";
@@ -20,14 +22,12 @@ import { Link, useLocation } from "react-router-dom";
 import FaqHighlights from "../../components/faq/FaqHighlights";
 import pricingConfig from "../../config/pricing.config";
 import { getEffectiveDiscountPercent } from "../../utils/pricing";
-import { getTenantContext } from "../../tenant/tenantContext";
-import { getTenantOverrides } from "../../tenant/tenantOverrides";
 import RecentlyViewedStrip from "../../components/RecentlyViewedStrip";
 
 const Home = () => {
     const { pendingScrollTarget, setPendingScrollTarget } = useBooking();
     const location = useLocation();
-    const propertyData = getTenantPropertyData();
+    const { properties: propertyData } = useTenantListings();
     const tenant = getTenantContext();
     const overrides = getTenantOverrides(tenant?.slug);
     const schemaBrandName =
