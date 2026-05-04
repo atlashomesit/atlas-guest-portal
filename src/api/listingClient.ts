@@ -135,7 +135,7 @@ export type PublicListing = {
 
 function normalizePublicListing(payload: Record<string, unknown>): PublicListing {
   const id = Number(payload.id);
-  const maxGuests = Number(payload.maxGuests ?? 0);
+  const maxGuests = Number(payload.maxGuests ?? payload.MaxGuests ?? 0);
   const rawRate = payload.baseNightlyRate;
   const photos = payload.photoUrls;
   const minStay = payload.minStay != null ? Number(payload.minStay) : null;
@@ -215,9 +215,11 @@ const coercePublicListingsPayload = (payload: unknown): Record<string, unknown>[
     return payload.filter((e): e is Record<string, unknown> => Boolean(e) && typeof e === 'object');
   }
   if (payload && typeof payload === 'object') {
-    const items = (payload as { items?: unknown }).items;
-    if (Array.isArray(items)) {
-      return items.filter((e): e is Record<string, unknown> => Boolean(e) && typeof e === 'object');
+    const obj = payload as Record<string, unknown>;
+    // Try common wrapper properties: items, data, results, value, values
+    const arrayField = obj.items ?? obj.data ?? obj.results ?? obj.value ?? obj.values;
+    if (Array.isArray(arrayField)) {
+      return arrayField.filter((e): e is Record<string, unknown> => Boolean(e) && typeof e === 'object');
     }
   }
   return [];
@@ -262,11 +264,17 @@ export const fetchPublicListings = async (signal?: AbortSignal): Promise<PublicL
   }
 
   const payload = (await response.json()) as unknown;
-  const rows = coercePublicListingsPayload(payload);
+  console.log('[fetchPublicListings] Raw API response:', payload);
 
-  return rows
+  const rows = coercePublicListingsPayload(payload);
+  console.log('[fetchPublicListings] Coerced rows count:', rows.length);
+
+  const result = rows
     .map((item) => normalizePublicListing(item))
     .filter((row): row is PublicListing => row !== null && row.id > 0);
+
+  console.log('[fetchPublicListings] Final normalized listings count:', result.length);
+  return result;
 };
 
 /** Normalize JSON from GET /listings/{propertyId}/photos into ordered URL strings. */
