@@ -30,6 +30,8 @@ export type TenantContactOverrides = {
   whatsappPhone?: string;
   /** Public contact email. */
   email?: string;
+  /** Physical address. */
+  address?: string;
 };
 
 export type TenantDirectBookingPromo = {
@@ -99,6 +101,7 @@ const TENANT_OVERRIDES: Record<string, TenantOverrides> = {
     hideListProperty: true,
     homes: STAR_GUEST_HOUSE_HOMES,
     contact: {
+      address: 'Shop No 2, 10, opposite Shilpa Park, Kondapur, Hanuman Nagar, Telangana 500084',
       businessPhone: '7799779192',
       ownerPhone: '7799779192',
       whatsappPhone: '7799779192',

@@ -42,8 +42,9 @@ const Footer = () => {
 
     const socialLinks = Array.isArray(footerData?.socialLinks) ? footerData.socialLinks : [];
     const contactInfo: { icon: keyof typeof iconMap; text: string | string[] }[] = [
-        { icon: 'IoIosMail', text: getContactEmail() },
-        { icon: 'IoIosCall', text: [formatDisplayNumber()] },
+        ...(overrides.contact?.address ? [{ icon: 'IoIosMail' as const, text: overrides.contact.address }] : []),
+        { icon: 'IoIosMail' as const, text: getContactEmail() },
+        { icon: 'IoIosCall' as const, text: [formatDisplayNumber()] },
     ];
 
     return (
