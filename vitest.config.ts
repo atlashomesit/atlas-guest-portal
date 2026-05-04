@@ -28,10 +28,10 @@ export default defineConfig({
     pool: "threads",
     poolOptions: {
       threads: {
-        maxThreads: process.env.CI ? 1 : 4,
+        maxThreads: process.env.CI ? 2 : 4,
         minThreads: 1,
         isolate: true,
-        singleThread: process.env.CI ? true : false,
+        singleThread: false,
       },
     },
     isolate: true,
