@@ -81,11 +81,9 @@ export type TenantOverrides = {
   faq?: TenantFaqEntry[];
 };
 
-/** Star Guest House public listing IDs (rooms 107–110, 201–208, 301–308). */
+/** Star Guest House public listing IDs from API (9-29). */
 const STAR_GUEST_HOUSE_LISTING_IDS: number[] = [
-  107, 108, 109, 110,
-  201, 202, 203, 204, 205, 206, 207, 208,
-  301, 302, 303, 304, 305, 306, 307, 308,
+  9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
 ];
 
 const TENANT_OVERRIDES: Record<string, TenantOverrides> = {
