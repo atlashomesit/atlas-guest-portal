@@ -8,7 +8,7 @@ import { parseDate } from "../utils/formatting";
 import { useCurrency } from "../contexts/CurrencyContext";
 import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 import { getTenantContext } from "../tenant/tenantContext";
-import { getTenantOverrides } from "../tenant/tenantOverrides";
+import { getTenantOverrides, getTenantPublicListingIdAllowlist } from "../tenant/tenantOverrides";
 import SkeletonCard from "../components/apartments/SkeletonCard";
 import OptimizedImage from "../components/ui/OptimizedImage";
 import OwnerShareBadge from "../components/OwnerShareBadge"; // TASK-1705
@@ -179,13 +179,22 @@ const SearchPage = () => {
 
   const loadFromApi = useCallback(async (signal: AbortSignal) => {
     setApiError(false);
+    const tenantOverrides = getTenantOverrides(getTenantContext()?.slug);
+    const strictApiOnly = tenantOverrides.onlyApiListings === true;
     try {
       const data = await fetchPublicListings(signal);
+      let normalized = apiToNormalized(data);
+      const allow = getTenantPublicListingIdAllowlist(tenantOverrides);
+      if (allow.size > 0) {
+        normalized = normalized.filter((u) => allow.has(u.numericId));
+      }
       // TASK-1867: always set apiListings (even empty array) so 0-listing response doesn't look like an error
-      setApiListings(apiToNormalized(data));
+      setApiListings(normalized);
     } catch {
-      // API failed — static fallback is used automatically; flag for honest banner
       setApiError(true);
+      if (strictApiOnly) {
+        setApiListings([]);
+      }
     }
   }, []);
 
@@ -240,14 +249,17 @@ const SearchPage = () => {
   const tenant = getTenantContext();
   const overrides = getTenantOverrides(tenant?.slug);
   const tenantAllowedIds = useMemo(() => {
-    const allowed = new Set((overrides.homes ?? []).map(h => Number(h.roomNo)));
+    const allowed = getTenantPublicListingIdAllowlist(overrides);
     return allowed.size > 0 ? allowed : undefined;
-  }, [overrides.homes]);
+  }, [tenant?.slug]);
 
-  const listings = useMemo(
-    () => apiListings ?? buildStaticListings(tenantAllowedIds),
-    [apiListings, tenantAllowedIds],
-  );
+  const onlyApiListings = overrides.onlyApiListings === true;
+  const listings = useMemo(() => {
+    if (onlyApiListings) {
+      return apiListings !== null ? apiListings : [];
+    }
+    return apiListings ?? buildStaticListings(tenantAllowedIds);
+  }, [apiListings, tenantAllowedIds, onlyApiListings]);
 
   useEffect(() => {
     if (!availableNow) {
@@ -1132,7 +1144,7 @@ const SearchPage = () => {
               <article
                 key={unit.id}
                 data-testid="guest-listing-card"
-                className="flex flex-col overflow-hidden rounded-2xl border border-border-subtle bg-bg-surface shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
+                className="flex flex-col overflow-hidden rounded-2xl border border-border-subtle bg-bg-surface shadow-sm transition-colors hover:border-border-subtle"
               >
                 <div className="h-48 w-full bg-gradient-to-br from-bg-muted to-bg-surface">
                   <OptimizedImage

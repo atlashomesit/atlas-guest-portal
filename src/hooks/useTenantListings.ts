@@ -4,7 +4,7 @@ import { fetchListingPhotos, fetchPublicListings, type PublicListing } from "@/a
 import { LISTINGS, type Listing } from "@/data/listings";
 import { propertyData } from "@/data/propertyData";
 import { getTenantContext } from "@/tenant/tenantContext";
-import { getTenantOverrides } from "@/tenant/tenantOverrides";
+import { getTenantOverrides, getTenantPublicListingIdAllowlist } from "@/tenant/tenantOverrides";
 
 type LocalProperty = (typeof propertyData)[number];
 
@@ -103,15 +103,17 @@ const mapDtosToData = (
 ): { listings: Listing[]; properties: TenantPropertyRecord[] } => {
   const tenant = getTenantContext();
   const overrides = getTenantOverrides(tenant?.slug);
-  const tenantAllowedIds = new Set((overrides.homes ?? []).map(h => Number(h.roomNo)));
+  const tenantAllowedIds = getTenantPublicListingIdAllowlist(overrides);
 
   let properties = dtos
     .filter((dto) => dto.id > 0)
     .map((dto) => mapDtoToProperty(dto, photosByListingId.get(dto.id) ?? []));
 
-  // Filter to only tenant-allowed properties if homes list is defined
   if (tenantAllowedIds.size > 0) {
-    properties = properties.filter(p => tenantAllowedIds.has(Number(p.id)));
+    properties = properties.filter((p) => {
+      const lid = p.listingId != null ? Number(p.listingId) : NaN;
+      return Number.isFinite(lid) && tenantAllowedIds.has(lid);
+    });
   }
 
   const listings: Listing[] = properties.map((p) => ({
@@ -129,12 +131,10 @@ const mapDtosToData = (
 
 export function useTenantListings(): UseTenantListings {
   const tenant = getTenantContext();
-
-  // For Star Guest House, don't show fallback (rooms only exist in API)
-  // For other tenants, show all fallback (will be replaced by API data)
-  const isStarGuestHouse = tenant?.slug === 'starguesthouse';
-  const filteredFallback = isStarGuestHouse ? [] : FALLBACK_PROPERTIES;
-  const filteredListings = isStarGuestHouse ? [] : FALLBACK_LISTINGS;
+  const overrides = getTenantOverrides(tenant?.slug);
+  const onlyApi = overrides.onlyApiListings === true;
+  const filteredFallback = onlyApi ? [] : FALLBACK_PROPERTIES;
+  const filteredListings = onlyApi ? [] : FALLBACK_LISTINGS;
 
   const [data, setData] = useState<{ listings: Listing[]; properties: TenantPropertyRecord[] }>({
     listings: filteredListings,
@@ -172,11 +172,6 @@ export function useTenantListings(): UseTenantListings {
       if (controller.signal.aborted) return;
 
       const mapped = mapDtosToData(dtos, photosByListingId);
-      if (mapped.properties.length === 0) {
-        // Keep the fallback so the page never goes blank on an empty/unfiltered response.
-        setState("success");
-        return;
-      }
       setData(mapped);
       setState("success");
     } catch (error) {

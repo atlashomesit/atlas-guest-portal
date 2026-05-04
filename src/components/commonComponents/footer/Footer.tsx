@@ -1,4 +1,5 @@
-import { FaFacebook, FaTwitter, FaYoutube, FaInstagram } from 'react-icons/fa';
+import type { ReactNode } from 'react';
+import { FaFacebook, FaTwitter, FaYoutube, FaInstagram, FaMapMarkerAlt, FaWhatsapp } from 'react-icons/fa';
 import { ImGithub } from 'react-icons/im';
 import { IoIosMail, IoIosCall, IoIosArrowForward } from "react-icons/io";
 import { footerData } from '../../../data';
@@ -8,7 +9,7 @@ import { LOGO_URL } from '../../../config/branding';
 import { getTenantContext } from '../../../tenant/tenantContext';
 import { getTenantOverrides } from '../../../tenant/tenantOverrides';
 import { CompactThemeSwitcher } from '../../ui/CompactThemeSwitcher';
-import { formatDisplayNumber, getContactEmail } from '../../../config/contact';
+import { formatDisplayNumber, getContactEmail, getTelLink, getWhatsAppLink, getContactPhone, getWhatsAppPhone } from '../../../config/contact';
 
 const iconMap = {
     ImGithub,
@@ -41,11 +42,55 @@ const Footer = () => {
     const year = new Date().getFullYear();
 
     const socialLinks = Array.isArray(footerData?.socialLinks) ? footerData.socialLinks : [];
-    const contactInfo: { icon: keyof typeof iconMap; text: string | string[] }[] = [
-        ...(overrides.contact?.address ? [{ icon: 'IoIosMail' as const, text: overrides.contact.address }] : []),
-        { icon: 'IoIosMail' as const, text: getContactEmail() },
-        { icon: 'IoIosCall' as const, text: [formatDisplayNumber()] },
-    ];
+
+    const businessPhone = getContactPhone("business");
+    const whatsappDigits = getWhatsAppPhone("business");
+    const showWhatsAppRow = whatsappDigits !== businessPhone;
+    const email = getContactEmail();
+
+    type LocateRow = { key: string; icon: ReactNode; content: ReactNode };
+    const locateRows: LocateRow[] = [];
+    if (overrides.contact?.address?.trim()) {
+        locateRows.push({
+            key: "address",
+            icon: <FaMapMarkerAlt className="mt-0.5 shrink-0 text-lg" aria-hidden />,
+            content: <span className="text-left">{overrides.contact.address.trim()}</span>,
+        });
+    }
+    locateRows.push({
+        key: "email",
+        icon: <IoIosMail className="shrink-0 text-xl" aria-hidden />,
+        content: (
+            <a href={`mailto:${encodeURIComponent(email)}`} className="break-all text-left hover:text-[var(--footer-link-hover)]">
+                {email}
+            </a>
+        ),
+    });
+    locateRows.push({
+        key: "phone",
+        icon: <IoIosCall className="shrink-0 text-xl" aria-hidden />,
+        content: (
+            <a href={getTelLink()} className="text-left hover:text-[var(--footer-link-hover)]">
+                {formatDisplayNumber()}
+            </a>
+        ),
+    });
+    if (showWhatsAppRow) {
+        locateRows.push({
+            key: "whatsapp",
+            icon: <FaWhatsapp className="shrink-0 text-lg" aria-hidden />,
+            content: (
+                <a
+                    href={getWhatsAppLink()}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-left hover:text-[var(--footer-link-hover)]"
+                >
+                    WhatsApp +91-{whatsappDigits}
+                </a>
+            ),
+        });
+    }
 
     return (
         <footer
@@ -124,32 +169,16 @@ const Footer = () => {
                     </div>
                 </div>
 
-                <div className="text-center lg:text-left">
-                    <h2 className="font-display text-xl font-semibold mb-4 text-[var(--footer-heading)]" style={{ fontFamily: 'var(--font-family-display)' }}>Locate Us</h2>                    <div className="text-base flex flex-col gap-3">
-                        {contactInfo.map(({ icon, text }, index) => {
-                            const IconComponent = iconMap[icon];
-
-                            return (
-                                <div key={index} className="hover:text-[var(--footer-link-hover)] text-[var(--footer-link)] flex flex-col gap-2 cursor-pointer transition-colors">                                    {Array.isArray(text) ? (
-                                        text.map((line, idx) => (
-                                            <p
-                                                key={idx}
-                                                className="flex gap-2 justify-center lg:justify-start items-center"
-                                            >
-                                                <span><IconComponent /></span>
-                                                <span>{line}</span>
-                                            </p>
-                                        ))
-                                    ) : (
-                                        <p className="flex gap-2 justify-center lg:justify-start items-center">
-                                            <span><IconComponent /></span>
-                                            <span>{text}</span>
-                                        </p>
-                                    )}
-                                </div>
-                            );
-                        })}
-                    </div>
+                <div className="text-center lg:text-left min-w-0">
+                    <h2 className="font-display text-xl font-semibold mb-4 text-[var(--footer-heading)]" style={{ fontFamily: 'var(--font-family-display)' }}>Locate Us</h2>
+                    <ul className="m-0 flex list-none flex-col gap-3 p-0 text-base text-[var(--footer-link)]">
+                        {locateRows.map((row) => (
+                            <li key={row.key} className="flex flex-row items-start justify-center gap-3 lg:justify-start">
+                                <span className="text-[var(--footer-link)] shrink-0 leading-relaxed">{row.icon}</span>
+                                <span className="min-w-0 flex-1 leading-relaxed">{row.content}</span>
+                            </li>
+                        ))}
+                    </ul>
                 </div>
             </div>
 

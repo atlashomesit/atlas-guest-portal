@@ -11,7 +11,6 @@ import { getTenantOverrides } from '../../../tenant/tenantOverrides';
 import { formatDisplayNumber, getTelLink } from '../../../config/contact';
 import { trackEvent } from '../../../utils/analytics';
 import { getFavoriteIds } from '../../../utils/guestHistory';
-import { getTenantFilteredHomes } from '../../../content/homes';
 import { useBooking } from '../../../contexts/BookingContext';
 import { usePropertyListings } from '../../../hooks/usePropertyListings';
 import CurrencySelector from '../../CurrencySelector';
@@ -27,10 +26,7 @@ const Navbar = () => {
   const showListProperty = !overrides.hideListProperty;
 
   const apiListings = usePropertyListings();
-  const defaultFilteredHomes = getTenantFilteredHomes();
-  const homesEntries = apiListings.usedFallback
-    ? (overrides.homes ?? defaultFilteredHomes)
-    : apiListings.homes;
+  const homesEntries = apiListings.homes;
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isHomesOpen, setIsHomesOpen] = useState(false);
@@ -355,17 +351,27 @@ const Navbar = () => {
 
                 {isHomesMobileOpen && (
                   <div id="mobile-homes-menu" className="mobile-submenu">
-                    {homesEntries.map((home) => (
-                      <Link
-                        key={home.roomNo}
-                        to={home.href}
-                        role="menuitem"
-                        className="block py-1 text-sm"
-                        onClick={handleHomeSelect}
-                      >
-                        {home.title}
-                      </Link>
-                    ))}
+                    {apiListings.isLoading ? (
+                      <div className="flex items-center justify-center py-3">
+                        <Loader size={20} className="animate-spin text-brand-primary" />
+                      </div>
+                    ) : homesEntries.length === 0 ? (
+                      <div className="dropdown-menu-empty px-2 py-2 text-sm" role="presentation">
+                        No listings available
+                      </div>
+                    ) : (
+                      homesEntries.map((home) => (
+                        <Link
+                          key={home.roomNo}
+                          to={home.href}
+                          role="menuitem"
+                          className="block py-1 text-sm"
+                          onClick={handleHomeSelect}
+                        >
+                          {home.title}
+                        </Link>
+                      ))
+                    )}
                   </div>
                 )}
               </div>

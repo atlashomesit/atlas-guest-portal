@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { fetchPublicListings, type PublicListing } from '../api/listingClient';
 import { getTenantContext } from '../tenant/tenantContext';
-import { getTenantOverrides } from '../tenant/tenantOverrides';
+import { getTenantOverrides, getTenantPublicListingIdAllowlist } from '../tenant/tenantOverrides';
 import { buildHomeUnitPath, getPropertySlug } from '../utils/navigation';
 
 export type HomeLink = {
@@ -49,11 +49,11 @@ export function usePropertyListings(): PropertyListingsState {
       try {
         const listings = await fetchPublicListings();
         const overrides = getTenantOverrides(tenant?.slug);
-        const tenantAllowedIds = new Set((overrides.homes ?? []).map(h => Number(h.roomNo)));
+        const tenantAllowedIds = getTenantPublicListingIdAllowlist(overrides);
 
         let filtered = listings;
         if (tenantAllowedIds.size > 0) {
-          filtered = listings.filter(l => tenantAllowedIds.has(l.id));
+          filtered = listings.filter((l) => tenantAllowedIds.has(l.id));
         }
 
         const mapped = filtered.map(mapPublicListingToHomeLink);
@@ -64,7 +64,8 @@ export function usePropertyListings(): PropertyListingsState {
         setListingsById(byId);
       } catch (error) {
         console.warn('Error fetching listings:', error);
-        setUsedFallback(true);
+        const overrides = getTenantOverrides(tenant?.slug);
+        setUsedFallback(overrides.onlyApiListings !== true);
         setHomes([]);
         setListingsById({});
       } finally {

@@ -1356,7 +1356,7 @@ useEffect(() => {
                                                 <Link
                                                     key={String(it.id)}
                                                     to={path}
-                                                    className="rounded-xl border border-border-subtle bg-bg-surface overflow-hidden shadow-level1 hover:shadow-level2 transition-shadow"
+                                                    className="rounded-xl border border-border-subtle bg-bg-surface overflow-hidden shadow-sm transition-colors hover:border-border-subtle"
                                                 >
                                                     {img ? <img src={img} alt={name} className="w-full h-40 object-cover" loading="lazy" /> : null}
                                                     <div className="p-4">

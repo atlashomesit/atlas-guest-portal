@@ -108,7 +108,7 @@ export default function MarketplaceHomepage() {
             return (
               <article
                 key={item.id}
-                className="relative flex flex-col overflow-hidden rounded-2xl border border-border bg-bg-surface shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
+                className="relative flex flex-col overflow-hidden rounded-2xl border border-border bg-bg-surface shadow-sm transition-colors hover:border-border-subtle"
                 data-testid="marketplace-card"
               >
                 {/* TASK-1874: OptimizedImage replaces raw <img> */}
