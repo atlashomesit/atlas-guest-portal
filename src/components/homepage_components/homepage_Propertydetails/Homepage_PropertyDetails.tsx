@@ -406,7 +406,7 @@ const PropertyDetails = () => {
             })
             .catch(() => {});
         return () => ac.abort();
-    }, [resolvedListingId]);
+    }, [resolvedListingId, data?.maxGuests]);
 
     /** TASK-1466: deep links e.g. `/homes/.../123?bookingId=1&t=...` load host phone without exposing it on public catalog. */
     const bookingIdForContact = searchParams.get('bookingId');
@@ -718,7 +718,7 @@ const PropertyDetails = () => {
         }
 
         setNotFound(true);
-    }, [propertySlug, listingIdParam, listingId, location.state?.property, getUrlsForListingId, apiProperties]);
+    }, [propertySlug, listingIdParam, listingId, location.state?.property, getUrlsForListingId, apiProperties, photosLoaded]);
 useEffect(() => {
   if (!data?.id) return;
 
@@ -760,7 +760,7 @@ useEffect(() => {
                 if (!ac.signal.aborted) setSimilarFromApi(null);
             });
         return () => ac.abort();
-    }, [resolvedListingId]);
+    }, [resolvedListingId, data?.listingId, listingId]);
 
     // Prefetch public availability calendar as soon as listing id resolves so date widget opens warm.
     useEffect(() => {

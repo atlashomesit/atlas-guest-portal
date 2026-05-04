@@ -486,7 +486,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
       isActive = false;
     };
     // availabilityRange is memoized and stable; rely on lastAvailabilityKeyRef deduplication for same requests
-  }, [listingId, isBookingDisabled, availabilityRange]);
+  }, [listingId, isBookingDisabled, availabilityRange, today]);
 
   // Auto-select next available date if today is blocked or hold
   useEffect(() => {
@@ -550,7 +550,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         setCalendarPricingLoading(false);
       });
     return () => controller.abort();
-  }, [listingId, toISODate(startOfMonth(shownDate))]);
+  }, [listingId, shownDate]);
 
   // TASK-571: Fetch long-stay (LOS) discount breakdown when guest selects a valid range.
   useEffect(() => {
@@ -586,7 +586,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         setLosDiscountPercent(0);
       });
     return () => controller.abort();
-  }, [listingId, dateRange?.startDate ? toISODate(dateRange.startDate) : null, dateRange?.endDate ? toISODate(dateRange.endDate) : null]);
+  }, [listingId, dateRange?.startDate, dateRange?.endDate]);
 
   const isCheckInAllowed = (date: Date) => {
   const iso = toISODate(getIstStartOfDay(date));
