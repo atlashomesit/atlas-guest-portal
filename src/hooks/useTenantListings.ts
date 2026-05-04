@@ -133,24 +133,10 @@ export function useTenantListings(): UseTenantListings {
   const overrides = getTenantOverrides(tenant?.slug);
   const tenantAllowedIds = new Set((overrides.homes ?? []).map(h => Number(h.roomNo)));
 
-  const getTenantFilteredFallback = () => {
-    let filtered = FALLBACK_PROPERTIES;
-    if (tenantAllowedIds.size > 0) {
-      filtered = FALLBACK_PROPERTIES.filter(p => tenantAllowedIds.has(Number(p.id)));
-    }
-    return filtered;
-  };
-
-  const getTenantFilteredListings = () => {
-    let filtered = FALLBACK_LISTINGS;
-    if (tenantAllowedIds.size > 0) {
-      filtered = FALLBACK_LISTINGS.filter(l => tenantAllowedIds.has(Number(l.id)));
-    }
-    return filtered;
-  };
-
-  const filteredFallback = getTenantFilteredFallback();
-  const filteredListings = getTenantFilteredListings();
+  // Show all fallback initially (will be replaced by API data)
+  // API results will be filtered by tenant
+  const filteredFallback = FALLBACK_PROPERTIES;
+  const filteredListings = FALLBACK_LISTINGS;
 
   const [data, setData] = useState<{ listings: Listing[]; properties: TenantPropertyRecord[] }>({
     listings: filteredListings,
