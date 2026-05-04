@@ -24,15 +24,13 @@ export default defineConfig({
     },
     globals: true,
     testTimeout: 120000, // 2 minutes for heavy property tests
-    // Optimize memory usage in CI environments — use threads pool for stability
-    pool: "threads",
-    poolOptions: {
+    // Optimize memory usage in CI environments — disable worker pool entirely
+    pool: process.env.CI ? "none" : "threads",
+    poolOptions: process.env.CI ? {} : {
       threads: {
-        singleThread: process.env.CI ? true : false,
+        singleThread: false,
       },
     },
-    minThreads: 1,
-    maxThreads: process.env.CI ? 1 : 4,
     isolate: true,
     hookTimeout: 60000,
     // TODO(atlas-guest-portal): refactor propertyDetailsRouteSmoke.test.tsx —
