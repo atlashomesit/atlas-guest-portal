@@ -101,7 +101,7 @@ function PropertyDetailsSkeleton() {
                         </div>
                     </div>
                     <div className="w-full sm:w-1/3 order-1 sm:order-2">
-                        <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6 space-y-4">
+                        <div className="rounded-2xl border border-border-subtle bg-bg-surface p-6 space-y-4">
                             <div className="h-40 w-full animate-pulse rounded-xl bg-bg-muted" />
                             <div className="h-6 w-28 animate-pulse rounded bg-bg-muted" />
                             <div className="h-10 w-full animate-pulse rounded-xl bg-bg-muted" />
@@ -1168,7 +1168,7 @@ useEffect(() => {
 
                 {/* TASK-1359: Virtual tour video embed (YouTube/Vimeo) */}
                 {data?.virtualTourUrl && toEmbedUrl(data.virtualTourUrl) && (
-                  <div className="mb-4 rounded-xl overflow-hidden aspect-video w-full shadow-level1">
+                  <div className="mb-4 rounded-xl overflow-hidden aspect-video w-full">
                     <iframe
                       src={toEmbedUrl(data.virtualTourUrl)!}
                       title="Virtual property tour"
@@ -1282,7 +1282,7 @@ useEffect(() => {
 
                         {/* Policies Section */}
                         {data?.property_policy_details && (
-                            <div className="border border-border-subtle rounded-lg overflow-hidden shadow-level1 bg-bg-surface">
+                            <div className="border border-border-subtle rounded-lg overflow-hidden bg-bg-surface">
                                 <div className="bg-bg-surface p-6">
                                     <h2 className="text-xl sm:text-2xl font-semibold mb-6 text-text-primary">Things to know</h2>
                                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
@@ -1333,7 +1333,7 @@ useEffect(() => {
                                     <div className="h-7 w-48 animate-pulse rounded bg-bg-muted mb-4" />
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         {Array.from({ length: 2 }).map((_, i) => (
-                                            <div key={i} className="rounded-xl border border-border-subtle bg-bg-surface overflow-hidden shadow-level1">
+                                            <div key={i} className="rounded-xl border border-border-subtle bg-bg-surface overflow-hidden">
                                                 <div className="h-40 w-full animate-pulse bg-bg-muted" />
                                                 <div className="p-4 space-y-2">
                                                     <div className="h-4 w-3/4 animate-pulse rounded bg-bg-muted" />
@@ -1358,7 +1358,7 @@ useEffect(() => {
                                                 <Link
                                                     key={String(it.id)}
                                                     to={path}
-                                                    className="rounded-xl border border-border-subtle bg-bg-surface overflow-hidden shadow-sm transition-colors hover:border-border-subtle"
+                                                    className="rounded-xl border border-border-subtle bg-bg-surface overflow-hidden transition-colors hover:border-border-subtle"
                                                 >
                                                     {img ? <img src={img} alt={name} className="w-full h-40 object-cover" loading="lazy" /> : null}
                                                     <div className="p-4">
@@ -1650,7 +1650,7 @@ useEffect(() => {
                                 </Suspense>
                             )}
                             {showAvailabilityPlaceholder && (
-                                <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6">
+                                <div className="rounded-2xl border border-border-subtle bg-bg-surface p-6">
                                     <h3 className="text-lg font-semibold text-text-primary mb-2">Check Availability</h3>
                                     <p className="text-text-muted text-sm mb-4">
                                         Availability check is currently unavailable. Please try again later.
@@ -1672,7 +1672,7 @@ useEffect(() => {
                 {/* Amenities Modal */}
                 {showAmenitiesModal && (
                     <div className="fixed inset-0 bg-[color:color-mix(in_srgb,var(--text-primary)_70%,transparent)] z-[var(--z-modal)] flex items-center justify-center p-4">
-                        <div className="bg-bg-surface rounded-lg max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-border-subtle shadow-level2">
+                        <div className="bg-bg-surface rounded-lg max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-border-subtle">
                             <div className="flex items-center justify-between p-6 border-b border-border-subtle">
                                 <h3 className="text-xl sm:text-2xl font-semibold text-text-primary">All Amenities</h3>
                                 <button
@@ -1741,7 +1741,7 @@ useEffect(() => {
         {/* Mobile fixed Reserve CTA - visible only below md breakpoint */}
         {data && (
           <div
-            className="fixed bottom-0 inset-x-0 z-30 flex items-center justify-between border-t border-border-subtle bg-bg-surface px-4 py-3 shadow-level2 md:hidden"
+            className="fixed bottom-0 inset-x-0 z-30 flex items-center justify-between border-t border-border-subtle bg-bg-surface px-4 py-3 md:hidden"
             data-testid="mobile-reserve-bar"
           >
             <div>
@@ -1752,7 +1752,7 @@ useEffect(() => {
             </div>
             <button
               type="button"
-              className="rounded-xl bg-cta-primary px-6 py-2.5 text-sm font-semibold text-white shadow-sm"
+              className="rounded-xl bg-cta-primary px-6 py-2.5 text-sm font-semibold text-white"
               onClick={() => {
                 // TASK-1861: was 'booking-name' which doesn't exist; 'guest-booking-form' is the actual form root testid
                 const widget = document.querySelector('[data-testid="guest-booking-form"]');

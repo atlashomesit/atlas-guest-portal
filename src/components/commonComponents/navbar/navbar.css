@@ -7,10 +7,8 @@
   -webkit-backdrop-filter: blur(20px);
   backdrop-filter: blur(20px);
   background-color: rgba(var(--bg-base-rgb, 255, 250, 245), 0.94);
-  box-shadow: var(--shadow-level-1);
   border-bottom: 1px solid rgba(240, 230, 220, 0.85);
   transition: background-color 0.25s cubic-bezier(0.4, 0, 0.2, 1),
-    box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1),
     border-color 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   flex-direction: column;
@@ -22,7 +20,6 @@
 /* Slightly stronger separation after scroll (still same readable chrome) */
 .navbar-container.backdrop-blur {
   background-color: rgba(var(--bg-base-rgb, 255, 250, 245), 0.98);
-  box-shadow: var(--shadow-level-2, var(--shadow-level-1));
   border-bottom-color: rgba(230, 218, 205, 0.95);
 }
 
@@ -238,7 +235,6 @@
   color: #fff;
   border: none;
   border-radius: 9999px;
-  box-shadow: var(--shadow-level-1);
   cursor: pointer;
   transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   min-height: 44px;
