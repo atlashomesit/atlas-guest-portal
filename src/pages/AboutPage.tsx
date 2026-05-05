@@ -132,23 +132,23 @@ const missionHighlights = [
 const AboutPage = () => (
   <div className="bg-bg-muted text-text-primary min-h-screen">
     <SEO
-      title="About Atlas Homestays | Mission, Team & Hospitality Standards"
-      description="Discover the mission behind Atlas Homestays, meet the team that powers guest experiences, and explore the hospitality standards and trust badges that guide every stay."
+      title="About Starguest House | Mission, Team & Hospitality Standards"
+      description="Discover the mission behind Starguest House, meet the team that powers guest experiences, and explore the hospitality standards and trust badges that guide every stay."
       jsonLd={{
         '@context': 'https://schema.org',
         '@type': 'Organization',
-        name: 'Atlas Homestays',
+        name: 'Starguest House',
         description:
           'Serviced apartments designed for modern travelers with verified hosts, trusted standards, and responsive local teams.',
-        url: 'https://atlashomestays.com/about',
-        brand: 'Atlas Homestays',
+        url: 'https://starguesthouse.com/about',
+        brand: 'Starguest House',
       }}
     />
 
     <div className="px-4 md:px-10 lg:px-20 py-20 space-y-16">
       <section className="bg-bg-surface border border-border-subtle shadow-level2 rounded-3xl p-8 md:p-12 grid gap-10 lg:grid-cols-[1.1fr_0.9fr] items-center" data-testid="mission-section">
         <div className="space-y-6">
-          <p className="uppercase tracking-[0.2em] text-primary font-semibold">Atlas Homestays</p>
+          <p className="uppercase tracking-[0.2em] text-primary font-semibold">Starguest House</p>
           <h1 className="text-3xl md:text-4xl font-bold leading-tight">Where dependable stays meet human hospitality</h1>
           <p className="text-lg text-text-muted max-w-2xl">
             We are a collective of hosts, designers, and operators who believe every serviced apartment should feel personal—without sacrificing reliability. From the first message to checkout, our mission is to keep guests at ease and make every city feel familiar.
@@ -183,7 +183,7 @@ const AboutPage = () => (
           <p className="text-sm uppercase tracking-[0.18em] text-primary font-semibold">Hospitality standards</p>
           <h2 className="text-2xl md:text-3xl font-bold">Standards that travel with you</h2>
           <p className="text-text-muted max-w-3xl">
-            Every Atlas home is audited on the same quality framework. We match hotel-grade consistency with the warmth of local hosts so travelers never have to choose between comfort and character.
+            Every Starguest House home is audited on the same quality framework. We match hotel-grade consistency with the warmth of local hosts so travelers never have to choose between comfort and character.
           </p>
           <div className="grid gap-4 sm:grid-cols-2">
             {hospitalityStandards.map(({ title, description, icon: Icon }) => (
@@ -209,7 +209,7 @@ const AboutPage = () => (
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <p className="text-sm uppercase tracking-[0.18em] text-primary font-semibold">Meet the team</p>
-            <h2 className="text-2xl md:text-3xl font-bold">People who craft every Atlas stay</h2>
+            <h2 className="text-2xl md:text-3xl font-bold">People who craft every Starguest House stay</h2>
             <p className="text-text-muted max-w-2xl mt-2">
               Our distributed team blends hospitality know-how with operational rigor, ensuring each apartment is cared for like a boutique property.
             </p>

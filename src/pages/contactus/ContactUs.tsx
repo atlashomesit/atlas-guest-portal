@@ -172,7 +172,7 @@ const ContactUs = () => {
             </div>
 
             {/* Contact Us form  */}
-            <div className="max-w-5xl my-12 mx-auto px-4 grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-8">
+            <div className="max-w-5xl my-6 mx-auto px-4 grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-8">
                 <Card className="space-y-2">
                     <Typography variant="h2" className="text-center">Send us a note</Typography>
                     <Typography variant="muted" className="text-center">Share your trip details and we will reply with tailored options.</Typography>
