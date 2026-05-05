@@ -49,9 +49,9 @@ const PrivacyPage = () => {
 
   const whatsappLink = useMemo(() => {
     const href = typeof window !== "undefined" ? window.location.href : "";
-    const prefill = defaultPrefill({ href, context: "Privacy" });
+    const prefill = defaultPrefill({ href, context: "Privacy", brandName: pack.legalName });
     return buildWaLink({ phoneE164: CONTACT.business.whatsapp, text: prefill });
-  }, []);
+  }, [pack.legalName]);
 
   const filteredSections = useMemo(() => {
     const term = search.trim().toLowerCase();

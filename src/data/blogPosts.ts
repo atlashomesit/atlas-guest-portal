@@ -1,4 +1,4 @@
-/* eslint-disable atlas-brand/no-atlas-string-leak -- TODO Task 16: replace with per-tenant content */
+/* eslint-disable atlas-brand/no-atlas-string-leak -- TODO Task 16: blog posts are shared platform content; per-tenant substitution happens at page render time (BlogHome.tsx, BlogCategory.tsx) */
 export type BlogCategory = "guest-guides" | "hospitality-tech";
 
 export interface BlogPost {

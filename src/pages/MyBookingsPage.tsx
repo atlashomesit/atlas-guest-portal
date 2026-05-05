@@ -5,6 +5,7 @@ import SEO from "../components/SEO";
 import { buildApiUrl, getApiHeaders } from "../api/client";
 import { messageFromApiResponse } from "../utils/serverErrorFromResponse";
 import { getContactEmail } from "../config/contact";
+import { getTenantContext } from "../tenant/tenantContext";
 
 interface BookingItem {
   id: number;
@@ -27,6 +28,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function MyBookingsPage() {
+  const brandName = getTenantContext()?.name ?? 'Atlas Homestays';
   const [searchParams] = useSearchParams();
   const guestId = searchParams.get("guestId");
   const token = searchParams.get("t");
@@ -99,7 +101,7 @@ export default function MyBookingsPage() {
 
   return (
     <>
-      <SEO title="My Bookings" description="View your booking history at Atlas Homestays." />
+      <SEO title="My Bookings" description={`View your booking history at ${brandName}.`} />
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10 space-y-6">
         <div className="space-y-1">
           <h1 className="text-2xl font-bold text-text-primary">My Bookings</h1>

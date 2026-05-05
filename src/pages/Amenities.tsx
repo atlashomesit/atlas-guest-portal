@@ -16,6 +16,7 @@ import {
 import { MdElevator, MdSecurity, MdLocalLaundryService, MdOutlineKitchen } from "react-icons/md";
 import SEO from "../components/SEO";
 import { useTenantListings } from "@/hooks/useTenantListings";
+import { getTenantContext } from "@/tenant/tenantContext";
 
 type IconKey = "wifi" | "tv" | "ac" | "kitchen" | "parking" | "pool" | "gym" | "couch" | "shower" | "laptop" | "elevator" | "security" | "laundry" | "refrigerator";
 
@@ -79,6 +80,7 @@ function AmenityCard({ icon, name, desc, variant = "standard" }: AmenityCardProp
 
 export default function Amenities() {
   const { properties, state } = useTenantListings();
+  const brandName = getTenantContext()?.name ?? 'Atlas Homestays';
 
   // Determine which premium amenities are actually available across our listings
   const availablePremiumKeys = useMemo<Set<IconKey>>(() => {
@@ -99,14 +101,14 @@ export default function Amenities() {
   return (
     <div className="min-h-screen bg-bg-muted px-4 md:px-10 lg:px-20 py-24">
       <SEO
-        title="Amenities | Atlas Homestays"
-        description="Every Atlas Homestays apartment includes high-speed Wi-Fi, AC, equipped kitchen, flat-screen TV, and 24/7 security — plus premium amenities at select properties."
+        title={`Amenities | ${brandName}`}
+        description={`Every ${brandName} apartment includes high-speed Wi-Fi, AC, equipped kitchen, flat-screen TV, and 24/7 security — plus premium amenities at select properties.`}
       />
 
       <div className="max-w-5xl mx-auto space-y-14">
         {/* Header */}
         <div className="text-center space-y-3">
-          <p className="uppercase tracking-[0.2em] text-brand-primary font-semibold text-sm">Atlas Homestays</p>
+          <p className="uppercase tracking-[0.2em] text-brand-primary font-semibold text-sm">{brandName}</p>
           <h1 className="text-3xl md:text-4xl font-bold text-text-primary">What's included</h1>
           <p className="text-lg text-text-muted max-w-2xl mx-auto">
             Every apartment is set up for comfort and productivity. Here's what you'll find across our properties.

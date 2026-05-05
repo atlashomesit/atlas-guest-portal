@@ -4,8 +4,10 @@ import LegalLayout from "../components/legal/LegalLayout";
 import SectionNav from "../components/legal/SectionNav";
 import SEO from "../components/SEO";
 import { paymentDataSharingNote, termsMetadata, termsSections } from "../content/legal/terms";
+import { getTenantContext } from "../tenant/tenantContext";
 
 const Terms = () => {
+  const brandName = getTenantContext()?.name ?? 'Atlas Homestays';
   const [open, setOpen] = useState<Set<string>>(new Set(termsSections.map((section) => section.id)));
 
   const sectionNav = useMemo(
@@ -36,7 +38,7 @@ const Terms = () => {
     >
       <SEO
         title={termsMetadata.title}
-        description="Review Atlas Homestays Terms of Service with booking rules, cancellations, conduct, and liability guidance."
+        description={`Review ${brandName} Terms of Service with booking rules, cancellations, conduct, and liability guidance.`}
         url="/terms"
       />
 

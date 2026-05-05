@@ -6,6 +6,7 @@ interface BuildWaLinkArgs {
 interface DefaultPrefillArgs {
   href?: string;
   context?: string;
+  brandName?: string;
 }
 
 const normalizePhone = (phoneE164: string) => phoneE164.replace(/[^\d]/g, "");
@@ -16,9 +17,9 @@ export const buildWaLink = ({ phoneE164, text }: BuildWaLinkArgs) => {
   return `https://wa.me/${normalizedPhone}${encodedText ? `?text=${encodedText}` : ""}`;
 };
 
-export const defaultPrefill = ({ href, context }: DefaultPrefillArgs) => {
+// eslint-disable-next-line atlas-brand/no-atlas-string-leak -- default fallback for brand name when not provided
+export const defaultPrefill = ({ href, context, brandName = 'Atlas Homestays' }: DefaultPrefillArgs) => {
   const pageUrl = href || (typeof window !== "undefined" ? window.location.href : "");
   const contextText = context ? ` and I have a question about: ${context}` : "";
-  // eslint-disable-next-line atlas-brand/no-atlas-string-leak -- whatsapp prefill template; TODO Task 16 per-tenant contact number
-  return `Hi Atlas Homestays 👋 I'm reading the FAQ${contextText}. Page: ${pageUrl}`.trim();
+  return `Hi ${brandName} 👋 I'm reading the FAQ${contextText}. Page: ${pageUrl}`.trim();
 };

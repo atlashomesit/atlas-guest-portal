@@ -2,20 +2,22 @@
 import { Link } from "react-router-dom";
 import SEO from "../../components/SEO";
 import { blogPosts } from "../../data/blogPosts";
+import { getTenantContext } from "../../tenant/tenantContext";
 
 const BlogHome = () => {
+  const brandName = getTenantContext()?.name ?? 'Atlas Homestays';
   return (
     <div className="px-4 md:px-10 lg:px-20 py-24 bg-bg-muted min-h-screen">
       <SEO
-        title="Atlas Homestays Blog"
-        description="Guest guides, hospitality technology, and updates from Atlas Homestays."
+        title={`${brandName} Blog`}
+        description={`Guest guides, hospitality technology, and updates from ${brandName}.`}
       />
       <div className="max-w-5xl mx-auto space-y-8">
         <div className="space-y-3">
-          <p className="uppercase tracking-[0.2em] text-primary font-semibold">Atlas Homestays</p>
+          <p className="uppercase tracking-[0.2em] text-primary font-semibold">{brandName}</p>
           <h1 className="text-4xl font-bold text-text-primary">Blog</h1>
           <p className="text-lg text-text-muted">
-            Explore travel tips, guest guides, and hospitality technology that powers Atlas Homestays.
+            Explore travel tips, guest guides, and hospitality technology that powers {brandName}.
           </p>
         </div>
 

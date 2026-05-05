@@ -1,6 +1,7 @@
 /* eslint-disable atlas-brand/no-atlas-string-leak -- TODO Task 16: replace with per-tenant content */
 import { Link } from "react-router-dom";
 import SEO from "../components/SEO";
+import { getTenantContext } from "../tenant/tenantContext";
 
 /**
  * TASK-016: DPDP 2023 privacy policy page.
@@ -12,13 +13,14 @@ import SEO from "../components/SEO";
  */
 
 export default function PrivacyPolicyPage() {
+  const brandName = getTenantContext()?.name ?? 'Atlas Homestays';
   const lastUpdated = "22 April 2026";
 
   return (
     <div className="mx-auto max-w-3xl px-4 sm:px-6 py-10 text-text-primary">
       <SEO
-        title="Privacy Policy — Atlas Homestays"
-        description="How Atlas Homestays collects, uses, stores, and protects your personal data in compliance with India's Digital Personal Data Protection Act, 2023."
+        title={`Privacy Policy — ${brandName}`}
+        description={`How ${brandName} collects, uses, stores, and protects your personal data in compliance with India's Digital Personal Data Protection Act, 2023.`}
       />
 
       <header className="mb-8">
@@ -28,7 +30,7 @@ export default function PrivacyPolicyPage() {
 
       <section className="space-y-4 text-sm leading-6">
         <p>
-          Atlas Homestays ("we", "us", "Atlas") respects your privacy and is committed to protecting your
+          {brandName} ("we", "us", "{brandName.split(' ')[0]}") respects your privacy and is committed to protecting your
           personal data in line with India's Digital Personal Data Protection Act, 2023 (DPDP 2023) and
           applicable data protection regulations.
         </p>
@@ -125,7 +127,7 @@ export default function PrivacyPolicyPage() {
 
       <footer className="mt-10 border-t border-border-subtle pt-4 text-xs text-text-muted">
         <Link to="/" className="text-brand-primary underline">
-          ← Back to Atlas Homestays
+          ← Back to {brandName}
         </Link>
       </footer>
     </div>

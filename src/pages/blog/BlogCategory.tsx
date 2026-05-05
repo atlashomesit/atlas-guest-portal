@@ -2,25 +2,28 @@
 import { Link, useParams } from "react-router-dom";
 import SEO from "../../components/SEO";
 import { blogPosts, BlogCategory as BlogCategoryType } from "../../data/blogPosts";
-
-const categoryMeta: Record<BlogCategoryType, { title: string; description: string; label: string }> = {
-  "guest-guides": {
-    title: "Guest Guides | Atlas Homestays",
-    description: "Destination tips and stay guidance for Atlas Homestays guests.",
-    label: "Guest Guides",
-  },
-  "hospitality-tech": {
-    title: "Hospitality Tech & AI | Atlas Homestays",
-    description: "Technology updates and automation powering Atlas Homestays.",
-    label: "Hospitality Tech & AI",
-  },
-};
-
-const isValidCategory = (value: string | undefined): value is BlogCategoryType => {
-  return Boolean(value && value in categoryMeta);
-};
+import { getTenantContext } from "../../tenant/tenantContext";
 
 const BlogCategory = () => {
+  const brandName = getTenantContext()?.name ?? 'Atlas Homestays';
+
+  const categoryMeta: Record<BlogCategoryType, { title: string; description: string; label: string }> = {
+    "guest-guides": {
+      title: `Guest Guides | ${brandName}`,
+      description: `Destination tips and stay guidance for ${brandName} guests.`,
+      label: "Guest Guides",
+    },
+    "hospitality-tech": {
+      title: `Hospitality Tech & AI | ${brandName}`,
+      description: `Technology updates and automation powering ${brandName}.`,
+      label: "Hospitality Tech & AI",
+    },
+  };
+
+  const isValidCategory = (value: string | undefined): value is BlogCategoryType => {
+    return Boolean(value && value in categoryMeta);
+  };
+
   const { category } = useParams();
   const safeCategory: BlogCategoryType = isValidCategory(category) ? category : "guest-guides";
   const meta = categoryMeta[safeCategory];
@@ -31,7 +34,7 @@ const BlogCategory = () => {
       <SEO title={meta.title} description={meta.description} />
       <div className="max-w-5xl mx-auto space-y-8">
         <div className="space-y-3">
-          <p className="uppercase tracking-[0.2em] text-primary font-semibold">Atlas Homestays</p>
+          <p className="uppercase tracking-[0.2em] text-primary font-semibold">{brandName}</p>
           <h1 className="text-4xl font-bold text-text-primary">{meta.label}</h1>
           <p className="text-lg text-text-muted">{meta.description}</p>
         </div>

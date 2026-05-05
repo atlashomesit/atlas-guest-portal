@@ -8,16 +8,18 @@ import { policyMetadata, policySections } from "../content/legal/policies";
 import { termsSections } from "../content/legal/terms";
 import { CONTACT } from "../config/contact";
 import { buildWaLink, defaultPrefill } from "../utils/whatsapp";
+import { getTenantContext } from "../tenant/tenantContext";
 
 const Policies = () => {
+  const brandName = getTenantContext()?.name ?? 'Atlas Homestays';
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState<Set<string>>(new Set());
 
   const whatsappLink = useMemo(() => {
     const href = typeof window !== "undefined" ? window.location.href : "";
-    const prefill = defaultPrefill({ href, context: "Policies" });
+    const prefill = defaultPrefill({ href, context: "Policies", brandName });
     return buildWaLink({ phoneE164: CONTACT.business.whatsapp, text: prefill });
-  }, []);
+  }, [brandName]);
 
   const filteredPolicies = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -52,7 +54,7 @@ const Policies = () => {
     >
       <SEO
         title={policyMetadata.title}
-        description="Atlas Homestays guest policies covering booking rules, cancellations, conduct, and amenity usage."
+        description={`${brandName} guest policies covering booking rules, cancellations, conduct, and amenity usage.`}
         url="/policies"
       />
 
