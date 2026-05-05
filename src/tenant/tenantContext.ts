@@ -34,6 +34,16 @@ export interface TenantInfo {
   upiQrAssetUrl?: string;
   /** Guest-facing payment instructions for UPI or Manual providers. */
   upiInstructions?: string;
+  /**
+   * How guest checkout completes for this tenant:
+   *  - "ONLINE"   — Razorpay / UPI inline checkout
+   *  - "MANUAL"   — pay-on-arrival; capture booking, skip payment
+   *  - "WHATSAPP" — no provider configured; hand off to host's WhatsApp with prefilled booking details
+   *  - undefined  — no path to book (no provider, no phone) — show "Bookings opening soon"
+   */
+  bookingMode?: 'ONLINE' | 'MANUAL' | 'WHATSAPP';
+  /** Digits-only WhatsApp number for direct-booking handoff. Always populated when host has a phone. */
+  whatsappBookingPhone?: string;
 }
 
 let tenantInfo: TenantInfo | null = null;
@@ -96,6 +106,12 @@ export async function resolveFromDomain(apiBaseUrl: string, domain: string): Pro
       upiVpa: data.upiVpa ?? undefined,
       upiQrAssetUrl: data.upiQrAssetUrl ?? undefined,
       upiInstructions: data.upiInstructions ?? undefined,
+      bookingMode: (data.bookingMode === 'ONLINE' || data.bookingMode === 'MANUAL' || data.bookingMode === 'WHATSAPP')
+        ? data.bookingMode
+        : undefined,
+      whatsappBookingPhone: typeof data.whatsappBookingPhone === 'string' && data.whatsappBookingPhone.length > 0
+        ? data.whatsappBookingPhone
+        : undefined,
     };
     return tenantInfo;
   } catch (error) {
