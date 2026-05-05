@@ -80,8 +80,8 @@ export async function fetchPricingBreakdown(
 ): Promise<PricingBreakdown> {
   const url = new URL(buildApiUrl(BREAKDOWN_ENDPOINT));
   url.searchParams.set('listingId', String(params.listingId));
-  url.searchParams.set('checkIn', params.checkIn);
-  url.searchParams.set('checkOut', params.checkOut);
+  url.searchParams.set('startDate', params.checkIn);
+  url.searchParams.set('months', '1');
 
   const response = await fetch(url.toString(), { signal, headers: getApiHeaders() });
 
@@ -89,8 +89,45 @@ export async function fetchPricingBreakdown(
     throw new Error(await messageFromApiResponse(response));
   }
 
-  const data = (await response.json()) as Record<string, unknown>;
-  return data as PricingBreakdown;
+  const raw = (await response.json()) as {
+    listings?: { listingId?: number; ListingId?: number; days?: Record<string, unknown>[]; Days?: Record<string, unknown>[] }[];
+    Listings?: { listingId?: number; ListingId?: number; days?: Record<string, unknown>[]; Days?: Record<string, unknown>[] }[];
+  };
+  const listings = raw.listings ?? raw.Listings ?? [];
+  const targetId = Number(params.listingId);
+
+  for (const listing of listings) {
+    const id = listing.listingId ?? listing.ListingId;
+    if (id !== targetId) continue;
+    const days = listing.days ?? listing.Days ?? [];
+
+    let totalBase = 0;
+    let totalDiscount = 0;
+    let convenienceFeePercent = 0;
+
+    for (const d of days) {
+      const base = Number(d.baseAmount ?? d.BaseAmount ?? 0);
+      const discount = Number(d.discountAmount ?? d.DiscountAmount ?? 0);
+      const los = Number(d.losDiscountAmount ?? d.LosDiscountAmount ?? 0);
+      totalBase += base;
+      totalDiscount += discount + los;
+      if (convenienceFeePercent === 0) {
+        const pct = d.convenienceFeePercent ?? d.ConvenienceFeePercent;
+        if (pct !== undefined && pct !== null) convenienceFeePercent = Number(pct);
+      }
+    }
+
+    return {
+      baseAmount: totalBase,
+      discountAmount: totalDiscount,
+      convenienceFeeAmount: Math.round((totalBase * convenienceFeePercent) / 100),
+      losDiscountAmount: totalDiscount,
+      losDiscountPercent: totalDiscount > 0 ? Math.round((totalDiscount / totalBase) * 100) : 0,
+      finalAmount: totalBase - totalDiscount,
+    };
+  }
+
+  return {};
 }
 
 /** Result of GET /pricing/breakdown calendar pricing: per-day prices and convenience fee percent from API (no default). */
