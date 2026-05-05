@@ -50,6 +50,28 @@ export type TenantCookieBanner = {
   privacyLinkLabel?: string;
 };
 
+export type TenantMapLocation = {
+  lat: number;
+  lng: number;
+  /** Label shown on the map marker. */
+  markerLabel?: string;
+  /** Zoom level (default 15). */
+  zoom?: number;
+};
+
+export type TenantLocationSection = {
+  title: string;
+  details: string;
+};
+
+export type TenantLocationContent = {
+  /** Page subtitle shown below the "Location & Neighborhood" heading. */
+  subtitle?: string;
+  transport?: TenantLocationSection[];
+  nearbyAmenities?: TenantLocationSection[];
+  landmarks?: TenantLocationSection[];
+};
+
 export type TenantOverrides = {
   /** Hide the logo image in the navbar/footer/subheading. */
   hideLogo?: boolean;
@@ -79,6 +101,10 @@ export type TenantOverrides = {
   cookieBanner?: TenantCookieBanner;
   /** TASK-1878: tenant-specific FAQ entries — replaces Atlas defaults when set. */
   faq?: TenantFaqEntry[];
+  /** Coordinates and zoom for the Location page map pin. */
+  mapLocation?: TenantMapLocation;
+  /** Copy blocks for the Location page (transport, amenities, landmarks). */
+  locationContent?: TenantLocationContent;
   /**
    * Noun used to refer to a stayable unit. Drives copy like "Our Homes",
    * "View home", "No homestays match…". Default = home/homes for Atlas.
@@ -145,6 +171,58 @@ const TENANT_OVERRIDES: Record<string, TenantOverrides> = {
       capitalSingular: 'Room',
       capitalPlural: 'Rooms',
       marketingPlural: 'rooms',
+    },
+    mapLocation: {
+      lat: 17.467607975653657,
+      lng: 78.36671473489571,
+      markerLabel: 'Star Guest House',
+      zoom: 15,
+    },
+    locationContent: {
+      subtitle:
+        'Find transport options, nearby dining, shopping, and corporate hubs close to Star Guest House so you can plan your arrival and daily commute with ease.',
+      transport: [
+        {
+          title: 'Metro',
+          details: 'Hitech City and Raidurg Metro stations are within 10 minutes for quick access across the city.',
+        },
+        {
+          title: 'Airport',
+          details: 'Rajiv Gandhi International Airport is about 30 minutes away with reliable cab availability day and night.',
+        },
+        {
+          title: 'Road connectivity',
+          details: 'Easy access to Gachibowli, Hitech City, Miyapur, and ORR towards Financial District and Manikonda.',
+        },
+      ],
+      nearbyAmenities: [
+        {
+          title: 'Daily essentials',
+          details: 'Nearby Ratnadeep supermarket, pharmacies, and local bakeries for everyday needs.',
+        },
+        {
+          title: 'Dining',
+          details: 'Restaurants and eateries in Kondapur, Hitech City, Raidurg, Gachibowli, Madhapur, and Miyapur.',
+        },
+        {
+          title: 'Healthcare',
+          details: 'KIIMS Hospital and Apollo Hospital nearby to handle routine visits and emergencies.',
+        },
+      ],
+      landmarks: [
+        {
+          title: 'Business hubs',
+          details: 'Proximity to Hitech City, Gachibowli, Manikonda, and Financial District for tech parks and corporate offices.',
+        },
+        {
+          title: 'Transport hubs',
+          details: 'Close to Raidurg and Miyapur with excellent connectivity via metro and road networks.',
+        },
+        {
+          title: 'Premium localities',
+          details: 'Located in a prime area with easy access to Hitech City and Financial District.',
+        },
+      ],
     },
     contact: {
       address: 'Shop No 2, 10, opposite Shilpa Park, Kondapur, Hanuman Nagar, Telangana 500084',
