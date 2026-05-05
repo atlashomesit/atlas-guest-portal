@@ -1231,17 +1231,29 @@ const SearchPage = () => {
                             💼 Co-working desk
                           </span>
                         )}
-                        {/* TASK-1725: Atlas-verified photos badge */}
-                        {unit.hasVerifiedPhotos && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700">
-                            ✅ Verified photos
+                        {/* TASK-1298: composite Atlas Trusted Host badge — shown when both verified photos and GST reg are present */}
+                        {unit.hasVerifiedPhotos && unit.isGstRegistered ? (
+                          <span
+                            className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700 border border-emerald-200 cursor-help"
+                            title="Identity verified, GST registered, photos checked by Atlas team. We've verified the documents."
+                          >
+                            ✅ Atlas Trusted Host
                           </span>
-                        )}
-                        {/* TASK-1727: GST registered badge */}
-                        {unit.isGstRegistered && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 border border-blue-200">
-                            🧾 GST Reg.
-                          </span>
+                        ) : (
+                          <>
+                            {/* TASK-1725: Atlas-verified photos badge */}
+                            {unit.hasVerifiedPhotos && (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700">
+                                ✅ Verified photos
+                              </span>
+                            )}
+                            {/* TASK-1727: GST registered badge */}
+                            {unit.isGstRegistered && (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 border border-blue-200">
+                                🧾 GST Reg.
+                              </span>
+                            )}
+                          </>
                         )}
                         {/* TASK-1695: LOS discount badge — show highest configured tier */}
                         {unit.losDiscount2MinNights != null && unit.losDiscount2MinNights > 0 &&
