@@ -9,7 +9,7 @@ import { getTenantOverrides, getTenantPublicListingIdAllowlist } from '../tenant
  */
 export function getTenantPropertyData() {
   const tenant = getTenantContext();
-  const tenantName = tenant?.name ?? 'Atlas Homestays';
+  const tenantName = tenant?.name ?? 'Our Platform';
   const overrides = getTenantOverrides(tenant?.slug);
 
   let filtered = propertyData;

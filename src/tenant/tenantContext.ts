@@ -23,6 +23,17 @@ export interface TenantInfo {
   category?: string;
   /** TASK-1727: true when the tenant has a valid GSTIN on file. */
   isGstVerified?: boolean;
+  // ── RA-006: TenantBrandPack payment fields ─────────────────────────────────
+  /** Active payment provider type (RAZORPAY, UPI_QR, MANUAL…). Undefined = not configured. */
+  paymentProvider?: string;
+  /** Merchant name to display on payment screens. Falls back to `name` when unset. */
+  displayMerchantName?: string;
+  /** UPI Virtual Payment Address — populated for UPI_QR / UPI_DEEPLINK providers. */
+  upiVpa?: string;
+  /** URL of the merchant's QR code image — populated for UPI_QR provider. */
+  upiQrAssetUrl?: string;
+  /** Guest-facing payment instructions for UPI or Manual providers. */
+  upiInstructions?: string;
 }
 
 let tenantInfo: TenantInfo | null = null;
@@ -79,6 +90,12 @@ export async function resolveFromDomain(apiBaseUrl: string, domain: string): Pro
       isMarketplaceRoot,
       brandColor: data.primaryColor ?? undefined, // backward compat
       isGstVerified: Boolean(data.isGstVerified), // TASK-1727
+      // RA-006: TenantBrandPack payment fields
+      paymentProvider: data.paymentProvider ?? undefined,
+      displayMerchantName: data.displayMerchantName ?? undefined,
+      upiVpa: data.upiVpa ?? undefined,
+      upiQrAssetUrl: data.upiQrAssetUrl ?? undefined,
+      upiInstructions: data.upiInstructions ?? undefined,
     };
     return tenantInfo;
   } catch (error) {

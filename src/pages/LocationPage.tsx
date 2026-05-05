@@ -1,3 +1,4 @@
+/* eslint-disable atlas-brand/no-atlas-string-leak -- TODO Task 16: replace with per-tenant content */
 import { useEffect, useMemo, useRef, useState } from "react";
 import SEO from "../components/SEO";
 import { Button } from "../components/ui/Button";

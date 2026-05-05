@@ -109,6 +109,7 @@ const HomeDetails = () => {
 
   const { updateBooking } = useBooking();
   const [reviewsData, setReviewsData] = useState<ListingReviewsResponse | null>(null);
+  const [showAllReviews, setShowAllReviews] = useState(false);
 
   const highlights = room?.highlights?.length ? room.highlights : defaultHomeHighlights;
 
@@ -287,7 +288,7 @@ const HomeDetails = () => {
             </div>
           </div>
           <div className="flex flex-col gap-4">
-            {reviewsData.reviews.slice(0, 6).map((r) => (
+            {reviewsData.reviews.slice(0, showAllReviews ? undefined : 6).map((r) => (
               <div key={r.id} className="border-t border-border-subtle pt-4 first:border-t-0 first:pt-0">
                 <div className="flex items-start justify-between gap-2 mb-1">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -316,6 +317,17 @@ const HomeDetails = () => {
               </div>
             ))}
           </div>
+          {reviewsData.reviews.length > 6 && (
+            <button
+              type="button"
+              onClick={() => setShowAllReviews((s) => !s)}
+              className="mt-3 text-sm font-semibold text-brand-primary underline underline-offset-2 hover:opacity-80 transition-opacity self-start"
+            >
+              {showAllReviews
+                ? "Show fewer reviews"
+                : `View all ${reviewsData.totalCount} reviews`}
+            </button>
+          )}
         </div>
       )}
 

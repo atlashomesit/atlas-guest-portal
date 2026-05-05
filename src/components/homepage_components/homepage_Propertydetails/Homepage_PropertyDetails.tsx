@@ -1,4 +1,5 @@
 import React from 'react';
+import { getTenantContext as _getTenantCtx } from '@/tenant/tenantContext';
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { FaBed, FaShower, FaSwimmingPool, FaCar, FaWifi, FaTv } from "react-icons/fa";
 import { TbAirConditioning } from "react-icons/tb";
@@ -1006,8 +1007,8 @@ useEffect(() => {
         <>
         {data && (
             <SEO
-                title={`${data.property_name} | Atlas Homestays`}
-                description={data.property_description?.slice(0, 160) || `Book ${data.property_name} in ${data.property_location || 'Hyderabad'} on Atlas Homestays.`}
+                title={`${data.property_name} | ${_getTenantCtx()?.name ?? 'Our Property'}`}
+                description={data.property_description?.slice(0, 160) || `Book ${data.property_name} in ${data.property_location || 'Hyderabad'} on ${_getTenantCtx()?.name ?? 'our platform'}.`}
                 image={primaryImage}
                 url={pageUrl}
                 type="lodgingBusiness"
@@ -1056,7 +1057,7 @@ useEffect(() => {
                                 className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border-subtle bg-bg-muted text-text-primary hover:opacity-90"
                                 onClick={() => {
                                     const url = window.location.href;
-                                    const text = `Check out ${data?.property_name ?? 'this home'} on Atlas Homestays`;
+                                    const text = `Check out ${data?.property_name ?? 'this home'} on ${_getTenantCtx()?.name ?? 'our platform'}`;
                                     const share = async () => {
                                         const nav: any = navigator;
                                         if (nav?.share) return nav.share({ title: document.title, text, url });
@@ -1620,7 +1621,7 @@ useEffect(() => {
                                 </div>
                                 <div className="min-w-0">
                                     <p className="text-sm font-semibold text-text-primary truncate">
-                                        Managed by Atlas Homestays
+                                        Managed by {_getTenantCtx()?.name ?? 'Our Team'}
                                     </p>
                                     <p className="text-xs text-text-muted">
                                         24/7 WhatsApp support{responseTimeBadge ? ` · ${responseTimeBadge}` : " · Local team based in Hyderabad. WhatsApp-first support."}

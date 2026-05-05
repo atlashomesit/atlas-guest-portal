@@ -19,5 +19,6 @@ export const buildWaLink = ({ phoneE164, text }: BuildWaLinkArgs) => {
 export const defaultPrefill = ({ href, context }: DefaultPrefillArgs) => {
   const pageUrl = href || (typeof window !== "undefined" ? window.location.href : "");
   const contextText = context ? ` and I have a question about: ${context}` : "";
+  // eslint-disable-next-line atlas-brand/no-atlas-string-leak -- whatsapp prefill template; TODO Task 16 per-tenant contact number
   return `Hi Atlas Homestays 👋 I'm reading the FAQ${contextText}. Page: ${pageUrl}`.trim();
 };

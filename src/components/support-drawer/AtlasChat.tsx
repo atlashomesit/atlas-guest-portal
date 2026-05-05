@@ -3,6 +3,7 @@ import { Send, Mic, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { buildApiUrl, getApiHeaders } from '@/api/client';
 import { messageFromApiResponse } from '@/utils/serverErrorFromResponse';
+import { getTenantContext } from '@/tenant/tenantContext';
 
 type AtlasChatProps = {
   onClose?: (e: React.MouseEvent) => void;
@@ -13,7 +14,7 @@ type AtlasChatProps = {
 const AtlasChat = ({ onClose, listingId = null }: AtlasChatProps) => {
   const [isOpen, setIsOpen] = useState(true); // 🔴 control visibility
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: 'Welcome to Atlas Homestays. How can I help you today?' }
+    { role: 'assistant', content: `Welcome to ${getTenantContext()?.name ?? 'our property'}. How can I help you today?` }
   ]);
   const [input, setInput] = useState('');
   const [isListening, setIsListening] = useState(false);

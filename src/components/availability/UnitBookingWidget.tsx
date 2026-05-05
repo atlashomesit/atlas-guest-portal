@@ -33,6 +33,7 @@ import { useListingPhotosFromApi } from '@/contexts/ListingPhotosContext';
 import OptimizedImage from '@/components/ui/OptimizedImage';
 import FomoBar from '@/components/FomoBar';
 import { track } from '@/lib/events'; // TASK-1480
+import { getTenantContext } from '@/tenant/tenantContext';
 
 declare global {
   interface Window {
@@ -238,6 +239,8 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [availableAddOns, setAvailableAddOns] = useState<Array<{ addOnServiceId: number; name: string; description?: string | null; price: number; priceType: string }>>([]);
   const [selectedAddOns, setSelectedAddOns] = useState<Record<number, number>>({}); // addOnServiceId -> quantity (0 = not selected)
   const [paymentStatus, setPaymentStatus] = useState<'success' | 'failed' | null>(null);
+  /** RA-006: payment provider not configured for this tenant. */
+  const [providerBlocked, setProviderBlocked] = useState(false);
   /** TASK-1469: Razorpay `payment.failed` metadata for richer failure UI. */
   const [razorpayFailure, setRazorpayFailure] = useState<{ code: string; description: string } | null>(null);
   const [bookingDetails, setBookingDetails] = useState<{
@@ -1331,7 +1334,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             key,
             amount: orderResponse.data.amount,
             currency: orderResponse.data.currency,
-            name: 'Atlas Homestays',
+            name: getTenantContext()?.displayMerchantName ?? getTenantContext()?.name ?? 'Our Property',
             description: `Booking for ${listingName || 'selected property'}`,
             order_id: orderId,
             prefill: {
@@ -1453,6 +1456,14 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     } catch (error: unknown) {
       console.error('Booking error:', error);
       localStorage.removeItem(PENDING_PAYMENT_KEY);
+      const status = (error as { response?: { status?: number } })?.response?.status;
+      const code = (error as { response?: { data?: { code?: string } } })?.response?.data?.code;
+      if (status === 503 && code === 'PAYMENT_PROVIDER_NOT_CONFIGURED') {
+        setProviderBlocked(true);
+        setIsSubmitting(false);
+        setIsLoading(false);
+        return;
+      }
       const msg = getBookingErrorMessage(error, 'order');
       setFormError(msg);
       setIsSubmitting(false);
@@ -1788,6 +1799,18 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       </div>
     );
   };
+
+  if (providerBlocked) {
+    return (
+      <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-8 text-center space-y-3" data-testid="provider-blocked-banner">
+        <div className="text-4xl">🔒</div>
+        <h2 className="text-lg font-semibold text-text-primary">Bookings opening soon</h2>
+        <p className="text-sm text-text-secondary">
+          Online booking is temporarily unavailable for this property. Please contact the host directly to make a reservation.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <>

@@ -23,11 +23,11 @@ const iconMap = {
 };
 
 const socialLabelByIcon: Record<string, string> = {
-    FaFacebook: 'Visit Atlas Homestays on Facebook',
-    FaInstagram: 'Visit Atlas Homestays on Instagram',
-    FaTwitter: 'Visit Atlas Homestays on X',
-    FaYoutube: 'Visit Atlas Homestays on YouTube',
-    ImGithub: 'Visit Atlas Homestays on GitHub',
+    FaFacebook: `Visit ${getTenantContext()?.name ?? 'us'} on Facebook`,
+    FaInstagram: `Visit ${getTenantContext()?.name ?? 'us'} on Instagram`,
+    FaTwitter: `Visit ${getTenantContext()?.name ?? 'us'} on X`,
+    FaYoutube: `Visit ${getTenantContext()?.name ?? 'us'} on YouTube`,
+    ImGithub: `Visit ${getTenantContext()?.name ?? 'us'} on GitHub`,
 };
 
 const Footer = () => {

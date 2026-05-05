@@ -1,3 +1,4 @@
+/* eslint-disable atlas-brand/no-atlas-string-leak -- TODO Task 16: replace with per-tenant content */
 import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -65,6 +66,12 @@ type CombinedListing = {
   property: PropertyRecord;
   /** TASK-1360: ISO date of most recent checkout within 30 days. */
   lastBookedAt?: string | null;
+  /** TASK-1695: LOS auto-discount tier 1. */
+  losDiscountMinNights?: number | null;
+  losDiscountPercent?: number | null;
+  /** TASK-1695: LOS auto-discount tier 2. */
+  losDiscount2MinNights?: number | null;
+  losDiscount2Percent?: number | null;
 };
 
 const derivePropertyType = (name?: string): string => {
@@ -345,6 +352,10 @@ export const Apartments = () => {
             image: images?.[0] ?? (getTenantOverrides(getTenantContext()?.slug).hideLogo ? "" : LOGO_URL),
             property,
             lastBookedAt: property.lastBookedAt ?? null, // TASK-1360
+            losDiscountMinNights: (property as { losDiscountMinNights?: number | null }).losDiscountMinNights ?? null,
+            losDiscountPercent: (property as { losDiscountPercent?: number | null }).losDiscountPercent ?? null,
+            losDiscount2MinNights: (property as { losDiscount2MinNights?: number | null }).losDiscount2MinNights ?? null,
+            losDiscount2Percent: (property as { losDiscount2Percent?: number | null }).losDiscount2Percent ?? null,
           };
         } catch (error) {
           console.error(`Error processing listing ${listing.id}:`, error);
@@ -586,6 +597,10 @@ export const Apartments = () => {
                   hasParking={listing.hasParking}
                   petFriendly={listing.petFriendly}
                   lastBookedAt={listing.lastBookedAt ?? undefined}
+                  losDiscountMinNights={listing.losDiscountMinNights}
+                  losDiscountPercent={listing.losDiscountPercent}
+                  losDiscount2MinNights={listing.losDiscount2MinNights}
+                  losDiscount2Percent={listing.losDiscount2Percent}
                   onClick={() => handleNavigate(listing.property)}
                 />
               ))}

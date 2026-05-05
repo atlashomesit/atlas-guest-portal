@@ -1,3 +1,4 @@
+/* eslint-disable atlas-brand/no-atlas-string-leak -- TODO Task 16: replace with per-tenant content */
 // DPDPA 2023 notice content for Atlas Homestays (Data Fiduciary).
 //
 // Sourced from:
