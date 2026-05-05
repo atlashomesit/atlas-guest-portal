@@ -37,8 +37,8 @@ export const fetchAvailability = async ({
 }: AvailabilityRequestParams): Promise<AvailabilityResponse> => {
   const url = new URL(buildApiUrl(AVAILABILITY_ENDPOINT));
   url.searchParams.set('propertyId', String(propertyId));
-  url.searchParams.set('checkIn', checkIn);
-  url.searchParams.set('checkOut', checkOut);
+  url.searchParams.set('from', checkIn);
+  url.searchParams.set('to', checkOut);
   url.searchParams.set('guests', String(guests));
 
   const response = await fetch(url.toString(), { signal, headers: getApiHeaders() });
