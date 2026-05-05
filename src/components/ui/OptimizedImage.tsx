@@ -93,7 +93,7 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
     <div className={`relative block overflow-hidden bg-[color:color-mix(in_srgb,var(--bg-muted)_85%,transparent)] ${wrapperClassName ?? ""}`}>
       {showSkeleton && (
         <div
-          className={`absolute inset-0 animate-pulse bg-gradient-to-br from-[color:color-mix(in_srgb,var(--border-subtle)_75%,transparent)] to-[color:color-mix(in_srgb,var(--bg-surface)_88%,transparent)] transition-opacity duration-300 ${
+          className={`absolute inset-0 animate-pulse bg-gradient-to-br from-[color:color-mix(in_srgb,var(--border-subtle)_75%,transparent)] to-[color:color-mix(in_srgb,var(--bg-surface)_88%,transparent)] ${
             isLoaded ? "opacity-0" : "opacity-100"
           }`}
           aria-hidden
@@ -102,7 +102,7 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
       <img
         {...props}
         alt={alt}
-        className={`transition-opacity duration-300 ${isLoaded ? "opacity-100" : "opacity-0"} ${className ?? ""}`}
+        className={`${isLoaded ? "opacity-100" : "opacity-0"} ${className ?? ""}`}
         decoding={decoding}
         loading={loading}
         onError={(event) => {
