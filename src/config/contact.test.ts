@@ -3,6 +3,7 @@ import {
   CONTACT,
   DEFAULT_CONTACT_CHANNEL,
   formatDisplayNumber,
+  getContactEmail,
   getTelLink,
   getWhatsAppLink,
 } from "./contact";
@@ -30,5 +31,10 @@ describe("contact config", () => {
     expect(JSON.stringify(CONTACT)).not.toContain(FORBIDDEN_NUMBER);
     expect(getTelLink()).not.toContain(FORBIDDEN_NUMBER);
     expect(getWhatsAppLink()).not.toContain(FORBIDDEN_NUMBER);
+  });
+
+  it("getContactEmail returns a valid default when no tenant override is set", () => {
+    const email = getContactEmail();
+    expect(email).toMatch(/^[^\s@]+@[^\s@]+\.[^\s@]+$/);
   });
 });
