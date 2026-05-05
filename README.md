@@ -21,6 +21,7 @@ For feature work spanning guest frontend and API, see workspace root `ATLAS-HIGH
 - Node.js **22.13.0+** (required by Vite 7 / toolchain engines and enforced in `.nvmrc`/`.node-version`)
 - npm **10.9.2+** (ships with the recommended Node releases)
 - Modern browser for previewing the development server
+- Git for version control and branch management
 
 Optional tooling:
 - Access to the Cloudflare Pages project dashboard for monitoring deployments
