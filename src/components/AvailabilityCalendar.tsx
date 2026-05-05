@@ -4,7 +4,7 @@ import { messageFromApiResponse } from '../utils/serverErrorFromResponse';
 
 interface DayEntry {
   date: string; // yyyy-MM-dd
-  status: 'available' | 'blocked' | 'booked';
+  status: 'available' | 'blocked' | 'booked' | 'turnover';
 }
 
 interface Props {
@@ -113,17 +113,27 @@ export default function AvailabilityCalendar({ listingId, onDateSelect }: Props)
         bg = 'bg-gray-100 cursor-not-allowed';
         text = 'text-text-muted line-through opacity-60';
         extra = '';
+      } else if (status === 'turnover') {
+        // Turnover day allows same-day check-in but should be visually distinct.
+        bg = 'bg-amber-50 hover:bg-amber-100 cursor-pointer border-amber-300';
+        text = 'text-amber-800';
       }
 
       cells.push(
         <div
           key={ymd}
           onClick={() => {
-            if (!isPast && status === 'available' && onDateSelect) {
+            if (!isPast && (status === 'available' || status === 'turnover') && onDateSelect) {
               onDateSelect(ymd);
             }
           }}
-          title={isPast ? undefined : status === 'available' ? `Check in ${ymd}` : `Unavailable`}
+          title={
+            isPast
+              ? undefined
+              : (status === 'available' || status === 'turnover')
+                ? `Check in ${ymd}`
+                : 'Unavailable'
+          }
           className={`flex items-center justify-center rounded-lg border text-xs font-medium h-8 ${bg} ${text} ${extra}`}
         >
           {d}
@@ -155,6 +165,7 @@ export default function AvailabilityCalendar({ listingId, onDateSelect }: Props)
       </div>
       <div className="flex items-center gap-4 mt-3 text-xs text-text-muted">
         <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded bg-white border border-green-200" /> Available</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded bg-amber-50 border border-amber-300" /> Turnover (check-in allowed)</span>
         <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded bg-gray-100" /> Unavailable</span>
       </div>
     </div>
