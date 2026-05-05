@@ -730,7 +730,7 @@ useEffect(() => {
                 if (!ac.signal.aborted) setSimilarFromApi(null);
             });
         return () => ac.abort();
-    }, [resolvedListingId, data?.listingId, listingId]);
+    }, [resolvedListingId]);
 
     // Prefetch public availability calendar as soon as listing id resolves so date widget opens warm.
     useEffect(() => {
@@ -756,7 +756,7 @@ useEffect(() => {
             });
 
         return () => controller.abort();
-    }, [resolvedListingId, data?.listingId, listingId, availabilityPrefetched]);
+    }, [resolvedListingId, availabilityPrefetched]);
 
 
     useEffect(() => {
