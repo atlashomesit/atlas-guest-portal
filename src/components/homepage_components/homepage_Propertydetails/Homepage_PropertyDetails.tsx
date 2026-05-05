@@ -30,6 +30,7 @@ import type { ListingDetail, PublicListing } from '../../../api/listingClient';
 import {
     fetchListingById,
     fetchListingContact,
+    fetchListingPhotos,
     parseMaxGuestsFromPayload,
     resolveStaticMaxGuests,
 } from '../../../api/listingClient';
@@ -486,6 +487,8 @@ const PropertyDetails = () => {
         return text ? text.slice(0, 280) : null;
     }, [listingReviewsFromApi]);
 
+    const lastPhotosFetchKeyRef = React.useRef<string>('');
+
     useEffect(() => {
         setNotFound(false);
         setData(null);
@@ -627,8 +630,6 @@ const PropertyDetails = () => {
                     const streetFromApi =
                         typeof rawAddr === 'string' && rawAddr.trim() ? rawAddr.trim() : null;
                     const listingNumericId = Number(apiListing.id) || listingId;
-                    // Photos already in listing API response (photoUrls/coverPhotoUrl)
-                    // Skip separate /photos API call to avoid duplicate requests
                     const mapped: Property = {
                         id: listingNumericId,
                         listingId: listingNumericId,
@@ -742,6 +743,35 @@ useEffect(() => {
             });
         return () => ac.abort();
     }, [resolvedListingId, data?.listingId, listingId]);
+
+    // Fetch photos if listing API response doesn't include them (fallback for missing photoUrls)
+    useEffect(() => {
+        if (!data || !Number.isFinite(data.id) || data.id <= 0) return;
+        const listingId = Number(data.listingId);
+        if (!Number.isFinite(listingId) || listingId <= 0) return;
+
+        // Skip if photos already present in listing response
+        if (data.property_img && data.property_img.length > 0) return;
+
+        // Deduplicate: only fetch once per listing
+        const dedupeKey = String(listingId);
+        if (lastPhotosFetchKeyRef.current === dedupeKey) return;
+        lastPhotosFetchKeyRef.current = dedupeKey;
+
+        const ac = new AbortController();
+        void (async () => {
+            try {
+                const photos = filterGuestImageUrls(
+                    await fetchListingPhotos(data.id, ac.signal),
+                );
+                if (ac.signal.aborted || !photos.length) return;
+                setData((prev) => (prev ? { ...prev, property_img: photos } : prev));
+            } catch {
+                /* fallback to existing images */
+            }
+        })();
+        return () => ac.abort();
+    }, [data]);
 
     // Prefetch public availability calendar as soon as listing id resolves so date widget opens warm.
     useEffect(() => {
