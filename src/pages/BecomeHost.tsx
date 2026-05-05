@@ -7,6 +7,7 @@ import { Input } from "../components/ui/Input";
 import { Button } from "../components/ui/Button";
 import { toast } from "react-toastify";
 import { buildApiUrl, getApiHeaders } from "../api/client";
+import { getTenantContactEmail } from "../tenant/displayBrand";
 import { messageFromApiResponse } from "../utils/serverErrorFromResponse";
 import { logUserAction, reportError } from "../lib/monitoring";
 
@@ -452,9 +453,10 @@ const BecomeHost = () => {
     } catch (err) {
       reportError(err, { feature: "become-host-submit" });
       // Surface the real reason so the user can act on it (vs. "Something went wrong").
+      const support = getTenantContactEmail("support");
       const message = err instanceof Error && err.message
         ? err.message
-        : "We could not complete registration. Try again or contact support@atlashomestays.com.";
+        : `We could not complete registration. Try again or contact ${support}.`;
       toast.error(message);
       setSubmitStatus("error");
     }

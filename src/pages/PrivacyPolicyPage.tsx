@@ -1,7 +1,7 @@
 /* eslint-disable atlas-brand/no-atlas-string-leak -- TODO Task 16: replace with per-tenant content */
 import { Link } from "react-router-dom";
 import SEO from "../components/SEO";
-import { getTenantBrandName } from "../tenant/displayBrand";
+import { getTenantBrandName, getTenantContactEmail } from "../tenant/displayBrand";
 
 /**
  * TASK-016: DPDP 2023 privacy policy page.
@@ -14,6 +14,7 @@ import { getTenantBrandName } from "../tenant/displayBrand";
 
 export default function PrivacyPolicyPage() {
   const brandName = getTenantBrandName();
+  const privacyEmail = getTenantContactEmail("privacy");
   const lastUpdated = "22 April 2026";
 
   return (
@@ -105,8 +106,8 @@ export default function PrivacyPolicyPage() {
         </p>
         <address className="not-italic">
           Atlas Tech Solutions<br />
-          <a href="mailto:privacy@atlashomestays.com" className="text-brand-primary underline">
-            privacy@atlashomestays.com
+          <a href={`mailto:${privacyEmail}`} className="text-brand-primary underline">
+            {privacyEmail}
           </a>
           <br />
           Phone: <a href="tel:+917246161981" className="text-brand-primary underline">+91 72461 61981</a>
