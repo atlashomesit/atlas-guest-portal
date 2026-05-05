@@ -109,27 +109,27 @@ const Footer = () => {
                             GST Verified
                         </span>
                     )}
-                    <div className='flex text-lg gap-6 text-[color:var(--footer-link)]'>
-                        {socialLinks.map(({ icon, link }, index) => {
-                            const IconComponent = iconMap[icon];
-                            const baseLabel = socialLabelByIcon[icon] ?? "Open social profile";
-                            const ariaLabel = overrides.hideAtlasHomesBranding
-                                ? baseLabel.replace(/Atlas Homestays/g, footerBrand)
-                                : baseLabel;
-                            return (
-                                <a
-                                    key={index}
-                                    href={link}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    aria-label={ariaLabel}
-                                    title={ariaLabel}
-                                >
-                                    <IconComponent className='hover:text-[var(--footer-link-hover)] duration-300 cursor-pointer' />
-                                </a>
-                            );
-                        })}
-                    </div>
+                    {/* RA-006: white-label tenants must not show Atlas's social profiles. */}
+                    {!overrides.hideAtlasHomesBranding && (
+                        <div className='flex text-lg gap-6 text-[color:var(--footer-link)]'>
+                            {socialLinks.map(({ icon, link }, index) => {
+                                const IconComponent = iconMap[icon];
+                                const ariaLabel = socialLabelByIcon[icon] ?? "Open social profile";
+                                return (
+                                    <a
+                                        key={index}
+                                        href={link}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        aria-label={ariaLabel}
+                                        title={ariaLabel}
+                                    >
+                                        <IconComponent className='hover:text-[var(--footer-link-hover)] duration-300 cursor-pointer' />
+                                    </a>
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
 
                 <div className='text-center lg:text-left'>

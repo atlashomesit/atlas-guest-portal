@@ -31,12 +31,17 @@ const BannerSecondary = () => {
     );
   }
 
+  // RA-006: substitute tenant brand into the centralized default copy so
+  // white-label subdomains never render "Atlas Homes" verbatim.
+  const title = secondaryBannerDefaults.title.replace(/Atlas Homes/g, brandName);
+  const description = secondaryBannerDefaults.description.replace(/Atlas Homes/g, brandName);
+
   if (enableSecondaryBannerImprovedOverlay) {
     return (
       <div className="py-8 md:py-12">        <Parallax
           image={parallaxImage}
-          title={secondaryBannerDefaults.title}
-          description={secondaryBannerDefaults.description}
+          title={title}
+          description={description}
           overlayOpacity={0.22}
         />
       </div>
@@ -46,8 +51,8 @@ const BannerSecondary = () => {
   return (
     <div className="py-8 md:py-12">      <Parallax
         image={parallaxImage}
-        title={secondaryBannerDefaults.title}
-        description={secondaryBannerDefaults.description}
+        title={title}
+        description={description}
       />
     </div>
   );

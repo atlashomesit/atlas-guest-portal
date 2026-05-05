@@ -93,7 +93,7 @@ const AtlasChat = ({ onClose, listingId = null }: AtlasChatProps) => {
       {/* Header */}
       <div className="p-1.5 bg-[#2c5282] text-white flex justify-between items-center border-b border-slate-200">
         <div className="flex items-center gap-2">
-          <h2 className="font-medium text-xs">Atlas Concierge</h2>
+          <h2 className="font-medium text-xs">{`${getTenantContext()?.name ?? "Atlas"} Concierge`}</h2>
           <span className="text-xs opacity-80">•</span>
           <p className="text-xs opacity-90">24/7</p>
         </div>
