@@ -31,7 +31,7 @@ const Home = () => {
     const tenant = getTenantContext();
     const overrides = getTenantOverrides(tenant?.slug);
     const schemaBrandName =
-        overrides.hideAtlasHomesBranding && tenant?.name?.trim() ? tenant.name.trim() : "Atlas Homestays";
+        overrides.hideAtlasHomesBranding && tenant?.name?.trim() ? tenant.name.trim() : "Starguest House";
     const schemaLogo = overrides.hideLogo ? undefined : sanitizeGuestImageUrl(tenant?.logoUrl) ?? LOGO_URL;
     const contactEmail = getContactEmail();
     const penthouse = propertyData.find((property) => property.id === 501);
@@ -63,7 +63,7 @@ const Home = () => {
             "@context": "https://schema.org",
             "@type": "Organization",
             name: schemaBrandName,
-            url: "https://atlashomestays.com/",
+            url: "https://starguesthouse.com/",
             ...(schemaLogo ? { logo: schemaLogo } : {}),
             description:
                 "Serviced apartments in Hyderabad designed for business travel, family trips, and extended stays.",
@@ -87,7 +87,7 @@ const Home = () => {
             "@context": "https://schema.org",
             "@type": ["LodgingBusiness", "Hotel"],
             name: schemaBrandName,
-            url: "https://atlashomestays.com/",
+            url: "https://starguesthouse.com/",
             ...(schemaLogo ? { logo: schemaLogo } : {}),
             description:
                 "Serviced apartments in KPHB, Hyderabad with Wi-Fi, parking, and responsive support for business and family stays.",
@@ -115,10 +115,10 @@ const Home = () => {
                 priceCurrency: "INR",
                 price: penthouseOfferPrice,
                 availability: "https://schema.org/InStock",
-                url: "https://atlashomestays.com/",
+                url: "https://starguesthouse.com/",
                 itemOffered: {
                     "@type": "Apartment",
-                    name: "Atlas Penthouse 501",
+                    name: "Starguest House Penthouse 501",
                     description: penthouse?.property_description,
                     ...(penthouseCover ? { image: penthouseCover } : {}),
                     address: {
@@ -148,12 +148,12 @@ const Home = () => {
                     // TASK-2064: fabricated review array removed — violates Google Structured Data Guidelines and ASCI 2025
                     offers: {
                         "@type": "Offer",
-                        name: "Atlas Penthouse 501 direct offer",
+                        name: "Starguest House Penthouse 501 direct offer",
                         priceCurrency: "INR",
                         price: penthouseOfferPrice,
                         availability: "https://schema.org/InStock",
                         validFrom: new Date().toISOString(),
-                        url: "https://atlashomestays.com/",
+                        url: "https://starguesthouse.com/",
                         availableAtOrFrom: {
                             "@type": "Place",
                             address: {
@@ -217,17 +217,17 @@ const Home = () => {
                 title={
                     overrides.hideAtlasHomesBranding && tenant?.name?.trim()
                         ? `${tenant.name.trim()} | Book your stay`
-                        : "Atlas Homestays | Serviced apartments in Hyderabad"
+                        : "Starguest House | Serviced apartments in Hyderabad"
                 }
                 description={
                     overrides.hideAtlasHomesBranding && tenant?.name?.trim()
                         ? `Book your stay with ${tenant.name.trim()}. Questions? Call ${CONTACT.business.phone} or email ${contactEmail}.`
-                        : "Book serviced apartments in Hyderabad with business-ready amenities, flexible stays, and attentive on-call support from Atlas Homestays."
+                        : "Book serviced apartments in Hyderabad with business-ready amenities, flexible stays, and attentive on-call support from Starguest House."
                 }
                 image={primaryOgImage}
-                url="https://atlashomestays.com/"
+                url="https://starguesthouse.com/"
                 twitterCard="summary_large_image"
-                twitterSite="@atlashomeskphb"
+                twitterSite="@starguesthouse"
                 jsonLd={homepageJsonLd}
             />
             <section className="relative font-roboto select-none">

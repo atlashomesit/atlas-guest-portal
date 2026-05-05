@@ -131,7 +131,7 @@ const LocationPage = () => {
     new window.google.maps.Marker({
       position: MAP_LOCATION,
       map,
-      title: "Atlas Homestays",
+      title: "Starguest House",
     });
 
     hasInitializedMap.current = true;
@@ -209,20 +209,20 @@ const LocationPage = () => {
   return (
     <div className="px-4 md:px-10 lg:px-20 py-16 bg-bg-muted">
       <SEO
-        title="Location & Neighborhood | Atlas Homestays"
-        description="Discover the Kukatpally neighborhood, access routes, and nearby essentials for Atlas Homestays."
+        title="Location & Neighborhood | Starguest House"
+        description="Discover the Kukatpally neighborhood, access routes, and nearby essentials for Starguest House."
       />
 
       <div className="max-w-6xl mx-auto space-y-12">
         <header className="space-y-3 text-center">
           <Typography variant="subtitle" className="uppercase tracking-[0.2em] text-primary font-semibold">
-            Atlas Homestays
+            Starguest House
           </Typography>
           <Typography as="h1" variant="h1" className="text-text-primary">
             Location & Neighborhood
           </Typography>
           <Typography className="text-text-muted text-lg">
-            Find transport options, nearby dining, shopping, and corporate hubs close to Atlas Homestays so you can plan your
+            Find transport options, nearby dining, shopping, and corporate hubs close to Starguest House so you can plan your
             arrival and daily commute with ease.
           </Typography>
         </header>
@@ -247,7 +247,7 @@ const LocationPage = () => {
                       Loading map
                     </Typography>
                     <Typography className="text-text-muted">
-                      Fetching directions and landmarks around Atlas Homestays.
+                      Fetching directions and landmarks around Starguest House.
                     </Typography>
                   </div>
                 </div>
@@ -257,7 +257,7 @@ const LocationPage = () => {
                 <div className="absolute inset-0 flex flex-col gap-4 items-center justify-center bg-bg-surface text-center p-6">
                   {staticMapUrl ? (
                     <OptimizedImage
-                      alt="Static map preview of Atlas Homestays"
+                      alt="Static map preview of Starguest House"
                       className="h-[180px] w-full object-cover md:h-[240px]"
                       src={staticMapUrl}
                       wrapperClassName="w-full max-w-2xl rounded-xl overflow-hidden border border-border-subtle"
