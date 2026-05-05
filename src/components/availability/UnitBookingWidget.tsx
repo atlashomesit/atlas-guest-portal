@@ -553,7 +553,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         setCalendarPricingLoading(false);
       });
     return () => controller.abort();
-  }, [listingId, shownDate]);
+  }, [listingId, toISODate(startOfMonth(shownDate))]);
 
   // TASK-571: Fetch long-stay (LOS) discount breakdown when guest selects a valid range.
   useEffect(() => {
