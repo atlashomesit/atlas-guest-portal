@@ -1,0 +1,28 @@
+{
+  "name": "Atlas Homestays",
+  "short_name": "Atlas",
+  "description": "Direct booking for serviced apartments and homestays — zero booking fees, instant WhatsApp confirmation, verified properties.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#ea580c",
+  "icons": [
+    {
+      "src": "/be/logo192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/be/logo512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["travel", "lifestyle", "business"],
+  "lang": "en-IN",
+  "dir": "ltr"
+}
