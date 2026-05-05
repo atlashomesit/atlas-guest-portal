@@ -36,23 +36,17 @@ export default defineConfig({
     },
     isolate: true,
     hookTimeout: 60000,
-    // TODO(atlas-guest-portal): refactor these tests — they render the entire
-    // App / route stack and trigger every React.lazy import at once, exhausting
-    // CI runner heap even at 14GB. Skipped in CI; should be migrated to
-    // Playwright route smokes against the Cloudflare Pages preview.
+    // Heavy route smokes: full App / lazy imports exhaust Vitest worker heap on Windows
+    // and can stall the suite; run explicitly (`npx vitest run <file>`) or cover via Playwright.
     exclude: [
       "**/node_modules/**",
       "**/dist/**",
       "**/cypress/**",
       "**/.{idea,git,cache,output,temp}/**",
       "**/{karma,rollup,webpack,vite,vitest,jest,ava,babel,nyc,cypress,tsup,build,eslint,prettier}.config.*",
-      ...(process.env.CI
-        ? [
-            "tests/propertyDetailsRouteSmoke.test.tsx",
-            "tests/PropertyDetailsMedia.test.tsx",
-            "src/App.a11y.test.tsx",
-          ]
-        : []),
+      "tests/propertyDetailsRouteSmoke.test.tsx",
+      "tests/PropertyDetailsMedia.test.tsx",
+      "src/App.a11y.test.tsx",
     ],
   },
 });
