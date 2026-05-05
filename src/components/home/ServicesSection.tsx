@@ -78,7 +78,7 @@ const ServicesSection = () => {
             {items.map((item, index) => (
               <div
                 key={item.title}
-                className={`group flex flex-col rounded-xl overflow-hidden shadow-level1 border border-border-subtle ${
+                className={`group flex flex-col rounded-xl overflow-hidden border border-border-subtle ${
                   enableServicesAlternatingBackgrounds && index % 2 === 1 ? 'bg-bg-muted' : 'bg-bg-surface'
                 }`}
               >

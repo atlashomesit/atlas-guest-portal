@@ -10,8 +10,8 @@ const FooterCtaStrip = () => {
         <p className="text-base md:text-lg font-semibold text-[var(--text-primary)]">{footerMiniCtaCopy.headline}</p>
         <a
           href={whatsappLink}
-          className="rounded-full inline-flex items-center justify-center px-8 py-3.5 text-sm font-semibold text-white transition-all duration-250 hover:scale-[1.03] hover:shadow-[0_0_24px_rgba(255,107,53,0.25)]"
-          style={{ background: 'var(--gradient-cta)', boxShadow: 'var(--shadow-level-2)' }}        >
+          className="rounded-full inline-flex items-center justify-center px-8 py-3.5 text-sm font-semibold text-white transition-all duration-250 hover:scale-[1.03]"
+          style={{ background: 'var(--gradient-cta)' }}        >
           {footerMiniCtaCopy.buttonLabel}
         </a>
       </div>

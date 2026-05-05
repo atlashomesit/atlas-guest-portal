@@ -140,7 +140,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
 
   return (
     <article
-      className="group flex flex-col overflow-hidden rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 transition duration-200 md:hover:-translate-y-1 md:hover:shadow-level2"
+      className="group flex flex-col overflow-hidden rounded-2xl border border-border-subtle bg-bg-surface transition duration-200 md:hover:-translate-y-1 md:"
       role="button"
       tabIndex={0}
       onClick={onClick}
@@ -159,7 +159,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
           wrapperClassName="h-full"
           sizes="(max-width: 768px) 100vw, 33vw"
         />
-        <span className="absolute left-3 top-3 rounded-full bg-[color:color-mix(in_srgb,var(--bg-surface)_90%,transparent)] px-3 py-1 text-xs font-semibold text-text-primary shadow-level1">
+        <span className="absolute left-3 top-3 rounded-full bg-[color:color-mix(in_srgb,var(--bg-surface)_90%,transparent)] px-3 py-1 text-xs font-semibold text-text-primary">
           {propertyType}
         </span>
       </div>
@@ -285,7 +285,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
               </div>
               <button
                 type="button"
-                className="inline-flex flex-1 items-center justify-center rounded-full bg-[color:var(--brand)] px-4 py-4 text-sm font-semibold text-[color:var(--text-contrast)] shadow-level1 transition duration-150 hover:-translate-y-0.5 hover:shadow-level2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brand)]"
+                className="inline-flex flex-1 items-center justify-center rounded-full bg-[color:var(--brand)] px-4 py-4 text-sm font-semibold text-[color:var(--text-contrast)] transition duration-150 hover:-translate-y-0.5  focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brand)]"
                 onClick={(event) => {
                   event.stopPropagation();
                   onClick?.();
