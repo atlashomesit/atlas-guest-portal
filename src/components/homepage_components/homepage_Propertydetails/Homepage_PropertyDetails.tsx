@@ -23,14 +23,12 @@ import { Button } from '../../ui/Button';
 import { calculateNightlyPrice, inferUnitType } from '../../../utils/pricing';
 import { buildHomeUnitPath, getPropertySlug } from '../../../utils/navigation';
 import { useBooking } from '../../../contexts/BookingContext';
-import { useListingPhotosFromApi } from '../../../contexts/ListingPhotosContext';
 import { resolveListing } from '../../../utils/listingResolver';
 import { filterGuestImageUrls, sanitizeGuestImageUrl } from '../../../utils/guestImageUrl';
 import type { ListingDetail, PublicListing } from '../../../api/listingClient';
 import {
     fetchListingById,
     fetchListingContact,
-    fetchListingPhotos,
     parseMaxGuestsFromPayload,
     resolveStaticMaxGuests,
 } from '../../../api/listingClient';
@@ -67,7 +65,7 @@ function PropertyDetailsSkeleton() {
             aria-label="Loading property details"
         >
             <div className="pt-10 pl-32">
-                <div className="h-4 w-32 animate-pulse rounded bg-bg-muted" />
+                <div className="h-4 w-32 rounded bg-bg-muted" />
             </div>
             <div className="max-w-[85rem] flex flex-col gap-10 mx-auto px-4 sm:px-8 lg:px-16 py-8">
                 <div className="space-y-3">
@@ -215,7 +213,6 @@ const PropertyDetails = () => {
     const [copyLinkLabel, setCopyLinkLabel] = useState<'Copy link' | 'Copied!'>('Copy link');
     const unitType = inferUnitType({ id: data?.id, property_name: data?.property_name });
     const { setProperty, updateBooking } = useBooking();
-    const { getUrlsForListingId, setCachedPhotos } = useListingPhotosFromApi();
     const [searchParams] = useSearchParams();
     // Build a back-to-results link when the user arrived from /search (params preserved in URL by SearchPage)
     const backToResultsHref = useMemo(() => {
@@ -698,7 +695,7 @@ const PropertyDetails = () => {
         }
 
         setNotFound(true);
-    }, [propertySlug, listingIdParam, listingId, location.state, getUrlsForListingId, apiProperties, photosLoaded]);
+    }, [propertySlug, listingIdParam, listingId, location.state, apiProperties]);
 useEffect(() => {
   if (!data?.id) return;
 
@@ -741,38 +738,6 @@ useEffect(() => {
             });
         return () => ac.abort();
     }, [resolvedListingId, data?.listingId, listingId]);
-
-    // Fetch photos if listing API response doesn't include them (fallback for missing photoUrls)
-    useEffect(() => {
-        if (!data || !Number.isFinite(data.id) || data.id <= 0) return;
-        const listingId = Number(data.listingId);
-        if (!Number.isFinite(listingId) || listingId <= 0) return;
-
-        // Skip if photos already present in listing response
-        if (data.property_img && data.property_img.length > 0) return;
-
-        // Check cache first (deduplication across component remounts)
-        const cached = getUrlsForListingId(listingId);
-        if (cached) {
-            setData((prev) => (prev ? { ...prev, property_img: cached } : prev));
-            return;
-        }
-
-        const ac = new AbortController();
-        void (async () => {
-            try {
-                const photos = filterGuestImageUrls(
-                    await fetchListingPhotos(data.id, ac.signal),
-                );
-                if (ac.signal.aborted || !photos.length) return;
-                setCachedPhotos(listingId, photos);
-                setData((prev) => (prev ? { ...prev, property_img: photos } : prev));
-            } catch {
-                /* fallback to existing images */
-            }
-        })();
-        return () => ac.abort();
-    }, [data?.id, data?.listingId, getUrlsForListingId, setCachedPhotos]);
 
     // Prefetch public availability calendar as soon as listing id resolves so date widget opens warm.
     useEffect(() => {
