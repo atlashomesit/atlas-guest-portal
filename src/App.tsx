@@ -123,9 +123,9 @@ function AppWrapper() {
       </a>
       {!shouldHideNavbar && <Navbar />}
       <ScrollToTop />
-      <ErrorBoundary name="router">
-        <main id="main-content" tabIndex={-1}>
-        <Suspense fallback={<LazyFallback />}>
+      <ErrorBoundary name="router" key={`error-boundary-${location.pathname}`}>
+        <main id="main-content" tabIndex={-1} key={`main-${location.pathname}`}>
+        <Suspense fallback={<LazyFallback />} key={`suspense-${location.pathname}`}>
         <Routes key={location.pathname}>
           <Route
             path="/"
@@ -186,7 +186,7 @@ function App() {
     <CurrencyProvider>
       <BookingProvider>
         <ListingPhotosProvider>
-          <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          <Router future={{ v7_relativeSplatPath: true }}>
             <AppWrapper />
           </Router>
         </ListingPhotosProvider>
