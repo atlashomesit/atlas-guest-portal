@@ -64,9 +64,6 @@
   --motion-duration-slow: 280ms;
   --motion-ease: cubic-bezier(0.4, 0, 0.2, 1);
 
-  /* Glow Effect Variables */
-  --glow-color: rgba(164, 84, 90, 0.25);
-  --glow-spread: 0 0 20px var(--glow-color);
 
   /* Softer Radius */
   --radius-sm: 0.625rem;
@@ -74,23 +71,4 @@
   --radius-lg: 1.125rem;
 }
 
-/* Subtle Glow on Primary CTA */
-[data-theme="loversRetreatBlush"] button[type="submit"],
-[data-theme="loversRetreatBlush"] .book-now,
-[data-theme="loversRetreatBlush"] .cta-primary {
-  box-shadow: var(--shadow-level-1), var(--glow-spread);
-  transition: all var(--motion-duration-slow) var(--motion-ease);
-}
-
-[data-theme="loversRetreatBlush"] button[type="submit"]:hover,
-[data-theme="loversRetreatBlush"] .book-now:hover,
-[data-theme="loversRetreatBlush"] .cta-primary:hover {
-  box-shadow: var(--shadow-level-2), 0 0 30px rgba(164, 84, 90, 0.35);
-}
-
-/* Gentle Transitions */
-[data-theme="loversRetreatBlush"] button,
-[data-theme="loversRetreatBlush"] a {
-  transition: all var(--motion-duration-slow) var(--motion-ease);
-}
 
