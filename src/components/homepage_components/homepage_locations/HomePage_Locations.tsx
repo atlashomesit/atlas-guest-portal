@@ -17,6 +17,7 @@ import { filterGuestImageUrls, sanitizeGuestImageUrl } from "../../../utils/gues
 import { compareAtlasHomesBuildingOrder } from "../../../utils/atlasHomesBuildingOrder";
 import { getTenantContext } from "../../../tenant/tenantContext";
 import { getTenantOverrides, getUnitNoun, type TenantOverrides } from "../../../tenant/tenantOverrides";
+import { useCurrency } from "../../../contexts/CurrencyContext";
 
 import "./homepage_location.css";
 
@@ -124,6 +125,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
   const tenant = getTenantContext();
   const tenantOverrides = getTenantOverrides(tenant?.slug);
   const unitNoun = getUnitNoun(tenantOverrides);
+  const { format: formatCurrency } = useCurrency();
   const { checkIn, checkOut, guests, searchString } = useSearchSelections(location.search);
   const [activeImageIndex, setActiveImageIndex] = React.useState<Record<string, number>>({});
   const { loading: dailyPricingLoading, getListingPricing } = useDailyPricingSummary();
@@ -244,13 +246,14 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
 
   const renderPrice = (model: ListingModel) => {
     if (!model.price) return null;
-    
-    const { baseNightlyPrice, finalNightlyPrice, currency, appliedDiscountPercent, hasSpecialDateMultiplier, dateKey } =
+
+    const { baseNightlyPrice, finalNightlyPrice, appliedDiscountPercent, hasSpecialDateMultiplier, dateKey } =
       model.price;
 
-    const formatter = new Intl.NumberFormat("en-IN", { style: "currency", currency });
-    const formattedBase = formatter.format(baseNightlyPrice);
-    const formattedFinal = formatter.format(finalNightlyPrice);
+    // TASK-1687: respect the user's selected display currency from CurrencyContext
+    // (was hardcoded to INR via local Intl.NumberFormat).
+    const formattedBase = formatCurrency(baseNightlyPrice);
+    const formattedFinal = formatCurrency(finalNightlyPrice);
     const specialLabel = priceDisplayConfig.specialPricingLabels[dateKey];
     const apiListingId = model.property?.listingId ?? model.listing.id;
     const todayBreakdown = getListingPricing(apiListingId);
@@ -274,10 +277,10 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
         )}
         {!dailyPricingLoading && todayBreakdown ? (
           <div className="flex items-baseline gap-2 flex-wrap">
-            <span className="text-2xl font-bold text-black">{formatter.format(todayBreakdown.actualPrice)}</span>
+            <span className="text-2xl font-bold text-black">{formatCurrency(todayBreakdown.actualPrice)}</span>
             {todayBreakdown.globalDiscountPercent > 0 && (
               <>
-                <span className="text-sm text-gray-400">{formatter.format(todayBreakdown.baseAmount)}</span>
+                <span className="text-sm text-gray-400">{formatCurrency(todayBreakdown.baseAmount)}</span>
                 <span className="text-sm font-semibold text-[color:color-mix(in_srgb,var(--cta-primary)_80%,transparent)]">
                   Save {Math.round(todayBreakdown.globalDiscountPercent)}%
                 </span>

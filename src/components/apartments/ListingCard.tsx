@@ -4,6 +4,7 @@ import { priceDisplayConfig } from "../../config/priceDisplay.config";
 import { type NightlyPriceBreakdown } from "../../utils/pricing";
 import OptimizedImage from "../ui/OptimizedImage";
 import OwnerShareBadge from "../OwnerShareBadge"; // TASK-1705
+import { useCurrency } from "../../contexts/CurrencyContext";
 
 type ListingCardProps = {
   id: string;
@@ -34,12 +35,8 @@ type ListingCardProps = {
   onClick?: () => void;
 };
 
-const formatCurrency = (value: number) =>
-  new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(value);
+// TASK-1687: replaced module-level INR-only formatter with the
+// CurrencyContext-aware one (see useCurrency() in the component body).
 
 const ListingCard: React.FC<ListingCardProps> = ({
   id,
@@ -64,6 +61,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
   losDiscount2Percent,
   onClick,
 }) => {
+  const { format: formatCurrency } = useCurrency();
   // TASK-1360: Compute "Last booked X days ago" label
   const lastBookedLabel = useMemo(() => {
     if (!lastBookedAt) return null;
