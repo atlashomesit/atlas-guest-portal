@@ -177,6 +177,7 @@ const SearchPage = () => {
   const [apiListings, setApiListings] = useState<NormalizedListing[] | null>(null);
   // TASK-1867: track real API errors separately; null apiListings on 0-listing response is not an error
   const [apiError, setApiError] = useState(false);
+  const [loadingTimeoutReached, setLoadingTimeoutReached] = useState(false);
 
   const loadFromApi = useCallback(async (signal: AbortSignal) => {
     setApiError(false);
@@ -202,10 +203,17 @@ const SearchPage = () => {
   useEffect(() => {
     const controller = new AbortController();
     setIsLoading(true);
+    setLoadingTimeoutReached(false);
 
     loadFromApi(controller.signal).finally(() => setIsLoading(false));
 
-    return () => controller.abort();
+    // Show cached/fallback results after 2s if API still loading
+    const fallbackTimer = setTimeout(() => setLoadingTimeoutReached(true), 2000);
+
+    return () => {
+      controller.abort();
+      clearTimeout(fallbackTimer);
+    };
   }, [loadFromApi]);
 
   const checkIn = parseDate(searchParams.get("checkIn"));
@@ -259,8 +267,12 @@ const SearchPage = () => {
     if (onlyApiListings) {
       return apiListings !== null ? apiListings : [];
     }
+    // Show fallback listings after timeout even if API still loading
+    if (loadingTimeoutReached && apiListings === null) {
+      return buildStaticListings(tenantAllowedIds);
+    }
     return apiListings ?? buildStaticListings(tenantAllowedIds);
-  }, [apiListings, tenantAllowedIds, onlyApiListings]);
+  }, [apiListings, tenantAllowedIds, onlyApiListings, loadingTimeoutReached]);
 
   useEffect(() => {
     if (!availableNow) {
@@ -702,7 +714,7 @@ const SearchPage = () => {
           <h1 className="text-3xl font-bold text-text-primary sm:text-4xl">
             {checkIn && checkOut
               ? `${filteredUnits.length} ${filteredUnits.length === 1 ? "home" : "homes"} for your dates`
-              : "Atlas Homestays"}
+              : "Starguest House"}
           </h1>
           <p className="max-w-3xl text-base text-text-body">
             {checkIn && checkOut && !hasInvalidDates
@@ -823,14 +835,10 @@ const SearchPage = () => {
           </label>
           )}
           <div className="ml-auto flex items-end gap-3">
-            {!isLoading && (
+            {!isLoading && listings.length > 0 && (
               <span className="text-sm text-text-muted">
-                {/* TASK-1865: show availability check status for date filter */}
-                {checkIn && checkOut && dateAvailLoading
-                  ? "Checking availability for your dates…"
-                  : availableNow && tonightProbeLoading
-                  ? "Checking tonight's availability..."
-                  : filteredUnits.length === 0 && hasActiveFilters
+                {/* TASK-1865: show availability check status for date filter (skip during initial load) */}
+                {filteredUnits.length === 0 && hasActiveFilters
                   ? "No properties match your filters"
                   : `${filteredUnits.length} ${filteredUnits.length === 1 ? "property" : "properties"} found`}
               </span>
@@ -927,7 +935,7 @@ const SearchPage = () => {
               onChange={(e) => updateParam("sortBy", e.target.value === "recommended" ? "" : e.target.value)}
               className="rounded-lg border border-border-subtle bg-bg-surface px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-cta-primary"
             >
-              <option value="recommended" title="Sorted by Atlas building/floor preference">Recommended</option>
+              <option value="recommended" title="Sorted by Starguest House building/floor preference">Recommended</option>
               <option value="price_asc">Price: low to high</option>
               <option value="price_desc">Price: high to low</option>
               <option value="rating_desc">Highest rated</option>
@@ -947,8 +955,17 @@ const SearchPage = () => {
             aria-busy="true"
             aria-label="Checking availability for your dates"
           >
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={`avail-sk-${i}`} className={i >= 4 ? "hidden sm:block" : ""}>
+            <div className="col-span-full py-8">
+              <div className="flex flex-col items-center justify-center gap-3 text-center">
+                <div className="h-8 w-8 rounded-full border-4 border-border-subtle border-t-cta-primary animate-spin" aria-hidden />
+                <div className="space-y-1">
+                  <p className="font-semibold text-text-primary">Checking availability</p>
+                  <p className="text-sm text-text-muted">Finding homes for your dates...</p>
+                </div>
+              </div>
+            </div>
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={`avail-sk-${i}`}>
                 <SkeletonCard />
               </div>
             ))}
@@ -1049,15 +1066,15 @@ const SearchPage = () => {
           </div>
         )}
 
-        {isLoading && (
+        {isLoading && !loadingTimeoutReached && (
           <section
             className="grid gap-6 sm:grid-cols-2"
             data-testid="search-skeleton"
             aria-busy="true"
             aria-label="Loading search results"
           >
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className={i >= 4 ? "hidden sm:block" : ""}>
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i}>
                 <SkeletonCard />
               </div>
             ))}
@@ -1126,8 +1143,17 @@ const SearchPage = () => {
             aria-busy="true"
             aria-label="Checking availability for your dates"
           >
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={`avail-skel-${i}`} className={i >= 4 ? "hidden sm:block" : ""}>
+            <div className="col-span-full py-8">
+              <div className="flex flex-col items-center justify-center gap-3 text-center">
+                <div className="h-8 w-8 rounded-full border-4 border-border-subtle border-t-cta-primary animate-spin" aria-hidden />
+                <div className="space-y-1">
+                  <p className="font-semibold text-text-primary">Checking availability</p>
+                  <p className="text-sm text-text-muted">Finding homes for your dates...</p>
+                </div>
+              </div>
+            </div>
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={`avail-skel-${i}`}>
                 <SkeletonCard />
               </div>
             ))}
