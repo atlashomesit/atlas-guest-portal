@@ -1,35 +1,36 @@
-/* Luxury navbar: frosted bar from first paint so dark body text stays readable on dark hero imagery. */
+/* Premium, minimal navbar with elegant design */
 .navbar-container {
   width: 100%;
   position: fixed;
   top: 0;
   z-index: var(--z-sticky);
-  -webkit-backdrop-filter: blur(20px);
-  backdrop-filter: blur(20px);
-  background-color: rgba(var(--bg-base-rgb, 255, 250, 245), 0.94);
-  border-bottom: 1px solid rgba(240, 230, 220, 0.85);
-  transition: background-color 0.25s cubic-bezier(0.4, 0, 0.2, 1),
-    border-color 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  background-color: rgba(255, 250, 245, 0.92);
+  border-bottom: 1px solid rgba(220, 210, 200, 0.4);
+  transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0;
   min-height: var(--nav-height);
   padding-top: var(--safe-area-top);
 }
 
-/* Slightly stronger separation after scroll (still same readable chrome) */
 .navbar-container.backdrop-blur {
-  background-color: rgba(var(--bg-base-rgb, 255, 250, 245), 0.98);
-  border-bottom-color: rgba(230, 218, 205, 0.95);
+  background-color: rgba(255, 250, 245, 0.96);
+  border-bottom-color: rgba(210, 200, 190, 0.6);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
 }
 
 .navbar-main {
-  width: min(1240px, calc(100% - 5% * 2));  margin: 0 auto;
+  width: min(1360px, calc(100% - 2.5% * 2));
+  margin: 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.5rem 0;
-  gap: 1rem;  flex-wrap: wrap;
+  padding: 1rem 0;
+  gap: 2rem;
+  flex-wrap: wrap;
   position: relative;
 }
 
@@ -38,49 +39,59 @@
 .navbar-right {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 1rem;
 }
 
 .navbar-center {
   flex: 1;
   justify-content: center;
-  gap: 2.5rem; /* 40px between nav links */}
-
-.navbar-right {
-  margin-left: 1rem;
-  flex-shrink: 0;
+  gap: 3rem;
 }
 
-/* Logo — Cormorant Garamond, one letter in coral */.navbar-logo {
-  width: 4rem;
-  height: 3rem;
+.navbar-right {
+  flex-shrink: 0;
+  gap: 1.5rem;
+}
+
+/* Logo and Brand */
+.navbar-logo {
+  width: 42px;
+  height: 36px;
   object-fit: contain;
-  border-radius: 0.25rem;
+  border-radius: 0.3rem;
+  transition: opacity 250ms ease;
+}
+
+.navbar-logo:hover {
+  opacity: 0.85;
 }
 
 .navbar-logo-text {
-  font-family: var(--font-family-display);
-  font-weight: 600;
-  font-size: 1.25rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+  font-weight: 500;
+  font-size: 1.1rem;
+  letter-spacing: -0.3px;
   color: var(--text-primary);
   display: none;
 }
 
-@media (min-width: 640px) {  .navbar-logo-text {
+@media (min-width: 640px) {
+  .navbar-logo-text {
     display: block;
   }
 }
 
-/* Nav links — DM Sans 400, active = coral 2px underline */
+/* Navigation Links */
 .navbar-center .nav-link {
-  padding: 0.5rem 0 0.35rem;
-  font-family: var(--font-family-base);
-  font-size: 0.9375rem;
+  padding: 0.5rem 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  font-size: 0.95rem;
   font-weight: 400;
+  letter-spacing: 0.2px;
   color: var(--text-primary);
   text-decoration: none;
   position: relative;
-  transition: color 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: color 250ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .navbar-center .nav-link::after {
@@ -88,26 +99,34 @@
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 0;
+  bottom: -2px;
   height: 2px;
   background: var(--brand-primary);
   transform: scaleX(0);
-  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: left;
+  transition: transform 250ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.navbar-center .nav-link:hover,
+.navbar-center .nav-link:hover {
+  color: var(--brand-primary);
+}
+
+.navbar-center .nav-link:hover::after {
+  transform: scaleX(1);
+}
+
 .navbar-center .nav-link.text-white {
   color: var(--brand-primary);
 }
 
-.navbar-center .nav-link.text-white::after,
-.navbar-center .nav-link:hover::after {
-  transform: scaleX(1);}
+.navbar-center .nav-link.text-white::after {
+  transform: scaleX(1);
+}
 
 .navbar-center .nav-link:focus-visible {
-  outline: none;
-  color: var(--brand-primary);
-  box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.35);}
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 4px;
+}
 
 /* Dropdown */
 .dropdown {
@@ -115,20 +134,21 @@
 }
 
 .dropdown-button {
-  padding: 0.5rem 0 0.35rem;
-  font-family: var(--font-family-base);
-  font-size: 0.9375rem;
-  font-weight: 400;  color: var(--text-primary);
+  padding: 0.5rem 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 400;
+  letter-spacing: 0.2px;
+  color: var(--text-primary);
   background: transparent;
   border: none;
   border-radius: 0;
   box-shadow: none;
   cursor: pointer;
   position: relative;
-  transition: color 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: color 250ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Undo global `button` premium styles from base.css so Our Homes matches nav links */
 .navbar-center .dropdown-button:hover,
 .navbar-center .dropdown-button:active,
 .navbar-center .dropdown.open .dropdown-button {
@@ -137,19 +157,20 @@
 }
 
 .dropdown-button:hover {
-  color: var(--brand-primary);}
+  color: var(--brand-primary);
+}
 
-/* Same coral underline treatment as `.nav-link` */
 .navbar-center .dropdown-button::after {
   content: '';
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 0;
+  bottom: -2px;
   height: 2px;
   background: var(--brand-primary);
   transform: scaleX(0);
-  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: left;
+  transition: transform 250ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .navbar-center .dropdown:hover .dropdown-button::after,
@@ -158,27 +179,27 @@
 }
 
 .navbar-center .dropdown-button:focus-visible {
-  outline: none;
-  color: var(--brand-primary);
-  box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.35);
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 4px;
 }
 
 .dropdown-menu {
   position: absolute;
-  top: 100%;
-  left: 0;
-  margin-top: 0.5rem;
-  background-color: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-  border-radius: 0.75rem;
-  min-width: 220px;
-  box-shadow: var(--shadow-level-2);  opacity: 0;
+  top: calc(100% + 0.75rem);
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: rgba(255, 250, 245, 0.98);
+  border: 1px solid rgba(220, 210, 200, 0.5);
+  border-radius: 0.875rem;
+  min-width: 240px;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(8px);
+  opacity: 0;
   visibility: hidden;
-  transition: all 0.2s;
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
   z-index: var(--z-dropdown);
 }
 
-/* Our Homes: cap height so many units scroll instead of overflowing the viewport */
 .dropdown-menu-scrollable {
   max-height: min(50vh, 20rem);
   overflow-y: auto;
@@ -187,101 +208,152 @@
 }
 
 .dropdown-menu-empty {
-  padding: 0.75rem 1rem;
+  padding: 0.875rem 1.25rem;
   font-size: 0.875rem;
   color: var(--text-muted, #6b7280);
+  text-align: center;
 }
 
-.dropdown:hover .dropdown-menu,.dropdown.open .dropdown-menu {
+.dropdown:hover .dropdown-menu,
+.dropdown.open .dropdown-menu {
   opacity: 1;
   visibility: visible;
 }
 
 .dropdown-menu a {
   display: block;
-  padding: 0.6rem 1rem;
+  padding: 0.75rem 1.25rem;
   font-size: 0.875rem;
   color: var(--text-primary);
   text-decoration: none;
-  transition: background-color 0.2s, color 0.2s;
+  transition: all 200ms ease;
 }
 
 .dropdown-menu a:hover {
-  background-color: var(--brand-soft);
+  background-color: rgba(234, 88, 12, 0.08);
   color: var(--brand-primary);
+  padding-left: 1.5rem;
 }
 
-/* Phone link */.navbar-right .phone {
+/* Phone Link */
+.navbar-right .phone {
   display: flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.4rem;
   font-weight: 500;
+  font-size: 0.95rem;
   color: var(--text-primary);
   text-decoration: none;
-  transition: color 0.25s;  min-height: 44px;
+  transition: all 250ms ease;
+  min-height: 44px;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
 }
 
 .navbar-right .phone:hover {
   color: var(--brand-primary);
+  background-color: rgba(234, 88, 12, 0.06);
 }
 
-/* Book Now — gradient-cta pill, bold, hover scale */
+/* Currency Selector Styling */
+.navbar-right :is(select, [role="combobox"]) {
+  padding: 0.6rem 0.875rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  background-color: rgba(220, 210, 200, 0.12);
+  border: 1px solid rgba(220, 210, 200, 0.4);
+  border-radius: 0.625rem;
+  cursor: pointer;
+  transition: all 250ms ease;
+  min-height: 40px;
+}
+
+.navbar-right :is(select, [role="combobox"]):hover {
+  background-color: rgba(220, 210, 200, 0.18);
+  border-color: rgba(220, 210, 200, 0.6);
+}
+
+.navbar-right :is(select, [role="combobox"]):focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+  background-color: rgba(255, 250, 245, 0.95);
+}
+
+/* Book Now Button */
 .navbar-right .book-now {
-  padding: 0.6rem 1.25rem;
-  font-family: var(--font-family-base);
+  padding: 0.65rem 1.4rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
   font-size: 0.875rem;
   font-weight: 600;
-  background: var(--gradient-cta);
+  letter-spacing: 0.3px;
+  background: linear-gradient(135deg, var(--brand-primary) 0%, #d97706 100%);
   color: #fff;
   border: none;
-  border-radius: 9999px;
+  border-radius: 0.625rem;
   cursor: pointer;
-  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1);
   min-height: 44px;
+  box-shadow: 0 4px 12px rgba(234, 88, 12, 0.25);
 }
 
 .navbar-right .book-now:hover {
-  transform: scale(1.03);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(234, 88, 12, 0.35);
+}
+
+.navbar-right .book-now:active {
+  transform: translateY(0);
 }
 
 .navbar-right .book-now:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.5);}
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}
 
 .book-now-status {
   font-size: 0.75rem;
   color: var(--brand-primary);
-  line-height: 1.1;
+  line-height: 1.2;
 }
-/* Mobile menu button */
+
+/* Mobile Menu Button */
 .mobile-menu-button {
   position: relative;
   display: inline-flex;
   flex-direction: column;
   justify-content: center;
-  gap: 0.3rem;
-  width: 3rem;
-  height: 3rem;
-  padding: 0.35rem;
+  gap: 0.35rem;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0.4rem;
   color: var(--text-primary);
-  background: none;
-  border: 1px solid var(--border-subtle);
-  border-radius: 0.75rem;
+  background: rgba(220, 210, 200, 0.12);
+  border: 1px solid rgba(220, 210, 200, 0.4);
+  border-radius: 0.625rem;
   cursor: pointer;
-  transition: border-color 0.2s, background-color 0.2s;  min-height: 44px;
+  transition: all 200ms ease;
+  min-height: 44px;
 }
 
 .mobile-menu-button:hover {
+  background: rgba(220, 210, 200, 0.2);
   border-color: var(--brand-primary);
-  background-color: var(--brand-soft);}
+}
+
+.mobile-menu-button:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}
 
 .hamburger-bar {
   display: block;
   width: 100%;
-  height: 0.18rem;
+  height: 0.2rem;
   background-color: currentColor;
   border-radius: 9999px;
-  transition: transform 0.2s ease, opacity 0.2s ease;
+  transition: all 250ms ease;
 }
 
 .mobile-menu-button.open .hamburger-bar:nth-child(2) {
@@ -296,21 +368,21 @@
   transform: translateY(-6px) rotate(-45deg);
 }
 
-/* Mobile menu — full-screen overlay feel, large links */
+/* Mobile Menu */
 .mobile-menu {
-  padding: 1.5rem;
+  padding: 1.75rem;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  border-top: 1px solid var(--border-subtle);
-  background-color: var(--bg-primary);
+  gap: 1rem;
+  border-top: 1px solid rgba(220, 210, 200, 0.4);
+  background-color: rgba(255, 250, 245, 0.98);
 }
 
 .mobile-submenu {
-  padding-left: 1rem;
+  padding-left: 1.25rem;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.625rem;
   max-height: min(45vh, 18rem);
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -319,42 +391,60 @@
 .mobile-menu a,
 .mobile-menu button {
   display: block;
-  padding: 0.5rem 0;
-  font-family: var(--font-family-base);
+  padding: 0.625rem 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
   color: var(--text-primary);
   font-weight: 500;
+  font-size: 0.95rem;
   text-decoration: none;
   border: none;
   background: none;
   text-align: left;
   cursor: pointer;
-  transition: color 0.25s;}
+  transition: all 250ms ease;
+}
 
 .mobile-menu a:hover,
 .mobile-menu button:hover {
   color: var(--brand-primary);
+  padding-left: 0.5rem;
 }
 
 .mobile-menu .book-now {
-  margin-top: 0.5rem;
-  background: var(--gradient-cta);
+  margin-top: 0.75rem;
+  background: linear-gradient(135deg, var(--brand-primary) 0%, #d97706 100%);
   color: #fff;
   text-align: center;
-  border-radius: 9999px;
-  padding: 0.75rem 1.25rem;
+  border-radius: 0.625rem;
+  padding: 0.75rem 1.4rem;
   font-weight: 600;
+  transition: all 250ms ease;
+  border: none;
+  cursor: pointer;
+  min-height: 44px;
 }
 
-@media (max-width: 1023px) {  .navbar-center,
+.mobile-menu .book-now:active {
+  transform: scale(0.98);
+}
+
+@media (max-width: 1023px) {
+  .navbar-center,
   .navbar-right {
     display: none !important;
   }
+
+  .navbar-main {
+    padding: 0.75rem 0;
+  }
 }
 
-@media (min-width: 1024px) {  .mobile-menu-container,
+@media (min-width: 1024px) {
+  .mobile-menu-container,
   .mobile-menu {
     display: none !important;
   }
+
   .navbar-center,
   .navbar-right {
     display: flex !important;
