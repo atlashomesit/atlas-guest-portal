@@ -531,15 +531,12 @@ const PropertyDetails = () => {
         });
 
         if (foundByUnitSlug) {
-            const lid = Number(foundByUnitSlug.listingId);
-            const apiUrls = getUrlsForListingId(Number.isFinite(lid) ? lid : undefined);
-            const images = filterGuestImageUrls(apiUrls && apiUrls.length > 0 ? apiUrls : []);
             setData({
                 ...foundByUnitSlug,
                 property_neighborhoods: Array.isArray(foundByUnitSlug.property_neighborhoods)
                     ? foundByUnitSlug.property_neighborhoods
                     : [],
-                property_img: images,
+                property_img: foundByUnitSlug.property_img || [],
                 maxGuests:
                     resolveStaticMaxGuests(foundByUnitSlug as unknown as Record<string, unknown>) ??
                     foundByUnitSlug.maxGuests,
@@ -552,15 +549,12 @@ const PropertyDetails = () => {
         if (propertyId) {
             const foundById = apiProperties.find((item: Property) => String(item.id) === String(propertyId));
             if (foundById) {
-                const lid = Number(foundById.listingId);
-                const apiUrls = getUrlsForListingId(Number.isFinite(lid) ? lid : undefined);
-                const images = filterGuestImageUrls(apiUrls && apiUrls.length > 0 ? apiUrls : []);
                 setData({
                     ...foundById,
                     property_neighborhoods: Array.isArray(foundById.property_neighborhoods)
                         ? foundById.property_neighborhoods
                         : [],
-                    property_img: images,
+                    property_img: foundById.property_img || [],
                     maxGuests:
                         resolveStaticMaxGuests(foundById as unknown as Record<string, unknown>) ?? foundById.maxGuests,
                 });
@@ -571,10 +565,9 @@ const PropertyDetails = () => {
         if (location.state?.property) {
             const prop = location.state.property;
             const navGallery = (location.state as { galleryImages?: string[] }).galleryImages;
-            const fromNav = Array.isArray(navGallery) && navGallery.length > 0 ? navGallery : undefined;
-            const lid = Number(prop.listingId);
-            const apiUrls = getUrlsForListingId(Number.isFinite(lid) ? lid : undefined);
-            const images = filterGuestImageUrls(fromNav ?? (apiUrls && apiUrls.length > 0 ? apiUrls : []));
+            const images = filterGuestImageUrls(
+                navGallery && navGallery.length > 0 ? navGallery : (prop.property_img || []),
+            );
             setData({
                 ...prop,
                 property_neighborhoods: Array.isArray(prop.property_neighborhoods)
