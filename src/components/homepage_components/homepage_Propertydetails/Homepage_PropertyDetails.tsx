@@ -30,7 +30,6 @@ import type { ListingDetail, PublicListing } from '../../../api/listingClient';
 import {
     fetchListingById,
     fetchListingContact,
-    fetchListingPhotos,
     parseMaxGuestsFromPayload,
     resolveStaticMaxGuests,
 } from '../../../api/listingClient';
@@ -407,7 +406,7 @@ const PropertyDetails = () => {
             })
             .catch(() => {});
         return () => ac.abort();
-    }, [resolvedListingId, data?.maxGuests]);
+    }, [resolvedListingId, data]);
 
     /** TASK-1466: deep links e.g. `/homes/.../123?bookingId=1&t=...` load host phone without exposing it on public catalog. */
     const bookingIdForContact = searchParams.get('bookingId');
@@ -628,25 +627,8 @@ const PropertyDetails = () => {
                     const streetFromApi =
                         typeof rawAddr === 'string' && rawAddr.trim() ? rawAddr.trim() : null;
                     const listingNumericId = Number(apiListing.id) || listingId;
-                    const propertyNumericId = Number(
-                        (apiListing as Record<string, unknown>).propertyId ??
-                            (apiListing as Record<string, unknown>).property_id,
-                    );
-                    // Try to get photos from context cache first to avoid duplicate API calls
-                    let fromPhotos: string[] = getUrlsForListingId(listingNumericId) ?? [];
-
-                    // Only fetch from API if not in context cache (and context is loaded)
-                    if (fromPhotos.length === 0 && photosLoaded) {
-                        try {
-                            fromPhotos = filterGuestImageUrls(
-                                await fetchListingPhotos(propertyNumericId, controller.signal, {
-                                    listingId: listingNumericId,
-                                }),
-                            );
-                        } catch {
-                            /* use DTO fields */
-                        }
-                    }
+                    // Photos already in listing API response (photoUrls/coverPhotoUrl)
+                    // Skip separate /photos API call to avoid duplicate requests
                     const mapped: Property = {
                         id: listingNumericId,
                         listingId: listingNumericId,
@@ -701,10 +683,8 @@ const PropertyDetails = () => {
                             return typeof raw === 'string' && raw.trim() ? raw.trim() : null;
                         })(),
                     };
-                    const fromDto =
-                        photoUrlsList.length > 0 ? photoUrlsList : (coverUrl ? [coverUrl] : []);
                     const images = filterGuestImageUrls(
-                        fromPhotos.length > 0 ? fromPhotos : fromDto,
+                        photoUrlsList.length > 0 ? photoUrlsList : (coverUrl ? [coverUrl] : []),
                     );
                     if (cancelled) return;
                     setData({ ...mapped, property_img: images });
@@ -719,7 +699,7 @@ const PropertyDetails = () => {
         }
 
         setNotFound(true);
-    }, [propertySlug, listingIdParam, listingId, location.state?.property, getUrlsForListingId, apiProperties, photosLoaded]);
+    }, [propertySlug, listingIdParam, listingId, location.state, getUrlsForListingId, apiProperties, photosLoaded]);
 useEffect(() => {
   if (!data?.id) return;
 
@@ -787,7 +767,7 @@ useEffect(() => {
             });
 
         return () => controller.abort();
-    }, [resolvedListingId, availabilityPrefetched]);
+    }, [resolvedListingId, data?.listingId, listingId, availabilityPrefetched]);
 
 
     useEffect(() => {
