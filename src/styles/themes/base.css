@@ -116,25 +116,8 @@ button,
 .cta-primary,
 .cta-secondary {
   border-radius: var(--radius-md);
-  transition: all var(--transition-base) var(--transition-ease);
-  box-shadow: var(--shadow-level-1);
 }
 
-button:hover,
-.book-now:hover,
-.cta-primary:hover,
-.cta-secondary:hover {
-  box-shadow: var(--shadow-level-2);
-  transform: translateY(-1px);
-}
-
-button:active,
-.book-now:active,
-.cta-primary:active,
-.cta-secondary:active {
-  transform: translateY(0);
-  box-shadow: var(--shadow-level-1);
-}
 
 /* Premium cards / surfaces */
 .card,

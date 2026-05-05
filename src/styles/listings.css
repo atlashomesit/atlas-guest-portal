@@ -8,7 +8,6 @@
   position: relative;
   overflow: hidden;
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-level-1);
   background: var(--bg-surface);
   display: flex;
   flex-direction: column;

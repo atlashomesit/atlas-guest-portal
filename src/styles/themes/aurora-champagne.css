@@ -77,9 +77,4 @@
   border: 1px solid var(--glass-border);
 }
 
-/* Primary CTA Faint Glow */
-[data-theme="auroraChampagne"] .book-now,
-[data-theme="auroraChampagne"] button[type="submit"] {
-  box-shadow: 0 0 20px rgba(212, 154, 133, 0.25), var(--shadow-level-1);
-}
 
