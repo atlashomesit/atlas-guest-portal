@@ -589,7 +589,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         setLosDiscountPercent(0);
       });
     return () => controller.abort();
-  }, [listingId, dateRange?.startDate, dateRange?.endDate]);
+  }, [listingId, dateRange.startDate ? toISODate(dateRange.startDate) : null, dateRange.endDate ? toISODate(dateRange.endDate) : null]);
 
   const isCheckInAllowed = (date: Date) => {
   const iso = toISODate(getIstStartOfDay(date));
