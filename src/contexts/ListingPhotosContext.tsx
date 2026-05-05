@@ -1,22 +1,16 @@
 /* eslint-disable react-refresh/only-export-components */
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { fetchListingPhotos, fetchPublicListings } from '@/api/listingClient';
-import { filterGuestImageUrls, sanitizeGuestImageUrl } from '@/utils/guestImageUrl';
+import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
 
 type ListingPhotosContextValue = {
-  /** Ordered gallery URLs for a listing id, when known from /listings/public */
   getUrlsForListingId: (listingId: number | undefined | null) => string[] | undefined;
-  loaded: boolean;
 };
 
 const ListingPhotosContext = createContext<ListingPhotosContextValue>({
   getUrlsForListingId: () => undefined,
-  loaded: false,
 });
 
 export function ListingPhotosProvider({ children }: { children: React.ReactNode }) {
-  const [byListingId, setByListingId] = useState<Map<number, string[]>>(new Map());
-  const [loaded, setLoaded] = useState(true);
+  const [byListingId] = useState<Map<number, string[]>>(new Map());
 
   const getUrlsForListingId = useCallback(
     (listingId: number | undefined | null) => {
@@ -27,8 +21,8 @@ export function ListingPhotosProvider({ children }: { children: React.ReactNode 
   );
 
   const value = useMemo(
-    () => ({ getUrlsForListingId, loaded }),
-    [getUrlsForListingId, loaded],
+    () => ({ getUrlsForListingId }),
+    [getUrlsForListingId],
   );
 
   return <ListingPhotosContext.Provider value={value}>{children}</ListingPhotosContext.Provider>;

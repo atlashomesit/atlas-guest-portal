@@ -406,7 +406,7 @@ const PropertyDetails = () => {
             })
             .catch(() => {});
         return () => ac.abort();
-    }, [resolvedListingId, data?.maxGuests]);
+    }, [resolvedListingId, data]);
 
     /** TASK-1466: deep links e.g. `/homes/.../123?bookingId=1&t=...` load host phone without exposing it on public catalog. */
     const bookingIdForContact = searchParams.get('bookingId');
@@ -627,13 +627,8 @@ const PropertyDetails = () => {
                     const streetFromApi =
                         typeof rawAddr === 'string' && rawAddr.trim() ? rawAddr.trim() : null;
                     const listingNumericId = Number(apiListing.id) || listingId;
-                    const propertyNumericId = Number(
-                        (apiListing as Record<string, unknown>).propertyId ??
-                            (apiListing as Record<string, unknown>).property_id,
-                    );
                     // Photos already in listing API response (photoUrls/coverPhotoUrl)
                     // Skip separate /photos API call to avoid duplicate requests
-                    let fromPhotos: string[] = [];
                     const mapped: Property = {
                         id: listingNumericId,
                         listingId: listingNumericId,
@@ -688,10 +683,8 @@ const PropertyDetails = () => {
                             return typeof raw === 'string' && raw.trim() ? raw.trim() : null;
                         })(),
                     };
-                    const fromDto =
-                        photoUrlsList.length > 0 ? photoUrlsList : (coverUrl ? [coverUrl] : []);
                     const images = filterGuestImageUrls(
-                        fromPhotos.length > 0 ? fromPhotos : fromDto,
+                        photoUrlsList.length > 0 ? photoUrlsList : (coverUrl ? [coverUrl] : []),
                     );
                     if (cancelled) return;
                     setData({ ...mapped, property_img: images });
@@ -706,7 +699,7 @@ const PropertyDetails = () => {
         }
 
         setNotFound(true);
-    }, [propertySlug, listingIdParam, listingId, location.state?.property, getUrlsForListingId, apiProperties, photosLoaded]);
+    }, [propertySlug, listingIdParam, listingId, location.state, getUrlsForListingId, apiProperties, photosLoaded]);
 useEffect(() => {
   if (!data?.id) return;
 
@@ -774,7 +767,7 @@ useEffect(() => {
             });
 
         return () => controller.abort();
-    }, [resolvedListingId, availabilityPrefetched]);
+    }, [resolvedListingId, data?.listingId, listingId, availabilityPrefetched]);
 
 
     useEffect(() => {
