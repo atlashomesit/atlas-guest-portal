@@ -1,4 +1,4 @@
-/* eslint-disable atlas-brand/no-atlas-string-leak -- TODO Task 16: replace with per-tenant content */
+/* eslint-disable atlas-brand/no-atlas-string-leak -- baseline notice substitutes tenant brand at render time */
 import { useMemo, useState } from "react";
 import LegalLayout from "../components/legal/LegalLayout";
 import LegalSearch from "../components/legal/LegalSearch";
@@ -8,11 +8,44 @@ import { privacyMetadata, privacySections } from "../content/legal/privacy";
 import { CONTACT } from "../config/contact";
 import { buildWaLink, defaultPrefill } from "../utils/whatsapp";
 import { resetCookieConsent } from "../utils/cookieConsent";
+import { getTenantContext } from "../tenant/tenantContext";
+
+/**
+ * RA-006 §3.5: substitute the baseline notice's "Atlas Homestays" / "atlashomestays.com" /
+ * "privacy@atlashomestays.com" tokens with the active tenant's legal pack values.
+ * The atlas marketplace tenant gets the originals (legalName='Atlas Homestays', etc.)
+ * so apex visitors still see the canonical Atlas notice.
+ */
+const legalizeText = (
+  source: string,
+  pack: { legalName: string; contactEmail: string; shareDomain: string },
+): string =>
+  source
+    .replace(/Atlas Homestays/g, pack.legalName)
+    .replace(/privacy@atlashomestays\.com/g, pack.contactEmail)
+    .replace(/atlashomestays\.com/g, pack.shareDomain);
 
 const PrivacyPage = () => {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [revoked, setRevoked] = useState(false);
+
+  // Build the active legal pack from server-provided values, falling back to the
+  // baseline notice (which names Atlas Homestays). Empty/missing fields can't be
+  // substituted in — we keep the baseline string so guests don't see a blank.
+  const tenant = getTenantContext();
+  const pack = useMemo(() => {
+    const lp = tenant?.legalContactPack;
+    return {
+      legalName: lp?.legalName?.trim() || privacyMetadata.dataFiduciary,
+      contactEmail: lp?.contactEmail?.trim() || privacyMetadata.grievanceOfficer.email,
+      shareDomain: (lp?.legalName ? `${lp.legalName.toLowerCase().replace(/[^a-z0-9]+/g, '')}.com` : 'atlashomestays.com'),
+      grievanceName: privacyMetadata.grievanceOfficer.name, // not yet on the server pack
+      grievancePhone: lp?.contactPhone?.trim() || privacyMetadata.grievanceOfficer.phone,
+    };
+  }, [tenant]);
+  const legalize = (s: string) => legalizeText(s, pack);
+  const tenantTitle = `Privacy Notice | ${pack.legalName}`;
 
   const whatsappLink = useMemo(() => {
     const href = typeof window !== "undefined" ? window.location.href : "";
@@ -49,13 +82,13 @@ const PrivacyPage = () => {
   return (
     <LegalLayout
       current="privacy"
-      title={privacyMetadata.title}
+      title={tenantTitle}
       description="How we collect, use, store, and share your personal data — and the rights you have under India's Digital Personal Data Protection Act, 2023."
       lastUpdated={privacyMetadata.effectiveDate}
     >
       <SEO
-        title={privacyMetadata.title}
-        description="Atlas Homestays DPDPA 2023 privacy notice: what data we collect, why, and how to exercise your rights as a Data Principal."
+        title={tenantTitle}
+        description={`${pack.legalName} DPDPA 2023 privacy notice: what data we collect, why, and how to exercise your rights as a Data Principal.`}
         url="/privacy"
       />
 
@@ -67,8 +100,8 @@ const PrivacyPage = () => {
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <LegalSearch value={search} onChange={setSearch} placeholder="Search privacy notice" />
               <div className="bg-[color:color-mix(in_srgb,var(--accent-soft)_65%,var(--bg-surface))] text-text-primary border border-border-subtle rounded-xl p-4 text-sm">
-                <p className="font-semibold">Data Fiduciary: {privacyMetadata.dataFiduciary}</p>
-                <p>Grievance Officer: {privacyMetadata.grievanceOfficer.name} ({privacyMetadata.grievanceOfficer.email})</p>
+                <p className="font-semibold">Data Fiduciary: {pack.legalName}</p>
+                <p>Grievance Officer: {pack.grievanceName} ({pack.contactEmail})</p>
               </div>
             </div>
           </div>
@@ -109,8 +142,8 @@ const PrivacyPage = () => {
                 <header className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                   <div>
                     <p className="text-xs uppercase tracking-[0.2em] text-primary">Privacy</p>
-                    <h2 className="text-2xl font-bold text-text-primary">{section.title}</h2>
-                    <p className="text-text-muted mt-1">{section.summary}</p>
+                    <h2 className="text-2xl font-bold text-text-primary">{legalize(section.title)}</h2>
+                    <p className="text-text-muted mt-1">{legalize(section.summary)}</p>
                   </div>
                   <button
                     type="button"
@@ -127,7 +160,7 @@ const PrivacyPage = () => {
                   <div id={`${section.id}-details`} className="mt-4 space-y-3 text-text-primary">
                     <ul className="list-disc pl-5 space-y-2">
                       {section.details.map((detail, idx) => (
-                        <li key={idx}>{detail}</li>
+                        <li key={idx}>{legalize(detail)}</li>
                       ))}
                     </ul>
                   </div>
@@ -152,7 +185,7 @@ const PrivacyPage = () => {
               </div>
               <div className="flex flex-wrap gap-3">
                 <a
-                  href={`mailto:${privacyMetadata.grievanceOfficer.email}`}
+                  href={`mailto:${pack.contactEmail}`}
                   className="inline-flex items-center gap-2 px-4 py-3 bg-bg-surface text-primary font-semibold rounded-xl shadow-level1 hover:shadow-level2"
                 >
                   Email Grievance Officer
