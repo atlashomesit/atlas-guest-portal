@@ -67,7 +67,7 @@ function PropertyDetailsSkeleton() {
             aria-label="Loading property details"
         >
             <div className="pt-10 pl-32">
-                <div className="h-4 w-32 animate-pulse rounded bg-bg-muted" />
+                <div className="h-4 w-32 rounded bg-bg-muted" />
             </div>
             <div className="max-w-[85rem] flex flex-col gap-10 mx-auto px-4 sm:px-8 lg:px-16 py-8">
                 <div className="space-y-3">
