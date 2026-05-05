@@ -216,28 +216,28 @@ const SearchPage = () => {
     };
   }, [loadFromApi]);
 
-  const checkIn = parseDate(searchParams.get("checkIn"));
-  const checkOut = parseDate(searchParams.get("checkOut"));
-  const guests = Number(searchParams.get("guests")) || null;
-  const minPrice = Number(searchParams.get("minPrice")) || null;
-  const maxPrice = Number(searchParams.get("maxPrice")) || null;
-  const remoteWork = searchParams.get("remoteWork") === "true";
-  const longStay = searchParams.get("longStay") === "true";
+  const checkIn = useMemo(() => parseDate(searchParams.get("checkIn")), [searchParams.get("checkIn")]);
+  const checkOut = useMemo(() => parseDate(searchParams.get("checkOut")), [searchParams.get("checkOut")]);
+  const guests = useMemo(() => Number(searchParams.get("guests")) || null, [searchParams.get("guests")]);
+  const minPrice = useMemo(() => Number(searchParams.get("minPrice")) || null, [searchParams.get("minPrice")]);
+  const maxPrice = useMemo(() => Number(searchParams.get("maxPrice")) || null, [searchParams.get("maxPrice")]);
+  const remoteWork = useMemo(() => searchParams.get("remoteWork") === "true", [searchParams.get("remoteWork")]);
+  const longStay = useMemo(() => searchParams.get("longStay") === "true", [searchParams.get("longStay")]);
   /** TASK-1297: filter to listings with inventory for tonight (IST). */
-  const availableNow = searchParams.get("availableNow") === "true";
-  const amenitiesParam = searchParams.get("amenities") || "";
-  const selectedAmenities = amenitiesParam ? amenitiesParam.split(",") : [];
+  const availableNow = useMemo(() => searchParams.get("availableNow") === "true", [searchParams.get("availableNow")]);
+  const amenitiesParam = useMemo(() => searchParams.get("amenities") || "", [searchParams.get("amenities")]);
+  const selectedAmenities = useMemo(() => amenitiesParam ? amenitiesParam.split(",") : [], [amenitiesParam]);
   /** TASK-1714: sort order — default "recommended" (Atlas building/floor order). */
-  const sortBy = searchParams.get("sortBy") || "recommended";
+  const sortBy = useMemo(() => searchParams.get("sortBy") || "recommended", [searchParams.get("sortBy")]);
   /** TASK-1738: Digital nomad filter chips. */
-  const nomadWifi = searchParams.get("nomadWifi") === "true";       // WiFi 50+ Mbps
-  const nomadWorkspace = searchParams.get("nomadWorkspace") === "true"; // dedicated workspace
-  const monthlyStay = searchParams.get("monthlyStay") === "true";   // 30+ nights min stay
+  const nomadWifi = useMemo(() => searchParams.get("nomadWifi") === "true", [searchParams.get("nomadWifi")]);       // WiFi 50+ Mbps
+  const nomadWorkspace = useMemo(() => searchParams.get("nomadWorkspace") === "true", [searchParams.get("nomadWorkspace")]); // dedicated workspace
+  const monthlyStay = useMemo(() => searchParams.get("monthlyStay") === "true", [searchParams.get("monthlyStay")]);   // 30+ nights min stay
   /** TASK-1457: list vs map layout for search results. */
-  const mapView = searchParams.get("view") === "map";
+  const mapView = useMemo(() => searchParams.get("view") === "map", [searchParams.get("view")]);
 
-  const hasInvalidDates = Boolean(checkIn && checkOut && checkOut <= checkIn);
-  const explicitDateSearch = Boolean(checkIn && checkOut);
+  const hasInvalidDates = useMemo(() => Boolean(checkIn && checkOut && checkOut <= checkIn), [checkIn, checkOut]);
+  const explicitDateSearch = useMemo(() => Boolean(checkIn && checkOut), [checkIn, checkOut]);
   /** TASK-1451: include guests so "Clear filters" resets guest count too. */
   const hasActiveFilters = Boolean(
     minPrice || maxPrice || remoteWork || longStay || availableNow || selectedAmenities.length > 0
