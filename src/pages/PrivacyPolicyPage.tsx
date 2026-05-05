@@ -78,8 +78,8 @@ export default function PrivacyPolicyPage() {
         </ul>
         <p>
           To exercise any right, email{" "}
-          <a href="mailto:privacy@atlashomestays.com" className="text-brand-primary underline">
-            privacy@atlashomestays.com
+          <a href={`mailto:${privacyEmail}`} className="text-brand-primary underline">
+            {privacyEmail}
           </a>
           . We will respond within 30 days.
         </p>
