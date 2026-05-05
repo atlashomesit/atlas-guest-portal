@@ -53,9 +53,12 @@ function LazyFallback() {
       role="status"
       aria-live="polite"
       aria-label="Loading page"
-      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '40vh' }}
+      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50vh' }}
     >
-      <div style={{ width: 32, height: 32, border: '3px solid #e5e7eb', borderTopColor: '#ea580c', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ width: 40, height: 40, border: '4px solid #f3f4f6', borderTopColor: '#ea580c', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 1rem' }} />
+        <p style={{ color: '#6b7280', fontSize: '14px' }}>Loading page...</p>
+      </div>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )
@@ -122,50 +125,50 @@ function AppWrapper() {
       <ScrollToTop />
       <ErrorBoundary name="router">
         <main id="main-content" tabIndex={-1}>
-        <Suspense fallback={<LazyFallback />}>
+        <Suspense fallback={<LazyFallback />} key={`suspense-${location.pathname}`}>
         <Routes>
           <Route
             path="/"
-            element={withBoundary(isMarketplaceMode() ? <MarketplaceHomepage /> : <Home />, isMarketplaceMode() ? "marketplace-home-route" : "home-route")}
+            element={withBoundary(<Suspense fallback={<LazyFallback />}>{isMarketplaceMode() ? <MarketplaceHomepage /> : <Home />}</Suspense>, isMarketplaceMode() ? "marketplace-home-route" : "home-route")}
           />
-          <Route path="/contact" element={withBoundary(<ContactUs />, "contact-route")} />
+          <Route path="/contact" element={withBoundary(<Suspense fallback={<LazyFallback />}><ContactUs /></Suspense>, "contact-route")} />
           <Route path="/apartments" element={withBoundary(<Navigate to="/#our-homes" replace />, "apartments-redirect")} />
-          <Route path="/amenities" element={withBoundary(<Amenities />, "amenities-route")} />
-          <Route path="/location" element={withBoundary(<LocationPage />, "location-route")} />
-          <Route path="/gallery" element={withBoundary(<GalleryPage />, "gallery-route")} />
-          <Route path="/offers" element={withBoundary(<OffersPage />, "offers-route")} />
-          <Route path="/about" element={withBoundary(<AboutPage />, "about-route")} />
-          <Route path="/faq" element={withBoundary(<FaqPage />, "faq-route")} />
-          <Route path="/search" element={withBoundary(<SearchPage />, "search-route")} />
-          <Route path="/blog" element={withBoundary(<BlogHome />, "blog-home-route")} />
-          <Route path="/blog/:category" element={withBoundary(<BlogCategory />, "blog-category-route")} />
-          <Route path="/blog/:category/:slug" element={withBoundary(<BlogPostPage />, "blog-post-route")} />
-          <Route path="/blog/:slug" element={withBoundary(<BlogPostPage />, "blog-legacy-route")} />
-          <Route path="/policies" element={withBoundary(<Policies />, "policies-route")} />
-          <Route path="/privacy" element={withBoundary(<PrivacyPolicyPage />, "privacy-route")} />
-          <Route path="/privacy-policy" element={withBoundary(<PrivacyPage />, "privacy-policy-legacy-route")} />
-          <Route path="/terms" element={withBoundary(<Terms />, "terms-route")} />
-          <Route path="/terms-and-conditions" element={withBoundary(<Terms />, "terms-legacy-route")} />
+          <Route path="/amenities" element={withBoundary(<Suspense fallback={<LazyFallback />}><Amenities /></Suspense>, "amenities-route")} />
+          <Route path="/location" element={withBoundary(<Suspense fallback={<LazyFallback />}><LocationPage /></Suspense>, "location-route")} />
+          <Route path="/gallery" element={withBoundary(<Suspense fallback={<LazyFallback />}><GalleryPage /></Suspense>, "gallery-route")} />
+          <Route path="/offers" element={withBoundary(<Suspense fallback={<LazyFallback />}><OffersPage /></Suspense>, "offers-route")} />
+          <Route path="/about" element={withBoundary(<Suspense fallback={<LazyFallback />}><AboutPage /></Suspense>, "about-route")} />
+          <Route path="/faq" element={withBoundary(<Suspense fallback={<LazyFallback />}><FaqPage /></Suspense>, "faq-route")} />
+          <Route path="/search" element={withBoundary(<Suspense fallback={<LazyFallback />}><SearchPage /></Suspense>, "search-route")} />
+          <Route path="/blog" element={withBoundary(<Suspense fallback={<LazyFallback />}><BlogHome /></Suspense>, "blog-home-route")} />
+          <Route path="/blog/:category" element={withBoundary(<Suspense fallback={<LazyFallback />}><BlogCategory /></Suspense>, "blog-category-route")} />
+          <Route path="/blog/:category/:slug" element={withBoundary(<Suspense fallback={<LazyFallback />}><BlogPostPage /></Suspense>, "blog-post-route")} />
+          <Route path="/blog/:slug" element={withBoundary(<Suspense fallback={<LazyFallback />}><BlogPostPage /></Suspense>, "blog-legacy-route")} />
+          <Route path="/policies" element={withBoundary(<Suspense fallback={<LazyFallback />}><Policies /></Suspense>, "policies-route")} />
+          <Route path="/privacy" element={withBoundary(<Suspense fallback={<LazyFallback />}><PrivacyPolicyPage /></Suspense>, "privacy-route")} />
+          <Route path="/privacy-policy" element={withBoundary(<Suspense fallback={<LazyFallback />}><PrivacyPage /></Suspense>, "privacy-policy-legacy-route")} />
+          <Route path="/terms" element={withBoundary(<Suspense fallback={<LazyFallback />}><Terms /></Suspense>, "terms-route")} />
+          <Route path="/terms-and-conditions" element={withBoundary(<Suspense fallback={<LazyFallback />}><Terms /></Suspense>, "terms-legacy-route")} />
           <Route path="/homes/:propertySlug/:unitSlug" element={withBoundary(<Suspense fallback={<PropertyDetailsLazyFallback />}><Homepage_PropertyDetails /></Suspense>, "property-details-home-route")} />
-          <Route path="/homes/:roomNo" element={withBoundary(<HomeDetails />, "home-details-route")} />
+          <Route path="/homes/:roomNo" element={withBoundary(<Suspense fallback={<LazyFallback />}><HomeDetails /></Suspense>, "home-details-route")} />
           <Route path="/property_details/:id" element={withBoundary(<Suspense fallback={<PropertyDetailsLazyFallback />}><LegacyPropertyRedirect /></Suspense>, "property-details-legacy-route")} />
           <Route path="/properties/:id" element={withBoundary(<Suspense fallback={<PropertyDetailsLazyFallback />}><LegacyPropertyRedirect /></Suspense>, "property-details-modern-redirect-route")} />
-          <Route path="/reserve" element={withBoundary(<Reserve />, "reserve-route")} />
-          <Route path="/booking/:bookingId" element={withBoundary(<BookingConfirmationPage />, "booking-confirmation-route")} />
-          <Route path="/check-in/:bookingRef" element={withBoundary(<SelfCheckIn />, "self-checkin-route")} />
-          <Route path="/check-in" element={withBoundary(<SelfCheckIn />, "self-checkin-noparam-route")} />
-          <Route path="/review/:bookingId" element={withBoundary(<ReviewSubmitPage />, "review-submit-route")} />
-          <Route path="/communication-preferences" element={withBoundary(<CommunicationPreferences />, "communication-preferences-route")} />
-          <Route path="/preferences/:guestToken" element={withBoundary(<CommunicationPreferences />, "communication-preferences-token-route")} />
-          <Route path="/profile" element={withBoundary(<ProfilePage />, "profile-route")} />
-          <Route path="/my-bookings" element={withBoundary(<MyBookingsPage />, "my-bookings-route")} />
-          <Route path="/favorites" element={withBoundary(<FavoritesPage />, "favorites-route")} />
+          <Route path="/reserve" element={withBoundary(<Suspense fallback={<LazyFallback />}><Reserve /></Suspense>, "reserve-route")} />
+          <Route path="/booking/:bookingId" element={withBoundary(<Suspense fallback={<LazyFallback />}><BookingConfirmationPage /></Suspense>, "booking-confirmation-route")} />
+          <Route path="/check-in/:bookingRef" element={withBoundary(<Suspense fallback={<LazyFallback />}><SelfCheckIn /></Suspense>, "self-checkin-route")} />
+          <Route path="/check-in" element={withBoundary(<Suspense fallback={<LazyFallback />}><SelfCheckIn /></Suspense>, "self-checkin-noparam-route")} />
+          <Route path="/review/:bookingId" element={withBoundary(<Suspense fallback={<LazyFallback />}><ReviewSubmitPage /></Suspense>, "review-submit-route")} />
+          <Route path="/communication-preferences" element={withBoundary(<Suspense fallback={<LazyFallback />}><CommunicationPreferences /></Suspense>, "communication-preferences-route")} />
+          <Route path="/preferences/:guestToken" element={withBoundary(<Suspense fallback={<LazyFallback />}><CommunicationPreferences /></Suspense>, "communication-preferences-token-route")} />
+          <Route path="/profile" element={withBoundary(<Suspense fallback={<LazyFallback />}><ProfilePage /></Suspense>, "profile-route")} />
+          <Route path="/my-bookings" element={withBoundary(<Suspense fallback={<LazyFallback />}><MyBookingsPage /></Suspense>, "my-bookings-route")} />
+          <Route path="/favorites" element={withBoundary(<Suspense fallback={<LazyFallback />}><FavoritesPage /></Suspense>, "favorites-route")} />
           <Route path="/saved" element={withBoundary(<Navigate to="/favorites" replace />, "saved-alias-route")} />
-          <Route path="/recent" element={withBoundary(<RecentlyViewedPage />, "recent-route")} />
-          <Route path="/become-a-host" element={withBoundary(<BecomeHost />, "become-host-route")} />
-          <Route path="/property_LocationDetails/:id" element={withBoundary(<Homepage_LocationDetails />, "location-details-route")} />
-          <Route path="/:shortCode" element={withBoundary(<ShortLinkRedirect />, "shortlink-route")} />
-          <Route path="/*" element={withBoundary(<PageNotFound />, "fallback-route")} />
+          <Route path="/recent" element={withBoundary(<Suspense fallback={<LazyFallback />}><RecentlyViewedPage /></Suspense>, "recent-route")} />
+          <Route path="/become-a-host" element={withBoundary(<Suspense fallback={<LazyFallback />}><BecomeHost /></Suspense>, "become-host-route")} />
+          <Route path="/property_LocationDetails/:id" element={withBoundary(<Suspense fallback={<LazyFallback />}><Homepage_LocationDetails /></Suspense>, "location-details-route")} />
+          <Route path="/:shortCode" element={withBoundary(<Suspense fallback={<LazyFallback />}><ShortLinkRedirect /></Suspense>, "shortlink-route")} />
+          <Route path="/*" element={withBoundary(<Suspense fallback={<LazyFallback />}><PageNotFound /></Suspense>, "fallback-route")} />
         </Routes>
         </Suspense>
         </main>
