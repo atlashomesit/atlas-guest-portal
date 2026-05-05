@@ -1,7 +1,7 @@
 /* eslint-disable atlas-brand/no-atlas-string-leak -- TODO Task 16: replace with per-tenant content */
 import { lazy, Suspense, useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Wifi, Briefcase } from "lucide-react";
 
 import { propertyData } from "../data";
 import { fetchPublicListings, type PublicListing } from "../api/listingClient";
@@ -1221,14 +1221,15 @@ const SearchPage = () => {
                       <p className="text-sm text-text-muted">Sleeps up to {unit.maxGuests} guests</p>
                       {/* TASK-577: Show WiFi speed and co-working desk badges */}
                       <div className="mt-2 flex flex-wrap gap-2">
+                        {/* TASK-1674: use lucide icons instead of emoji for visual consistency */}
                         {(unit as any).wifiSpeedMbps && (unit as any).wifiSpeedMbps >= 25 && (
                           <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700">
-                            📶 WiFi {(unit as any).wifiSpeedMbps}Mbps
+                            <Wifi className="h-3 w-3" /> WiFi {(unit as any).wifiSpeedMbps}Mbps
                           </span>
                         )}
                         {(unit as any).hasCoworkingDesk && (
                           <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700">
-                            💼 Co-working desk
+                            <Briefcase className="h-3 w-3" /> Co-working desk
                           </span>
                         )}
                         {/* TASK-1298: composite Atlas Trusted Host badge — shown when both verified photos and GST reg are present */}
