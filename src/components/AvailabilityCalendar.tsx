@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { buildApiUrl, getApiHeaders } from '../api/client';
 import { messageFromApiResponse } from '../utils/serverErrorFromResponse';
 
 interface DayEntry {
   date: string; // yyyy-MM-dd
-  status: 'available' | 'blocked' | 'booked';
+  status: 'available' | 'blocked' | 'booked' | 'turnover';
 }
 
 interface Props {
@@ -38,18 +38,23 @@ export default function AvailabilityCalendar({ listingId, onDateSelect }: Props)
   const [calData, setCalData] = useState<Map<string, DayEntry['status']>>(new Map());
   const [loading, setLoading] = useState(true);
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-  const monthEnd = addMonths(monthStart, 2);
-  const fromStr = formatYmd(monthStart);
-  const toStr = formatYmd(monthEnd);
+  const { today, monthStart, fromStr, toStr } = useMemo(() => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    const end = addMonths(start, 2);
+    return {
+      today: now,
+      monthStart: start,
+      fromStr: formatYmd(start),
+      toStr: formatYmd(end),
+    };
+  }, []);
 
   useEffect(() => {
     if (!listingId) return;
     setLoading(true);
-    const url = new URL(buildApiUrl(`/api/listings/${listingId}/availability`));
+    const url = new URL(buildApiUrl(`/api/public/listings/${listingId}/availability-calendar`));
     url.searchParams.set('from', fromStr);
     url.searchParams.set('to', toStr);
     fetch(url.toString(), { headers: getApiHeaders() })
@@ -74,7 +79,8 @@ export default function AvailabilityCalendar({ listingId, onDateSelect }: Props)
         }
       })
       .finally(() => setLoading(false));
-  }, [listingId, fromStr, toStr]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listingId]);
 
   const renderMonth = (monthOffset: number) => {
     const base = addMonths(monthStart, monthOffset);
@@ -107,17 +113,27 @@ export default function AvailabilityCalendar({ listingId, onDateSelect }: Props)
         bg = 'bg-gray-100 cursor-not-allowed';
         text = 'text-text-muted line-through opacity-60';
         extra = '';
+      } else if (status === 'turnover') {
+        // Turnover day allows same-day check-in but should be visually distinct.
+        bg = 'bg-amber-50 hover:bg-amber-100 cursor-pointer border-amber-300';
+        text = 'text-amber-800';
       }
 
       cells.push(
         <div
           key={ymd}
           onClick={() => {
-            if (!isPast && status === 'available' && onDateSelect) {
+            if (!isPast && (status === 'available' || status === 'turnover') && onDateSelect) {
               onDateSelect(ymd);
             }
           }}
-          title={isPast ? undefined : status === 'available' ? `Check in ${ymd}` : `Unavailable`}
+          title={
+            isPast
+              ? undefined
+              : (status === 'available' || status === 'turnover')
+                ? `Check in ${ymd}`
+                : 'Unavailable'
+          }
           className={`flex items-center justify-center rounded-lg border text-xs font-medium h-8 ${bg} ${text} ${extra}`}
         >
           {d}
@@ -149,6 +165,7 @@ export default function AvailabilityCalendar({ listingId, onDateSelect }: Props)
       </div>
       <div className="flex items-center gap-4 mt-3 text-xs text-text-muted">
         <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded bg-white border border-green-200" /> Available</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded bg-amber-50 border border-amber-300" /> Turnover (check-in allowed)</span>
         <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded bg-gray-100" /> Unavailable</span>
       </div>
     </div>

@@ -339,6 +339,7 @@ const HomeDetails = () => {
           listingId={room.listingId}
           listingName={room.title}
           maxGuests={room.maxGuests}
+          hostPhone={room.hostPhone ?? null}
         />
       </Suspense>
 
