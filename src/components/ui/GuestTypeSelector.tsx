@@ -42,14 +42,14 @@ const GuestTypeRow: React.FC<GuestTypeRowProps> = ({
   const isAtMax = max !== undefined && value >= max;
 
   return (
-    <div className="flex items-center justify-between py-3 border-b border-[var(--border-subtle)] last:border-0">
+    <div className="flex items-center justify-between py-3 border-b-subtle)] last:border-0">
       <div className="flex-1">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-[var(--text-primary)]">{label}</span>
           {info && (
             <div className="group relative">
               <Info className="h-3.5 w-3.5 text-[var(--text-muted)] cursor-help" />
-              <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-48 p-2 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg shadow-[var(--shadow-level-2)] text-xs text-[var(--text-muted)] z-50">
+              <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-48 p-2 bg-transparent border-subtle)] rounded-lg shadow-[var(--shadow-level-2)] text-xs text-[var(--text-muted)] z-50">
                 {info}
               </div>
             </div>
@@ -62,7 +62,7 @@ const GuestTypeRow: React.FC<GuestTypeRowProps> = ({
           type="button"
           onClick={() => onChange(value - 1)}
           disabled={isAtMin || disabled}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border-subtle)] text-[var(--text-primary)] transition-all hover:border-[var(--cta-primary)] hover:bg-[var(--bg-muted)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cta-primary)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-[var(--border-subtle)] disabled:hover:bg-transparent"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-full border-subtle)] text-[var(--text-primary)] transition-all hover:border-[var(--cta-primary)] hover:bg-[var(--bg-muted)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-[var(--border-subtle)] disabled:hover:bg-transparent"
           aria-label={`Decrease ${label.toLowerCase()}`}
         >
           <Minus className="h-4 w-4" />
@@ -72,7 +72,7 @@ const GuestTypeRow: React.FC<GuestTypeRowProps> = ({
           type="button"
           onClick={() => onChange(value + 1)}
           disabled={isAtMax || disabled}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border-subtle)] text-[var(--text-primary)] transition-all hover:border-[var(--cta-primary)] hover:bg-[var(--bg-muted)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cta-primary)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-[var(--border-subtle)] disabled:hover:bg-transparent"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-full border-subtle)] text-[var(--text-primary)] transition-all hover:border-[var(--cta-primary)] hover:bg-[var(--bg-muted)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-[var(--border-subtle)] disabled:hover:bg-transparent"
           aria-label={`Increase ${label.toLowerCase()}`}
         >
           <Plus className="h-4 w-4" />
@@ -152,7 +152,7 @@ export const GuestTypeSelector: React.FC<GuestTypeSelectorProps> = ({
       <button
         type="button"
         onClick={onToggle}
-        className="field-card flex h-full min-h-[120px] flex-col justify-between rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-7 py-7 shadow-[var(--shadow-level-1)] hover:shadow-[var(--shadow-level-2)] hover:scale-[1.01] text-left w-full transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cta-primary)]"
+        className="field-card flex h-full min-h-[120px] flex-col justify-between rounded-2xl border-subtle)] bg-transparent px-7 py-7 shadow-[var(--shadow-level-1)] hover:shadow-[var(--shadow-level-2)] hover:scale-[1.01] text-left w-full transition-all
         aria-expanded={isOpen}
         aria-label="Select guests"
       >
@@ -170,7 +170,7 @@ export const GuestTypeSelector: React.FC<GuestTypeSelectorProps> = ({
       </button>
       
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 mt-2 bg-[var(--bg-surface)] rounded-xl shadow-[var(--shadow-level-3)] border border-[var(--border-subtle)] p-5 z-50 min-w-[320px]">
+        <div className="absolute top-full left-0 right-0 mt-2 bg-transparent rounded-xl shadow-[var(--shadow-level-3)] border-subtle)] p-5 z-50 min-w-[320px]">
           <div className="flex flex-col">
             <GuestTypeRow
               label="Adults"
@@ -211,7 +211,7 @@ export const GuestTypeSelector: React.FC<GuestTypeSelectorProps> = ({
           </div>
           
           {isAtCapacity && (
-            <div className="mt-3 pt-3 border-t border-[var(--border-subtle)]">
+            <div className="mt-3 pt-3 border-t-subtle)]">
               <p className="text-xs text-[var(--support-error)] font-medium">
                 Maximum capacity reached ({maxCapacity} guests)
               </p>

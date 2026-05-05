@@ -325,12 +325,12 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
   }
 
   return (
-    <section className="py-12 px-4 sm:px-6 lg:px-8 bg-bg-surface scroll-mt-28" id="our-homes">
+    <section className="py-12 px-4 sm:px-6 lg:px-8 bg-transparent scroll-mt-28" id="our-homes">
       <div className="max-w-7xl mx-auto flex flex-col gap-8">
         <Heading title="Our Homes" id="our-homes" />
 
         <div className="grid gap-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch rounded-3xl overflow-hidden shadow-sm bg-white border border-border-subtle property-card">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch rounded-3xl overflow-hidden shadow-sm bg-white property-card">
             <div className="relative h-full">
               <OptimizedImage
                 key={`${heroModel.listing.id}-${activeImageIndex[heroModel.listing.id] ?? 0}`}
@@ -449,7 +449,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
                 <button
                   type="button"
                   onClick={() => handleNavigate(heroModel)}
-                  className="property-card__button inline-flex items-center justify-center rounded-full border border-border-subtle px-5 py-3 text-sm font-semibold text-text-primary transition hover:border-[color:var(--cta-primary)] hover:text-[color:var(--cta-primary)]"
+                  className="property-card__button inline-flex items-center justify-center rounded-full px-5 py-3 text-sm font-semibold text-text-primary transition hover:border-[color:var(--cta-primary)] hover:text-[color:var(--cta-primary)]"
                 >
                   View home
                 </button>
@@ -466,7 +466,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
               return (
                 <div
                   key={getItemKey(model.listing, index)}
-                  className="property-card rounded-2xl shadow-sm bg-white overflow-hidden border border-border-subtle flex flex-col"
+                  className="property-card rounded-2xl shadow-sm bg-white overflow-hidden flex flex-col"
                 >
                   <div className="relative h-56">
                     <OptimizedImage
@@ -575,7 +575,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
                           event.preventDefault();
                           handleNavigate(model);
                         }}
-                        className="property-card__button inline-flex items-center justify-center rounded-full border border-border-subtle px-5 py-3 text-sm font-semibold text-text-primary transition hover:border-[color:var(--cta-primary)] hover:text-[color:var(--cta-primary)]"
+                        className="property-card__button inline-flex items-center justify-center rounded-full px-5 py-3 text-sm font-semibold text-text-primary transition hover:border-[color:var(--cta-primary)] hover:text-[color:var(--cta-primary)]"
                       >
                         View home
                       </Link>

@@ -11,7 +11,7 @@ const SupportWidgetTrigger = ({ bottomSpacing, onOpen }: SupportWidgetTriggerPro
   <button
     type="button"
     onClick={onOpen}
-    className="fixed right-4 z-[var(--z-floating)] inline-flex items-center gap-3 rounded-full border border-border-subtle bg-[color-mix(in_srgb,var(--bg-surface)_96%,#f3f0ea_10%)] px-4 py-3 text-sm font-semibold text-text-primary shadow-level3 ring-1 ring-border-subtle transition hover:-translate-y-0.5 hover:shadow-level4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary md:right-5"
+    className="fixed right-4 z-[var(--z-floating)] inline-flex items-center gap-3 rounded-full bg-[color-mix(in_srgb,var(--bg-surface)_96%,#f3f0ea_10%)] px-4 py-3 text-sm font-semibold text-text-primary shadow-level3 ring-1 ring-border-subtle transition hover:-translate-y-0.5 hover:shadow-level4 md:right-5"
     style={{ bottom: bottomSpacing }}
     aria-label={SUPPORT_DRAWER_COPY.trigger.ariaLabel}
   >

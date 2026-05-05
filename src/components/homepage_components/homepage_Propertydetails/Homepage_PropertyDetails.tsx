@@ -85,11 +85,11 @@ function PropertyDetailsSkeleton() {
 
                 <div className="flex flex-col gap-4 sm:flex-row">
                     <div className="w-full sm:w-2/3 order-2 sm:order-1 space-y-6">
-                        <div className="pb-8 border-b border-border-subtle space-y-4">
+                        <div className="pb-8 border-b space-y-4">
                             <div className="h-7 w-56 animate-pulse rounded bg-bg-muted" />
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                 {Array.from({ length: 6 }).map((_, i) => (
-                                    <div key={i} className="h-24 rounded-xl animate-pulse bg-bg-muted border border-border-subtle" />
+                                    <div key={i} className="h-24 rounded-xl animate-pulse bg-bg-muted" />
                                 ))}
                             </div>
                         </div>
@@ -101,7 +101,7 @@ function PropertyDetailsSkeleton() {
                         </div>
                     </div>
                     <div className="w-full sm:w-1/3 order-1 sm:order-2">
-                        <div className="rounded-2xl border border-border-subtle bg-bg-surface p-6 space-y-4">
+                        <div className="rounded-2xl bg-transparent p-6 space-y-4">
                             <div className="h-40 w-full animate-pulse rounded-xl bg-bg-muted" />
                             <div className="h-6 w-28 animate-pulse rounded bg-bg-muted" />
                             <div className="h-10 w-full animate-pulse rounded-xl bg-bg-muted" />
@@ -951,7 +951,7 @@ useEffect(() => {
                         </Button>
                         <Link
                             to="/"
-                            className="inline-flex items-center justify-center rounded-full border border-border-subtle px-5 py-3 text-sm font-semibold text-text-primary transition hover:border-[color:var(--cta-primary)] hover:text-[color:var(--cta-primary)]"
+                            className="inline-flex items-center justify-center rounded-full px-5 py-3 text-sm font-semibold text-text-primary transition hover:border-[color:var(--cta-primary)] hover:text-[color:var(--cta-primary)]"
                         >
                             Return to homepage
                         </Link>
@@ -1024,7 +1024,7 @@ useEffect(() => {
                         <div className="flex shrink-0 items-center gap-1">
                             <button
                                 type="button"
-                                className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border-subtle bg-bg-muted text-text-primary hover:opacity-90"
+                                className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-bg-muted text-text-primary hover:opacity-90"
                                 onClick={() => {
                                     const lid = Number(resolvedListingId ?? data?.listingId ?? listingId);
                                     if (!Number.isFinite(lid) || lid <= 0) return;
@@ -1036,7 +1036,7 @@ useEffect(() => {
                             </button>
                             <button
                                 type="button"
-                                className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border-subtle bg-bg-muted text-text-primary hover:opacity-90"
+                                className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-bg-muted text-text-primary hover:opacity-90"
                                 onClick={() => {
                                     const url = window.location.href;
                                     const text = `Check out ${data?.property_name ?? 'this home'} on ${_getTenantCtx()?.name ?? 'our platform'}`;
@@ -1239,14 +1239,14 @@ useEffect(() => {
                     {/* Left div  */}
                     <div className="w-full sm:w-2/3 order-2 sm:order-1">
                         {/* What this place offers */}
-                        <div className="pb-8 border-b border-border-subtle">
+                        <div className="pb-8 border-b">
                             <h2 className="text-xl sm:text-2xl font-semibold mb-6 text-text-primary">What this place offers</h2>
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                 {data?.amenityCodes && data.amenityCodes.length > 0 ? (
                                     data.amenityCodes.slice(0, 9).map((code) => {
                                         const label = amenityMaster.get(code.toLowerCase()) ?? formatAmenityName(code);
                                         return (
-                                            <div key={code} className="flex flex-col items-center gap-2 p-3 rounded-xl bg-bg-muted border border-border-subtle text-center">
+                                            <div key={code} className="flex flex-col items-center gap-2 p-3 rounded-xl bg-bg-muted text-center">
                                                 <span className="text-2xl text-accent-primary">
                                                     {renderIconForCode(code)}
                                                 </span>
@@ -1256,7 +1256,7 @@ useEffect(() => {
                                     })
                                 ) : (data?.property_amenities || []).length > 0 ? (
                                     (data?.property_amenities || []).slice(0, 9).map((amenity, idx) => (
-                                        <div key={idx} className="flex flex-col items-center gap-2 p-3 rounded-xl bg-bg-muted border border-border-subtle text-center">
+                                        <div key={idx} className="flex flex-col items-center gap-2 p-3 rounded-xl bg-bg-muted text-center">
                                             <span className="text-2xl text-accent-primary">
                                                 {renderIcon(amenity?.amenities_icon || '')}
                                             </span>
@@ -1282,11 +1282,11 @@ useEffect(() => {
 
                         {/* Policies Section */}
                         {data?.property_policy_details && (
-                            <div className="border border-border-subtle rounded-lg overflow-hidden bg-bg-surface">
+                            <div className="border rounded-lg overflow-hidden bg-transparent">
                                 <div className="bg-bg-surface p-6">
                                     <h2 className="text-xl sm:text-2xl font-semibold mb-6 text-text-primary">Things to know</h2>
                                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
-                                        <div className="p-4 border border-border-subtle rounded-lg bg-bg-muted">
+                                        <div className="p-4 rounded-lg bg-bg-muted">
                                             <div className="flex items-center gap-2 mb-1">
                                                 <Clock className="w-4 h-4 text-accent-primary" />
                                                 <p className="text-text-muted text-sm">Check-in / Check-out</p>
@@ -1297,7 +1297,7 @@ useEffect(() => {
                                             </p>
                                             <a className="text-sm text-accent-primary underline" href="/terms#check-in-check-out">View terms</a>
                                         </div>
-                                        <div className="p-4 border border-border-subtle rounded-lg bg-bg-muted">
+                                        <div className="p-4 rounded-lg bg-bg-muted">
                                             <div className="flex items-center gap-2 mb-1">
                                                 <KeyRound className="w-4 h-4 text-accent-primary" />
                                                 <p className="text-text-muted text-sm">Cancellation & rules</p>
@@ -1329,11 +1329,11 @@ useEffect(() => {
                         {(() => {
                             const s = similarFromApi;
                             if (s?.loading) return (
-                                <div className="pb-8 border-b border-border-subtle">
+                                <div className="pb-8 border-b">
                                     <div className="h-7 w-48 animate-pulse rounded bg-bg-muted mb-4" />
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         {Array.from({ length: 2 }).map((_, i) => (
-                                            <div key={i} className="rounded-xl border border-border-subtle bg-bg-surface overflow-hidden">
+                                            <div key={i} className="rounded-xl bg-transparent overflow-hidden">
                                                 <div className="h-40 w-full animate-pulse bg-bg-muted" />
                                                 <div className="p-4 space-y-2">
                                                     <div className="h-4 w-3/4 animate-pulse rounded bg-bg-muted" />
@@ -1346,7 +1346,7 @@ useEffect(() => {
                             );
                             if (!s || !Array.isArray(s.items) || s.items.length === 0) return null;
                             return (
-                                <div className="pb-8 border-b border-border-subtle">
+                                <div className="pb-8 border-b">
                                     <h2 className="text-xl sm:text-2xl font-semibold mb-4 text-text-primary">Similar stays</h2>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         {s.items.slice(0, 4).map((it: any) => {
@@ -1358,7 +1358,7 @@ useEffect(() => {
                                                 <Link
                                                     key={String(it.id)}
                                                     to={path}
-                                                    className="rounded-xl border border-border-subtle bg-bg-surface overflow-hidden transition-colors hover:border-border-subtle"
+                                                    className="rounded-xl bg-transparent overflow-hidden transition-colors hover:border-border-subtle"
                                                 >
                                                     {img ? <img src={img} alt={name} className="w-full h-40 object-cover" loading="lazy" /> : null}
                                                     <div className="p-4">
@@ -1381,19 +1381,19 @@ useEffect(() => {
                             const apiLoaded = api != null && !api.loading;
                             const showStatic = !showApi && !apiLoaded && data && data.property_reviews > 0;
                             if (api?.loading && !showStatic) return (
-                                <div className="pb-8 border-b border-border-subtle">
+                                <div className="pb-8 border-b">
                                     <div className="h-7 w-40 animate-pulse rounded bg-bg-muted mb-4" />
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                         {Array.from({ length: 2 }).map((_, i) => (
-                                            <div key={i} className="p-4 rounded-xl bg-bg-muted border border-border-subtle space-y-2">
-                                                <div className="h-3 w-24 animate-pulse rounded bg-bg-surface" />
+                                            <div key={i} className="p-4 rounded-xl bg-bg-muted space-y-2">
+                                                <div className="h-3 w-24 animate-pulse rounded bg-transparent" />
                                                 <div className="flex gap-1">
                                                     {Array.from({ length: 5 }).map((__, j) => (
-                                                        <div key={j} className="h-3 w-3 animate-pulse rounded-full bg-bg-surface" />
+                                                        <div key={j} className="h-3 w-3 animate-pulse rounded-full bg-transparent" />
                                                     ))}
                                                 </div>
-                                                <div className="h-3 w-full animate-pulse rounded bg-bg-surface" />
-                                                <div className="h-3 w-4/5 animate-pulse rounded bg-bg-surface" />
+                                                <div className="h-3 w-full animate-pulse rounded bg-transparent" />
+                                                <div className="h-3 w-4/5 animate-pulse rounded bg-transparent" />
                                             </div>
                                         ))}
                                     </div>
@@ -1404,7 +1404,7 @@ useEffect(() => {
                             const rating = showApi ? api!.averageRating : data!.property_rating;
                             const count = showApi ? api!.totalCount : data!.property_reviews;
                             return (
-                            <div className="pb-8 border-b border-border-subtle" data-testid="reviews-section">
+                            <div className="pb-8 border-b" data-testid="reviews-section">
                                 <h2 className="text-xl sm:text-2xl font-semibold mb-4 text-text-primary">Guest Reviews</h2>
                                 <div className="flex items-center gap-3 mb-4">
                                     <div className="flex items-center gap-1 text-accent-primary">
@@ -1418,7 +1418,7 @@ useEffect(() => {
                                 {showApi && api!.reviews.length > 0 ? (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                         {api!.reviews.slice(0, 6).map((r) => (
-                                            <div key={r.id} className="p-4 rounded-xl bg-bg-muted border border-border-subtle">
+                                            <div key={r.id} className="p-4 rounded-xl bg-bg-muted">
                                                 <div className="flex items-center gap-2 mb-1 flex-wrap">
                                                     <span className="text-sm font-semibold text-text-primary">{r.guestName ?? 'Guest'}</span>
                                                     <span className="text-xs text-text-muted">
@@ -1453,7 +1453,7 @@ useEffect(() => {
                                                                     href={safe}
                                                                     target="_blank"
                                                                     rel="noopener noreferrer"
-                                                                    className="block w-14 h-14 rounded-lg overflow-hidden border border-border-subtle bg-bg-muted shrink-0"
+                                                                    className="block w-14 h-14 rounded-lg overflow-hidden bg-bg-muted shrink-0"
                                                                 >
                                                                     <img src={safe} alt="" className="w-full h-full object-cover" loading="lazy" />
                                                                 </a>
@@ -1474,7 +1474,7 @@ useEffect(() => {
                                     data?.property_review_snippets && data.property_review_snippets.length > 0 && (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                         {data.property_review_snippets.slice(0, 4).map((snippet: string, idx: number) => (
-                                            <div key={idx} className="p-4 rounded-xl bg-bg-muted border border-border-subtle">
+                                            <div key={idx} className="p-4 rounded-xl bg-bg-muted">
                                                 <p className="text-sm text-text-muted italic">"{snippet}"</p>
                                             </div>
                                         ))}
@@ -1486,7 +1486,7 @@ useEffect(() => {
                         })()}
 
                         {/* About this place */}
-                        <div className="pb-8 border-b border-border-subtle">
+                        <div className="pb-8 border-b">
                             <h2 className="text-xl sm:text-2xl font-semibold mb-4 text-text-primary">About this place</h2>
                             <p className="text-text-muted leading-relaxed text-justify">
                                 {!data?.property_description ? 
@@ -1508,7 +1508,7 @@ useEffect(() => {
                         {/* Location Map — TASK-1677: fallback when embed URL missing */}
                         <div className="">
                             <h2 className="text-xl sm:text-2xl font-semibold mb-4 text-text-primary">Where you'll be</h2>
-                            <div className="rounded-lg overflow-hidden border border-border-subtle">
+                            <div className="rounded-lg overflow-hidden">
                                 {mapSrcTrimmed ? (
                                     <iframe
                                         src={mapSrcTrimmed}
@@ -1542,7 +1542,7 @@ useEffect(() => {
                         </div>
 
                         {/* About neighborhood */}
-                        <div className="pb-8 border-b border-border-subtle">
+                        <div className="pb-8 border-b">
                             <h2 className="text-xl sm:text-2xl font-semibold mb-4 text-text-primary">About neighborhood</h2>
                             <p className="text-text-muted leading-relaxed mb-2">
                                 Location & Neighborhood Located in {data?.property_location || 'this area'}, this property offers easy access to major attractions and landmarks in the area.
@@ -1592,7 +1592,7 @@ useEffect(() => {
                             </div>
                             {/* TASK-545: Host profile card — builds trust (#2 signal per 2025 Indian hospitality research). */}
                             <div
-                                className="mt-3 flex items-center gap-3 rounded-2xl border border-border-subtle bg-bg-surface p-3"
+                                className="mt-3 flex items-center gap-3 rounded-2xl bg-transparent p-3"
                                 data-testid="host-profile-card"
                             >
                                 <div
@@ -1625,7 +1625,7 @@ useEffect(() => {
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             data-testid="chat-with-host-btn"
-                                            className="flex items-center justify-center gap-2 w-full rounded-xl border border-border-strong bg-bg-surface px-4 py-3 text-sm font-medium text-text-primary hover:bg-bg-muted transition"
+                                            className="flex items-center justify-center gap-2 w-full rounded-xl border border-border-strong bg-transparent px-4 py-3 text-sm font-medium text-text-primary hover:bg-bg-muted transition"
                                             onClick={() => trackEvent('whatsapp_cta_click', { listingId: resolvedListingId })}
                                         >
                                             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="#25D366" aria-hidden="true">
@@ -1638,7 +1638,7 @@ useEffect(() => {
                             })()}
                             {resolvedListingId && (
                                 <Suspense fallback={
-                                    <div className="rounded-lg border border-border-subtle bg-bg-surface p-4 animate-pulse h-64" />
+                                    <div className="rounded-lg bg-transparent p-4 animate-pulse h-64" />
                                 }>
                                     <AvailabilityCalendar
                                         listingId={resolvedListingId}
@@ -1650,7 +1650,7 @@ useEffect(() => {
                                 </Suspense>
                             )}
                             {showAvailabilityPlaceholder && (
-                                <div className="rounded-2xl border border-border-subtle bg-bg-surface p-6">
+                                <div className="rounded-2xl bg-transparent p-6">
                                     <h3 className="text-lg font-semibold text-text-primary mb-2">Check Availability</h3>
                                     <p className="text-text-muted text-sm mb-4">
                                         Availability check is currently unavailable. Please try again later.
@@ -1672,8 +1672,8 @@ useEffect(() => {
                 {/* Amenities Modal */}
                 {showAmenitiesModal && (
                     <div className="fixed inset-0 bg-[color:color-mix(in_srgb,var(--text-primary)_70%,transparent)] z-[var(--z-modal)] flex items-center justify-center p-4">
-                        <div className="bg-bg-surface rounded-lg max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-border-subtle">
-                            <div className="flex items-center justify-between p-6 border-b border-border-subtle">
+                        <div className="bg-bg-surface rounded-lg max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+                            <div className="flex items-center justify-between p-6 border-b">
                                 <h3 className="text-xl sm:text-2xl font-semibold text-text-primary">All Amenities</h3>
                                 <button
                                     onClick={() => setShowAmenitiesModal(false)}
@@ -1718,7 +1718,7 @@ useEffect(() => {
                                 </div>
                             </div>
 
-                            <div className="p-6 border-t border-border-subtle">
+                            <div className="p-6 border-t">
                                 <Button
                                     onClick={() => setShowAmenitiesModal(false)}
                                     fullWidth
@@ -1741,7 +1741,7 @@ useEffect(() => {
         {/* Mobile fixed Reserve CTA - visible only below md breakpoint */}
         {data && (
           <div
-            className="fixed bottom-0 inset-x-0 z-30 flex items-center justify-between border-t border-border-subtle bg-bg-surface px-4 py-3 md:hidden"
+            className="fixed bottom-0 inset-x-0 z-30 flex items-center justify-between border-t bg-transparent px-4 py-3 md:hidden"
             data-testid="mobile-reserve-bar"
           >
             <div>

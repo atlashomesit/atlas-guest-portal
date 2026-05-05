@@ -46,7 +46,7 @@ const ExclusiveService_Card = () => {
           {data.map((item, index) => (
             <div
               key={item.title}
-              className="group flex flex-col rounded-xl overflow-hidden bg-bg-surface  transition-all duration-300 border border-border-subtle"
+              className="group flex flex-col rounded-xl overflow-hidden bg-transparent  transition-all duration-300"
               onMouseEnter={() => setHoveredIndex(index)}
               onMouseLeave={() => setHoveredIndex(null)}
             >

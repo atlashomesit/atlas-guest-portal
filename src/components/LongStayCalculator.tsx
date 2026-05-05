@@ -66,7 +66,7 @@ export default function LongStayCalculator({
   const totalCost = effectiveNightly * selected;
 
   return (
-    <div className="mt-2 rounded-xl border border-border-subtle bg-bg-muted px-3 py-2">
+    <div className="mt-2 rounded-xl bg-bg-muted px-3 py-2">
       <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-text-muted">
         Stay calculator
       </p>
@@ -82,7 +82,7 @@ export default function LongStayCalculator({
               className={`flex-1 rounded-lg border px-1 py-1.5 text-center text-xs transition-colors ${
                 selected === nights
                   ? "border-cta-primary bg-cta-primary text-white"
-                  : "border-border-subtle bg-bg-surface text-text-secondary hover:border-cta-primary"
+                  : "border-border-subtle bg-transparent text-text-secondary hover:border-cta-primary"
               }`}
             >
               <span className="font-semibold">{nights}N</span>

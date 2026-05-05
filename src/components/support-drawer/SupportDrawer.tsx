@@ -141,7 +141,7 @@ const SupportDrawer = ({
             <button
               type="button"
               onClick={onClose}
-              className={`rounded-full ${enableCloseReassurance ? "p-2.5" : "p-2"} text-text-muted transition hover:bg-bg-muted hover:text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-strong`}
+              className={`rounded-full ${enableCloseReassurance ? "p-2.5" : "p-2"} text-text-muted transition hover:bg-bg-muted hover:text-text-primary
               aria-label={SUPPORT_DRAWER_COPY.controls.closeAriaLabel}
             >
               <FiX aria-hidden="true" size={enableCloseReassurance ? 26 : 24} />

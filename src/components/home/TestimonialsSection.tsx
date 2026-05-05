@@ -27,7 +27,7 @@ const TestimonialsSection = () => {
             {[1, 2, 3].map((card) => (
               <div
                 key={card}
-                className="rounded-2xl border border-white/20 bg-white/10 backdrop-blur-sm p-6 md:p-8 transition-all duration-[180ms] hover:-translate-y-1.5 hover:scale-[1.02] min-w-[280px]"
+                className="rounded-2xl border border-white/20 bg-white/10 p-6 md:p-8 transition-all duration-[180ms] hover:-translate-y-1.5 hover:scale-[1.02] min-w-[280px]"
               >
                 <p className="font-display text-xl md:text-2xl font-normal italic text-white leading-relaxed" style={{ fontFamily: 'var(--font-family-display)' }}>
                   “Guests highlight spotless rooms, warm hosts, and easy check-ins.”
@@ -49,7 +49,7 @@ const TestimonialsSection = () => {
         style={{ background: 'linear-gradient(180deg, var(--dark-footer-start) 0%, var(--dark-footer-end) 100%)' }}
       >
         <div className="mx-auto max-w-prose px-[5%]">
-          <div className="rounded-2xl border border-white/20 bg-white/10 backdrop-blur-sm p-8 md:p-12 text-center">
+          <div className="rounded-2xl border border-white/20 bg-white/10 p-8 md:p-12 text-center">
             <h2 className="font-display text-[var(--text-h2)] font-semibold text-white tracking-tight" style={{ fontFamily: 'var(--font-family-display)' }}>
               {testimonialsCopy.spotlightHeadline}
             </h2>

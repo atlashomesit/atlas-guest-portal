@@ -141,7 +141,7 @@ export default function AvailabilityCalendar({ listingId, onDateSelect }: Props)
   };
 
   return (
-    <div className="py-4 border-t border-border-subtle">
+    <div className="py-4 border-t">
       <h3 className="text-base font-semibold text-text-primary mb-3">Availability</h3>
       <div className="flex flex-col sm:flex-row gap-6">
         {renderMonth(0)}

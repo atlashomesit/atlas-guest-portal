@@ -4,7 +4,7 @@ const FaqHighlights = () => {
   const faqHighlights = getFaqHighlights();
 
   return (
-    <section className="bg-bg-card border border-[var(--border)] rounded-2xl p-6 md:p-8 shadow-level1">
+    <section className="bg-bg-card border)] rounded-2xl p-6 md:p-8 shadow-level1">
       <div className="max-w-prose mb-8">
         <h2 className="font-display text-xl md:text-2xl font-semibold text-[var(--text-primary)] tracking-tight" style={{ fontFamily: 'var(--font-family-display)' }}>
           Frequently Asked Questions
@@ -17,7 +17,7 @@ const FaqHighlights = () => {
         {faqHighlights.map((item) => (
           <div
             key={item.id}
-            className="rounded-xl border border-[var(--border)] bg-bg-secondary p-5 md:p-6 space-y-2 transition-all duration-300 hover:shadow-level2"
+            className="rounded-xl border)] bg-bg-secondary p-5 md:p-6 space-y-2 transition-all duration-300 hover:shadow-level2"
           >
             <h3 className="text-base md:text-lg font-semibold text-[var(--text-primary)]">{item.question}</h3>
             <p className="text-sm md:text-base text-[var(--text-primary)] leading-relaxed">{item.answer}</p>

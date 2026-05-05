@@ -77,7 +77,7 @@ const Slider = () => {
 
           <Link
             to="/become-a-host"
-            className="mt-2 inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-5 py-2.5 text-sm font-semibold text-[var(--text-on-hero)] backdrop-blur-sm transition hover:bg-white/20 hover:border-white/50"
+            className="mt-2 inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-5 py-2.5 text-sm font-semibold text-[var(--text-on-hero)] transition hover:bg-white/20 hover:border-white/50"
           >
             <Home className="h-4 w-4" />
             List your property — it's free

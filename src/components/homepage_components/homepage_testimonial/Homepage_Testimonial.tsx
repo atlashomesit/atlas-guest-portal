@@ -104,7 +104,7 @@ const Homepage_Testimonial = () => {
                     >
                         {data?.map((item, index) => (
                             <SwiperSlide key={index}>
-                                <div className="h-auto min-h-64 bg-bg-surface border border-border-subtle shadow-level1 rounded-lg overflow-hidden transition-all duration-300 hover:shadow-level2 hover:border-cta-primary">
+                                <div className="h-auto min-h-64 bg-transparent shadow-level1 rounded-lg overflow-hidden transition-all duration-300 hover:shadow-level2 hover:border-cta-primary">
                                     <div className="p-6 h-full flex flex-col">
                                         <div className="mb-4">
                                             <FaQuoteLeft className="text-accent-primary text-3xl opacity-50" />
@@ -129,10 +129,10 @@ const Homepage_Testimonial = () => {
                     </Swiper>
 
                     <div className="absolute top-1/2 left-0 right-0 z-20 flex justify-between items-center px-2 transform -translate-y-1/2">
-                        <button className="PrevElement flex justify-center items-center bg-bg-surface shadow-level1 hover:bg-cta-primary hover:text-[var(--text-contrast)] transition-colors duration-300 cursor-pointer h-10 w-10 md:h-12 md:w-12 rounded-full text-text-primary border border-border-subtle">
+                        <button className="PrevElement flex justify-center items-center bg-transparent shadow-level1 hover:bg-cta-primary hover:text-[var(--text-contrast)] transition-colors duration-300 cursor-pointer h-10 w-10 md:h-12 md:w-12 rounded-full text-text-primary">
                             <GrFormPrevious className="text-xl md:text-2xl" />
                         </button>
-                        <button className="NextElement flex justify-center items-center bg-bg-surface shadow-level1 hover:bg-cta-primary hover:text-[var(--text-contrast)] transition-colors duration-300 cursor-pointer h-10 w-10 md:h-12 md:w-12 rounded-full text-text-primary border border-border-subtle">
+                        <button className="NextElement flex justify-center items-center bg-transparent shadow-level1 hover:bg-cta-primary hover:text-[var(--text-contrast)] transition-colors duration-300 cursor-pointer h-10 w-10 md:h-12 md:w-12 rounded-full text-text-primary">
                             <MdOutlineNavigateNext className="text-xl md:text-2xl" />
                         </button>
                     </div>

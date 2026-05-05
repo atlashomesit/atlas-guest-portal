@@ -51,7 +51,7 @@ const CookieConsent = () => {
       role="dialog"
       aria-labelledby="atlas-cookie-consent-title"
       aria-live="polite"
-      className="fixed inset-x-0 bottom-0 z-[9999] flex items-center justify-between gap-3 border-t border-border-subtle bg-white px-4 py-3 shadow-lg"
+      className="fixed inset-x-0 bottom-0 z-[9999] flex items-center justify-between gap-3 border-t bg-white px-4 py-3 shadow-lg"
     >
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p id="atlas-cookie-consent-title" className="text-sm text-text-primary">
@@ -61,7 +61,7 @@ const CookieConsent = () => {
         <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
           <button
             type="button"
-            className="rounded-lg border border-border-subtle px-4 py-2 text-sm font-semibold text-text-primary hover:bg-bg-muted"
+            className="rounded-lg px-4 py-2 text-sm font-semibold text-text-primary hover:bg-bg-muted"
             onClick={() => save("necessary")}
           >
             Necessary only

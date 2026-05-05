@@ -5,7 +5,7 @@ const FooterCtaStrip = () => {
   const whatsappLink = getWhatsAppLink();
 
   return (
-    <div className="bg-bg-secondary border-t border-[var(--border)] py-10 px-[5%]">
+    <div className="bg-bg-secondary border-t)] py-10 px-[5%]">
       <div className="mx-auto max-w-luxury flex flex-col gap-4 items-start sm:items-center sm:flex-row sm:justify-between">
         <p className="text-base md:text-lg font-semibold text-[var(--text-primary)]">{footerMiniCtaCopy.headline}</p>
         <a

@@ -1535,7 +1535,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
     return (
       <div 
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-in fade-in duration-200"
         onClick={(e) => {
           if (e.target === e.currentTarget) closePaymentPopup();
         }}
@@ -1690,7 +1690,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
     return (
       <div 
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-in fade-in duration-200"
         onClick={(e) => {
           if (e.target === e.currentTarget) handleRetryPayment();
         }}
@@ -1802,7 +1802,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
   if (providerBlocked) {
     return (
-      <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-8 text-center space-y-3" data-testid="provider-blocked-banner">
+      <div className="rounded-2xl bg-transparent shadow-level1 p-8 text-center space-y-3" data-testid="provider-blocked-banner">
         <div className="text-4xl">🔒</div>
         <h2 className="text-lg font-semibold text-text-primary">Bookings opening soon</h2>
         <p className="text-sm text-text-secondary">
@@ -1816,10 +1816,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     <>
       {paymentStatus === 'success' && <PaymentSuccessPopup />}
       {paymentStatus === 'failed' && <PaymentFailedPopup />}
-      <form onSubmit={handleSubmit} className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6 space-y-5" role="region" aria-label="Booking and availability" data-testid="guest-booking-form">
+      <form onSubmit={handleSubmit} className="rounded-2xl bg-transparent shadow-level1 p-6 space-y-5" role="region" aria-label="Booking and availability" data-testid="guest-booking-form">
 
       {displayCoverUrl && (
-        <div className="overflow-hidden rounded-xl border border-border-subtle -mt-1 mb-1">
+        <div className="overflow-hidden rounded-xl -mt-1 mb-1">
           <OptimizedImage
             src={displayCoverUrl}
             alt={listingName ? `${listingName} — preview` : 'Listing preview'}
@@ -1942,7 +1942,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           <button
             id="unit-booking-dates"
             ref={calendarButtonRef}
-            className="w-full rounded-xl border border-border-strong bg-bg-muted px-4 py-3 text-left text-text-primary hover:border-cta-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary"
+            className="w-full rounded-xl border border-border-strong bg-bg-muted px-4 py-3 text-left text-text-primary hover:border-cta-primary
             aria-label="Click to select check-in date, then choose from calendar"
             title="Click to select check-in date, then choose from calendar"
             disabled={isBookingDisabled}
@@ -1967,7 +1967,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
             {dateRange.startDate && dateRange.endDate && calculateNights(dateRange.startDate, dateRange.endDate) > 0 && (
               <div className="mt-2 flex items-center justify-center">
-                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--accent-primary)] bg-[var(--bg-surface)] px-2.5 py-1 rounded-lg border border-[var(--border-subtle)]">
+                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--accent-primary)] bg-transparent px-2.5 py-1 rounded-lg border-subtle)]">
                   {formatNightCount(calculateNights(dateRange.startDate, dateRange.endDate))}
                 </span>
               </div>
@@ -2112,7 +2112,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           </div>
         </div>
         {/* Price Breakdown */}
-        <div className="mt-4 border-t border-border-subtle pt-4 text-sm">
+        <div className="mt-4 border-t pt-4 text-sm">
           <h4 className="mb-2 text-base font-bold text-text-primary">
             Price Breakdown
           </h4>
@@ -2204,7 +2204,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               <span className="text-right">{displayPrice(addOnsTotal)}</span>
             </div>
           )}
-          <div className="mt-3 border-t border-border-subtle pt-3 grid grid-cols-[140px_12px_1fr] text-base font-semibold text-text-primary">
+          <div className="mt-3 border-t pt-3 grid grid-cols-[140px_12px_1fr] text-base font-semibold text-text-primary">
             <span>Total</span>
             <span>:</span>
             <span className="text-right">
@@ -2225,7 +2225,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
       {/* TASK-171: add-on services selection */}
       {availableAddOns.length > 0 && (
-        <div className="rounded-xl border border-border-subtle bg-bg-muted/40 p-4 space-y-3">
+        <div className="rounded-xl bg-bg-muted/40 p-4 space-y-3">
           <p className="text-sm font-semibold text-text-primary">Add-on services</p>
           {availableAddOns.map(ao => {
             const qty = selectedAddOns[ao.addOnServiceId] ?? 0;
@@ -2259,7 +2259,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             );
           })}
           {addOnsTotal > 0 && (
-            <div className="pt-2 border-t border-border-subtle grid grid-cols-[120px_12px_1fr] text-sm text-text-secondary">
+            <div className="pt-2 border-t grid grid-cols-[120px_12px_1fr] text-sm text-text-secondary">
               <span>Add-ons</span><span>:</span>
               <span className="text-right">{displayPrice(addOnsTotal)}</span>
             </div>
@@ -2471,7 +2471,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           <p className="text-xs text-text-muted">{formData.notes.length}/500</p>
         </div>
 
-        <div className="space-y-2 rounded-xl border border-border-subtle bg-bg-muted/40 px-4 py-3">
+        <div className="space-y-2 rounded-xl bg-bg-muted/40 px-4 py-3">
           <label className="flex items-start gap-3 cursor-pointer text-sm text-text-primary">
             <input
               type="checkbox"

@@ -24,13 +24,13 @@ const CallbackRequestForm = ({
   const resolvedExpectationText = expectationText ?? copy.expectationText;
 
   return (
-    <div className="rounded-2xl border border-border-subtle bg-bg-surface p-[var(--drawer-card-padding-block,0.75rem)] shadow-inner">
+    <div className="rounded-2xl bg-transparent p-[var(--drawer-card-padding-block,0.75rem)] shadow-inner">
       <p className="text-sm font-semibold text-text-primary">{copy.title}</p>
       <p className="text-xs text-text-muted">{copy.subtitle}</p>
       {resolvedExpectationText ? (
         <p className="mt-1 text-[11px] text-text-muted">{resolvedExpectationText}</p>
       ) : null}
-      <div className="mt-2 flex items-center gap-2 rounded-xl border border-border-subtle bg-bg-muted px-3 py-2 focus-within:border-accent-primary focus-within:ring-2 focus-within:ring-accent-primary/20">
+      <div className="mt-2 flex items-center gap-2 rounded-xl bg-bg-muted px-3 py-2 focus-within:border-accent-primary focus-within:ring-2 focus-within:ring-accent-primary/20">
         <span className="text-xs font-semibold text-text-muted">{copy.phonePrefixLabel}</span>
         <input
           type="tel"
@@ -48,7 +48,7 @@ const CallbackRequestForm = ({
           type="button"
           disabled={callbackStatus === "sending"}
           onClick={onSubmit}
-          className="inline-flex flex-1 items-center justify-center rounded-full bg-cta-primary px-4 py-2 text-sm font-semibold text-[var(--text-contrast)] shadow-level1 transition hover:bg-cta-secondary disabled:cursor-not-allowed disabled:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
+          className="inline-flex flex-1 items-center justify-center rounded-full bg-cta-primary px-4 py-2 text-sm font-semibold text-[var(--text-contrast)] shadow-level1 transition hover:bg-cta-secondary disabled:cursor-not-allowed disabled:opacity-70
         >
           {callbackStatus === "sending"
             ? copy.submitLabels.sending

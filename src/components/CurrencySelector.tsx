@@ -15,7 +15,7 @@ const CurrencySelector: React.FC = () => {
       aria-label="Display currency"
       value={currency}
       onChange={(e) => setCurrency(e.target.value as SupportedCurrency)}
-      className="rounded border border-border-subtle bg-transparent px-1.5 py-0.5 text-xs text-text-muted hover:text-text-primary focus:outline-none focus:ring-1 focus:ring-cta-primary cursor-pointer"
+      className="rounded bg-transparent px-1.5 py-0.5 text-xs text-text-muted hover:text-text-primary focus:outline-none focus:ring-1 focus:ring-cta-primary cursor-pointer"
       title="Choose display currency (display only — payments are in INR)"
     >
       {SUPPORTED_CURRENCIES.map(({ value, label }) => (

@@ -35,7 +35,7 @@ const WhyChooseSection = () => {
           </p>
           <div className="space-y-2">
             {whyChooseHighlights.map((item) => (
-              <details key={item.title} className="rounded-lg border border-border-subtle bg-bg-surface p-4">
+              <details key={item.title} className="rounded-lg bg-transparent p-4">
                 <summary className="cursor-pointer font-semibold text-text-primary">{item.title}</summary>
                 <p className="mt-2 text-sm text-text-muted">{item.description}</p>
               </details>
@@ -61,7 +61,7 @@ const WhyChooseSection = () => {
               <span
                 key={label}
                 role="presentation"
-                className="rounded-full border border-border-subtle bg-bg-surface px-4 py-3 text-sm font-medium text-text-primary"
+                className="rounded-full bg-transparent px-4 py-3 text-sm font-medium text-text-primary"
               >
                 {label}
               </span>
@@ -72,7 +72,7 @@ const WhyChooseSection = () => {
           {whyChooseHighlights.map((item) => (
             <li
               key={item.title}
-              className={`rounded-xl border border-border-subtle bg-bg-surface p-6 ${
+              className={`rounded-xl bg-transparent p-6 ${
                 enableWhyChooseNoSelectionState ? "" : "hover:border-accent-primary/40 transition-colors"
               }`}
             >

@@ -78,7 +78,7 @@ const ServicesSection = () => {
             {items.map((item, index) => (
               <div
                 key={item.title}
-                className={`group flex flex-col rounded-xl overflow-hidden border border-border-subtle ${
+                className={`group flex flex-col rounded-xl overflow-hidden ${
                   enableServicesAlternatingBackgrounds && index % 2 === 1 ? 'bg-bg-muted' : 'bg-bg-surface'
                 }`}
               >
@@ -90,11 +90,11 @@ const ServicesSection = () => {
                         return Icon ? (
                           <Icon className="h-10 w-10 text-accent-primary" aria-hidden />
                         ) : (
-                          <div className="h-12 w-12 rounded-full border border-dashed border-border-subtle" aria-hidden />
+                          <div className="h-12 w-12 rounded-full border border-dashed" aria-hidden />
                         );
                       })()
                     ) : (
-                      <div className="h-12 w-12 rounded-full border border-dashed border-border-subtle" aria-hidden />
+                      <div className="h-12 w-12 rounded-full border border-dashed" aria-hidden />
                     )}
                   </div>
                 )}

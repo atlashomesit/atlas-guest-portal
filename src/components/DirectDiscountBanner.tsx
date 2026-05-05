@@ -70,7 +70,7 @@ export default function DirectDiscountBanner() {
         <button
           type="button"
           onClick={handleCopy}
-          className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1 font-mono font-bold tracking-widest text-emerald-700 ring-1 ring-emerald-300 transition hover:bg-emerald-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-emerald-600"
+          className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1 font-mono font-bold tracking-widest text-emerald-700 ring-1 ring-emerald-300 transition hover:bg-emerald-50
           aria-label={`Copy promo code ${PROMO_CODE}`}
           title="Click to copy"
         >
@@ -82,7 +82,7 @@ export default function DirectDiscountBanner() {
       <button
         type="button"
         onClick={handleDismiss}
-        className="ml-auto flex-shrink-0 rounded p-1 text-emerald-600 transition hover:bg-emerald-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-emerald-600"
+        className="ml-auto flex-shrink-0 rounded p-1 text-emerald-600 transition hover:bg-emerald-100
         aria-label="Dismiss direct discount banner"
       >
         ✕

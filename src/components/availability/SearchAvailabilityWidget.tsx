@@ -576,15 +576,15 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
   }, [isAvailabilityModalOpen]);
 
   const formContainerClass = enableWidgetExperiment
-    ? 'hero-form w-full max-w-5xl rounded-[24px] bg-[var(--bg-surface)] shadow-[var(--shadow-level-3)] backdrop-blur-sm border border-[var(--border-subtle)] p-8 flex flex-col gap-6'
-    : 'hero-form w-full max-w-5xl rounded-[24px] bg-[var(--bg-surface)] shadow-[var(--shadow-level-3)] backdrop-blur-sm border border-[var(--border-subtle)] p-8 flex flex-col gap-6';
+    ? 'hero-form w-full max-w-5xl rounded-[24px] bg-transparent shadow-[var(--shadow-level-3)] border-subtle)] p-8 flex flex-col gap-6'
+    : 'hero-form w-full max-w-5xl rounded-[24px] bg-transparent shadow-[var(--shadow-level-3)] border-subtle)] p-8 flex flex-col gap-6';
 
   const formGridClass = enableWidgetExperiment
     ? 'hero-form-grid grid grid-cols-1 gap-6 md:grid-cols-2 md:auto-rows-fr lg:grid-cols-4'
     : 'hero-form-grid grid grid-cols-1 gap-6 md:grid-cols-2 md:auto-rows-fr lg:grid-cols-4';
 
   const fieldShellClass =
-    'field-card flex h-full min-h-[120px] flex-col justify-between rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-7 py-7 shadow-[var(--shadow-level-1)] hover:shadow-[var(--shadow-level-2)] hover:scale-[1.01]';
+    'field-card flex h-full min-h-[120px] flex-col justify-between rounded-2xl border-subtle)] bg-transparent px-7 py-7 shadow-[var(--shadow-level-1)] hover:shadow-[var(--shadow-level-2)] hover:scale-[1.01]';
   const dateFieldShellClass = `${fieldShellClass}${
     dateError ? ' border-[var(--support-error)] shadow-[0_0_0_1px_var(--support-error)] error-shake' : ''
   }`;
@@ -599,7 +599,7 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
         <div className="relative">
           <button
             type="button"
-            className={`${dateFieldShellClass} text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary${activeField === 'checkin' && isCalendarOpen ? ' ring-2 ring-[var(--cta-primary)] ring-offset-2' : ''}`}
+            className={`${dateFieldShellClass} text-left transition === 'checkin' && isCalendarOpen ? ' ring-2 ring-[var(--cta-primary)] ring-offset-2' : ''}`}
             aria-label="Click to select check-in date, then choose from calendar"
             title="Click to select check-in date, then choose from calendar"
             aria-expanded={isCalendarOpen}
@@ -628,7 +628,7 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
 
         <button
           type="button"
-          className={`${dateFieldShellClass} text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary md:-ml-[1px]${activeField === 'checkout' && isCalendarOpen ? ' ring-2 ring-[var(--cta-primary)] ring-offset-2' : ''}`}
+          className={`${dateFieldShellClass} text-left transition md:-ml-[1px]${activeField === 'checkout' && isCalendarOpen ? ' ring-2 ring-[var(--cta-primary)] ring-offset-2' : ''}`}
           aria-label="Click to select check-out date, then choose from calendar"
           title="Click to select check-out date, then choose from calendar"
           aria-expanded={isCalendarOpen}
@@ -737,7 +737,7 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
             type="submit"
             disabled={isSubmitDisabled || isSubmitting}
             data-testid="hero-search-submit"
-            className="inline-flex h-[60px] w-full items-center justify-center rounded-[14px] bg-gradient-to-br from-[var(--cta-primary)] to-[var(--cta-primary-hover)] px-6 text-base font-semibold tracking-[0.02em] text-white shadow-[var(--shadow-level-2)] transition-all hover:scale-[1.02] hover:shadow-[var(--shadow-level-3)] active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cta-primary)] disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none disabled:hover:scale-100 aria-busy:cursor-progress aria-busy:opacity-90 whitespace-nowrap"
+            className="inline-flex h-[60px] w-full items-center justify-center rounded-[14px] bg-gradient-to-br from-[var(--cta-primary)] to-[var(--cta-primary-hover)] px-6 text-base font-semibold tracking-[0.02em] text-white shadow-[var(--shadow-level-2)] transition-all hover:scale-[1.02] hover:shadow-[var(--shadow-level-3)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none disabled:hover:scale-100 aria-busy:cursor-progress aria-busy:opacity-90 whitespace-nowrap"
             onClick={() => setStatusMessage('Checking availability...')}
             aria-busy={isSubmitting}
           >
@@ -745,7 +745,7 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
           </button>
           <Link
             to="/#our-homes"
-            className="group inline-flex items-center justify-center gap-1 text-[14px] font-medium text-[var(--cta-primary)] transition-all hover:text-[var(--text-body)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#475569] whitespace-nowrap mt-3"
+            className="group inline-flex items-center justify-center gap-1 text-[14px] font-medium text-[var(--cta-primary)] transition-all hover:text-[var(--text-body)] whitespace-nowrap mt-3"
           >
             Browse all apartments
             <span className="inline-block transition-transform group-hover:translate-x-1">→</span>
@@ -764,7 +764,7 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
         </p>
       )}
 
-      <div className="flex flex-col gap-3 rounded-2xl bg-[var(--bg-surface)] border border-[var(--bg-muted)] px-6 py-5 text-left md:flex-row md:items-center md:gap-4">
+      <div className="flex flex-col gap-3 rounded-2xl bg-transparent border border-[var(--bg-muted)] px-6 py-5 text-left md:flex-row md:items-center md:gap-4">
         <div className="flex items-center gap-2 text-[15px] font-bold text-[var(--text-body)]">
           <ShieldCheck className="h-4 w-4 text-[var(--cta-primary)]" aria-hidden="true" />
           <span>Book with confidence</span>
@@ -784,7 +784,7 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
           onClick={() => setIsAvailabilityModalOpen(false)}
         >
           <div
-            className="relative w-[90%] max-w-lg rounded-2xl bg-bg-surface p-6 shadow-level3"
+            className="relative w-[90%] max-w-lg rounded-2xl bg-transparent p-6 shadow-level3"
             onClick={(event) => event.stopPropagation()}
           >
             <h3 id="availability-modal-title" className="text-xl font-semibold text-text-primary">
@@ -799,14 +799,14 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
             <div className="mt-6 flex justify-end gap-3">
               <button
                 type="button"
-                className="inline-flex items-center justify-center rounded-lg px-4 py-3 text-sm font-semibold text-text-primary underline-offset-4 transition hover:text-cta-secondary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
+                className="inline-flex items-center justify-center rounded-lg px-4 py-3 text-sm font-semibold text-text-primary underline-offset-4 transition hover:text-cta-secondary hover:underline
                 onClick={() => setIsAvailabilityModalOpen(false)}
               >
                 Close
               </button>
               <button
                 type="button"
-                className="inline-flex items-center justify-center rounded-lg bg-cta-primary px-4 py-2 text-sm font-semibold text-[var(--text-contrast)] shadow-sm transition hover:bg-cta-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
+                className="inline-flex items-center justify-center rounded-lg bg-cta-primary px-4 py-2 text-sm font-semibold text-[var(--text-contrast)] shadow-sm transition hover:bg-cta-secondary
                 onClick={() => pendingSearchParams && performAvailabilityCheck(pendingSearchParams)}
                 disabled={!pendingSearchParams || isSubmitting}
               >

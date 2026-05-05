@@ -4,7 +4,7 @@
  */
 const SkeletonCard = () => (
   <article
-    className="flex flex-col overflow-hidden rounded-2xl border border-border-subtle bg-bg-surface"
+    className="flex flex-col overflow-hidden rounded-2xl bg-transparent"
     aria-hidden
   >
     <div className="h-48 w-full animate-pulse bg-gradient-to-br from-bg-muted to-bg-surface" />
