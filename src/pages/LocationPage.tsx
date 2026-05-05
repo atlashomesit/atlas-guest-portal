@@ -41,7 +41,8 @@ type MapStatus = "loading" | "ready" | "failed";
 const LocationPage = () => {
   const tenant = getTenantContext();
   const overrides = getTenantOverrides(tenant?.slug);
-  const mapLocation = overrides.mapLocation;
+  // TL-GUEST: API-sourced location (set by host via admin picker) wins over the static override.
+  const mapLocation = tenant?.mapLocation ?? overrides.mapLocation;
   const locationContent = overrides.locationContent;
   const tenantName = tenant?.name ?? "Atlas Homestays";
 
