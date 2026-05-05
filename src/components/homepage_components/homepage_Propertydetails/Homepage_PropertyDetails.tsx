@@ -328,7 +328,7 @@ const PropertyDetails = () => {
     }, [directBookingNightly]);
 
     useEffect(() => {
-        const lookupId = data?.listingId ?? location.state?.property?.listingId ?? listingIdParam;
+        const lookupId = listingIdParam;
 
         if (!lookupId) {
             setListingPropertyId(null);
@@ -381,7 +381,7 @@ const PropertyDetails = () => {
         return () => {
             controller.abort();
         };
-    }, [data?.listingId, location.state?.property?.listingId, listingIdParam]);
+    }, [listingIdParam]);
 
     useEffect(() => {
         const lid = Number(resolvedListingId ?? data?.listingId ?? NaN);
@@ -688,7 +688,7 @@ const PropertyDetails = () => {
         }
 
         setNotFound(true);
-    }, [propertySlug, listingIdParam, listingId, location.state, apiProperties]);
+    }, [propertySlug, listingIdParam, listingId]);
 useEffect(() => {
   if (!data?.id) return;
 
