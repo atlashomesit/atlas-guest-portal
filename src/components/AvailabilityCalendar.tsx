@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { buildApiUrl, getApiHeaders } from '../api/client';
 import { messageFromApiResponse } from '../utils/serverErrorFromResponse';
 
@@ -38,13 +38,19 @@ export default function AvailabilityCalendar({ listingId, onDateSelect }: Props)
   const [calData, setCalData] = useState<Map<string, DayEntry['status']>>(new Map());
   const [loading, setLoading] = useState(true);
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-  const monthEnd = addMonths(monthStart, 2);
-  const fromStr = formatYmd(monthStart);
-  const toStr = formatYmd(monthEnd);
+  const { today, monthStart, monthEnd, fromStr, toStr } = useMemo(() => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    const end = addMonths(start, 2);
+    return {
+      today: now,
+      monthStart: start,
+      monthEnd: end,
+      fromStr: formatYmd(start),
+      toStr: formatYmd(end),
+    };
+  }, []);
 
   useEffect(() => {
     if (!listingId) return;
@@ -74,7 +80,7 @@ export default function AvailabilityCalendar({ listingId, onDateSelect }: Props)
         }
       })
       .finally(() => setLoading(false));
-  }, [listingId, fromStr, toStr]);
+  }, [listingId]);
 
   const renderMonth = (monthOffset: number) => {
     const base = addMonths(monthStart, monthOffset);
