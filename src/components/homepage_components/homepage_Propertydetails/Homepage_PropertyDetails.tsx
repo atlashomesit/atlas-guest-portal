@@ -23,14 +23,12 @@ import { Button } from '../../ui/Button';
 import { calculateNightlyPrice, inferUnitType } from '../../../utils/pricing';
 import { buildHomeUnitPath, getPropertySlug } from '../../../utils/navigation';
 import { useBooking } from '../../../contexts/BookingContext';
-import { useListingPhotosFromApi } from '../../../contexts/ListingPhotosContext';
 import { resolveListing } from '../../../utils/listingResolver';
 import { filterGuestImageUrls, sanitizeGuestImageUrl } from '../../../utils/guestImageUrl';
 import type { ListingDetail, PublicListing } from '../../../api/listingClient';
 import {
     fetchListingById,
     fetchListingContact,
-    fetchListingPhotos,
     parseMaxGuestsFromPayload,
     resolveStaticMaxGuests,
 } from '../../../api/listingClient';
@@ -697,7 +695,7 @@ const PropertyDetails = () => {
         }
 
         setNotFound(true);
-    }, [propertySlug, listingIdParam, listingId, location.state, getUrlsForListingId, apiProperties, photosLoaded]);
+    }, [propertySlug, listingIdParam, listingId, location.state, apiProperties]);
 useEffect(() => {
   if (!data?.id) return;
 
