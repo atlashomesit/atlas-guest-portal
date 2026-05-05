@@ -107,7 +107,7 @@ const ContactUs = () => {
             {/* Contact Info Section */}
             <div className="bg-bg-muted border-b border-border-subtle">
                 <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-                    <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr] gap-12 lg:gap-16">
+                    <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr] gap-6 lg:gap-8">
                         {/* Left Section - Main Message */}
                         <div className="flex flex-col justify-between space-y-8">
                             <div className="space-y-4">
@@ -174,7 +174,7 @@ const ContactUs = () => {
 
             {/* Contact Form Section */}
             <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-                <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr] gap-12 lg:gap-16">
+                <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr] gap-6 lg:gap-8">
                     {/* Form Card */}
                     <Card className="space-y-6">
                         <div className="space-y-3 text-center">
