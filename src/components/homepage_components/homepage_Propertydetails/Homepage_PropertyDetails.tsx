@@ -29,7 +29,6 @@ import type { ListingDetail, PublicListing } from '../../../api/listingClient';
 import {
     fetchListingById,
     fetchListingContact,
-    fetchListingPhotos,
     parseMaxGuestsFromPayload,
     resolveStaticMaxGuests,
 } from '../../../api/listingClient';
