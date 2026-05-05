@@ -16,7 +16,7 @@ import { useTenantListings, type TenantPropertyRecord } from "../../../hooks/use
 import { filterGuestImageUrls, sanitizeGuestImageUrl } from "../../../utils/guestImageUrl";
 import { compareAtlasHomesBuildingOrder } from "../../../utils/atlasHomesBuildingOrder";
 import { getTenantContext } from "../../../tenant/tenantContext";
-import { getTenantOverrides, type TenantOverrides } from "../../../tenant/tenantOverrides";
+import { getTenantOverrides, getUnitNoun, type TenantOverrides } from "../../../tenant/tenantOverrides";
 
 import "./homepage_location.css";
 
@@ -123,6 +123,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
   const navigate = useNavigate();
   const tenant = getTenantContext();
   const tenantOverrides = getTenantOverrides(tenant?.slug);
+  const unitNoun = getUnitNoun(tenantOverrides);
   const { checkIn, checkOut, guests, searchString } = useSearchSelections(location.search);
   const [activeImageIndex, setActiveImageIndex] = React.useState<Record<string, number>>({});
   const { loading: dailyPricingLoading, getListingPricing } = useDailyPricingSummary();
@@ -327,7 +328,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
   return (
     <section className="py-12 px-4 sm:px-6 lg:px-8 bg-bg-surface scroll-mt-28" id="our-homes">
       <div className="max-w-7xl mx-auto flex flex-col gap-8">
-        <Heading title="Our Homes" id="our-homes" />
+        <Heading title={`Our ${unitNoun.capitalPlural}`} id="our-homes" />
 
         <div className="grid gap-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch rounded-3xl overflow-hidden shadow-sm bg-white border border-border-subtle property-card">
@@ -451,7 +452,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
                   onClick={() => handleNavigate(heroModel)}
                   className="property-card__button inline-flex items-center justify-center rounded-full border border-border-subtle px-5 py-3 text-sm font-semibold text-text-primary transition hover:border-[color:var(--cta-primary)] hover:text-[color:var(--cta-primary)]"
                 >
-                  View home
+                  {`View ${unitNoun.singular}`}
                 </button>
               </div>
             </div>
@@ -577,7 +578,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
                         }}
                         className="property-card__button inline-flex items-center justify-center rounded-full border border-border-subtle px-5 py-3 text-sm font-semibold text-text-primary transition hover:border-[color:var(--cta-primary)] hover:text-[color:var(--cta-primary)]"
                       >
-                        View home
+                        {`View ${unitNoun.singular}`}
                       </Link>
                     </div>
                   </div>

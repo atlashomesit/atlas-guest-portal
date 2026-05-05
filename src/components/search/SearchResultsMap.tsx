@@ -6,6 +6,8 @@ import L from "leaflet";
 import type { LatLngExpression } from "leaflet";
 
 import { HYDERABAD_CENTER, hasMapCoords, fallbackCoordsForListing } from "../../utils/mapCoords";
+import { getTenantContext } from "../../tenant/tenantContext";
+import { getTenantOverrides, getUnitNoun } from "../../tenant/tenantOverrides";
 
 import "leaflet/dist/leaflet.css";
 
@@ -76,6 +78,7 @@ export default function SearchResultsMap({ units, formatPrice, querySuffix }: Se
   const positions = useMemo(() => capped.map((u) => resolvePosition(u)), [capped]);
   const withApiCoords = useMemo(() => capped.filter(usedApiCoords).length, [capped]);
   const center: LatLngExpression = [HYDERABAD_CENTER.lat, HYDERABAD_CENTER.lng];
+  const unitNoun = getUnitNoun(getTenantOverrides(getTenantContext()?.slug));
 
   return (
     <div className="flex flex-col gap-2" data-testid="search-results-map">
@@ -120,7 +123,7 @@ export default function SearchResultsMap({ units, formatPrice, querySuffix }: Se
                       to={`${u.canonicalPath}${querySuffix}`}
                       className="inline-block font-medium text-cta-primary underline"
                     >
-                      View home
+                      {`View ${unitNoun.singular}`}
                     </Link>
                   </div>
                 </Popup>
