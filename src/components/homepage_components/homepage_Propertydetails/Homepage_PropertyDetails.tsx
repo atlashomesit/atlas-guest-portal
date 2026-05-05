@@ -215,7 +215,7 @@ const PropertyDetails = () => {
     const [copyLinkLabel, setCopyLinkLabel] = useState<'Copy link' | 'Copied!'>('Copy link');
     const unitType = inferUnitType({ id: data?.id, property_name: data?.property_name });
     const { setProperty, updateBooking } = useBooking();
-    const { getUrlsForListingId, loaded: photosLoaded } = useListingPhotosFromApi();
+    const { getUrlsForListingId, setCachedPhotos } = useListingPhotosFromApi();
     const [searchParams] = useSearchParams();
     // Build a back-to-results link when the user arrived from /search (params preserved in URL by SearchPage)
     const backToResultsHref = useMemo(() => {
@@ -487,8 +487,6 @@ const PropertyDetails = () => {
         return text ? text.slice(0, 280) : null;
     }, [listingReviewsFromApi]);
 
-    const lastPhotosFetchKeyRef = React.useRef<string>('');
-
     useEffect(() => {
         setNotFound(false);
         setData(null);
@@ -753,10 +751,12 @@ useEffect(() => {
         // Skip if photos already present in listing response
         if (data.property_img && data.property_img.length > 0) return;
 
-        // Deduplicate: only fetch once per listing
-        const dedupeKey = String(listingId);
-        if (lastPhotosFetchKeyRef.current === dedupeKey) return;
-        lastPhotosFetchKeyRef.current = dedupeKey;
+        // Check cache first (deduplication across component remounts)
+        const cached = getUrlsForListingId(listingId);
+        if (cached) {
+            setData((prev) => (prev ? { ...prev, property_img: cached } : prev));
+            return;
+        }
 
         const ac = new AbortController();
         void (async () => {
@@ -765,13 +765,14 @@ useEffect(() => {
                     await fetchListingPhotos(data.id, ac.signal),
                 );
                 if (ac.signal.aborted || !photos.length) return;
+                setCachedPhotos(listingId, photos);
                 setData((prev) => (prev ? { ...prev, property_img: photos } : prev));
             } catch {
                 /* fallback to existing images */
             }
         })();
         return () => ac.abort();
-    }, [data]);
+    }, [data, getUrlsForListingId, setCachedPhotos]);
 
     // Prefetch public availability calendar as soon as listing id resolves so date widget opens warm.
     useEffect(() => {

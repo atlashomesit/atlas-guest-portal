@@ -3,14 +3,16 @@ import React, { createContext, useCallback, useContext, useMemo, useState } from
 
 type ListingPhotosContextValue = {
   getUrlsForListingId: (listingId: number | undefined | null) => string[] | undefined;
+  setCachedPhotos: (listingId: number, urls: string[]) => void;
 };
 
 const ListingPhotosContext = createContext<ListingPhotosContextValue>({
   getUrlsForListingId: () => undefined,
+  setCachedPhotos: () => {},
 });
 
 export function ListingPhotosProvider({ children }: { children: React.ReactNode }) {
-  const [byListingId] = useState<Map<number, string[]>>(new Map());
+  const [byListingId, setByListingId] = useState<Map<number, string[]>>(new Map());
 
   const getUrlsForListingId = useCallback(
     (listingId: number | undefined | null) => {
@@ -20,9 +22,20 @@ export function ListingPhotosProvider({ children }: { children: React.ReactNode 
     [byListingId],
   );
 
+  const setCachedPhotos = useCallback(
+    (listingId: number, urls: string[]) => {
+      setByListingId((prev) => {
+        const next = new Map(prev);
+        next.set(listingId, urls);
+        return next;
+      });
+    },
+    [],
+  );
+
   const value = useMemo(
-    () => ({ getUrlsForListingId }),
-    [getUrlsForListingId],
+    () => ({ getUrlsForListingId, setCachedPhotos }),
+    [getUrlsForListingId, setCachedPhotos],
   );
 
   return <ListingPhotosContext.Provider value={value}>{children}</ListingPhotosContext.Provider>;
