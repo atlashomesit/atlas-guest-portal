@@ -381,7 +381,7 @@ const PropertyDetails = () => {
         return () => {
             controller.abort();
         };
-    }, [data?.listingId, listingIdParam]);
+    }, [listingIdParam]);
 
     useEffect(() => {
         const lid = Number(resolvedListingId ?? data?.listingId ?? NaN);
