@@ -840,6 +840,8 @@ export default function BookingConfirmationPage() {
                 </a>
                 .
               </p>
+              {/* TASK-1387: build review expectation at confirmation time */}
+              <p>⭐ After your stay, we'll ask you to share a quick review — it helps future guests and your host.</p>
             </div>
           </div>
         )}
