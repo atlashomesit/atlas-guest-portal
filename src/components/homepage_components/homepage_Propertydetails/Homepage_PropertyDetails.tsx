@@ -688,7 +688,7 @@ const PropertyDetails = () => {
         }
 
         setNotFound(true);
-    }, [propertySlug, listingIdParam, listingId, location.state, apiProperties]);
+    }, [propertySlug, listingIdParam, listingId]);
 useEffect(() => {
   if (!data?.id) return;
 
