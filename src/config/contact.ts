@@ -29,7 +29,11 @@ export function getWhatsAppPhone(channel: ContactChannel = "business"): string {
 }
 
 export function getContactEmail(): string {
-  return tenantContact()?.email ?? DEFAULT_EMAIL;
+  const override = tenantContact()?.email?.trim();
+  if (override) return override;
+  const fromApi = getTenantContext()?.legalContactPack?.contactEmail?.trim();
+  if (fromApi) return fromApi;
+  return DEFAULT_EMAIL;
 }
 
 /**
