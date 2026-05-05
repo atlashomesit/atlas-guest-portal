@@ -51,7 +51,6 @@ export default function AvailabilityCalendar({ listingId, onDateSelect }: Props)
     };
   }, []);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!listingId) return;
     setLoading(true);
@@ -80,6 +79,7 @@ export default function AvailabilityCalendar({ listingId, onDateSelect }: Props)
         }
       })
       .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listingId]);
 
   const renderMonth = (monthOffset: number) => {
