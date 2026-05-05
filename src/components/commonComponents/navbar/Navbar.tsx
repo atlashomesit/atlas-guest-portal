@@ -7,7 +7,7 @@ import { Loader } from 'lucide-react';
 import { primaryNav, ctaNav } from '../../../config/navigation';
 import { LOGO_URL } from '../../../config/branding';
 import { getTenantContext } from '../../../tenant/tenantContext';
-import { getTenantOverrides } from '../../../tenant/tenantOverrides';
+import { getTenantOverrides, getUnitNoun } from '../../../tenant/tenantOverrides';
 import { formatDisplayNumber, getTelLink } from '../../../config/contact';
 import { trackEvent } from '../../../utils/analytics';
 import { getFavoriteIds } from '../../../utils/guestHistory';
@@ -24,6 +24,8 @@ const Navbar = () => {
     : (getTenantContext()?.name ?? 'Home');
   const showLogo = !overrides.hideLogo;
   const showListProperty = !overrides.hideListProperty;
+  const unitNoun = getUnitNoun(overrides);
+  const homesLabel = `Our ${unitNoun.capitalPlural}`;
 
   const apiListings = usePropertyListings();
   const homesEntries = apiListings.homes;
@@ -235,7 +237,7 @@ const Navbar = () => {
                   aria-controls="homes-menu"
                   onClick={() => setIsHomesOpen((prev) => !prev)}
                 >
-                  Our Homes
+                  {homesLabel}
                 </button>
 
                 <div className="dropdown-menu dropdown-menu-scrollable" role="menu" id="homes-menu">

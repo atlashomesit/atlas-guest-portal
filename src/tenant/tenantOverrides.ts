@@ -79,7 +79,52 @@ export type TenantOverrides = {
   cookieBanner?: TenantCookieBanner;
   /** TASK-1878: tenant-specific FAQ entries — replaces Atlas defaults when set. */
   faq?: TenantFaqEntry[];
+  /**
+   * Noun used to refer to a stayable unit. Drives copy like "Our Homes",
+   * "View home", "No homestays match…". Default = home/homes for Atlas.
+   * For room-stay tenants (e.g. guest houses), set to room/rooms.
+   */
+  unitNoun?: {
+    singular: string;
+    plural: string;
+    /** Capitalized variants for headings/buttons (e.g. "Home", "Homes"). */
+    capitalSingular: string;
+    capitalPlural: string;
+    /**
+     * Noun used in marketing/empty-state copy ("homestays match", "stays").
+     * Defaults to plural when omitted.
+     */
+    marketingPlural?: string;
+  };
 };
+
+/** Default unit noun (Atlas marketplace). */
+export const DEFAULT_UNIT_NOUN = {
+  singular: 'home',
+  plural: 'homes',
+  capitalSingular: 'Home',
+  capitalPlural: 'Homes',
+  marketingPlural: 'homestays',
+} as const;
+
+/** Resolve the unit noun for the active tenant overrides, falling back to defaults. */
+export function getUnitNoun(overrides: TenantOverrides): {
+  singular: string;
+  plural: string;
+  capitalSingular: string;
+  capitalPlural: string;
+  marketingPlural: string;
+} {
+  const n = overrides.unitNoun;
+  if (!n) return DEFAULT_UNIT_NOUN;
+  return {
+    singular: n.singular,
+    plural: n.plural,
+    capitalSingular: n.capitalSingular,
+    capitalPlural: n.capitalPlural,
+    marketingPlural: n.marketingPlural ?? n.plural,
+  };
+}
 
 /** Star Guest House public listing IDs from API (9-29). */
 const STAR_GUEST_HOUSE_LISTING_IDS: number[] = [
@@ -93,6 +138,14 @@ const TENANT_OVERRIDES: Record<string, TenantOverrides> = {
     hideListProperty: true,
     onlyApiListings: true,
     publicListingIdAllowlist: STAR_GUEST_HOUSE_LISTING_IDS,
+    // Star Guest House is a room-stay (not a homestay) — use "room"/"rooms"
+    unitNoun: {
+      singular: 'room',
+      plural: 'rooms',
+      capitalSingular: 'Room',
+      capitalPlural: 'Rooms',
+      marketingPlural: 'rooms',
+    },
     contact: {
       address: 'Shop No 2, 10, opposite Shilpa Park, Kondapur, Hanuman Nagar, Telangana 500084',
       businessPhone: '7799779192',

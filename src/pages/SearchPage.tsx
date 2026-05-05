@@ -9,7 +9,7 @@ import { parseDate } from "../utils/formatting";
 import { useCurrency } from "../contexts/CurrencyContext";
 import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 import { getTenantContext } from "../tenant/tenantContext";
-import { getTenantOverrides, getTenantPublicListingIdAllowlist } from "../tenant/tenantOverrides";
+import { getTenantOverrides, getTenantPublicListingIdAllowlist, getUnitNoun } from "../tenant/tenantOverrides";
 import SkeletonCard from "../components/apartments/SkeletonCard";
 import OptimizedImage from "../components/ui/OptimizedImage";
 import OwnerShareBadge from "../components/OwnerShareBadge"; // TASK-1705
@@ -257,6 +257,7 @@ const SearchPage = () => {
 
   const tenant = getTenantContext();
   const overrides = getTenantOverrides(tenant?.slug);
+  const unitNoun = getUnitNoun(overrides);
   const tenantAllowedIds = useMemo(() => {
     const allowed = getTenantPublicListingIdAllowlist(overrides);
     return allowed.size > 0 ? allowed : undefined;
@@ -1003,14 +1004,17 @@ const SearchPage = () => {
               className="rounded-2xl border border-border-subtle bg-bg-surface px-4 py-8 text-center shadow-sm sm:px-8"
               data-testid="search-empty-state"
             >
-              <div className="mx-auto mb-6 flex max-w-xs justify-center" aria-hidden>
-                <img
-                  src="/images/atlas-homestays-static-map.svg"
-                  alt=""
-                  className="h-28 w-auto max-w-full object-contain opacity-90"
-                />
-              </div>
-              <h2 className="text-xl font-bold text-text-primary sm:text-2xl">No homestays match your filters</h2>
+              {/* RA-006: SVG depicts Atlas Homestays — only show on the marketplace root. */}
+              {!overrides.hideAtlasHomesBranding && (
+                <div className="mx-auto mb-6 flex max-w-xs justify-center" aria-hidden>
+                  <img
+                    src="/images/atlas-homestays-static-map.svg"
+                    alt=""
+                    className="h-28 w-auto max-w-full object-contain opacity-90"
+                  />
+                </div>
+              )}
+              <h2 className="text-xl font-bold text-text-primary sm:text-2xl">{`No ${unitNoun.marketingPlural} match your filters`}</h2>
               <p className="mx-auto mt-3 max-w-lg text-text-muted">
                 Try adjusting dates, price range, or guest count.
               </p>
@@ -1066,7 +1070,7 @@ const SearchPage = () => {
                           to={`${unit.canonicalPath}${querySuffix}`}
                           className="mt-auto inline-flex min-h-[44px] items-center justify-center rounded-xl bg-[var(--cta-primary-hover)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--cta-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
                         >
-                          View home
+                          {`View ${unitNoun.singular}`}
                         </Link>
                       </div>
                     </article>
@@ -1312,7 +1316,7 @@ const SearchPage = () => {
                       to={`${unit.canonicalPath}${querySuffix}`}
                       className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl bg-[var(--cta-primary-hover)] px-4 py-2 text-sm font-semibold text-white shadow hover:bg-[var(--cta-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
                     >
-                      View home
+                      {`View ${unitNoun.singular}`}
                     </Link>
                   </div>
                 </div>

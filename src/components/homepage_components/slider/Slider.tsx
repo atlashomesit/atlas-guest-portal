@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { BadgePercent, CheckCircle2, ShieldCheck, Home } from 'lucide-react';
 import { HERO_IMAGE_URL } from '../../../config/hero';
 import { heroWidgetLayoutFlag } from '../../../config/abFlags';
+import { getTenantContext } from '../../../tenant/tenantContext';
 import { TrustBadge } from '../../ui/TrustBadge';
 import { SearchAvailabilityWidget } from '../../availability/SearchAvailabilityWidget';
 
@@ -18,7 +19,14 @@ const TRUST_BADGES = [
 
 const Slider = () => {
   const enableWidgetExperiment = heroWidgetLayoutFlag();
-  const hasHeroPhoto = Boolean(HERO_IMAGE_URL.trim());
+  // RA-006: only show the Atlas penthouse hero on the Atlas marketplace root.
+  // White-label tenant subdomains (e.g. starguesthouse.atlastays.com) must not
+  // leak Atlas-branded imagery — fall back to the gradient-only background
+  // until per-tenant heroImageUrl is wired through TenantBranding.
+  const tenant = getTenantContext();
+  const isAtlasRoot = tenant?.isMarketplaceRoot !== false;
+  const heroImageUrl = isAtlasRoot ? HERO_IMAGE_URL : '';
+  const hasHeroPhoto = Boolean(heroImageUrl.trim());
 
   const overlayStyle = React.useMemo(() => {
     // With a photo, keep text readable without painting the whole viewport flat black.
@@ -47,7 +55,7 @@ const Slider = () => {
         className="relative isolate overflow-hidden min-h-[min(78vh,820px)] md:min-h-[min(72vh,760px)] flex items-center justify-center bg-bg-muted bg-cover bg-center bg-no-repeat pt-[calc(var(--nav-height,80px)+1rem)] pb-8"
         style={
           hasHeroPhoto
-            ? { backgroundImage: `url(${HERO_IMAGE_URL})` }
+            ? { backgroundImage: `url(${heroImageUrl})` }
             : undefined
         }
       >
