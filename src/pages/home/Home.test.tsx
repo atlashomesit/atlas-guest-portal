@@ -27,7 +27,9 @@ describe("Homepage layout", () => {
       </MemoryRouter>,
     );
 
-    const ourHomesSection = screen.getByRole("heading", { name: /our homes/i }).closest("section");
+    // Use exact match: substring /our homes/ also matches the WhyChooseSection's
+    // "Why choose Our Homestays" fallback when the tenant context is unresolved (RA-006 §3.6).
+    const ourHomesSection = screen.getByRole("heading", { name: /^our homes$/i }).closest("section");
     expect(ourHomesSection).toHaveAttribute("id", "our-homes");
     expect(screen.getByTestId("search-input")).toHaveAttribute("id", "search-form");
   });

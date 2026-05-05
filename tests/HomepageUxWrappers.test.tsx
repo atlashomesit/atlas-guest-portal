@@ -46,7 +46,10 @@ describe("Homepage UX wrappers (default path)", () => {
   it("renders the default secondary banner when flags are off", () => {
     const { asFragment } = render(withBooking(<BannerSecondary />));
 
-    expect(screen.getByTestId("parallax-title").textContent).toContain("Atlas Homes");
+    // RA-006 §3.6: with no tenant resolved in the test, BannerSecondary falls back to a
+    // brand-neutral "Our Homestays" instead of "Atlas Homes" so unrecognised tenants
+    // don't leak Atlas brand on a cold load.
+    expect(screen.getByTestId("parallax-title").textContent).toContain("Our Homestays");
     expect(screen.queryByText(/value-block variant/i)).not.toBeInTheDocument();
     expect(asFragment()).toMatchSnapshot();
   });

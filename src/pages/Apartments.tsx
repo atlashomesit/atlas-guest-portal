@@ -8,7 +8,7 @@ import ListingCard from "../components/apartments/ListingCard";
 import ListingFilters from "../components/apartments/ListingFilters";
 import { LOGO_URL } from "../config/branding";
 import { getTenantContext } from "../tenant/tenantContext";
-import { getTenantOverrides } from "../tenant/tenantOverrides";
+import { getTenantOverrides, shouldHideAtlasBranding } from "../tenant/tenantOverrides";
 import type { Listing } from "../data/listings";
 import { useTenantListings } from "../hooks/useTenantListings";
 import { trackEvent } from "../utils/analytics";
@@ -233,6 +233,7 @@ export const Apartments = () => {
 
   const tenant = getTenantContext();
   const tenantOverrides = getTenantOverrides(tenant?.slug);
+  const hideAtlasBranding = shouldHideAtlasBranding(tenant, tenantOverrides);
 
   const safeListings = React.useMemo(() => sanitizeListings(listingsSource), [listingsSource]);
   const safeProperties = React.useMemo(() => sanitizeProperties(propertiesSource), [propertiesSource]);
@@ -495,7 +496,7 @@ export const Apartments = () => {
     <div className="bg-bg-muted py-10">
       <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 md:px-8">
         <header className="space-y-2">
-          {tenantOverrides.hideAtlasHomesBranding ? (
+          {hideAtlasBranding ? (
             tenant?.name?.trim() ? (
               <p className="text-sm font-semibold uppercase tracking-wide text-primary">{tenant.name.trim()}</p>
             ) : null

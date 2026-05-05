@@ -44,6 +44,35 @@ export interface TenantInfo {
   bookingMode?: 'ONLINE' | 'MANUAL' | 'WHATSAPP';
   /** Digits-only WhatsApp number for direct-booking handoff. Always populated when host has a phone. */
   whatsappBookingPhone?: string;
+  /** TL-API: Map pin coordinates for the location page, set by the host via the admin portal picker.
+   *  Undefined when the host has not configured a location yet — caller falls back to tenantOverrides. */
+  mapLocation?: {
+    lat: number;
+    lng: number;
+    zoom?: number;
+    markerLabel?: string;
+  };
+  /**
+   * RA-006 §3.5: legal + contact identity used by tenant-aware privacy notices, terms,
+   * footer rows, and consent text. Any field can be undefined when the host hasn't filled
+   * it in; consumers should pair each read with a brand-neutral fallback.
+   */
+  legalContactPack?: TenantLegalContactPack;
+}
+
+/** RA-006 §3.5: legal/contact identity returned by /tenants/from-domain.LegalContactPack. */
+export interface TenantLegalContactPack {
+  legalName?: string;
+  displayName?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  registeredAddress?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  gstin?: string;
+  /** When true, the guest portal renders a small "Powered by Atlas Homestays" footer credit. */
+  showAtlasFooterCredit: boolean;
 }
 
 let tenantInfo: TenantInfo | null = null;
@@ -111,6 +140,30 @@ export async function resolveFromDomain(apiBaseUrl: string, domain: string): Pro
         : undefined,
       whatsappBookingPhone: typeof data.whatsappBookingPhone === 'string' && data.whatsappBookingPhone.length > 0
         ? data.whatsappBookingPhone
+        : undefined,
+      mapLocation: (data.mapLocation && typeof data.mapLocation.lat === 'number' && typeof data.mapLocation.lng === 'number')
+        ? {
+            lat: data.mapLocation.lat,
+            lng: data.mapLocation.lng,
+            zoom: typeof data.mapLocation.zoom === 'number' ? data.mapLocation.zoom : undefined,
+            markerLabel: typeof data.mapLocation.markerLabel === 'string' && data.mapLocation.markerLabel.length > 0
+              ? data.mapLocation.markerLabel
+              : undefined,
+          }
+        : undefined,
+      legalContactPack: data.legalContactPack
+        ? {
+            legalName: typeof data.legalContactPack.legalName === 'string' ? data.legalContactPack.legalName : undefined,
+            displayName: typeof data.legalContactPack.displayName === 'string' ? data.legalContactPack.displayName : undefined,
+            contactEmail: typeof data.legalContactPack.contactEmail === 'string' ? data.legalContactPack.contactEmail : undefined,
+            contactPhone: typeof data.legalContactPack.contactPhone === 'string' ? data.legalContactPack.contactPhone : undefined,
+            registeredAddress: typeof data.legalContactPack.registeredAddress === 'string' ? data.legalContactPack.registeredAddress : undefined,
+            city: typeof data.legalContactPack.city === 'string' ? data.legalContactPack.city : undefined,
+            state: typeof data.legalContactPack.state === 'string' ? data.legalContactPack.state : undefined,
+            pincode: typeof data.legalContactPack.pincode === 'string' ? data.legalContactPack.pincode : undefined,
+            gstin: typeof data.legalContactPack.gstin === 'string' ? data.legalContactPack.gstin : undefined,
+            showAtlasFooterCredit: Boolean(data.legalContactPack.showAtlasFooterCredit),
+          }
         : undefined,
     };
     return tenantInfo;

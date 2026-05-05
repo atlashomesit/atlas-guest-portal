@@ -11,7 +11,9 @@ const parallaxImage = "";
 
 const BannerSecondary = () => {
   const tenant = getTenantContext();
-  const brandName = tenant?.name ?? "Atlas Homes";
+  // RA-006 §3.6: when tenant resolution fails, fall back to a brand-neutral string
+  // instead of "Atlas Homes" so white-label tenants don't leak Atlas during cold loads.
+  const brandName = tenant?.name ?? "Our Homestays";
 
   if (enableSecondaryBannerRemoved) {
     return null;

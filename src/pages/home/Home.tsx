@@ -3,7 +3,7 @@ import Slider from "../../components/homepage_components/slider/Slider";
 import HomePage_Locations from "../../components/homepage_components/homepage_locations/HomePage_Locations";
 import { useEffect, useMemo } from "react";
 import { useTenantListings } from "../../hooks/useTenantListings";
-import { getTenantOverrides } from "../../tenant/tenantOverrides";
+import { getTenantOverrides, shouldHideAtlasBranding } from "../../tenant/tenantOverrides";
 import { getTenantContext } from "../../tenant/tenantContext";
 import { getFaqHighlights } from "../../content/faqHighlights";
 import { trackEvent } from "../../utils/analytics";
@@ -30,8 +30,9 @@ const Home = () => {
     const { properties: propertyData } = useTenantListings();
     const tenant = getTenantContext();
     const overrides = getTenantOverrides(tenant?.slug);
+    const hideAtlasBranding = shouldHideAtlasBranding(tenant, overrides);
     const schemaBrandName =
-        overrides.hideAtlasHomesBranding && tenant?.name?.trim() ? tenant.name.trim() : "Starguest House";
+        hideAtlasBranding && tenant?.name?.trim() ? tenant.name.trim() : "Starguest House";
     const schemaLogo = overrides.hideLogo ? undefined : sanitizeGuestImageUrl(tenant?.logoUrl) ?? LOGO_URL;
     const contactEmail = getContactEmail();
     const penthouse = propertyData.find((property) => property.id === 501);
@@ -42,7 +43,7 @@ const Home = () => {
     /** TASK-1293: marketplace shows by default; white-label opts in with directBookingPromo.enabled */
     const showDirectBookingPromo =
         overrides.directBookingPromo?.enabled === true ||
-        (!overrides.hideAtlasHomesBranding && overrides.directBookingPromo?.enabled !== false);
+        (!hideAtlasBranding && overrides.directBookingPromo?.enabled !== false);
     const directPromoHeadline =
         overrides.directBookingPromo?.headline?.trim() ||
         (effectiveDiscountPercent > 0
@@ -215,12 +216,12 @@ const Home = () => {
         <>
             <SEO
                 title={
-                    overrides.hideAtlasHomesBranding && tenant?.name?.trim()
+                    hideAtlasBranding && tenant?.name?.trim()
                         ? `${tenant.name.trim()} | Book your stay`
                         : "Starguest House | Serviced apartments in Hyderabad"
                 }
                 description={
-                    overrides.hideAtlasHomesBranding && tenant?.name?.trim()
+                    hideAtlasBranding && tenant?.name?.trim()
                         ? `Book your stay with ${tenant.name.trim()}. Questions? Call ${CONTACT.business.phone} or email ${contactEmail}.`
                         : "Book serviced apartments in Hyderabad with business-ready amenities, flexible stays, and attentive on-call support from Starguest House."
                 }

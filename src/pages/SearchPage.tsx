@@ -9,7 +9,7 @@ import { parseDate } from "../utils/formatting";
 import { useCurrency } from "../contexts/CurrencyContext";
 import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 import { getTenantContext } from "../tenant/tenantContext";
-import { getTenantOverrides, getTenantPublicListingIdAllowlist, getUnitNoun } from "../tenant/tenantOverrides";
+import { getTenantOverrides, getTenantPublicListingIdAllowlist, getUnitNoun, shouldHideAtlasBranding } from "../tenant/tenantOverrides";
 import SkeletonCard from "../components/apartments/SkeletonCard";
 import OptimizedImage from "../components/ui/OptimizedImage";
 import OwnerShareBadge from "../components/OwnerShareBadge"; // TASK-1705
@@ -257,6 +257,7 @@ const SearchPage = () => {
 
   const tenant = getTenantContext();
   const overrides = getTenantOverrides(tenant?.slug);
+  const hideAtlasBranding = shouldHideAtlasBranding(tenant, overrides);
   const unitNoun = getUnitNoun(overrides);
   const tenantAllowedIds = useMemo(() => {
     const allowed = getTenantPublicListingIdAllowlist(overrides);
@@ -1005,7 +1006,7 @@ const SearchPage = () => {
               data-testid="search-empty-state"
             >
               {/* RA-006: SVG depicts Atlas Homestays — only show on the marketplace root. */}
-              {!overrides.hideAtlasHomesBranding && (
+              {!hideAtlasBranding && (
                 <div className="mx-auto mb-6 flex max-w-xs justify-center" aria-hidden>
                   <img
                     src="/images/atlas-homestays-static-map.svg"
