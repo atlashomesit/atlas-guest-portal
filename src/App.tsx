@@ -125,8 +125,8 @@ function AppWrapper() {
       <ScrollToTop />
       <ErrorBoundary name="router">
         <main id="main-content" tabIndex={-1}>
-        <Suspense fallback={<LazyFallback />} key={`suspense-${location.pathname}`}>
-        <Routes>
+        <Suspense fallback={<LazyFallback />}>
+        <Routes key={location.pathname}>
           <Route
             path="/"
             element={withBoundary(<Suspense fallback={<LazyFallback />}>{isMarketplaceMode() ? <MarketplaceHomepage /> : <Home />}</Suspense>, isMarketplaceMode() ? "marketplace-home-route" : "home-route")}
