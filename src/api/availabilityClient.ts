@@ -26,7 +26,7 @@ export type AvailabilityRequestParams = {
   signal?: AbortSignal;
 };
 
-const AVAILABILITY_ENDPOINT = '/availability';
+const AVAILABILITY_BATCH_ENDPOINT = '/api/public/listings/availability-batch';
 
 export const fetchAvailability = async ({
   propertyId,
@@ -35,11 +35,9 @@ export const fetchAvailability = async ({
   guests,
   signal,
 }: AvailabilityRequestParams): Promise<AvailabilityResponse> => {
-  const url = new URL(buildApiUrl(AVAILABILITY_ENDPOINT));
-  url.searchParams.set('propertyId', String(propertyId));
-  url.searchParams.set('checkIn', checkIn);
-  url.searchParams.set('checkOut', checkOut);
-  url.searchParams.set('guests', String(guests));
+  const url = new URL(buildApiUrl(AVAILABILITY_BATCH_ENDPOINT));
+  url.searchParams.set('startDate', checkIn);
+  url.searchParams.set('endDate', checkOut);
 
   const response = await fetch(url.toString(), { signal, headers: getApiHeaders() });
 
