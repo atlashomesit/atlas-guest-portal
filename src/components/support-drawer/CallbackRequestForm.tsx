@@ -37,7 +37,7 @@ const CallbackRequestForm = ({
           inputMode="numeric"
           value={callbackPhone}
           onChange={(event) => onPhoneChange(event.target.value)}
-          className="w-full bg-transparent text-sm font-medium text-text-primary outline-none placeholder:text-text-muted"
+          className="w-full bg-transparent text-base font-medium text-text-primary outline-none placeholder:text-text-muted"
           placeholder={copy.phonePlaceholder}
           aria-label={copy.phoneInputAriaLabel}
         />
@@ -48,7 +48,7 @@ const CallbackRequestForm = ({
           type="button"
           disabled={callbackStatus === "sending"}
           onClick={onSubmit}
-          className="inline-flex flex-1 items-center justify-center rounded-full bg-cta-primary px-4 py-2 text-sm font-semibold text-[var(--text-contrast)] shadow-level1 transition hover:bg-cta-secondary disabled:cursor-not-allowed disabled:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
+          className="inline-flex flex-1 items-center justify-center rounded-full bg-cta-primary px-4 py-3 text-sm font-semibold text-[var(--text-contrast)] shadow-level1 transition hover:bg-cta-secondary disabled:cursor-not-allowed disabled:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
         >
           {callbackStatus === "sending"
             ? copy.submitLabels.sending

@@ -31,6 +31,7 @@ const SupportWidgetContent = () => {
   const [callbackStatus, setCallbackStatus] = useState<CallbackStatus>("idle");
   const [callbackError, setCallbackError] = useState<string | null>(null);
   const {
+    enableCompactDrawer,
     enableClickOutsideToClose,
     enableSupportCtaHierarchy,
     enableSupportLayoutVariants,
@@ -44,6 +45,7 @@ const SupportWidgetContent = () => {
   } = useSupportDrawerFlags();
   const [isDismissed, setIsDismissed] = useState(false);
   const [isCallbackExpanded, setIsCallbackExpanded] = useState(() => !enableRevealCallbackOnClickOnly);
+  const routePath = location?.pathname ?? "";
 
   const analyticsMetadata: SupportAnalyticsMetadata = {
     route: location.pathname,
@@ -223,7 +225,7 @@ const SupportWidgetContent = () => {
     );
   };
 
-  if (location.pathname.includes("payment") || location.pathname.includes("checkout")) {
+  if (routePath.includes("payment") || routePath.includes("checkout")) {
     return null;
   }
 

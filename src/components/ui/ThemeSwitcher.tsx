@@ -44,7 +44,7 @@ export const ThemeSwitcher: React.FC = () => {
         id="theme-select"
         value={selectedTheme}
         onChange={(e) => handleThemeChange(e.target.value as ThemeName | typeof AUTO_THEME_KEY)}
-        className="mt-1 block w-full rounded-lg border border-[#E2E8F0] bg-white px-3 py-2 text-sm text-[#0F172A] shadow-sm focus:border-[#475569] focus:outline-none focus:ring-2 focus:ring-[#475569]/20"
+        className="mt-1 block w-full rounded-lg border border-[#E2E8F0] bg-white px-3 py-2 text-base text-[#0F172A] shadow-sm focus:border-[#475569] focus:outline-none focus:ring-2 focus:ring-[#475569]/20"
       >
         <option value="auto">Auto (Seasonal)</option>
         {availableThemes.map((theme) => (

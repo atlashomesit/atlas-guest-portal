@@ -139,7 +139,7 @@ const styles = {
     transition: "background 0.3s ease",
   }),
   stepLabel: (active: boolean): React.CSSProperties => ({
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: active ? 600 : 400,
     color: active ? "var(--text-primary, #1e293b)" : "#94a3b8",
     textAlign: "center",
@@ -201,7 +201,7 @@ const styles = {
     transition: "opacity 0.2s",
   } as React.CSSProperties,
   hint: {
-    fontSize: 12,
+    fontSize: 14,
     color: "#94a3b8",
     marginTop: 4,
   } as React.CSSProperties,
@@ -751,7 +751,7 @@ const BecomeHost = () => {
             <button
               type="button"
               onClick={resetForm}
-              style={{ fontSize: 13, color: "#6b7280", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}
+              style={{ fontSize: 13, color: "#6b7280", background: "none", border: "none", cursor: "pointer", textDecoration: "underline", minHeight: 44, padding: "0 8px" }}
             >
               Clear and start over
             </button>
