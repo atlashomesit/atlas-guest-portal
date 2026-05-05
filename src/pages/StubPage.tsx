@@ -1,6 +1,6 @@
 /* eslint-disable atlas-brand/no-atlas-string-leak -- TODO Task 16: replace with per-tenant content */
 import SEO from "../components/SEO";
-import { getTenantContext } from "../tenant/tenantContext";
+import { getTenantBrandName } from "../tenant/displayBrand";
 
 interface StubPageProps {
   title: string;
@@ -12,7 +12,7 @@ interface StubPageProps {
 }
 
 const StubPage = ({ title, description, heading, body, ctaHref, ctaLabel }: StubPageProps) => {
-  const brandName = getTenantContext()?.name ?? 'Atlas Homestays';
+  const brandName = getTenantBrandName();
   return (
     <div className="px-4 md:px-10 lg:px-20 py-28 bg-bg-muted min-h-screen">
       <SEO title={title} description={description} />

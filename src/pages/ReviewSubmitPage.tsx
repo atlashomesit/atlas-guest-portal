@@ -6,7 +6,7 @@ import { buildApiUrl, getApiHeaders } from "../api/client";
 import { sanitizeGuestImageUrl } from "../utils/guestImageUrl";
 import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 import { messageFromApiResponse } from "../utils/serverErrorFromResponse";
-import { getTenantContext } from "../tenant/tenantContext";
+import { getTenantBrandName } from "../tenant/displayBrand";
 
 interface ReviewEligibility {
   bookingId: number;
@@ -96,7 +96,7 @@ const emptySubRatings = (): Record<SubKey, number> => ({
 });
 
 export default function ReviewSubmitPage() {
-  const brandName = getTenantContext()?.name ?? 'Atlas Homestays';
+  const brandName = getTenantBrandName();
   const { bookingId } = useParams<{ bookingId: string }>();
   const [searchParams] = useSearchParams();
   const token = searchParams.get("t");

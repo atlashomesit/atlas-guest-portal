@@ -1,7 +1,7 @@
 /* eslint-disable atlas-brand/no-atlas-string-leak -- TODO Task 16: replace with per-tenant content */
 import { Link } from "react-router-dom";
 import SEO from "../components/SEO";
-import { getTenantContext } from "../tenant/tenantContext";
+import { getTenantBrandName } from "../tenant/displayBrand";
 
 /**
  * TASK-016: DPDP 2023 privacy policy page.
@@ -13,7 +13,7 @@ import { getTenantContext } from "../tenant/tenantContext";
  */
 
 export default function PrivacyPolicyPage() {
-  const brandName = getTenantContext()?.name ?? 'Atlas Homestays';
+  const brandName = getTenantBrandName();
   const lastUpdated = "22 April 2026";
 
   return (

@@ -1,18 +1,31 @@
-/* eslint-disable atlas-brand/no-atlas-string-leak -- TODO Task 16: replace with per-tenant content */
 import { useMemo, useState } from "react";
 import LegalLayout from "../components/legal/LegalLayout";
 import SectionNav from "../components/legal/SectionNav";
 import SEO from "../components/SEO";
 import { paymentDataSharingNote, termsMetadata, termsSections } from "../content/legal/terms";
-import { getTenantContext } from "../tenant/tenantContext";
+import { getTenantBrandName, MARKETPLACE_BRAND_BASELINE } from "../tenant/displayBrand";
 
 const Terms = () => {
-  const brandName = getTenantContext()?.name ?? 'Atlas Homestays';
+  const brandName = getTenantBrandName();
+  const localizedSections = useMemo(
+    () =>
+      termsSections.map((section) => ({
+        ...section,
+        body: section.body?.map((p) => p.replaceAll(MARKETPLACE_BRAND_BASELINE, brandName)),
+        bullets: section.bullets?.map((p) => p.replaceAll(MARKETPLACE_BRAND_BASELINE, brandName)),
+      })),
+    [brandName],
+  );
+  const localizedPaymentNote = useMemo(
+    () => paymentDataSharingNote.replaceAll(MARKETPLACE_BRAND_BASELINE, brandName),
+    [brandName],
+  );
+
   const [open, setOpen] = useState<Set<string>>(new Set(termsSections.map((section) => section.id)));
 
   const sectionNav = useMemo(
-    () => termsSections.map((section) => ({ id: section.id, label: section.title })),
-    []
+    () => localizedSections.map((section) => ({ id: section.id, label: section.title })),
+    [localizedSections],
   );
 
   const toggle = (id: string) => {
@@ -49,7 +62,7 @@ const Terms = () => {
           <div className="flex flex-wrap gap-3 items-center">
             <button
               type="button"
-              onClick={() => setOpen(new Set(termsSections.map((section) => section.id)))}
+              onClick={() => setOpen(new Set(localizedSections.map((section) => section.id)))}
               className="min-h-11 px-5 py-3 rounded-full border border-border-subtle text-base font-semibold text-primary hover:border-primary"
             >
               Expand all
@@ -71,7 +84,7 @@ const Terms = () => {
           </div>
 
           <div className="space-y-4">
-            {termsSections.map((section) => (
+            {localizedSections.map((section) => (
               <article
                 key={section.id}
                 id={section.id}
@@ -114,7 +127,7 @@ const Terms = () => {
 
           <div className="bg-bg-muted border border-border-subtle rounded-2xl p-6 text-text-primary">
             <p className="text-sm uppercase tracking-[0.2em] text-primary">Payment data sharing</p>
-            <p className="mt-2">{paymentDataSharingNote}</p>
+            <p className="mt-2">{localizedPaymentNote}</p>
           </div>
         </div>
       </div>

@@ -1,4 +1,6 @@
-/* eslint-disable atlas-brand/no-atlas-string-leak -- TODO Task 16: blog posts are shared platform content; per-tenant substitution happens at page render time (BlogHome.tsx, BlogCategory.tsx) */
+/** Placeholder resolved at runtime by `getLocalizedBlogPosts` (CPO-001). */
+export const TENANT_BRAND_PLACEHOLDER = "{{TENANT_BRAND}}";
+
 export type BlogCategory = "guest-guides" | "hospitality-tech";
 
 export interface BlogPost {
@@ -17,27 +19,27 @@ export interface BlogPost {
 export const blogPosts: BlogPost[] = [
   {
     id: "1",
-    title: "Essential Guest Guide to Atlas Homestays",
+    title: `Essential Guest Guide to ${TENANT_BRAND_PLACEHOLDER}`,
     slug: "essential-guest-guide",
     category: "guest-guides",
     excerpt: "Plan your arrival, explore nearby dining, and discover how to get the most from your stay.",
     content:
       "Explore the neighborhood, check in smoothly, and review our on-site amenities before you arrive.",
     featuredImage: "https://atlashomestorage.blob.core.windows.net/listing-images/101/img_9.jpg",
-    metaTitle: "Guest Guide | Atlas Homestays",
-    metaDescription: "Arrival tips, local attractions, and stay recommendations for Atlas Homestays guests.",
+    metaTitle: `Guest Guide | ${TENANT_BRAND_PLACEHOLDER}`,
+    metaDescription: `Arrival tips, local attractions, and stay recommendations for ${TENANT_BRAND_PLACEHOLDER} guests.`,
     canonicalPath: "/blog/essential-guest-guide",
   },
   {
     id: "2",
-    title: "Hospitality Tech & AI at Atlas Homestays",
+    title: `Hospitality Tech & AI at ${TENANT_BRAND_PLACEHOLDER}`,
     slug: "hospitality-tech-ai",
     category: "hospitality-tech",
-    excerpt: "How Atlas Homestays uses automation, security, and smart features to improve each visit.",
+    excerpt: `How ${TENANT_BRAND_PLACEHOLDER} uses automation, security, and smart features to improve each visit.`,
     content: "Learn how smart entry, responsive support, and automation make your stay seamless.",
     featuredImage: "https://atlashomestorage.blob.core.windows.net/listing-images/102/img_2.jpg",
-    metaTitle: "Hospitality Tech & AI | Atlas Homestays",
-    metaDescription: "Discover the technology powering comfort, safety, and service at Atlas Homestays.",
+    metaTitle: `Hospitality Tech & AI | ${TENANT_BRAND_PLACEHOLDER}`,
+    metaDescription: `Discover the technology powering comfort, safety, and service at ${TENANT_BRAND_PLACEHOLDER}.`,
     canonicalPath: "/blog/hospitality-tech-ai",
   },
   {
@@ -67,3 +69,19 @@ export const blogPosts: BlogPost[] = [
     canonicalPath: "/blog/rooms-vs-homes",
   },
 ];
+
+function localizeBlogText(text: string, brandName: string): string {
+  return text.split(TENANT_BRAND_PLACEHOLDER).join(brandName);
+}
+
+/** CPO-001: personalize shared blog templates for the active tenant (marketplace baseline unchanged). */
+export function getLocalizedBlogPosts(brandName: string): BlogPost[] {
+  return blogPosts.map((post) => ({
+    ...post,
+    title: localizeBlogText(post.title, brandName),
+    excerpt: localizeBlogText(post.excerpt, brandName),
+    content: localizeBlogText(post.content, brandName),
+    metaTitle: post.metaTitle ? localizeBlogText(post.metaTitle, brandName) : undefined,
+    metaDescription: post.metaDescription ? localizeBlogText(post.metaDescription, brandName) : undefined,
+  }));
+}

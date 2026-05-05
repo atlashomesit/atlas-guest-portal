@@ -1,5 +1,7 @@
-/* eslint-disable atlas-brand/no-atlas-string-leak -- TODO Task 16: replace with per-tenant content */
-// DPDPA 2023 notice content for Atlas Homestays (Data Fiduciary).
+/* eslint-disable atlas-brand/no-atlas-string-leak -- baseline marketplace notice; tenant substitution in PrivacyPage (RA-006). */
+import { MARKETPLACE_BRAND_BASELINE } from "../../tenant/displayBrand";
+
+// DPDPA 2023 notice content for the marketplace data fiduciary (see MARKETPLACE_BRAND_BASELINE).
 //
 // Sourced from:
 //   - Digital Personal Data Protection Act, 2023 (Act No. 22 of 2023) — Section 5 (Notice),
@@ -12,7 +14,8 @@
 // (b) clear and plain language with an itemised description of personal data + specified purposes,
 // (c) a communication link for withdrawal, rights exercise, and complaints to the Data Protection Board.
 //
-// IMPORTANT: This notice must be reviewed and signed off by Atlas Homestays' Grievance Officer
+// TODO(CPO-001-followup): tenant-specific counsel review for white-label domains.
+// IMPORTANT: This notice must be reviewed and signed off by the data fiduciary's Grievance Officer
 // (legal counsel) before the first paying customer. Content below is drafted to meet the statutory
 // minimum, not to serve as a substitute for legal review.
 
@@ -24,9 +27,9 @@ export type PrivacySection = {
 };
 
 export const privacyMetadata = {
-  title: "Privacy Notice | Atlas Homestays",
+  title: `Privacy Notice | ${MARKETPLACE_BRAND_BASELINE}`,
   effectiveDate: "Effective from April 22, 2026",
-  dataFiduciary: "Atlas Homestays",
+  dataFiduciary: MARKETPLACE_BRAND_BASELINE,
   grievanceOfficer: {
     name: "Sreekar Atla",
     email: "privacy@atlashomestays.com",
@@ -39,7 +42,7 @@ export const privacySections: PrivacySection[] = [
     id: "about-this-notice",
     title: "About this notice",
     summary:
-      "Atlas Homestays is a Data Fiduciary under India's Digital Personal Data Protection Act, 2023 (DPDP Act). This notice explains what personal data we collect, why we collect it, and how you can exercise your rights.",
+      `${MARKETPLACE_BRAND_BASELINE} is a Data Fiduciary under India's Digital Personal Data Protection Act, 2023 (DPDP Act). This notice explains what personal data we collect, why we collect it, and how you can exercise your rights.`,
     details: [
       "This notice is given to you under Section 5 of the DPDP Act, 2023 and Rule 3 of the DPDP Rules, 2025, at or before we process your personal data.",
       "It is written to be understood on its own. If any other document conflicts with this notice, the statutory rights under the DPDP Act prevail.",
@@ -103,7 +106,7 @@ export const privacySections: PrivacySection[] = [
     details: [
       "Primary database: Azure SQL, Central India region (Pune).",
       "Backup / secondary region: Azure Central US region, used only for disaster recovery.",
-      "Cloudflare and Auth0 operate global networks and may process request metadata outside India. They are bound by contractual data-protection terms with Atlas Homestays.",
+      `Cloudflare and Auth0 operate global networks and may process request metadata outside India. They are bound by contractual data-protection terms with ${MARKETPLACE_BRAND_BASELINE}.`,
       "We do not transfer personal data to any country notified as restricted under Section 16 of the DPDP Act.",
     ],
   },
@@ -145,7 +148,7 @@ export const privacySections: PrivacySection[] = [
       `Grievance Officer: ${privacyMetadata.grievanceOfficer.name}`,
       `Email: ${privacyMetadata.grievanceOfficer.email}`,
       `Phone / WhatsApp: ${privacyMetadata.grievanceOfficer.phone}`,
-      "Postal address: Atlas Homestays, Hyderabad, Telangana, India.",
+      `Postal address: ${MARKETPLACE_BRAND_BASELINE}, Hyderabad, Telangana, India.`,
       "We will acknowledge complaints within 72 hours and resolve them within 90 days, as required by Section 13 of the DPDP Act.",
       "If you are not satisfied with our response, you can file a complaint with the Data Protection Board of India through the Board's official portal once it becomes operational. Guidance is at https://www.meity.gov.in/data-protection-framework.",
     ],

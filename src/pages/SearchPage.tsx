@@ -1005,7 +1005,7 @@ const SearchPage = () => {
               className="rounded-2xl border border-border-subtle bg-bg-surface px-4 py-8 text-center shadow-sm sm:px-8"
               data-testid="search-empty-state"
             >
-              {/* RA-006: SVG depicts Atlas Homestays — only show on the marketplace root. */}
+              {/* RA-006: SVG depicts marketplace brand — only show on the marketplace root. */} {/* TODO(CPO-001-followup): swap SVG/wordmark per tenant pack */}
               {!hideAtlasBranding && (
                 <div className="mx-auto mb-6 flex max-w-xs justify-center" aria-hidden>
                   <img

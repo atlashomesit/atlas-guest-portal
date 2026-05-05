@@ -5,7 +5,7 @@ import SEO from "../components/SEO";
 import { buildApiUrl, getApiHeaders } from "../api/client";
 import { messageFromApiResponse } from "../utils/serverErrorFromResponse";
 import { getContactEmail } from "../config/contact";
-import { getTenantContext } from "../tenant/tenantContext";
+import { getTenantBrandName } from "../tenant/displayBrand";
 
 interface BookingItem {
   id: number;
@@ -28,7 +28,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function MyBookingsPage() {
-  const brandName = getTenantContext()?.name ?? 'Atlas Homestays';
+  const brandName = getTenantBrandName();
   const [searchParams] = useSearchParams();
   const guestId = searchParams.get("guestId");
   const token = searchParams.get("t");

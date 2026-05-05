@@ -75,7 +75,7 @@ export type TenantLocationContent = {
 export type TenantOverrides = {
   /** Hide the logo image in the navbar/footer/subheading. */
   hideLogo?: boolean;
-  /** Hide default "Atlas Homes" / Atlas Homestays copy where we show a listing brand row. */
+  /** Hide default marketplace / parent-brand copy where we show a listing brand row. */ // TODO(CPO-001-followup): align naming with displayBrand helpers
   hideAtlasHomesBranding?: boolean;
   /** Hide the "List your property" CTA in the header (desktop + mobile). */
   hideListProperty?: boolean;

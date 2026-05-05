@@ -1,10 +1,14 @@
+import { useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import SEO from "../../components/SEO";
-import { blogPosts } from "../../data/blogPosts";
+import { getLocalizedBlogPosts } from "../../data/blogPosts";
+import { getTenantBrandName } from "../../tenant/displayBrand";
 
 const BlogPostPage = () => {
   const { slug } = useParams();
-  const post = blogPosts.find((p) => p.slug === slug);
+  const brandName = getTenantBrandName();
+  const posts = useMemo(() => getLocalizedBlogPosts(brandName), [brandName]);
+  const post = posts.find((p) => p.slug === slug);
 
   if (!post) {
     return (

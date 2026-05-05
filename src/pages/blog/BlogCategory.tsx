@@ -1,11 +1,12 @@
-/* eslint-disable atlas-brand/no-atlas-string-leak -- TODO Task 16: replace with per-tenant content */
+import { useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
 import SEO from "../../components/SEO";
-import { blogPosts, BlogCategory as BlogCategoryType } from "../../data/blogPosts";
-import { getTenantContext } from "../../tenant/tenantContext";
+import { getLocalizedBlogPosts, BlogCategory as BlogCategoryType } from "../../data/blogPosts";
+import { getTenantBrandName } from "../../tenant/displayBrand";
 
 const BlogCategory = () => {
-  const brandName = getTenantContext()?.name ?? 'Atlas Homestays';
+  const brandName = getTenantBrandName();
+  const posts = useMemo(() => getLocalizedBlogPosts(brandName), [brandName]);
 
   const categoryMeta: Record<BlogCategoryType, { title: string; description: string; label: string }> = {
     "guest-guides": {
@@ -27,7 +28,7 @@ const BlogCategory = () => {
   const { category } = useParams();
   const safeCategory: BlogCategoryType = isValidCategory(category) ? category : "guest-guides";
   const meta = categoryMeta[safeCategory];
-  const filtered = blogPosts.filter((post) => post.category === safeCategory);
+  const filtered = posts.filter((post) => post.category === safeCategory);
 
   return (
     <div className="px-4 md:px-10 lg:px-20 py-24 bg-bg-muted min-h-screen">

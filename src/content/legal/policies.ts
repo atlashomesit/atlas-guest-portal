@@ -1,4 +1,4 @@
-/* eslint-disable atlas-brand/no-atlas-string-leak -- TODO Task 16: replace with per-tenant content */
+import { MARKETPLACE_BRAND_BASELINE } from "../../tenant/displayBrand";
 import { termsSections } from "./terms";
 
 type TermsRef = (typeof termsSections)[number]["id"];
@@ -109,11 +109,11 @@ export const policySections: PolicySection[] = [
     id: "compliance-liability",
     title: "Compliance, Safety & Liability",
     summary:
-      "Follow safety instructions and applicable law; Atlas Homestays is not liable for personal belongings unless required by law.",
+      `Follow safety instructions and applicable law; ${MARKETPLACE_BRAND_BASELINE} is not liable for personal belongings unless required by law.`,
     details: [
       "Guests must comply with building safety rules, emergency procedures, and reasonable instructions from staff or building management.",
       "Illegal activity is prohibited and may be reported to authorities.",
-      "Atlas Homestays is not liable for personal belongings or service interruptions outside our control unless required by law.",
+      `${MARKETPLACE_BRAND_BASELINE} is not liable for personal belongings or service interruptions outside our control unless required by law.`,
     ],
     termsRefs: ["force-majeure-disputes", "damages-liability"],
   },

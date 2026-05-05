@@ -11,7 +11,12 @@ import { setDomainResolvedSlug } from '@/tenant/tenantResolver';
 
 export interface TenantInfo {
   id?: number;
+  /** API `brandName` — short name for UI (e.g. Star Guest House). */
   name: string;
+  /** CPO-001: explicit short brand; mirrors `name` when resolved from `/tenants/from-domain`. */
+  brandName?: string;
+  /** CPO-001: legal-entity line when available (e.g. from `legalContactPack.legalName`). */
+  brandNameLong?: string;
   slug: string;
   logoUrl?: string;
   primaryColor?: string;
@@ -71,7 +76,7 @@ export interface TenantLegalContactPack {
   state?: string;
   pincode?: string;
   gstin?: string;
-  /** When true, the guest portal renders a small "Powered by Atlas Homestays" footer credit. */
+  /** When true, the guest portal renders a small powered-by footer credit for the marketplace operator. */
   showAtlasFooterCredit: boolean;
 }
 
@@ -118,8 +123,14 @@ export async function resolveFromDomain(apiBaseUrl: string, domain: string): Pro
 
     if (slug) setDomainResolvedSlug(slug);
 
+    const brandShort = String(data.brandName ?? "").trim();
+    const brandLong =
+      typeof data.legalContactPack?.legalName === "string" ? data.legalContactPack.legalName.trim() : "";
+
     tenantInfo = {
-      name: data.brandName ?? '',
+      name: brandShort,
+      brandName: brandShort || undefined,
+      brandNameLong: brandLong || undefined,
       slug: slug ?? '',
       logoUrl: data.logoUrl ?? undefined,
       primaryColor: data.primaryColor ?? undefined,
@@ -196,9 +207,12 @@ export async function validateTenant(slug: string): Promise<TenantInfo> {
   }
 
   const data = await res.json();
+  const nm = String(data.name ?? "").trim();
   tenantInfo = {
     id: data.id,
-    name: data.name,
+    name: nm,
+    brandName: nm || undefined,
+    brandNameLong: undefined,
     slug: data.slug,
     logoUrl: data.logoUrl ?? undefined,
     primaryColor: data.brandColor ?? undefined,

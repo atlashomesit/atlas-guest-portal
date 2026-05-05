@@ -5,10 +5,10 @@ import SEO from "../components/SEO";
 import { fetchPublicListings } from "../api/listingClient";
 import { clearRecentlyViewed, getRecentlyViewed } from "../utils/guestHistory";
 import { formatCurrency } from "../utils/formatting";
-import { getTenantContext } from "../tenant/tenantContext";
+import { getTenantBrandName } from "../tenant/displayBrand";
 
 export default function RecentlyViewedPage() {
-  const brandName = getTenantContext()?.name ?? 'Atlas Homestays';
+  const brandName = getTenantBrandName();
   const [items, setItems] = useState(() => getRecentlyViewed());
   const [liveNightlyByListingId, setLiveNightlyByListingId] = useState<Record<number, number>>({});
 

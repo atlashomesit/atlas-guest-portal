@@ -1,4 +1,3 @@
-/* eslint-disable atlas-brand/no-atlas-string-leak -- TODO Task 16: replace with per-tenant content */
 import { useMemo, useState } from "react";
 import LegalLayout from "../components/legal/LegalLayout";
 import LegalSearch from "../components/legal/LegalSearch";
@@ -8,10 +7,19 @@ import { policyMetadata, policySections } from "../content/legal/policies";
 import { termsSections } from "../content/legal/terms";
 import { CONTACT } from "../config/contact";
 import { buildWaLink, defaultPrefill } from "../utils/whatsapp";
-import { getTenantContext } from "../tenant/tenantContext";
+import { getTenantBrandName, MARKETPLACE_BRAND_BASELINE } from "../tenant/displayBrand";
 
 const Policies = () => {
-  const brandName = getTenantContext()?.name ?? 'Atlas Homestays';
+  const brandName = getTenantBrandName();
+  const localizedPolicies = useMemo(
+    () =>
+      policySections.map((section) => ({
+        ...section,
+        summary: section.summary.replaceAll(MARKETPLACE_BRAND_BASELINE, brandName),
+        details: section.details.map((d) => d.replaceAll(MARKETPLACE_BRAND_BASELINE, brandName)),
+      })),
+    [brandName],
+  );
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState<Set<string>>(new Set());
 
@@ -23,13 +31,13 @@ const Policies = () => {
 
   const filteredPolicies = useMemo(() => {
     const term = search.trim().toLowerCase();
-    if (!term) return policySections;
+    if (!term) return localizedPolicies;
 
-    return policySections.filter((section) => {
+    return localizedPolicies.filter((section) => {
       const haystack = `${section.title} ${section.summary} ${section.details.join(" ")}`.toLowerCase();
       return haystack.includes(term);
     });
-  }, [search]);
+  }, [search, localizedPolicies]);
 
   const toggle = (id: string) => {
     setOpen((prev) => {

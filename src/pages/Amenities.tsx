@@ -16,7 +16,7 @@ import {
 import { MdElevator, MdSecurity, MdLocalLaundryService, MdOutlineKitchen } from "react-icons/md";
 import SEO from "../components/SEO";
 import { useTenantListings } from "@/hooks/useTenantListings";
-import { getTenantContext } from "@/tenant/tenantContext";
+import { getTenantBrandName } from "@/tenant/displayBrand";
 
 type IconKey = "wifi" | "tv" | "ac" | "kitchen" | "parking" | "pool" | "gym" | "couch" | "shower" | "laptop" | "elevator" | "security" | "laundry" | "refrigerator";
 
@@ -80,7 +80,7 @@ function AmenityCard({ icon, name, desc, variant = "standard" }: AmenityCardProp
 
 export default function Amenities() {
   const { properties, state } = useTenantListings();
-  const brandName = getTenantContext()?.name ?? 'Atlas Homestays';
+  const brandName = getTenantBrandName();
 
   // Determine which premium amenities are actually available across our listings
   const availablePremiumKeys = useMemo<Set<IconKey>>(() => {

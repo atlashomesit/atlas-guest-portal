@@ -12,10 +12,10 @@ import { CONTACT } from "../config/contact";
 import { buildWaLink, defaultPrefill } from "../utils/whatsapp";
 import FaqHighlights from "../components/faq/FaqHighlights";
 import { getFaqHighlights } from "../content/faqHighlights";
-import { getTenantContext } from "../tenant/tenantContext";
+import { getTenantBrandName } from "../tenant/displayBrand";
 
 const FaqPage = () => {
-  const brandName = getTenantContext()?.name ?? 'Atlas Homestays';
+  const brandName = getTenantBrandName();
   useScrollToHash();
   const [search, setSearch] = useState("");
   const whatsappLink = useMemo(() => {

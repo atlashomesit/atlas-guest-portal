@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import SEO from "../components/SEO";
 import { buildApiUrl } from "@/api/client";
 import { useTenantListings, type TenantPropertyRecord } from "@/hooks/useTenantListings";
-import { getTenantContext } from "@/tenant/tenantContext";
+import { getTenantBrandName } from "@/tenant/displayBrand";
 
 interface DiscountTier {
   minNights: number;
@@ -41,7 +41,7 @@ function extractLastMinutePercent(properties: TenantPropertyRecord[]): number {
 
 export default function OffersPage() {
   const { properties, state } = useTenantListings();
-  const brandName = getTenantContext()?.name ?? 'Atlas Homestays';
+  const brandName = getTenantBrandName();
 
   const [promoCode, setPromoCode] = useState("");
   const [promoResult, setPromoResult] = useState<PromoResult | null>(null);
