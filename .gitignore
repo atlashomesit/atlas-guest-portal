@@ -11,6 +11,7 @@ dist/
 *.log
 
 # Wrangler Pages Functions build output (regenerate via wrangler / CI; do not commit)
+_worker.bundle
 _worker.bundle/
 _worker.bundledesktop.ini
 *.ini
