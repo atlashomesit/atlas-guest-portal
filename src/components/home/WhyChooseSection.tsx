@@ -72,7 +72,7 @@ const WhyChooseSection = () => {
           {whyChooseHighlights.map((item) => (
             <li
               key={item.title}
-              className={`rounded-xl border border-border-subtle bg-bg-surface p-6 shadow-level1 ${
+              className={`rounded-xl border border-border-subtle bg-bg-surface p-6 ${
                 enableWhyChooseNoSelectionState ? "" : "hover:border-accent-primary/40 transition-colors"
               }`}
             >

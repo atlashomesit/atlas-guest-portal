@@ -31,7 +31,7 @@ const ListingFilters: React.FC<ListingFiltersProps> = ({
   onPetFriendlyChange,
   onSortChange,
 }) => (
-  <div className="flex flex-col gap-4 rounded-2xl bg-bg-surface p-4 shadow-level1 border border-border-subtle sm:flex-row sm:items-end sm:justify-between">
+  <div className="flex flex-col gap-4 rounded-2xl bg-bg-surface p-4 border border-border-subtle sm:flex-row sm:items-end sm:justify-between">
     <div className="grid flex-1 grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <label className="flex flex-col gap-1 text-sm font-semibold text-text-primary">
         Min price (₹)
