@@ -631,21 +631,9 @@ const PropertyDetails = () => {
                         (apiListing as Record<string, unknown>).propertyId ??
                             (apiListing as Record<string, unknown>).property_id,
                     );
-                    // Try to get photos from context cache first to avoid duplicate API calls
-                    let fromPhotos: string[] = getUrlsForListingId(listingNumericId) ?? [];
-
-                    // Only fetch from API if not in context cache (and context is loaded)
-                    if (fromPhotos.length === 0 && photosLoaded) {
-                        try {
-                            fromPhotos = filterGuestImageUrls(
-                                await fetchListingPhotos(propertyNumericId, controller.signal, {
-                                    listingId: listingNumericId,
-                                }),
-                            );
-                        } catch {
-                            /* use DTO fields */
-                        }
-                    }
+                    // Photos already in listing API response (photoUrls/coverPhotoUrl)
+                    // Skip separate /photos API call to avoid duplicate requests
+                    let fromPhotos: string[] = [];
                     const mapped: Property = {
                         id: listingNumericId,
                         listingId: listingNumericId,
