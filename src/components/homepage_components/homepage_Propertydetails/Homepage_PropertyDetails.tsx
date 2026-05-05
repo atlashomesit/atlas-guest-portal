@@ -1055,7 +1055,8 @@ useEffect(() => {
                                 className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border-subtle bg-bg-muted text-text-primary hover:opacity-90"
                                 onClick={() => {
                                     const url = window.location.href;
-                                    const text = `Check out ${data?.property_name ?? 'this home'} on ${_getTenantCtx()?.name ?? 'our platform'}`;
+                                    const priceText = data?.property_price && data.property_price > 0 ? ` from ₹${data.property_price}/night` : '';
+                                    const text = `Check out ${data?.property_name ?? 'this home'}${priceText} on ${_getTenantCtx()?.name ?? 'our platform'}`;
                                     const share = async () => {
                                         const nav: any = navigator;
                                         if (nav?.share) return nav.share({ title: document.title, text, url });
@@ -1142,7 +1143,11 @@ useEffect(() => {
                 {/* Social sharing — minimal, does not distract from booking CTA */}
                 <div className="flex items-center gap-3 mt-2 flex-wrap">
                     <a
-                        href={`https://wa.me/?text=${encodeURIComponent(`Check out ${data?.property_name ?? 'this home'}: ${window.location.href}`)}`}
+                        href={(() => {
+                            const priceText = data?.property_price && data.property_price > 0 ? ` from ₹${data.property_price}/night` : '';
+                            const shareText = `Check out ${data?.property_name ?? 'this home'}${priceText}: ${window.location.href}`;
+                            return `https://wa.me/?text=${encodeURIComponent(shareText)}`;
+                        })()}
                         target="_blank"
                         rel="noreferrer"
                         style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.85rem', color: '#25d366' }}
