@@ -155,6 +155,8 @@ interface Property {
     property_address?: string | null;
     /** TASK-1359: YouTube / Vimeo virtual tour URL */
     virtualTourUrl?: string | null;
+    /** TASK-1385: Cancellation policy tier from listing — Flexible, Moderate, or Strict. */
+    cancellationTier?: 'Flexible' | 'Moderate' | 'Strict' | null;
 }
 
 /** TASK-1359: Convert YouTube/Vimeo watch URL to embed URL, or return null if unrecognised. */
@@ -671,6 +673,10 @@ const PropertyDetails = () => {
                             const raw = (apiListing as Record<string, unknown>).virtualTourUrl;
                             return typeof raw === 'string' && raw.trim() ? raw.trim() : null;
                         })(),
+                        cancellationTier: (() => {
+                            const raw = (apiListing as Record<string, unknown>).cancellationTier ?? pub.cancellationTier;
+                            return (raw === 'Flexible' || raw === 'Moderate' || raw === 'Strict') ? raw : null;
+                        })(), // TASK-1385
                     };
                     const images = filterGuestImageUrls(
                         photoUrlsList.length > 0 ? photoUrlsList : (coverUrl ? [coverUrl] : []),
@@ -972,6 +978,16 @@ useEffect(() => {
         )?.value;
         return fromListingPolicy || inlinePolicySnippets?.cancellation || 'Standard cancellation policy applies.';
     })();
+
+    // TASK-1385: tier-specific plain-language text overrides generic policy copy when set
+    const cancellationTierLabel: Record<string, string> = {
+        Flexible: 'Flexible — full refund if cancelled 24+ hours before check-in.',
+        Moderate: 'Moderate — full refund if cancelled 5+ days before check-in.',
+        Strict: 'Strict — 50% refund if cancelled 7+ days before check-in; no refund after.',
+    };
+    const resolvedCancellationText = data?.cancellationTier
+        ? cancellationTierLabel[data.cancellationTier]
+        : cancellationPolicyText;
 
     const pageUrl = typeof window !== 'undefined' ? window.location.href : '';
     const galleryUrls = filterGuestImageUrls(data?.property_img ?? []);
@@ -1302,8 +1318,15 @@ useEffect(() => {
                                                 <KeyRound className="w-4 h-4 text-accent-primary" />
                                                 <p className="text-text-muted text-sm">Cancellation & rules</p>
                                             </div>
+                                            {data?.cancellationTier && (
+                                                <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full mb-1 ${
+                                                    data.cancellationTier === 'Flexible' ? 'bg-green-100 text-green-800' :
+                                                    data.cancellationTier === 'Moderate' ? 'bg-yellow-100 text-yellow-800' :
+                                                    'bg-red-100 text-red-800'
+                                                }`}>{data.cancellationTier}</span>
+                                            )}
                                             <p className="font-medium text-text-primary">
-                                                {cancellationPolicyText}
+                                                {resolvedCancellationText}
                                             </p>
                                             <p className="text-text-primary mt-2 text-sm">
                                                 {inlinePolicySnippets?.houseRules || 'Standard house rules apply'}
