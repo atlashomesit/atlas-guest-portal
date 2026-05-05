@@ -772,7 +772,7 @@ useEffect(() => {
             }
         })();
         return () => ac.abort();
-    }, [data, getUrlsForListingId, setCachedPhotos]);
+    }, [data?.id, data?.listingId, getUrlsForListingId, setCachedPhotos]);
 
     // Prefetch public availability calendar as soon as listing id resolves so date widget opens warm.
     useEffect(() => {
