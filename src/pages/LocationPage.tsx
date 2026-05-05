@@ -41,45 +41,45 @@ const FALLBACK_STATIC_MAP_URL = "/images/atlas-homestays-static-map.svg";
 const transportOptions = [
   {
     title: "Metro",
-    details: "Kukatpally and KPHB Colony Metro stations are within a 10-15 minute drive for quick access across the city.",
+    details: "Hitech City and Raidurg Metro stations are within 10 minutes for quick access across the city.",
   },
   {
     title: "Airport",
-    details: "Rajiv Gandhi International Airport is about 45 minutes away via ORR, with reliable cab availability day and night.",
+    details: "Rajiv Gandhi International Airport is about 30 minutes away with reliable cab availability day and night.",
   },
   {
     title: "Road connectivity",
-    details: "Easy access to Mumbai Highway, JNTU Road, and the ORR for commuting towards Hitech City, Gachibowli, or BHEL.",
+    details: "Easy access to Gachibowli, Hitech City, Miyapur, and ORR towards Financial District and Manikonda.",
   },
 ];
 
 const nearbyAmenities = [
   {
     title: "Daily essentials",
-    details: "Supermarkets, pharmacies, and local bakeries within a 5-10 minute drive for everyday needs.",
+    details: "Nearby Ratnadeep supermarket, pharmacies, and local bakeries for everyday needs.",
   },
   {
     title: "Dining",
-    details: "A mix of local eateries and popular chains around Kukatpally, JNTU, and KPHB for quick meals or dine-in plans.",
+    details: "Restaurants and eateries in Kondapur, Hitech City, Raidurg, Gachibowli, Madhapur, and Miyapur.",
   },
   {
     title: "Healthcare",
-    details: "Multi-specialty hospitals and clinics nearby to handle routine visits and emergencies.",
+    details: "KIIMS Hospital and Apollo Hospital nearby to handle routine visits and emergencies.",
   },
 ];
 
 const landmarks = [
   {
     title: "Business hubs",
-    details: "Proximity to Hitech City, Gachibowli, and Financial District for tech parks and corporate offices.",
+    details: "Proximity to Hitech City, Gachibowli, Manikonda, and Financial District for tech parks and corporate offices.",
   },
   {
-    title: "Education",
-    details: "Universities and colleges around Kukatpally and Miyapur, with straightforward commutes by metro or cab.",
+    title: "Transport hubs",
+    details: "Close to Raidurg and Miyapur with excellent connectivity via metro and road networks.",
   },
   {
-    title: "Leisure",
-    details: "Shopping streets, malls, and cinemas across KPHB, Miyapur, and Kukatpally for entertainment.",
+    title: "Premium localities",
+    details: "Located in a prime area with easy access to Hitech City and Financial District.",
   },
 ];
 
