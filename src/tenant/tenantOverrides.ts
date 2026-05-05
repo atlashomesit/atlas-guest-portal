@@ -313,3 +313,26 @@ export function getTenantOverrides(slug?: string | null): TenantOverrides {
 
   return EMPTY_OVERRIDES;
 }
+
+/**
+ * RA-006 §3.5/§3.6: should we hide Atlas-Homes brand strings (footer brand,
+ * social links, "Atlas Homes" badges) for the current tenant?
+ *
+ * Resolution order:
+ *   1. Per-slug override (`hideAtlasHomesBranding`) wins if set explicitly to true/false.
+ *   2. Otherwise default to *hidden* unless the tenant is the marketplace root
+ *      (atlas itself), so any new tenant subdomain gets white-label by default
+ *      without an engineer adding a TENANT_OVERRIDES entry.
+ *
+ * `tenantHint` accepts the minimum shape we need (slug + isMarketplaceRoot) so
+ * callers don't need to import the full TenantInfo type.
+ */
+export function shouldHideAtlasBranding(
+  tenantHint: { slug?: string | null; isMarketplaceRoot?: boolean | null } | null | undefined,
+  overrides: TenantOverrides,
+): boolean {
+  if (overrides.hideAtlasHomesBranding === true) return true;
+  if (overrides.hideAtlasHomesBranding === false) return false;
+  // Default: only the Atlas marketplace root keeps Atlas branding.
+  return !tenantHint?.isMarketplaceRoot;
+}

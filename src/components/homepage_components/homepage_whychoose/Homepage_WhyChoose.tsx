@@ -42,7 +42,8 @@ const getFeatureData = (brandName: string) => ({
 
 const Homepage_WhyChoose = () => {
     const tenant = getTenantContext();
-    const brandName = tenant?.name ?? "Atlas Homes";
+    // RA-006 §3.6: brand-neutral fallback so unresolved tenant context doesn't leak Atlas.
+    const brandName = tenant?.name ?? "Our Homestays";
     const featureData = getFeatureData(brandName);
 
     const [activeFeature, setActiveFeature] = useState(0);

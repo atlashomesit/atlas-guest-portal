@@ -21,7 +21,8 @@ const initialsFromName = (name: string) => {
 
 const Homepage_Testimonial = () => {
     // RA-006: substitute tenant brand into placeholder testimonial copy.
-    const brandName = getTenantContext()?.name?.trim() || "Atlas Homes";
+    // Brand-neutral fallback: don't leak "Atlas Homes" if tenant context hasn't resolved.
+    const brandName = getTenantContext()?.name?.trim() || "Our Homestays";
     const sub = (s: string) => s.replace(/Atlas Homes/g, brandName);
     const data: Review[] = [
         {

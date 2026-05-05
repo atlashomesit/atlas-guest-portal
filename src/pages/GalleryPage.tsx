@@ -5,7 +5,7 @@ import { LOGO_URL } from "../config/branding";
 import { useTenantListings } from "../hooks/useTenantListings";
 import { filterGuestImageUrls, sanitizeGuestImageUrl } from "../utils/guestImageUrl";
 import { getTenantContext } from "../tenant/tenantContext";
-import { getTenantOverrides } from "../tenant/tenantOverrides";
+import { getTenantOverrides, shouldHideAtlasBranding } from "../tenant/tenantOverrides";
 
 interface GalleryItem {
   propertyId: number;
@@ -27,6 +27,7 @@ const GalleryPage = () => {
   const { properties } = useTenantListings();
   const tenant = getTenantContext();
   const tenantOverrides = getTenantOverrides(tenant?.slug);
+  const hideAtlasBranding = shouldHideAtlasBranding(tenant, tenantOverrides);
   const [activeSegment, setActiveSegment] = useState<string>("all");
   const [propertyFilter, setPropertyFilter] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState<string>("");
@@ -89,12 +90,12 @@ const GalleryPage = () => {
     <div className="px-4 md:px-10 lg:px-20 py-24 bg-bg-muted min-h-screen">
       <SEO
         title={
-          tenantOverrides.hideAtlasHomesBranding && tenant?.name?.trim()
+          hideAtlasBranding && tenant?.name?.trim()
             ? `Gallery | ${tenant.name.trim()}`
             : "Gallery | Atlas Homestays"
         }
         description={
-          tenantOverrides.hideAtlasHomesBranding && tenant?.name?.trim()
+          hideAtlasBranding && tenant?.name?.trim()
             ? `Browse property photos for ${tenant.name.trim()}.`
             : "Browse Atlas Homestays property photos, grouped by floor and suite type."
         }
@@ -102,7 +103,7 @@ const GalleryPage = () => {
 
       <div className="max-w-6xl mx-auto space-y-10">
         <div className="space-y-3 text-center md:text-left">
-          {tenantOverrides.hideAtlasHomesBranding ? (
+          {hideAtlasBranding ? (
             tenant?.name?.trim() ? (
               <p className="uppercase tracking-[0.2em] text-primary font-semibold">{tenant.name.trim()}</p>
             ) : null

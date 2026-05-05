@@ -22,10 +22,10 @@ exports[`Homepage UX wrappers (default path) > renders the default secondary ban
       <h2
         data-testid="parallax-title"
       >
-        Atlas Homes – Where Every Stay Feels Like Home
+        Our Homestays – Where Every Stay Feels Like Home
       </h2>
       <p>
-        At Atlas Homes, every detail is designed for your comfort. Relax in beautifully appointed spaces, enjoy modern amenities, and make every moment unforgettable.
+        At Our Homestays, every detail is designed for your comfort. Relax in beautifully appointed spaces, enjoy modern amenities, and make every moment unforgettable.
       </p>
     </div>
   </div>

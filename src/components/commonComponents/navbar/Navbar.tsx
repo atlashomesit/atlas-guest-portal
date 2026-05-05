@@ -7,7 +7,7 @@ import { Loader } from 'lucide-react';
 import { primaryNav, ctaNav } from '../../../config/navigation';
 import { LOGO_URL } from '../../../config/branding';
 import { getTenantContext } from '../../../tenant/tenantContext';
-import { getTenantOverrides, getUnitNoun } from '../../../tenant/tenantOverrides';
+import { getTenantOverrides, getUnitNoun, shouldHideAtlasBranding } from '../../../tenant/tenantOverrides';
 import { formatDisplayNumber, getTelLink } from '../../../config/contact';
 import { trackEvent } from '../../../utils/analytics';
 import { getFavoriteIds } from '../../../utils/guestHistory';
@@ -18,10 +18,12 @@ import CurrencySelector from '../../CurrencySelector';
 const Navbar = () => {
   const tenant = getTenantContext();
   const overrides = getTenantOverrides(tenant?.slug);
+  const hideAtlasBranding = shouldHideAtlasBranding(tenant, overrides);
   const logoSrc = tenant?.logoUrl ?? LOGO_URL;
-  const brandName = overrides.hideAtlasHomesBranding
+  // RA-006 §3.5: prefer tenant name everywhere; only fall back to "Home" on the Atlas root.
+  const brandName = hideAtlasBranding
     ? (tenant?.name?.trim() ?? '')
-    : (getTenantContext()?.name ?? 'Home');
+    : (tenant?.name ?? 'Home');
   const showLogo = !overrides.hideLogo;
   const showListProperty = !overrides.hideListProperty;
   const unitNoun = getUnitNoun(overrides);

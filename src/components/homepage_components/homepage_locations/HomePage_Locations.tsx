@@ -16,7 +16,7 @@ import { useTenantListings, type TenantPropertyRecord } from "../../../hooks/use
 import { filterGuestImageUrls, sanitizeGuestImageUrl } from "../../../utils/guestImageUrl";
 import { compareAtlasHomesBuildingOrder } from "../../../utils/atlasHomesBuildingOrder";
 import { getTenantContext } from "../../../tenant/tenantContext";
-import { getTenantOverrides, getUnitNoun, type TenantOverrides } from "../../../tenant/tenantOverrides";
+import { getTenantOverrides, getUnitNoun, shouldHideAtlasBranding, type TenantOverrides } from "../../../tenant/tenantOverrides";
 import { useCurrency } from "../../../contexts/CurrencyContext";
 
 import "./homepage_location.css";
@@ -124,6 +124,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
   const navigate = useNavigate();
   const tenant = getTenantContext();
   const tenantOverrides = getTenantOverrides(tenant?.slug);
+  const hideAtlasBranding = shouldHideAtlasBranding(tenant, tenantOverrides);
   const unitNoun = getUnitNoun(tenantOverrides);
   const { format: formatCurrency } = useCurrency();
   const { checkIn, checkOut, guests, searchString } = useSearchSelections(location.search);
@@ -429,7 +430,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
                 </span>
               </div>
               <div>
-                {!tenantOverrides.hideAtlasHomesBranding && (
+                {!hideAtlasBranding && (
                   <p className="text-sm font-semibold uppercase tracking-wide text-text-muted">Atlas Homes</p>
                 )}
                 <h3 className="text-3xl font-bold text-text-primary">{heroModel.listing.title}</h3>
@@ -552,7 +553,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
 
                   <div className="p-4 flex flex-col gap-3 flex-1">
                     <div>
-                      {!tenantOverrides.hideAtlasHomesBranding && (
+                      {!hideAtlasBranding && (
                         <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">Atlas Homes</p>
                       )}
                       <h3 className="text-lg font-semibold text-text-primary">{model.listing.title}</h3>

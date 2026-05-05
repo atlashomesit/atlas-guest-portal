@@ -7,7 +7,7 @@ import { Link } from 'react-router-dom';
 import { helpNav, moreNav, primaryNav } from '../../../config/navigation';
 import { LOGO_URL } from '../../../config/branding';
 import { getTenantContext } from '../../../tenant/tenantContext';
-import { getTenantOverrides } from '../../../tenant/tenantOverrides';
+import { getTenantOverrides, shouldHideAtlasBranding } from '../../../tenant/tenantOverrides';
 import { CompactThemeSwitcher } from '../../ui/CompactThemeSwitcher';
 import { formatDisplayNumber, getContactEmail, getTelLink, getWhatsAppLink, getContactPhone, getWhatsAppPhone } from '../../../config/contact';
 
@@ -33,12 +33,17 @@ const socialLabelByIcon: Record<string, string> = {
 const Footer = () => {
     const tenant = getTenantContext();
     const overrides = getTenantOverrides(tenant?.slug);
+    const hideAtlasBranding = shouldHideAtlasBranding(tenant, overrides);
     const logoSrc = overrides.hideLogo ? "" : (tenant?.logoUrl ?? LOGO_URL);
     const showLogo = Boolean(logoSrc);
-    const footerBrand = overrides.hideAtlasHomesBranding ? (tenant?.name?.trim() || "Guest stays") : "Atlas Homes";
-    const footerTagline = overrides.hideAtlasHomesBranding
+    // RA-006 §3.5: footer brand always prefers the tenant's own name. Atlas-specific
+    // copy is reached only on the Atlas marketplace root where hideAtlasBranding=false.
+    const footerBrand = hideAtlasBranding
+        ? (tenant?.name?.trim() || "Our homestays")
+        : (tenant?.name?.trim() || "Atlas Homes");
+    const footerTagline = hideAtlasBranding
         ? (tenant?.tagline?.trim() || "Comfortable stays with responsive support.")
-        : "Thoughtfully curated stays in Hyderabad";
+        : (tenant?.tagline?.trim() || "Thoughtfully curated stays in Hyderabad");
     const year = new Date().getFullYear();
 
     const socialLinks = Array.isArray(footerData?.socialLinks) ? footerData.socialLinks : [];
@@ -110,7 +115,7 @@ const Footer = () => {
                         </span>
                     )}
                     {/* RA-006: white-label tenants must not show Atlas's social profiles. */}
-                    {!overrides.hideAtlasHomesBranding && (
+                    {!hideAtlasBranding && (
                         <div className='flex text-lg gap-6 text-[color:var(--footer-link)]'>
                             {socialLinks.map(({ icon, link }, index) => {
                                 const IconComponent = iconMap[icon];
