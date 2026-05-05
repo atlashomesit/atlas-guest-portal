@@ -24,16 +24,12 @@ export default defineConfig({
     },
     globals: true,
     testTimeout: 120000, // 2 minutes for heavy property tests
-    // Optimize memory usage in CI environments — single-threaded execution
-    pool: "threads",
-    poolOptions: {
-      threads: {
-        maxThreads: process.env.CI ? 2 : 4,
-        minThreads: 1,
-        isolate: true,
-        singleThread: false,
-      },
-    },
+    // Windows: release gate runs API/admin/guest Vitest in parallel — avoid thread-pool startup timeouts (Vitest 4: maxWorkers).
+    ...(process.platform === "win32"
+      ? { maxWorkers: 1 }
+      : process.env.CI
+        ? { maxWorkers: 2 }
+        : {}),
     isolate: true,
     hookTimeout: 60000,
     // Heavy route smokes: full App / lazy imports exhaust Vitest worker heap on Windows
