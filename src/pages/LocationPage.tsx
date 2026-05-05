@@ -33,6 +33,7 @@ declare global {
   }
 }
 
+/* Starguest House location coordinates only */
 const MAP_LOCATION = { lat: 17.467607975653657, lng: 78.36671473489571 } as const;
 const MAP_SCRIPT_ID = "atlas-homestays-google-maps-script";
 const FALLBACK_STATIC_MAP_URL = "/images/atlas-homestays-static-map.svg";
