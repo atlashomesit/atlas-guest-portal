@@ -215,9 +215,6 @@ const LocationPage = () => {
 
       <div className="max-w-6xl mx-auto space-y-12">
         <header className="space-y-3 text-center">
-          <Typography variant="subtitle" className="uppercase tracking-[0.2em] text-primary font-semibold">
-            Starguest House
-          </Typography>
           <Typography as="h1" variant="h1" className="text-text-primary">
             Location & Neighborhood
           </Typography>
