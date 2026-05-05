@@ -41,7 +41,7 @@ export const CompactThemeSwitcher: React.FC = () => {
         id="footer-theme-select"
         value={selectedTheme}
         onChange={(e) => handleThemeChange(e.target.value as ThemeName | typeof AUTO_THEME_KEY)}
-        className="bg-transparent border-subtle)] rounded px-2 py-1 text-sm text-[var(--footer-link)] hover:text-[var(--footer-link-hover)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] cursor-pointer transition-colors"
+        className="bg-transparent border border-[var(--border-subtle)] rounded px-2 py-1 text-sm text-[var(--footer-link)] hover:text-[var(--footer-link-hover)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] cursor-pointer transition-colors"
         aria-label="Select theme"
       >
         <option value="auto" className="bg-[var(--footer-bg)] text-[var(--footer-text)]">Auto</option>

@@ -72,13 +72,13 @@ const ChatbotPlaceholder = ({
           </div>
         </div>
         <div className="flex flex-col gap-2">
-          <div className="rounded-xl bg-transparent p-[var(--drawer-card-padding-block,0.75rem)] text-sm text-text-muted shadow-level1">
+          <div className="rounded-xl bg-bg-surface p-[var(--drawer-card-padding-block,0.75rem)] text-sm text-text-muted shadow-level1">
             {SUPPORT_DRAWER_COPY.chatbot.placeholder.openingLine}
           </div>
           <textarea
             rows={2}
             disabled
-            className="w-full resize-none rounded-xl bg-bg-muted p-[var(--drawer-card-padding-block,0.75rem)] text-sm text-text-muted outline-none"
+            className="w-full resize-none rounded-xl border border-border-subtle bg-bg-muted p-[var(--drawer-card-padding-block,0.75rem)] text-sm text-text-muted outline-none"
             placeholder={SUPPORT_DRAWER_COPY.chatbot.placeholder.inputPlaceholder}
           />
         </div>

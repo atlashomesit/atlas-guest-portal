@@ -46,7 +46,7 @@ const ShortLinkRedirect = () => {
     if (!normalizedCode || !targetUrl) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-bg-muted px-6">
-                <div className="max-w-md w-full bg-transparent shadow-level2 rounded-lg p-8 text-center">
+                <div className="max-w-md w-full bg-bg-surface shadow-level2 rounded-lg p-8 text-center">
                     <h1 className="text-2xl font-semibold text-text-primary mb-4">Link not found</h1>
                     <p className="text-text-muted mb-6">
                         We couldn't find the short link you're looking for. Please return to the homepage and try again.
@@ -66,9 +66,9 @@ const ShortLinkRedirect = () => {
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-bg-muted px-6">
-            <div className="max-w-md w-full bg-transparent shadow-level2 rounded-lg p-8 text-center space-y-4">
+            <div className="max-w-md w-full bg-bg-surface shadow-level2 rounded-lg p-8 text-center space-y-4">
                 <div className="flex justify-center">
-                    <div className="h-12 w-12 rounded-full border-4 border-t-primary animate-spin" aria-hidden="true" />
+                    <div className="h-12 w-12 rounded-full border-4 border-border-subtle border-t-primary animate-spin" aria-hidden="true" />
                 </div>
                 <h1 className="text-2xl font-semibold text-text-primary">Taking you to Atlas Homes {label}…</h1>
                 <p className="text-text-muted break-words">{targetUrl}</p>

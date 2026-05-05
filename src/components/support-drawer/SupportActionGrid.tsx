@@ -24,7 +24,7 @@ interface SupportActionGridProps {
 }
 
 const ACTION_STYLES =
-  "flex items-center gap-[var(--drawer-section-gap,0.75rem)] rounded-2xl bg-transparent px-3 py-2 text-left text-sm font-semibold shadow-level1 transition hover:-translate-y-0.5 hover:border-accent-primary hover:bg-[color-mix(in_srgb,var(--cta-primary)_10%,transparent)]
+  "flex items-center gap-[var(--drawer-section-gap,0.75rem)] rounded-2xl border border-border-subtle bg-bg-surface px-3 py-2 text-left text-sm font-semibold shadow-level1 transition hover:-translate-y-0.5 hover:border-accent-primary hover:bg-[color-mix(in_srgb,var(--cta-primary)_10%,transparent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary";
 
 const SupportActionGrid = ({
   contactPhone,
@@ -160,7 +160,7 @@ const SupportActionGrid = ({
       <div className="flex flex-col gap-2">{primaryIds.map(renderAction)}</div>
 
       {renderSecondary ? (
-        <div className="rounded-2xl bg-bg-muted/60 p-2">
+        <div className="rounded-2xl border border-border-subtle bg-bg-muted/60 p-2">
           <p className="px-1 pb-1 text-[13px] font-medium text-text-muted">
             {shouldApplyHierarchy
               ? SUPPORT_DRAWER_COPY.actions.secondaryHeader.hierarchy
@@ -171,7 +171,7 @@ const SupportActionGrid = ({
       ) : null}
 
       {renderTertiary ? (
-        <div className="rounded-2xl bg-[color-mix(in_srgb,var(--bg-muted)_50%,transparent)] p-2">
+        <div className="rounded-2xl border border-border-subtle bg-[color-mix(in_srgb,var(--bg-muted)_50%,transparent)] p-2">
           <p className="px-1 pb-1 text-[13px] font-medium text-text-muted">
             {SUPPORT_DRAWER_COPY.actions.tertiaryHeader}
           </p>

@@ -7,8 +7,8 @@
 .card {
   position: relative;
   overflow: hidden;
-  
-  
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
   display: flex;
   flex-direction: column;
 }

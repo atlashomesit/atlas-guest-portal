@@ -87,7 +87,7 @@ export default function SearchResultsMap({ units, formatPrice, querySuffix }: Se
         </p>
       ) : null}
       <div
-        className="relative z-0 min-h-[50vh] w-full overflow-hidden rounded-2xl md:min-h-[60vh]"
+        className="relative z-0 min-h-[50vh] w-full overflow-hidden rounded-2xl border border-border-subtle md:min-h-[60vh]"
         style={{ height: "min(60vh, 520px)" }}
       >
         <MapContainer

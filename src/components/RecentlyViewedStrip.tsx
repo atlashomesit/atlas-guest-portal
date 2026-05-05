@@ -30,7 +30,7 @@ export default function RecentlyViewedStrip() {
 
   return (
     <section
-      className="rounded-2xl bg-transparent px-3 py-4 shadow-sm"
+      className="rounded-2xl border border-border-subtle bg-bg-surface px-3 py-4 shadow-sm"
       data-testid="recently-viewed-strip"
       aria-label="Recently viewed"
     >
@@ -52,7 +52,7 @@ export default function RecentlyViewedStrip() {
           >
             <Link
               to={it.path}
-              className="flex flex-col overflow-hidden rounded-xl bg-bg-muted transition hover:border-cta-primary"
+              className="flex flex-col overflow-hidden rounded-xl border border-border-subtle bg-bg-muted transition hover:border-cta-primary"
             >
               <div className="aspect-[4/3] w-full bg-bg-muted">
                 {it.coverPhotoUrl ? (

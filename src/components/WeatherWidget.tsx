@@ -89,13 +89,13 @@ export default function WeatherWidget({ lat, lng, fromDate, toDate }: Props) {
   if (failed || days === null) return null;
 
   return (
-    <div className="rounded-2xl bg-transparent p-5 space-y-3" data-testid="weather-widget">
+    <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3" data-testid="weather-widget">
       <h2 className="text-sm font-semibold text-text-primary">Weather at check-in</h2>
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
         {days.map((day) => (
           <div
             key={day.date}
-            className="flex flex-col items-center gap-1 min-w-[72px] rounded-xl bg-bg-page px-2 py-3 text-center flex-shrink-0"
+            className="flex flex-col items-center gap-1 min-w-[72px] rounded-xl border border-border-subtle bg-bg-page px-2 py-3 text-center flex-shrink-0"
           >
             <span className="text-2xl leading-none" title={weatherLabel(day.weatherCode)}>
               {weatherEmoji(day.weatherCode)}

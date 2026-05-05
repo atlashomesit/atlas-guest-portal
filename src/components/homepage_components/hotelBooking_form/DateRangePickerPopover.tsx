@@ -168,15 +168,15 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
         tabIndex={-1}
         className={`booking-calendar-popover${popoverClassName ? ` ${popoverClassName}` : ''} ${
           isMobile
-            ? 'fixed inset-x-0 bottom-0 z-[95] max-h-[80vh] rounded-t-[32px] border-subtle)] bg-transparent shadow-[0_32px_96px_rgba(15,23,42,0.12),0_16px_48px_rgba(15,23,42,0.08)]'
-            : 'absolute z-[95] rounded-[20px] border-subtle)] bg-transparent shadow-[0_32px_96px_rgba(15,23,42,0.12),0_16px_48px_rgba(15,23,42,0.08)]'
+            ? 'fixed inset-x-0 bottom-0 z-[95] max-h-[80vh] rounded-t-[32px] border border-[var(--border-subtle)] bg-[var(--bg-surface)] shadow-[0_32px_96px_rgba(15,23,42,0.12),0_16px_48px_rgba(15,23,42,0.08)]'
+            : 'absolute z-[95] rounded-[20px] border border-[var(--border-subtle)] bg-[var(--bg-surface)] shadow-[0_32px_96px_rgba(15,23,42,0.12),0_16px_48px_rgba(15,23,42,0.08)]'
         }`}
         style={desktopStyles}
         onClick={(event) => event.stopPropagation()}
       >
         {!isMobile && (
           <div
-            className="pointer-events-none absolute -top-2 h-4 w-4 rotate-45 border-subtle)] border-b-transparent border-r-transparent bg-transparent"
+            className="pointer-events-none absolute -top-2 h-4 w-4 rotate-45 border border-[var(--border-subtle)] border-b-transparent border-r-transparent bg-[var(--bg-surface)]"
             style={{ left: position.caretLeft - 8 }}
             aria-hidden
           />
@@ -188,13 +188,13 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
           </div>
         )}
 
-        <div className="flex items-center justify-between px-6 py-5 border-b border-[var(--bg-muted)] bg-transparent">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-[var(--bg-muted)] bg-[var(--bg-surface)]">
           <div className="flex items-center gap-2">
             <p id={labelId} className="text-[17px] font-semibold text-[var(--text-primary)]">
               {heading}
             </p>
             <span
-              className="inline-flex h-5 w-5 items-center justify-center rounded-full border-subtle)] text-[11px] font-semibold text-[var(--text-muted)]"
+              className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-[var(--border-subtle)] text-[11px] font-semibold text-[var(--text-muted)]"
               title="Click a date for check-in, then a later date for check-out."
               aria-label={instructionAriaLabel ?? 'Click a date for check-in, then a later date for check-out.'}
             >
@@ -211,7 +211,7 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
               type="button"
               onClick={onClose}
               aria-label="Close date picker"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border-subtle)] bg-transparent text-lg font-semibold text-[var(--text-primary)] shadow-sm"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-lg font-semibold text-[var(--text-primary)] shadow-sm"
             >
               ×
             </button>

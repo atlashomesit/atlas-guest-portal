@@ -124,11 +124,11 @@ export default function GuestAssistant({ listingId }: GuestAssistantProps) {
             // On mobile clear the reserve bar (~56 px); on md+ use standard 20 px gap
             'bottom-[4.5rem] md:bottom-5',
             'inline-flex items-center gap-2 rounded-full',
-            'border bg-transparent px-3.5 py-2.5',
+            'border border-border-subtle bg-bg-surface px-3.5 py-2.5',
             'text-sm font-semibold text-text-primary',
             'shadow-level3 ring-1 ring-border-subtle',
             'transition hover:-translate-y-0.5 hover:shadow-level4',
-            'focus-visible:outline
+            'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary',
           ].join(' ')}
         >
           <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--cta-primary)_12%,transparent)] text-accent-primary">
@@ -155,7 +155,7 @@ export default function GuestAssistant({ listingId }: GuestAssistantProps) {
             aria-label="Listing FAQ"
             className={[
               'fixed bottom-0 left-0 right-0 z-[calc(var(--z-floating)+2)]',
-              'flex flex-col bg-transparent',
+              'flex flex-col bg-bg-surface',
               'rounded-t-2xl shadow-level4',
               'max-h-[75vh]',
               'md:left-auto md:right-4 md:bottom-4 md:w-96',
@@ -163,7 +163,7 @@ export default function GuestAssistant({ listingId }: GuestAssistantProps) {
             ].join(' ')}
           >
             {/* Header */}
-            <div className="flex items-center justify-between gap-3 px-4 pt-4 pb-3 border-b">
+            <div className="flex items-center justify-between gap-3 px-4 pt-4 pb-3 border-b border-border-subtle">
               <div className="min-w-0">
                 <h2 className="text-base font-semibold text-text-primary leading-tight">
                   Questions &amp; Answers
@@ -178,7 +178,7 @@ export default function GuestAssistant({ listingId }: GuestAssistantProps) {
               </div>
               <button
                 type="button"
-                className="flex-shrink-0 rounded-full p-1.5 text-text-muted hover:bg-bg-subtle
+                className="flex-shrink-0 rounded-full p-1.5 text-text-muted hover:bg-bg-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-cta-primary"
                 onClick={() => setIsOpen(false)}
                 aria-label="Close FAQ panel"
               >
@@ -188,7 +188,7 @@ export default function GuestAssistant({ listingId }: GuestAssistantProps) {
 
             {/* Search bar */}
             {faqs.length > 0 && (
-              <div className="px-4 py-2.5 border-b">
+              <div className="px-4 py-2.5 border-b border-border-subtle">
                 <input
                   ref={inputRef}
                   type="search"
@@ -197,7 +197,7 @@ export default function GuestAssistant({ listingId }: GuestAssistantProps) {
                   placeholder="Search questions…"
                   aria-label="Search FAQs"
                   className={[
-                    'w-full rounded-lg',
+                    'w-full rounded-lg border border-border-subtle',
                     'bg-bg-subtle px-3 py-2 text-sm text-text-primary',
                     'placeholder:text-text-muted',
                     'focus:outline-none focus:ring-2 focus:ring-cta-primary',
@@ -213,7 +213,7 @@ export default function GuestAssistant({ listingId }: GuestAssistantProps) {
                   <div
                     aria-label="Loading FAQs"
                     role="status"
-                    className="h-6 w-6 rounded-full border-2 border-t-cta-primary animate-spin"
+                    className="h-6 w-6 rounded-full border-2 border-border-subtle border-t-cta-primary animate-spin"
                   />
                 </div>
               )}
@@ -242,7 +242,7 @@ export default function GuestAssistant({ listingId }: GuestAssistantProps) {
                         <p className="text-xs text-text-muted animate-pulse">Getting AI answer…</p>
                       )}
                       {aiReply && (
-                        <div className="mt-2 rounded-xl bg-bg-subtle p-3 text-left text-sm text-text-secondary">
+                        <div className="mt-2 rounded-xl border border-border-subtle bg-bg-subtle p-3 text-left text-sm text-text-secondary">
                           <p className="text-[10px] font-semibold uppercase tracking-wide text-text-muted mb-1">AI answer</p>
                           {aiReply}
                         </div>
@@ -257,13 +257,13 @@ export default function GuestAssistant({ listingId }: GuestAssistantProps) {
                 filtered.map((entry, i) => (
                   <div
                     key={i}
-                    className="rounded-xl overflow-hidden"
+                    className="rounded-xl border border-border-subtle overflow-hidden"
                   >
                     <button
                       type="button"
                       onClick={() => handleToggle(i)}
                       aria-expanded={expandedIdx === i}
-                      className="flex w-full items-start justify-between gap-3 px-3.5 py-3 text-left text-sm font-medium text-text-primary hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cta-primary"
+                      className="flex w-full items-start justify-between gap-3 px-3.5 py-3 text-left text-sm font-medium text-text-primary hover:bg-bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cta-primary"
                     >
                       <span className="flex-1 leading-snug">{entry.q}</span>
                       {expandedIdx === i ? (
@@ -282,7 +282,7 @@ export default function GuestAssistant({ listingId }: GuestAssistantProps) {
                     </button>
 
                     {expandedIdx === i && (
-                      <div className="px-3.5 pb-3 pt-2.5 text-sm text-text-secondary leading-relaxed border-t bg-bg-subtle">
+                      <div className="px-3.5 pb-3 pt-2.5 text-sm text-text-secondary leading-relaxed border-t border-border-subtle bg-bg-subtle">
                         {entry.a}
                       </div>
                     )}
@@ -291,7 +291,7 @@ export default function GuestAssistant({ listingId }: GuestAssistantProps) {
             </div>
 
             {/* Footer */}
-            <div className="px-4 py-2 border-t bg-bg-subtle rounded-b-2xl md:rounded-b-2xl">
+            <div className="px-4 py-2 border-t border-border-subtle bg-bg-subtle rounded-b-2xl md:rounded-b-2xl">
               <p className="text-[10px] text-text-muted text-center">
                 Keyword search · AI answers available
               </p>

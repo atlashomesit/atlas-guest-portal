@@ -58,7 +58,7 @@ const CookieConsentBanner = () => {
       aria-describedby="cookie-consent-desc"
       className="fixed inset-x-0 bottom-0 z-[9999] px-4 pb-4 md:pb-6"
     >
-      <div className="max-w-3xl mx-auto bg-transparent rounded-2xl shadow-level2 p-5 md:p-6">
+      <div className="max-w-3xl mx-auto bg-bg-surface border border-border-subtle rounded-2xl shadow-level2 p-5 md:p-6">
         <div className="flex flex-col md:flex-row md:items-center gap-4">
           <div className="flex-1 space-y-1">
             <h2 id="cookie-consent-title" className="text-base md:text-lg font-bold text-text-primary">
@@ -76,7 +76,7 @@ const CookieConsentBanner = () => {
             <button
               type="button"
               onClick={onReject}
-              className="px-4 py-4 rounded-xl text-text-primary font-semibold hover:border-primary flex-1 md:flex-none"
+              className="px-4 py-4 rounded-xl border border-border-subtle text-text-primary font-semibold hover:border-primary flex-1 md:flex-none"
             >
               Reject non-essential
             </button>

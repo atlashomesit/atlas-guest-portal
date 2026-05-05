@@ -140,7 +140,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
 
   return (
     <article
-      className="group flex flex-col overflow-hidden rounded-2xl bg-transparent transition duration-200 md:hover:-translate-y-1 md:"
+      className="group flex flex-col overflow-hidden rounded-2xl border border-border-subtle bg-bg-surface transition duration-200 md:hover:-translate-y-1 md:"
       role="button"
       tabIndex={0}
       onClick={onClick}
@@ -276,16 +276,16 @@ const ListingCard: React.FC<ListingCardProps> = ({
             <div className="flex flex-wrap gap-2">
               <div className="w-full rounded-xl bg-[color:color-mix(in_srgb,var(--bg-muted)_55%,var(--bg-surface))] px-3 py-2 text-xs font-semibold text-text-primary">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="inline-flex items-center gap-1 rounded-full bg-transparent px-2 py-1">No hidden fees</span>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-transparent px-2 py-1">Secure Razorpay payments</span>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-transparent px-2 py-1">Avg. rating {ratingSnippet}</span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-bg-surface px-2 py-1">No hidden fees</span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-bg-surface px-2 py-1">Secure Razorpay payments</span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-bg-surface px-2 py-1">Avg. rating {ratingSnippet}</span>
                   {/* TASK-1705: Owner-share trust badge */}
                   <OwnerShareBadge nightlyPrice={finalPrice} />
                 </div>
               </div>
               <button
                 type="button"
-                className="inline-flex flex-1 items-center justify-center rounded-full bg-[color:var(--brand)] px-4 py-4 text-sm font-semibold text-[color:var(--text-contrast)] transition duration-150 hover:-translate-y-0.5 
+                className="inline-flex flex-1 items-center justify-center rounded-full bg-[color:var(--brand)] px-4 py-4 text-sm font-semibold text-[color:var(--text-contrast)] transition duration-150 hover:-translate-y-0.5  focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brand)]"
                 onClick={(event) => {
                   event.stopPropagation();
                   onClick?.();

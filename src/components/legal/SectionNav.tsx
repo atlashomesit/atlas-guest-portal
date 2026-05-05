@@ -8,7 +8,7 @@ const SectionNav = ({ sections }: SectionNavProps) => {
   return (
     <nav
       aria-label="Section navigation"
-      className="sticky top-24 bg-transparent rounded-xl p-4 shadow-sm h-fit z-[var(--z-sticky)]"
+      className="sticky top-24 bg-bg-surface border border-border-subtle rounded-xl p-4 shadow-sm h-fit z-[var(--z-sticky)]"
     >
       <p className="text-sm font-semibold text-text-primary mb-3">Jump to section</p>
       <ul className="space-y-2 text-sm">

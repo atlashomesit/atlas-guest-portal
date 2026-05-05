@@ -88,8 +88,8 @@ const Homepage_LocationDetails = () => {
             <section className="relative flex justify-center items-center px-4 lg:px-14 py-8 pb-10 md:pb-20">
                 <div className=" flex flex-col gap-5  md:flex-row items-start">
                     {/* filters Left side  */}
-                    <div className="flex-[1] md:sticky md:top-14 bg-transparent shadow-level1 rounded-md p-4 h-fit text-text-primary">
-                        <h2 className="text-lg font-semibold mb-4 border-b pb-2">Filter by:</h2>
+                    <div className="flex-[1] md:sticky md:top-14 bg-bg-surface shadow-level1 rounded-md p-4 h-fit border border-border-subtle text-text-primary">
+                        <h2 className="text-lg font-semibold mb-4 border-b border-border-subtle pb-2">Filter by:</h2>
 
                         {/* Price per night */}
                         <div className="mb-6">
@@ -208,7 +208,7 @@ const Homepage_LocationDetails = () => {
                             return (
                             <div
                                 key={data.id}
-                                className="group w-full flex flex-col md:flex-row gap-4 bg-transparent p-4 hover:border-cta-primary rounded-md shadow-level1 transition"
+                                className="group w-full flex flex-col md:flex-row gap-4 bg-bg-surface p-4 border border-border-subtle hover:border-cta-primary rounded-md shadow-level1 transition"
                             >
                                 {/* Left: Image Slider */}
                                 <div className="relative w-full md:w-2/5 h-60 rounded-md overflow-hidden">

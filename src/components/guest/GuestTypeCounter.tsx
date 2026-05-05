@@ -28,7 +28,7 @@ export const GuestTypeCounter: React.FC<GuestTypeCounterProps> = ({
   const canIncrement = value < max && !disabled;
 
   return (
-    <div className="flex items-center justify-between py-4 border-b last:border-b-0">
+    <div className="flex items-center justify-between py-4 border-b border-border-subtle last:border-b-0">
       <div className="flex-1">
         <div className="flex items-baseline gap-2">
           <span className="text-base font-semibold text-text-primary">{label}</span>
@@ -46,7 +46,7 @@ export const GuestTypeCounter: React.FC<GuestTypeCounterProps> = ({
           onClick={onDecrement}
           disabled={!canDecrement}
           aria-label={`Decrease ${label.toLowerCase()}`}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-transparent text-text-primary transition hover:border-cta-primary hover:bg-bg-muted disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-border-subtle disabled:hover:bg-bg-surface"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border-subtle bg-bg-surface text-text-primary transition hover:border-cta-primary hover:bg-bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-border-subtle disabled:hover:bg-bg-surface"
         >
           <Minus className="h-4 w-4" />
         </button>
@@ -58,7 +58,7 @@ export const GuestTypeCounter: React.FC<GuestTypeCounterProps> = ({
           onClick={onIncrement}
           disabled={!canIncrement}
           aria-label={`Increase ${label.toLowerCase()}`}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-transparent text-text-primary transition hover:border-cta-primary hover:bg-bg-muted disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-border-subtle disabled:hover:bg-bg-surface"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border-subtle bg-bg-surface text-text-primary transition hover:border-cta-primary hover:bg-bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-border-subtle disabled:hover:bg-bg-surface"
         >
           <Plus className="h-4 w-4" />
         </button>
