@@ -15,6 +15,7 @@ import SEO from "../../components/SEO";
 import { LOGO_URL } from "../../config/branding";
 import { sanitizeGuestImageUrl } from "../../utils/guestImageUrl";
 import { CONTACT, getContactEmail } from "../../config/contact";
+import { getTenantBrandName } from "../../tenant/displayBrand";
 import {
     enableFooterMiniCtaAboveFooter,
 } from "../../config/homepageUxFlags";
@@ -31,8 +32,8 @@ const Home = () => {
     const tenant = getTenantContext();
     const overrides = getTenantOverrides(tenant?.slug);
     const hideAtlasBranding = shouldHideAtlasBranding(tenant, overrides);
-    const schemaBrandName =
-        hideAtlasBranding && tenant?.name?.trim() ? tenant.name.trim() : "Starguest House";
+    /** CPO-001 / SEO: never emit a wrong hardcoded brand in JSON-LD — use resolved tenant or marketplace baseline. */
+    const schemaBrandName = getTenantBrandName();
     const schemaLogo = overrides.hideLogo ? undefined : sanitizeGuestImageUrl(tenant?.logoUrl) ?? LOGO_URL;
     const contactEmail = getContactEmail();
     const penthouse = propertyData.find((property) => property.id === 501);
