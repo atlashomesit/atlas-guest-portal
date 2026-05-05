@@ -123,8 +123,8 @@ function AppWrapper() {
       </a>
       {!shouldHideNavbar && <Navbar />}
       <ScrollToTop />
-      <ErrorBoundary name="router" key={`error-boundary-${location.pathname}`}>
-        <main id="main-content" tabIndex={-1} key={`main-${location.pathname}`}>
+      <ErrorBoundary name="router">
+        <main id="main-content" tabIndex={-1}>
         <Suspense fallback={<LazyFallback />} key={`suspense-${location.pathname}`}>
         <Routes key={location.pathname}>
           <Route
