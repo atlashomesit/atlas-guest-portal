@@ -38,7 +38,7 @@ export default function AvailabilityCalendar({ listingId, onDateSelect }: Props)
   const [calData, setCalData] = useState<Map<string, DayEntry['status']>>(new Map());
   const [loading, setLoading] = useState(true);
 
-  const { today, monthStart, monthEnd, fromStr, toStr } = useMemo(() => {
+  const { today, monthStart, fromStr, toStr } = useMemo(() => {
     const now = new Date();
     now.setHours(0, 0, 0, 0);
     const start = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -46,12 +46,12 @@ export default function AvailabilityCalendar({ listingId, onDateSelect }: Props)
     return {
       today: now,
       monthStart: start,
-      monthEnd: end,
       fromStr: formatYmd(start),
       toStr: formatYmd(end),
     };
   }, []);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!listingId) return;
     setLoading(true);
