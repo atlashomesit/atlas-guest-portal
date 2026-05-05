@@ -328,7 +328,7 @@ const PropertyDetails = () => {
     }, [directBookingNightly]);
 
     useEffect(() => {
-        const lookupId = data?.listingId ?? location.state?.property?.listingId ?? listingIdParam;
+        const lookupId = listingIdParam;
 
         if (!lookupId) {
             setListingPropertyId(null);
