@@ -1,4 +1,3 @@
-import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import 'react-date-range/dist/styles.css'
 import 'react-date-range/dist/theme/default.css'
@@ -105,15 +104,13 @@ const bootstrapApp = async () => {
     await new Promise(resolve => setTimeout(resolve, 100));
 
     root.render(
-      <StrictMode>
-        <ThemeProvider initialTheme={DEFAULT_THEME}>
-          <ErrorBoundary name="app-shell">
-            <ApiConfigGuard>
-              <App />
-            </ApiConfigGuard>
-          </ErrorBoundary>
-        </ThemeProvider>
-      </StrictMode>,
+      <ThemeProvider initialTheme={DEFAULT_THEME}>
+        <ErrorBoundary name="app-shell">
+          <ApiConfigGuard>
+            <App />
+          </ApiConfigGuard>
+        </ErrorBoundary>
+      </ThemeProvider>,
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Runtime config missing/invalid'

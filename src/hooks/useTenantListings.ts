@@ -30,8 +30,10 @@ export type TenantPropertyRecord = {
   property_policy_details?: { type: string; value: string }[];
   /** TASK-1360: ISO date of most recent checkout within 30 days (for social proof badge). */
   lastBookedAt?: string | null;
-  /** TASK-1649: discount rule percents from public listings API (0 when absent). */
+  /** TASK-1695: LOS auto-discount tiers from public listings API. */
+  losDiscountMinNights?: number | null;
   losDiscountPercent?: number | null;
+  losDiscount2MinNights?: number | null;
   losDiscount2Percent?: number | null;
   lastMinuteDiscountPercent?: number | null;
 };
@@ -91,13 +93,15 @@ const mapDtoToProperty = (dto: PublicListing, photosFromEndpoint: string[]): Ten
       `Comfortable stay for up to ${dto.maxGuests || local?.maxGuests || 2} guests.`,
     property_location: local?.property_location ?? dto.propertyAddress ?? "Hyderabad",
     property_neighborhoods: local?.property_neighborhoods ?? [],
-    property_reviews: local?.property_reviews ?? 0,
-    property_rating: local?.property_rating ?? dto.propertyRating ?? 0,
+    property_reviews: dto.reviewCount ?? local?.property_reviews ?? 0,
+    property_rating: dto.propertyRating ?? local?.property_rating ?? 0,
     property_img: photoUrls,
     property_amenities: local?.property_amenities ?? [],
     property_policy_details: local?.property_policy_details ?? [],
     lastBookedAt: dto.lastBookedAt ?? null, // TASK-1360
+    losDiscountMinNights: dto.losDiscountMinNights ?? null,
     losDiscountPercent: dto.losDiscountPercent ?? null,
+    losDiscount2MinNights: dto.losDiscount2MinNights ?? null,
     losDiscount2Percent: dto.losDiscount2Percent ?? null,
     lastMinuteDiscountPercent: dto.lastMinuteDiscountPercent ?? null,
   };

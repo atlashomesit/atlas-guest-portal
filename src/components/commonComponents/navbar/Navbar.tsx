@@ -21,7 +21,7 @@ const Navbar = () => {
   const logoSrc = tenant?.logoUrl ?? LOGO_URL;
   const brandName = overrides.hideAtlasHomesBranding
     ? (tenant?.name?.trim() ?? '')
-    : (tenant?.name ?? 'Atlas Homestays');
+    : (getTenantContext()?.name ?? 'Home');
   const showLogo = !overrides.hideLogo;
   const showListProperty = !overrides.hideListProperty;
 

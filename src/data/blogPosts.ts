@@ -1,3 +1,4 @@
+/* eslint-disable atlas-brand/no-atlas-string-leak -- TODO Task 16: replace with per-tenant content */
 export type BlogCategory = "guest-guides" | "hospitality-tech";
 
 export interface BlogPost {

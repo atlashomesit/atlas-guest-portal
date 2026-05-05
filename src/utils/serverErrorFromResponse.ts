@@ -36,6 +36,7 @@ export async function messageFromApiResponse(res: Response): Promise<string> {
 
   const fallback =
     res.status >= 500
+      // eslint-disable-next-line atlas-brand/no-atlas-string-leak -- TODO Task 16: per-tenant support email
       ? `Our servers hit an unexpected error (${res.status}). Try again or contact support@atlashomestays.com.`
       : `Request failed (HTTP ${res.status}). Please check your input and try again.`;
   return fallback;

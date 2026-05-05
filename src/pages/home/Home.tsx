@@ -1,3 +1,4 @@
+/* eslint-disable atlas-brand/no-atlas-string-leak -- TODO Task 16: replace with per-tenant content */
 import Slider from "../../components/homepage_components/slider/Slider";
 import HomePage_Locations from "../../components/homepage_components/homepage_locations/HomePage_Locations";
 import { useEffect, useMemo } from "react";

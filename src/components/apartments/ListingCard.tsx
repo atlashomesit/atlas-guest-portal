@@ -23,6 +23,14 @@ type ListingCardProps = {
   petFriendly: boolean;
   /** TASK-1360: ISO date of most recent checkout within 30 days for social-proof badge. */
   lastBookedAt?: string | null;
+  /** TASK-1695: LOS auto-discount tier 1 — minimum nights required. */
+  losDiscountMinNights?: number | null;
+  /** TASK-1695: LOS auto-discount tier 1 — discount percentage (0-100). */
+  losDiscountPercent?: number | null;
+  /** TASK-1695: LOS auto-discount tier 2 — minimum nights required. */
+  losDiscount2MinNights?: number | null;
+  /** TASK-1695: LOS auto-discount tier 2 — discount percentage (0-100). */
+  losDiscount2Percent?: number | null;
   onClick?: () => void;
 };
 
@@ -50,6 +58,10 @@ const ListingCard: React.FC<ListingCardProps> = ({
   hasParking,
   petFriendly,
   lastBookedAt,
+  losDiscountMinNights,
+  losDiscountPercent,
+  losDiscount2MinNights,
+  losDiscount2Percent,
   onClick,
 }) => {
   // TASK-1360: Compute "Last booked X days ago" label
@@ -183,6 +195,20 @@ const ListingCard: React.FC<ListingCardProps> = ({
           <span className="inline-flex items-center gap-1 self-start rounded-full bg-green-50 border border-green-200 px-2.5 py-0.5 text-xs font-medium text-green-700">
             🔥 {lastBookedLabel}
           </span>
+        )}
+
+        {/* TASK-1695: LOS discount badges */}
+        {((losDiscountMinNights ?? 0) > 0 && (losDiscountPercent ?? 0) > 0) && (
+          <div className="flex flex-wrap gap-1.5">
+            <span className="inline-flex items-center gap-1 self-start rounded-full bg-amber-50 border border-amber-200 px-2.5 py-0.5 text-xs font-medium text-amber-700">
+              🏷 Stay {losDiscountMinNights}+ nights → save {Math.round(losDiscountPercent!)}%
+            </span>
+            {(losDiscount2MinNights ?? 0) > 0 && (losDiscount2Percent ?? 0) > 0 && (
+              <span className="inline-flex items-center gap-1 self-start rounded-full bg-amber-50 border border-amber-200 px-2.5 py-0.5 text-xs font-medium text-amber-700">
+                🏷 Stay {losDiscount2MinNights}+ nights → save {Math.round(losDiscount2Percent!)}%
+              </span>
+            )}
+          </div>
         )}
 
         {quickFacts.length > 0 && (

@@ -5,6 +5,7 @@ const MAP: Record<string, string> = {
   BAD_REQUEST_ERROR: 'Your bank or UPI app declined this attempt. Try another card or UPI ID.',
   GATEWAY_ERROR: 'The payment gateway had a problem. Please try again in a few minutes.',
   NETWORK_ERROR: 'We could not reach the payment network. Check your connection and try again.',
+  // eslint-disable-next-line atlas-brand/no-atlas-string-leak -- TODO Task 16: per-tenant support email
   SERVER_ERROR: 'The payment service returned an error. Try again shortly or contact support@atlashomestays.com.',
   USER_CANCELLED: 'Payment was cancelled before completion.',
 };

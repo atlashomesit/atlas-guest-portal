@@ -1,3 +1,4 @@
+/* eslint-disable atlas-brand/no-atlas-string-leak -- TODO Task 16: replace with per-tenant content */
 // NOTE: this file is imported by Node scripts during build; keep ESM imports explicit for Windows.
 import { LOGO_URL } from "./config/branding.ts";
 import { CONTACT } from "./config/contact.ts";
