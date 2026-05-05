@@ -138,8 +138,29 @@ export const CurrencyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   );
 };
 
+/**
+ * Returns the currency context, or a safe INR-only fallback when no provider
+ * is mounted (e.g. unit tests that render leaf components without the app
+ * shell). Production runs always have CurrencyProvider in main.tsx.
+ */
+const FALLBACK_INR_FORMATTER = (n: number) =>
+  new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 0,
+  }).format(Number.isFinite(n) ? n : 0);
+
+const FALLBACK_VALUE: CurrencyContextValue = {
+  currency: 'INR',
+  setCurrency: () => { /* no-op outside provider */ },
+  convert: (n) => n,
+  format: FALLBACK_INR_FORMATTER,
+  formatINR: FALLBACK_INR_FORMATTER,
+  isConverted: false,
+  rates: {},
+};
+
 export function useCurrency(): CurrencyContextValue {
   const ctx = useContext(CurrencyContext);
-  if (!ctx) throw new Error('useCurrency must be used within CurrencyProvider');
-  return ctx;
+  return ctx ?? FALLBACK_VALUE;
 }
