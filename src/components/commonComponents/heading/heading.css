@@ -20,7 +20,7 @@
   height: 3px;
   border-radius: 999px;
   background: var(--gradient-cta);
-  box-shadow: 0 4px 16px rgba(255, 107, 53, 0.2);}
+}
 
 @media (max-width: 640px) {
   .section-heading {
