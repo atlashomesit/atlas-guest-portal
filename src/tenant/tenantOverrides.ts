@@ -161,6 +161,7 @@ const TENANT_OVERRIDES: Record<string, TenantOverrides> = {
   starguesthouse: {
     hideLogo: true,
     hideAtlasHomesBranding: true,
+    hideListProperty: true,
     onlyApiListings: true,
     publicListingIdAllowlist: STAR_GUEST_HOUSE_LISTING_IDS,
     // Star Guest House is a room-stay (not a homestay) — use "room"/"rooms"
