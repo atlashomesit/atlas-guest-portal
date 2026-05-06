@@ -4,6 +4,7 @@ import { BadgePercent, CheckCircle2, ShieldCheck, Home } from 'lucide-react';
 import { HERO_IMAGE_URL } from '../../../config/hero';
 import { heroWidgetLayoutFlag } from '../../../config/abFlags';
 import { getTenantContext } from '../../../tenant/tenantContext';
+import { getTenantOverrides } from '../../../tenant/tenantOverrides';
 import { TrustBadge } from '../../ui/TrustBadge';
 import { SearchAvailabilityWidget } from '../../availability/SearchAvailabilityWidget';
 
@@ -24,9 +25,11 @@ const Slider = () => {
   // leak Atlas-branded imagery — fall back to the gradient-only background
   // until per-tenant heroImageUrl is wired through TenantBranding.
   const tenant = getTenantContext();
+  const overrides = getTenantOverrides(tenant?.slug);
   const isAtlasRoot = tenant?.isMarketplaceRoot !== false;
   const heroImageUrl = isAtlasRoot ? HERO_IMAGE_URL : '';
   const hasHeroPhoto = Boolean(heroImageUrl.trim());
+  const showListProperty = !overrides.hideListProperty;
 
   const overlayStyle = React.useMemo(() => {
     // With a photo, keep text readable without painting the whole viewport flat black.
@@ -83,13 +86,15 @@ const Slider = () => {
 
           <div data-testid="hero-widget"><SearchAvailabilityWidget /></div>
 
-          <Link
-            to="/become-a-host"
-            className="mt-2 inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-5 py-2.5 text-sm font-semibold text-[var(--text-on-hero)] backdrop-blur-sm transition hover:bg-white/20 hover:border-white/50"
-          >
-            <Home className="h-4 w-4" />
-            List your property — it's free
-          </Link>
+          {showListProperty && (
+            <Link
+              to="/become-a-host"
+              className="mt-2 inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-5 py-2.5 text-sm font-semibold text-[var(--text-on-hero)] backdrop-blur-sm transition hover:bg-white/20 hover:border-white/50"
+            >
+              <Home className="h-4 w-4" />
+              List your property — it's free
+            </Link>
+          )}
         </div>
       </div>
 

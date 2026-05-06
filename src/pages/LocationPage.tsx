@@ -44,7 +44,7 @@ const LocationPage = () => {
   const overrides = getTenantOverrides(tenant?.slug);
   // TL-GUEST: API-sourced location (set by host via admin picker) wins over the static override.
   const mapLocation = tenant?.mapLocation ?? overrides.mapLocation;
-  const locationContent = overrides.locationContent;
+  const locationContent = tenant?.locationContent ?? overrides.locationContent;
   const tenantName = tenant?.name?.trim() || getTenantBrandName();
 
   const [mapStatus, setMapStatus] = useState<MapStatus>("loading");
