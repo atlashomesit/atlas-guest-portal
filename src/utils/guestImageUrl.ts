@@ -1,9 +1,13 @@
-/** Listing imagery for this product ships from this account (public-read container). */
-const ALLOWED_AZURE_BLOB_HOSTS = new Set(["atlashomestorage.blob.core.windows.net"]);
+/** Listing imagery from Atlas accounts (public-read containers). Includes both tenant and platform images. */
+const ALLOWED_AZURE_BLOB_HOSTS = new Set([
+  "atlashomestorage.blob.core.windows.net",
+  "atlasplatform.blob.core.windows.net",
+  "atlasstg.blob.core.windows.net",
+]);
 
 /**
- * Block arbitrary Azure blob hosts (private tenants / accidental URLs). Allow the
- * canonical listing-images account so cards and galleries can load real photos.
+ * Block arbitrary Azure blob hosts (private tenants / accidental URLs). Allow Atlas-owned
+ * listing-images accounts (tenant and platform) so cards and galleries can load real photos.
  */
 export function isBlockedGuestImageUrl(url: string): boolean {
   const t = (url ?? "").trim();
@@ -12,7 +16,8 @@ export function isBlockedGuestImageUrl(url: string): boolean {
     const base = typeof window !== "undefined" ? window.location.origin : "https://local.invalid";
     const u = new URL(t, base);
     if (!u.hostname.includes("blob.core.windows.net")) return false;
-    return !ALLOWED_AZURE_BLOB_HOSTS.has(u.hostname);
+    // Allow known Atlas storage accounts and any account starting with "atlas"
+    return !ALLOWED_AZURE_BLOB_HOSTS.has(u.hostname) && !u.hostname.startsWith("atlas");
   } catch {
     return false;
   }
