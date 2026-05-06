@@ -965,7 +965,22 @@ useEffect(() => {
         : cancellationPolicyText;
 
     const pageUrl = typeof window !== 'undefined' ? window.location.href : '';
-    const galleryUrls = filterGuestImageUrls(data?.property_img ?? []);
+
+    // For atlashomestays domain, construct full blob URL from pattern
+    const buildAtlasMediaUrl = (imageUrl: string): string => {
+      if (!imageUrl || !resolvedListingId) return imageUrl;
+      const isAtlasHomesteays = typeof window !== 'undefined' && window.location.hostname.includes('atlashomestays');
+      if (!isAtlasHomesteays) return imageUrl;
+
+      // If already has full blob URL, return as-is
+      if (imageUrl.includes('blob.core.windows.net')) return imageUrl;
+
+      // Extract filename from path
+      const filename = imageUrl.split('/').pop() || imageUrl;
+      return `https://atlashomestorage.blob.core.windows.net/atlas-media/atlas/${resolvedListingId}/${filename}`;
+    };
+
+    const galleryUrls = filterGuestImageUrls(data?.property_img ?? []).map(buildAtlasMediaUrl);
     const primaryImage = galleryUrls[0];
     const mapSrcTrimmed = (data?.property_mapSrc ?? "").trim();
     const locationParts = (data?.property_location ?? "")
