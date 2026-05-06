@@ -57,6 +57,14 @@ export interface TenantInfo {
     zoom?: number;
     markerLabel?: string;
   };
+  /** TL-API: Location page content (transport, amenities, landmarks) from admin portal.
+   *  Undefined when not configured — caller falls back to tenantOverrides. */
+  locationContent?: {
+    subtitle?: string;
+    transport?: Array<{ title: string; details: string }>;
+    nearbyAmenities?: Array<{ title: string; details: string }>;
+    landmarks?: Array<{ title: string; details: string }>;
+  };
   /**
    * RA-006 §3.5: legal + contact identity used by tenant-aware privacy notices, terms,
    * footer rows, and consent text. Any field can be undefined when the host hasn't filled
@@ -162,6 +170,14 @@ export async function resolveFromDomain(apiBaseUrl: string, domain: string): Pro
               : undefined,
           }
         : undefined,
+      locationContent: data.locationContent
+        ? {
+            subtitle: typeof data.locationContent.subtitle === 'string' ? data.locationContent.subtitle : undefined,
+            transport: Array.isArray(data.locationContent.transport) ? data.locationContent.transport : undefined,
+            nearbyAmenities: Array.isArray(data.locationContent.nearbyAmenities) ? data.locationContent.nearbyAmenities : undefined,
+            landmarks: Array.isArray(data.locationContent.landmarks) ? data.locationContent.landmarks : undefined,
+          }
+        : undefined,
       legalContactPack: data.legalContactPack
         ? {
             legalName: typeof data.legalContactPack.legalName === 'string' ? data.legalContactPack.legalName : undefined,
@@ -217,6 +233,22 @@ export async function validateTenant(slug: string): Promise<TenantInfo> {
     logoUrl: data.logoUrl ?? undefined,
     primaryColor: data.brandColor ?? undefined,
     brandColor: data.brandColor ?? undefined,
+    mapLocation: (data.mapLocation && typeof data.mapLocation.lat === 'number' && typeof data.mapLocation.lng === 'number')
+      ? {
+          lat: data.mapLocation.lat,
+          lng: data.mapLocation.lng,
+          zoom: typeof data.mapLocation.zoom === 'number' ? data.mapLocation.zoom : undefined,
+          markerLabel: typeof data.mapLocation.markerLabel === 'string' ? data.mapLocation.markerLabel : undefined,
+        }
+      : undefined,
+    locationContent: data.locationContent
+      ? {
+          subtitle: typeof data.locationContent.subtitle === 'string' ? data.locationContent.subtitle : undefined,
+          transport: Array.isArray(data.locationContent.transport) ? data.locationContent.transport : undefined,
+          nearbyAmenities: Array.isArray(data.locationContent.nearbyAmenities) ? data.locationContent.nearbyAmenities : undefined,
+          landmarks: Array.isArray(data.locationContent.landmarks) ? data.locationContent.landmarks : undefined,
+        }
+      : undefined,
   };
   return tenantInfo;
 }

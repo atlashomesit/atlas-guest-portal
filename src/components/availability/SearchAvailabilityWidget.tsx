@@ -746,6 +746,7 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
           <Link
             to="/#our-homes"
             className="group inline-flex items-center justify-center gap-1 text-[14px] font-medium text-[var(--cta-primary)] transition-all hover:text-[var(--text-body)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#475569] whitespace-nowrap mt-3"
+            data-discover="true"
           >
             Browse all apartments
             <span className="inline-block transition-transform group-hover:translate-x-1">→</span>
