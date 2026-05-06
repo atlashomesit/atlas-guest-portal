@@ -18,10 +18,12 @@ import { applyTenantBranding } from './tenant/tenantBranding'
 import { ConfigLoadingScreen } from './runtime-config/ConfigLoadingScreen'
 import { ConfigErrorScreen } from './runtime-config/ConfigErrorScreen'
 
-// Suppress chrome extension module loading errors in console (non-critical, expected in dev)
-const isExtensionModuleError = (message: string, filename?: string) =>
-  message.includes("Failed to fetch dynamically imported module") &&
-  filename?.includes("chrome-extension://");
+// Suppress chrome extension module loading errors in console (non-critical, expected in dev).
+// ErrorEvent.message is typed `string` but is nullish for some cross-origin / platform error
+// events (Sentry caught a TypeError here on dev). Treat both args as possibly nullish.
+const isExtensionModuleError = (message?: string | null, filename?: string | null): boolean =>
+  !!(message?.includes("Failed to fetch dynamically imported module") &&
+     filename?.includes("chrome-extension://"));
 
 window.addEventListener("error", (event) => {
   if (isExtensionModuleError(event.message, event.filename)) {

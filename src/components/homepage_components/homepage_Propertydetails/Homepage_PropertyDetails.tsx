@@ -39,6 +39,7 @@ import SkeletonCard from '../../apartments/SkeletonCard';
 const UnitBookingWidget = lazy(() => import('../../availability/UnitBookingWidget'));
 const AvailabilityCalendar = lazy(() => import('../../AvailabilityCalendar'));
 const GuestAssistant = lazy(() => import('../../GuestAssistant')); // TASK-1728
+const VirtualTourSection = lazy(() => import('../../VirtualTourSection')); // Task 37
 
 /** TASK-1294: illustrative uplift for “typical OTA” guest all-in (fees vary by site). */
 const OTA_ILLUSTRATIVE_MARKUP_PCT = 17;
@@ -746,15 +747,14 @@ useEffect(() => {
 
         const initFancybox = async () => {
             try {
-                const { Fancybox } = await import("@fancyapps/ui");
+                // CSS bundled from the installed package (matches the v6 JS) — avoids
+                // the CSP style-src violation from the previous cdn.jsdelivr.net link
+                // and the v5↔v6 version mismatch.
+                const [{ Fancybox }] = await Promise.all([
+                    import("@fancyapps/ui"),
+                    import("@fancyapps/ui/dist/fancybox/fancybox.css"),
+                ]);
 
-                // Load CSS dynamically
-                const link = document.createElement('link');
-                link.rel = 'stylesheet';
-                link.href = 'https://cdn.jsdelivr.net/npm/@fancyapps/ui@5.0/dist/fancybox/fancybox.css';
-                document.head.appendChild(link);
-
-                // Fancybox v6 syntax
                 (Fancybox as { bind: (sel: string, opts: object) => void }).bind("[data-fancybox='property-gallery']", {
                     Thumbs: {
                         type: "classic",
@@ -766,7 +766,6 @@ useEffect(() => {
 
                 return () => {
                     Fancybox.destroy();
-                    document.head.removeChild(link);
                 };
             } catch (err) {
                 console.warn('Failed to load Fancybox', err);
@@ -1174,6 +1173,13 @@ useEffect(() => {
                       className="w-full h-full border-0"
                     />
                   </div>
+                )}
+
+                {/* Task 37: 3D virtual tour viewer (Pannellum / Matterport). Renders nothing when no tours. */}
+                {Number.isFinite(Number(resolvedListingId)) && Number(resolvedListingId) > 0 && (
+                  <Suspense fallback={null}>
+                    <VirtualTourSection listingId={Number(resolvedListingId)} />
+                  </Suspense>
                 )}
 
                 {/* Image Gallery — Azure blob URLs are skipped (409); API/static must serve reachable images */}
