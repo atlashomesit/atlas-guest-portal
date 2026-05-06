@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import SEO from "../components/SEO";
 import { buildApiUrl } from "@/api/client";
 import { useTenantListings, type TenantPropertyRecord } from "@/hooks/useTenantListings";
+import { getTenantBrandName } from "@/tenant/displayBrand";
 
 interface DiscountTier {
   minNights: number;
@@ -40,6 +41,7 @@ function extractLastMinutePercent(properties: TenantPropertyRecord[]): number {
 
 export default function OffersPage() {
   const { properties, state } = useTenantListings();
+  const brandName = getTenantBrandName();
 
   const [promoCode, setPromoCode] = useState("");
   const [promoResult, setPromoResult] = useState<PromoResult | null>(null);
@@ -83,12 +85,12 @@ export default function OffersPage() {
 
   return (
     <div className="min-h-screen bg-bg-muted px-4 md:px-10 lg:px-20 py-24">
-      <SEO title="Offers | Atlas Homestays" description="Direct booking deals, extended-stay discounts, and promo codes for Atlas Homestays guests." />
+      <SEO title={`Offers | ${brandName}`} description={`Direct booking deals, extended-stay discounts, and promo codes for ${brandName} guests.`} />
 
       <div className="max-w-3xl mx-auto space-y-10">
         {/* Header */}
         <div className="space-y-2">
-          <p className="uppercase tracking-[0.2em] text-brand-primary font-semibold text-sm">Atlas Homestays</p>
+          <p className="uppercase tracking-[0.2em] text-brand-primary font-semibold text-sm">{brandName}</p>
           <h1 className="text-3xl md:text-4xl font-bold text-text-primary">Exclusive Offers</h1>
           <p className="text-lg text-text-muted">Book direct and unlock the best rates — no OTA fees, no middlemen.</p>
         </div>

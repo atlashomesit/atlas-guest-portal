@@ -5,8 +5,10 @@ import SEO from "../components/SEO";
 import { fetchPublicListings } from "../api/listingClient";
 import { clearRecentlyViewed, getRecentlyViewed } from "../utils/guestHistory";
 import { formatCurrency } from "../utils/formatting";
+import { getTenantBrandName } from "../tenant/displayBrand";
 
 export default function RecentlyViewedPage() {
+  const brandName = getTenantBrandName();
   const [items, setItems] = useState(() => getRecentlyViewed());
   const [liveNightlyByListingId, setLiveNightlyByListingId] = useState<Record<number, number>>({});
 
@@ -35,7 +37,7 @@ export default function RecentlyViewedPage() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-6">
-      <SEO title="Recently viewed | Atlas Homestays" description="Homes you viewed recently on Atlas Homestays." />
+      <SEO title={`Recently viewed | ${brandName}`} description={`Homes you viewed recently on ${brandName}.`} />
       <div className="flex items-baseline justify-between gap-2 flex-wrap">
         <div className="flex items-baseline gap-3 flex-wrap">
           <h1 className="text-2xl font-bold text-text-primary">Recently viewed</h1>

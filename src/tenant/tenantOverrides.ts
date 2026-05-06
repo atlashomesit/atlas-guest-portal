@@ -75,7 +75,7 @@ export type TenantLocationContent = {
 export type TenantOverrides = {
   /** Hide the logo image in the navbar/footer/subheading. */
   hideLogo?: boolean;
-  /** Hide default "Atlas Homes" / Atlas Homestays copy where we show a listing brand row. */
+  /** Hide default marketplace / parent-brand copy where we show a listing brand row. */ // TODO(CPO-001-followup): align naming with displayBrand helpers
   hideAtlasHomesBranding?: boolean;
   /** Hide the "List your property" CTA in the header (desktop + mobile). */
   hideListProperty?: boolean;
@@ -161,7 +161,6 @@ const TENANT_OVERRIDES: Record<string, TenantOverrides> = {
   starguesthouse: {
     hideLogo: true,
     hideAtlasHomesBranding: true,
-    hideListProperty: true,
     onlyApiListings: true,
     publicListingIdAllowlist: STAR_GUEST_HOUSE_LISTING_IDS,
     // Star Guest House is a room-stay (not a homestay) — use "room"/"rooms"

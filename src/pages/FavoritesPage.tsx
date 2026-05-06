@@ -7,8 +7,10 @@ import { fetchPublicListings, type PublicListing } from "../api/listingClient";
 import { getFavoriteIds, getRecentlyViewed, toggleFavorite } from "../utils/guestHistory";
 import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 import { buildApiUrl, getApiHeaders } from "../api/client";
+import { getTenantBrandName } from "../tenant/displayBrand";
 
 export default function FavoritesPage() {
+  const brandName = getTenantBrandName();
   const [all, setAll] = useState<PublicListing[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -99,10 +101,10 @@ export default function FavoritesPage() {
     if (!ids.length) return;
     const token = btoa(ids.join(","));
     const shareUrl = `${window.location.origin}/favorites?wishlist=${encodeURIComponent(token)}`;
-    const waText = `Check out these Atlas Homestays I saved! ${shareUrl}`;
+    const waText = `Check out these ${brandName} I saved! ${shareUrl}`;
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(waText)}`;
     if (navigator.share) {
-      navigator.share({ title: "My Atlas Homestays Wishlist", url: shareUrl }).catch(() => {});
+      navigator.share({ title: `My ${brandName} Wishlist`, url: shareUrl }).catch(() => {});
     } else {
       navigator.clipboard.writeText(shareUrl).then(() => {
         setShareState("copied");
@@ -115,7 +117,7 @@ export default function FavoritesPage() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-6">
-      <SEO title="Saved homes | Atlas Homestays" description="Your saved Atlas Homestays listings." />
+      <SEO title={`Saved homes | ${brandName}`} description={`Your saved ${brandName} listings.`} />
       {/* TASK-1299: Shared wishlist banner */}
       {sharedWishlistIds && (
         <div className="rounded-xl border border-brand-primary/30 bg-brand-primary/5 px-4 py-3 text-sm text-text-primary">
@@ -162,7 +164,7 @@ export default function FavoritesPage() {
             to="/search"
             className="inline-flex min-h-11 items-center justify-center rounded-lg bg-brand-primary text-white text-base font-medium px-5 py-3 hover:opacity-95 transition-opacity"
           >
-            Browse Atlas Homestays
+            Browse {brandName}
           </Link>
           {recent.length > 0 && (
             <p className="text-xs text-text-muted">

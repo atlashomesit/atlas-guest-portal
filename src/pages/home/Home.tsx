@@ -15,6 +15,7 @@ import SEO from "../../components/SEO";
 import { LOGO_URL } from "../../config/branding";
 import { sanitizeGuestImageUrl } from "../../utils/guestImageUrl";
 import { CONTACT, getContactEmail } from "../../config/contact";
+import { getTenantBrandName } from "../../tenant/displayBrand";
 import {
     enableFooterMiniCtaAboveFooter,
 } from "../../config/homepageUxFlags";
@@ -31,8 +32,8 @@ const Home = () => {
     const tenant = getTenantContext();
     const overrides = getTenantOverrides(tenant?.slug);
     const hideAtlasBranding = shouldHideAtlasBranding(tenant, overrides);
-    const schemaBrandName =
-        hideAtlasBranding && tenant?.name?.trim() ? tenant.name.trim() : "Starguest House";
+    /** CPO-001 / SEO: never emit a wrong hardcoded brand in JSON-LD — use resolved tenant or marketplace baseline. */
+    const schemaBrandName = getTenantBrandName();
     const schemaLogo = overrides.hideLogo ? undefined : sanitizeGuestImageUrl(tenant?.logoUrl) ?? LOGO_URL;
     const contactEmail = getContactEmail();
     const penthouse = propertyData.find((property) => property.id === 501);
@@ -58,22 +59,30 @@ const Home = () => {
     );
 
     const faqHighlights = getFaqHighlights();
+    // CPO-007: derive canonical from the actual host the page is served on so tenant subdomains
+    // emit the right URL in JSON-LD instead of leaking a hardcoded one.
+    const canonicalUrl =
+        typeof window !== "undefined" && window.location?.origin
+            ? `${window.location.origin}/`
+            : "https://atlashomestays.com/";
+    // Atlas social handles only published as sameAs when running under the Atlas brand.
+    const atlasSocialSameAs = [
+        "https://www.facebook.com/profile.php?id=100040632723189",
+        "https://www.instagram.com/atlashomeskphb/",
+        "https://x.com/atlashomeskphb",
+        "https://www.youtube.com/@atlashomestays",
+    ];
     const homepageJsonLd = useMemo(
         () => [
         {
             "@context": "https://schema.org",
             "@type": "Organization",
             name: schemaBrandName,
-            url: "https://starguesthouse.com/",
+            url: canonicalUrl,
             ...(schemaLogo ? { logo: schemaLogo } : {}),
             description:
                 "Serviced apartments in Hyderabad designed for business travel, family trips, and extended stays.",
-            sameAs: [
-                "https://www.facebook.com/profile.php?id=100040632723189",
-                "https://www.instagram.com/atlashomeskphb/",
-                "https://x.com/atlashomeskphb",
-                "https://www.youtube.com/@atlashomestays",
-            ],
+            ...(hideAtlasBranding ? {} : { sameAs: atlasSocialSameAs }),
             contactPoint: [
                 {
                     "@type": "ContactPoint",
@@ -88,7 +97,7 @@ const Home = () => {
             "@context": "https://schema.org",
             "@type": ["LodgingBusiness", "Hotel"],
             name: schemaBrandName,
-            url: "https://starguesthouse.com/",
+            url: canonicalUrl,
             ...(schemaLogo ? { logo: schemaLogo } : {}),
             description:
                 "Serviced apartments in KPHB, Hyderabad with Wi-Fi, parking, and responsive support for business and family stays.",
@@ -116,7 +125,7 @@ const Home = () => {
                 priceCurrency: "INR",
                 price: penthouseOfferPrice,
                 availability: "https://schema.org/InStock",
-                url: "https://starguesthouse.com/",
+                url: canonicalUrl,
                 itemOffered: {
                     "@type": "Apartment",
                     name: "Starguest House Penthouse 501",
@@ -154,7 +163,7 @@ const Home = () => {
                         price: penthouseOfferPrice,
                         availability: "https://schema.org/InStock",
                         validFrom: new Date().toISOString(),
-                        url: "https://starguesthouse.com/",
+                        url: canonicalUrl,
                         availableAtOrFrom: {
                             "@type": "Place",
                             address: {
@@ -189,6 +198,8 @@ const Home = () => {
             penthouseOfferPrice,
             schemaBrandName,
             schemaLogo,
+            canonicalUrl,
+            hideAtlasBranding,
         ],
     );
 
@@ -226,7 +237,7 @@ const Home = () => {
                         : "Book serviced apartments in Hyderabad with business-ready amenities, flexible stays, and attentive on-call support from Starguest House."
                 }
                 image={primaryOgImage}
-                url="https://starguesthouse.com/"
+                url={canonicalUrl}
                 twitterCard="summary_large_image"
                 twitterSite="@starguesthouse"
                 jsonLd={homepageJsonLd}

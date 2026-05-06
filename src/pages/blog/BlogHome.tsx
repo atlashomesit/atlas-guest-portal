@@ -1,21 +1,24 @@
-/* eslint-disable atlas-brand/no-atlas-string-leak -- TODO Task 16: replace with per-tenant content */
+import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import SEO from "../../components/SEO";
-import { blogPosts } from "../../data/blogPosts";
+import { getLocalizedBlogPosts } from "../../data/blogPosts";
+import { getTenantBrandName } from "../../tenant/displayBrand";
 
 const BlogHome = () => {
+  const brandName = getTenantBrandName();
+  const posts = useMemo(() => getLocalizedBlogPosts(brandName), [brandName]);
   return (
     <div className="px-4 md:px-10 lg:px-20 py-24 bg-bg-muted min-h-screen">
       <SEO
-        title="Atlas Homestays Blog"
-        description="Guest guides, hospitality technology, and updates from Atlas Homestays."
+        title={`${brandName} Blog`}
+        description={`Guest guides, hospitality technology, and updates from ${brandName}.`}
       />
       <div className="max-w-5xl mx-auto space-y-8">
         <div className="space-y-3">
-          <p className="uppercase tracking-[0.2em] text-primary font-semibold">Atlas Homestays</p>
+          <p className="uppercase tracking-[0.2em] text-primary font-semibold">{brandName}</p>
           <h1 className="text-4xl font-bold text-text-primary">Blog</h1>
           <p className="text-lg text-text-muted">
-            Explore travel tips, guest guides, and hospitality technology that powers Atlas Homestays.
+            Explore travel tips, guest guides, and hospitality technology that powers {brandName}.
           </p>
         </div>
 
@@ -29,7 +32,7 @@ const BlogHome = () => {
         </div>
 
         <div className="grid md:grid-cols-2 gap-6">
-          {blogPosts.map((post) => (
+          {posts.map((post) => (
             <Link key={post.id} to={`/blog/${post.slug}`} className="bg-bg-surface p-5 rounded-2xl border border-border-subtle shadow-level1 hover:shadow-level2 transition">
               {post.featuredImage && (
                 <img

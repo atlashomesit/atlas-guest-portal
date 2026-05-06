@@ -6,6 +6,7 @@ import OptimizedImage from "../components/ui/OptimizedImage";
 import { Typography } from "../components/ui/Typography";
 import { GOOGLE_MAPS_API_KEY } from "../config/googleMaps";
 import { getTenantOverrides } from "../tenant/tenantOverrides";
+import { getTenantBrandName } from "../tenant/displayBrand";
 import { getTenantContext } from "../tenant/tenantContext";
 
 type GoogleMapsMapOptions = {
@@ -44,7 +45,7 @@ const LocationPage = () => {
   // TL-GUEST: API-sourced location (set by host via admin picker) wins over the static override.
   const mapLocation = tenant?.mapLocation ?? overrides.mapLocation;
   const locationContent = overrides.locationContent;
-  const tenantName = tenant?.name ?? "Atlas Homestays";
+  const tenantName = tenant?.name?.trim() || getTenantBrandName();
 
   const [mapStatus, setMapStatus] = useState<MapStatus>("loading");
   const [, setErrorDetails] = useState<string | null>(null);

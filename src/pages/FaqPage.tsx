@@ -12,15 +12,17 @@ import { CONTACT } from "../config/contact";
 import { buildWaLink, defaultPrefill } from "../utils/whatsapp";
 import FaqHighlights from "../components/faq/FaqHighlights";
 import { getFaqHighlights } from "../content/faqHighlights";
+import { getTenantBrandName } from "../tenant/displayBrand";
 
 const FaqPage = () => {
+  const brandName = getTenantBrandName();
   useScrollToHash();
   const [search, setSearch] = useState("");
   const whatsappLink = useMemo(() => {
     const href = typeof window !== "undefined" ? window.location.href : "";
-    const prefill = defaultPrefill({ href, context: "FAQs" });
+    const prefill = defaultPrefill({ href, context: "FAQs", brandName });
     return buildWaLink({ phoneE164: CONTACT.business.whatsapp, text: prefill });
-  }, []);
+  }, [brandName]);
 
   const grouped = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -67,7 +69,7 @@ const FaqPage = () => {
       description="Quick answers that link directly to the underlying policy and terms sections."
     >
       <SEO
-        title="FAQs | Atlas Homestays"
+        title={`FAQs | ${brandName}`}
         description="Common questions about bookings, payments, check-in, guests, amenities, and deposits."
         url="/faq"
         jsonLd={faqStructuredData}

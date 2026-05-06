@@ -8,20 +8,20 @@ import { privacyMetadata, privacySections } from "../content/legal/privacy";
 import { CONTACT } from "../config/contact";
 import { buildWaLink, defaultPrefill } from "../utils/whatsapp";
 import { resetCookieConsent } from "../utils/cookieConsent";
+import { MARKETPLACE_BRAND_BASELINE } from "../tenant/displayBrand";
 import { getTenantContext } from "../tenant/tenantContext";
 
 /**
- * RA-006 §3.5: substitute the baseline notice's "Atlas Homestays" / "atlashomestays.com" /
+ * RA-006 §3.5: substitute the baseline notice's marketplace brand / "atlashomestays.com" /
  * "privacy@atlashomestays.com" tokens with the active tenant's legal pack values.
- * The atlas marketplace tenant gets the originals (legalName='Atlas Homestays', etc.)
- * so apex visitors still see the canonical Atlas notice.
+ * The atlas marketplace tenant keeps the canonical baseline so apex visitors still see Atlas copy.
  */
 const legalizeText = (
   source: string,
   pack: { legalName: string; contactEmail: string; shareDomain: string },
 ): string =>
   source
-    .replace(/Atlas Homestays/g, pack.legalName)
+    .replaceAll(MARKETPLACE_BRAND_BASELINE, pack.legalName)
     .replace(/privacy@atlashomestays\.com/g, pack.contactEmail)
     .replace(/atlashomestays\.com/g, pack.shareDomain);
 
@@ -31,7 +31,7 @@ const PrivacyPage = () => {
   const [revoked, setRevoked] = useState(false);
 
   // Build the active legal pack from server-provided values, falling back to the
-  // baseline notice (which names Atlas Homestays). Empty/missing fields can't be
+  // Baseline notice names MARKETPLACE_BRAND_BASELINE. Empty/missing fields can't be
   // substituted in — we keep the baseline string so guests don't see a blank.
   const tenant = getTenantContext();
   const pack = useMemo(() => {
@@ -49,9 +49,9 @@ const PrivacyPage = () => {
 
   const whatsappLink = useMemo(() => {
     const href = typeof window !== "undefined" ? window.location.href : "";
-    const prefill = defaultPrefill({ href, context: "Privacy" });
+    const prefill = defaultPrefill({ href, context: "Privacy", brandName: pack.legalName });
     return buildWaLink({ phoneE164: CONTACT.business.whatsapp, text: prefill });
-  }, []);
+  }, [pack.legalName]);
 
   const filteredSections = useMemo(() => {
     const term = search.trim().toLowerCase();
