@@ -969,14 +969,18 @@ useEffect(() => {
     // For atlashomestays domain, construct full blob URL from pattern
     const buildAtlasMediaUrl = (imageUrl: string): string => {
       if (!imageUrl || !resolvedListingId) return imageUrl;
-      const isAtlasHomesteays = typeof window !== 'undefined' && window.location.hostname.includes('atlashomestays');
-      if (!isAtlasHomesteays) return imageUrl;
+      const isAtlasHomestays = typeof window !== 'undefined' && window.location.hostname.includes('atlashomestays');
+      if (!isAtlasHomestays) return imageUrl;
 
       // If already has full blob URL, return as-is
       if (imageUrl.includes('blob.core.windows.net')) return imageUrl;
 
-      // Extract filename from path
-      const filename = imageUrl.split('/').pop() || imageUrl;
+      // Handle relative paths and filenames
+      const cleanPath = imageUrl.replace(/^\/+/, '').trim();
+      if (!cleanPath) return imageUrl;
+
+      // Extract filename from path (e.g., "room201.jpg" from "photos/room201.jpg" or just "room201.jpg")
+      const filename = cleanPath.split('/').pop() || cleanPath;
       return `https://atlashomestorage.blob.core.windows.net/atlas-media/atlas/${resolvedListingId}/${filename}`;
     };
 
