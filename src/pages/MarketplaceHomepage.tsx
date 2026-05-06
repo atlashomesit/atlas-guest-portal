@@ -7,6 +7,18 @@ import { getFavoriteIds, toggleFavorite } from '@/utils/guestHistory'; // TASK-1
 import OptimizedImage from '@/components/ui/OptimizedImage'; // TASK-1874
 import SkeletonCard from '@/components/apartments/SkeletonCard'; // TASK-1875
 import SEO from '@/components/SEO'; // TASK-1876
+import MultiPinMap, { type MapPin } from '@/components/map/MultiPinMap'; // TL-PROP
+
+// TL-PROP: shape from GET /marketplace/properties (powers the map view).
+type MarketplacePropertyApi = {
+  propertyId: number;
+  listingId: number;
+  propertyName: string;
+  propertyAddress?: string | null;
+  listingName: string;
+  latitude?: number | null;
+  longitude?: number | null;
+};
 
 type MarketplaceItem = {
   id: number;
@@ -34,6 +46,9 @@ export default function MarketplaceHomepage() {
   // TASK-1873: save-heart state keyed by listing id
   const [favEpoch, setFavEpoch] = useState(0);
   const favIds = useMemo(() => new Set(getFavoriteIds()), [favEpoch]);
+  // TL-PROP: map view of all marketplace properties. Toggle to show/hide.
+  const [showMap, setShowMap] = useState(false);
+  const [mapPins, setMapPins] = useState<MapPin[]>([]);
 
   const apiPath = useMemo(() => {
     const p = new URLSearchParams();
@@ -63,6 +78,37 @@ export default function MarketplaceHomepage() {
     };
   }, [apiPath]);
 
+  // TL-PROP: separately fetch the canonical marketplace properties endpoint for map pins.
+  // Independent of the card grid — different endpoint shape, different fields.
+  useEffect(() => {
+    let cancelled = false;
+    fetch(buildApiUrl('/marketplace/properties?pageSize=200'))
+      .then(async (r) => (r.ok ? ((await r.json()) as MarketplacePropertyApi[]) : []))
+      .then((rows) => {
+        if (cancelled) return;
+        const seen = new Map<number, MapPin>();
+        for (const row of rows ?? []) {
+          if (row.latitude == null || row.longitude == null) continue;
+          if (seen.has(row.propertyId)) continue;
+          seen.set(row.propertyId, {
+            id: `mp-${row.propertyId}`,
+            lat: Number(row.latitude),
+            lng: Number(row.longitude),
+            title: row.propertyName || row.listingName || `Property ${row.propertyId}`,
+            subtitle: row.propertyAddress ?? undefined,
+            href: `/${row.listingId}`,
+          });
+        }
+        setMapPins(Array.from(seen.values()));
+      })
+      .catch(() => {
+        if (!cancelled) setMapPins([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <section className="mx-auto w-full max-w-6xl px-4 py-8" data-testid="marketplace-homepage">
       {/* TASK-1876: SEO meta for marketplace homepage */}
@@ -91,7 +137,24 @@ export default function MarketplaceHomepage() {
             {c[0].toUpperCase() + c.slice(1)}
           </button>
         ))}
+        {/* TL-PROP: map view toggle. Hidden if no properties have lat/lng configured. */}
+        {mapPins.length > 0 && (
+          <button
+            data-testid="marketplace-map-toggle"
+            className={`ml-auto min-h-[44px] rounded-xl px-4 py-2 ${showMap ? 'bg-black text-white' : 'bg-gray-100 text-black'}`}
+            onClick={() => setShowMap((v) => !v)}
+            aria-pressed={showMap}
+          >
+            {showMap ? 'Hide map' : `Map (${mapPins.length})`}
+          </button>
+        )}
       </div>
+
+      {showMap && mapPins.length > 0 && (
+        <div className="mt-6">
+          <MultiPinMap pins={mapPins} height={400} />
+        </div>
+      )}
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3" data-testid="marketplace-grid">
         {/* TASK-1875: skeleton cards while loading */}
