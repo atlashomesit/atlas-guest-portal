@@ -1213,6 +1213,19 @@ useEffect(() => {
           fetchPriority="high"
           sizes="(min-width: 1024px) 50vw, 100vw"
           className="w-full h-full object-cover"
+          onError={(e) => {
+            const img = e.currentTarget;
+            if (img.dataset.retryCount === undefined) {
+              img.dataset.retryCount = '0';
+            }
+            const retryCount = parseInt(img.dataset.retryCount || '0', 10);
+            if (retryCount < 2) {
+              img.dataset.retryCount = String(retryCount + 1);
+              setTimeout(() => {
+                img.src = galleryUrls[0];
+              }, 1000 * (retryCount + 1));
+            }
+          }}
         />
       </a>
     ) : (
@@ -1233,6 +1246,19 @@ useEffect(() => {
             decoding="async"
             sizes="(min-width: 1024px) 25vw, 50vw"
             className="w-full h-full object-cover hover:opacity-80 transition"
+            onError={(e) => {
+              const imgEl = e.currentTarget;
+              if (imgEl.dataset.retryCount === undefined) {
+                imgEl.dataset.retryCount = '0';
+              }
+              const retryCount = parseInt(imgEl.dataset.retryCount || '0', 10);
+              if (retryCount < 2) {
+                imgEl.dataset.retryCount = String(retryCount + 1);
+                setTimeout(() => {
+                  imgEl.src = img;
+                }, 1000 * (retryCount + 1));
+              }
+            }}
           />
         </a>
         {index === 3 && galleryUrls.length > 0 && (
