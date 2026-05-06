@@ -1987,7 +1987,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             </p>
           )}
           <p className="text-xs text-text-secondary">
-            <span className="mr-2 inline-block rounded bg-gray-100 px-1.5 py-0.5 text-gray-500">Turnover</span>
+            <span className="mr-2 inline-block rounded bg-yellow-100 px-1.5 py-0.5 text-yellow-700">Turnover</span>
             cleaning window (still bookable).
             <span className="mx-2 inline-block bg-[repeating-linear-gradient(-45deg,#d1d5db,#d1d5db_3px,#e5e7eb_3px,#e5e7eb_6px)] px-2 py-0.5 text-gray-700">
               Unavailable
@@ -2085,7 +2085,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
                 let statusBg = '';
                 if (status === 'Turnover') {
-                  statusBg = 'bg-gray-100';
+                  statusBg = 'bg-yellow-100';
                 } else if (status === 'Blocked' || status === 'Hold' || (isBlocked && !status)) {
                   statusBg =
                     'bg-[repeating-linear-gradient(-45deg,#d1d5db,#d1d5db_4px,#e5e7eb_4px,#e5e7eb_8px)]';
@@ -2103,7 +2103,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                   : status === 'Blocked' || status === 'Hold' || (isBlocked && !status)
                     ? 'text-gray-700 cursor-not-allowed'
                     : status === 'Turnover'
-                      ? 'text-gray-400'
+                      ? 'text-yellow-700'
                       : 'text-black';
 
                 const dayStatusLabel =
