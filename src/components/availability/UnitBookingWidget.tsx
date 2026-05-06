@@ -12,6 +12,7 @@ import ErrorBanner from '@/components/ErrorBanner';
 import { type AvailabilityNightlyRate, type AvailabilityResponse } from '@/api/availabilityClient';
 import { buildApiUrl, getApiHeaders } from '@/api/client';
 import { apiFetch } from '@/lib/http';
+import { monitoredFetch } from '@/lib/monitoring';
 import { getIstStartOfDay } from '@/utils/date';
 import { calculateNights, formatNightCount, formatDateInTimezone } from '@/utils/dateHelpers';
 import { doesRangeIntersectBlocked, toISODate } from '@/utils/dateRange';
@@ -414,7 +415,14 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         setIsLoading(true);
         setStatusMessage('Checking availability...');
 
-        const response = await apiFetch(availabilityKey);
+        // TASK-2118: use monitoredFetch (single attempt) instead of apiFetch (retries on
+        // 5xx/network). Retries against a cold dev API push GET count above the
+        // duplicate-fetch guard's MAX_GETS=2 cap. Matches the public AvailabilityCalendar
+        // component's no-retry behavior.
+        const response = await monitoredFetch(availabilityKey, { headers: getApiHeaders() });
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
         const data = await response.json() as unknown;
         const entries = Array.isArray(data) ? (data as Array<{ date?: string; status?: string }>) : [];
         

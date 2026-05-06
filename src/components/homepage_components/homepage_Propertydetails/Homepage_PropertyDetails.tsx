@@ -12,9 +12,6 @@ import { FaCcMastercard, FaLocationDot } from "react-icons/fa6";
 import { FaStar } from "react-icons/fa";
 import { X, ChevronRight, Clock, KeyRound, Bookmark, Share2 } from 'lucide-react';
 import { useEffect, useMemo, useState, Suspense, lazy } from 'react';
-import { addDays } from 'date-fns';
-import { getIstStartOfDay } from '../../../utils/date';
-import { toISODate } from '../../../utils/dateRange';
 import { useTenantListings } from '../../../hooks/useTenantListings';
 import { inlinePolicySnippets } from '../../../content/terms';
 import Subheading from '../../commonComponents/subheading/Subheading';
@@ -42,6 +39,7 @@ import SkeletonCard from '../../apartments/SkeletonCard';
 const UnitBookingWidget = lazy(() => import('../../availability/UnitBookingWidget'));
 const AvailabilityCalendar = lazy(() => import('../../AvailabilityCalendar'));
 const GuestAssistant = lazy(() => import('../../GuestAssistant')); // TASK-1728
+const VirtualTourSection = lazy(() => import('../../VirtualTourSection')); // Task 37
 
 /** TASK-1294: illustrative uplift for “typical OTA” guest all-in (fees vary by site). */
 const OTA_ILLUSTRATIVE_MARKUP_PCT = 17;
@@ -224,7 +222,6 @@ const PropertyDetails = () => {
         return `/search?${searchParams.toString()}`;
     }, [searchParams]);
     const showAvailabilityPlaceholder = false;
-    const [availabilityPrefetched, setAvailabilityPrefetched] = useState(false);
     const [fav, setFav] = useState(false);
     const [similarFromApi, setSimilarFromApi] = useState<null | { loading: boolean; items: any[] }>(null);
     /** TASK-1726: host response time badge text (e.g. "Replies in <1h"). */
@@ -738,31 +735,11 @@ useEffect(() => {
         return () => ac.abort();
     }, [resolvedListingId]);
 
-    // Prefetch public availability calendar as soon as listing id resolves so date widget opens warm.
-    useEffect(() => {
-        const listingToPrefetch = Number(resolvedListingId ?? data?.listingId ?? listingId);
-        if (!Number.isFinite(listingToPrefetch) || listingToPrefetch <= 0 || availabilityPrefetched) return;
-
-        const controller = new AbortController();
-        // Use IST timezone to match UnitBookingWidget (avoid duplicate calls with different date ranges)
-        const today = getIstStartOfDay();
-        const from = toISODate(today);
-        const to = toISODate(addDays(today, 60));
-        const url = buildApiUrl(`/api/public/listings/${listingToPrefetch}/availability-calendar?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
-        fetch(url, {
-            method: 'GET',
-            headers: { Accept: 'application/json', ...getApiHeaders() },
-            signal: controller.signal,
-        })
-            .then(() => setAvailabilityPrefetched(true))
-            .catch(() => {
-                if (!controller.signal.aborted) {
-                    // non-blocking prefetch; widget still fetches on demand
-                }
-            });
-
-        return () => controller.abort();
-    }, [resolvedListingId, availabilityPrefetched]);
+    // TASK-2118: prefetch removed. UnitBookingWidget + AvailabilityCalendar each fetch
+    // /availability-calendar on mount; an additional prefetch here pushed the listing
+    // detail page to 3 GETs against the same endpoint and broke the duplicate-fetch
+    // guard. The "warm" benefit was marginal because both components do their own
+    // fetch immediately on render — there is no shared cache to populate.
 
 
     useEffect(() => {
@@ -770,15 +747,14 @@ useEffect(() => {
 
         const initFancybox = async () => {
             try {
-                const { Fancybox } = await import("@fancyapps/ui");
+                // CSS bundled from the installed package (matches the v6 JS) — avoids
+                // the CSP style-src violation from the previous cdn.jsdelivr.net link
+                // and the v5↔v6 version mismatch.
+                const [{ Fancybox }] = await Promise.all([
+                    import("@fancyapps/ui"),
+                    import("@fancyapps/ui/dist/fancybox/fancybox.css"),
+                ]);
 
-                // Load CSS dynamically
-                const link = document.createElement('link');
-                link.rel = 'stylesheet';
-                link.href = 'https://cdn.jsdelivr.net/npm/@fancyapps/ui@5.0/dist/fancybox/fancybox.css';
-                document.head.appendChild(link);
-
-                // Fancybox v6 syntax
                 (Fancybox as { bind: (sel: string, opts: object) => void }).bind("[data-fancybox='property-gallery']", {
                     Thumbs: {
                         type: "classic",
@@ -790,7 +766,6 @@ useEffect(() => {
 
                 return () => {
                     Fancybox.destroy();
-                    document.head.removeChild(link);
                 };
             } catch (err) {
                 console.warn('Failed to load Fancybox', err);
@@ -1198,6 +1173,13 @@ useEffect(() => {
                       className="w-full h-full border-0"
                     />
                   </div>
+                )}
+
+                {/* Task 37: 3D virtual tour viewer (Pannellum / Matterport). Renders nothing when no tours. */}
+                {Number.isFinite(Number(resolvedListingId)) && Number(resolvedListingId) > 0 && (
+                  <Suspense fallback={null}>
+                    <VirtualTourSection listingId={Number(resolvedListingId)} />
+                  </Suspense>
                 )}
 
                 {/* Image Gallery — Azure blob URLs are skipped (409); API/static must serve reachable images */}
