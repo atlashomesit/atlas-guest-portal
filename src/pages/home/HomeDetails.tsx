@@ -12,7 +12,7 @@ import { getTenantFilteredHomes, defaultHomeHighlights } from "../../content/hom
 import { useBooking } from "../../contexts/BookingContext";
 import { CONTACT } from "../../config/contact";
 import { getTenantContext } from "../../tenant/tenantContext";
-import { getTenantOverrides } from "../../tenant/tenantOverrides";
+import { getTenantOverrides, shouldHideAtlasBranding } from "../../tenant/tenantOverrides";
 import { usePropertyListings } from "../../hooks/usePropertyListings";
 import { addRecentlyViewed } from "../../utils/guestHistory";
 import { track } from "../../lib/events";
@@ -90,7 +90,9 @@ function AmenityChip({ label }: { label: string }) {
 const HomeDetails = () => {
   const { roomNo } = useParams<{ roomNo: string }>();
   const { homes: apiHomes, listingsById } = usePropertyListings();
-  const tenantOverrides = getTenantOverrides(getTenantContext()?.slug);
+  const tenant = getTenantContext();
+  const tenantOverrides = getTenantOverrides(tenant?.slug);
+  const hideAtlasBranding = shouldHideAtlasBranding(tenant, tenantOverrides);
 
   // First try to find in API data (by listing ID)
   const apiRoom = apiHomes.find((item) => item.roomNo === roomNo);
@@ -223,7 +225,7 @@ const HomeDetails = () => {
   return (
     <section className="max-w-5xl mx-auto px-4 py-12 flex flex-col gap-6">
       <div>
-        {!tenantOverrides.hideAtlasHomesBranding && (
+        {!hideAtlasBranding && (
           <p className="text-sm uppercase tracking-wide text-text-muted">Atlas Homes</p>
         )}
         <h1 className="text-4xl font-bold text-text-primary">{room.title}</h1>

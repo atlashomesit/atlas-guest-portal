@@ -6,6 +6,7 @@ import { getFeatureFlags } from "../../config/featureFlags";
 import { SUPPORT_DRAWER_COPY } from "../../config/supportDrawerCopy";
 import { trackEvent } from "../../utils/analytics";
 import { buildWaLink, defaultPrefill } from "../../utils/whatsapp";
+import { getTenantBrandName } from "../../tenant/displayBrand";
 import { submitCallbackRequest } from "../support/callbackService";
 import CallbackRequestForm from "./CallbackRequestForm";
 import ChatbotPlaceholder from "./ChatbotPlaceholder";
@@ -19,6 +20,7 @@ const SCROLL_BUFFER_PX = 200;
 const DISMISS_KEY = "supportDrawer:dismissed";
 
 const SupportWidgetContent = () => {
+  const brandName = getTenantBrandName();
   const location = useLocation();
   const matchPropertyDetails =
     matchPath("/property_details/:id", location.pathname) ?? matchPath("/properties/:id", location.pathname);
@@ -61,9 +63,9 @@ const SupportWidgetContent = () => {
     () =>
       buildWaLink({
         phoneE164: CONTACT.business.whatsapp,
-        text: defaultPrefill({ href: pageUrl, context: "booking or payments" }),
+        text: defaultPrefill({ href: pageUrl, context: "booking or payments", brandName }),
       }),
-    [pageUrl],
+    [pageUrl, brandName],
   );
 
   useEffect(() => {

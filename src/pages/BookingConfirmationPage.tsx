@@ -133,12 +133,22 @@ const PRE_ARRIVAL_STRINGS: Record<string, {
   },
 };
 
+interface ListingAddOnPublic {
+  addOnServiceId: number;
+  name: string;
+  description?: string | null;
+  price: number;
+  priceType: string;
+  category?: string | null;
+}
+
 export default function BookingConfirmationPage() {
   const { bookingId } = useParams<{ bookingId: string }>();
   const [searchParams] = useSearchParams();
   const token = searchParams.get("t");
 
   const [booking, setBooking] = useState<BookingSummary | null>(null);
+  const [addOns, setAddOns] = useState<ListingAddOnPublic[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pushState, setPushState] = useState<"idle" | "loading" | "done" | "error">("idle");
@@ -201,6 +211,15 @@ export default function BookingConfirmationPage() {
           .then((r) => r.ok ? r.json() : Promise.resolve([]))
           .then((data: unknown) => { if (Array.isArray(data)) setModRequests(data); })
           .catch(() => {});
+        // TASK-1376: fetch listing add-ons for post-payment upsell (best-effort, non-blocking)
+        if (b.listingId != null && b.listingId > 0) {
+          fetch(buildApiUrl(`/listings/${b.listingId}/add-ons`), {
+            headers: { Accept: "application/json", ...getApiHeaders() },
+          })
+            .then((r) => r.ok ? r.json() : Promise.resolve([]))
+            .then((data: unknown) => { if (Array.isArray(data)) setAddOns(data as ListingAddOnPublic[]); })
+            .catch(() => {});
+        }
       })
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
@@ -821,6 +840,42 @@ export default function BookingConfirmationPage() {
                 </a>
                 .
               </p>
+              {/* TASK-1387: build review expectation at confirmation time */}
+              <p>⭐ After your stay, we'll ask you to share a quick review — it helps future guests and your host.</p>
+            </div>
+          </div>
+        )}
+
+        {/* TASK-1376: Add-on upsell — only when listing has active add-ons and booking is not cancelled */}
+        {!isCancelled && addOns.length > 0 && (
+          <div className="rounded-2xl border border-brand-primary/30 bg-brand-primary/5 p-5">
+            <h2 className="text-sm font-semibold text-text-primary mb-3">Make your stay even better</h2>
+            <div className="space-y-3">
+              {addOns.slice(0, 3).map((addOn) => {
+                const priceLabel = addOn.priceType === 'per_night' ? '/night'
+                  : addOn.priceType === 'per_guest' ? '/guest'
+                  : '';
+                const addOnText = encodeURIComponent(
+                  `Hi, I just booked #${booking!.bookingId} and I'd like to add: ${addOn.name} (₹${addOn.price}${priceLabel}). Please confirm.`
+                );
+                const addOnWhatsapp = `https://wa.me/${whatsappUrl.split('/')[3].split('?')[0]}?text=${addOnText}`;
+                return (
+                  <div key={addOn.addOnServiceId} className="flex items-center justify-between gap-3 bg-bg-surface rounded-xl border border-border-subtle px-4 py-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-text-primary">{addOn.name}</p>
+                      {addOn.description && <p className="text-xs text-text-secondary truncate">{addOn.description}</p>}
+                    </div>
+                    <a
+                      href={addOnWhatsapp}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="shrink-0 inline-flex items-center gap-1 rounded-lg bg-brand-primary text-white text-xs font-semibold px-3 py-1.5 hover:opacity-90 transition-opacity"
+                    >
+                      Add ₹{addOn.price}{priceLabel}
+                    </a>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

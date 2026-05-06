@@ -11,7 +11,8 @@ import { getTenantContext } from "../../tenant/tenantContext";
 
 const WhyChooseSection = () => {
   const tenant = getTenantContext();
-  const brandName = tenant?.name ?? "Atlas Homes";
+  // RA-006 §3.6: brand-neutral fallback for unresolved tenant context.
+  const brandName = tenant?.name ?? "Our Homestays";
 
   const useExperimentalLayout =
     enableWhyChooseAccordion ||

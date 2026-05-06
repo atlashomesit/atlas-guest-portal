@@ -19,7 +19,7 @@ describe('apiFetch', () => {
 
     await apiFetch('/foo');
 
-    expect(mock).toHaveBeenCalledWith('https://api.test/foo', expect.objectContaining({ credentials: 'include' }));
+    expect(mock).toHaveBeenCalledWith('https://api.test/foo', expect.objectContaining({ credentials: 'omit' }));
   });
 
   it('blocks localhost absolute URLs when running off localhost', async () => {

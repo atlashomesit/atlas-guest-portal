@@ -1,4 +1,6 @@
-/* eslint-disable atlas-brand/no-atlas-string-leak -- TODO Task 16: replace with per-tenant content */
+/* eslint-disable atlas-brand/no-atlas-string-leak -- legacy SGH terms stub; marketplace name from displayBrand (CPO-001). */
+import { MARKETPLACE_BRAND_BASELINE } from "../tenant/displayBrand";
+
 export type TermsSection = {
   id: string;
   number: string;
@@ -8,7 +10,7 @@ export type TermsSection = {
 };
 
 export const termsMetadata = {
-  title: "Terms & Conditions – Atlas Homestays",
+  title: `Terms & Conditions – ${MARKETPLACE_BRAND_BASELINE}`,
   lastUpdated: "Last updated: January 10, 2025",
 };
 

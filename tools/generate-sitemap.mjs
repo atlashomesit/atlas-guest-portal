@@ -21,7 +21,10 @@ const propertyData = propertyRows.map((m) => ({
   property_name: String(m[2]),
 }));
 
-const origin = "https://atlashomestays.com";
+// CPO-007: tenant builds override the canonical host via SITEMAP_ORIGIN. Default keeps Atlas
+// for the marketplace deploy. Cloudflare Pages Function still serves a fully tenant-aware
+// sitemap at request time (functions/sitemap.xml.ts) — this static file is only the fallback.
+const origin = (process.env.SITEMAP_ORIGIN || "https://atlashomestays.com").replace(/\/+$/, "");
 const now = new Date().toISOString();
 
 const staticUrls = [

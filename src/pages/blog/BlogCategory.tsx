@@ -1,37 +1,41 @@
-/* eslint-disable atlas-brand/no-atlas-string-leak -- TODO Task 16: replace with per-tenant content */
+import { useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
 import SEO from "../../components/SEO";
-import { blogPosts, BlogCategory as BlogCategoryType } from "../../data/blogPosts";
-
-const categoryMeta: Record<BlogCategoryType, { title: string; description: string; label: string }> = {
-  "guest-guides": {
-    title: "Guest Guides | Atlas Homestays",
-    description: "Destination tips and stay guidance for Atlas Homestays guests.",
-    label: "Guest Guides",
-  },
-  "hospitality-tech": {
-    title: "Hospitality Tech & AI | Atlas Homestays",
-    description: "Technology updates and automation powering Atlas Homestays.",
-    label: "Hospitality Tech & AI",
-  },
-};
-
-const isValidCategory = (value: string | undefined): value is BlogCategoryType => {
-  return Boolean(value && value in categoryMeta);
-};
+import { getLocalizedBlogPosts, BlogCategory as BlogCategoryType } from "../../data/blogPosts";
+import { getTenantBrandName } from "../../tenant/displayBrand";
 
 const BlogCategory = () => {
+  const brandName = getTenantBrandName();
+  const posts = useMemo(() => getLocalizedBlogPosts(brandName), [brandName]);
+
+  const categoryMeta: Record<BlogCategoryType, { title: string; description: string; label: string }> = {
+    "guest-guides": {
+      title: `Guest Guides | ${brandName}`,
+      description: `Destination tips and stay guidance for ${brandName} guests.`,
+      label: "Guest Guides",
+    },
+    "hospitality-tech": {
+      title: `Hospitality Tech & AI | ${brandName}`,
+      description: `Technology updates and automation powering ${brandName}.`,
+      label: "Hospitality Tech & AI",
+    },
+  };
+
+  const isValidCategory = (value: string | undefined): value is BlogCategoryType => {
+    return Boolean(value && value in categoryMeta);
+  };
+
   const { category } = useParams();
   const safeCategory: BlogCategoryType = isValidCategory(category) ? category : "guest-guides";
   const meta = categoryMeta[safeCategory];
-  const filtered = blogPosts.filter((post) => post.category === safeCategory);
+  const filtered = posts.filter((post) => post.category === safeCategory);
 
   return (
     <div className="px-4 md:px-10 lg:px-20 py-24 bg-bg-muted min-h-screen">
       <SEO title={meta.title} description={meta.description} />
       <div className="max-w-5xl mx-auto space-y-8">
         <div className="space-y-3">
-          <p className="uppercase tracking-[0.2em] text-primary font-semibold">Atlas Homestays</p>
+          <p className="uppercase tracking-[0.2em] text-primary font-semibold">{brandName}</p>
           <h1 className="text-4xl font-bold text-text-primary">{meta.label}</h1>
           <p className="text-lg text-text-muted">{meta.description}</p>
         </div>

@@ -1,7 +1,7 @@
 /* eslint-disable atlas-brand/no-atlas-string-leak -- TODO Task 16: replace with per-tenant content */
 import { lazy, Suspense, useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Wifi, Briefcase } from "lucide-react";
 
 import { propertyData } from "../data";
 import { fetchPublicListings, type PublicListing } from "../api/listingClient";
@@ -9,7 +9,7 @@ import { parseDate } from "../utils/formatting";
 import { useCurrency } from "../contexts/CurrencyContext";
 import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 import { getTenantContext } from "../tenant/tenantContext";
-import { getTenantOverrides, getTenantPublicListingIdAllowlist, getUnitNoun } from "../tenant/tenantOverrides";
+import { getTenantOverrides, getTenantPublicListingIdAllowlist, getUnitNoun, shouldHideAtlasBranding } from "../tenant/tenantOverrides";
 import SkeletonCard from "../components/apartments/SkeletonCard";
 import OptimizedImage from "../components/ui/OptimizedImage";
 import OwnerShareBadge from "../components/OwnerShareBadge"; // TASK-1705
@@ -257,6 +257,7 @@ const SearchPage = () => {
 
   const tenant = getTenantContext();
   const overrides = getTenantOverrides(tenant?.slug);
+  const hideAtlasBranding = shouldHideAtlasBranding(tenant, overrides);
   const unitNoun = getUnitNoun(overrides);
   const tenantAllowedIds = useMemo(() => {
     const allowed = getTenantPublicListingIdAllowlist(overrides);
@@ -1004,8 +1005,8 @@ const SearchPage = () => {
               className="rounded-2xl border border-border-subtle bg-bg-surface px-4 py-8 text-center shadow-sm sm:px-8"
               data-testid="search-empty-state"
             >
-              {/* RA-006: SVG depicts Atlas Homestays — only show on the marketplace root. */}
-              {!overrides.hideAtlasHomesBranding && (
+              {/* RA-006: SVG depicts marketplace brand — only show on the marketplace root. */} {/* TODO(CPO-001-followup): swap SVG/wordmark per tenant pack */}
+              {!hideAtlasBranding && (
                 <div className="mx-auto mb-6 flex max-w-xs justify-center" aria-hidden>
                   <img
                     src="/images/atlas-homestays-static-map.svg"
@@ -1220,27 +1221,40 @@ const SearchPage = () => {
                       <p className="text-sm text-text-muted">Sleeps up to {unit.maxGuests} guests</p>
                       {/* TASK-577: Show WiFi speed and co-working desk badges */}
                       <div className="mt-2 flex flex-wrap gap-2">
+                        {/* TASK-1674: use lucide icons instead of emoji for visual consistency */}
                         {(unit as any).wifiSpeedMbps && (unit as any).wifiSpeedMbps >= 25 && (
                           <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700">
-                            📶 WiFi {(unit as any).wifiSpeedMbps}Mbps
+                            <Wifi className="h-3 w-3" /> WiFi {(unit as any).wifiSpeedMbps}Mbps
                           </span>
                         )}
                         {(unit as any).hasCoworkingDesk && (
                           <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700">
-                            💼 Co-working desk
+                            <Briefcase className="h-3 w-3" /> Co-working desk
                           </span>
                         )}
-                        {/* TASK-1725: Atlas-verified photos badge */}
-                        {unit.hasVerifiedPhotos && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700">
-                            ✅ Verified photos
+                        {/* TASK-1298: composite Atlas Trusted Host badge — shown when both verified photos and GST reg are present */}
+                        {unit.hasVerifiedPhotos && unit.isGstRegistered ? (
+                          <span
+                            className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700 border border-emerald-200 cursor-help"
+                            title="Identity verified, GST registered, photos checked by Atlas team. We've verified the documents."
+                          >
+                            ✅ Atlas Trusted Host
                           </span>
-                        )}
-                        {/* TASK-1727: GST registered badge */}
-                        {unit.isGstRegistered && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 border border-blue-200">
-                            🧾 GST Reg.
-                          </span>
+                        ) : (
+                          <>
+                            {/* TASK-1725: Atlas-verified photos badge */}
+                            {unit.hasVerifiedPhotos && (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700">
+                                ✅ Verified photos
+                              </span>
+                            )}
+                            {/* TASK-1727: GST registered badge */}
+                            {unit.isGstRegistered && (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 border border-blue-200">
+                                🧾 GST Reg.
+                              </span>
+                            )}
+                          </>
                         )}
                         {/* TASK-1695: LOS discount badge — show highest configured tier */}
                         {unit.losDiscount2MinNights != null && unit.losDiscount2MinNights > 0 &&

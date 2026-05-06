@@ -154,6 +154,16 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const { getUrlsForListingId } = useListingPhotosFromApi();
   const isBookingDisabled = !hasRuntimeConfig();
 
+  // RA-006 + WhatsApp-fallback: when the tenant has no online payment provider configured
+  // we hand the booking off to the host's WhatsApp instead of attempting a Razorpay order.
+  // Money never flows through Atlas; the tenant collects directly.
+  const tenantBookingMode = getTenantContext()?.bookingMode;
+  const tenantWhatsappPhone = getTenantContext()?.whatsappBookingPhone;
+  const isWhatsAppDirectBooking =
+    tenantBookingMode === 'WHATSAPP' &&
+    typeof tenantWhatsappPhone === 'string' &&
+    tenantWhatsappPhone.length >= 6;
+
   const coverFromPublicListings = useMemo(() => {
     const id = listingId != null ? Number(listingId) : NaN;
     if (!Number.isFinite(id) || id <= 0) return undefined;
@@ -1113,6 +1123,49 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     setDateError(null);
 
     if (!validateForm()) {
+      return;
+    }
+
+    // RA-006 WhatsApp direct-booking handoff: when the tenant has no online provider,
+    // bundle the form details into a wa.me message and open the host's WhatsApp instead
+    // of calling /api/Razorpay/order. No Atlas-side booking row, no payment intent.
+    if (isWhatsAppDirectBooking && tenantWhatsappPhone) {
+      const tenantNameForMessage = getTenantContext()?.name?.trim() || 'your team';
+      const checkinForMessage = dateRange.startDate
+        ? formatHumanDate(dateRange.startDate)
+        : 'a date to be confirmed';
+      const checkoutForMessage = dateRange.endDate
+        ? formatHumanDate(dateRange.endDate)
+        : 'a date to be confirmed';
+      const guestsForMessage = formData.guests || '1';
+      const propertyForMessage = listingName?.trim() || 'your property';
+      const guestNameForMessage = formData.name.trim() || 'a guest';
+      const noteForMessage = formData.notes.trim()
+        ? `\nSpecial requests: ${formData.notes.trim()}`
+        : '';
+
+      const messageLines = [
+        `Hi ${tenantNameForMessage} — I'd like to book ${propertyForMessage}.`,
+        `Check-in: ${checkinForMessage}`,
+        `Check-out: ${checkoutForMessage}`,
+        `Guests: ${guestsForMessage}`,
+        `Name: ${guestNameForMessage}`,
+        formData.email.trim() ? `Email: ${formData.email.trim()}` : null,
+      ].filter(Boolean) as string[];
+
+      const message = messageLines.join('\n') + noteForMessage;
+      const url = `https://wa.me/${encodeURIComponent(tenantWhatsappPhone)}?text=${encodeURIComponent(message)}`;
+      try {
+        track('whatsapp_direct_booking_handoff', {
+          tenantSlug: getTenantContext()?.slug ?? null,
+          listingId: listingId != null ? String(listingId) : null,
+          checkinIso: dateRange.startDate ? toISODate(dateRange.startDate) : null,
+          checkoutIso: dateRange.endDate ? toISODate(dateRange.endDate) : null,
+          guests: guestsForMessage,
+        });
+      } catch { /* analytics best-effort */ }
+      window.open(url, '_blank', 'noopener');
+      toast.info('Opening WhatsApp — your host will confirm availability and payment with you.');
       return;
     }
 
@@ -2531,12 +2584,19 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         </div>
       )}
 
-      {!isBookingDisabled && (
+      {!isBookingDisabled && !isWhatsAppDirectBooking && (
         <div className="flex items-center gap-2 flex-wrap justify-center py-1">
           <img src="/icons/upi.svg" alt="UPI" className="h-5" loading="lazy" decoding="async" />
           <img src="/icons/visa.svg" alt="Visa" className="h-4" loading="lazy" decoding="async" />
           <img src="/icons/rupay.svg" alt="RuPay" className="h-4" loading="lazy" decoding="async" />
           <span className="text-xs text-text-muted">Secured by Razorpay · UPI / Visa / RuPay</span>
+        </div>
+      )}
+      {!isBookingDisabled && isWhatsAppDirectBooking && (
+        <div className="flex items-center gap-2 flex-wrap justify-center py-1">
+          <span className="text-xs text-text-muted">
+            Booking is confirmed directly with the host on WhatsApp — no payment is taken on this site.
+          </span>
         </div>
       )}
 
@@ -2555,7 +2615,13 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         className={isSubmitting || isLoading ? 'opacity-75' : ''}
         data-testid="guest-booking-submit"
       >
-        {isBookingDisabled ? 'Unavailable' : isSubmitting || isLoading ? 'Processing…' : 'Book Now'}
+        {isBookingDisabled
+          ? 'Unavailable'
+          : isSubmitting || isLoading
+            ? 'Processing…'
+            : isWhatsAppDirectBooking
+              ? 'Continue on WhatsApp'
+              : 'Book Now'}
       </Button>
     </form>
     </>

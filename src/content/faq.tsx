@@ -1,4 +1,3 @@
-/* eslint-disable atlas-brand/no-atlas-string-leak -- TODO Task 16: replace with per-tenant content */
 import { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
@@ -16,7 +15,9 @@ export interface FaqSection {
   items: FaqItem[];
 }
 
-export const faqSections: FaqSection[] = [
+/** CPO-001: retail FAQ copy parameterized by tenant short brand (unused legacy widget; kept for parity with legal FAQ). */
+export function buildRetailFaqSections(brandName: string): FaqSection[] {
+  return [
   {
     id: "booking-payments",
     title: "Booking & Payments",
@@ -24,7 +25,7 @@ export const faqSections: FaqSection[] = [
     items: [
       {
         id: "book-directly",
-        question: "How do I book directly on Atlas Homestays?",
+        question: `How do I book directly on ${brandName}?`,
         answer: (
           <p>
             Browse our apartments, pick your preferred dates, and submit your details on the booking
@@ -252,3 +253,4 @@ export const faqSections: FaqSection[] = [
     ],
   },
 ];
+}

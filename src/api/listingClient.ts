@@ -131,6 +131,8 @@ export type PublicListing = {
   longitude?: number | null;
   /** TASK-2076: Total number of verified reviews. Null when no reviews yet. */
   reviewCount?: number | null;
+  /** TASK-1385: Cancellation policy tier — "Flexible", "Moderate", or "Strict". Null when host hasn't set one. */
+  cancellationTier?: 'Flexible' | 'Moderate' | 'Strict' | null;
 };
 
 function normalizePublicListing(payload: Record<string, unknown>): PublicListing {
@@ -207,6 +209,9 @@ function normalizePublicListing(payload: Record<string, unknown>): PublicListing
     latitude: Number.isFinite(latitude) ? latitude : null,
     longitude: Number.isFinite(longitude) ? longitude : null,
     reviewCount: payload.reviewCount != null ? Number(payload.reviewCount) : null,
+    cancellationTier: (payload.cancellationTier === 'Flexible' || payload.cancellationTier === 'Moderate' || payload.cancellationTier === 'Strict')
+      ? payload.cancellationTier
+      : null, // TASK-1385
   };
 }
 

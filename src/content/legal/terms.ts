@@ -1,4 +1,5 @@
-/* eslint-disable atlas-brand/no-atlas-string-leak -- TODO Task 16: replace with per-tenant content */
+import { MARKETPLACE_BRAND_BASELINE } from "../../tenant/displayBrand";
+
 export type TermsSection = {
   id: string;
   title: string;
@@ -88,7 +89,7 @@ export const termsSections: TermsSection[] = [
     body: [
       "We may charge for repair, replacement, or deep cleaning caused by avoidable damage, missing items, or violation of house rules.",
       "Security deposits (when collected) may be applied toward such costs; itemised statements are shared when deductions occur.",
-      "Atlas Homestays is not liable for personal belongings unless required by law. Please safeguard valuables and use available lockers where provided.",
+      `${MARKETPLACE_BRAND_BASELINE} is not liable for personal belongings unless required by law. Please safeguard valuables and use available lockers where provided.`,
     ],
   },
   {
@@ -105,4 +106,4 @@ export const termsSections: TermsSection[] = [
 ];
 
 export const paymentDataSharingNote =
-  "You agree to share booking and payment details with Atlas Homestays and our payment providers, in line with applicable laws and privacy notices.";
+  `You agree to share booking and payment details with ${MARKETPLACE_BRAND_BASELINE} and our payment providers, in line with applicable laws and privacy notices.`;

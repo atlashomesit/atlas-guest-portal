@@ -1,5 +1,7 @@
 // Hardening for BUG-ONBOARD-1 (incident 2026-05-02). See atlas-e2e/docs/incidents/2026-05-02-property-registration-failure.md
 
+import { getTenantContactEmail } from "@/tenant/displayBrand";
+
 /**
  * Builds a user-visible message from an API error response (ASP.NET ProblemDetails / ModelState).
  * Uses `res.clone()` so callers can still read the body from `res` if needed.
@@ -34,10 +36,10 @@ export async function messageFromApiResponse(res: Response): Promise<string> {
   if (serverMsg) return serverMsg;
   if (raw) return raw.length > 500 ? `${raw.slice(0, 500)}…` : raw;
 
+  const support = getTenantContactEmail("support");
   const fallback =
     res.status >= 500
-      // eslint-disable-next-line atlas-brand/no-atlas-string-leak -- TODO Task 16: per-tenant support email
-      ? `Our servers hit an unexpected error (${res.status}). Try again or contact support@atlashomestays.com.`
+      ? `Our servers hit an unexpected error (${res.status}). Try again or contact ${support}.`
       : `Request failed (HTTP ${res.status}). Please check your input and try again.`;
   return fallback;
 }

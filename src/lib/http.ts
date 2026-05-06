@@ -28,9 +28,17 @@ export async function apiFetch(path: string, init?: RequestInit): Promise<Respon
   let lastError: Error | undefined;
   const maxAttempts = isRetryable(init?.method) ? RETRY_LIMIT + 1 : 1;
 
+  // Cross-origin credentialed fetches require Access-Control-Allow-Credentials on the API.
+  // Guest portal public calls use JWT/headers, not cookies — omit avoids spurious CORS failures.
+  const defaultCredentials: RequestCredentials = IS_LOCALHOST ? 'include' : 'omit';
+
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      const res = await monitoredFetch(url, { credentials: 'include', ...init, headers: mergedHeaders });
+      const res = await monitoredFetch(url, {
+        credentials: defaultCredentials,
+        ...init,
+        headers: mergedHeaders,
+      });
       if (!res.ok) {
         if (isRetryable(init?.method) && RETRYABLE_STATUSES.has(res.status) && attempt < maxAttempts) {
           await new Promise((r) => setTimeout(r, RETRY_DELAY_MS * attempt));
