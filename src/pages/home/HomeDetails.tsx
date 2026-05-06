@@ -345,6 +345,30 @@ const HomeDetails = () => {
         />
       </Suspense>
 
+      {/* TL-PROP: per-property location map. Renders only when admin has set lat/lng. */}
+      {(() => {
+        const apiListing = listingsById[room.roomNo ?? ""];
+        const lat = apiListing?.latitude;
+        const lng = apiListing?.longitude;
+        if (lat == null || lng == null) return null;
+        return (
+          <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3">
+            <div>
+              <h2 className="text-lg font-semibold text-text-primary">Location</h2>
+              {apiListing?.propertyAddress && (
+                <p className="text-sm text-text-secondary">{apiListing.propertyAddress}</p>
+              )}
+            </div>
+            <EmbeddedListingMap
+              latitude={Number(lat)}
+              longitude={Number(lng)}
+              label={room.title}
+              height={320}
+            />
+          </div>
+        );
+      })()}
+
       {/* Chat with host WhatsApp CTA (TASK-355) */}
       <a
         href={`https://wa.me/${CONTACT.business.whatsapp}?text=${encodeURIComponent(`Hi, I'm interested in booking ${room.title}`)}`}

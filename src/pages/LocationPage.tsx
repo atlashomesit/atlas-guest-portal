@@ -8,6 +8,8 @@ import { GOOGLE_MAPS_API_KEY } from "../config/googleMaps";
 import { getTenantOverrides } from "../tenant/tenantOverrides";
 import { getTenantBrandName } from "../tenant/displayBrand";
 import { getTenantContext } from "../tenant/tenantContext";
+import MultiPinMap, { type MapPin } from "../components/map/MultiPinMap";
+import { usePropertyListings } from "../hooks/usePropertyListings";
 
 type GoogleMapsMapOptions = {
   center: { lat: number; lng: number };
@@ -46,6 +48,28 @@ const LocationPage = () => {
   const mapLocation = tenant?.mapLocation ?? overrides.mapLocation;
   const locationContent = tenant?.locationContent ?? overrides.locationContent;
   const tenantName = tenant?.name?.trim() || getTenantBrandName();
+
+  // TL-PROP: aggregate per-property pins. When the tenant has 2+ properties with lat/lng,
+  // we render a multi-pin map; otherwise we fall back to the single tenant pin below.
+  const { listingsById } = usePropertyListings();
+  const propertyPins = useMemo<MapPin[]>(() => {
+    const seen = new Map<number, MapPin>();
+    for (const l of Object.values(listingsById)) {
+      const lat = typeof l.latitude === "number" ? l.latitude : null;
+      const lng = typeof l.longitude === "number" ? l.longitude : null;
+      if (lat == null || lng == null) continue;
+      if (seen.has(l.propertyId)) continue;
+      seen.set(l.propertyId, {
+        id: `property-${l.propertyId}`,
+        lat,
+        lng,
+        title: l.propertyName?.trim() || `Property ${l.propertyId}`,
+        subtitle: l.propertyAddress ?? undefined,
+      });
+    }
+    return Array.from(seen.values());
+  }, [listingsById]);
+  const useMultiPin = propertyPins.length >= 2;
 
   const [mapStatus, setMapStatus] = useState<MapStatus>("loading");
   const [, setErrorDetails] = useState<string | null>(null);
@@ -102,6 +126,10 @@ const LocationPage = () => {
     setErrorDetails(null);
     hasInitializedMap.current = false;
 
+    // TL-PROP: when MultiPinMap is rendering, the single-pin container is unmounted —
+    // skip the legacy script-loading path entirely.
+    if (useMultiPin) return;
+
     if (!mapLocation) {
       setMapStatus("failed");
       return;
@@ -155,7 +183,7 @@ const LocationPage = () => {
       script.removeEventListener("load", handleLoad);
       script.removeEventListener("error", handleError);
     };
-  }, [apiKey, retryCount, mapLocation]);
+  }, [apiKey, retryCount, mapLocation, useMultiPin]);
 
   return (
     <div className="px-4 md:px-10 lg:px-20 py-16 bg-bg-muted">
@@ -176,7 +204,19 @@ const LocationPage = () => {
           )}
         </header>
 
-        {mapLocation ? (
+        {useMultiPin ? (
+          <Card className="p-0 overflow-hidden shadow-level2">
+            <div className="p-4 border-b border-border-subtle">
+              <Typography as="p" className="text-text-primary font-semibold">
+                Our properties ({propertyPins.length})
+              </Typography>
+              <Typography className="text-text-muted text-sm">
+                Click a pin for details. Each marker is a separate property.
+              </Typography>
+            </div>
+            <MultiPinMap pins={propertyPins} height={420} />
+          </Card>
+        ) : mapLocation ? (
           <Card className="p-0 overflow-hidden shadow-level2">
             <div className="relative bg-bg-surface border border-border-subtle rounded-2xl overflow-hidden">
               <div className="relative h-[280px] md:h-[420px]">
