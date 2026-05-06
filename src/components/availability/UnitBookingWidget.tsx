@@ -437,20 +437,22 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
           
           const normalizedStatus = String(item?.status ?? '').toLowerCase();
           const status: ListingCalendarDayStatus =
-            normalizedStatus === 'blocked'
+            normalizedStatus === 'booked'
               ? 'Blocked'
-              : normalizedStatus === 'hold'
-                ? 'Hold'
-                : normalizedStatus === 'turnover'
-                  ? 'Turnover'
-                  : 'Available';
-          
+              : normalizedStatus === 'blocked'
+                ? 'Blocked'
+                : normalizedStatus === 'hold'
+                  ? 'Hold'
+                  : normalizedStatus === 'turnover'
+                    ? 'Turnover'
+                    : 'Available';
+
           // Store status for rendering
           newDateStatusMap.set(itemISO, status);
-          
+
           // Update blockedSet for backward compatibility with existing logic
-          // Blocked and Hold dates should be in blockedSet (both are non-selectable). Turnover is bookable.
-          const isBlocked = 
+          // Booked, Blocked and Hold dates should be in blockedSet (all are non-selectable). Turnover is bookable.
+          const isBlocked =
             status === 'Blocked' ||
             status === 'Hold';
           
