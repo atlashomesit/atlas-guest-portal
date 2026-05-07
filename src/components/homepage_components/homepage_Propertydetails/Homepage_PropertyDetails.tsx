@@ -385,7 +385,11 @@ const PropertyDetails = () => {
     useEffect(() => {
         const lid = Number(resolvedListingId ?? data?.listingId ?? NaN);
         if (!data || !Number.isFinite(lid) || lid <= 0) return;
-        if (typeof data.maxGuests === 'number' && data.maxGuests >= 1) return;
+        const hasMaxGuests = typeof data.maxGuests === 'number' && data.maxGuests >= 1;
+        const hasGalleryImages = filterGuestImageUrls(data.property_img ?? []).length > 0;
+        const hasHostPhone = typeof data.hostPhone === 'string' && data.hostPhone.trim().length > 0;
+        if (hasMaxGuests && hasGalleryImages && hasHostPhone) return;
+
         const ac = new AbortController();
         void fetchListingById(lid, ac.signal)
             .then((detail) => {
@@ -393,11 +397,29 @@ const PropertyDetails = () => {
                 const mg = parseMaxGuestsFromPayload(d);
                 const rawPhone = d.hostPhone ?? d.contactPhone;
                 const phone = typeof rawPhone === 'string' && rawPhone.trim() ? rawPhone.trim() : null;
+
+                const rawPhotoUrls = Array.isArray(d.photoUrls)
+                    ? (d.photoUrls as unknown[])
+                          .filter((v): v is string => typeof v === 'string')
+                    : [];
+                const photoUrls = filterGuestImageUrls(rawPhotoUrls);
+                const coverUrl = sanitizeGuestImageUrl(
+                    typeof d.coverPhotoUrl === 'string' ? d.coverPhotoUrl : undefined,
+                );
+                const hydratedImages = photoUrls.length > 0 ? photoUrls : (coverUrl ? [coverUrl] : []);
+
                 setData((prev) => {
                     if (!prev) return prev;
                     const updates: Partial<typeof prev> = {};
-                    if (mg != null) updates.maxGuests = mg;
-                    if (phone !== null && !prev.hostPhone) updates.hostPhone = phone;
+                    if (mg != null && !(typeof prev.maxGuests === 'number' && prev.maxGuests >= 1)) {
+                        updates.maxGuests = mg;
+                    }
+                    if (phone !== null && !prev.hostPhone) {
+                        updates.hostPhone = phone;
+                    }
+                    if (filterGuestImageUrls(prev.property_img ?? []).length === 0 && hydratedImages.length > 0) {
+                        updates.property_img = hydratedImages;
+                    }
                     return Object.keys(updates).length > 0 ? { ...prev, ...updates } : prev;
                 });
             })
