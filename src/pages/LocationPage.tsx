@@ -46,7 +46,19 @@ const LocationPage = () => {
   const overrides = getTenantOverrides(tenant?.slug);
   // TL-GUEST: API-sourced location (set by host via admin picker) wins over the static override.
   const mapLocation = tenant?.mapLocation ?? overrides.mapLocation;
-  const locationContent = tenant?.locationContent ?? overrides.locationContent;
+  const locationContent = useMemo(() => {
+    const fallback = overrides.locationContent;
+    const fromApi = tenant?.locationContent;
+    if (!fallback && !fromApi) return undefined;
+    return {
+      subtitle: fromApi?.subtitle ?? fallback?.subtitle,
+      transport: fromApi?.transport?.length ? fromApi.transport : fallback?.transport,
+      nearbyAmenities: fromApi?.nearbyAmenities?.length
+        ? fromApi.nearbyAmenities
+        : fallback?.nearbyAmenities,
+      landmarks: fromApi?.landmarks?.length ? fromApi.landmarks : fallback?.landmarks,
+    };
+  }, [overrides.locationContent, tenant?.locationContent]);
   const tenantName = tenant?.name?.trim() || getTenantBrandName();
 
   // TL-PROP: aggregate per-property pins. When the tenant has 2+ properties with lat/lng,
