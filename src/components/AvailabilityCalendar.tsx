@@ -104,7 +104,7 @@ export default function AvailabilityCalendar({ listingId, onDateSelect }: Props)
       let extra = '';
 
       if (loading) {
-        bg = 'animate-pulse bg-bg-muted';
+        bg = 'bg-bg-muted';
         text = 'text-transparent';
       } else if (isPast) {
         bg = 'bg-bg-muted cursor-default';

@@ -229,7 +229,7 @@ const LocationPage = () => {
 
                 {mapStatus === "loading" && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-[color:color-mix(in_srgb,var(--bg-surface)_90%,transparent)]">
-                    <div className="h-24 w-24 rounded-full bg-[color:color-mix(in_srgb,var(--border-subtle)_70%,transparent)] animate-pulse" aria-hidden />
+                    <div className="h-24 w-24 rounded-full bg-[color:color-mix(in_srgb,var(--border-subtle)_70%,transparent)]" aria-hidden />
                     <div className="space-y-2 text-center px-6">
                       <Typography as="p" className="text-text-primary font-semibold">
                         Loading map

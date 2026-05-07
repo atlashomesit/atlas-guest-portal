@@ -59,7 +59,7 @@ export default function FomoBar({ listingId, workerUrl }: FomoBarProps) {
       aria-live="polite"
       aria-label={`${count} people are viewing this listing right now`}
     >
-      <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-amber-500" aria-hidden="true" />
+      <span className="inline-block h-2 w-2 rounded-full bg-amber-500" aria-hidden="true" />
       <span>
         <strong>{count} people</strong> viewing this listing right now
       </span>

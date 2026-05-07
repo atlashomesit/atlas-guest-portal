@@ -181,7 +181,7 @@ exports[`AboutPage > matches the snapshot 1`] = `
         </div>
       </div>
       <figure
-        class="bg-gradient-to-br from-primary/10 via-cta-primary/10 to-secondary/10 rounded-2xl p-4 border border-border-subtle"
+        class="bg-primary/10 rounded-2xl p-4 border border-border-subtle"
       >
         <img
           alt="Apartment interior with warm lighting"
