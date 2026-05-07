@@ -67,16 +67,16 @@ function PropertyDetailsSkeleton() {
             </div>
             <div className="max-w-[85rem] flex flex-col gap-10 mx-auto px-4 sm:px-8 lg:px-16 py-8">
                 <div className="space-y-3">
-                    <div className="h-9 max-w-xl animate-pulse rounded-lg bg-bg-muted" />
-                    <div className="h-4 w-48 animate-pulse rounded bg-bg-muted" />
-                    <div className="h-4 w-64 animate-pulse rounded bg-bg-muted" />
+                    <div className="h-9 max-w-xl rounded-lg bg-bg-muted" />
+                    <div className="h-4 w-48 rounded bg-bg-muted" />
+                    <div className="h-4 w-64 rounded bg-bg-muted" />
                 </div>
 
                 <div className="flex gap-2 h-64 md:h-96 lg:h-[450px] overflow-hidden">
-                    <div className="flex-1 h-full rounded-md overflow-hidden animate-pulse bg-bg-muted" />
+                    <div className="flex-1 h-full rounded-md overflow-hidden bg-bg-muted" />
                     <div className="flex-1 grid grid-cols-2 grid-rows-2 gap-2 h-full">
                         {Array.from({ length: 4 }).map((_, i) => (
-                            <div key={i} className="h-full w-full rounded-md animate-pulse bg-bg-muted" />
+                            <div key={i} className="h-full w-full rounded-md bg-bg-muted" />
                         ))}
                     </div>
                 </div>
@@ -84,26 +84,26 @@ function PropertyDetailsSkeleton() {
                 <div className="flex flex-col gap-4 sm:flex-row">
                     <div className="w-full sm:w-2/3 order-2 sm:order-1 space-y-6">
                         <div className="pb-8 border-b border-border-subtle space-y-4">
-                            <div className="h-7 w-56 animate-pulse rounded bg-bg-muted" />
+                            <div className="h-7 w-56 rounded bg-bg-muted" />
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                 {Array.from({ length: 6 }).map((_, i) => (
-                                    <div key={i} className="h-24 rounded-xl animate-pulse bg-bg-muted border border-border-subtle" />
+                                    <div key={i} className="h-24 rounded-xl bg-bg-muted border border-border-subtle" />
                                 ))}
                             </div>
                         </div>
                         <div className="space-y-3">
-                            <div className="h-7 w-48 animate-pulse rounded bg-bg-muted" />
-                            <div className="h-4 w-full animate-pulse rounded bg-bg-muted" />
-                            <div className="h-4 w-5/6 animate-pulse rounded bg-bg-muted" />
-                            <div className="h-4 w-4/6 animate-pulse rounded bg-bg-muted" />
+                            <div className="h-7 w-48 rounded bg-bg-muted" />
+                            <div className="h-4 w-full rounded bg-bg-muted" />
+                            <div className="h-4 w-5/6 rounded bg-bg-muted" />
+                            <div className="h-4 w-4/6 rounded bg-bg-muted" />
                         </div>
                     </div>
                     <div className="w-full sm:w-1/3 order-1 sm:order-2">
                         <div className="rounded-2xl border border-border-subtle bg-bg-surface p-6 space-y-4">
-                            <div className="h-40 w-full animate-pulse rounded-xl bg-bg-muted" />
-                            <div className="h-6 w-28 animate-pulse rounded bg-bg-muted" />
-                            <div className="h-10 w-full animate-pulse rounded-xl bg-bg-muted" />
-                            <div className="h-12 w-full animate-pulse rounded-xl bg-bg-muted" />
+                            <div className="h-40 w-full rounded-xl bg-bg-muted" />
+                            <div className="h-6 w-28 rounded bg-bg-muted" />
+                            <div className="h-10 w-full rounded-xl bg-bg-muted" />
+                            <div className="h-12 w-full rounded-xl bg-bg-muted" />
                         </div>
                     </div>
                 </div>
@@ -1385,14 +1385,14 @@ useEffect(() => {
                             const s = similarFromApi;
                             if (s?.loading) return (
                                 <div className="pb-8 border-b border-border-subtle">
-                                    <div className="h-7 w-48 animate-pulse rounded bg-bg-muted mb-4" />
+                                    <div className="h-7 w-48 rounded bg-bg-muted mb-4" />
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         {Array.from({ length: 2 }).map((_, i) => (
                                             <div key={i} className="rounded-xl border border-border-subtle bg-bg-surface overflow-hidden">
-                                                <div className="h-40 w-full animate-pulse bg-bg-muted" />
+                                                <div className="h-40 w-full bg-bg-muted" />
                                                 <div className="p-4 space-y-2">
-                                                    <div className="h-4 w-3/4 animate-pulse rounded bg-bg-muted" />
-                                                    <div className="h-3 w-1/2 animate-pulse rounded bg-bg-muted" />
+                                                    <div className="h-4 w-3/4 rounded bg-bg-muted" />
+                                                    <div className="h-3 w-1/2 rounded bg-bg-muted" />
                                                 </div>
                                             </div>
                                         ))}
@@ -1437,18 +1437,18 @@ useEffect(() => {
                             const showStatic = !showApi && !apiLoaded && data && data.property_reviews > 0;
                             if (api?.loading && !showStatic) return (
                                 <div className="pb-8 border-b border-border-subtle">
-                                    <div className="h-7 w-40 animate-pulse rounded bg-bg-muted mb-4" />
+                                    <div className="h-7 w-40 rounded bg-bg-muted mb-4" />
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                         {Array.from({ length: 2 }).map((_, i) => (
                                             <div key={i} className="p-4 rounded-xl bg-bg-muted border border-border-subtle space-y-2">
-                                                <div className="h-3 w-24 animate-pulse rounded bg-bg-surface" />
+                                                <div className="h-3 w-24 rounded bg-bg-surface" />
                                                 <div className="flex gap-1">
                                                     {Array.from({ length: 5 }).map((__, j) => (
-                                                        <div key={j} className="h-3 w-3 animate-pulse rounded-full bg-bg-surface" />
+                                                        <div key={j} className="h-3 w-3 rounded-full bg-bg-surface" />
                                                     ))}
                                                 </div>
-                                                <div className="h-3 w-full animate-pulse rounded bg-bg-surface" />
-                                                <div className="h-3 w-4/5 animate-pulse rounded bg-bg-surface" />
+                                                <div className="h-3 w-full rounded bg-bg-surface" />
+                                                <div className="h-3 w-4/5 rounded bg-bg-surface" />
                                             </div>
                                         ))}
                                     </div>
@@ -1693,7 +1693,7 @@ useEffect(() => {
                             })()}
                             {resolvedListingId && (
                                 <Suspense fallback={
-                                    <div className="rounded-lg border border-border-subtle bg-bg-surface p-4 animate-pulse h-64" />
+                                    <div className="rounded-lg border border-border-subtle bg-bg-surface p-4 h-64" />
                                 }>
                                     <AvailabilityCalendar
                                         listingId={resolvedListingId}

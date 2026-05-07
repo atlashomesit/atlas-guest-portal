@@ -175,7 +175,7 @@ export default function MarketplaceHomepage() {
                 data-testid="marketplace-card"
               >
                 {/* TASK-1874: OptimizedImage replaces raw <img> */}
-                <div className="h-40 w-full bg-gradient-to-br from-bg-muted to-bg-surface">
+                <div className="h-40 w-full bg-bg-muted">
                   <OptimizedImage
                     src={item.coverImageUrl ?? ''}
                     alt={item.title || 'Listing photo'}

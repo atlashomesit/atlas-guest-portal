@@ -1054,7 +1054,7 @@ const SearchPage = () => {
                       className="flex flex-col overflow-hidden rounded-2xl border border-border-subtle bg-bg-surface shadow-sm"
                       data-testid="search-empty-suggestion-card"
                     >
-                      <div className="h-36 w-full bg-gradient-to-br from-bg-muted to-bg-surface">
+                      <div className="h-36 w-full bg-bg-muted">
                         <OptimizedImage
                           src={unit.imageUrl}
                           alt={unit.title ?? "Property listing"}
@@ -1189,7 +1189,7 @@ const SearchPage = () => {
                 data-testid="guest-listing-card"
                 className="flex flex-col overflow-hidden rounded-2xl border border-border-subtle bg-bg-surface shadow-sm transition-colors hover:border-border-subtle"
               >
-                <div className="h-48 w-full bg-gradient-to-br from-bg-muted to-bg-surface">
+                <div className="h-48 w-full bg-bg-muted">
                   <OptimizedImage
                     src={unit.imageUrl}
                     alt={unit.title ?? "Property listing"}
@@ -1210,7 +1210,7 @@ const SearchPage = () => {
                         {chip.label}
                       </span>
                     ) : !availabilityFetchDone ? (
-                      <span className="inline-block h-5 w-16 animate-pulse rounded-full bg-bg-muted" aria-hidden />
+                      <span className="inline-block h-5 w-16 rounded-full bg-bg-muted" aria-hidden />
                     ) : null;
                   })() : null}
                 </div>

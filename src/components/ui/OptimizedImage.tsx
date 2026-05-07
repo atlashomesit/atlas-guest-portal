@@ -93,7 +93,7 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
     <div className={`relative block overflow-hidden bg-[color:color-mix(in_srgb,var(--bg-muted)_85%,transparent)] ${wrapperClassName ?? ""}`}>
       {showSkeleton && (
         <div
-          className={`absolute inset-0 animate-pulse bg-gradient-to-br from-[color:color-mix(in_srgb,var(--border-subtle)_75%,transparent)] to-[color:color-mix(in_srgb,var(--bg-surface)_88%,transparent)] ${
+          className={`absolute inset-0 bg-[color:color-mix(in_srgb,var(--border-subtle)_55%,var(--bg-surface)_45%)] ${
             isLoaded ? "opacity-0" : "opacity-100"
           }`}
           aria-hidden

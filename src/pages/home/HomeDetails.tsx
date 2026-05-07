@@ -335,7 +335,7 @@ const HomeDetails = () => {
 
       {/* Booking widget */}
       <Suspense fallback={
-        <div className="rounded-2xl border border-border-subtle bg-bg-surface p-6 animate-pulse h-48" />
+        <div className="rounded-2xl border border-border-subtle bg-bg-surface p-6 h-48" />
       }>
         <UnitBookingWidget
           listingId={room.listingId}

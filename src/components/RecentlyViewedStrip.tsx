@@ -54,7 +54,7 @@ export default function RecentlyViewedStrip() {
               to={it.path}
               className="flex flex-col overflow-hidden rounded-xl border border-border-subtle bg-bg-muted transition hover:border-cta-primary"
             >
-              <div className="aspect-[4/3] w-full bg-gradient-to-br from-bg-muted to-bg-surface flex items-center justify-center">
+              <div className="aspect-[4/3] w-full bg-bg-muted flex items-center justify-center">
                 {it.coverPhotoUrl ? (
                   <OptimizedImage
                     src={it.coverPhotoUrl}

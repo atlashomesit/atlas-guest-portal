@@ -239,7 +239,7 @@ export default function GuestAssistant({ listingId }: GuestAssistantProps) {
                         </button>
                       )}
                       {aiLoading && (
-                        <p className="text-xs text-text-muted animate-pulse">Getting AI answer…</p>
+                        <p className="text-xs text-text-muted">Getting AI answer…</p>
                       )}
                       {aiReply && (
                         <div className="mt-2 rounded-xl border border-border-subtle bg-bg-subtle p-3 text-left text-sm text-text-secondary">
