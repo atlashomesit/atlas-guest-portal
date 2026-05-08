@@ -148,6 +148,8 @@ interface BookingPaymentStatusResponse {
   failureReason?: string;
   failedAtUtc?: string;
   retryUrl?: string;
+  bookingStatus?: string;
+  holdExpiresAtUtc?: string | null;
 }
 
 type ApiErrorEnvelope = ApiErrorResponse & {
