@@ -158,6 +158,52 @@ const STAR_GUEST_HOUSE_LISTING_IDS: number[] = [
 ];
 
 const TENANT_OVERRIDES: Record<string, TenantOverrides> = {
+  atlas: {
+    locationContent: {
+      transport: [
+        {
+          title: 'Metro',
+          details: 'Kukatpally and KPHB Colony Metro stations are within a 10-15 minute drive for quick access across the city.',
+        },
+        {
+          title: 'Airport',
+          details: 'Rajiv Gandhi International Airport is about 45 minutes away via ORR, with reliable cab availability day and night.',
+        },
+        {
+          title: 'Road connectivity',
+          details: 'Easy access to Mumbai Highway, JNTU Road, and the ORR for commuting towards Hitech City, Gachibowli, or BHEL.',
+        },
+      ],
+      nearbyAmenities: [
+        {
+          title: 'Daily essentials',
+          details: 'Supermarkets, pharmacies, and local bakeries within a 5-10 minute drive for everyday needs.',
+        },
+        {
+          title: 'Dining',
+          details: 'A mix of local eateries and popular chains around Kukatpally, JNTU, and KPHB for quick meals or dine-in plans.',
+        },
+        {
+          title: 'Healthcare',
+          details: 'Multi-specialty hospitals and clinics nearby to handle routine visits and emergencies.',
+        },
+      ],
+      landmarks: [
+        {
+          title: 'Business hubs',
+          details: 'Proximity to Hitech City, Gachibowli, and Financial District for tech parks and corporate offices.',
+        },
+        {
+          title: 'Education',
+          details: 'Universities and colleges around Kukatpally and Miyapur, with straightforward commutes by metro or cab.',
+        },
+        {
+          title: 'Leisure',
+          details: 'Shopping streets, malls, and cinemas across KPHB, Miyapur, and Kukatpally for entertainment.',
+        },
+      ],
+    },
+  },
   starguesthouse: {
     hideLogo: true,
     hideAtlasHomesBranding: true,

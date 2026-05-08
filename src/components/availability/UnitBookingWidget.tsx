@@ -1125,6 +1125,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
     if (isSubmitting) return;
 
+    const submitter = (e.nativeEvent as SubmitEvent).submitter as
+      | HTMLButtonElement
+      | HTMLInputElement
+      | null;
+    const bookingIntent = submitter?.value === 'online_payment' ? 'online_payment' : 'whatsapp';
+
     if (isBookingDisabled) {
       setFormError('Service temporarily unavailable. Please try again later.');
       return;
@@ -1136,10 +1142,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       return;
     }
 
-    // RA-006 WhatsApp direct-booking handoff: when the tenant has no online provider,
-    // bundle the form details into a wa.me message and open the host's WhatsApp instead
-    // of calling /api/Razorpay/order. No Atlas-side booking row, no payment intent.
-    if (isWhatsAppDirectBooking && tenantWhatsappPhone) {
+    // RA-006 WhatsApp direct-booking handoff: keep WhatsApp as default CTA.
+    // When users explicitly pick the secondary "Book now" button, continue to
+    // the normal checkout path below (Razorpay order/verify flow).
+    if (isWhatsAppDirectBooking && bookingIntent === 'whatsapp' && tenantWhatsappPhone) {
       const tenantNameForMessage = getTenantContext()?.name?.trim() || 'your team';
       const checkinForMessage = dateRange.startDate
         ? formatHumanDate(dateRange.startDate)
@@ -2605,13 +2611,14 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       {!isBookingDisabled && isWhatsAppDirectBooking && (
         <div className="flex items-center gap-2 flex-wrap justify-center py-1">
           <span className="text-xs text-text-muted">
-            Booking is confirmed directly with the host on WhatsApp — no payment is taken on this site.
+            Continue on WhatsApp for host confirmation, or use Book now to pay securely online.
           </span>
         </div>
       )}
 
       <Button
         type="submit"
+        value="whatsapp"
         fullWidth
         disabled={
           isSubmitting ||
@@ -2633,6 +2640,26 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               ? 'Continue on WhatsApp'
               : 'Book Now'}
       </Button>
+      {!isBookingDisabled && isWhatsAppDirectBooking && (
+        <Button
+          type="submit"
+          value="online_payment"
+          fullWidth
+          disabled={
+            isSubmitting ||
+            isLoading ||
+            !dateRange.startDate ||
+            !dateRange.endDate ||
+            isBookingDisabled ||
+            invalidIstStayRange ||
+            priceDetails.nights < 1
+          }
+          className={`mt-2 ${isSubmitting || isLoading ? 'opacity-75' : ''}`}
+          data-testid="guest-booking-submit-online"
+        >
+          {isSubmitting || isLoading ? 'Processing…' : 'Book now'}
+        </Button>
+      )}
     </form>
     </>
   );
