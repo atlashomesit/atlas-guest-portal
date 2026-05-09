@@ -50,6 +50,10 @@ const CookieConsent = () => {
   const save = (next: AtlasCookieConsentLevel) => {
     try {
       window.localStorage.setItem(STORAGE_KEY, next);
+      // Let main.tsx / analytics lazily initialise GA after consent (DPDP Act §6).
+      window.dispatchEvent(
+        new CustomEvent<AtlasCookieConsentLevel>("atlas:cookie-consent-changed", { detail: next }),
+      );
     } catch {
       /* private mode / quota */
     }
