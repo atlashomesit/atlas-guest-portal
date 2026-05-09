@@ -8,7 +8,17 @@ function isAtlasPrimaryHostname(): boolean {
   if (typeof window === "undefined") return false;
   const h = window.location.hostname.replace(/^www\./i, "").toLowerCase();
   // eslint-disable-next-line atlas-brand/no-atlas-string-leak -- domain guard, not user-visible
-  return h === "atlashomestays.com" || h === "atlashomes.in";
+  return (
+    h === "atlashomestays.com" ||
+    // Any Atlas subdomain — includes dev.atlashomestays.com so dev + E2E share banner parity.
+    // eslint-disable-next-line atlas-brand/no-atlas-string-leak -- domain guard, not user-visible
+    h.endsWith(".atlashomestays.com") ||
+    h === "atlashomes.in" ||
+    h.endsWith(".atlashomes.in") ||
+    // Local dev and CI environments.
+    h === "localhost" ||
+    h === "127.0.0.1"
+  );
 }
 
 function readConsent(): AtlasCookieConsentLevel | null {
