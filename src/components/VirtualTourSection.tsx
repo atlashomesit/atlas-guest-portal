@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { buildApiUrl, getApiHeaders } from '../api/client';
 
 /** Task 37: 3D virtual tour viewer for the listing detail page.
- *  Pannellum CDN script is injected only when a pannellum tour is present, so
- *  pages without 3D tours don't pay the JS download cost. */
+ *  Pannellum is bundled and dynamically imported only when a pannellum tour is present,
+ *  so pages without 3D tours don't pay the JS/CSS cost and CSP stays on self-hosted assets. */
 
 interface Tour3D {
   id: number;
@@ -12,42 +12,6 @@ interface Tour3D {
   title: string | null;
   hotspotsJson: string | null;
   sortOrder: number;
-}
-
-const PANNELLUM_VERSION = '2.5.6';
-const PANNELLUM_JS = `https://cdn.jsdelivr.net/npm/pannellum@${PANNELLUM_VERSION}/build/pannellum.js`;
-const PANNELLUM_CSS = `https://cdn.jsdelivr.net/npm/pannellum@${PANNELLUM_VERSION}/build/pannellum.css`;
-
-let pannellumLoadPromise: Promise<void> | null = null;
-function loadPannellum(): Promise<void> {
-  if (pannellumLoadPromise) return pannellumLoadPromise;
-  if (typeof window !== 'undefined' && (window as unknown as { pannellum?: unknown }).pannellum) {
-    pannellumLoadPromise = Promise.resolve();
-    return pannellumLoadPromise;
-  }
-  pannellumLoadPromise = new Promise((resolve, reject) => {
-    if (!document.querySelector('link[data-pannellum-css]')) {
-      const link = document.createElement('link');
-      link.rel = 'stylesheet';
-      link.href = PANNELLUM_CSS;
-      link.dataset.pannellumCss = 'true';
-      document.head.appendChild(link);
-    }
-    const existing = document.querySelector<HTMLScriptElement>('script[data-pannellum-js]');
-    if (existing) {
-      existing.addEventListener('load', () => resolve(), { once: true });
-      existing.addEventListener('error', () => reject(new Error('pannellum load failed')), { once: true });
-      return;
-    }
-    const script = document.createElement('script');
-    script.src = PANNELLUM_JS;
-    script.async = true;
-    script.dataset.pannellumJs = 'true';
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error('pannellum load failed'));
-    document.head.appendChild(script);
-  });
-  return pannellumLoadPromise;
 }
 
 export default function VirtualTourSection({ listingId }: { listingId: number }) {
@@ -116,18 +80,20 @@ interface PannellumViewerHandle {
   destroy?: () => void;
 }
 
+type PannellumApi = {
+  viewer: (
+    target: HTMLElement,
+    config: {
+      type: string;
+      panorama: string;
+      autoLoad: boolean;
+      hotSpots?: Hotspot[];
+    },
+  ) => PannellumViewerHandle;
+};
+
 interface PannellumWindow {
-  pannellum?: {
-    viewer: (
-      target: HTMLElement,
-      config: {
-        type: string;
-        panorama: string;
-        autoLoad: boolean;
-        hotSpots?: Hotspot[];
-      },
-    ) => PannellumViewerHandle;
-  };
+  pannellum?: PannellumApi;
 }
 
 function PannellumViewer({ tour }: { tour: Tour3D }) {
@@ -136,11 +102,17 @@ function PannellumViewer({ tour }: { tour: Tour3D }) {
   useEffect(() => {
     let cancelled = false;
     let viewer: PannellumViewerHandle | null = null;
-    loadPannellum()
-      .then(() => {
+    void (async () => {
+      try {
+        const [pannellumMod] = await Promise.all([
+          import('pannellum'),
+          import('pannellum/build/pannellum.css'),
+        ]);
         if (cancelled || !containerRef.current) return;
-        const w = window as unknown as PannellumWindow;
-        if (!w.pannellum) return;
+        const pannellum =
+          (pannellumMod as { default?: PannellumApi }).default ??
+          (window as unknown as PannellumWindow).pannellum;
+        if (!pannellum) return;
         const hotspots: Hotspot[] = (() => {
           if (!tour.hotspotsJson) return [];
           try {
@@ -150,14 +122,16 @@ function PannellumViewer({ tour }: { tour: Tour3D }) {
             return [];
           }
         })();
-        viewer = w.pannellum.viewer(containerRef.current, {
+        viewer = pannellum.viewer(containerRef.current, {
           type: 'equirectangular',
           panorama: tour.tourUrl,
           autoLoad: true,
           hotSpots: hotspots,
         });
-      })
-      .catch(() => { /* CDN unreachable: leave placeholder */ });
+      } catch {
+        /* bundle unreachable: leave placeholder */
+      }
+    })();
     return () => {
       cancelled = true;
       try { viewer?.destroy?.(); } catch { /* noop */ }
