@@ -1,5 +1,5 @@
 /* eslint-disable atlas-brand/no-atlas-string-leak -- legacy SGH terms stub; marketplace name from displayBrand (CPO-001). */
-import { MARKETPLACE_BRAND_BASELINE } from "../tenant/displayBrand";
+import { MARKETPLACE_BRAND_BASELINE, getTenantBrandNameLong } from "../tenant/displayBrand";
 
 export type TermsSection = {
   id: string;
@@ -99,8 +99,11 @@ export const termsSections: TermsSection[] = [
   },
 ];
 
-export const paymentDataSharingNote =
-  "You agree to share information entered on this page with ATLAS HOMES (owner of this page) and Razorpay, adhering to applicable laws.";
+/** Razorpay / checkout: data controller name must follow the resolved tenant (RA-006 AC-8). */
+export function getPaymentDataSharingNote(): string {
+  const controller = getTenantBrandNameLong().toUpperCase();
+  return `You agree to share information entered on this page with ${controller} (owner of this page) and Razorpay, adhering to applicable laws.`;
+}
 
 export const inlinePolicySnippets = {
   guestId: "Govt ID required for all adult guests; guests under 21 must stay with a guardian.",
@@ -110,5 +113,4 @@ export const inlinePolicySnippets = {
   houseRules:
     "Keep quiet hours 10PM–7AM; no parties or decorations without approval; smoke only in balcony/patio/terrace; pets only if pre-approved.",
   damages: "Damage or missing items will be billed; specific penalties may apply.",
-  paymentConsent: paymentDataSharingNote,
 };

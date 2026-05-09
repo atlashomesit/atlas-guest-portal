@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { buildApiUrl, getApiHeaders } from "../api/client";
+import { getTenantBrandName } from "../tenant/displayBrand";
 
 interface CheckinDetails {
   bookingRef: string;
@@ -98,7 +99,7 @@ export default function SelfCheckIn() {
       <div className="mx-auto max-w-lg">
         {/* Logo / Brand */}
         <p className="text-center text-sm font-semibold uppercase tracking-widest text-text-muted mb-6">
-          Atlas Homes · Self Check-in
+          {getTenantBrandName()} · Self Check-in
         </p>
 
         {/* Step dots (auth is hidden once verified) */}

@@ -16,7 +16,7 @@ const ExclusiveService_Card = () => {
     {
       title: "Sanctuary of Serenity",
       thumbnail: "",
-      description: "Retreat to tranquil spaces where comfort meets style, offering you a peaceful escape at the heart of Atlas Homes.",
+      description: "Retreat to tranquil spaces where comfort meets style, offering you a peaceful escape at the heart of your stay.",
       link: "/rooms"
     },
     {

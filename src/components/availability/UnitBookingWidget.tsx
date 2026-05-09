@@ -35,6 +35,7 @@ import OptimizedImage from '@/components/ui/OptimizedImage';
 import FomoBar from '@/components/FomoBar';
 import { track } from '@/lib/events'; // TASK-1480
 import { getTenantContext } from '@/tenant/tenantContext';
+import { getTenantBrandNameLong } from '@/tenant/displayBrand';
 
 declare global {
   interface Window {
@@ -60,9 +61,11 @@ const PENDING_PAYMENT_KEY = 'atlas_pending_razorpay_order';
 /** TASK-1468: browser-local last UPI VPA for Razorpay prefill (also persisted server-side on Guests when verify returns it). */
 const LAST_UPI_VPA_KEY = 'atlas_last_upi_vpa';
 
-/** COMP-001: keep in sync with Atlas.Api.Constants.GuestConsentConstants.DisplayText */
-const GUEST_DATA_CONSENT_LABEL =
-  'I consent to Atlas Homes collecting and using my name, phone, and email to process my booking and send booking communications.';
+/** COMP-001: keep wording aligned with Atlas.Api.Constants.GuestConsentConstants.BuildGuestConsentDisplayText (tenant via getTenantBrandNameLong). */
+function guestDataConsentLabel(): string {
+  const brand = getTenantBrandNameLong();
+  return `I consent to ${brand} collecting and using my name, phone, and email to process my booking and send booking communications.`;
+}
 
 const normalizeListingId = (value: string | number | null | undefined) =>
   String(value ?? '')
@@ -2585,7 +2588,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               .{' '}
               <details className="inline">
                 <summary className="cursor-pointer text-cta-primary underline underline-offset-2 text-xs">Show details</summary>
-                <span className="text-xs text-text-muted block mt-1">{GUEST_DATA_CONSENT_LABEL}</span>
+                <span className="text-xs text-text-muted block mt-1">{guestDataConsentLabel()}</span>
               </details>
             </span>
           </label>

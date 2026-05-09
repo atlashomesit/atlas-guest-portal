@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
 import { shortLinkMap } from "../config/shortLinks";
+import { getTenantBrandName } from "../tenant/displayBrand";
 
 const ShortLinkRedirect = () => {
     const { shortCode } = useParams<{ shortCode: string }>();
@@ -70,7 +71,7 @@ const ShortLinkRedirect = () => {
                 <div className="flex justify-center">
                     <div className="h-12 w-12 rounded-full border-4 border-border-subtle border-t-primary animate-spin" aria-hidden="true" />
                 </div>
-                <h1 className="text-2xl font-semibold text-text-primary">Taking you to Atlas Homes {label}…</h1>
+                <h1 className="text-2xl font-semibold text-text-primary">Taking you to {getTenantBrandName()} {label}…</h1>
                 <p className="text-text-muted break-words">{targetUrl}</p>
                 <button
                     type="button"

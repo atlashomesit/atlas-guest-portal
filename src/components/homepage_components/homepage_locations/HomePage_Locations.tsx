@@ -16,6 +16,7 @@ import { useTenantListings, type TenantPropertyRecord } from "../../../hooks/use
 import { filterGuestImageUrls, sanitizeGuestImageUrl } from "../../../utils/guestImageUrl";
 import { compareAtlasHomesBuildingOrder } from "../../../utils/atlasHomesBuildingOrder";
 import { getTenantContext } from "../../../tenant/tenantContext";
+import { getTenantBrandName } from "../../../tenant/displayBrand";
 import { getTenantOverrides, getUnitNoun, shouldHideAtlasBranding, type TenantOverrides } from "../../../tenant/tenantOverrides";
 import { useCurrency } from "../../../contexts/CurrencyContext";
 
@@ -431,7 +432,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
               </div>
               <div>
                 {!hideAtlasBranding && (
-                  <p className="text-sm font-semibold uppercase tracking-wide text-text-muted">Atlas Homes</p>
+                  <p className="text-sm font-semibold uppercase tracking-wide text-text-muted">{getTenantBrandName()}</p>
                 )}
                 <h3 className="text-3xl font-bold text-text-primary">{heroModel.listing.title}</h3>
                 {heroModel.listing.subtitle && (
@@ -554,7 +555,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
                   <div className="p-4 flex flex-col gap-3 flex-1">
                     <div>
                       {!hideAtlasBranding && (
-                        <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">Atlas Homes</p>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">{getTenantBrandName()}</p>
                       )}
                       <h3 className="text-lg font-semibold text-text-primary">{model.listing.title}</h3>
                       {model.listing.subtitle && (

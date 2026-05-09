@@ -24,9 +24,9 @@ export const enableFooterMiniCtaAboveFooter = false;
 // icon selections centralized so that enabling a variant never shows placeholder text
 // placeholders.
 export const secondaryBannerDefaults = {
-  title: "Atlas Homes – Where Every Stay Feels Like Home",
+  title: "Where Every Stay Feels Like Home",
   description:
-    "At Atlas Homes, every detail is designed for your comfort. Relax in beautifully appointed spaces, enjoy modern amenities, and make every moment unforgettable.",
+    "Every detail is designed for your comfort. Relax in beautifully appointed spaces, enjoy modern amenities, and make every moment unforgettable.",
 };
 
 export const servicesSummaryCopy =
@@ -92,7 +92,7 @@ export const testimonialsCopy = {
   headline: "What guests are saying",
   supporting: "Recent guests call out spotless homes, attentive hosts, and smooth check-ins.",
   spotlightHeadline: "Guest spotlight",
-  spotlightSupporting: "Highlights from recent stays across Atlas Homes properties.",
+  spotlightSupporting: "Highlights from recent stays across our properties.",
 };
 
 export const footerMiniCtaCopy = {

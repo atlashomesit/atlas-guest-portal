@@ -12,6 +12,7 @@ import { getTenantFilteredHomes, defaultHomeHighlights } from "../../content/hom
 import { useBooking } from "../../contexts/BookingContext";
 import { CONTACT } from "../../config/contact";
 import { getTenantContext } from "../../tenant/tenantContext";
+import { getTenantBrandName } from "../../tenant/displayBrand";
 import { getTenantOverrides, shouldHideAtlasBranding } from "../../tenant/tenantOverrides";
 import { usePropertyListings } from "../../hooks/usePropertyListings";
 import { addRecentlyViewed } from "../../utils/guestHistory";
@@ -226,7 +227,7 @@ const HomeDetails = () => {
     <section className="max-w-5xl mx-auto px-4 py-12 flex flex-col gap-6">
       <div>
         {!hideAtlasBranding && (
-          <p className="text-sm uppercase tracking-wide text-text-muted">Atlas Homes</p>
+          <p className="text-sm uppercase tracking-wide text-text-muted">{getTenantBrandName()}</p>
         )}
         <h1 className="text-4xl font-bold text-text-primary">{room.title}</h1>
         {room.tagline && <p className="mt-2 text-lg text-text-secondary">{room.tagline}</p>}

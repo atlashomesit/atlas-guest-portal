@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getTenantContext } from "../tenant/tenantContext";
+import { getTenantBrandName } from "../tenant/displayBrand";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react"; // TASK-1476
 import SEO from "../components/SEO";
@@ -1085,7 +1086,7 @@ export default function BookingConfirmationPage() {
         {/* TASK-2082: PWA install nudge — only within 72h of check-in, only when prompt is available */}
         {!isCancelled && booking.preArrivalBriefingVisible && !pwaInstallDismissed && !isIosNonPwa && (
           <div className="flex items-center justify-between gap-3 rounded-2xl border border-border-subtle bg-bg-muted/60 px-4 py-3 text-sm">
-            <span>📱 Save Atlas to your home screen for quick access during your stay</span>
+            <span>📱 Save {getTenantBrandName()} to your home screen for quick access during your stay</span>
             <div className="flex items-center gap-2 shrink-0">
               <button
                 type="button"
@@ -1232,7 +1233,7 @@ export default function BookingConfirmationPage() {
             <p className="text-sm text-text-secondary">Get instant alerts on your booking status and check-in reminders.</p>
             {isIosNonPwa ? (
               <p className="text-sm text-text-secondary">
-                To receive trip alerts on iPhone, add Atlas to your home screen first: Safari → Share (
+                To receive trip alerts on iPhone, add {getTenantBrandName()} to your home screen first: Safari → Share (
                 <span aria-hidden>⎙</span>) → Add to Home Screen. Then re-open from the home screen icon.
               </p>
             ) : (
@@ -1435,7 +1436,9 @@ export default function BookingConfirmationPage() {
         {!isCancelled && (
           <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-2">
             <h2 className="text-sm font-semibold text-text-primary">Explore more stays</h2>
-            <p className="text-sm text-text-secondary">Atlas homes across India — same secure checkout.</p>
+            <p className="text-sm text-text-secondary">
+              {getTenantBrandName()} across India — same secure checkout.
+            </p>
             <Link
               to="/search"
               className="inline-flex text-sm font-medium text-brand-primary underline underline-offset-2"
