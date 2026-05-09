@@ -280,9 +280,9 @@ const TENANT_OVERRIDES: Record<string, TenantOverrides> = {
     // TASK-1877: white-label cookie banner with tenant-specific copy + privacy link
     cookieBanner: {
       text:
-        'We use strictly necessary cookies to make this site work, and optional analytics cookies ' +
-        "to understand how it's used. Under India's DPDP Act 2023 we ask for your consent before " +
-        'loading anything non-essential. Read our',
+        'Star Guest House uses strictly necessary cookies to make this site work, and optional ' +
+        "analytics cookies to understand how it's used. Under India's DPDP Act 2023 we ask for " +
+        'your consent before loading anything non-essential. Read our',
       privacyUrl: '/privacy',
       privacyLinkLabel: 'privacy notice',
     },
