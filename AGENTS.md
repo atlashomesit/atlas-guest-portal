@@ -2,6 +2,7 @@
 
 For AI assistants (Cursor, Codex, etc.) working in this repo:
 
+- **Blocked work:** Up to **three** materially different attempts per blocker; if still stuck, append one row to [MANUAL-DEVELOPER-BACKLOG.md](../atlas-e2e/docs/product/MANUAL-DEVELOPER-BACKLOG.md) (Agent-deferred queue), then continue. Full rule: workspace root `AGENTS.md` (Blocked work section).
 - **PRs and CI:** Run lint, build, and tests locally before suggesting a PR (see [CONTRIBUTING.md](CONTRIBUTING.md)). The **CI** workflow (`.github/workflows/ci.yml`) must pass before merge. Status check name for branch protection: **build**.
 - **Feature work:** Product roadmap and execution workflow live in [atlas-e2e/docs/product/](../atlas-e2e/docs/product/) — use `backlog.md` and `ATLAS-DEVELOPER-TASKS.md` for current priorities spanning API + guest frontend.
 - **Docs:** See `docs/design-system.md`, `docs/short-links.md`, and README for theming, short links, and project map. Messaging/booking integration: `atlas-api/docs/eventing-servicebus-implementation-plan.md`.

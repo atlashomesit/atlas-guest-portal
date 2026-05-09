@@ -1391,6 +1391,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             paymentCompleted = true; // Prevent double-reset from ondismiss + close event
             void abandonPaymentPendingCheckout(bookingId, bookingToken);
             localStorage.removeItem(PENDING_PAYMENT_KEY);
+            updateBooking({
+              paymentHoldBookingId: null,
+              paymentHoldToken: null,
+              holdExpiresAt: null,
+            });
             setIsSubmitting(false);
             setIsLoading(false);
             setPaymentStatus(null);
@@ -1474,18 +1479,19 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                   checkIn: checkinDate.toISOString(),
                   checkOut: checkoutDate.toISOString(),
                   guests,
-                  customerInfo: { 
-                    name: formData.name,
-                    email: formData.email,
-                    phone: formData.phone
-                  },
-                  paymentStatus: 'completed',
-                  bookingId
+                  paymentHoldBookingId: null,
+                  paymentHoldToken: null,
+                  holdExpiresAt: null,
                 });
               } catch (error) {
                 console.error('Payment processing error:', error);
                 setPaymentStatus('failed');
                 setFormError(getBookingErrorMessage(error, 'verify'));
+                updateBooking({
+                  paymentHoldBookingId: null,
+                  paymentHoldToken: null,
+                  holdExpiresAt: null,
+                });
                 if (isNetworkError(error)) toast.error(NETWORK_ERROR_MESSAGE);
               } finally {
                 setIsSubmitting(false);
@@ -1499,6 +1505,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             paymentCompleted = true; // Payment attempt was made
             void abandonPaymentPendingCheckout(bookingId, bookingToken);
             localStorage.removeItem(PENDING_PAYMENT_KEY);
+            updateBooking({
+              paymentHoldBookingId: null,
+              paymentHoldToken: null,
+              holdExpiresAt: null,
+            });
             const code = String(response?.error?.code ?? '');
             const description = String(response?.error?.description ?? '');
             setRazorpayFailure({ code, description });
@@ -1512,10 +1523,20 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
           // TASK-1480: payment_init = Razorpay modal is about to open
           track('payment_init', numericListingId);
+          updateBooking({
+            paymentHoldBookingId: Number(bookingId),
+            paymentHoldToken: typeof bookingToken === 'string' && bookingToken.trim() ? bookingToken.trim() : null,
+            holdExpiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+          });
           rzp.open();
         } catch (error) {
           console.error('Error initializing Razorpay:', error);
           localStorage.removeItem(PENDING_PAYMENT_KEY);
+          updateBooking({
+            paymentHoldBookingId: null,
+            paymentHoldToken: null,
+            holdExpiresAt: null,
+          });
           setFormError('Unable to connect to payment service. Please try again.');
           setIsSubmitting(false);
           setIsLoading(false);

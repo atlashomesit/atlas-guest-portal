@@ -47,6 +47,8 @@ const SupportWidgetContent = () => {
   } = useSupportDrawerFlags();
   const [isDismissed, setIsDismissed] = useState(false);
   const [isCallbackExpanded, setIsCallbackExpanded] = useState(() => !enableRevealCallbackOnClickOnly);
+  /** Lift floating trigger on `/` so it clears the hero date widget on phones (E2E mobile-viewport). */
+  const [narrowViewport, setNarrowViewport] = useState(false);
   const routePath = location?.pathname ?? "";
 
   const analyticsMetadata: SupportAnalyticsMetadata = {
@@ -56,8 +58,9 @@ const SupportWidgetContent = () => {
 
   const bottomSpacing = useMemo(() => {
     const base = 20;
-    return `calc(var(--safe-area-bottom, env(safe-area-inset-bottom, 0px)) + ${base + footerOffset}px)`;
-  }, [footerOffset]);
+    const homeHeroLift = routePath === "/" && narrowViewport ? 112 : 0;
+    return `calc(var(--safe-area-bottom, env(safe-area-inset-bottom, 0px)) + ${base + footerOffset + homeHeroLift}px)`;
+  }, [footerOffset, routePath, narrowViewport]);
 
   const whatsappLink = useMemo(
     () =>
@@ -77,6 +80,15 @@ const SupportWidgetContent = () => {
     if (!enableSessionDismissRemember || typeof window === "undefined") return;
     setIsDismissed(sessionStorage.getItem(DISMISS_KEY) === "true");
   }, [enableSessionDismissRemember]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const mq = window.matchMedia("(max-width: 767px)");
+    const sync = () => setNarrowViewport(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;

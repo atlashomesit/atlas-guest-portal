@@ -44,7 +44,7 @@ const CookieConsentBanner = () => {
   const cookieBannerOverride = tenantOverrides.cookieBanner;
 
   const bannerText = cookieBannerOverride?.text ??
-    "We use strictly necessary cookies to make this site work, and optional analytics cookies " +
+    "Atlas Homestays uses strictly necessary cookies to make this site work, and optional analytics cookies " +
     "to understand how it is used. Under India’s DPDP Act 2023 we ask for your consent " +
     "before loading anything non-essential. Read our";
   const privacyUrl = cookieBannerOverride?.privacyUrl ?? "/privacy";

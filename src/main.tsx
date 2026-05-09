@@ -45,6 +45,9 @@ const bootstrapApp = async () => {
   applyTheme(DEFAULT_THEME)
   initMonitoring()
   initAnalytics()
+  window.addEventListener('atlas:cookie-consent-changed', () => {
+    initAnalytics()
+  })
 
   root.render(<ConfigLoadingScreen />)
 

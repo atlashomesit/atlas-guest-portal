@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getTenantContext } from "../tenant/tenantContext";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react"; // TASK-1476
 import SEO from "../components/SEO";
 import WeatherWidget from "../components/WeatherWidget";
+import ErrorDisplay, { type ErrorResponse as ApiErrorResponse, type RecoveryAction as ApiRecoveryAction } from "../components/ErrorDisplay";
 import { track } from "../lib/events";
 import { buildApiUrl, getApiHeaders } from "../api/client";
 import { getRuntimeConfig, hasRuntimeConfig } from "../runtime-config";
@@ -142,6 +143,19 @@ interface ListingAddOnPublic {
   category?: string | null;
 }
 
+interface BookingPaymentStatusResponse {
+  status: "Pending" | "Failed" | "Paid";
+  failureReason?: string;
+  failedAtUtc?: string;
+  retryUrl?: string;
+  bookingStatus?: string;
+  holdExpiresAtUtc?: string | null;
+}
+
+type ApiErrorEnvelope = ApiErrorResponse & {
+  recoveryActions?: ApiRecoveryAction[];
+};
+
 export default function BookingConfirmationPage() {
   const { bookingId } = useParams<{ bookingId: string }>();
   const [searchParams] = useSearchParams();
@@ -151,6 +165,7 @@ export default function BookingConfirmationPage() {
   const [addOns, setAddOns] = useState<ListingAddOnPublic[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [errorPayload, setErrorPayload] = useState<ApiErrorEnvelope | null>(null);
   const [pushState, setPushState] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [pushMessage, setPushMessage] = useState<string>("");
   const [modCheckin, setModCheckin] = useState("");
@@ -169,14 +184,58 @@ export default function BookingConfirmationPage() {
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [copyRefFeedback, setCopyRefFeedback] = useState(false);
   const [shareLanguage, setShareLanguage] = useState<"en" | "hi" | "te">("en");
+  const [paymentStatus, setPaymentStatus] = useState<"pending" | "success" | "failed">("pending");
+  const [paymentFailureReason, setPaymentFailureReason] = useState<string | null>(null);
+  const [paymentFailedAt, setPaymentFailedAt] = useState<string | null>(null);
+  const [paymentRetryUrl, setPaymentRetryUrl] = useState<string | null>(null);
+  const [paymentCheckManual, setPaymentCheckManual] = useState(false);
+  const [paymentPollAttempt, setPaymentPollAttempt] = useState(0);
+  const [paymentPollExhausted, setPaymentPollExhausted] = useState(false);
+  const [lastPaymentCheckAt, setLastPaymentCheckAt] = useState<Date | null>(null);
+  const [relativeNowMs, setRelativeNowMs] = useState(() => Date.now());
   const [pwaInstallDismissed, setPwaInstallDismissed] = useState(() => {
     try { return localStorage.getItem("atlas_guest_pwa_install_dismissed_v1") === "1"; } catch { return false; }
   });
   const pwaInstallPromptRef = useRef<any>(null);
+  const pollAttemptsRef = useRef(0);
+  const statusKeyRef = useRef<string | null>(null);
+  const isPageUnloadRef = useRef(false);
 
   const isIos = typeof navigator !== "undefined" && /iPhone|iPad|iPod/.test(navigator.userAgent);
   const isStandalone = typeof window !== "undefined" && window.matchMedia("(display-mode: standalone)").matches;
   const isIosNonPwa = isIos && !isStandalone;
+
+  const mapErrorCodeToRecoveryActions = (
+    code: string | undefined,
+    paymentRetryLink: string | null
+  ): ApiRecoveryAction[] => {
+    const normalized = (code ?? "").trim().toUpperCase();
+    if (normalized === "DATE_NO_LONGER_AVAILABLE") {
+      return [{ actionType: "SEARCH_AGAIN", actionLabel: "Search Again", actionUrl: "/search" }];
+    }
+    if (normalized === "PAYMENT_DECLINED") {
+      return paymentRetryLink
+        ? [{ actionType: "RETRY_PAYMENT", actionLabel: "Retry Payment", actionUrl: paymentRetryLink }]
+        : [{ actionType: "RETRY_PAYMENT", actionLabel: "Retry Payment", delaySeconds: 5 }];
+    }
+    if (normalized === "PAYMENT_TIMEOUT") {
+      return [
+        ...(paymentRetryLink ? [{ actionType: "RETRY_PAYMENT" as const, actionLabel: "Retry Payment", actionUrl: paymentRetryLink }] : []),
+        { actionType: "CONTACT_SUPPORT", actionLabel: "Contact Support", actionUrl: "/contact" },
+      ];
+    }
+    if (normalized === "LISTING_NOT_FOUND") {
+      return [{ actionType: "SEARCH_AGAIN", actionLabel: "Browse All", actionUrl: "/search" }];
+    }
+    return [{ actionType: "CONTACT_SUPPORT", actionLabel: "Contact Support", actionUrl: "/contact" }];
+  };
+
+  const handleRecoveryActionClick = (action: ApiRecoveryAction) => {
+    track(`booking_error_action_${action.actionType.toLowerCase()}`);
+    if (action.actionType === "RETRY_PAYMENT" && paymentRetryUrl && !action.actionUrl) {
+      window.open(paymentRetryUrl, "_blank", "noopener,noreferrer");
+    }
+  };
 
   useEffect(() => {
     const handler = (e: Event) => { e.preventDefault(); pwaInstallPromptRef.current = e; };
@@ -196,8 +255,18 @@ export default function BookingConfirmationPage() {
       headers: { Accept: "application/json", ...getApiHeaders() },
     })
       .then(async (res) => {
-        if (res.status === 404) throw new Error("Booking not found. Please check your confirmation email for the correct link.");
-        if (!res.ok) throw new Error(await messageFromApiResponse(res));
+        if (res.status === 404) {
+          const parsed404 = await res.clone().json().catch(() => null) as ApiErrorEnvelope | null;
+          if (parsed404?.code && parsed404?.message) setErrorPayload(parsed404);
+          throw new Error("Booking not found. Please check your confirmation email for the correct link.");
+        }
+        if (!res.ok) {
+          const parsed = await res.clone().json().catch(() => null) as ApiErrorEnvelope | null;
+          if (parsed?.code && parsed?.message) {
+            setErrorPayload(parsed);
+          }
+          throw new Error(await messageFromApiResponse(res));
+        }
         return res.json() as Promise<BookingSummary>;
       })
       .then((b) => {
@@ -224,6 +293,164 @@ export default function BookingConfirmationPage() {
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
   }, [bookingId, token]);
+
+  useEffect(() => {
+    if (!errorPayload?.code) return;
+    track(`booking_error_${errorPayload.code.toLowerCase()}`);
+  }, [errorPayload]);
+
+  const updatePaymentStateFromBody = useCallback(
+    (body: BookingPaymentStatusResponse) => {
+      const normalized = (body.status || "Pending").toLowerCase();
+      if (normalized === "paid") {
+        setPaymentStatus("success");
+        setPaymentFailureReason(null);
+        setPaymentFailedAt(null);
+        setPaymentRetryUrl(null);
+        return "success" as const;
+      }
+      if (normalized === "failed") {
+        setPaymentStatus("failed");
+        const reason = body.failureReason ?? "Payment was declined by the bank or gateway.";
+        setPaymentFailureReason(reason);
+        setPaymentFailedAt(body.failedAtUtc ?? null);
+        setPaymentRetryUrl(body.retryUrl ?? null);
+        setErrorPayload({
+          code: "PAYMENT_DECLINED",
+          message: "Your card was declined. Try another payment method or contact support.",
+          details: reason,
+          recoveryActions: mapErrorCodeToRecoveryActions("PAYMENT_DECLINED", body.retryUrl ?? null),
+        });
+        return "failed" as const;
+      }
+      setPaymentStatus("pending");
+      return "pending" as const;
+    },
+    [],
+  );
+
+  const fetchPaymentStatus = useCallback(async () => {
+    if (!bookingId || !token) return "pending" as const;
+    pollAttemptsRef.current += 1;
+    setPaymentPollAttempt(pollAttemptsRef.current);
+    try {
+      const res = await fetch(
+        buildApiUrl(`/bookings/${bookingId}/payment-status?t=${encodeURIComponent(token)}`),
+        { headers: { Accept: "application/json", ...getApiHeaders() } },
+      );
+      if (!res.ok) {
+        setLastPaymentCheckAt(new Date());
+        return "pending" as const;
+      }
+      const body = (await res.json()) as BookingPaymentStatusResponse;
+      setLastPaymentCheckAt(new Date());
+      return updatePaymentStateFromBody(body);
+    } catch {
+      setLastPaymentCheckAt(new Date());
+      return "pending" as const;
+    }
+  }, [bookingId, token, updatePaymentStateFromBody]);
+
+  useEffect(() => {
+    if (!bookingId || !token) return;
+
+    const maxAttempts = 150; // 5m / 2s
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let cancelled = false;
+    const storageKey = `booking_${bookingId}_payment_status`;
+    statusKeyRef.current = storageKey;
+    pollAttemptsRef.current = 0;
+    setPaymentPollAttempt(0);
+    setPaymentPollExhausted(false);
+
+    try {
+      const cached = sessionStorage.getItem(storageKey)?.toLowerCase();
+      if (cached === "success") {
+        setPaymentStatus("success");
+        return;
+      }
+      if (cached === "failed") {
+        setPaymentStatus("failed");
+      }
+    } catch {
+      // ignore unavailable sessionStorage
+    }
+
+    const runPoll = async () => {
+      const current = await fetchPaymentStatus();
+      if (cancelled) return;
+      if (current === "success" || current === "failed") return;
+      if (pollAttemptsRef.current >= maxAttempts) {
+        setPaymentPollExhausted(true);
+        return;
+      }
+      timer = setTimeout(runPoll, 2000);
+    };
+
+    void runPoll();
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [bookingId, token, fetchPaymentStatus]);
+
+  useEffect(() => {
+    const tick = window.setInterval(() => setRelativeNowMs(Date.now()), 30000);
+    return () => window.clearInterval(tick);
+  }, []);
+
+  useEffect(() => {
+    const key = statusKeyRef.current;
+    if (!key) return;
+    try {
+      sessionStorage.setItem(key, paymentStatus);
+    } catch {
+      // ignore unavailable sessionStorage
+    }
+  }, [paymentStatus]);
+
+  useEffect(() => {
+    const persistBeforeUnload = () => {
+      isPageUnloadRef.current = true;
+      const key = statusKeyRef.current;
+      if (!key) return;
+      try {
+        sessionStorage.setItem(key, paymentStatus);
+      } catch {
+        // ignore unavailable sessionStorage
+      }
+    };
+    window.addEventListener("beforeunload", persistBeforeUnload);
+    return () => window.removeEventListener("beforeunload", persistBeforeUnload);
+  }, [paymentStatus]);
+
+  useEffect(() => {
+    return () => {
+      if (isPageUnloadRef.current) return;
+      const key = statusKeyRef.current;
+      if (!key) return;
+      try {
+        sessionStorage.removeItem(key);
+      } catch {
+        // ignore unavailable sessionStorage
+      }
+    };
+  }, []);
+
+  async function runManualPaymentStatusCheck() {
+    setPaymentCheckManual(true);
+    await fetchPaymentStatus();
+    setPaymentCheckManual(false);
+  }
+
+  function formatRelativeLastCheck(lastChecked: Date | null): string {
+    if (!lastChecked) return "Not checked yet";
+    const diffMs = Math.max(0, relativeNowMs - lastChecked.getTime());
+    const mins = Math.floor(diffMs / 60000);
+    if (mins < 1) return "just now";
+    if (mins === 1) return "1 min ago";
+    return `${mins} min ago`;
+  }
 
   const modCheckinError = useMemo(() => {
     if (modCheckin.length < 10) return "";
@@ -265,12 +492,26 @@ export default function BookingConfirmationPage() {
       : "";
 
   if (error || !booking) {
+    const computedErrorPayload: ApiErrorEnvelope = errorPayload ?? {
+      code: "SERVER_ERROR",
+      message: error ?? "We could not load your booking details.",
+      details: "Try again in a moment or contact support if this continues.",
+      recoveryActions: mapErrorCodeToRecoveryActions(undefined, paymentRetryUrl),
+    };
     return (
       <div className="min-h-[60vh] flex items-center justify-center px-4">
         <div className="max-w-md text-center space-y-4">
           <div className="text-4xl">🔍</div>
           <h1 className="text-xl font-bold text-text-primary">Booking not found</h1>
-          <p className="text-sm text-text-secondary">{error ?? "We could not find your booking. Please use the link from your confirmation email."}</p>
+          <ErrorDisplay
+            error={{
+              ...computedErrorPayload,
+              recoveryActions: computedErrorPayload.recoveryActions?.length
+                ? computedErrorPayload.recoveryActions
+                : mapErrorCodeToRecoveryActions(computedErrorPayload.code, paymentRetryUrl),
+            }}
+            onActionClick={handleRecoveryActionClick}
+          />
           <Link to="/" className="inline-block mt-2 text-sm text-brand-primary underline underline-offset-2">Return to homepage</Link>
         </div>
       </div>
@@ -498,6 +739,76 @@ export default function BookingConfirmationPage() {
         {isCancelled && (
           <div className="rounded-xl bg-red-50 border border-red-200 p-4 text-sm text-red-700">
             This booking has been cancelled. If you have questions, please contact us at the number below.
+          </div>
+        )}
+
+        {paymentStatus === "pending" && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-1" data-testid="payment-polling-status">
+            <p className="text-sm text-amber-800 font-medium">Checking payment... attempt {paymentPollAttempt}/150</p>
+            {paymentPollExhausted && (
+              <p className="text-sm text-amber-800">
+                Still processing? Check your email for confirmation or contact support.
+              </p>
+            )}
+          </div>
+        )}
+
+        {paymentStatus === "failed" && (
+          <div className="rounded-xl border border-red-200 bg-red-50 p-4 space-y-3" data-testid="payment-failed-card">
+            <h2 className="text-sm font-semibold text-red-800">Payment failed</h2>
+            <p className="text-sm text-red-700">
+              Payment failed: {paymentFailureReason ?? "Your payment could not be completed."}
+            </p>
+            {paymentFailedAt && (
+              <p className="text-xs text-red-700/80">
+                Failed at: {new Date(paymentFailedAt).toLocaleString("en-IN", {
+                  day: "2-digit",
+                  month: "short",
+                  year: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </p>
+            )}
+            <div className="flex flex-wrap items-center gap-3">
+              {paymentStatus === "failed" && paymentRetryUrl ? (
+                <button
+                  type="button"
+                  onClick={() => window.open(paymentRetryUrl, "_blank", "noopener,noreferrer")}
+                  className="inline-flex items-center justify-center rounded-lg bg-red-600 text-white text-sm font-medium px-4 py-2.5 hover:bg-red-700 transition-colors"
+                  data-testid="retry-payment-btn-manual"
+                >
+                  Retry Payment
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => { void runManualPaymentStatusCheck(); }}
+                disabled={paymentCheckManual}
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-300 text-red-800 text-sm font-medium px-4 py-2.5 hover:bg-red-100 transition-colors disabled:opacity-70"
+                data-testid="check-payment-status-btn"
+              >
+                {paymentCheckManual ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-red-300 border-t-red-700 rounded-full animate-spin" aria-hidden />
+                    Checking...
+                  </>
+                ) : (
+                  "Check payment status"
+                )}
+              </button>
+              <span className="text-xs text-red-700/80" data-testid="payment-last-checked">
+                Last checked: {formatRelativeLastCheck(lastPaymentCheckAt)}
+              </span>
+              <a
+                href={whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm font-medium text-red-800 underline underline-offset-2"
+              >
+                Contact Support
+              </a>
+            </div>
           </div>
         )}
 

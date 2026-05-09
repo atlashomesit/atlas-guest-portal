@@ -63,12 +63,16 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
 
   const paymentEntity = payload?.payload?.payment?.entity || payload?.payload?.order?.entity;
   const bookingId = paymentEntity?.notes?.bookingId || 'unknown-booking';
+  const isFailed = payload?.event === 'payment.failed';
+  const failureReason =
+    paymentEntity?.error_description || paymentEntity?.error_reason || paymentEntity?.error_code || null;
   const bookingUpdate = {
     bookingId,
     paymentId: paymentEntity?.id,
     status: payload?.event,
     amount: paymentEntity?.amount,
     currency: paymentEntity?.currency,
+    failureReason,
     receivedAt: new Date().toISOString(),
   };
 
@@ -76,7 +80,11 @@ export const onRequestPost = async ({ request, env }: { request: Request; env: E
     await env.BOOKINGS_KV.put(bookingId, JSON.stringify(bookingUpdate));
   }
 
-  console.log('[Webhook] Processed Razorpay event', bookingUpdate);
+  if (isFailed) {
+    console.warn('[Webhook] Razorpay payment.failed received', bookingUpdate);
+  } else {
+    console.log('[Webhook] Processed Razorpay event', bookingUpdate);
+  }
 
   return new Response(JSON.stringify({ success: true, booking: bookingUpdate }), {
     status: 200,

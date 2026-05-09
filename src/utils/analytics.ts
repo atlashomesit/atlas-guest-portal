@@ -1,3 +1,5 @@
+import { hasAcceptedCookies } from './cookieConsent';
+
 type AnalyticsEnv = 'dev' | 'prod';
 
 type AnalyticsIdentifiers = {
@@ -104,6 +106,8 @@ export const resetAnalyticsTransport = () => {
 };
 
 export const initAnalytics = () => {
+  // DPDP Act §6: do not load non-essential analytics scripts until the user has accepted cookies.
+  if (!hasAcceptedCookies()) return;
   if (transport !== defaultTransport) return;
 
   const measurementId = getGaMeasurementId();
