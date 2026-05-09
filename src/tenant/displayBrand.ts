@@ -36,3 +36,17 @@ export function getTenantBrandNameLong(): string {
   const raw = (c?.brandNameLong ?? c?.legalContactPack?.legalName ?? "").trim();
   return raw || getTenantBrandName();
 }
+
+/**
+ * Entity name in the short booking-consent line ("I agree to … processing my data").
+ * Marketplace apex uses the full baseline so copy reads "Atlas Homestays"; whitelabel
+ * tenants use legal/long brand from context (RA-006/AC-5).
+ */
+export function getGuestDataProcessingEntityName(): string {
+  const c = getTenantContext();
+  const slug = (c?.slug ?? "").trim().toLowerCase();
+  if (slug === "atlas" || Boolean(c?.isMarketplaceRoot)) {
+    return MARKETPLACE_BRAND_BASELINE;
+  }
+  return getTenantBrandNameLong();
+}

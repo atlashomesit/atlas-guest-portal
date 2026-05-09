@@ -35,7 +35,7 @@ import OptimizedImage from '@/components/ui/OptimizedImage';
 import FomoBar from '@/components/FomoBar';
 import { track } from '@/lib/events'; // TASK-1480
 import { getTenantContext } from '@/tenant/tenantContext';
-import { getTenantBrandNameLong } from '@/tenant/displayBrand';
+import { getGuestDataProcessingEntityName, getTenantBrandNameLong } from '@/tenant/displayBrand';
 
 declare global {
   interface Window {
@@ -2581,7 +2581,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               aria-invalid={Boolean(consentError)}
             />
             <span>
-              I agree to Atlas processing my data for this booking —{' '}
+              I agree to {getGuestDataProcessingEntityName()} processing my data for this booking —{' '}
               <Link to="/privacy" className="text-cta-primary underline underline-offset-2 hover:opacity-90">
                 see Privacy Policy
               </Link>
