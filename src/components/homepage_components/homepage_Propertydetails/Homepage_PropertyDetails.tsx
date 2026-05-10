@@ -1662,7 +1662,10 @@ useEffect(() => {
                                 />
                             </Suspense>
                             <div className="mt-3 flex flex-wrap gap-2">
-                                <span className="inline-flex items-center gap-1 rounded-full bg-green-50 border border-green-200 px-2.5 py-1 text-xs font-medium text-green-700">
+                                <span
+                                    className="inline-flex items-center gap-1 rounded-full bg-green-50 border border-green-200 px-2.5 py-1 text-xs font-medium text-green-700 cursor-help"
+                                    title="Listing details and photos reviewed by the Atlas team before going live."
+                                >
                                     ✓ Verified listing
                                 </span>
                                 <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2.5 py-1 text-xs font-medium text-blue-700">

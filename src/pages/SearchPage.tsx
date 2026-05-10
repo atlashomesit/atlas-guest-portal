@@ -1235,7 +1235,7 @@ const SearchPage = () => {
                         {unit.hasVerifiedPhotos && unit.isGstRegistered ? (
                           <span
                             className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700 border border-emerald-200 cursor-help"
-                            title="Identity verified, GST registered, photos checked by Atlas team. We've verified the documents."
+                            title="Identity verified, GST registered, 50+ stays. We've checked the documents."
                           >
                             ✅ Atlas Trusted Host
                           </span>
