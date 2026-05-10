@@ -157,6 +157,24 @@ interface Property {
     cancellationTier?: 'Flexible' | 'Moderate' | 'Strict' | null;
 }
 
+/** TASK-1664: row shape from `GET /api/listings/{id}/reviews` (camelCase JSON). */
+type ListingReviewRow = {
+    id: number;
+    guestName?: string | null;
+    rating: number;
+    title?: string | null;
+    body?: string | null;
+    createdAt: string;
+    hostResponse?: string | null;
+    hostResponseAt?: string | null;
+    photoUrls?: string[] | null;
+    isVerifiedStay?: boolean;
+    ratingCleanliness?: number | null;
+    ratingValue?: number | null;
+    ratingCheckin?: number | null;
+    ratingCommunication?: number | null;
+};
+
 /** TASK-1359: Convert YouTube/Vimeo watch URL to embed URL, or return null if unrecognised. */
 function toEmbedUrl(url: string): string | null {
     try {
@@ -236,7 +254,7 @@ const PropertyDetails = () => {
         loading: boolean;
         averageRating: number;
         totalCount: number;
-        reviews: { id: number; guestName?: string | null; rating: number; title?: string | null; body?: string | null; createdAt: string; hostResponse?: string | null; hostResponseAt?: string | null; photoUrls?: string[] | null; isVerifiedStay?: boolean }[];
+        reviews: ListingReviewRow[];
     }>(null);
 
     // AMN-001: Fetch amenity master list once on mount
@@ -480,7 +498,7 @@ const PropertyDetails = () => {
                 const j = (await res.json()) as {
                     averageRating?: number;
                     totalCount?: number;
-                    reviews?: { id: number; guestName?: string | null; rating: number; title?: string | null; body?: string | null; createdAt: string; hostResponse?: string | null; hostResponseAt?: string | null; photoUrls?: string[] | null; isVerifiedStay?: boolean }[];
+                    reviews?: ListingReviewRow[];
                 };
                 if (ac.signal.aborted) return;
                 setListingReviewsFromApi({
@@ -1017,7 +1035,9 @@ useEffect(() => {
         .filter(Boolean);
     const mapCity = locationParts[0] ?? "";
     const mapState = locationParts.slice(1).join(", ");
-    const mapSearchQuery = [mapCity, mapState].filter(Boolean).join(", ");
+    const mapStreet = String(data?.propertyAddress ?? data?.property_address ?? "").trim();
+    const mapSearchQuery =
+        [mapStreet, mapCity, mapState].filter(Boolean).join(", ") || (data?.property_location ?? "").trim();
 
     return (
         <>
@@ -1162,7 +1182,19 @@ useEffect(() => {
                 <div className="flex items-center gap-3 mt-2 flex-wrap">
                     <a
                         href={(() => {
-                            const priceText = data?.property_price && data.property_price > 0 ? ` from ₹${data.property_price}/night` : '';
+                            // TASK-1678: prefer live/computed nightly when catalog price is missing or stale
+                            const shareNightly =
+                                directBookingNightly > 0
+                                    ? Math.round(directBookingNightly)
+                                    : data?.property_price && data.property_price > 0
+                                      ? Math.round(data.property_price)
+                                      : nightlyPrice?.finalNightlyPrice && nightlyPrice.finalNightlyPrice > 0
+                                        ? Math.round(nightlyPrice.finalNightlyPrice)
+                                        : 0;
+                            const priceText =
+                                shareNightly > 0
+                                    ? ` from ₹${shareNightly.toLocaleString('en-IN')}/night`
+                                    : '';
                             const shareText = `Check out ${data?.property_name ?? 'this home'}${priceText}: ${window.location.href}`;
                             return `https://wa.me/?text=${encodeURIComponent(shareText)}`;
                         })()}
@@ -1519,6 +1551,28 @@ useEffect(() => {
                                                         <FaStar key={i} className={`text-xs ${i < r.rating ? 'text-accent-primary' : 'text-border-subtle'}`} />
                                                     ))}
                                                 </div>
+                                                {(() => {
+                                                    const chips: { label: string; v: number }[] = [];
+                                                    if (r.ratingCleanliness != null && r.ratingCleanliness >= 1)
+                                                        chips.push({ label: 'Cleanliness', v: r.ratingCleanliness });
+                                                    if (r.ratingValue != null && r.ratingValue >= 1)
+                                                        chips.push({ label: 'Value', v: r.ratingValue });
+                                                    if (r.ratingCheckin != null && r.ratingCheckin >= 1)
+                                                        chips.push({ label: 'Check-in', v: r.ratingCheckin });
+                                                    if (r.ratingCommunication != null && r.ratingCommunication >= 1)
+                                                        chips.push({ label: 'Communication', v: r.ratingCommunication });
+                                                    if (chips.length === 0) return null;
+                                                    return (
+                                                        <p className="mb-2 text-xs text-text-muted" data-testid="review-sub-ratings">
+                                                            {chips.map((c, idx) => (
+                                                                <span key={c.label}>
+                                                                    {idx > 0 ? ' · ' : ''}
+                                                                    {c.label} {c.v}/5
+                                                                </span>
+                                                            ))}
+                                                        </p>
+                                                    );
+                                                })()}
                                                 {r.title && <p className="text-sm font-medium text-text-primary mb-1">{r.title}</p>}
                                                 {r.body && <p className="text-sm text-text-muted italic">"{r.body}"</p>}
                                                 {filterGuestImageUrls(r.photoUrls ?? []).length > 0 && (
