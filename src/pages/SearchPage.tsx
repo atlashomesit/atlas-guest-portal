@@ -8,6 +8,7 @@ import { parseDate } from "../utils/formatting";
 import { useCurrency } from "../contexts/CurrencyContext";
 import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 import { getTenantContext } from "../tenant/tenantContext";
+import { getTenantBrandName } from "../tenant/displayBrand";
 import { getTenantOverrides, getTenantPublicListingIdAllowlist, getUnitNoun, shouldHideAtlasBranding } from "../tenant/tenantOverrides";
 import SkeletonCard from "../components/apartments/SkeletonCard";
 import OptimizedImage from "../components/ui/OptimizedImage";
@@ -726,7 +727,7 @@ const SearchPage = () => {
           <h1 className="text-3xl font-bold text-text-primary sm:text-4xl">
             {checkIn && checkOut
               ? `${filteredUnits.length} ${filteredUnits.length === 1 ? "home" : "homes"} for your dates`
-              : "Starguest House"}
+              : getTenantBrandName()}
           </h1>
           <p className="max-w-3xl text-base text-text-body">
             {checkIn && checkOut && !hasInvalidDates
@@ -1272,12 +1273,12 @@ const SearchPage = () => {
                           </span>
                         ) : null}
                       </div>
-                      {unit.rating != null && unit.rating > 0 && (
+                      {/* TASK-1660: match ListingCard — no catalog star average without verified review count */}
+                      {(unit.reviewCount ?? 0) > 0 && unit.rating != null && unit.rating > 0 && (
                         <p className="mt-0.5 text-sm text-accent-primary font-medium">
-                          {"★".repeat(Math.round(unit.rating))}<span className="text-text-muted ml-1">{unit.rating.toFixed(1)}</span>
-                          {unit.reviewCount != null && unit.reviewCount > 0 && (
-                            <span className="text-text-muted ml-1 text-xs">({unit.reviewCount})</span>
-                          )}
+                          {"★".repeat(Math.round(unit.rating))}
+                          <span className="text-text-muted ml-1">{unit.rating.toFixed(1)}</span>
+                          <span className="text-text-muted ml-1 text-xs">({unit.reviewCount})</span>
                         </p>
                       )}
                       {/* TASK-1716: keyword-bucketed sentiment summary */}
@@ -1301,17 +1302,25 @@ const SearchPage = () => {
                         {(() => { const gstMult = unit.pricePerNight > 7500 ? 1.12 : 1.05; const pct = unit.pricePerNight > 7500 ? 12 : 5; return `Est. total: ${formatDisplayCurrency(Math.round(unit.pricePerNight * gstMult))} (incl. ${pct}% GST)`; })()}
                       </p>
                       {longStay && (
-                        <p className="text-sm font-semibold text-cta-primary">
-                          {/* TASK-2077: apply LOS discount to monthly estimate when tier is configured */}
+                        <div className="text-sm font-semibold text-cta-primary">
+                          {/* TASK-2077 / TASK-1661: monthly line uses configured LOS tier; otherwise nightly×30 + honest hint */}
                           {(() => {
                             const discountPct = unit.losDiscount2Percent ?? unit.losDiscountPercent ?? 0;
                             const base = unit.pricePerNight * 30;
-                            const discounted = discountPct > 0 ? Math.round(base * (1 - discountPct / 100)) : base;
-                            return discountPct > 0
-                              ? `from ${formatDisplayCurrency(discounted)}/month with long-stay discount`
-                              : `from ${formatDisplayCurrency(base)}/month`;
+                            const discounted =
+                              discountPct > 0 ? Math.round(base * (1 - discountPct / 100)) : base;
+                            return discountPct > 0 ? (
+                              <p>{`from ${formatDisplayCurrency(discounted)}/month with long-stay discount`}</p>
+                            ) : (
+                              <>
+                                <p>{`from ${formatDisplayCurrency(base)}/month at listed nightly rate`}</p>
+                                <p className="mt-0.5 text-xs font-normal text-text-muted">
+                                  Many hosts offer 15–20% off for 30+ nights; use the calculator below to plan.
+                                </p>
+                              </>
+                            );
                           })()}
-                        </p>
+                        </div>
                       )}
                       {/* TASK-1739: LOS discount calculator — only shows when tiers are configured */}
                       <LongStayCalculator

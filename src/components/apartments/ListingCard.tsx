@@ -73,7 +73,9 @@ const ListingCard: React.FC<ListingCardProps> = ({
   }, [lastBookedAt]);
   const finalPrice = pricingBreakdown?.finalNightlyPrice ?? price;
   const originalPrice = pricingBreakdown?.baseNightlyPrice ?? price;
-  const ratingSnippet = rating > 0 ? `${rating.toFixed(2)} / 5` : "Rating updates soon";
+  /** TASK-1660: only treat star average as verified when at least one guest review exists. */
+  const hasVerifiedReviews = reviews > 0 && rating > 0;
+  const ratingSnippet = hasVerifiedReviews ? `${rating.toFixed(2)} / 5` : "Reviews after first stay";
   const hasSpecialPricing = Boolean(pricingBreakdown?.hasSpecialDateMultiplier);
   const specialPricingLabel =
     hasSpecialPricing && pricingBreakdown?.dateKey
@@ -182,9 +184,15 @@ const ListingCard: React.FC<ListingCardProps> = ({
             )}
           </div>
           <div className="flex flex-shrink-0 items-center gap-1 text-sm font-semibold text-text-primary">
-            <span aria-hidden>★</span>
-            <span>{rating > 0 ? rating.toFixed(2) : "New"}</span>
-            <span className="text-text-muted">({reviews.toLocaleString()})</span>
+            {hasVerifiedReviews ? (
+              <>
+                <span aria-hidden>★</span>
+                <span>{rating.toFixed(2)}</span>
+                <span className="text-text-muted">({reviews.toLocaleString()})</span>
+              </>
+            ) : (
+              <span className="text-xs font-semibold text-text-muted">New listing</span>
+            )}
           </div>
         </div>
 
@@ -276,7 +284,9 @@ const ListingCard: React.FC<ListingCardProps> = ({
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="inline-flex items-center gap-1 rounded-full bg-bg-surface px-2 py-1">No hidden fees</span>
                   <span className="inline-flex items-center gap-1 rounded-full bg-bg-surface px-2 py-1">Secure Razorpay payments</span>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-bg-surface px-2 py-1">Avg. rating {ratingSnippet}</span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-bg-surface px-2 py-1">
+                    {hasVerifiedReviews ? `Avg. rating ${ratingSnippet}` : ratingSnippet}
+                  </span>
                   {/* TASK-1705: Owner-share trust badge */}
                   <OwnerShareBadge nightlyPrice={finalPrice} />
                 </div>
