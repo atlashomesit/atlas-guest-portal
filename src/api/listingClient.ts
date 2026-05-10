@@ -135,6 +135,8 @@ export type PublicListing = {
   ratingStarCounts?: number[] | null;
   /** TASK-1385: Cancellation policy tier — "Flexible", "Moderate", or "Strict". Null when host hasn't set one. */
   cancellationTier?: 'Flexible' | 'Moderate' | 'Strict' | null;
+  /** TASK-1974: refundable security deposit configured on listing (null/0 = none). */
+  securityDepositAmount?: number | null;
 };
 
 function normalizePublicListing(payload: Record<string, unknown>): PublicListing {
@@ -220,6 +222,12 @@ function normalizePublicListing(payload: Record<string, unknown>): PublicListing
     cancellationTier: (payload.cancellationTier === 'Flexible' || payload.cancellationTier === 'Moderate' || payload.cancellationTier === 'Strict')
       ? payload.cancellationTier
       : null, // TASK-1385
+    securityDepositAmount: (() => {
+      const raw = payload.securityDepositAmount ?? payload.SecurityDepositAmount;
+      if (raw == null || raw === '') return null;
+      const n = Number(raw);
+      return Number.isFinite(n) && n > 0 ? n : null;
+    })(),
   };
 }
 

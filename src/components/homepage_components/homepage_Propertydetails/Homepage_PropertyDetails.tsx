@@ -154,6 +154,8 @@ interface Property {
     virtualTourUrl?: string | null;
     /** TASK-1385: Cancellation policy tier from listing — Flexible, Moderate, or Strict. */
     cancellationTier?: 'Flexible' | 'Moderate' | 'Strict' | null;
+    /** TASK-1974: security deposit amount from listing API for checkout disclosure. */
+    securityDepositAmount?: number | null;
 }
 
 /** TASK-1664: row shape from `GET /api/listings/{id}/reviews` (camelCase JSON). */
@@ -436,6 +438,11 @@ const PropertyDetails = () => {
                     }
                     if (filterGuestImageUrls(prev.property_img ?? []).length === 0 && hydratedImages.length > 0) {
                         updates.property_img = hydratedImages;
+                    }
+                    const rawSd = d.securityDepositAmount ?? d.SecurityDepositAmount;
+                    const sd = typeof rawSd === 'number' && Number.isFinite(rawSd) && rawSd > 0 ? rawSd : null;
+                    if (sd != null && prev.securityDepositAmount == null) {
+                        updates.securityDepositAmount = sd;
                     }
                     return Object.keys(updates).length > 0 ? { ...prev, ...updates } : prev;
                 });
@@ -1714,6 +1721,7 @@ useEffect(() => {
                                     timezoneId={data.timezoneId}
                                     coverPhotoUrl={primaryImage}
                                     maxGuests={data.maxGuests}
+                                    securityDepositAmount={data.securityDepositAmount ?? null}
                                 />
                             </Suspense>
                             <div className="mt-3 flex flex-wrap gap-2">

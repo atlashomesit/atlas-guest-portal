@@ -179,6 +179,7 @@ const HomeDetails = () => {
   }, [room, roomNo]);
 
   const primaryImage = room?.images?.[0] ?? fallbackImage;
+  const apiListingForDeposit = listingsById[room?.roomNo ?? ""];
 
   /** TASK-1453: LCP preload for hero photo (no react-helmet-async — inject once per navigation). */
   useEffect(() => {
@@ -329,6 +330,7 @@ const HomeDetails = () => {
           listingName={displayTitle}
           maxGuests={room.maxGuests}
           hostPhone={room.hostPhone ?? null}
+          securityDepositAmount={apiListingForDeposit?.securityDepositAmount ?? null}
         />
       </Suspense>
 
