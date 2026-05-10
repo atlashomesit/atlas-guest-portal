@@ -107,6 +107,54 @@ const PrivacyPage = () => {
           </div>
 
           <section
+            id="dpdp-at-a-glance"
+            className="bg-bg-surface border border-border-subtle rounded-2xl p-6 shadow-level1"
+            aria-labelledby="dpdp-glance-heading"
+          >
+            <h2 id="dpdp-glance-heading" className="text-xl font-bold text-text-primary">
+              DPDP Act — quick links
+            </h2>
+            <p className="text-text-muted text-sm mt-1">
+              Jump to the statutory topics most guests ask about: why we process data, how long we keep it, the rights you
+              can exercise, and how to contact the Grievance Officer.
+            </p>
+            <ul className="mt-4 grid sm:grid-cols-2 gap-3 list-none p-0 m-0">
+              <li>
+                <a
+                  href="#purposes-of-processing"
+                  className="block rounded-xl border border-border-subtle px-4 py-3 font-semibold text-primary hover:border-cta-primary min-h-11"
+                >
+                  Lawful purposes
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#retention"
+                  className="block rounded-xl border border-border-subtle px-4 py-3 font-semibold text-primary hover:border-cta-primary min-h-11"
+                >
+                  Retention periods
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#your-rights"
+                  className="block rounded-xl border border-border-subtle px-4 py-3 font-semibold text-primary hover:border-cta-primary min-h-11"
+                >
+                  Access, correct, erase, withdraw
+                </a>
+              </li>
+              <li>
+                <a
+                  href="#grievance-redressal"
+                  className="block rounded-xl border border-border-subtle px-4 py-3 font-semibold text-primary hover:border-cta-primary min-h-11"
+                >
+                  Grievance contact
+                </a>
+              </li>
+            </ul>
+          </section>
+
+          <section
             id="cookie-consent-revocation"
             className="bg-bg-surface border border-border-subtle rounded-2xl p-6 shadow-level1 space-y-3"
           >
