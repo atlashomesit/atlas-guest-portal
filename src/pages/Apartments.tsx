@@ -13,7 +13,12 @@ import type { Listing } from "../data/listings";
 import { useTenantListings } from "../hooks/useTenantListings";
 import { trackEvent } from "../utils/analytics";
 import { buildHomeUnitPath, getPropertySlug, navigateToHomeUnit } from "../utils/navigation";
-import { calculateNightlyPrice, inferUnitType, type NightlyPriceBreakdown } from "../utils/pricing";
+import {
+  calculateNightlyPrice,
+  getEffectiveDiscountPercent,
+  inferUnitType,
+  type NightlyPriceBreakdown,
+} from "../utils/pricing";
 import type { UnitType } from "../config/pricing.config";
 
 type PropertyMetadata = {
@@ -235,6 +240,7 @@ export const Apartments = () => {
   const brandName = getTenantBrandName();
   const tenantOverrides = getTenantOverrides(tenant?.slug);
   const hideAtlasBranding = shouldHideAtlasBranding(tenant, tenantOverrides);
+  const directBookingDiscountPercent = React.useMemo(() => getEffectiveDiscountPercent(), []);
 
   const safeListings = React.useMemo(() => sanitizeListings(listingsSource), [listingsSource]);
   const safeProperties = React.useMemo(() => sanitizeProperties(propertiesSource), [propertiesSource]);
@@ -603,6 +609,7 @@ export const Apartments = () => {
                   losDiscountPercent={listing.losDiscountPercent}
                   losDiscount2MinNights={listing.losDiscount2MinNights}
                   losDiscount2Percent={listing.losDiscount2Percent}
+                  directBookingDiscountPercent={directBookingDiscountPercent}
                   onClick={() => handleNavigate(listing.property)}
                 />
               ))}

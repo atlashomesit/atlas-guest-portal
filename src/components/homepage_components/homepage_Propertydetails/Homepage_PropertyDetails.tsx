@@ -35,14 +35,12 @@ import { addRecentlyViewed, isFavorite, toggleFavorite } from '../../../utils/gu
 import { formatCurrency, formatHumanDate } from '../../../utils/formatting';
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
 import SkeletonCard from '../../apartments/SkeletonCard';
+import { ILLUSTRATIVE_OTA_GUEST_FEE_PERCENT } from '@/utils/directBookingPromo';
 
 const UnitBookingWidget = lazy(() => import('../../availability/UnitBookingWidget'));
 const AvailabilityCalendar = lazy(() => import('../../AvailabilityCalendar'));
 const GuestAssistant = lazy(() => import('../../GuestAssistant')); // TASK-1728
 const VirtualTourSection = lazy(() => import('../../VirtualTourSection')); // Task 37
-
-/** TASK-1294: illustrative uplift for “typical OTA” guest all-in (fees vary by site). */
-const OTA_ILLUSTRATIVE_MARKUP_PCT = 17;
 
 interface PropertyAmenity {
     amenities_icon: string;
@@ -341,7 +339,7 @@ const PropertyDetails = () => {
 
     const illustrativeOtaNightly = useMemo(() => {
         if (directBookingNightly <= 0) return 0;
-        return Math.round(directBookingNightly * (1 + OTA_ILLUSTRATIVE_MARKUP_PCT / 100));
+        return Math.round(directBookingNightly * (1 + ILLUSTRATIVE_OTA_GUEST_FEE_PERCENT / 100));
     }, [directBookingNightly]);
 
     useEffect(() => {
@@ -1014,8 +1012,10 @@ useEffect(() => {
       const useMarketplaceBlobLayout = slug === "atlas" || Boolean(ctx?.isMarketplaceRoot);
       if (!useMarketplaceBlobLayout) return imageUrl;
 
-      // If already has full blob URL, return as-is
-      if (imageUrl.includes('blob.core.windows.net')) return imageUrl;
+      // If already a fully-qualified absolute URL (any scheme/host — Azure blob OR a dev/static
+      // server like http://127.0.0.1:5120/uploads/...), trust it. Rewriting absolute URLs to
+      // Azure blob URLs broke local/dev where blobs don't exist (TASK-2118 console-error fix).
+      if (/^https?:\/\//i.test(imageUrl)) return imageUrl;
 
       // Handle relative paths and filenames
       const cleanPath = imageUrl.replace(/^\/+/, '').trim();
@@ -1267,7 +1267,7 @@ useEffect(() => {
           alt={data?.property_name ? `${data.property_name} photo` : "Main property photo"}
           loading="eager"
           decoding="async"
-          fetchPriority="high"
+          {...({ fetchpriority: "high" } as { fetchpriority: string })}
           sizes="(min-width: 1024px) 50vw, 100vw"
           className="w-full h-full object-cover"
           onError={(e) => {

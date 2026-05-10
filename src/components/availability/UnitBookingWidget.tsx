@@ -36,6 +36,10 @@ import FomoBar from '@/components/FomoBar';
 import { track } from '@/lib/events'; // TASK-1480
 import { getTenantContext } from '@/tenant/tenantContext';
 import { getGuestDataProcessingEntityName, getTenantBrandNameLong } from '@/tenant/displayBrand';
+import {
+  ILLUSTRATIVE_OTA_GUEST_FEE_PERCENT,
+  PMS_AIRBNB_2026_TERMS_URL,
+} from '@/utils/directBookingPromo';
 
 declare global {
   interface Window {
@@ -918,6 +922,15 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     formatCurrency(n, { maximumFractionDigits: 0 });
 
   const convenienceFeePctLabel = Math.round(convenienceFeePercent * 100);
+
+  const illustrativeOtaGuestFeeComparison = useMemo(() => {
+    if (!hasSelectedRange || breakdownPrice <= 0) return null;
+    const illustrativeGuestFee = Math.round((breakdownPrice * ILLUSTRATIVE_OTA_GUEST_FEE_PERCENT) / 100);
+    return {
+      illustrativeGuestFee,
+      illustrativeRoomPlusFee: breakdownPrice + illustrativeGuestFee,
+    };
+  }, [hasSelectedRange, breakdownPrice]);
 
   const formattedDateLabel = dateRange.startDate && dateRange.endDate
     ? `${timezoneId ? formatDateInTimezone(dateRange.startDate, timezoneId) : format(dateRange.startDate, 'EEE, dd MMM')} – ${timezoneId ? formatDateInTimezone(dateRange.endDate, timezoneId) : format(dateRange.endDate, 'EEE, dd MMM')} • ${priceDetails.nights} ${priceDetails.nights === 1 ? 'night' : 'nights'}`
@@ -2307,6 +2320,46 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           <p className="mt-3 text-xs text-text-muted">
             Direct booking — no platform fee. Pay securely via Razorpay.
           </p>
+          {illustrativeOtaGuestFeeComparison && (
+            <details className="mt-3 rounded-lg border border-border-subtle bg-bg-muted/50 px-3 py-2 text-xs text-text-secondary">
+              <summary className="cursor-pointer select-none font-semibold text-text-primary">
+                How does this compare to Airbnb or other travel sites?
+              </summary>
+              <p className="mt-2 text-text-muted">
+                OTAs often add a guest service fee on the room subtotal (commonly in the{' '}
+                {ILLUSTRATIVE_OTA_GUEST_FEE_PERCENT}% range before taxes). This is an illustration only — your
+                actual OTA total varies by site, currency, and promotions.
+              </p>
+              <ul className="mt-2 list-inside list-disc space-y-1">
+                <li>
+                  Your direct room fare (this stay):{' '}
+                  <span className="font-semibold text-text-primary">{displayPrice(breakdownPrice)}</span>
+                </li>
+                <li>
+                  Illustrative guest fee (~{ILLUSTRATIVE_OTA_GUEST_FEE_PERCENT}% on that subtotal):{' '}
+                  <span className="font-semibold text-text-primary">
+                    {displayPrice(illustrativeOtaGuestFeeComparison.illustrativeGuestFee)}
+                  </span>
+                </li>
+                <li>
+                  Illustrative comparable subtotal:{' '}
+                  <span className="font-semibold text-text-primary">
+                    {displayPrice(illustrativeOtaGuestFeeComparison.illustrativeRoomPlusFee)}
+                  </span>
+                </li>
+              </ul>
+              <p className="mt-2">
+                <a
+                  href={PMS_AIRBNB_2026_TERMS_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-cta-primary underline underline-offset-2"
+                >
+                  Read how 2026 Airbnb terms affect hosts (opens Atlas PMS) →
+                </a>
+              </p>
+            </details>
+          )}
         </div>
 
       </div>
