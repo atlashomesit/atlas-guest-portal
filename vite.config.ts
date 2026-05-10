@@ -48,6 +48,9 @@ export default defineConfig({
     port: 5174,
     /** Must stay 5174 — E2E and docs assume guest portal here; do not silently move to another port. */
     strictPort: true,
+    headers: {
+      "Referrer-Policy": "strict-origin-when-cross-origin",
+    },
     proxy: {
       "/listings": { target: BACKEND_TARGET, changeOrigin: true, secure: false },
       "/availability": { target: BACKEND_TARGET, changeOrigin: true, secure: false },
