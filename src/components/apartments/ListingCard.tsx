@@ -34,6 +34,8 @@ type ListingCardProps = {
   losDiscount2Percent?: number | null;
   /** TASK-1943: global / tenant direct-booking discount percent for badge (0–100). */
   directBookingDiscountPercent?: number | null;
+  /** TASK-1982: guest review counts per star (index 0 = 1★ … 4 = 5★), length 5 when present. */
+  ratingStarCounts?: number[] | null;
   onClick?: () => void;
 };
 
@@ -62,6 +64,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
   losDiscount2MinNights,
   losDiscount2Percent,
   directBookingDiscountPercent,
+  ratingStarCounts,
   onClick,
 }) => {
   const { format: formatCurrency } = useCurrency();
@@ -79,6 +82,14 @@ const ListingCard: React.FC<ListingCardProps> = ({
   /** TASK-1660: only treat star average as verified when at least one guest review exists. */
   const hasVerifiedReviews = reviews > 0 && rating > 0;
   const ratingSnippet = hasVerifiedReviews ? `${rating.toFixed(2)} / 5` : "Reviews after first stay";
+  const starHistogram = useMemo(() => {
+    if (!ratingStarCounts || ratingStarCounts.length !== 5) return null;
+    const counts = ratingStarCounts.map((n) => (Number.isFinite(n) && n >= 0 ? n : 0));
+    const total = counts.reduce((a, b) => a + b, 0);
+    if (total <= 0) return null;
+    const max = Math.max(...counts, 1);
+    return { counts, max };
+  }, [ratingStarCounts]);
   const hasSpecialPricing = Boolean(pricingBreakdown?.hasSpecialDateMultiplier);
   const specialPricingLabel =
     hasSpecialPricing && pricingBreakdown?.dateKey
@@ -299,6 +310,25 @@ const ListingCard: React.FC<ListingCardProps> = ({
                   <span className="inline-flex items-center gap-1 rounded-full bg-bg-surface px-2 py-1">
                     {hasVerifiedReviews ? `Avg. rating ${ratingSnippet}` : ratingSnippet}
                   </span>
+                  {hasVerifiedReviews && starHistogram && (
+                    <div
+                      className="inline-flex items-end gap-0.5 rounded-md bg-bg-surface px-2 py-1"
+                      data-testid="listing-card-star-histogram"
+                      title={starHistogram.counts.map((c, i) => `${i + 1}★: ${c}`).join(" · ")}
+                      aria-label={`Review star distribution: ${starHistogram.counts.map((c, i) => `${i + 1} star, ${c} reviews`).join("; ")}`}
+                    >
+                      {starHistogram.counts.map((count, idx) => (
+                        <span
+                          key={idx}
+                          className="block w-1 min-h-[3px] rounded-sm bg-amber-500"
+                          style={{
+                            height: `${4 + Math.round((count / starHistogram.max) * 20)}px`,
+                            opacity: count > 0 ? 1 : 0.2,
+                          }}
+                        />
+                      ))}
+                    </div>
+                  )}
                   {/* TASK-1705: Owner-share trust badge */}
                   <OwnerShareBadge nightlyPrice={finalPrice} />
                 </div>

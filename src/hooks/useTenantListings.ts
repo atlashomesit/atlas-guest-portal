@@ -36,6 +36,8 @@ export type TenantPropertyRecord = {
   losDiscount2MinNights?: number | null;
   losDiscount2Percent?: number | null;
   lastMinuteDiscountPercent?: number | null;
+  /** TASK-1982: guest review histogram (1★–5★ counts). */
+  ratingStarCounts?: number[] | null;
 };
 
 export type TenantListingsState = "idle" | "loading" | "error" | "success";
@@ -104,6 +106,7 @@ const mapDtoToProperty = (dto: PublicListing, photosFromEndpoint: string[]): Ten
     losDiscount2MinNights: dto.losDiscount2MinNights ?? null,
     losDiscount2Percent: dto.losDiscount2Percent ?? null,
     lastMinuteDiscountPercent: dto.lastMinuteDiscountPercent ?? null,
+    ratingStarCounts: dto.ratingStarCounts ?? null,
   };
 };
 

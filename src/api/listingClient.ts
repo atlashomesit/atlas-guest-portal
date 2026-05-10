@@ -131,6 +131,8 @@ export type PublicListing = {
   longitude?: number | null;
   /** TASK-2076: Total number of verified reviews. Null when no reviews yet. */
   reviewCount?: number | null;
+  /** TASK-1982: review counts per star 1–5 (length 5). Omitted when API has no reviews. */
+  ratingStarCounts?: number[] | null;
   /** TASK-1385: Cancellation policy tier — "Flexible", "Moderate", or "Strict". Null when host hasn't set one. */
   cancellationTier?: 'Flexible' | 'Moderate' | 'Strict' | null;
 };
@@ -209,6 +211,12 @@ function normalizePublicListing(payload: Record<string, unknown>): PublicListing
     latitude: Number.isFinite(latitude) ? latitude : null,
     longitude: Number.isFinite(longitude) ? longitude : null,
     reviewCount: payload.reviewCount != null ? Number(payload.reviewCount) : null,
+    ratingStarCounts: (() => {
+      const raw = payload.ratingStarCounts ?? payload.RatingStarCounts;
+      if (!Array.isArray(raw) || raw.length === 0) return null;
+      const nums = raw.map((x) => Number(x)).filter((n) => Number.isFinite(n) && n >= 0);
+      return nums.length === 5 ? nums : null;
+    })(),
     cancellationTier: (payload.cancellationTier === 'Flexible' || payload.cancellationTier === 'Moderate' || payload.cancellationTier === 'Strict')
       ? payload.cancellationTier
       : null, // TASK-1385
