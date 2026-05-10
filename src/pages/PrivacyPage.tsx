@@ -107,6 +107,88 @@ const PrivacyPage = () => {
           </div>
 
           <section
+            id="dpdp-at-a-glance"
+            className="bg-bg-surface border border-border-subtle rounded-2xl p-6 shadow-level1 space-y-8"
+            aria-labelledby="dpdp-glance-heading"
+          >
+            <div>
+              <h2 id="dpdp-glance-heading" className="text-xl font-bold text-text-primary">
+                Digital Personal Data Protection Act, 2023 (DPDP) — summary
+              </h2>
+              <p className="text-text-muted text-sm mt-2">
+                The sections below highlight how {pack.legalName} meets core DPDP notice expectations. For full detail,
+                expand the topic areas further down this page or jump to the linked sections.
+              </p>
+            </div>
+
+            <div id="dpdp-lawful-purposes" className="space-y-2">
+              <h3 className="text-lg font-semibold text-text-primary">Lawful purposes</h3>
+              <p className="text-text-primary text-sm leading-relaxed">
+                We process your personal data only for specified purposes and on a lawful basis under the DPDP Act.
+                Where we rely on your consent (for example, non-essential cookies or marketing messages), you may
+                withdraw it at any time without affecting the lawfulness of earlier processing. Where the Act permits
+                processing without consent—such as taking steps at your request before a booking, performing a
+                contract, complying with Indian law, or protecting safety and security—we limit use to what is
+                necessary for that purpose. A fuller itemised list of data categories and purposes appears under{" "}
+                <a className="text-primary font-semibold underline" href="#purposes-of-processing">
+                  Why we process your personal data
+                </a>
+                .
+              </p>
+            </div>
+
+            <div id="dpdp-retention" className="space-y-2">
+              <h3 className="text-lg font-semibold text-text-primary">Retention period</h3>
+              <p className="text-text-primary text-sm leading-relaxed">
+                We retain personal data only as long as needed for the purpose collected or as required by applicable
+                Indian law, whichever is longer. In practice, booking and tax-related records are kept for the period
+                described under{" "}
+                <a className="text-primary font-semibold underline" href="#retention">
+                  How long we keep your personal data
+                </a>{" "}
+                (including GST and income-tax record-keeping). Communications logs and cookie lifetimes are shorter.
+                When retention ends, we delete or irreversibly de-identify data except where a narrow legal carve-out
+                applies, and we explain that to you if you ask.
+              </p>
+            </div>
+
+            <div id="dpdp-rights" className="space-y-2">
+              <h3 className="text-lg font-semibold text-text-primary">
+                Your rights — access, correction, erasure, and withdrawal of consent
+              </h3>
+              <p className="text-text-primary text-sm leading-relaxed">
+                As a Data Principal you may request access to a summary of your personal data and information about how
+                it is processed; request correction of inaccurate or incomplete data; request erasure where the Act
+                allows (we will retain minimum fields where statute requires, and tell you why); and withdraw consent
+                where processing is consent-based—including cookie preferences via the footer link or the reset control
+                on this page. You may also nominate another person to exercise certain rights on your behalf as
+                permitted under the Act. Step-by-step guidance is under{" "}
+                <a className="text-primary font-semibold underline" href="#your-rights">
+                  Your rights as a Data Principal
+                </a>
+                .
+              </p>
+            </div>
+
+            <div id="dpdp-grievance" className="space-y-2">
+              <h3 className="text-lg font-semibold text-text-primary">Grievance contact</h3>
+              <p className="text-text-primary text-sm leading-relaxed">
+                Questions or complaints about personal data should first go to our Grievance Officer at{" "}
+                <a className="text-primary font-semibold underline" href={`mailto:${pack.contactEmail}`}>
+                  {pack.contactEmail}
+                </a>{" "}
+                (phone / WhatsApp: {pack.grievancePhone}). We acknowledge grievances promptly and work to resolve them
+                within the timelines set out under{" "}
+                <a className="text-primary font-semibold underline" href="#grievance-redressal">
+                  Grievance Officer and how to complain
+                </a>
+                . If you remain dissatisfied after our response, you may escalate to the Data Protection Board of India
+                when its complaint channel is available.
+              </p>
+            </div>
+          </section>
+
+          <section
             id="cookie-consent-revocation"
             className="bg-bg-surface border border-border-subtle rounded-2xl p-6 shadow-level1 space-y-3"
           >
