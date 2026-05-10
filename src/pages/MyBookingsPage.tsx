@@ -1,5 +1,4 @@
-/* eslint-disable atlas-brand/no-atlas-string-leak -- TODO Task 16: replace with per-tenant content */
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import SEO from "../components/SEO";
 import { buildApiUrl, getApiHeaders } from "../api/client";
@@ -27,6 +26,21 @@ const STATUS_COLORS: Record<string, string> = {
   Lead: "bg-yellow-100 text-yellow-800",
 };
 
+type BookingsTab = "upcoming" | "past" | "cancelled";
+
+function startOfTodayUtc(): Date {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function parseBookingDate(s: string): Date {
+  const t = s.trim();
+  const iso = /^\d{4}-\d{2}-\d{2}/.test(t) ? t.slice(0, 10) : t;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? new Date(0) : d;
+}
+
 export default function MyBookingsPage() {
   const brandName = getTenantBrandName();
   const [searchParams] = useSearchParams();
@@ -36,6 +50,7 @@ export default function MyBookingsPage() {
   const [bookings, setBookings] = useState<BookingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [tab, setTab] = useState<BookingsTab>("upcoming");
 
   useEffect(() => {
     if (!guestId || !token) {
@@ -56,6 +71,19 @@ export default function MyBookingsPage() {
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
   }, [guestId, token]);
+
+  const filteredBookings = useMemo(() => {
+    const today = startOfTodayUtc();
+    const isCancelled = (b: BookingItem) => b.status?.toLowerCase() === "cancelled";
+    if (tab === "cancelled") return bookings.filter(isCancelled);
+    return bookings.filter((b) => {
+      if (isCancelled(b)) return false;
+      const cin = parseBookingDate(b.checkinDate);
+      if (tab === "upcoming") return cin >= today;
+      /* past */
+      return cin < today;
+    });
+  }, [bookings, tab]);
 
   if (loading) {
     return (
@@ -108,6 +136,27 @@ export default function MyBookingsPage() {
           <p className="text-sm text-text-secondary">{bookings.length} booking{bookings.length !== 1 ? "s" : ""} found</p>
         </div>
 
+        {bookings.length > 0 && (
+          <div className="flex flex-wrap gap-2" role="tablist" aria-label="Filter bookings">
+            {(["upcoming", "past", "cancelled"] as const).map((id) => (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                aria-selected={tab === id}
+                onClick={() => setTab(id)}
+                className={`min-h-11 rounded-full px-4 py-2.5 text-sm font-semibold capitalize transition-colors border ${
+                  tab === id
+                    ? "bg-brand-primary text-white border-brand-primary"
+                    : "bg-bg-surface text-text-primary border-border-subtle hover:bg-bg-muted"
+                }`}
+              >
+                {id === "upcoming" ? "Upcoming" : id === "past" ? "Past" : "Cancelled"}
+              </button>
+            ))}
+          </div>
+        )}
+
         {bookings.length === 0 ? (
           <div className="text-center py-12 space-y-4">
             <p className="text-text-secondary text-sm">No bookings found.</p>
@@ -123,9 +172,13 @@ export default function MyBookingsPage() {
               to locate a booking by reference number.
             </p>
           </div>
+        ) : filteredBookings.length === 0 ? (
+          <div className="rounded-xl border border-border-subtle bg-bg-muted/40 px-4 py-6 text-center text-sm text-text-secondary">
+            No {tab === "upcoming" ? "upcoming" : tab === "past" ? "past" : "cancelled"} bookings in this view.
+          </div>
         ) : (
           <div className="space-y-3">
-            {bookings.map((b) => {
+            {filteredBookings.map((b) => {
               const statusClass = STATUS_COLORS[b.status] ?? "bg-gray-100 text-gray-700";
               return (
                 <Link
@@ -138,13 +191,13 @@ export default function MyBookingsPage() {
                       <p className="text-base font-semibold text-text-primary">{b.listingName}</p>
                       <p className="text-sm text-text-muted">{b.propertyName}</p>
                     </div>
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${statusClass}`}>
+                    <span className={`text-sm font-medium px-2 py-1 rounded-full shrink-0 ${statusClass}`}>
                       {b.status}
                     </span>
                   </div>
                   <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-text-secondary">
                     <span>{b.checkinDate} → {b.checkoutDate}</span>
-                    <span className="font-mono text-text-muted">#{b.bookingRef}</span>
+                    <span className="font-mono text-sm text-text-muted">#{b.bookingRef}</span>
                     <span className="ml-auto font-medium text-text-primary">₹{Number(b.totalAmount).toLocaleString("en-IN")}</span>
                   </div>
                 </Link>

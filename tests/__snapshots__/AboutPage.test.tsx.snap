@@ -30,7 +30,7 @@ exports[`AboutPage > matches the snapshot 1`] = `
           We are a collective of hosts, designers, and operators who believe every serviced apartment should feel personal—without sacrificing reliability. From the first message to checkout, our mission is to keep guests at ease and make every city feel familiar.
         </p>
         <ul
-          class="space-y-3 text-text-muted"
+          class="space-y-3 text-base text-text-muted leading-relaxed"
         >
           <li
             class="flex items-start gap-3"
@@ -216,7 +216,7 @@ exports[`AboutPage > matches the snapshot 1`] = `
           Standards that travel with you
         </h2>
         <p
-          class="text-text-muted max-w-3xl"
+          class="text-base text-text-muted max-w-3xl leading-relaxed"
         >
           Every Starguest House home is audited on the same quality framework. We match hotel-grade consistency with the warmth of local hosts so travelers never have to choose between comfort and character.
         </p>
@@ -442,7 +442,7 @@ exports[`AboutPage > matches the snapshot 1`] = `
             People who craft every Starguest House stay
           </h2>
           <p
-            class="text-text-muted max-w-2xl mt-2"
+            class="text-base text-text-muted max-w-2xl mt-2 leading-relaxed"
           >
             Our distributed team blends hospitality know-how with operational rigor, ensuring each apartment is cared for like a boutique property.
           </p>
@@ -598,7 +598,7 @@ exports[`AboutPage > matches the snapshot 1`] = `
             Confidence built into every booking
           </h2>
           <p
-            class="text-text-muted max-w-3xl mt-2"
+            class="text-base text-text-muted max-w-3xl mt-2 leading-relaxed"
           >
             We publish the promises that guide our team, so guests know exactly how we operate before they arrive.
           </p>

@@ -99,7 +99,7 @@ const Policies = () => {
                       return (
                         <a
                           key={ref}
-                          className="text-sm px-3 py-2 rounded-full bg-bg-muted text-primary font-semibold hover:bg-primary/10"
+                          className="text-base px-4 py-3 min-h-11 inline-flex items-center rounded-full bg-bg-muted text-primary font-semibold hover:bg-primary/10"
                           href={`/terms#${ref}`}
                         >
                           Terms: {term?.title || ref}

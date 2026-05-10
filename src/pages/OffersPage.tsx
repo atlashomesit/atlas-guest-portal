@@ -1,4 +1,3 @@
-/* eslint-disable atlas-brand/no-atlas-string-leak -- Task 16: per-tenant promo codes wired via API */
 import { useEffect, useRef, useState } from "react";
 import SEO from "../components/SEO";
 import { buildApiUrl } from "@/api/client";

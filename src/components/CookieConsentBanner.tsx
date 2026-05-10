@@ -6,6 +6,7 @@ import {
   type CookieConsentRecord,
 } from "../utils/cookieConsent";
 import { getTenantContext } from "../tenant/tenantContext";
+import { getGuestDataProcessingEntityName } from "../tenant/displayBrand";
 import { getTenantOverrides } from "../tenant/tenantOverrides"; // TASK-1877
 
 // DPDP-compliant cookie consent banner.
@@ -43,8 +44,13 @@ const CookieConsentBanner = () => {
   const tenantOverrides = getTenantOverrides(tenantSlug);
   const cookieBannerOverride = tenantOverrides.cookieBanner;
 
+  const bannerTitle = cookieBannerOverride?.title ?? "Your privacy choice";
+  // Marketplace apex resolves to "Atlas Homestays" (full brand baseline); white-label tenants
+  // use legal/long brand from context. Aligns with cookie-consent-compliance.e2e.spec.ts which
+  // asserts banner copy starts with "Atlas Homestays uses" on the marketplace and
+  // "Star Guest House uses" on tenant subdomains.
   const bannerText = cookieBannerOverride?.text ??
-    "Atlas Homestays uses strictly necessary cookies to make this site work, and optional analytics cookies " +
+    `${getGuestDataProcessingEntityName()} uses strictly necessary cookies to make this site work, and optional analytics cookies ` +
     "to understand how it is used. Under India’s DPDP Act 2023 we ask for your consent " +
     "before loading anything non-essential. Read our";
   const privacyUrl = cookieBannerOverride?.privacyUrl ?? "/privacy";
@@ -62,7 +68,7 @@ const CookieConsentBanner = () => {
         <div className="flex flex-col md:flex-row md:items-center gap-4">
           <div className="flex-1 space-y-1">
             <h2 id="cookie-consent-title" className="text-base md:text-lg font-bold text-text-primary">
-              Your privacy choice
+              {bannerTitle}
             </h2>
             <p id="cookie-consent-desc" className="text-sm text-text-muted">
               {bannerText}{" "}

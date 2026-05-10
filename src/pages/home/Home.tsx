@@ -20,10 +20,11 @@ import {
     enableFooterMiniCtaAboveFooter,
 } from "../../config/homepageUxFlags";
 import { useBooking } from "../../contexts/BookingContext";
-import { Link, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import FaqHighlights from "../../components/faq/FaqHighlights";
 import pricingConfig from "../../config/pricing.config";
 import { getEffectiveDiscountPercent } from "../../utils/pricing";
+import { getPublicSiteOrigin } from "../../config/siteOrigin";
 
 const Home = () => {
     const { pendingScrollTarget, setPendingScrollTarget } = useBooking();
@@ -41,30 +42,16 @@ const Home = () => {
     const primaryOgImage = room101Cover ?? (!overrides.hideLogo ? LOGO_URL : undefined);
     const penthouseCover = sanitizeGuestImageUrl(penthouse?.property_img?.[0]) ?? (!overrides.hideLogo ? LOGO_URL : undefined);
     const effectiveDiscountPercent = getEffectiveDiscountPercent();
-    /** TASK-1293: marketplace shows by default; white-label opts in with directBookingPromo.enabled */
-    const showDirectBookingPromo =
-        overrides.directBookingPromo?.enabled === true ||
-        (!hideAtlasBranding && overrides.directBookingPromo?.enabled !== false);
-    const directPromoHeadline =
-        overrides.directBookingPromo?.headline?.trim() ||
-        (effectiveDiscountPercent > 0
-            ? `Book direct — save up to ${Math.round(effectiveDiscountPercent)}% vs typical booking sites`
-            : "Book direct — best rates on our official site");
-    const directPromoSub =
-        overrides.directBookingPromo?.subline?.trim() ||
-        "Pay with UPI or cards via Razorpay. Your price is guaranteed at checkout.";
+    /** TASK-1293 / TASK-1944: direct-booking strip lives in Slider (below hero search), not above the hero. */
     const penthouseOfferPrice = Math.round(
         pricingConfig.baseNightlyPriceByUnitType.penthouse *
             (1 - effectiveDiscountPercent / 100),
     );
 
     const faqHighlights = getFaqHighlights();
-    // CPO-007: derive canonical from the actual host the page is served on so tenant subdomains
-    // emit the right URL in JSON-LD instead of leaking a hardcoded one.
-    const canonicalUrl =
-        typeof window !== "undefined" && window.location?.origin
-            ? `${window.location.origin}/`
-            : "https://atlashomestays.com/";
+    // CPO-007: derive canonical from the actual host (or VITE_PUBLIC_SITE_ORIGIN for SSR) so tenant
+    // subdomains emit the right URL in JSON-LD instead of defaulting to the marketplace domain.
+    const canonicalUrl = `${getPublicSiteOrigin()}/`;
     // Atlas social handles only published as sameAs when running under the Atlas brand.
     const atlasSocialSameAs = [
         "https://www.facebook.com/profile.php?id=100040632723189",
@@ -243,25 +230,6 @@ const Home = () => {
                 jsonLd={homepageJsonLd}
             />
             <section className="relative font-roboto select-none">
-                {showDirectBookingPromo ? (
-                    <div
-                        className="border-b border-emerald-900/40 bg-emerald-950 px-4 py-2.5 text-center text-emerald-50"
-                        data-testid="home-direct-booking-promo"
-                        role="region"
-                        aria-label="Direct booking savings"
-                    >
-                        <p className="text-sm font-semibold tracking-tight sm:text-base">{directPromoHeadline}</p>
-                        <p className="mt-0.5 text-xs text-emerald-100/95 sm:text-sm">{directPromoSub}</p>
-                        <Link
-                            to="/"
-                            state={{ scrollTo: "search-form" }}
-                            className="mt-1 inline-block text-xs font-medium text-emerald-200 underline underline-offset-2 hover:text-white sm:text-sm"
-                            data-testid="home-direct-booking-promo-dates"
-                        >
-                            Pick dates →
-                        </Link>
-                    </div>
-                ) : null}
                 <div className="w-full h-fit relative ">
                     <Slider />
                 </div>

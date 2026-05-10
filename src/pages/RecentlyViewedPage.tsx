@@ -1,4 +1,3 @@
-/* eslint-disable atlas-brand/no-atlas-string-leak -- TODO Task 16: replace with per-tenant content */
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import SEO from "../components/SEO";
@@ -62,8 +61,14 @@ export default function RecentlyViewedPage() {
       </div>
 
       {items.length === 0 ? (
-        <div className="rounded-2xl border border-border-subtle bg-bg-surface p-6">
+        <div className="rounded-2xl border border-border-subtle bg-bg-surface p-6 space-y-4">
           <p className="text-text-secondary">No recent homes yet.</p>
+          <Link
+            to="/search"
+            className="inline-flex min-h-11 items-center justify-center rounded-lg bg-brand-primary text-white text-base font-medium px-5 py-3 hover:opacity-95 transition-opacity"
+          >
+            Browse {brandName}
+          </Link>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

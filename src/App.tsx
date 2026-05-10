@@ -11,6 +11,7 @@ import { ListingPhotosProvider } from "./contexts/ListingPhotosContext"
 import { CurrencyProvider } from "./contexts/CurrencyContext"
 import { trackEvent } from "./utils/analytics"
 import { isMarketplaceMode } from "./tenant/tenantResolver"
+import { CITY_LANDING_SLUGS } from "./content/cities/cityLandingSlugs"
 
 const Home = React.lazy(() => import("./pages/home/Home"))
 const ContactUs = React.lazy(() => import("./pages/contactus/ContactUs"))
@@ -46,6 +47,7 @@ const RecentlyViewedPage = React.lazy(() => import("./pages/RecentlyViewedPage")
 const PrivacyPolicyPage = React.lazy(() => import("./pages/PrivacyPolicyPage"))
 const CookieConsentBanner = React.lazy(() => import("./components/CookieConsentBanner"))
 const PageNotFound = React.lazy(() => import("./pages/pagenotfound/PageNotFound"))
+const CityLandingPage = React.lazy(() => import("./pages/CityLandingPage"))
 
 function LazyFallback() {
   return (
@@ -139,6 +141,18 @@ function AppWrapper() {
           <Route path="/offers" element={withBoundary(<Suspense fallback={<LazyFallback />}><OffersPage /></Suspense>, "offers-route")} />
           <Route path="/about" element={withBoundary(<Suspense fallback={<LazyFallback />}><AboutPage /></Suspense>, "about-route")} />
           <Route path="/faq" element={withBoundary(<Suspense fallback={<LazyFallback />}><FaqPage /></Suspense>, "faq-route")} />
+          {CITY_LANDING_SLUGS.map((citySlug) => (
+            <Route
+              key={citySlug}
+              path={`/homestays-in-${citySlug}`}
+              element={withBoundary(
+                <Suspense fallback={<LazyFallback />}>
+                  <CityLandingPage citySlug={citySlug} />
+                </Suspense>,
+                `city-landing-${citySlug}-route`,
+              )}
+            />
+          ))}
           <Route path="/search" element={withBoundary(<Suspense fallback={<LazyFallback />}><SearchPage /></Suspense>, "search-route")} />
           <Route path="/blog" element={withBoundary(<Suspense fallback={<LazyFallback />}><BlogHome /></Suspense>, "blog-home-route")} />
           <Route path="/blog/:category" element={withBoundary(<Suspense fallback={<LazyFallback />}><BlogCategory /></Suspense>, "blog-category-route")} />

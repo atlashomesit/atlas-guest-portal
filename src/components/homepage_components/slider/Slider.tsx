@@ -5,6 +5,10 @@ import { HERO_IMAGE_URL } from '../../../config/hero';
 import { heroWidgetLayoutFlag } from '../../../config/abFlags';
 import { getTenantContext } from '../../../tenant/tenantContext';
 import { getTenantOverrides } from '../../../tenant/tenantOverrides';
+import {
+  PMS_AIRBNB_2026_TERMS_URL,
+  resolveDirectBookingPromo,
+} from '../../../utils/directBookingPromo';
 import { TrustBadge } from '../../ui/TrustBadge';
 import { SearchAvailabilityWidget } from '../../availability/SearchAvailabilityWidget';
 
@@ -26,6 +30,10 @@ const Slider = () => {
   // until per-tenant heroImageUrl is wired through TenantBranding.
   const tenant = getTenantContext();
   const overrides = getTenantOverrides(tenant?.slug);
+  const directPromo = React.useMemo(
+    () => resolveDirectBookingPromo(tenant, overrides),
+    [tenant, overrides],
+  );
   const isAtlasRoot = tenant?.isMarketplaceRoot !== false;
   const heroImageUrl = isAtlasRoot ? HERO_IMAGE_URL : '';
   const hasHeroPhoto = Boolean(heroImageUrl.trim());
@@ -84,7 +92,42 @@ const Slider = () => {
             </h2>
           </div>
 
-          <div data-testid="hero-widget"><SearchAvailabilityWidget /></div>
+          <div data-testid="hero-widget">
+            <SearchAvailabilityWidget />
+          </div>
+
+          {directPromo.show ? (
+            <div
+              className="w-full max-w-2xl rounded-xl border border-emerald-400/35 bg-emerald-950/90 px-4 py-3 text-center text-emerald-50 shadow-lg backdrop-blur-sm"
+              data-testid="home-direct-booking-promo"
+              role="region"
+              aria-label="Direct booking savings"
+            >
+              <p className="text-sm font-semibold tracking-tight sm:text-base">{directPromo.savingsStripLine}</p>
+              <p className="mt-1 text-xs text-emerald-100/95 sm:text-sm">{directPromo.sub}</p>
+              <div className="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs sm:text-sm">
+                <Link
+                  to="/"
+                  state={{ scrollTo: 'search-form' }}
+                  className="font-medium text-emerald-200 underline underline-offset-2 hover:text-white"
+                  data-testid="home-direct-booking-promo-dates"
+                >
+                  Pick dates →
+                </Link>
+                <span className="text-emerald-300/80" aria-hidden>
+                  ·
+                </span>
+                <a
+                  href={PMS_AIRBNB_2026_TERMS_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-emerald-200 underline underline-offset-2 hover:text-white"
+                >
+                  Why direct booking matters →
+                </a>
+              </div>
+            </div>
+          ) : null}
 
           {showListProperty && (
             <Link

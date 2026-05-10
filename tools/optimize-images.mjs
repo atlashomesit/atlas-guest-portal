@@ -56,62 +56,64 @@ async function main() {
     process.exit(1);
   }, maxRuntimeMs);
 
-  const files = await glob(sourceGlobs, {
-    cwd: projectRoot,
-    absolute: true,
-    nodir: true,
-    ignore: ignoreGlobs,
-  });
+  try {
+    const files = await glob(sourceGlobs, {
+      cwd: projectRoot,
+      absolute: true,
+      nodir: true,
+      ignore: ignoreGlobs,
+    });
 
-  if (!files.length) {
-    console.info('No source images found.');
-    return;
-  }
-
-  const manifest = existsSync(manifestPath)
-    ? JSON.parse(await fs.readFile(manifestPath, 'utf8'))
-    : {};
-
-  const oversizedRaw = [];
-
-  for (const file of files) {
-    const relative = path.relative(projectRoot, file);
-    const dir = path.dirname(file);
-    const ext = path.extname(file);
-    const baseName = path.basename(file, ext);
-
-    const buffer = await fs.readFile(file);
-    const hash = createHash('sha1').update(buffer).digest('hex').slice(0, 8);
-    const optimizedName = `${baseName}.${hash}.webp`;
-    const optimizedPath = path.join(dir, optimizedName);
-
-    await removeOutdatedOptimizedFiles(dir, baseName, optimizedPath);
-
-    if (!existsSync(optimizedPath)) {
-      const pipeline = sharp(buffer).rotate();
-      const webpBuffer = await pipeline.webp({ quality: 80 }).toBuffer();
-      await fs.writeFile(optimizedPath, webpBuffer);
-      console.info(`Created ${path.relative(projectRoot, optimizedPath)}`);
+    if (!files.length) {
+      console.info('No source images found.');
+      return;
     }
 
-    if (relative.startsWith('src/assets/')) {
-      manifest[normalizeKey(relative)] = normalizeKey(path.relative(projectRoot, optimizedPath));
+    const manifest = existsSync(manifestPath)
+      ? JSON.parse(await fs.readFile(manifestPath, 'utf8'))
+      : {};
+
+    const oversizedRaw = [];
+
+    for (const file of files) {
+      const relative = path.relative(projectRoot, file);
+      const dir = path.dirname(file);
+      const ext = path.extname(file);
+      const baseName = path.basename(file, ext);
+
+      const buffer = await fs.readFile(file);
+      const hash = createHash('sha1').update(buffer).digest('hex').slice(0, 8);
+      const optimizedName = `${baseName}.${hash}.webp`;
+      const optimizedPath = path.join(dir, optimizedName);
+
+      await removeOutdatedOptimizedFiles(dir, baseName, optimizedPath);
+
+      if (!existsSync(optimizedPath)) {
+        const pipeline = sharp(buffer).rotate();
+        const webpBuffer = await pipeline.webp({ quality: 80 }).toBuffer();
+        await fs.writeFile(optimizedPath, webpBuffer);
+        console.info(`Created ${path.relative(projectRoot, optimizedPath)}`);
+      }
+
+      if (relative.startsWith('src/assets/')) {
+        manifest[normalizeKey(relative)] = normalizeKey(path.relative(projectRoot, optimizedPath));
+      }
+
+      const { size } = await fs.stat(file);
+      if (size > sizeCeilingBytes) {
+        oversizedRaw.push(relative);
+      }
     }
 
-    const { size } = await fs.stat(file);
-    if (size > sizeCeilingBytes) {
-      oversizedRaw.push(relative);
+    await writeManifest(manifest);
+
+    if (oversizedRaw.length) {
+      console.warn('Oversized raw images detected (consider archiving or recompressing):');
+      oversizedRaw.sort().forEach((item) => console.warn(` - ${item}`));
     }
+  } finally {
+    clearTimeout(timeout);
   }
-
-  await writeManifest(manifest);
-
-  if (oversizedRaw.length) {
-    console.warn('Oversized raw images detected (consider archiving or recompressing):');
-    oversizedRaw.sort().forEach((item) => console.warn(` - ${item}`));
-  }
-
-  clearTimeout(timeout);
 }
 
 main().catch((error) => {

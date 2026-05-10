@@ -1,4 +1,3 @@
-/* eslint-disable atlas-brand/no-atlas-string-leak -- TODO Task 16: replace with per-tenant content */
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { FaHeart } from "react-icons/fa";
@@ -60,7 +59,10 @@ export default function FavoritesPage() {
 
   useEffect(() => loadListings(), [loadListings]);
 
-  const favIds = useMemo(() => new Set(getFavoriteIds()), [favEpoch]);
+  const favIds = useMemo(() => {
+    void favEpoch;
+    return new Set(getFavoriteIds());
+  }, [favEpoch]);
   const recent = useMemo(() => getRecentlyViewed(), []);
 
   const favorites = useMemo(() => {

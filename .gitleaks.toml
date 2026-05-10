@@ -1,0 +1,67 @@
+# Atlas secret scanning — shared across Atlas repos (keep in sync).
+# https://github.com/gitleaks/gitleaks
+title = "Atlas Homestays — Gitleaks"
+
+[extend]
+useDefault = true
+
+# Paths that have historically contained redacted narrative or public analytics tokens.
+# Prefer scrubbing/redacting source; remove entries once content is cleaned.
+[allowlist]
+paths = [
+  '''(?i)docs/agents/reports/.*\.md$''',
+  '''(?i)^index\.html$''',
+  # Public-by-design runtime config: contains the client-side Google Maps API
+  # key which browsers must read. Key is restricted to atlashomestays.com /
+  # atlastays.com / localhost referrers in GCP, so exposure is harmless.
+  '''(?i)^public/\.well-known/atlas-runtime-config\.json$''',
+]
+
+[[rules]]
+id = "atlas-razorpay-live-key-id"
+description = "Razorpay live Key ID — never commit; rotate at Razorpay dashboard if found in history."
+regex = '''rzp_live_[A-Za-z0-9]{14,}'''
+
+[[rules]]
+id = "atlas-razorpay-test-key-id"
+description = "Razorpay test Key ID — allowed only under test/e2e/fixture/doc-install paths."
+regex = '''rzp_test_[A-Za-z0-9]{14,}'''
+[rules.allowlist]
+paths = [
+  '''(?i)(^|/)tests/''',
+  '''(?i)(^|/)e2e/''',
+  '''(?i)(^|/)fixtures/''',
+  '''(?i)\.spec\.ts$''',
+  '''(?i)\.test\.ts$''',
+  '''(?i)docs/RAZORPAY.*\.md$''',
+  '''(?i)(^|/)fixtures/razorpay-test-keys\.json$''',
+]
+
+[[rules]]
+id = "atlas-azure-app-service-bearer"
+description = "Atlas App Service URL paired with a long Bearer token on the same line."
+regex = '''(?i)https://atlas-api[^\s/]*\.azurewebsites\.net[^\n]{0,400}Bearer\s+[A-Za-z0-9._-]{20,}'''
+
+[[rules]]
+id = "atlas-sql-password-assignment"
+description = "SQL Password or pwd assignment in connection text."
+regex = '''(?i)(Password|pwd)\s*=\s*[^;\s'"]{6,}'''
+[rules.allowlist]
+description = "Exclude env-var reads (TypeScript / .NET) and config-key string literals — those aren't leaked secrets."
+regexTarget = "line"
+regexes = [
+  '''process\.env\.''',
+  '''Environment\.GetEnvironmentVariable''',
+  '''GetSection\(''',
+  '''Configuration\[''',
+]
+
+[[rules]]
+id = "atlas-azure-storage-sas-signature"
+description = "Azure Storage SAS signature fragment."
+regex = '''sig=[A-Za-z0-9%]{20,}&'''
+
+[[rules]]
+id = "atlas-azure-storage-account-key"
+description = "Azure Storage AccountKey in connection string."
+regex = '''(?i)AccountKey=[A-Za-z0-9+/=]{40,}'''

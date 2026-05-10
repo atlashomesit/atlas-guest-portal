@@ -1,7 +1,6 @@
-/* eslint-disable atlas-brand/no-atlas-string-leak -- TODO Task 16: replace with per-tenant content */
 import { lazy, Suspense, useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { AlertTriangle, Wifi, Briefcase } from "lucide-react";
+import { AlertTriangle, Briefcase, CalendarDays, CalendarRange, Wifi } from "lucide-react";
 
 import { propertyData } from "../data";
 import { fetchPublicListings, type PublicListing } from "../api/listingClient";
@@ -9,6 +8,7 @@ import { parseDate } from "../utils/formatting";
 import { useCurrency } from "../contexts/CurrencyContext";
 import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 import { getTenantContext } from "../tenant/tenantContext";
+import { getTenantBrandName } from "../tenant/displayBrand";
 import { getTenantOverrides, getTenantPublicListingIdAllowlist, getUnitNoun, shouldHideAtlasBranding } from "../tenant/tenantOverrides";
 import SkeletonCard from "../components/apartments/SkeletonCard";
 import OptimizedImage from "../components/ui/OptimizedImage";
@@ -25,6 +25,7 @@ import {
 } from "../api/availabilitySummaryClient";
 import RecentlyViewedStrip from "../components/RecentlyViewedStrip";
 import { fallbackCoordsForListing, hasMapCoords } from "../utils/mapCoords";
+import { getEffectiveDiscountPercent } from "../utils/pricing";
 
 const SearchResultsMap = lazy(() => import("../components/search/SearchResultsMap"));
 
@@ -235,6 +236,7 @@ const SearchPage = () => {
   const monthlyStay = useMemo(() => searchParams.get("monthlyStay") === "true", [searchParams.get("monthlyStay")]);   // 30+ nights min stay
   /** TASK-1457: list vs map layout for search results. */
   const mapView = useMemo(() => searchParams.get("view") === "map", [searchParams.get("view")]);
+  const directBookingDiscountPercent = useMemo(() => getEffectiveDiscountPercent(), []);
 
   const hasInvalidDates = useMemo(() => Boolean(checkIn && checkOut && checkOut <= checkIn), [checkIn, checkOut]);
   const explicitDateSearch = useMemo(() => Boolean(checkIn && checkOut), [checkIn, checkOut]);
@@ -727,7 +729,7 @@ const SearchPage = () => {
           <h1 className="text-3xl font-bold text-text-primary sm:text-4xl">
             {checkIn && checkOut
               ? `${filteredUnits.length} ${filteredUnits.length === 1 ? "home" : "homes"} for your dates`
-              : "Starguest House"}
+              : getTenantBrandName()}
           </h1>
           <p className="max-w-3xl text-base text-text-body">
             {checkIn && checkOut && !hasInvalidDates
@@ -889,23 +891,27 @@ const SearchPage = () => {
         {/* TASK-1738: Digital nomad filter chips */}
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-medium text-text-muted uppercase tracking-wide">Digital nomad:</span>
-          {[
-            { label: "📶 WiFi 50+ Mbps", param: "nomadWifi",    active: nomadWifi },
-            { label: "💻 Workspace",      param: "nomadWorkspace", active: nomadWorkspace },
-            { label: "📅 7+ nights",      param: "longStay",    active: longStay },
-            { label: "🗓️ 30+ nights",     param: "monthlyStay", active: monthlyStay },
-          ].map(({ label, param, active }) => (
+          {(
+            [
+              { param: "nomadWifi", active: nomadWifi, icon: Wifi, text: "WiFi 50+ Mbps" },
+              { param: "nomadWorkspace", active: nomadWorkspace, icon: Briefcase, text: "Workspace" },
+              { param: "longStay", active: longStay, icon: CalendarDays, text: "7+ nights" },
+              { param: "monthlyStay", active: monthlyStay, icon: CalendarRange, text: "30+ nights" },
+            ] as const
+          ).map(({ param, active, icon: Icon, text }) => (
             <button
               key={param}
+              type="button"
               onClick={() => updateParam(param, active ? "" : "true")}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors min-h-11 ${
+              className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-colors min-h-11 ${
                 active
                   ? "bg-emerald-600 text-white border border-emerald-600"
                   : "bg-bg-surface border border-border-subtle text-text-primary hover:border-emerald-500"
               } focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2`}
               aria-pressed={active}
             >
-              {label}
+              <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              <span>{text}</span>
             </button>
           ))}
         </div>
@@ -1236,7 +1242,7 @@ const SearchPage = () => {
                         {unit.hasVerifiedPhotos && unit.isGstRegistered ? (
                           <span
                             className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700 border border-emerald-200 cursor-help"
-                            title="Identity verified, GST registered, photos checked by Atlas team. We've verified the documents."
+                            title="Identity verified, GST registered, 50+ stays. We've checked the documents."
                           >
                             ✅ Atlas Trusted Host
                           </span>
@@ -1268,13 +1274,21 @@ const SearchPage = () => {
                             🏷️ Stay {unit.losDiscountMinNights}+ nights — {unit.losDiscountPercent}% off
                           </span>
                         ) : null}
+                        {directBookingDiscountPercent > 0 && (
+                          <span
+                            data-testid="search-listing-direct-discount"
+                            className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800"
+                          >
+                            {Math.round(directBookingDiscountPercent)}% off direct
+                          </span>
+                        )}
                       </div>
-                      {unit.rating != null && unit.rating > 0 && (
+                      {/* TASK-1660: match ListingCard — no catalog star average without verified review count */}
+                      {(unit.reviewCount ?? 0) > 0 && unit.rating != null && unit.rating > 0 && (
                         <p className="mt-0.5 text-sm text-accent-primary font-medium">
-                          {"★".repeat(Math.round(unit.rating))}<span className="text-text-muted ml-1">{unit.rating.toFixed(1)}</span>
-                          {unit.reviewCount != null && unit.reviewCount > 0 && (
-                            <span className="text-text-muted ml-1 text-xs">({unit.reviewCount})</span>
-                          )}
+                          {"★".repeat(Math.round(unit.rating))}
+                          <span className="text-text-muted ml-1">{unit.rating.toFixed(1)}</span>
+                          <span className="text-text-muted ml-1 text-xs">({unit.reviewCount})</span>
                         </p>
                       )}
                       {/* TASK-1716: keyword-bucketed sentiment summary */}
@@ -1298,17 +1312,25 @@ const SearchPage = () => {
                         {(() => { const gstMult = unit.pricePerNight > 7500 ? 1.12 : 1.05; const pct = unit.pricePerNight > 7500 ? 12 : 5; return `Est. total: ${formatDisplayCurrency(Math.round(unit.pricePerNight * gstMult))} (incl. ${pct}% GST)`; })()}
                       </p>
                       {longStay && (
-                        <p className="text-sm font-semibold text-cta-primary">
-                          {/* TASK-2077: apply LOS discount to monthly estimate when tier is configured */}
+                        <div className="text-sm font-semibold text-cta-primary">
+                          {/* TASK-2077 / TASK-1661: monthly line uses configured LOS tier; otherwise nightly×30 + honest hint */}
                           {(() => {
                             const discountPct = unit.losDiscount2Percent ?? unit.losDiscountPercent ?? 0;
                             const base = unit.pricePerNight * 30;
-                            const discounted = discountPct > 0 ? Math.round(base * (1 - discountPct / 100)) : base;
-                            return discountPct > 0
-                              ? `from ${formatDisplayCurrency(discounted)}/month with long-stay discount`
-                              : `from ${formatDisplayCurrency(base)}/month`;
+                            const discounted =
+                              discountPct > 0 ? Math.round(base * (1 - discountPct / 100)) : base;
+                            return discountPct > 0 ? (
+                              <p>{`from ${formatDisplayCurrency(discounted)}/month with long-stay discount`}</p>
+                            ) : (
+                              <>
+                                <p>{`from ${formatDisplayCurrency(base)}/month at listed nightly rate`}</p>
+                                <p className="mt-0.5 text-xs font-normal text-text-muted">
+                                  Many hosts offer 15–20% off for 30+ nights; use the calculator below to plan.
+                                </p>
+                              </>
+                            );
                           })()}
-                        </p>
+                        </div>
                       )}
                       {/* TASK-1739: LOS discount calculator — only shows when tiers are configured */}
                       <LongStayCalculator

@@ -1,4 +1,3 @@
-/* eslint-disable atlas-brand/no-atlas-string-leak -- TODO Task 16: replace with per-tenant content */
 import { CheckCircle2, HeartHandshake, ShieldCheck, Sparkles, Users, MapPin, Clock4, BedDouble, Medal } from "lucide-react";
 import SEO from "../components/SEO";
 
@@ -153,7 +152,7 @@ const AboutPage = () => (
           <p className="text-lg text-text-muted max-w-2xl">
             We are a collective of hosts, designers, and operators who believe every serviced apartment should feel personal—without sacrificing reliability. From the first message to checkout, our mission is to keep guests at ease and make every city feel familiar.
           </p>
-          <ul className="space-y-3 text-text-muted">
+          <ul className="space-y-3 text-base text-text-muted leading-relaxed">
             {missionHighlights.map((highlight) => (
               <li key={highlight} className="flex items-start gap-3">
                 <CheckCircle2 className="w-5 h-5 text-primary mt-1" />
@@ -182,7 +181,7 @@ const AboutPage = () => (
         <div className="space-y-4">
           <p className="text-sm uppercase tracking-[0.18em] text-primary font-semibold">Hospitality standards</p>
           <h2 className="text-2xl md:text-3xl font-bold">Standards that travel with you</h2>
-          <p className="text-text-muted max-w-3xl">
+          <p className="text-base text-text-muted max-w-3xl leading-relaxed">
             Every Starguest House home is audited on the same quality framework. We match hotel-grade consistency with the warmth of local hosts so travelers never have to choose between comfort and character.
           </p>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -210,7 +209,7 @@ const AboutPage = () => (
           <div>
             <p className="text-sm uppercase tracking-[0.18em] text-primary font-semibold">Meet the team</p>
             <h2 className="text-2xl md:text-3xl font-bold">People who craft every Starguest House stay</h2>
-            <p className="text-text-muted max-w-2xl mt-2">
+            <p className="text-base text-text-muted max-w-2xl mt-2 leading-relaxed">
               Our distributed team blends hospitality know-how with operational rigor, ensuring each apartment is cared for like a boutique property.
             </p>
           </div>
@@ -245,7 +244,7 @@ const AboutPage = () => (
           <div>
             <p className="text-sm uppercase tracking-[0.18em] text-primary font-semibold">Trust badges</p>
             <h2 className="text-2xl md:text-3xl font-bold">Confidence built into every booking</h2>
-            <p className="text-text-muted max-w-3xl mt-2">
+            <p className="text-base text-text-muted max-w-3xl mt-2 leading-relaxed">
               We publish the promises that guide our team, so guests know exactly how we operate before they arrive.
             </p>
           </div>

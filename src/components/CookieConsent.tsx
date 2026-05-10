@@ -7,11 +7,11 @@ export type AtlasCookieConsentLevel = "all" | "necessary";
 function isAtlasPrimaryHostname(): boolean {
   if (typeof window === "undefined") return false;
   const h = window.location.hostname.replace(/^www\./i, "").toLowerCase();
-  // eslint-disable-next-line atlas-brand/no-atlas-string-leak -- domain guard, not user-visible
   return (
+    // eslint-disable-next-line atlas-brand/no-atlas-string-leak -- primary marketplace hostname guard (not marketing copy)
     h === "atlashomestays.com" ||
     // Any Atlas subdomain — includes dev.atlashomestays.com so dev + E2E share banner parity.
-    // eslint-disable-next-line atlas-brand/no-atlas-string-leak -- domain guard, not user-visible
+    // eslint-disable-next-line atlas-brand/no-atlas-string-leak -- Atlas subdomain suffix guard
     h.endsWith(".atlashomestays.com") ||
     h === "atlashomes.in" ||
     h.endsWith(".atlashomes.in") ||

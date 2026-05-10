@@ -42,6 +42,8 @@ export type TenantDirectBookingPromo = {
 };
 
 export type TenantCookieBanner = {
+  /** Dialog heading (optional; default "Your privacy choice"). */
+  title?: string;
   /** Full consent text shown in the banner body. */
   text: string;
   /** URL to the tenant's privacy notice. */
@@ -277,8 +279,9 @@ const TENANT_OVERRIDES: Record<string, TenantOverrides> = {
       whatsappPhone: '7799779192',
       email: 'starguesthousekondapur@gmail.com',
     },
-    // TASK-1877: white-label cookie banner with tenant-specific copy + privacy link
+    // TASK-1877 / TASK-1672: white-label cookie banner heading + copy + privacy link
     cookieBanner: {
+      title: 'Your privacy at Star Guest House',
       text:
         'Star Guest House uses strictly necessary cookies to make this site work, and optional ' +
         "analytics cookies to understand how it's used. Under India's DPDP Act 2023 we ask for " +

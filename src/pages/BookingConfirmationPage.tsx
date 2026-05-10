@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getTenantContext } from "../tenant/tenantContext";
+import { getTenantBrandName } from "../tenant/displayBrand";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react"; // TASK-1476
 import SEO from "../components/SEO";
@@ -86,7 +87,7 @@ const statusLabel: Record<string, { label: string; color: string }> = {
 function StatusBadge({ status }: { status: string }) {
   const s = statusLabel[status] ?? { label: status, color: "text-gray-700 bg-gray-50 border-gray-200" };
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${s.color}`}>
+    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-sm font-medium border ${s.color}`}>
       {s.label}
     </span>
   );
@@ -107,6 +108,8 @@ const PRE_ARRIVAL_STRINGS: Record<string, {
   heading: string; intro: string; checkinLabel: string; addressLabel: string;
   hostLabel: string; hostDesc: string; chatBtn: string; wifiLabel: string;
   landmarksLabel: string; viewListing: string; t1Hint: (date: string) => string; t1Fallback: string;
+  t1PreviewSummary: string;
+  t1PreviewDisclaimer: string;
 }> = {
   en: {
     heading: "Before you arrive", intro: "You are checking in soon. Here is a quick reference for your stay — save this page or add to calendar below.",
@@ -115,6 +118,8 @@ const PRE_ARRIVAL_STRINGS: Record<string, {
     wifiLabel: "WiFi", landmarksLabel: "Nearby landmarks", viewListing: "View full listing & photos",
     t1Hint: (d) => `🏠 WhatsApp reminder with check-in instructions will be sent on ${d}.`,
     t1Fallback: "🏠 WhatsApp reminder with check-in instructions will be sent the day before your stay.",
+    t1PreviewSummary: "Preview the day-before WhatsApp message",
+    t1PreviewDisclaimer: "The exact wording may vary; your host may personalize the message before it is sent.",
   },
   hi: {
     heading: "आगमन से पहले", intro: "आप जल्द ही चेक-इन कर रहे हैं। यहाँ आपके प्रवास का त्वरित संदर्भ है — यह पृष्ठ सहेजें या नीचे कैलेंडर में जोड़ें।",
@@ -123,6 +128,8 @@ const PRE_ARRIVAL_STRINGS: Record<string, {
     wifiLabel: "WiFi", landmarksLabel: "नज़दीकी स्थान", viewListing: "पूरी लिस्टिंग और फ़ोटो देखें",
     t1Hint: (d) => `🏠 WhatsApp रिमाइंडर चेक-इन निर्देशों के साथ ${d} को भेजा जाएगा।`,
     t1Fallback: "🏠 आपके प्रवास के एक दिन पहले WhatsApp रिमाइंडर भेजा जाएगा।",
+    t1PreviewSummary: "एक दिन पहले भेजे जाने वाले WhatsApp संदेश का पूर्वावलोकन",
+    t1PreviewDisclaimer: "वास्तविक शब्द भिन्न हो सकते हैं; आपका होस्ट भेजने से पहले संदेश को अनुकूलित कर सकता है।",
   },
   te: {
     heading: "రాక ముందు", intro: "మీరు త్వరలో చెక్-ఇన్ చేస్తున్నారు. ఇది మీ వసతికి త్వరిత సూచన — ఈ పేజీని సేవ్ చేయండి లేదా క్రింద క్యాలెండర్‌కు జోడించండి।",
@@ -131,8 +138,61 @@ const PRE_ARRIVAL_STRINGS: Record<string, {
     wifiLabel: "WiFi", landmarksLabel: "సమీప ప్రదేశాలు", viewListing: "పూర్తి లిస్టింగ్ & ఫోటోలు చూడండి",
     t1Hint: (d) => `🏠 చెక్-ఇన్ సూచనలతో WhatsApp రిమైండర్ ${d}న పంపబడుతుంది।`,
     t1Fallback: "🏠 మీ వసతికి ముందు రోజు WhatsApp రిమైండర్ పంపబడుతుంది।",
+    t1PreviewSummary: "ముందురోజు WhatsApp సందేశాన్ని చూడండి",
+    t1PreviewDisclaimer: "నిజమైన పదాలు మారవచ్చు; పంపే ముందు మీ హోస్ట్ సందేశాన్ని సవరించవచ్చు.",
   },
 };
+
+/** TASK-1680: sample body for T-1 reminder (not server-rendered template). */
+function truncateForPreview(s: string, max: number): string {
+  const t = s.trim();
+  if (t.length <= max) return t;
+  return `${t.slice(0, max - 1)}…`;
+}
+
+function buildTMinus1WhatsAppPreviewBody(booking: BookingSummary): string {
+  const guest = booking.guestName?.trim() || "Guest";
+  const place = (booking.listingName || booking.propertyName || "your stay").trim();
+  const cin = booking.checkInTime?.trim();
+  const cout = booking.checkOutTime?.trim();
+  let checkinLine: string;
+  try {
+    const d = new Date(booking.checkinDate);
+    const datePretty = !isNaN(d.getTime())
+      ? d.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "short", year: "numeric" })
+      : booking.checkinDate;
+    if (cin && cout) checkinLine = `${cin} – ${cout} (${datePretty})`;
+    else if (cin) checkinLine = `${cin} (${datePretty})`;
+    else checkinLine = datePretty;
+  } catch {
+    checkinLine = booking.checkinDate;
+  }
+
+  const lines: string[] = [];
+  lines.push(`Hi ${guest},`);
+  lines.push("");
+  lines.push(`We're looking forward to welcoming you tomorrow at ${place}.`);
+  lines.push("");
+  lines.push(`Check-in: ${checkinLine}`);
+  if (booking.propertyAddress?.trim()) {
+    lines.push(`Address: ${booking.propertyAddress.trim()}`);
+  }
+  const ins = (booking.checkinInstructions || "").trim();
+  if (ins) {
+    lines.push(`Directions / access: ${truncateForPreview(ins, 320)}`);
+  }
+  if (booking.wifiVisible && booking.wifiName?.trim()) {
+    lines.push(
+      booking.wifiPassword?.trim()
+        ? `Wi-Fi: ${booking.wifiName.trim()} · Password: ${booking.wifiPassword.trim()}`
+        : `Wi-Fi network: ${booking.wifiName.trim()}`,
+    );
+  }
+  lines.push("");
+  lines.push("—");
+  lines.push("(Sample preview — your host sends the final message.)");
+  return lines.join("\n");
+}
 
 interface ListingAddOnPublic {
   addOnServiceId: number;
@@ -1085,7 +1145,7 @@ export default function BookingConfirmationPage() {
         {/* TASK-2082: PWA install nudge — only within 72h of check-in, only when prompt is available */}
         {!isCancelled && booking.preArrivalBriefingVisible && !pwaInstallDismissed && !isIosNonPwa && (
           <div className="flex items-center justify-between gap-3 rounded-2xl border border-border-subtle bg-bg-muted/60 px-4 py-3 text-sm">
-            <span>📱 Save Atlas to your home screen for quick access during your stay</span>
+            <span>📱 Save {getTenantBrandName()} to your home screen for quick access during your stay</span>
             <div className="flex items-center gap-2 shrink-0">
               <button
                 type="button"
@@ -1139,6 +1199,19 @@ export default function BookingConfirmationPage() {
                   return pa.t1Fallback;
                 })()}
               </p>
+              {/* TASK-1680: collapsible sample of day-before WhatsApp reminder */}
+              <details
+                className="rounded-xl border border-border-subtle bg-bg-muted/50 px-3 py-2"
+                data-testid="confirmation-t-minus-1-preview"
+              >
+                <summary className="cursor-pointer text-xs font-semibold text-text-primary select-none">
+                  {pa.t1PreviewSummary}
+                </summary>
+                <p className="mt-2 text-xs text-text-muted leading-relaxed">{pa.t1PreviewDisclaimer}</p>
+                <pre className="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap break-words rounded-lg bg-bg-surface border border-border-subtle p-3 font-sans text-xs text-text-secondary leading-relaxed">
+                  {buildTMinus1WhatsAppPreviewBody(booking)}
+                </pre>
+              </details>
               <p>
                 💬 Need details sooner?{" "}
                 <a
@@ -1232,7 +1305,7 @@ export default function BookingConfirmationPage() {
             <p className="text-sm text-text-secondary">Get instant alerts on your booking status and check-in reminders.</p>
             {isIosNonPwa ? (
               <p className="text-sm text-text-secondary">
-                To receive trip alerts on iPhone, add Atlas to your home screen first: Safari → Share (
+                To receive trip alerts on iPhone, add {getTenantBrandName()} to your home screen first: Safari → Share (
                 <span aria-hidden>⎙</span>) → Add to Home Screen. Then re-open from the home screen icon.
               </p>
             ) : (
@@ -1435,7 +1508,9 @@ export default function BookingConfirmationPage() {
         {!isCancelled && (
           <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-2">
             <h2 className="text-sm font-semibold text-text-primary">Explore more stays</h2>
-            <p className="text-sm text-text-secondary">Atlas homes across India — same secure checkout.</p>
+            <p className="text-sm text-text-secondary">
+              {getTenantBrandName()} across India — same secure checkout.
+            </p>
             <Link
               to="/search"
               className="inline-flex text-sm font-medium text-brand-primary underline underline-offset-2"

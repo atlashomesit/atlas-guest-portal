@@ -14,6 +14,15 @@ interface GuestProfile {
 
 const PHONE_RE = /^[6-9]\d{9}$/;
 
+function initialsFromName(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  const a = parts[0][0];
+  const b = parts[parts.length - 1][0];
+  return (a + b).toUpperCase();
+}
+
 export default function ProfilePage() {
   const [searchParams] = useSearchParams();
   const bookingId = searchParams.get("bookingId");
@@ -123,6 +132,17 @@ export default function ProfilePage() {
         <div className="space-y-1">
           <h1 className="text-2xl font-bold text-text-primary">My Profile</h1>
           <p className="text-sm text-text-secondary">Update your contact details below.</p>
+        </div>
+
+        <div className="flex flex-col items-center gap-2 py-1">
+          <div
+            className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-brand-primary/15 text-xl font-semibold tracking-tight text-brand-primary"
+            title="From your name"
+            aria-label={`Profile initials: ${initialsFromName((name || profile?.name || "").trim() || "Guest")}`}
+          >
+            {initialsFromName((name || profile?.name || "").trim() || "Guest")}
+          </div>
+          <p className="text-center text-xs text-text-muted">Avatar from your name; photo upload coming later.</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">

@@ -1,4 +1,3 @@
-/* eslint-disable atlas-brand/no-atlas-string-leak -- TODO Task 16: replace with per-tenant content */
 import { Link } from "react-router-dom";
 import SEO from "../components/SEO";
 import { getTenantBrandName, getTenantContactEmail } from "../tenant/displayBrand";

@@ -1,4 +1,3 @@
-/* eslint-disable atlas-brand/no-atlas-string-leak -- TODO Task 16: replace with per-tenant content */
 import SEO from "../components/SEO";
 import { getTenantBrandName } from "../tenant/displayBrand";
 

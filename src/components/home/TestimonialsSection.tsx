@@ -56,7 +56,7 @@ const TestimonialsSection = () => {
             <p className="mt-4 text-white/80 text-base md:text-lg">{testimonialsCopy.spotlightSupporting}</p>
             <div className="mt-8">
               <p className="font-display text-xl md:text-2xl font-normal italic text-white leading-relaxed" style={{ fontFamily: 'var(--font-family-display)' }}>
-                “Staying at Atlas Homes was seamless from booking to checkout.”
+                “Staying here was seamless from booking to checkout.”
               </p>
               <p className="mt-4 text-amber-300" aria-hidden>★★★★★</p>
               <p className="mt-4 font-semibold text-white">Guest name</p>

@@ -12,10 +12,13 @@ import { getTenantFilteredHomes, defaultHomeHighlights } from "../../content/hom
 import { useBooking } from "../../contexts/BookingContext";
 import { CONTACT } from "../../config/contact";
 import { getTenantContext } from "../../tenant/tenantContext";
+import { getTenantBrandName } from "../../tenant/displayBrand";
 import { getTenantOverrides, shouldHideAtlasBranding } from "../../tenant/tenantOverrides";
 import { usePropertyListings } from "../../hooks/usePropertyListings";
 import { addRecentlyViewed } from "../../utils/guestHistory";
 import { track } from "../../lib/events";
+import { buildHomeDetailsLodgingJsonLd } from "./homeDetailsJsonLd";
+import { formatListingTitle } from "../../utils/formatListingTitle";
 
 const UnitBookingWidget = lazy(() => import("../../components/availability/UnitBookingWidget"));
 
@@ -114,6 +117,8 @@ const HomeDetails = () => {
   const [showAllReviews, setShowAllReviews] = useState(false);
 
   const highlights = room?.highlights?.length ? room.highlights : defaultHomeHighlights;
+  /** TASK-2208: API returns underscored slugs (e.g. `Star_Guest_House_201`). Render readable text. */
+  const displayTitle = formatListingTitle(room?.title);
 
   useEffect(() => {
     if (!room) return;
@@ -136,47 +141,29 @@ const HomeDetails = () => {
     if (Number.isFinite(listingId) && listingId > 0) track('view_listing', listingId);
   }, [room]);
 
-  /** TASK-1477: inject LodgingBusiness JSON-LD for SEO. */
+  /** TASK-1477: inject LodgingBusiness JSON-LD for SEO (url, ratings, white-label provider). */
   useEffect(() => {
     if (!room) return;
     const apiListing = listingsById[room.roomNo ?? ""];
-    const amenities = (highlights ?? []).slice(0, 20);
     const images = room.images?.length ? room.images : (apiListing?.photoUrls ?? []);
-    const schema: Record<string, unknown> = {
-      "@context": "https://schema.org",
-      "@type": "LodgingBusiness",
-      name: room.title,
-      ...(room.tagline ? { description: room.tagline } : {}),
-      ...(images.length ? { image: images } : {}),
-      ...(apiListing?.propertyAddress ? {
-        address: {
-          "@type": "PostalAddress",
-          streetAddress: apiListing.propertyAddress,
-          addressCountry: "IN",
-        },
-      } : {}),
-      ...((apiListing?.latitude != null && apiListing?.longitude != null) ? {
-        geo: {
-          "@type": "GeoCoordinates",
-          latitude: apiListing.latitude,
-          longitude: apiListing.longitude,
-        },
-      } : {}),
-      ...(apiListing?.baseNightlyRate != null ? {
-        priceRange: `₹${Math.round(apiListing.baseNightlyRate)}+`,
-      } : {}),
-      amenityFeature: amenities.map((a) => ({
-        "@type": "LocationFeatureSpecification",
-        name: a,
-      })),
-    };
+    const schema = buildHomeDetailsLodgingJsonLd({
+      roomTitle: displayTitle,
+      roomHref: room.href,
+      tagline: room.tagline,
+      highlights: highlights ?? [],
+      imageUrls: images,
+      apiListing: apiListing ?? null,
+      tenantBrandName: getTenantBrandName(),
+      hideAtlasBranding,
+      reviews: reviewsData,
+    });
     const script = document.createElement("script");
     script.type = "application/ld+json";
     script.setAttribute("data-atlas-jsonld", "home-details");
     script.textContent = JSON.stringify(schema);
     document.head.appendChild(script);
     return () => { script.remove(); };
-  }, [room, highlights, listingsById]);
+  }, [room, highlights, listingsById, reviewsData, hideAtlasBranding]);
 
   /** TASK-1459: record listing view for Recently viewed strip. */
   useEffect(() => {
@@ -186,12 +173,13 @@ const HomeDetails = () => {
     addRecentlyViewed({
       listingId: lid,
       path: room.href,
-      name: room.title,
+      name: displayTitle,
       coverPhotoUrl: room.images?.[0],
     });
   }, [room, roomNo]);
 
   const primaryImage = room?.images?.[0] ?? fallbackImage;
+  const apiListingForDeposit = listingsById[room?.roomNo ?? ""];
 
   /** TASK-1453: LCP preload for hero photo (no react-helmet-async — inject once per navigation). */
   useEffect(() => {
@@ -226,9 +214,9 @@ const HomeDetails = () => {
     <section className="max-w-5xl mx-auto px-4 py-12 flex flex-col gap-6">
       <div>
         {!hideAtlasBranding && (
-          <p className="text-sm uppercase tracking-wide text-text-muted">Atlas Homes</p>
+          <p className="text-sm uppercase tracking-wide text-text-muted">{getTenantBrandName()}</p>
         )}
-        <h1 className="text-4xl font-bold text-text-primary">{room.title}</h1>
+        <h1 className="text-4xl font-bold text-text-primary">{displayTitle}</h1>
         {room.tagline && <p className="mt-2 text-lg text-text-secondary">{room.tagline}</p>}
       </div>
 
@@ -236,7 +224,7 @@ const HomeDetails = () => {
         <div className="lg:col-span-2">
           <img
             src={primaryImage}
-            alt={room.title}
+            alt={displayTitle}
             className="w-full h-80 object-cover rounded-2xl shadow-level1"
             loading="eager"
             decoding="async"
@@ -248,7 +236,7 @@ const HomeDetails = () => {
                 <img
                   key={idx}
                   src={img}
-                  alt={`${room.title} photo ${idx + 1}`}
+                  alt={`${displayTitle} photo ${idx + 1}`}
                   className="h-20 w-24 flex-shrink-0 rounded-lg object-cover"
                   loading="lazy"
                   decoding="async"
@@ -339,9 +327,10 @@ const HomeDetails = () => {
       }>
         <UnitBookingWidget
           listingId={room.listingId}
-          listingName={room.title}
+          listingName={displayTitle}
           maxGuests={room.maxGuests}
           hostPhone={room.hostPhone ?? null}
+          securityDepositAmount={apiListingForDeposit?.securityDepositAmount ?? null}
         />
       </Suspense>
 
@@ -362,7 +351,7 @@ const HomeDetails = () => {
             <EmbeddedListingMap
               latitude={Number(lat)}
               longitude={Number(lng)}
-              label={room.title}
+              label={displayTitle}
               height={320}
             />
           </div>
@@ -371,12 +360,12 @@ const HomeDetails = () => {
 
       {/* Chat with host WhatsApp CTA (TASK-355) */}
       <a
-        href={`https://wa.me/${CONTACT.business.whatsapp}?text=${encodeURIComponent(`Hi, I'm interested in booking ${room.title}`)}`}
+        href={`https://wa.me/${CONTACT.business.whatsapp}?text=${encodeURIComponent(`Hi, I'm interested in booking ${displayTitle}`)}`}
         target="_blank"
         rel="noopener noreferrer"
         data-testid="chat-with-host-btn"
         className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#25D366] text-[#1a9e4f] bg-[#f0fdf4] px-5 py-3 text-sm font-semibold transition hover:bg-[#dcfce7]"
-        aria-label={`Chat with host on WhatsApp about ${room.title}`}
+        aria-label={`Chat with host on WhatsApp about ${displayTitle}`}
       >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
           <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>

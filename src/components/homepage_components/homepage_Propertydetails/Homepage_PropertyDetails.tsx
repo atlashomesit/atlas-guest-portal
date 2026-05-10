@@ -33,16 +33,15 @@ import SEO from '../../SEO';
 import { buildApiUrl, getApiHeaders } from '../../../api/client';
 import { addRecentlyViewed, isFavorite, toggleFavorite } from '../../../utils/guestHistory';
 import { formatCurrency, formatHumanDate } from '../../../utils/formatting';
+import { formatListingTitle } from '../../../utils/formatListingTitle';
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
 import SkeletonCard from '../../apartments/SkeletonCard';
+import { ILLUSTRATIVE_OTA_GUEST_FEE_PERCENT } from '@/utils/directBookingPromo';
 
 const UnitBookingWidget = lazy(() => import('../../availability/UnitBookingWidget'));
 const AvailabilityCalendar = lazy(() => import('../../AvailabilityCalendar'));
 const GuestAssistant = lazy(() => import('../../GuestAssistant')); // TASK-1728
 const VirtualTourSection = lazy(() => import('../../VirtualTourSection')); // Task 37
-
-/** TASK-1294: illustrative uplift for “typical OTA” guest all-in (fees vary by site). */
-const OTA_ILLUSTRATIVE_MARKUP_PCT = 17;
 
 interface PropertyAmenity {
     amenities_icon: string;
@@ -155,7 +154,27 @@ interface Property {
     virtualTourUrl?: string | null;
     /** TASK-1385: Cancellation policy tier from listing — Flexible, Moderate, or Strict. */
     cancellationTier?: 'Flexible' | 'Moderate' | 'Strict' | null;
+    /** TASK-1974: security deposit amount from listing API for checkout disclosure. */
+    securityDepositAmount?: number | null;
 }
+
+/** TASK-1664: row shape from `GET /api/listings/{id}/reviews` (camelCase JSON). */
+type ListingReviewRow = {
+    id: number;
+    guestName?: string | null;
+    rating: number;
+    title?: string | null;
+    body?: string | null;
+    createdAt: string;
+    hostResponse?: string | null;
+    hostResponseAt?: string | null;
+    photoUrls?: string[] | null;
+    isVerifiedStay?: boolean;
+    ratingCleanliness?: number | null;
+    ratingValue?: number | null;
+    ratingCheckin?: number | null;
+    ratingCommunication?: number | null;
+};
 
 /** TASK-1359: Convert YouTube/Vimeo watch URL to embed URL, or return null if unrecognised. */
 function toEmbedUrl(url: string): string | null {
@@ -236,7 +255,7 @@ const PropertyDetails = () => {
         loading: boolean;
         averageRating: number;
         totalCount: number;
-        reviews: { id: number; guestName?: string | null; rating: number; title?: string | null; body?: string | null; createdAt: string; hostResponse?: string | null; hostResponseAt?: string | null; photoUrls?: string[] | null; isVerifiedStay?: boolean }[];
+        reviews: ListingReviewRow[];
     }>(null);
 
     // AMN-001: Fetch amenity master list once on mount
@@ -323,7 +342,7 @@ const PropertyDetails = () => {
 
     const illustrativeOtaNightly = useMemo(() => {
         if (directBookingNightly <= 0) return 0;
-        return Math.round(directBookingNightly * (1 + OTA_ILLUSTRATIVE_MARKUP_PCT / 100));
+        return Math.round(directBookingNightly * (1 + ILLUSTRATIVE_OTA_GUEST_FEE_PERCENT / 100));
     }, [directBookingNightly]);
 
     useEffect(() => {
@@ -420,6 +439,11 @@ const PropertyDetails = () => {
                     if (filterGuestImageUrls(prev.property_img ?? []).length === 0 && hydratedImages.length > 0) {
                         updates.property_img = hydratedImages;
                     }
+                    const rawSd = d.securityDepositAmount ?? d.SecurityDepositAmount;
+                    const sd = typeof rawSd === 'number' && Number.isFinite(rawSd) && rawSd > 0 ? rawSd : null;
+                    if (sd != null && prev.securityDepositAmount == null) {
+                        updates.securityDepositAmount = sd;
+                    }
                     return Object.keys(updates).length > 0 ? { ...prev, ...updates } : prev;
                 });
             })
@@ -480,7 +504,7 @@ const PropertyDetails = () => {
                 const j = (await res.json()) as {
                     averageRating?: number;
                     totalCount?: number;
-                    reviews?: { id: number; guestName?: string | null; rating: number; title?: string | null; body?: string | null; createdAt: string; hostResponse?: string | null; hostResponseAt?: string | null; photoUrls?: string[] | null; isVerifiedStay?: boolean }[];
+                    reviews?: ListingReviewRow[];
                 };
                 if (ac.signal.aborted) return;
                 setListingReviewsFromApi({
@@ -644,7 +668,7 @@ const PropertyDetails = () => {
                         listingId: listingNumericId,
                         property_name: (apiListing.name as string) ?? `Listing ${apiListing.id}`,
                         property_img: photoUrlsList.length > 0 ? photoUrlsList : (coverUrl ? [coverUrl] : []),
-                        property_location: (apiListing as Record<string, unknown>).property_location as string ?? 'Location not specified',
+                        property_location: ((apiListing as Record<string, unknown>).property_location as string) ?? streetFromApi ?? 'Location not specified',
                         property_neighborhoods: Array.isArray((apiListing as Record<string, unknown>).property_neighborhoods) ? (apiListing as Record<string, unknown>).property_neighborhoods as string[] : [],
                         property_amenities: Array.isArray((apiListing as Record<string, unknown>).property_amenities) ? (apiListing as Record<string, unknown>).property_amenities as PropertyAmenity[] : [],
                         property_description: (apiListing as Record<string, unknown>).property_description as string ?? '',
@@ -870,7 +894,7 @@ useEffect(() => {
             {
                 '@context': 'https://schema.org',
                 '@type': 'LodgingBusiness',
-                name: data.property_name,
+                name: formatListingTitle(data.property_name),
                 description: data.property_description?.slice(0, 300),
                 image: primaryImageForLd,
                 url: pageUrlForLd,
@@ -922,7 +946,7 @@ useEffect(() => {
                       {
                           '@context': 'https://schema.org',
                           '@type': 'Place',
-                          name: data.property_name,
+                          name: formatListingTitle(data.property_name),
                           description: data.property_description?.slice(0, 300),
                           url: pageUrlForLd,
                       },
@@ -988,14 +1012,18 @@ useEffect(() => {
 
     const pageUrl = typeof window !== 'undefined' ? window.location.href : '';
 
-    // For atlashomestays domain, construct full blob URL from pattern
+    // Marketplace tenant: construct full blob URL from relative paths (white-label uses full URLs from API).
     const buildAtlasMediaUrl = (imageUrl: string): string => {
       if (!imageUrl || !resolvedListingId) return imageUrl;
-      const isAtlasHomestays = typeof window !== 'undefined' && window.location.hostname.includes('atlashomestays');
-      if (!isAtlasHomestays) return imageUrl;
+      const ctx = _getTenantCtx();
+      const slug = (ctx?.slug ?? "").trim().toLowerCase();
+      const useMarketplaceBlobLayout = slug === "atlas" || Boolean(ctx?.isMarketplaceRoot);
+      if (!useMarketplaceBlobLayout) return imageUrl;
 
-      // If already has full blob URL, return as-is
-      if (imageUrl.includes('blob.core.windows.net')) return imageUrl;
+      // If already a fully-qualified absolute URL (any scheme/host — Azure blob OR a dev/static
+      // server like http://127.0.0.1:5120/uploads/...), trust it. Rewriting absolute URLs to
+      // Azure blob URLs broke local/dev where blobs don't exist (TASK-2118 console-error fix).
+      if (/^https?:\/\//i.test(imageUrl)) return imageUrl;
 
       // Handle relative paths and filenames
       const cleanPath = imageUrl.replace(/^\/+/, '').trim();
@@ -1015,14 +1043,16 @@ useEffect(() => {
         .filter(Boolean);
     const mapCity = locationParts[0] ?? "";
     const mapState = locationParts.slice(1).join(", ");
-    const mapSearchQuery = [mapCity, mapState].filter(Boolean).join(", ");
+    const mapStreet = String(data?.propertyAddress ?? data?.property_address ?? "").trim();
+    const mapSearchQuery =
+        [mapStreet, mapCity, mapState].filter(Boolean).join(", ") || (data?.property_location ?? "").trim();
 
     return (
         <>
         {data && (
             <SEO
-                title={`${data.property_name} | ${_getTenantCtx()?.name ?? 'Our Property'}`}
-                description={data.property_description?.slice(0, 160) || `Book ${data.property_name} in ${data.property_location || 'Hyderabad'} on ${_getTenantCtx()?.name ?? 'our platform'}.`}
+                title={`${formatListingTitle(data.property_name)} | ${_getTenantCtx()?.name ?? 'Our Property'}`}
+                description={data.property_description?.slice(0, 160) || `Book ${formatListingTitle(data.property_name)} in ${data.property_location || 'Hyderabad'} on ${_getTenantCtx()?.name ?? 'our platform'}.`}
                 image={primaryImage}
                 url={pageUrl}
                 type="lodgingBusiness"
@@ -1051,7 +1081,7 @@ useEffect(() => {
                 <div className="">
                     <div className="mb-2 flex flex-wrap items-start justify-between gap-3">
                         <h1 className="min-w-0 flex-1 text-2xl sm:text-3xl font-semibold capitalize text-text-primary">
-                            {data?.property_name}
+                            {formatListingTitle(data?.property_name)}
                         </h1>
                         <div className="flex shrink-0 items-center gap-1">
                             <button
@@ -1072,7 +1102,7 @@ useEffect(() => {
                                 onClick={() => {
                                     const url = window.location.href;
                                     const priceText = data?.property_price && data.property_price > 0 ? ` from ₹${data.property_price}/night` : '';
-                                    const text = `Check out ${data?.property_name ?? 'this home'}${priceText} on ${_getTenantCtx()?.name ?? 'our platform'}`;
+                                    const text = `Check out ${formatListingTitle(data?.property_name) || 'this home'}${priceText} on ${_getTenantCtx()?.name ?? 'our platform'}`;
                                     const share = async () => {
                                         const nav: any = navigator;
                                         if (nav?.share) return nav.share({ title: document.title, text, url });
@@ -1160,8 +1190,20 @@ useEffect(() => {
                 <div className="flex items-center gap-3 mt-2 flex-wrap">
                     <a
                         href={(() => {
-                            const priceText = data?.property_price && data.property_price > 0 ? ` from ₹${data.property_price}/night` : '';
-                            const shareText = `Check out ${data?.property_name ?? 'this home'}${priceText}: ${window.location.href}`;
+                            // TASK-1678: prefer live/computed nightly when catalog price is missing or stale
+                            const shareNightly =
+                                directBookingNightly > 0
+                                    ? Math.round(directBookingNightly)
+                                    : data?.property_price && data.property_price > 0
+                                      ? Math.round(data.property_price)
+                                      : nightlyPrice?.finalNightlyPrice && nightlyPrice.finalNightlyPrice > 0
+                                        ? Math.round(nightlyPrice.finalNightlyPrice)
+                                        : 0;
+                            const priceText =
+                                shareNightly > 0
+                                    ? ` from ₹${shareNightly.toLocaleString('en-IN')}/night`
+                                    : '';
+                            const shareText = `Check out ${formatListingTitle(data?.property_name) || 'this home'}${priceText}: ${window.location.href}`;
                             return `https://wa.me/?text=${encodeURIComponent(shareText)}`;
                         })()}
                         target="_blank"
@@ -1230,10 +1272,10 @@ useEffect(() => {
       <a href={galleryUrls[0]} data-fancybox="property-gallery">
         <img
           src={galleryUrls[0]}
-          alt={data?.property_name ? `${data.property_name} photo` : "Main property photo"}
+          alt={data?.property_name ? `${formatListingTitle(data.property_name)} photo` : "Main property photo"}
           loading="eager"
           decoding="async"
-          fetchPriority="high"
+          {...({ fetchpriority: "high" } as { fetchpriority: string })}
           sizes="(min-width: 1024px) 50vw, 100vw"
           className="w-full h-full object-cover"
           onError={(e) => {
@@ -1264,7 +1306,7 @@ useEffect(() => {
         <a href={img} data-fancybox="property-gallery">
           <img
             src={img}
-            alt={data?.property_name ? `${data.property_name} photo ${index + 2}` : `Property photo ${index + 2}`}
+            alt={data?.property_name ? `${formatListingTitle(data.property_name)} photo ${index + 2}` : `Property photo ${index + 2}`}
             loading="lazy"
             decoding="async"
             sizes="(min-width: 1024px) 25vw, 50vw"
@@ -1428,7 +1470,7 @@ useEffect(() => {
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         {s.items.slice(0, 4).map((it: any) => {
                                             const id = Number(it.id);
-                                            const name = String(it.name ?? it.propertyName ?? `Listing ${it.id}`);
+                                            const name = formatListingTitle(String(it.name ?? it.propertyName ?? '')) || `Listing ${it.id}`;
                                             const img = (it.coverPhotoUrl as string | undefined) ?? (Array.isArray(it.photoUrls) ? it.photoUrls[0] : undefined);
                                             const path = buildHomeUnitPath(getPropertySlug({ name: it.propertyName, property_name: it.propertyName }), id);
                                             return (
@@ -1517,6 +1559,28 @@ useEffect(() => {
                                                         <FaStar key={i} className={`text-xs ${i < r.rating ? 'text-accent-primary' : 'text-border-subtle'}`} />
                                                     ))}
                                                 </div>
+                                                {(() => {
+                                                    const chips: { label: string; v: number }[] = [];
+                                                    if (r.ratingCleanliness != null && r.ratingCleanliness >= 1)
+                                                        chips.push({ label: 'Cleanliness', v: r.ratingCleanliness });
+                                                    if (r.ratingValue != null && r.ratingValue >= 1)
+                                                        chips.push({ label: 'Value', v: r.ratingValue });
+                                                    if (r.ratingCheckin != null && r.ratingCheckin >= 1)
+                                                        chips.push({ label: 'Check-in', v: r.ratingCheckin });
+                                                    if (r.ratingCommunication != null && r.ratingCommunication >= 1)
+                                                        chips.push({ label: 'Communication', v: r.ratingCommunication });
+                                                    if (chips.length === 0) return null;
+                                                    return (
+                                                        <p className="mb-2 text-xs text-text-muted" data-testid="review-sub-ratings">
+                                                            {chips.map((c, idx) => (
+                                                                <span key={c.label}>
+                                                                    {idx > 0 ? ' · ' : ''}
+                                                                    {c.label} {c.v}/5
+                                                                </span>
+                                                            ))}
+                                                        </p>
+                                                    );
+                                                })()}
                                                 {r.title && <p className="text-sm font-medium text-text-primary mb-1">{r.title}</p>}
                                                 {r.body && <p className="text-sm text-text-muted italic">"{r.body}"</p>}
                                                 {filterGuestImageUrls(r.photoUrls ?? []).length > 0 && (
@@ -1653,14 +1717,18 @@ useEffect(() => {
                                 <UnitBookingWidget
                                     listingId={resolvedListingId ?? undefined}
                                     propertyId={listingPropertyId ?? undefined}
-                                    listingName={data.property_name || 'This property'}
+                                    listingName={formatListingTitle(data.property_name) || 'This property'}
                                     timezoneId={data.timezoneId}
                                     coverPhotoUrl={primaryImage}
                                     maxGuests={data.maxGuests}
+                                    securityDepositAmount={data.securityDepositAmount ?? null}
                                 />
                             </Suspense>
                             <div className="mt-3 flex flex-wrap gap-2">
-                                <span className="inline-flex items-center gap-1 rounded-full bg-green-50 border border-green-200 px-2.5 py-1 text-xs font-medium text-green-700">
+                                <span
+                                    className="inline-flex items-center gap-1 rounded-full bg-green-50 border border-green-200 px-2.5 py-1 text-xs font-medium text-green-700 cursor-help"
+                                    title="Listing details and photos reviewed by the Atlas team before going live."
+                                >
                                     ✓ Verified listing
                                 </span>
                                 <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2.5 py-1 text-xs font-medium text-blue-700">
@@ -1698,7 +1766,7 @@ useEffect(() => {
                                 return (
                                     <div className="mt-3">
                                         <a
-                                            href={`https://wa.me/${phoneToUse}?text=Hi%2C%20I'm%20interested%20in%20booking%20${encodeURIComponent(data.property_name || 'this property')}`}
+                                            href={`https://wa.me/${phoneToUse}?text=Hi%2C%20I'm%20interested%20in%20booking%20${encodeURIComponent(formatListingTitle(data.property_name) || 'this property')}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             data-testid="chat-with-host-btn"

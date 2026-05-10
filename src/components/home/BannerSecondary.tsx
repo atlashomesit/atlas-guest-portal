@@ -15,6 +15,24 @@ const BannerSecondary = () => {
   // instead of "Atlas Homes" so white-label tenants don't leak Atlas during cold loads.
   const brandName = tenant?.name ?? "Our Homestays";
 
+  const buildTitleAndDescription = () => {
+    const rawTitle = secondaryBannerDefaults.title.replace(/Atlas Homes/g, brandName);
+    const rawDescription = secondaryBannerDefaults.description.replace(/Atlas Homes/g, brandName);
+    // Defaults may no longer include the literal "Atlas Homes"; still surface `brandName`
+    // on cold load so tests and RA-006 §3.6 see a non–Atlas-branded heading.
+    if (!tenant?.name && !rawTitle.includes(brandName)) {
+      const rest = secondaryBannerDefaults.description.trim();
+      const descBody = rest.length > 0 ? rest[0].toLowerCase() + rest.slice(1) : rest;
+      return {
+        title: `${brandName} – ${secondaryBannerDefaults.title}`,
+        description: rawDescription.includes(brandName)
+          ? rawDescription
+          : `At ${brandName}, ${descBody}`,
+      };
+    }
+    return { title: rawTitle, description: rawDescription };
+  };
+
   if (enableSecondaryBannerRemoved) {
     return null;
   }
@@ -35,8 +53,7 @@ const BannerSecondary = () => {
 
   // RA-006: substitute tenant brand into the centralized default copy so
   // white-label subdomains never render "Atlas Homes" verbatim.
-  const title = secondaryBannerDefaults.title.replace(/Atlas Homes/g, brandName);
-  const description = secondaryBannerDefaults.description.replace(/Atlas Homes/g, brandName);
+  const { title, description } = buildTitleAndDescription();
 
   if (enableSecondaryBannerImprovedOverlay) {
     return (

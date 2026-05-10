@@ -1,4 +1,3 @@
-/* eslint-disable atlas-brand/no-atlas-string-leak -- TODO Task 16: replace with per-tenant content */
 import { useMemo, useState } from "react";
 import LegalLayout from "../components/legal/LegalLayout";
 import LegalSearch from "../components/legal/LegalSearch";

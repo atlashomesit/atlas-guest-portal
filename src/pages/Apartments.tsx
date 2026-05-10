@@ -1,6 +1,5 @@
-/* eslint-disable atlas-brand/no-atlas-string-leak -- TODO Task 16: replace with per-tenant content */
 import React from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import ErrorBoundary from "../components/ErrorBoundary";
 import ErrorLayout from "../components/ErrorLayout";
@@ -14,7 +13,12 @@ import type { Listing } from "../data/listings";
 import { useTenantListings } from "../hooks/useTenantListings";
 import { trackEvent } from "../utils/analytics";
 import { buildHomeUnitPath, getPropertySlug, navigateToHomeUnit } from "../utils/navigation";
-import { calculateNightlyPrice, inferUnitType, type NightlyPriceBreakdown } from "../utils/pricing";
+import {
+  calculateNightlyPrice,
+  getEffectiveDiscountPercent,
+  inferUnitType,
+  type NightlyPriceBreakdown,
+} from "../utils/pricing";
 import type { UnitType } from "../config/pricing.config";
 
 type PropertyMetadata = {
@@ -73,6 +77,8 @@ type CombinedListing = {
   /** TASK-1695: LOS auto-discount tier 2. */
   losDiscount2MinNights?: number | null;
   losDiscount2Percent?: number | null;
+  /** TASK-1982: optional 1★–5★ review counts from public API. */
+  ratingStarCounts?: number[] | null;
 };
 
 const derivePropertyType = (name?: string): string => {
@@ -236,6 +242,7 @@ export const Apartments = () => {
   const brandName = getTenantBrandName();
   const tenantOverrides = getTenantOverrides(tenant?.slug);
   const hideAtlasBranding = shouldHideAtlasBranding(tenant, tenantOverrides);
+  const directBookingDiscountPercent = React.useMemo(() => getEffectiveDiscountPercent(), []);
 
   const safeListings = React.useMemo(() => sanitizeListings(listingsSource), [listingsSource]);
   const safeProperties = React.useMemo(() => sanitizeProperties(propertiesSource), [propertiesSource]);
@@ -371,7 +378,7 @@ export const Apartments = () => {
       console.error('Error creating listings:', error);
       return [];
     }
-  }, [computeNightlyPrice, safeListings, safeProperties, tenant?.slug]);
+  }, [computeNightlyPrice, safeListings, safeProperties]);
 
   const filteredListings = React.useMemo(() => {
     let result = listings.filter(
@@ -526,12 +533,12 @@ export const Apartments = () => {
               >
                 {fetchState === "loading" ? "Refreshing..." : "Retry loading"}
               </button>
-              <button
-                onClick={() => window.location.href = '/'}
-                className="px-6 py-3 bg-bg-muted text-text-primary rounded-full hover:bg-border-subtle transition-colors"
+              <Link
+                to="/"
+                className="inline-flex items-center justify-center px-6 py-3 bg-bg-muted text-text-primary rounded-full hover:bg-border-subtle transition-colors font-medium"
               >
                 Go to Home
-              </button>
+              </Link>
             </div>
           </div>
         ) : (
@@ -539,16 +546,16 @@ export const Apartments = () => {
             <div className="rounded-2xl bg-bg-surface p-4 shadow-level1 border border-border-subtle text-sm text-text-muted">
               <p className="text-base font-semibold text-text-primary">Trip details</p>
               <p className="mt-1 flex flex-wrap gap-2">
-                <span className="rounded-full bg-bg-muted px-3 py-1 text-xs font-semibold uppercase tracking-wide text-text-primary">
+                <span className="rounded-full bg-bg-muted px-3 py-1.5 text-sm font-semibold uppercase tracking-wide text-text-primary">
                   Guests: {guests}
                 </span>
                 {formattedDates.displayCheckIn && (
-                  <span className="rounded-full bg-bg-muted px-3 py-1 text-xs font-semibold uppercase tracking-wide text-text-primary">
+                  <span className="rounded-full bg-bg-muted px-3 py-1.5 text-sm font-semibold uppercase tracking-wide text-text-primary">
                     Check-in: {formattedDates.displayCheckIn}
                   </span>
                 )}
                 {formattedDates.displayCheckOut && (
-                  <span className="rounded-full bg-bg-muted px-3 py-1 text-xs font-semibold uppercase tracking-wide text-text-primary">
+                  <span className="rounded-full bg-bg-muted px-3 py-1.5 text-sm font-semibold uppercase tracking-wide text-text-primary">
                     Check-out: {formattedDates.displayCheckOut}
                   </span>
                 )}
@@ -604,6 +611,8 @@ export const Apartments = () => {
                   losDiscountPercent={listing.losDiscountPercent}
                   losDiscount2MinNights={listing.losDiscount2MinNights}
                   losDiscount2Percent={listing.losDiscount2Percent}
+                  ratingStarCounts={listing.ratingStarCounts ?? undefined}
+                  directBookingDiscountPercent={directBookingDiscountPercent}
                   onClick={() => handleNavigate(listing.property)}
                 />
               ))}

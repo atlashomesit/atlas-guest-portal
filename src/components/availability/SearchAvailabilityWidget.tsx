@@ -732,7 +732,7 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
           onClose={() => setIsGuestsOpen(false)}
         />
 
-        <div className={`${fieldShellClass} md:-ml-[1px] lg:min-h-[120px] lg:items-stretch lg:justify-center lg:flex-col`}>
+        <div className={`${fieldShellClass} md:-ml-[1px] lg:min-h-[120px] lg:min-w-[180px] lg:!px-4 lg:items-stretch lg:justify-center lg:flex-col`}>
           <button
             type="submit"
             disabled={isSubmitDisabled || isSubmitting}

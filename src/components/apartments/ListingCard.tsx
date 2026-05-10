@@ -32,6 +32,10 @@ type ListingCardProps = {
   losDiscount2MinNights?: number | null;
   /** TASK-1695: LOS auto-discount tier 2 — discount percentage (0-100). */
   losDiscount2Percent?: number | null;
+  /** TASK-1943: global / tenant direct-booking discount percent for badge (0–100). */
+  directBookingDiscountPercent?: number | null;
+  /** TASK-1982: guest review counts per star (index 0 = 1★ … 4 = 5★), length 5 when present. */
+  ratingStarCounts?: number[] | null;
   onClick?: () => void;
 };
 
@@ -59,6 +63,8 @@ const ListingCard: React.FC<ListingCardProps> = ({
   losDiscountPercent,
   losDiscount2MinNights,
   losDiscount2Percent,
+  directBookingDiscountPercent,
+  ratingStarCounts,
   onClick,
 }) => {
   const { format: formatCurrency } = useCurrency();
@@ -73,7 +79,17 @@ const ListingCard: React.FC<ListingCardProps> = ({
   }, [lastBookedAt]);
   const finalPrice = pricingBreakdown?.finalNightlyPrice ?? price;
   const originalPrice = pricingBreakdown?.baseNightlyPrice ?? price;
-  const ratingSnippet = rating > 0 ? `${rating.toFixed(2)} / 5` : "Rating updates soon";
+  /** TASK-1660: only treat star average as verified when at least one guest review exists. */
+  const hasVerifiedReviews = reviews > 0 && rating > 0;
+  const ratingSnippet = hasVerifiedReviews ? `${rating.toFixed(2)} / 5` : "Reviews after first stay";
+  const starHistogram = useMemo(() => {
+    if (!ratingStarCounts || ratingStarCounts.length !== 5) return null;
+    const counts = ratingStarCounts.map((n) => (Number.isFinite(n) && n >= 0 ? n : 0));
+    const total = counts.reduce((a, b) => a + b, 0);
+    if (total <= 0) return null;
+    const max = Math.max(...counts, 1);
+    return { counts, max };
+  }, [ratingStarCounts]);
   const hasSpecialPricing = Boolean(pricingBreakdown?.hasSpecialDateMultiplier);
   const specialPricingLabel =
     hasSpecialPricing && pricingBreakdown?.dateKey
@@ -182,9 +198,15 @@ const ListingCard: React.FC<ListingCardProps> = ({
             )}
           </div>
           <div className="flex flex-shrink-0 items-center gap-1 text-sm font-semibold text-text-primary">
-            <span aria-hidden>★</span>
-            <span>{rating > 0 ? rating.toFixed(2) : "New"}</span>
-            <span className="text-text-muted">({reviews.toLocaleString()})</span>
+            {hasVerifiedReviews ? (
+              <>
+                <span aria-hidden>★</span>
+                <span>{rating.toFixed(2)}</span>
+                <span className="text-text-muted">({reviews.toLocaleString()})</span>
+              </>
+            ) : (
+              <span className="text-xs font-semibold text-text-muted">New listing</span>
+            )}
           </div>
         </div>
 
@@ -207,6 +229,15 @@ const ListingCard: React.FC<ListingCardProps> = ({
               </span>
             )}
           </div>
+        )}
+
+        {directBookingDiscountPercent != null && directBookingDiscountPercent > 0 && (
+          <span
+            data-testid="listing-card-direct-discount"
+            className="inline-flex items-center gap-1 self-start rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-800"
+          >
+            {Math.round(directBookingDiscountPercent)}% off direct
+          </span>
         )}
 
         {quickFacts.length > 0 && (
@@ -276,7 +307,28 @@ const ListingCard: React.FC<ListingCardProps> = ({
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="inline-flex items-center gap-1 rounded-full bg-bg-surface px-2 py-1">No hidden fees</span>
                   <span className="inline-flex items-center gap-1 rounded-full bg-bg-surface px-2 py-1">Secure Razorpay payments</span>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-bg-surface px-2 py-1">Avg. rating {ratingSnippet}</span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-bg-surface px-2 py-1">
+                    {hasVerifiedReviews ? `Avg. rating ${ratingSnippet}` : ratingSnippet}
+                  </span>
+                  {hasVerifiedReviews && starHistogram && (
+                    <div
+                      className="inline-flex items-end gap-0.5 rounded-md bg-bg-surface px-2 py-1"
+                      data-testid="listing-card-star-histogram"
+                      title={starHistogram.counts.map((c, i) => `${i + 1}★: ${c}`).join(" · ")}
+                      aria-label={`Review star distribution: ${starHistogram.counts.map((c, i) => `${i + 1} star, ${c} reviews`).join("; ")}`}
+                    >
+                      {starHistogram.counts.map((count, idx) => (
+                        <span
+                          key={idx}
+                          className="block w-1 min-h-[3px] rounded-sm bg-amber-500"
+                          style={{
+                            height: `${4 + Math.round((count / starHistogram.max) * 20)}px`,
+                            opacity: count > 0 ? 1 : 0.2,
+                          }}
+                        />
+                      ))}
+                    </div>
+                  )}
                   {/* TASK-1705: Owner-share trust badge */}
                   <OwnerShareBadge nightlyPrice={finalPrice} />
                 </div>

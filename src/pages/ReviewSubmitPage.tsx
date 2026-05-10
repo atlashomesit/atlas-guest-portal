@@ -1,4 +1,3 @@
-/* eslint-disable atlas-brand/no-atlas-string-leak -- TODO Task 16: replace with per-tenant content */
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import SEO from "../components/SEO";
@@ -398,7 +397,7 @@ export default function ReviewSubmitPage() {
 
           <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3">
             <p className="text-sm font-medium text-text-primary">Photos <span className="text-text-muted font-normal">(optional, max 3)</span></p>
-            <p className="text-xs text-text-secondary">JPEG, PNG, WebP, or GIF — up to 5 MB each. Help future guests see what your stay looked like.</p>
+            <p className="text-xs text-text-secondary">JPEG, PNG, WebP, or GIF — up to 16 MB each (TASK-2072). Help future guests see what your stay looked like.</p>
             <input
               type="file"
               accept="image/jpeg,image/png,image/webp,image/gif"
