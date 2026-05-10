@@ -17,6 +17,7 @@ import { getTenantOverrides, shouldHideAtlasBranding } from "../../tenant/tenant
 import { usePropertyListings } from "../../hooks/usePropertyListings";
 import { addRecentlyViewed } from "../../utils/guestHistory";
 import { track } from "../../lib/events";
+import { buildHomeDetailsLodgingJsonLd } from "./homeDetailsJsonLd";
 
 const UnitBookingWidget = lazy(() => import("../../components/availability/UnitBookingWidget"));
 
@@ -137,47 +138,29 @@ const HomeDetails = () => {
     if (Number.isFinite(listingId) && listingId > 0) track('view_listing', listingId);
   }, [room]);
 
-  /** TASK-1477: inject LodgingBusiness JSON-LD for SEO. */
+  /** TASK-1477: inject LodgingBusiness JSON-LD for SEO (url, ratings, white-label provider). */
   useEffect(() => {
     if (!room) return;
     const apiListing = listingsById[room.roomNo ?? ""];
-    const amenities = (highlights ?? []).slice(0, 20);
     const images = room.images?.length ? room.images : (apiListing?.photoUrls ?? []);
-    const schema: Record<string, unknown> = {
-      "@context": "https://schema.org",
-      "@type": "LodgingBusiness",
-      name: room.title,
-      ...(room.tagline ? { description: room.tagline } : {}),
-      ...(images.length ? { image: images } : {}),
-      ...(apiListing?.propertyAddress ? {
-        address: {
-          "@type": "PostalAddress",
-          streetAddress: apiListing.propertyAddress,
-          addressCountry: "IN",
-        },
-      } : {}),
-      ...((apiListing?.latitude != null && apiListing?.longitude != null) ? {
-        geo: {
-          "@type": "GeoCoordinates",
-          latitude: apiListing.latitude,
-          longitude: apiListing.longitude,
-        },
-      } : {}),
-      ...(apiListing?.baseNightlyRate != null ? {
-        priceRange: `₹${Math.round(apiListing.baseNightlyRate)}+`,
-      } : {}),
-      amenityFeature: amenities.map((a) => ({
-        "@type": "LocationFeatureSpecification",
-        name: a,
-      })),
-    };
+    const schema = buildHomeDetailsLodgingJsonLd({
+      roomTitle: room.title,
+      roomHref: room.href,
+      tagline: room.tagline,
+      highlights: highlights ?? [],
+      imageUrls: images,
+      apiListing: apiListing ?? null,
+      tenantBrandName: getTenantBrandName(),
+      hideAtlasBranding,
+      reviews: reviewsData,
+    });
     const script = document.createElement("script");
     script.type = "application/ld+json";
     script.setAttribute("data-atlas-jsonld", "home-details");
     script.textContent = JSON.stringify(schema);
     document.head.appendChild(script);
     return () => { script.remove(); };
-  }, [room, highlights, listingsById]);
+  }, [room, highlights, listingsById, reviewsData, hideAtlasBranding]);
 
   /** TASK-1459: record listing view for Recently viewed strip. */
   useEffect(() => {

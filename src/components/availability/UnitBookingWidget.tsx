@@ -1175,13 +1175,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       const message = messageLines.join('\n') + noteForMessage;
       const url = `https://wa.me/${encodeURIComponent(tenantWhatsappPhone)}?text=${encodeURIComponent(message)}`;
       try {
-        track('whatsapp_direct_booking_handoff', {
-          tenantSlug: getTenantContext()?.slug ?? null,
-          listingId: listingId != null ? String(listingId) : null,
-          checkinIso: dateRange.startDate ? toISODate(dateRange.startDate) : null,
-          checkoutIso: dateRange.endDate ? toISODate(dateRange.endDate) : null,
-          guests: guestsForMessage,
-        });
+        const lid = listingId != null ? Number(listingId) : NaN;
+        if (Number.isFinite(lid) && lid > 0) track("whatsapp_direct_booking_handoff", lid);
       } catch { /* analytics best-effort */ }
       window.open(url, '_blank', 'noopener');
       toast.info('Opening WhatsApp — your host will confirm availability and payment with you.');
