@@ -265,6 +265,7 @@ const SupportWidgetContent = () => {
               to trial the compact drawer and CTA priority without changing the default experience. */}
           <SupportDrawer
             bottomSpacing={bottomSpacing}
+            brandName={brandName}
             layoutVariant={
               enableSupportLayoutVariants
                 ? enableCompactDrawer

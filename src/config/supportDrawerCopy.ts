@@ -1,7 +1,11 @@
 export const SUPPORT_DRAWER_COPY = {
   header: {
-    title: "Need a hand?",
-    subtitle: "Chat with Atlas or jump to WhatsApp/callback without losing your place.",
+    // Brand-templated to avoid leaking the "Atlas" brand on white-label tenants
+    // (e.g. SGH renders "Star Guest House Concierge"). Marketplace apex resolves
+    // brand to "Atlas Homestays" via getTenantBrandName().
+    title: (brand: string) => `${brand} Concierge`,
+    subtitle: (brand: string) =>
+      `Chat with ${brand} or jump to WhatsApp/callback without losing your place.`,
     // Warmer variants for future experiments:
     // - "We’re right here if you need us—ping us and we’ll reply in minutes."
     // - "Questions? Our team is online and ready to help."
