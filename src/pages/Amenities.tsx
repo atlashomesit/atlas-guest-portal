@@ -1,4 +1,3 @@
-/* eslint-disable atlas-brand/no-atlas-string-leak -- Task 16: amenities pulled from live listings API */
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import {

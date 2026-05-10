@@ -1,4 +1,3 @@
-/* eslint-disable atlas-brand/no-atlas-string-leak -- TODO Task 16: replace with per-tenant content */
 import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -371,7 +370,7 @@ export const Apartments = () => {
       console.error('Error creating listings:', error);
       return [];
     }
-  }, [computeNightlyPrice, safeListings, safeProperties, tenant?.slug]);
+  }, [computeNightlyPrice, safeListings, safeProperties]);
 
   const filteredListings = React.useMemo(() => {
     let result = listings.filter(

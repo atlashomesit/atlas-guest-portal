@@ -1,4 +1,3 @@
-/* eslint-disable atlas-brand/no-atlas-string-leak -- TODO Task 16: replace with per-tenant content */
 import { CheckCircle2, HeartHandshake, ShieldCheck, Sparkles, Users, MapPin, Clock4, BedDouble, Medal } from "lucide-react";
 import SEO from "../components/SEO";
 
