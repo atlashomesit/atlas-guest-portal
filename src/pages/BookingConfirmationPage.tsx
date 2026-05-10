@@ -87,7 +87,7 @@ const statusLabel: Record<string, { label: string; color: string }> = {
 function StatusBadge({ status }: { status: string }) {
   const s = statusLabel[status] ?? { label: status, color: "text-gray-700 bg-gray-50 border-gray-200" };
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${s.color}`}>
+    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-sm font-medium border ${s.color}`}>
       {s.label}
     </span>
   );

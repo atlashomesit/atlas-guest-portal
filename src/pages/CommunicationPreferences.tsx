@@ -101,34 +101,34 @@ export default function CommunicationPreferences() {
             <p className="text-text-muted text-sm">Loading...</p>
           ) : (
             <div className="flex flex-col gap-3">
-              <label className="flex items-center gap-3 text-sm text-text-secondary">
-                <input type="checkbox" checked disabled className="h-4 w-4" />
+              <label className="flex items-center gap-3 min-h-11 cursor-pointer text-sm text-text-secondary py-1 -my-1">
+                <input type="checkbox" checked disabled className="h-5 w-5 min-h-[24px] min-w-[24px] shrink-0 accent-[color:var(--cta-primary)]" />
                 <span>Transactional messages (required)</span>
               </label>
-              <label className="flex items-center gap-3 text-sm text-text-secondary">
+              <label className="flex items-center gap-3 min-h-11 cursor-pointer text-sm text-text-secondary py-1 -my-1">
                 <input
                   type="checkbox"
                   checked={form.checkInCheckoutReminders}
                   onChange={(e) => setForm((f) => ({ ...f, checkInCheckoutReminders: e.target.checked }))}
-                  className="h-4 w-4"
+                  className="h-5 w-5 min-h-[24px] min-w-[24px] shrink-0 accent-[color:var(--cta-primary)]"
                 />
                 <span>Check-in/check-out reminders</span>
               </label>
-              <label className="flex items-center gap-3 text-sm text-text-secondary">
+              <label className="flex items-center gap-3 min-h-11 cursor-pointer text-sm text-text-secondary py-1 -my-1">
                 <input
                   type="checkbox"
                   checked={form.postStayReviewRequest}
                   onChange={(e) => setForm((f) => ({ ...f, postStayReviewRequest: e.target.checked }))}
-                  className="h-4 w-4"
+                  className="h-5 w-5 min-h-[24px] min-w-[24px] shrink-0 accent-[color:var(--cta-primary)]"
                 />
                 <span>Post-stay review requests</span>
               </label>
-              <label className="flex items-center gap-3 text-sm text-text-secondary">
+              <label className="flex items-center gap-3 min-h-11 cursor-pointer text-sm text-text-secondary py-1 -my-1">
                 <input
                   type="checkbox"
                   checked={form.promotionalOffers}
                   onChange={(e) => setForm((f) => ({ ...f, promotionalOffers: e.target.checked }))}
-                  className="h-4 w-4"
+                  className="h-5 w-5 min-h-[24px] min-w-[24px] shrink-0 accent-[color:var(--cta-primary)]"
                 />
                 <span>Promotional offers</span>
               </label>

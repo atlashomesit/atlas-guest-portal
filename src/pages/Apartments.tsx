@@ -1,5 +1,5 @@
 import React from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import ErrorBoundary from "../components/ErrorBoundary";
 import ErrorLayout from "../components/ErrorLayout";
@@ -525,12 +525,12 @@ export const Apartments = () => {
               >
                 {fetchState === "loading" ? "Refreshing..." : "Retry loading"}
               </button>
-              <button
-                onClick={() => window.location.href = '/'}
-                className="px-6 py-3 bg-bg-muted text-text-primary rounded-full hover:bg-border-subtle transition-colors"
+              <Link
+                to="/"
+                className="inline-flex items-center justify-center px-6 py-3 bg-bg-muted text-text-primary rounded-full hover:bg-border-subtle transition-colors font-medium"
               >
                 Go to Home
-              </button>
+              </Link>
             </div>
           </div>
         ) : (
@@ -538,16 +538,16 @@ export const Apartments = () => {
             <div className="rounded-2xl bg-bg-surface p-4 shadow-level1 border border-border-subtle text-sm text-text-muted">
               <p className="text-base font-semibold text-text-primary">Trip details</p>
               <p className="mt-1 flex flex-wrap gap-2">
-                <span className="rounded-full bg-bg-muted px-3 py-1 text-xs font-semibold uppercase tracking-wide text-text-primary">
+                <span className="rounded-full bg-bg-muted px-3 py-1.5 text-sm font-semibold uppercase tracking-wide text-text-primary">
                   Guests: {guests}
                 </span>
                 {formattedDates.displayCheckIn && (
-                  <span className="rounded-full bg-bg-muted px-3 py-1 text-xs font-semibold uppercase tracking-wide text-text-primary">
+                  <span className="rounded-full bg-bg-muted px-3 py-1.5 text-sm font-semibold uppercase tracking-wide text-text-primary">
                     Check-in: {formattedDates.displayCheckIn}
                   </span>
                 )}
                 {formattedDates.displayCheckOut && (
-                  <span className="rounded-full bg-bg-muted px-3 py-1 text-xs font-semibold uppercase tracking-wide text-text-primary">
+                  <span className="rounded-full bg-bg-muted px-3 py-1.5 text-sm font-semibold uppercase tracking-wide text-text-primary">
                     Check-out: {formattedDates.displayCheckOut}
                   </span>
                 )}
