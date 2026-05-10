@@ -6,6 +6,7 @@ import {
   type CookieConsentRecord,
 } from "../utils/cookieConsent";
 import { getTenantContext } from "../tenant/tenantContext";
+import { getTenantBrandName } from "../tenant/displayBrand";
 import { getTenantOverrides } from "../tenant/tenantOverrides"; // TASK-1877
 
 // DPDP-compliant cookie consent banner.
@@ -44,7 +45,7 @@ const CookieConsentBanner = () => {
   const cookieBannerOverride = tenantOverrides.cookieBanner;
 
   const bannerText = cookieBannerOverride?.text ??
-    "Atlas Homestays uses strictly necessary cookies to make this site work, and optional analytics cookies " +
+    `${getTenantBrandName()} uses strictly necessary cookies to make this site work, and optional analytics cookies ` +
     "to understand how it is used. Under India’s DPDP Act 2023 we ask for your consent " +
     "before loading anything non-essential. Read our";
   const privacyUrl = cookieBannerOverride?.privacyUrl ?? "/privacy";

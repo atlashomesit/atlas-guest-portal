@@ -988,11 +988,13 @@ useEffect(() => {
 
     const pageUrl = typeof window !== 'undefined' ? window.location.href : '';
 
-    // For atlashomestays domain, construct full blob URL from pattern
+    // Marketplace tenant: construct full blob URL from relative paths (white-label uses full URLs from API).
     const buildAtlasMediaUrl = (imageUrl: string): string => {
       if (!imageUrl || !resolvedListingId) return imageUrl;
-      const isAtlasHomestays = typeof window !== 'undefined' && window.location.hostname.includes('atlashomestays');
-      if (!isAtlasHomestays) return imageUrl;
+      const ctx = _getTenantCtx();
+      const slug = (ctx?.slug ?? "").trim().toLowerCase();
+      const useMarketplaceBlobLayout = slug === "atlas" || Boolean(ctx?.isMarketplaceRoot);
+      if (!useMarketplaceBlobLayout) return imageUrl;
 
       // If already has full blob URL, return as-is
       if (imageUrl.includes('blob.core.windows.net')) return imageUrl;
