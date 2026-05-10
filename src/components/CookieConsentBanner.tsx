@@ -44,6 +44,7 @@ const CookieConsentBanner = () => {
   const tenantOverrides = getTenantOverrides(tenantSlug);
   const cookieBannerOverride = tenantOverrides.cookieBanner;
 
+  const bannerTitle = cookieBannerOverride?.title ?? "Your privacy choice";
   const bannerText = cookieBannerOverride?.text ??
     `${getTenantBrandName()} uses strictly necessary cookies to make this site work, and optional analytics cookies ` +
     "to understand how it is used. Under India’s DPDP Act 2023 we ask for your consent " +
@@ -63,7 +64,7 @@ const CookieConsentBanner = () => {
         <div className="flex flex-col md:flex-row md:items-center gap-4">
           <div className="flex-1 space-y-1">
             <h2 id="cookie-consent-title" className="text-base md:text-lg font-bold text-text-primary">
-              Your privacy choice
+              {bannerTitle}
             </h2>
             <p id="cookie-consent-desc" className="text-sm text-text-muted">
               {bannerText}{" "}

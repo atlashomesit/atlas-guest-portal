@@ -1,6 +1,6 @@
 import { lazy, Suspense, useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { AlertTriangle, Wifi, Briefcase } from "lucide-react";
+import { AlertTriangle, Briefcase, CalendarDays, CalendarRange, Wifi } from "lucide-react";
 
 import { propertyData } from "../data";
 import { fetchPublicListings, type PublicListing } from "../api/listingClient";
@@ -888,23 +888,27 @@ const SearchPage = () => {
         {/* TASK-1738: Digital nomad filter chips */}
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-medium text-text-muted uppercase tracking-wide">Digital nomad:</span>
-          {[
-            { label: "📶 WiFi 50+ Mbps", param: "nomadWifi",    active: nomadWifi },
-            { label: "💻 Workspace",      param: "nomadWorkspace", active: nomadWorkspace },
-            { label: "📅 7+ nights",      param: "longStay",    active: longStay },
-            { label: "🗓️ 30+ nights",     param: "monthlyStay", active: monthlyStay },
-          ].map(({ label, param, active }) => (
+          {(
+            [
+              { param: "nomadWifi", active: nomadWifi, icon: Wifi, text: "WiFi 50+ Mbps" },
+              { param: "nomadWorkspace", active: nomadWorkspace, icon: Briefcase, text: "Workspace" },
+              { param: "longStay", active: longStay, icon: CalendarDays, text: "7+ nights" },
+              { param: "monthlyStay", active: monthlyStay, icon: CalendarRange, text: "30+ nights" },
+            ] as const
+          ).map(({ param, active, icon: Icon, text }) => (
             <button
               key={param}
+              type="button"
               onClick={() => updateParam(param, active ? "" : "true")}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors min-h-11 ${
+              className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-colors min-h-11 ${
                 active
                   ? "bg-emerald-600 text-white border border-emerald-600"
                   : "bg-bg-surface border border-border-subtle text-text-primary hover:border-emerald-500"
               } focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2`}
               aria-pressed={active}
             >
-              {label}
+              <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              <span>{text}</span>
             </button>
           ))}
         </div>
