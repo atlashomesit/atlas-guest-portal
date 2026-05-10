@@ -274,26 +274,52 @@ export async function fetchListingContact(
   return (await response.json()) as ListingContact;
 }
 
-let cachedListings: PublicListing[] | null = null;
-let cachePromise: Promise<PublicListing[]> | null = null;
+type FetchPublicListingsOptions = { signal?: AbortSignal; city?: string };
 
-export const fetchPublicListings = async (signal?: AbortSignal): Promise<PublicListing[]> => {
-  // Return cached result if available
-  if (cachedListings != null) {
-    console.log('[fetchPublicListings] Returning cached listings');
-    return cachedListings;
+const publicListingsCache = new Map<string, PublicListing[]>();
+const publicListingsInflight = new Map<string, Promise<PublicListing[]>>();
+
+function publicListingsCacheKey(city?: string): string {
+  const c = city?.trim().toLowerCase();
+  return c && c.length > 0 ? c : '__all__';
+}
+
+function buildPublicListingsPath(city?: string): string {
+  if (!city?.trim()) return PUBLIC_LISTINGS_ENDPOINT;
+  const q = new URLSearchParams({ city: city.trim().toLowerCase() });
+  return `${PUBLIC_LISTINGS_ENDPOINT}?${q}`;
+}
+
+export async function fetchPublicListings(signal?: AbortSignal): Promise<PublicListing[]>;
+export async function fetchPublicListings(options: FetchPublicListingsOptions): Promise<PublicListing[]>;
+export async function fetchPublicListings(
+  arg?: AbortSignal | FetchPublicListingsOptions,
+): Promise<PublicListing[]> {
+  let signal: AbortSignal | undefined;
+  let city: string | undefined;
+  if (arg instanceof AbortSignal) {
+    signal = arg;
+  } else if (arg && typeof arg === 'object') {
+    signal = arg.signal;
+    city = arg.city;
   }
 
-  // Return existing promise if already fetching
-  if (cachePromise != null) {
-    console.log('[fetchPublicListings] Returning existing fetch promise');
-    return cachePromise;
+  const key = publicListingsCacheKey(city);
+  const cached = publicListingsCache.get(key);
+  if (cached != null) {
+    console.log('[fetchPublicListings] Returning cached listings', key);
+    return cached;
   }
 
-  // Create new fetch promise
-  cachePromise = (async () => {
+  const existingPromise = publicListingsInflight.get(key);
+  if (existingPromise != null) {
+    console.log('[fetchPublicListings] Returning existing fetch promise', key);
+    return existingPromise;
+  }
+
+  const fetchPromise = (async () => {
     try {
-      const response = await fetch(buildApiUrl(PUBLIC_LISTINGS_ENDPOINT), {
+      const response = await fetch(buildApiUrl(buildPublicListingsPath(city)), {
         signal,
         headers: getApiHeaders(),
       });
@@ -313,15 +339,16 @@ export const fetchPublicListings = async (signal?: AbortSignal): Promise<PublicL
         .filter((row): row is PublicListing => row !== null && row.id > 0);
 
       console.log('[fetchPublicListings] Final normalized listings count:', result.length);
-      cachedListings = result;
+      publicListingsCache.set(key, result);
       return result;
     } finally {
-      cachePromise = null;
+      publicListingsInflight.delete(key);
     }
   })();
 
-  return cachePromise;
-};
+  publicListingsInflight.set(key, fetchPromise);
+  return fetchPromise;
+}
 
 /** Normalize JSON from GET /listings/{propertyId}/photos into ordered URL strings. */
 export function normalizeListingPhotoResponse(payload: unknown): string[] {
