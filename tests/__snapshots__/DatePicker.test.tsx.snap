@@ -59,7 +59,7 @@ exports[`Hero date picker > captures a stable mobile viewport snapshot > date-pi
                   class="relative"
                 >
                   <button
-                    aria-controls=":rg:"
+                    aria-controls="_r_g_"
                     aria-expanded="true"
                     aria-label="Click to select check-in date, then choose from calendar"
                     class="field-card flex h-full min-h-[120px] flex-col justify-between rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-7 py-7 shadow-[var(--shadow-level-1)] hover:shadow-[var(--shadow-level-2)] hover:scale-[1.01] text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary ring-2 ring-[var(--cta-primary)] ring-offset-2"
@@ -143,7 +143,7 @@ exports[`Hero date picker > captures a stable mobile viewport snapshot > date-pi
                   </button>
                 </div>
                 <button
-                  aria-controls=":rg:"
+                  aria-controls="_r_g_"
                   aria-expanded="true"
                   aria-label="Click to select check-out date, then choose from calendar"
                   class="field-card flex h-full min-h-[120px] flex-col justify-between rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-7 py-7 shadow-[var(--shadow-level-1)] hover:shadow-[var(--shadow-level-2)] hover:scale-[1.01] text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary md:-ml-[1px]"
@@ -311,7 +311,7 @@ exports[`Hero date picker > captures a stable mobile viewport snapshot > date-pi
                   </button>
                 </div>
                 <div
-                  class="field-card flex h-full min-h-[120px] flex-col justify-between rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-7 py-7 shadow-[var(--shadow-level-1)] hover:shadow-[var(--shadow-level-2)] hover:scale-[1.01] md:-ml-[1px] lg:min-h-[120px] lg:items-stretch lg:justify-center lg:flex-col"
+                  class="field-card flex h-full min-h-[120px] flex-col justify-between rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-7 py-7 shadow-[var(--shadow-level-1)] hover:shadow-[var(--shadow-level-2)] hover:scale-[1.01] md:-ml-[1px] lg:min-h-[120px] lg:min-w-[180px] lg:!px-4 lg:items-stretch lg:justify-center lg:flex-col"
                 >
                   <button
                     aria-busy="false"
@@ -531,10 +531,10 @@ exports[`Hero date picker > captures a stable mobile viewport snapshot > date-pi
     class="fixed inset-0 pointer-events-none bg-transparent z-[90]"
   />
   <div
-    aria-labelledby=":rh:"
+    aria-labelledby="_r_h_"
     aria-modal="true"
     class="booking-calendar-popover absolute z-[95] rounded-[20px] border border-[var(--border-subtle)] bg-[var(--bg-surface)] shadow-[0_32px_96px_rgba(15,23,42,0.12),0_16px_48px_rgba(15,23,42,0.08)]"
-    id=":rg:"
+    id="_r_g_"
     role="dialog"
     style="top: 230px; left: 12px; width: auto; min-width: 366px; max-width: min(640px, calc(100vw - 48px));"
     tabindex="-1"
@@ -552,7 +552,7 @@ exports[`Hero date picker > captures a stable mobile viewport snapshot > date-pi
       >
         <p
           class="text-[17px] font-semibold text-[var(--text-primary)]"
-          id=":rh:"
+          id="_r_h_"
         >
           Choose your stay dates
         </p>
