@@ -50,6 +50,10 @@ export default defineConfig({
     strictPort: true,
     headers: {
       "Referrer-Policy": "strict-origin-when-cross-origin",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+      "X-Content-Type-Options": "nosniff",
+      "X-Frame-Options": "DENY",
+      "Permissions-Policy": "geolocation=(), microphone=(), camera=()",
     },
     proxy: {
       "/listings": { target: BACKEND_TARGET, changeOrigin: true, secure: false },
