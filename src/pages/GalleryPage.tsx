@@ -1,4 +1,3 @@
-/* eslint-disable atlas-brand/no-atlas-string-leak -- TODO Task 16: replace with per-tenant content */
 import { useMemo, useState } from "react";
 import SEO from "../components/SEO";
 import { LOGO_URL } from "../config/branding";
