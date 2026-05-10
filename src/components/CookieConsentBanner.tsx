@@ -6,7 +6,7 @@ import {
   type CookieConsentRecord,
 } from "../utils/cookieConsent";
 import { getTenantContext } from "../tenant/tenantContext";
-import { getTenantBrandName } from "../tenant/displayBrand";
+import { getGuestDataProcessingEntityName } from "../tenant/displayBrand";
 import { getTenantOverrides } from "../tenant/tenantOverrides"; // TASK-1877
 
 // DPDP-compliant cookie consent banner.
@@ -45,8 +45,12 @@ const CookieConsentBanner = () => {
   const cookieBannerOverride = tenantOverrides.cookieBanner;
 
   const bannerTitle = cookieBannerOverride?.title ?? "Your privacy choice";
+  // Marketplace apex resolves to "Atlas Homestays" (full brand baseline); white-label tenants
+  // use legal/long brand from context. Aligns with cookie-consent-compliance.e2e.spec.ts which
+  // asserts banner copy starts with "Atlas Homestays uses" on the marketplace and
+  // "Star Guest House uses" on tenant subdomains.
   const bannerText = cookieBannerOverride?.text ??
-    `${getTenantBrandName()} uses strictly necessary cookies to make this site work, and optional analytics cookies ` +
+    `${getGuestDataProcessingEntityName()} uses strictly necessary cookies to make this site work, and optional analytics cookies ` +
     "to understand how it is used. Under India’s DPDP Act 2023 we ask for your consent " +
     "before loading anything non-essential. Read our";
   const privacyUrl = cookieBannerOverride?.privacyUrl ?? "/privacy";
