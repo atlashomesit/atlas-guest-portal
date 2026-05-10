@@ -11,6 +11,10 @@ useDefault = true
 paths = [
   '''(?i)docs/agents/reports/.*\.md$''',
   '''(?i)^index\.html$''',
+  # Public-by-design runtime config: contains the client-side Google Maps API
+  # key which browsers must read. Key is restricted to atlashomestays.com /
+  # atlastays.com / localhost referrers in GCP, so exposure is harmless.
+  '''(?i)^public/\.well-known/atlas-runtime-config\.json$''',
 ]
 
 [[rules]]
