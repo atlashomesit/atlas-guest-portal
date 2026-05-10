@@ -38,6 +38,11 @@ const staticUrls = [
   "/policies",
   "/privacy",
   "/blog",
+  // TASK-1479: SEO city landing pages
+  "/homestays-in-goa",
+  "/homestays-in-coorg",
+  "/homestays-in-hyderabad",
+  "/homestays-in-manali",
 ];
 
 const listingUrls = propertyData
