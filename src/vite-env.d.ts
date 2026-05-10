@@ -1,6 +1,10 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
+  /** Admin PMS URL for host signup CTAs (e.g. https://app.atlaspms.in). */
+  readonly VITE_ADMIN_PORTAL_URL?: string;
+  /** Canonical origin for JSON-LD when not running in a browser (e.g. https://guest.example.com). */
+  readonly VITE_PUBLIC_SITE_ORIGIN?: string;
   readonly VITE_CALLBACK_LEADS_ENDPOINT?: string;
   readonly VITE_CHAT_API_URL?: string;
   readonly VITE_ATLAS_AUTH_KEY?: string;

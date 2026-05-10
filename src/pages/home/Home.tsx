@@ -24,6 +24,7 @@ import { Link, useLocation } from "react-router-dom";
 import FaqHighlights from "../../components/faq/FaqHighlights";
 import pricingConfig from "../../config/pricing.config";
 import { getEffectiveDiscountPercent } from "../../utils/pricing";
+import { getPublicSiteOrigin } from "../../config/siteOrigin";
 
 const Home = () => {
     const { pendingScrollTarget, setPendingScrollTarget } = useBooking();
@@ -59,12 +60,9 @@ const Home = () => {
     );
 
     const faqHighlights = getFaqHighlights();
-    // CPO-007: derive canonical from the actual host the page is served on so tenant subdomains
-    // emit the right URL in JSON-LD instead of leaking a hardcoded one.
-    const canonicalUrl =
-        typeof window !== "undefined" && window.location?.origin
-            ? `${window.location.origin}/`
-            : "https://atlashomestays.com/";
+    // CPO-007: derive canonical from the actual host (or VITE_PUBLIC_SITE_ORIGIN for SSR) so tenant
+    // subdomains emit the right URL in JSON-LD instead of defaulting to the marketplace domain.
+    const canonicalUrl = `${getPublicSiteOrigin()}/`;
     // Atlas social handles only published as sameAs when running under the Atlas brand.
     const atlasSocialSameAs = [
         "https://www.facebook.com/profile.php?id=100040632723189",

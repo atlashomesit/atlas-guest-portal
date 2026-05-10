@@ -477,7 +477,7 @@ const BecomeHost = () => {
                 to set up pricing, upload photos, and go live.
               </Typography>
               <a
-                href={`${import.meta.env.VITE_ADMIN_PORTAL_URL || "https://app.atlaspms.in"}/onboarding/setup?auto_login=1`}
+                href={`${(import.meta.env.VITE_ADMIN_PORTAL_URL as string | undefined)?.trim() || "https://app.atlaspms.in"}/onboarding/setup?auto_login=1`}
                 style={styles.adminLink}
               >
                 Open Admin Portal
@@ -1109,8 +1109,8 @@ const BecomeHost = () => {
           Already a host?{" "}
           <a
             href={
-              import.meta.env.VITE_ADMIN_PORTAL_URL ||
-              "https://admin.atlashomestays.com"
+              (import.meta.env.VITE_ADMIN_PORTAL_URL as string | undefined)?.trim() ||
+              "https://app.atlaspms.in"
             }
             style={{ color: "var(--cta-primary, #2563eb)", fontWeight: 600 }}
           >
