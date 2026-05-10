@@ -4,6 +4,7 @@ import path from "path";
 import fs from "fs";
 
 const RUNTIME_CONFIG_PATH = path.resolve(__dirname, "public/.well-known/atlas-runtime-config.json");
+const MANIFEST_PATH = path.resolve(__dirname, "public/manifest.webmanifest");
 const BACKEND_TARGET = "http://localhost:5120";
 
 /** In dev, serve runtime config with apiBaseUrl = 5120 (API only). */
@@ -32,10 +33,42 @@ function devRuntimeConfigPlugin() {
   };
 }
 
+/**
+ * Serve `/manifest.json` as an alias for `/manifest.webmanifest` with an
+ * explicit `application/json` Content-Type. PWA tooling and several E2E
+ * checks expect this canonical path; without the alias, Vite falls back to
+ * the SPA's `index.html` and the response masquerades as `text/html`.
+ */
+function devManifestJsonAliasPlugin() {
+  return {
+    name: "dev-manifest-json-alias",
+    configureServer(server: { middlewares: { use: (fn: (req: any, res: any, next: () => void) => void) => void } }) {
+      server.middlewares.use((req, res, next) => {
+        const url = req.url?.split("?")[0];
+        if (url !== "/manifest.json") {
+          return next();
+        }
+        try {
+          const raw = fs.readFileSync(MANIFEST_PATH, "utf-8");
+          // Round-trip parse so we ship strict JSON (no comments / trailing commas).
+          const parsed = JSON.parse(raw);
+          res.setHeader("Content-Type", "application/json; charset=utf-8");
+          res.setHeader("Cache-Control", "no-cache");
+          res.end(JSON.stringify(parsed));
+        } catch {
+          // Fall through to the default 404/SPA handler if the manifest is missing.
+          return next();
+        }
+      });
+    },
+  };
+}
+
 export default defineConfig({
   plugins: [
     react(),
     devRuntimeConfigPlugin(),
+    devManifestJsonAliasPlugin(),
   ],
   envPrefix: ["VITE_", "NEXT_PUBLIC_"],
   resolve: {
