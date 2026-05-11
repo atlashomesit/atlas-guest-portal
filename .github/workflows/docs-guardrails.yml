@@ -46,5 +46,5 @@ jobs:
 
       - name: Spell check (changed files only)
         if: steps.changed.outputs.files != ''
-        run: npx --yes cspell lint -c ./cspell.json ${{ steps.changed.outputs.files }}
+        run: npx --yes cspell lint --no-must-find-files -c ./cspell.json ${{ steps.changed.outputs.files }}
 
