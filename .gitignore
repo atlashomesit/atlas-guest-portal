@@ -16,3 +16,7 @@ _worker.bundle/
 _worker.bundledesktop.ini
 *.ini
 eslint-violations.json
+
+# Local preview worktrees and divergence-resolution scratch (see `git worktree list`)
+atlas-guest-portal-preview-*/
+cherry-picks-*.txt
