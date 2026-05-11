@@ -28,9 +28,9 @@ const Parallax: React.FC<ParallaxProps> = ({ image, title, description, overlayO
                 }}
             >
                 <div className="flex flex-col gap-4 md:gap-10 text-[color:var(--text-contrast)] w-[95%] md:w-[70%] drop-shadow-[0_10px_24px_color-mix(in_srgb,var(--text-primary)_30%,transparent)]">
-                    <h1 className="text-2xl lg:text-5xl font-bold mb-4 leading-tight text-balance">
+                    <h2 className="text-2xl lg:text-5xl font-bold mb-4 leading-tight text-balance">
                         {title}
-                    </h1>
+                    </h2>
                     <p className="text-base lg:text-xl leading-relaxed">
                         {description}
                     </p>
