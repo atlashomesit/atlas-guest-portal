@@ -10,6 +10,12 @@ dist/
 # Local dev logs
 *.log
 
+# Local preview build snapshots (operator scratch from wrangler/vite preview)
+/atlas-guest-portal-preview-*/
+
+# Cherry-pick session scratch (one-off operator artifacts)
+/cherry-picks-*.txt
+
 # Wrangler Pages Functions build output (regenerate via wrangler / CI; do not commit)
 _worker.bundle
 _worker.bundle/
