@@ -39,6 +39,7 @@ export default defineConfig({
       "**/dist/**",
       "**/cypress/**",
       "**/.{idea,git,cache,output,temp}/**",
+      "**/*-preview-*/**",
       "**/{karma,rollup,webpack,vite,vitest,jest,ava,babel,nyc,cypress,tsup,build,eslint,prettier}.config.*",
       "tests/propertyDetailsRouteSmoke.test.tsx",
       "tests/PropertyDetailsMedia.test.tsx",
