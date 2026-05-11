@@ -26,7 +26,16 @@
 }
 
 .btn-chip {
-  @apply inline-flex items-center gap-2 px-4 py-2 rounded-full bg-bg-surface border border-border-subtle text-text-primary font-semibold shadow-level1 transition;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 9999px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-weight: 600;
+  transition: all 150ms ease;
   box-shadow: var(--shadow-level-1);
 }
 
@@ -37,7 +46,8 @@
 }
 
 .btn-chip--active {
-  @apply border-cta-primary text-cta-primary;
+  border-color: var(--cta-primary);
+  color: var(--cta-primary);
 }
 
 /* ============================================

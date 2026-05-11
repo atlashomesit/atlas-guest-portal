@@ -28,6 +28,7 @@ const SupportDrawerViewContext = createContext<SupportDrawerViewContextValue | n
 
 interface SupportDrawerProps {
   bottomSpacing: string;
+  brandName: string;
   children: ReactNode;
   enableCloseReassurance?: boolean;
   layoutVariant?: SupportDrawerLayoutVariant;
@@ -45,6 +46,7 @@ const SUPPORT_DRAWER_SPACING = {
 
 const SupportDrawer = ({
   bottomSpacing,
+  brandName,
   children,
   enableCloseReassurance,
   layoutVariant,
@@ -134,8 +136,8 @@ const SupportDrawer = ({
       >
         <div className="flex items-start justify-between gap-[var(--drawer-section-gap,0.75rem)] bg-[color-mix(in_srgb,var(--bg-surface)_96%,#f2efe8_18%)] px-[var(--drawer-card-padding-inline,1rem)] py-[var(--drawer-card-padding-block,0.75rem)]">
           <div className="flex flex-col gap-0.5">
-            <p className="text-sm font-semibold text-text-primary">{SUPPORT_DRAWER_COPY.header.title}</p>
-            <p className="text-xs text-text-muted">{SUPPORT_DRAWER_COPY.header.subtitle}</p>
+            <p className="text-sm font-semibold text-text-primary">{SUPPORT_DRAWER_COPY.header.title(brandName)}</p>
+            <p className="text-xs text-text-muted">{SUPPORT_DRAWER_COPY.header.subtitle(brandName)}</p>
           </div>
           <div className="flex flex-col items-end gap-1">
             <button

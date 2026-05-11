@@ -19,6 +19,7 @@ import { getTenantContext } from "../../../tenant/tenantContext";
 import { getTenantBrandName } from "../../../tenant/displayBrand";
 import { getTenantOverrides, getUnitNoun, shouldHideAtlasBranding, type TenantOverrides } from "../../../tenant/tenantOverrides";
 import { useCurrency } from "../../../contexts/CurrencyContext";
+import { formatListingTitle } from "../../../utils/formatListingTitle";
 
 import "./homepage_location.css";
 
@@ -341,7 +342,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
               <OptimizedImage
                 key={`${heroModel.listing.id}-${activeImageIndex[heroModel.listing.id] ?? 0}`}
                 src={heroModel.images[activeImageIndex[heroModel.listing.id] ?? 0] ?? ""}
-                alt={heroModel.listing.title}
+                alt={formatListingTitle(heroModel.listing.title)}
                 className="w-full h-full object-cover min-h-[280px]"
                 wrapperClassName="h-full"
                 sizes="(max-width: 1023px) 100vw, 50vw"
@@ -434,7 +435,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
                 {!hideAtlasBranding && (
                   <p className="text-sm font-semibold uppercase tracking-wide text-text-muted">{getTenantBrandName()}</p>
                 )}
-                <h3 className="text-3xl font-bold text-text-primary">{heroModel.listing.title}</h3>
+                <h3 className="text-3xl font-bold text-text-primary">{formatListingTitle(heroModel.listing.title)}</h3>
                 {heroModel.listing.subtitle && (
                   <p className="text-base text-text-secondary mt-1">{heroModel.listing.subtitle}</p>
                 )}
@@ -478,7 +479,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
                     <OptimizedImage
                       key={`${model.listing.id}-${activeIndex}`}
                       src={imageSrc}
-                      alt={model.listing.title}
+                      alt={formatListingTitle(model.listing.title)}
                       className="w-full h-full object-cover"
                       wrapperClassName="h-full"
                       sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
@@ -557,7 +558,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
                       {!hideAtlasBranding && (
                         <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">{getTenantBrandName()}</p>
                       )}
-                      <h3 className="text-lg font-semibold text-text-primary">{model.listing.title}</h3>
+                      <h3 className="text-lg font-semibold text-text-primary">{formatListingTitle(model.listing.title)}</h3>
                       {model.listing.subtitle && (
                         <p className="text-sm text-text-secondary mt-1">{model.listing.subtitle}</p>
                       )}

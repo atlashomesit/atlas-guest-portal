@@ -33,6 +33,7 @@ import SEO from '../../SEO';
 import { buildApiUrl, getApiHeaders } from '../../../api/client';
 import { addRecentlyViewed, isFavorite, toggleFavorite } from '../../../utils/guestHistory';
 import { formatCurrency, formatHumanDate } from '../../../utils/formatting';
+import { formatListingTitle } from '../../../utils/formatListingTitle';
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
 import SkeletonCard from '../../apartments/SkeletonCard';
 import { ILLUSTRATIVE_OTA_GUEST_FEE_PERCENT } from '@/utils/directBookingPromo';
@@ -153,6 +154,8 @@ interface Property {
     virtualTourUrl?: string | null;
     /** TASK-1385: Cancellation policy tier from listing — Flexible, Moderate, or Strict. */
     cancellationTier?: 'Flexible' | 'Moderate' | 'Strict' | null;
+    /** TASK-1974: security deposit amount from listing API for checkout disclosure. */
+    securityDepositAmount?: number | null;
 }
 
 /** TASK-1664: row shape from `GET /api/listings/{id}/reviews` (camelCase JSON). */
@@ -436,6 +439,11 @@ const PropertyDetails = () => {
                     if (filterGuestImageUrls(prev.property_img ?? []).length === 0 && hydratedImages.length > 0) {
                         updates.property_img = hydratedImages;
                     }
+                    const rawSd = d.securityDepositAmount ?? d.SecurityDepositAmount;
+                    const sd = typeof rawSd === 'number' && Number.isFinite(rawSd) && rawSd > 0 ? rawSd : null;
+                    if (sd != null && prev.securityDepositAmount == null) {
+                        updates.securityDepositAmount = sd;
+                    }
                     return Object.keys(updates).length > 0 ? { ...prev, ...updates } : prev;
                 });
             })
@@ -660,7 +668,7 @@ const PropertyDetails = () => {
                         listingId: listingNumericId,
                         property_name: (apiListing.name as string) ?? `Listing ${apiListing.id}`,
                         property_img: photoUrlsList.length > 0 ? photoUrlsList : (coverUrl ? [coverUrl] : []),
-                        property_location: (apiListing as Record<string, unknown>).property_location as string ?? 'Location not specified',
+                        property_location: ((apiListing as Record<string, unknown>).property_location as string) ?? streetFromApi ?? 'Location not specified',
                         property_neighborhoods: Array.isArray((apiListing as Record<string, unknown>).property_neighborhoods) ? (apiListing as Record<string, unknown>).property_neighborhoods as string[] : [],
                         property_amenities: Array.isArray((apiListing as Record<string, unknown>).property_amenities) ? (apiListing as Record<string, unknown>).property_amenities as PropertyAmenity[] : [],
                         property_description: (apiListing as Record<string, unknown>).property_description as string ?? '',
@@ -886,7 +894,7 @@ useEffect(() => {
             {
                 '@context': 'https://schema.org',
                 '@type': 'LodgingBusiness',
-                name: data.property_name,
+                name: formatListingTitle(data.property_name),
                 description: data.property_description?.slice(0, 300),
                 image: primaryImageForLd,
                 url: pageUrlForLd,
@@ -938,7 +946,7 @@ useEffect(() => {
                       {
                           '@context': 'https://schema.org',
                           '@type': 'Place',
-                          name: data.property_name,
+                          name: formatListingTitle(data.property_name),
                           description: data.property_description?.slice(0, 300),
                           url: pageUrlForLd,
                       },
@@ -1043,8 +1051,8 @@ useEffect(() => {
         <>
         {data && (
             <SEO
-                title={`${data.property_name} | ${_getTenantCtx()?.name ?? 'Our Property'}`}
-                description={data.property_description?.slice(0, 160) || `Book ${data.property_name} in ${data.property_location || 'Hyderabad'} on ${_getTenantCtx()?.name ?? 'our platform'}.`}
+                title={`${formatListingTitle(data.property_name)} | ${_getTenantCtx()?.name ?? 'Our Property'}`}
+                description={data.property_description?.slice(0, 160) || `Book ${formatListingTitle(data.property_name)} in ${data.property_location || 'Hyderabad'} on ${_getTenantCtx()?.name ?? 'our platform'}.`}
                 image={primaryImage}
                 url={pageUrl}
                 type="lodgingBusiness"
@@ -1073,7 +1081,7 @@ useEffect(() => {
                 <div className="">
                     <div className="mb-2 flex flex-wrap items-start justify-between gap-3">
                         <h1 className="min-w-0 flex-1 text-2xl sm:text-3xl font-semibold capitalize text-text-primary">
-                            {data?.property_name}
+                            {formatListingTitle(data?.property_name)}
                         </h1>
                         <div className="flex shrink-0 items-center gap-1">
                             <button
@@ -1094,7 +1102,7 @@ useEffect(() => {
                                 onClick={() => {
                                     const url = window.location.href;
                                     const priceText = data?.property_price && data.property_price > 0 ? ` from ₹${data.property_price}/night` : '';
-                                    const text = `Check out ${data?.property_name ?? 'this home'}${priceText} on ${_getTenantCtx()?.name ?? 'our platform'}`;
+                                    const text = `Check out ${formatListingTitle(data?.property_name) || 'this home'}${priceText} on ${_getTenantCtx()?.name ?? 'our platform'}`;
                                     const share = async () => {
                                         const nav: any = navigator;
                                         if (nav?.share) return nav.share({ title: document.title, text, url });
@@ -1195,7 +1203,7 @@ useEffect(() => {
                                 shareNightly > 0
                                     ? ` from ₹${shareNightly.toLocaleString('en-IN')}/night`
                                     : '';
-                            const shareText = `Check out ${data?.property_name ?? 'this home'}${priceText}: ${window.location.href}`;
+                            const shareText = `Check out ${formatListingTitle(data?.property_name) || 'this home'}${priceText}: ${window.location.href}`;
                             return `https://wa.me/?text=${encodeURIComponent(shareText)}`;
                         })()}
                         target="_blank"
@@ -1264,7 +1272,7 @@ useEffect(() => {
       <a href={galleryUrls[0]} data-fancybox="property-gallery">
         <img
           src={galleryUrls[0]}
-          alt={data?.property_name ? `${data.property_name} photo` : "Main property photo"}
+          alt={data?.property_name ? `${formatListingTitle(data.property_name)} photo` : "Main property photo"}
           loading="eager"
           decoding="async"
           {...({ fetchpriority: "high" } as { fetchpriority: string })}
@@ -1298,7 +1306,7 @@ useEffect(() => {
         <a href={img} data-fancybox="property-gallery">
           <img
             src={img}
-            alt={data?.property_name ? `${data.property_name} photo ${index + 2}` : `Property photo ${index + 2}`}
+            alt={data?.property_name ? `${formatListingTitle(data.property_name)} photo ${index + 2}` : `Property photo ${index + 2}`}
             loading="lazy"
             decoding="async"
             sizes="(min-width: 1024px) 25vw, 50vw"
@@ -1462,7 +1470,7 @@ useEffect(() => {
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         {s.items.slice(0, 4).map((it: any) => {
                                             const id = Number(it.id);
-                                            const name = String(it.name ?? it.propertyName ?? `Listing ${it.id}`);
+                                            const name = formatListingTitle(String(it.name ?? it.propertyName ?? '')) || `Listing ${it.id}`;
                                             const img = (it.coverPhotoUrl as string | undefined) ?? (Array.isArray(it.photoUrls) ? it.photoUrls[0] : undefined);
                                             const path = buildHomeUnitPath(getPropertySlug({ name: it.propertyName, property_name: it.propertyName }), id);
                                             return (
@@ -1709,10 +1717,11 @@ useEffect(() => {
                                 <UnitBookingWidget
                                     listingId={resolvedListingId ?? undefined}
                                     propertyId={listingPropertyId ?? undefined}
-                                    listingName={data.property_name || 'This property'}
+                                    listingName={formatListingTitle(data.property_name) || 'This property'}
                                     timezoneId={data.timezoneId}
                                     coverPhotoUrl={primaryImage}
                                     maxGuests={data.maxGuests}
+                                    securityDepositAmount={data.securityDepositAmount ?? null}
                                 />
                             </Suspense>
                             <div className="mt-3 flex flex-wrap gap-2">
@@ -1757,7 +1766,7 @@ useEffect(() => {
                                 return (
                                     <div className="mt-3">
                                         <a
-                                            href={`https://wa.me/${phoneToUse}?text=Hi%2C%20I'm%20interested%20in%20booking%20${encodeURIComponent(data.property_name || 'this property')}`}
+                                            href={`https://wa.me/${phoneToUse}?text=Hi%2C%20I'm%20interested%20in%20booking%20${encodeURIComponent(formatListingTitle(data.property_name) || 'this property')}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             data-testid="chat-with-host-btn"

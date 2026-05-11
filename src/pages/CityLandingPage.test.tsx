@@ -52,5 +52,6 @@ describe("CityLandingPage", () => {
 
     expect(screen.getByText(/Garden-view room/i)).toBeInTheDocument();
     expect(fetchPublicListings).toHaveBeenCalledTimes(1);
+    expect(fetchPublicListings).toHaveBeenCalledWith(expect.objectContaining({ city: "goa" }));
   });
 });

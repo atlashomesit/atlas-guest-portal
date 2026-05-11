@@ -59,6 +59,8 @@ interface UnitBookingWidgetProps {
   maxGuests?: number;
   /** Optional host WhatsApp/phone for payment-failure support CTA. */
   hostPhone?: string | null;
+  /** TASK-1974: listing security deposit (INR); when greater than zero, guest must confirm before Razorpay order. */
+  securityDepositAmount?: number | null;
 }
 
 const PENDING_PAYMENT_KEY = 'atlas_pending_razorpay_order';
@@ -121,6 +123,9 @@ function getBookingErrorMessage(error: unknown, context: 'order' | 'verify'): st
   if (lower.includes('consent') && lower.includes('booking')) {
     return 'Please accept the data processing consent below and try again.';
   }
+  if (lower.includes('security_deposit_consent_required') || lower.includes('security deposit')) {
+    return 'Please confirm the refundable security deposit below and try again.';
+  }
   return context === 'order'
     ? 'We couldn\'t start checkout. Please check your dates and try again, or contact support.'
     : 'Payment verification failed. Please contact support with your payment ID.';
@@ -151,6 +156,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   coverPhotoUrl,
   maxGuests = 16,
   hostPhone,
+  securityDepositAmount,
 }) => {
   if (import.meta.env.DEV) {
     console.assert(Boolean(propertyId), '[UnitBookingWidget] propertyId is required for unit mode');
@@ -171,6 +177,15 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     tenantBookingMode === 'WHATSAPP' &&
     typeof tenantWhatsappPhone === 'string' &&
     tenantWhatsappPhone.length >= 6;
+
+  const depositRequired =
+    typeof securityDepositAmount === 'number' &&
+    Number.isFinite(securityDepositAmount) &&
+    securityDepositAmount > 0;
+
+  useEffect(() => {
+    setSecurityDepositAccepted(false);
+  }, [listingId, securityDepositAmount]);
 
   const coverFromPublicListings = useMemo(() => {
     const id = listingId != null ? Number(listingId) : NaN;
@@ -241,6 +256,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     setFormData((prev) => ({ ...prev, phone: clampNationalDigits(prev.phone, dial.maxDigits) }));
   }, [phoneDialCode]);
   const [guestConsentAccepted, setGuestConsentAccepted] = useState(false);
+  const [securityDepositAccepted, setSecurityDepositAccepted] = useState(false);
   const [consentError, setConsentError] = useState('');
   const [referralCode, setReferralCode] = useState('');
   const [appliedReferralCode, setAppliedReferralCode] = useState<string | null>(null);
@@ -974,6 +990,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       setConsentError('');
     }
 
+    if (depositRequired && !securityDepositAccepted) {
+      setFormError('Please confirm the refundable security deposit below.');
+      isValid = false;
+    }
+
     setFormErrors(errors);
     return isValid;
   };
@@ -1334,7 +1355,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         currency: 'INR',
         referralCode: referralCode.trim() ? referralCode.trim().slice(0, 32) : undefined,
         promoCode: promoCode.trim() ? promoCode.trim().slice(0, 32) : undefined,
-        guestConsentAccepted: true,
+        guestConsentAccepted,
+        securityDepositAccepted: depositRequired ? securityDepositAccepted : true,
         guestInfo: {
           name: formData.name.trim(),
           email: formData.email.trim(),
@@ -2611,6 +2633,29 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           />
           <p className="text-xs text-text-muted">{formData.notes.length}/500</p>
         </div>
+
+        {depositRequired && (
+          <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50/50 px-4 py-3">
+            <label className="flex items-start gap-3 cursor-pointer text-sm text-text-primary">
+              <input
+                type="checkbox"
+                name="securityDepositAck"
+                checked={securityDepositAccepted}
+                onChange={(e) => {
+                  setSecurityDepositAccepted(e.target.checked);
+                  if (e.target.checked) setFormError(null);
+                }}
+                disabled={isBookingDisabled}
+                className="mt-1 h-4 w-4 shrink-0 rounded border-border-strong text-cta-primary focus:ring-cta-primary"
+                data-testid="guest-booking-security-deposit-consent"
+              />
+              <span>
+                I understand a <strong>{formatCurrency(Math.round(securityDepositAmount ?? 0), { maximumFractionDigits: 0 })}</strong> refundable
+                security deposit may be collected for this stay, typically released within 3 business days after checkout if no damage claim is filed.
+              </span>
+            </label>
+          </div>
+        )}
 
         <div className="space-y-2 rounded-xl border border-border-subtle bg-bg-muted/40 px-4 py-3">
           <label className="flex items-start gap-3 cursor-pointer text-sm text-text-primary">

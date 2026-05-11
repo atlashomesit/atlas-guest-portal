@@ -11,6 +11,10 @@ useDefault = true
 paths = [
   '''(?i)docs/agents/reports/.*\.md$''',
   '''(?i)^index\.html$''',
+  # Public-by-design runtime config: contains the client-side Google Maps API
+  # key which browsers must read. Key is restricted to atlashomestays.com /
+  # atlastays.com / localhost referrers in GCP, so exposure is harmless.
+  '''(?i)^public/\.well-known/atlas-runtime-config\.json$''',
 ]
 
 [[rules]]
@@ -42,6 +46,15 @@ regex = '''(?i)https://atlas-api[^\s/]*\.azurewebsites\.net[^\n]{0,400}Bearer\s+
 id = "atlas-sql-password-assignment"
 description = "SQL Password or pwd assignment in connection text."
 regex = '''(?i)(Password|pwd)\s*=\s*[^;\s'"]{6,}'''
+[rules.allowlist]
+description = "Exclude env-var reads (TypeScript / .NET) and config-key string literals — those aren't leaked secrets."
+regexTarget = "line"
+regexes = [
+  '''process\.env\.''',
+  '''Environment\.GetEnvironmentVariable''',
+  '''GetSection\(''',
+  '''Configuration\[''',
+]
 
 [[rules]]
 id = "atlas-azure-storage-sas-signature"

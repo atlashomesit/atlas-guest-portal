@@ -77,6 +77,8 @@ type CombinedListing = {
   /** TASK-1695: LOS auto-discount tier 2. */
   losDiscount2MinNights?: number | null;
   losDiscount2Percent?: number | null;
+  /** TASK-1982: optional 1★–5★ review counts from public API. */
+  ratingStarCounts?: number[] | null;
 };
 
 const derivePropertyType = (name?: string): string => {
@@ -609,6 +611,7 @@ export const Apartments = () => {
                   losDiscountPercent={listing.losDiscountPercent}
                   losDiscount2MinNights={listing.losDiscount2MinNights}
                   losDiscount2Percent={listing.losDiscount2Percent}
+                  ratingStarCounts={listing.ratingStarCounts ?? undefined}
                   directBookingDiscountPercent={directBookingDiscountPercent}
                   onClick={() => handleNavigate(listing.property)}
                 />

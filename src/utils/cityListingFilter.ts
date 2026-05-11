@@ -1,8 +1,8 @@
 import type { PublicListing } from "@/api/listingClient";
 
 /**
- * TASK-1479: `GET /listings/public` does not yet support `?city=` — match listings client-side
- * using address and titles against curated keywords for each destination.
+ * TASK-1479 / TASK-2212: optional second pass after `GET /listings/public?city=…` — align cards with
+ * curated destination keywords (address + titles) so SEO copy and grid stay consistent.
  */
 export function listingMatchesCityKeywords(
   listing: PublicListing,
