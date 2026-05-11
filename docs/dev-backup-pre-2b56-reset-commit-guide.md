@@ -32,8 +32,8 @@ Bumps [react](https://github.com/facebook/react/tree/HEAD/packages/react) and [@
 ### Files changed (name-status)
 
 ```text
-M	package-lock.json
-M	package.json
+M  package-lock.json
+M  package.json
 ```
 
 ### Diff statistics
@@ -64,8 +64,8 @@ Bumps [tailwindcss](https://github.com/tailwindlabs/tailwindcss/tree/HEAD/packag
 ### Files changed (name-status)
 
 ```text
-M	package-lock.json
-M	package.json
+M  package-lock.json
+M  package.json
 ```
 
 ### Diff statistics
@@ -96,8 +96,8 @@ Bumps [react-router-dom](https://github.com/remix-run/react-router/tree/HEAD/pac
 ### Files changed (name-status)
 
 ```text
-M	package-lock.json
-M	package.json
+M  package-lock.json
+M  package.json
 ```
 
 ### Diff statistics
@@ -128,7 +128,7 @@ Recovered from atlas-guest-portal stash@{0} dated 2026-04-25 17:09. Adds: - Lodg
 ### Files changed (name-status)
 
 ```text
-M	index.html
+M  index.html
 ```
 
 ### Diff statistics
@@ -158,118 +158,118 @@ chore(deps): bump react and @types/react
 ### Files changed (name-status)
 
 ```text
-M	package-lock.json
-M	package.json
-M	.env.example
-M	.github/dependabot.yml
-M	.github/workflows/ci.yml
-M	.github/workflows/docs-guardrails.yml
-M	.github/workflows/lockfile-guard.yml
-A	.github/workflows/secret-scan.yml
-M	.github/workflows/sri-check.yml
-M	.github/workflows/vulnerability-scan.yml
-A	.gitleaks.toml
-A	.markdownlint.json
-M	AGENTS.md
-A	docs/security/secret-rotation.md
-M	package-lock.json
-M	package.json
-M	public/.well-known/atlas-runtime-config.json
-D	public/be/asset-manifest.json
-D	public/be/favicon.ico
-D	public/be/index.html
-D	public/be/logo192.f181800b.webp
-D	public/be/logo192.png
-D	public/be/logo512.f181800b.webp
-D	public/be/logo512.png
-D	public/be/manifest.json
-D	public/be/robots.txt
-D	public/be/static/css/main.5a8b9a96.css
-D	public/be/static/css/main.5a8b9a96.css.map
-D	public/be/static/js/453.cc1bb556.chunk.js
-D	public/be/static/js/453.cc1bb556.chunk.js.map
-D	public/be/static/js/main.caa69fb1.css
-D	public/be/static/js/main.caa69fb1.css.map
-D	public/be/static/js/main.caa69fb1.js
-D	public/be/static/js/main.caa69fb1.js.LICENSE.txt
-D	public/be/static/js/main.caa69fb1.js.map
-M	public/sitemap.xml
-D	public/static/css/main.a475c3c1.css
-D	public/static/css/main.a475c3c1.css.map
-D	public/static/js/787.a9ed2b2b.chunk.js
-D	public/static/js/787.a9ed2b2b.chunk.js.map
-D	public/static/js/main.0f16a38a.js
-D	public/static/js/main.0f16a38a.js.LICENSE.txt
-D	public/static/js/main.0f16a38a.js.map
-A	public/sw-register.js
-A	public/sw.js
-M	src/App.tsx
-D	src/components/CookieConsent (1).tsx
-M	src/components/CookieConsent.tsx
-M	src/components/CookieConsentBanner.tsx
-D	src/components/RecentlyViewedStrip (1).tsx
-M	src/components/ShortLinkRedirect.tsx
-M	src/components/VirtualTourSection.tsx
-M	src/components/apartments/ListingCard.tsx
-M	src/components/availability/UnitBookingWidget.tsx
-M	src/components/home/BannerSecondary.tsx
-M	src/components/home/ServicesSection.tsx
-M	src/components/home/TestimonialsSection.tsx
-M	src/components/homepage_components/homepage_Propertydetails/Homepage_PropertyDetails.tsx
-M	src/components/homepage_components/homepage_exclusiveservice/ExclusiveService_Card.tsx
-M	src/components/homepage_components/homepage_locations/HomePage_Locations.tsx
-M	src/components/homepage_components/slider/Slider.tsx
-D	src/components/search/SearchResultsMap (1).tsx
-M	src/config/homepageUxFlags.ts
-A	src/config/siteOrigin.ts
-A	src/content/cities/cityLandingSlugs.ts
-A	src/content/cities/coorg.json
-A	src/content/cities/goa.json
-A	src/content/cities/hyderabad.json
-A	src/content/cities/manali.json
-M	src/content/terms.ts
-D	src/contexts/CurrencyContext (1).tsx
-D	src/hooks/useTenantListings (1).ts
-M	src/pages/AboutPage.tsx
-M	src/pages/Amenities.tsx
-M	src/pages/Apartments.tsx
-M	src/pages/BecomeHost.tsx
-M	src/pages/BookingConfirmationPage.tsx
-A	src/pages/CityLandingPage.test.tsx
-A	src/pages/CityLandingPage.tsx
-M	src/pages/CommunicationPreferences.tsx
-M	src/pages/FaqPage.tsx
-M	src/pages/FavoritesPage.tsx
-M	src/pages/GalleryPage.tsx
-D	src/pages/MarketplaceHomepage (1).tsx
-M	src/pages/MyBookingsPage.tsx
-M	src/pages/OffersPage.tsx
-M	src/pages/Policies.tsx
-M	src/pages/PrivacyPage.tsx
-M	src/pages/PrivacyPolicyPage.tsx
-M	src/pages/ProfilePage.tsx
-M	src/pages/RecentlyViewedPage.tsx
-M	src/pages/ReviewSubmitPage.tsx
-M	src/pages/SearchPage.tsx
-M	src/pages/SelfCheckIn.tsx
-M	src/pages/StubPage.tsx
-M	src/pages/home/Home.tsx
-M	src/pages/home/HomeDetails.tsx
-A	src/pages/home/homeDetailsJsonLd.test.ts
-A	src/pages/home/homeDetailsJsonLd.ts
-M	src/tenant/displayBrand.ts
-D	src/tenant/tenantOverrides (1).ts
-M	src/tenant/tenantOverrides.ts
-A	src/types/pannellum.d.ts
-A	src/utils/cityListingFilter.ts
-A	src/utils/directBookingPromo.ts
-D	src/utils/propertyDataUtils (1).ts
-D	src/utils/razorpayGuestErrors (1).ts
-D	src/utils/serverErrorFromResponse (1).ts
-M	src/vite-env.d.ts
-M	tools/generate-sitemap.mjs
-M	tools/optimize-images.mjs
-M	vite.config.ts
+M  package-lock.json
+M  package.json
+M  .env.example
+M  .github/dependabot.yml
+M  .github/workflows/ci.yml
+M  .github/workflows/docs-guardrails.yml
+M  .github/workflows/lockfile-guard.yml
+A  .github/workflows/secret-scan.yml
+M  .github/workflows/sri-check.yml
+M  .github/workflows/vulnerability-scan.yml
+A  .gitleaks.toml
+A  .markdownlint.json
+M  AGENTS.md
+A  docs/security/secret-rotation.md
+M  package-lock.json
+M  package.json
+M  public/.well-known/atlas-runtime-config.json
+D  public/be/asset-manifest.json
+D  public/be/favicon.ico
+D  public/be/index.html
+D  public/be/logo192.f181800b.webp
+D  public/be/logo192.png
+D  public/be/logo512.f181800b.webp
+D  public/be/logo512.png
+D  public/be/manifest.json
+D  public/be/robots.txt
+D  public/be/static/css/main.5a8b9a96.css
+D  public/be/static/css/main.5a8b9a96.css.map
+D  public/be/static/js/453.cc1bb556.chunk.js
+D  public/be/static/js/453.cc1bb556.chunk.js.map
+D  public/be/static/js/main.caa69fb1.css
+D  public/be/static/js/main.caa69fb1.css.map
+D  public/be/static/js/main.caa69fb1.js
+D  public/be/static/js/main.caa69fb1.js.LICENSE.txt
+D  public/be/static/js/main.caa69fb1.js.map
+M  public/sitemap.xml
+D  public/static/css/main.a475c3c1.css
+D  public/static/css/main.a475c3c1.css.map
+D  public/static/js/787.a9ed2b2b.chunk.js
+D  public/static/js/787.a9ed2b2b.chunk.js.map
+D  public/static/js/main.0f16a38a.js
+D  public/static/js/main.0f16a38a.js.LICENSE.txt
+D  public/static/js/main.0f16a38a.js.map
+A  public/sw-register.js
+A  public/sw.js
+M  src/App.tsx
+D  src/components/CookieConsent (1).tsx
+M  src/components/CookieConsent.tsx
+M  src/components/CookieConsentBanner.tsx
+D  src/components/RecentlyViewedStrip (1).tsx
+M  src/components/ShortLinkRedirect.tsx
+M  src/components/VirtualTourSection.tsx
+M  src/components/apartments/ListingCard.tsx
+M  src/components/availability/UnitBookingWidget.tsx
+M  src/components/home/BannerSecondary.tsx
+M  src/components/home/ServicesSection.tsx
+M  src/components/home/TestimonialsSection.tsx
+M  src/components/homepage_components/homepage_Propertydetails/Homepage_PropertyDetails.tsx
+M  src/components/homepage_components/homepage_exclusiveservice/ExclusiveService_Card.tsx
+M  src/components/homepage_components/homepage_locations/HomePage_Locations.tsx
+M  src/components/homepage_components/slider/Slider.tsx
+D  src/components/search/SearchResultsMap (1).tsx
+M  src/config/homepageUxFlags.ts
+A  src/config/siteOrigin.ts
+A  src/content/cities/cityLandingSlugs.ts
+A  src/content/cities/coorg.json
+A  src/content/cities/goa.json
+A  src/content/cities/hyderabad.json
+A  src/content/cities/manali.json
+M  src/content/terms.ts
+D  src/contexts/CurrencyContext (1).tsx
+D  src/hooks/useTenantListings (1).ts
+M  src/pages/AboutPage.tsx
+M  src/pages/Amenities.tsx
+M  src/pages/Apartments.tsx
+M  src/pages/BecomeHost.tsx
+M  src/pages/BookingConfirmationPage.tsx
+A  src/pages/CityLandingPage.test.tsx
+A  src/pages/CityLandingPage.tsx
+M  src/pages/CommunicationPreferences.tsx
+M  src/pages/FaqPage.tsx
+M  src/pages/FavoritesPage.tsx
+M  src/pages/GalleryPage.tsx
+D  src/pages/MarketplaceHomepage (1).tsx
+M  src/pages/MyBookingsPage.tsx
+M  src/pages/OffersPage.tsx
+M  src/pages/Policies.tsx
+M  src/pages/PrivacyPage.tsx
+M  src/pages/PrivacyPolicyPage.tsx
+M  src/pages/ProfilePage.tsx
+M  src/pages/RecentlyViewedPage.tsx
+M  src/pages/ReviewSubmitPage.tsx
+M  src/pages/SearchPage.tsx
+M  src/pages/SelfCheckIn.tsx
+M  src/pages/StubPage.tsx
+M  src/pages/home/Home.tsx
+M  src/pages/home/HomeDetails.tsx
+A  src/pages/home/homeDetailsJsonLd.test.ts
+A  src/pages/home/homeDetailsJsonLd.ts
+M  src/tenant/displayBrand.ts
+D  src/tenant/tenantOverrides (1).ts
+M  src/tenant/tenantOverrides.ts
+A  src/types/pannellum.d.ts
+A  src/utils/cityListingFilter.ts
+A  src/utils/directBookingPromo.ts
+D  src/utils/propertyDataUtils (1).ts
+D  src/utils/razorpayGuestErrors (1).ts
+D  src/utils/serverErrorFromResponse (1).ts
+M  src/vite-env.d.ts
+M  tools/generate-sitemap.mjs
+M  tools/optimize-images.mjs
+M  vite.config.ts
 ```
 
 ### Diff statistics
@@ -300,118 +300,118 @@ chore(deps-dev): bump tailwindcss from 3.4.19 to 4.3.0
 ### Files changed (name-status)
 
 ```text
-M	package-lock.json
-M	package.json
-M	.env.example
-M	.github/dependabot.yml
-M	.github/workflows/ci.yml
-M	.github/workflows/docs-guardrails.yml
-M	.github/workflows/lockfile-guard.yml
-A	.github/workflows/secret-scan.yml
-M	.github/workflows/sri-check.yml
-M	.github/workflows/vulnerability-scan.yml
-A	.gitleaks.toml
-A	.markdownlint.json
-M	AGENTS.md
-A	docs/security/secret-rotation.md
-M	package-lock.json
-M	package.json
-M	public/.well-known/atlas-runtime-config.json
-D	public/be/asset-manifest.json
-D	public/be/favicon.ico
-D	public/be/index.html
-D	public/be/logo192.f181800b.webp
-D	public/be/logo192.png
-D	public/be/logo512.f181800b.webp
-D	public/be/logo512.png
-D	public/be/manifest.json
-D	public/be/robots.txt
-D	public/be/static/css/main.5a8b9a96.css
-D	public/be/static/css/main.5a8b9a96.css.map
-D	public/be/static/js/453.cc1bb556.chunk.js
-D	public/be/static/js/453.cc1bb556.chunk.js.map
-D	public/be/static/js/main.caa69fb1.css
-D	public/be/static/js/main.caa69fb1.css.map
-D	public/be/static/js/main.caa69fb1.js
-D	public/be/static/js/main.caa69fb1.js.LICENSE.txt
-D	public/be/static/js/main.caa69fb1.js.map
-M	public/sitemap.xml
-D	public/static/css/main.a475c3c1.css
-D	public/static/css/main.a475c3c1.css.map
-D	public/static/js/787.a9ed2b2b.chunk.js
-D	public/static/js/787.a9ed2b2b.chunk.js.map
-D	public/static/js/main.0f16a38a.js
-D	public/static/js/main.0f16a38a.js.LICENSE.txt
-D	public/static/js/main.0f16a38a.js.map
-A	public/sw-register.js
-A	public/sw.js
-M	src/App.tsx
-D	src/components/CookieConsent (1).tsx
-M	src/components/CookieConsent.tsx
-M	src/components/CookieConsentBanner.tsx
-D	src/components/RecentlyViewedStrip (1).tsx
-M	src/components/ShortLinkRedirect.tsx
-M	src/components/VirtualTourSection.tsx
-M	src/components/apartments/ListingCard.tsx
-M	src/components/availability/UnitBookingWidget.tsx
-M	src/components/home/BannerSecondary.tsx
-M	src/components/home/ServicesSection.tsx
-M	src/components/home/TestimonialsSection.tsx
-M	src/components/homepage_components/homepage_Propertydetails/Homepage_PropertyDetails.tsx
-M	src/components/homepage_components/homepage_exclusiveservice/ExclusiveService_Card.tsx
-M	src/components/homepage_components/homepage_locations/HomePage_Locations.tsx
-M	src/components/homepage_components/slider/Slider.tsx
-D	src/components/search/SearchResultsMap (1).tsx
-M	src/config/homepageUxFlags.ts
-A	src/config/siteOrigin.ts
-A	src/content/cities/cityLandingSlugs.ts
-A	src/content/cities/coorg.json
-A	src/content/cities/goa.json
-A	src/content/cities/hyderabad.json
-A	src/content/cities/manali.json
-M	src/content/terms.ts
-D	src/contexts/CurrencyContext (1).tsx
-D	src/hooks/useTenantListings (1).ts
-M	src/pages/AboutPage.tsx
-M	src/pages/Amenities.tsx
-M	src/pages/Apartments.tsx
-M	src/pages/BecomeHost.tsx
-M	src/pages/BookingConfirmationPage.tsx
-A	src/pages/CityLandingPage.test.tsx
-A	src/pages/CityLandingPage.tsx
-M	src/pages/CommunicationPreferences.tsx
-M	src/pages/FaqPage.tsx
-M	src/pages/FavoritesPage.tsx
-M	src/pages/GalleryPage.tsx
-D	src/pages/MarketplaceHomepage (1).tsx
-M	src/pages/MyBookingsPage.tsx
-M	src/pages/OffersPage.tsx
-M	src/pages/Policies.tsx
-M	src/pages/PrivacyPage.tsx
-M	src/pages/PrivacyPolicyPage.tsx
-M	src/pages/ProfilePage.tsx
-M	src/pages/RecentlyViewedPage.tsx
-M	src/pages/ReviewSubmitPage.tsx
-M	src/pages/SearchPage.tsx
-M	src/pages/SelfCheckIn.tsx
-M	src/pages/StubPage.tsx
-M	src/pages/home/Home.tsx
-M	src/pages/home/HomeDetails.tsx
-A	src/pages/home/homeDetailsJsonLd.test.ts
-A	src/pages/home/homeDetailsJsonLd.ts
-M	src/tenant/displayBrand.ts
-D	src/tenant/tenantOverrides (1).ts
-M	src/tenant/tenantOverrides.ts
-A	src/types/pannellum.d.ts
-A	src/utils/cityListingFilter.ts
-A	src/utils/directBookingPromo.ts
-D	src/utils/propertyDataUtils (1).ts
-D	src/utils/razorpayGuestErrors (1).ts
-D	src/utils/serverErrorFromResponse (1).ts
-M	src/vite-env.d.ts
-M	tools/generate-sitemap.mjs
-M	tools/optimize-images.mjs
-M	vite.config.ts
+M  package-lock.json
+M  package.json
+M  .env.example
+M  .github/dependabot.yml
+M  .github/workflows/ci.yml
+M  .github/workflows/docs-guardrails.yml
+M  .github/workflows/lockfile-guard.yml
+A  .github/workflows/secret-scan.yml
+M  .github/workflows/sri-check.yml
+M  .github/workflows/vulnerability-scan.yml
+A  .gitleaks.toml
+A  .markdownlint.json
+M  AGENTS.md
+A  docs/security/secret-rotation.md
+M  package-lock.json
+M  package.json
+M  public/.well-known/atlas-runtime-config.json
+D  public/be/asset-manifest.json
+D  public/be/favicon.ico
+D  public/be/index.html
+D  public/be/logo192.f181800b.webp
+D  public/be/logo192.png
+D  public/be/logo512.f181800b.webp
+D  public/be/logo512.png
+D  public/be/manifest.json
+D  public/be/robots.txt
+D  public/be/static/css/main.5a8b9a96.css
+D  public/be/static/css/main.5a8b9a96.css.map
+D  public/be/static/js/453.cc1bb556.chunk.js
+D  public/be/static/js/453.cc1bb556.chunk.js.map
+D  public/be/static/js/main.caa69fb1.css
+D  public/be/static/js/main.caa69fb1.css.map
+D  public/be/static/js/main.caa69fb1.js
+D  public/be/static/js/main.caa69fb1.js.LICENSE.txt
+D  public/be/static/js/main.caa69fb1.js.map
+M  public/sitemap.xml
+D  public/static/css/main.a475c3c1.css
+D  public/static/css/main.a475c3c1.css.map
+D  public/static/js/787.a9ed2b2b.chunk.js
+D  public/static/js/787.a9ed2b2b.chunk.js.map
+D  public/static/js/main.0f16a38a.js
+D  public/static/js/main.0f16a38a.js.LICENSE.txt
+D  public/static/js/main.0f16a38a.js.map
+A  public/sw-register.js
+A  public/sw.js
+M  src/App.tsx
+D  src/components/CookieConsent (1).tsx
+M  src/components/CookieConsent.tsx
+M  src/components/CookieConsentBanner.tsx
+D  src/components/RecentlyViewedStrip (1).tsx
+M  src/components/ShortLinkRedirect.tsx
+M  src/components/VirtualTourSection.tsx
+M  src/components/apartments/ListingCard.tsx
+M  src/components/availability/UnitBookingWidget.tsx
+M  src/components/home/BannerSecondary.tsx
+M  src/components/home/ServicesSection.tsx
+M  src/components/home/TestimonialsSection.tsx
+M  src/components/homepage_components/homepage_Propertydetails/Homepage_PropertyDetails.tsx
+M  src/components/homepage_components/homepage_exclusiveservice/ExclusiveService_Card.tsx
+M  src/components/homepage_components/homepage_locations/HomePage_Locations.tsx
+M  src/components/homepage_components/slider/Slider.tsx
+D  src/components/search/SearchResultsMap (1).tsx
+M  src/config/homepageUxFlags.ts
+A  src/config/siteOrigin.ts
+A  src/content/cities/cityLandingSlugs.ts
+A  src/content/cities/coorg.json
+A  src/content/cities/goa.json
+A  src/content/cities/hyderabad.json
+A  src/content/cities/manali.json
+M  src/content/terms.ts
+D  src/contexts/CurrencyContext (1).tsx
+D  src/hooks/useTenantListings (1).ts
+M  src/pages/AboutPage.tsx
+M  src/pages/Amenities.tsx
+M  src/pages/Apartments.tsx
+M  src/pages/BecomeHost.tsx
+M  src/pages/BookingConfirmationPage.tsx
+A  src/pages/CityLandingPage.test.tsx
+A  src/pages/CityLandingPage.tsx
+M  src/pages/CommunicationPreferences.tsx
+M  src/pages/FaqPage.tsx
+M  src/pages/FavoritesPage.tsx
+M  src/pages/GalleryPage.tsx
+D  src/pages/MarketplaceHomepage (1).tsx
+M  src/pages/MyBookingsPage.tsx
+M  src/pages/OffersPage.tsx
+M  src/pages/Policies.tsx
+M  src/pages/PrivacyPage.tsx
+M  src/pages/PrivacyPolicyPage.tsx
+M  src/pages/ProfilePage.tsx
+M  src/pages/RecentlyViewedPage.tsx
+M  src/pages/ReviewSubmitPage.tsx
+M  src/pages/SearchPage.tsx
+M  src/pages/SelfCheckIn.tsx
+M  src/pages/StubPage.tsx
+M  src/pages/home/Home.tsx
+M  src/pages/home/HomeDetails.tsx
+A  src/pages/home/homeDetailsJsonLd.test.ts
+A  src/pages/home/homeDetailsJsonLd.ts
+M  src/tenant/displayBrand.ts
+D  src/tenant/tenantOverrides (1).ts
+M  src/tenant/tenantOverrides.ts
+A  src/types/pannellum.d.ts
+A  src/utils/cityListingFilter.ts
+A  src/utils/directBookingPromo.ts
+D  src/utils/propertyDataUtils (1).ts
+D  src/utils/razorpayGuestErrors (1).ts
+D  src/utils/serverErrorFromResponse (1).ts
+M  src/vite-env.d.ts
+M  tools/generate-sitemap.mjs
+M  tools/optimize-images.mjs
+M  vite.config.ts
 ```
 
 ### Diff statistics
@@ -442,118 +442,118 @@ chore(deps): bump react-router-dom from 6.30.3 to 7.15.0
 ### Files changed (name-status)
 
 ```text
-M	package-lock.json
-M	package.json
-M	.env.example
-M	.github/dependabot.yml
-M	.github/workflows/ci.yml
-M	.github/workflows/docs-guardrails.yml
-M	.github/workflows/lockfile-guard.yml
-A	.github/workflows/secret-scan.yml
-M	.github/workflows/sri-check.yml
-M	.github/workflows/vulnerability-scan.yml
-A	.gitleaks.toml
-A	.markdownlint.json
-M	AGENTS.md
-A	docs/security/secret-rotation.md
-M	package-lock.json
-M	package.json
-M	public/.well-known/atlas-runtime-config.json
-D	public/be/asset-manifest.json
-D	public/be/favicon.ico
-D	public/be/index.html
-D	public/be/logo192.f181800b.webp
-D	public/be/logo192.png
-D	public/be/logo512.f181800b.webp
-D	public/be/logo512.png
-D	public/be/manifest.json
-D	public/be/robots.txt
-D	public/be/static/css/main.5a8b9a96.css
-D	public/be/static/css/main.5a8b9a96.css.map
-D	public/be/static/js/453.cc1bb556.chunk.js
-D	public/be/static/js/453.cc1bb556.chunk.js.map
-D	public/be/static/js/main.caa69fb1.css
-D	public/be/static/js/main.caa69fb1.css.map
-D	public/be/static/js/main.caa69fb1.js
-D	public/be/static/js/main.caa69fb1.js.LICENSE.txt
-D	public/be/static/js/main.caa69fb1.js.map
-M	public/sitemap.xml
-D	public/static/css/main.a475c3c1.css
-D	public/static/css/main.a475c3c1.css.map
-D	public/static/js/787.a9ed2b2b.chunk.js
-D	public/static/js/787.a9ed2b2b.chunk.js.map
-D	public/static/js/main.0f16a38a.js
-D	public/static/js/main.0f16a38a.js.LICENSE.txt
-D	public/static/js/main.0f16a38a.js.map
-A	public/sw-register.js
-A	public/sw.js
-M	src/App.tsx
-D	src/components/CookieConsent (1).tsx
-M	src/components/CookieConsent.tsx
-M	src/components/CookieConsentBanner.tsx
-D	src/components/RecentlyViewedStrip (1).tsx
-M	src/components/ShortLinkRedirect.tsx
-M	src/components/VirtualTourSection.tsx
-M	src/components/apartments/ListingCard.tsx
-M	src/components/availability/UnitBookingWidget.tsx
-M	src/components/home/BannerSecondary.tsx
-M	src/components/home/ServicesSection.tsx
-M	src/components/home/TestimonialsSection.tsx
-M	src/components/homepage_components/homepage_Propertydetails/Homepage_PropertyDetails.tsx
-M	src/components/homepage_components/homepage_exclusiveservice/ExclusiveService_Card.tsx
-M	src/components/homepage_components/homepage_locations/HomePage_Locations.tsx
-M	src/components/homepage_components/slider/Slider.tsx
-D	src/components/search/SearchResultsMap (1).tsx
-M	src/config/homepageUxFlags.ts
-A	src/config/siteOrigin.ts
-A	src/content/cities/cityLandingSlugs.ts
-A	src/content/cities/coorg.json
-A	src/content/cities/goa.json
-A	src/content/cities/hyderabad.json
-A	src/content/cities/manali.json
-M	src/content/terms.ts
-D	src/contexts/CurrencyContext (1).tsx
-D	src/hooks/useTenantListings (1).ts
-M	src/pages/AboutPage.tsx
-M	src/pages/Amenities.tsx
-M	src/pages/Apartments.tsx
-M	src/pages/BecomeHost.tsx
-M	src/pages/BookingConfirmationPage.tsx
-A	src/pages/CityLandingPage.test.tsx
-A	src/pages/CityLandingPage.tsx
-M	src/pages/CommunicationPreferences.tsx
-M	src/pages/FaqPage.tsx
-M	src/pages/FavoritesPage.tsx
-M	src/pages/GalleryPage.tsx
-D	src/pages/MarketplaceHomepage (1).tsx
-M	src/pages/MyBookingsPage.tsx
-M	src/pages/OffersPage.tsx
-M	src/pages/Policies.tsx
-M	src/pages/PrivacyPage.tsx
-M	src/pages/PrivacyPolicyPage.tsx
-M	src/pages/ProfilePage.tsx
-M	src/pages/RecentlyViewedPage.tsx
-M	src/pages/ReviewSubmitPage.tsx
-M	src/pages/SearchPage.tsx
-M	src/pages/SelfCheckIn.tsx
-M	src/pages/StubPage.tsx
-M	src/pages/home/Home.tsx
-M	src/pages/home/HomeDetails.tsx
-A	src/pages/home/homeDetailsJsonLd.test.ts
-A	src/pages/home/homeDetailsJsonLd.ts
-M	src/tenant/displayBrand.ts
-D	src/tenant/tenantOverrides (1).ts
-M	src/tenant/tenantOverrides.ts
-A	src/types/pannellum.d.ts
-A	src/utils/cityListingFilter.ts
-A	src/utils/directBookingPromo.ts
-D	src/utils/propertyDataUtils (1).ts
-D	src/utils/razorpayGuestErrors (1).ts
-D	src/utils/serverErrorFromResponse (1).ts
-M	src/vite-env.d.ts
-M	tools/generate-sitemap.mjs
-M	tools/optimize-images.mjs
-M	vite.config.ts
+M  package-lock.json
+M  package.json
+M  .env.example
+M  .github/dependabot.yml
+M  .github/workflows/ci.yml
+M  .github/workflows/docs-guardrails.yml
+M  .github/workflows/lockfile-guard.yml
+A  .github/workflows/secret-scan.yml
+M  .github/workflows/sri-check.yml
+M  .github/workflows/vulnerability-scan.yml
+A  .gitleaks.toml
+A  .markdownlint.json
+M  AGENTS.md
+A  docs/security/secret-rotation.md
+M  package-lock.json
+M  package.json
+M  public/.well-known/atlas-runtime-config.json
+D  public/be/asset-manifest.json
+D  public/be/favicon.ico
+D  public/be/index.html
+D  public/be/logo192.f181800b.webp
+D  public/be/logo192.png
+D  public/be/logo512.f181800b.webp
+D  public/be/logo512.png
+D  public/be/manifest.json
+D  public/be/robots.txt
+D  public/be/static/css/main.5a8b9a96.css
+D  public/be/static/css/main.5a8b9a96.css.map
+D  public/be/static/js/453.cc1bb556.chunk.js
+D  public/be/static/js/453.cc1bb556.chunk.js.map
+D  public/be/static/js/main.caa69fb1.css
+D  public/be/static/js/main.caa69fb1.css.map
+D  public/be/static/js/main.caa69fb1.js
+D  public/be/static/js/main.caa69fb1.js.LICENSE.txt
+D  public/be/static/js/main.caa69fb1.js.map
+M  public/sitemap.xml
+D  public/static/css/main.a475c3c1.css
+D  public/static/css/main.a475c3c1.css.map
+D  public/static/js/787.a9ed2b2b.chunk.js
+D  public/static/js/787.a9ed2b2b.chunk.js.map
+D  public/static/js/main.0f16a38a.js
+D  public/static/js/main.0f16a38a.js.LICENSE.txt
+D  public/static/js/main.0f16a38a.js.map
+A  public/sw-register.js
+A  public/sw.js
+M  src/App.tsx
+D  src/components/CookieConsent (1).tsx
+M  src/components/CookieConsent.tsx
+M  src/components/CookieConsentBanner.tsx
+D  src/components/RecentlyViewedStrip (1).tsx
+M  src/components/ShortLinkRedirect.tsx
+M  src/components/VirtualTourSection.tsx
+M  src/components/apartments/ListingCard.tsx
+M  src/components/availability/UnitBookingWidget.tsx
+M  src/components/home/BannerSecondary.tsx
+M  src/components/home/ServicesSection.tsx
+M  src/components/home/TestimonialsSection.tsx
+M  src/components/homepage_components/homepage_Propertydetails/Homepage_PropertyDetails.tsx
+M  src/components/homepage_components/homepage_exclusiveservice/ExclusiveService_Card.tsx
+M  src/components/homepage_components/homepage_locations/HomePage_Locations.tsx
+M  src/components/homepage_components/slider/Slider.tsx
+D  src/components/search/SearchResultsMap (1).tsx
+M  src/config/homepageUxFlags.ts
+A  src/config/siteOrigin.ts
+A  src/content/cities/cityLandingSlugs.ts
+A  src/content/cities/coorg.json
+A  src/content/cities/goa.json
+A  src/content/cities/hyderabad.json
+A  src/content/cities/manali.json
+M  src/content/terms.ts
+D  src/contexts/CurrencyContext (1).tsx
+D  src/hooks/useTenantListings (1).ts
+M  src/pages/AboutPage.tsx
+M  src/pages/Amenities.tsx
+M  src/pages/Apartments.tsx
+M  src/pages/BecomeHost.tsx
+M  src/pages/BookingConfirmationPage.tsx
+A  src/pages/CityLandingPage.test.tsx
+A  src/pages/CityLandingPage.tsx
+M  src/pages/CommunicationPreferences.tsx
+M  src/pages/FaqPage.tsx
+M  src/pages/FavoritesPage.tsx
+M  src/pages/GalleryPage.tsx
+D  src/pages/MarketplaceHomepage (1).tsx
+M  src/pages/MyBookingsPage.tsx
+M  src/pages/OffersPage.tsx
+M  src/pages/Policies.tsx
+M  src/pages/PrivacyPage.tsx
+M  src/pages/PrivacyPolicyPage.tsx
+M  src/pages/ProfilePage.tsx
+M  src/pages/RecentlyViewedPage.tsx
+M  src/pages/ReviewSubmitPage.tsx
+M  src/pages/SearchPage.tsx
+M  src/pages/SelfCheckIn.tsx
+M  src/pages/StubPage.tsx
+M  src/pages/home/Home.tsx
+M  src/pages/home/HomeDetails.tsx
+A  src/pages/home/homeDetailsJsonLd.test.ts
+A  src/pages/home/homeDetailsJsonLd.ts
+M  src/tenant/displayBrand.ts
+D  src/tenant/tenantOverrides (1).ts
+M  src/tenant/tenantOverrides.ts
+A  src/types/pannellum.d.ts
+A  src/utils/cityListingFilter.ts
+A  src/utils/directBookingPromo.ts
+D  src/utils/propertyDataUtils (1).ts
+D  src/utils/razorpayGuestErrors (1).ts
+D  src/utils/serverErrorFromResponse (1).ts
+M  src/vite-env.d.ts
+M  tools/generate-sitemap.mjs
+M  tools/optimize-images.mjs
+M  vite.config.ts
 ```
 
 ### Diff statistics
@@ -584,12 +584,12 @@ Bumps [actions/checkout](https://github.com/actions/checkout) from 4 to 6. - [Re
 ### Files changed (name-status)
 
 ```text
-M	.github/workflows/ci.yml
-M	.github/workflows/docs-guardrails.yml
-M	.github/workflows/lockfile-guard.yml
-M	.github/workflows/secret-scan.yml
-M	.github/workflows/sri-check.yml
-M	.github/workflows/vulnerability-scan.yml
+M  .github/workflows/ci.yml
+M  .github/workflows/docs-guardrails.yml
+M  .github/workflows/lockfile-guard.yml
+M  .github/workflows/secret-scan.yml
+M  .github/workflows/sri-check.yml
+M  .github/workflows/vulnerability-scan.yml
 ```
 
 ### Diff statistics
@@ -624,8 +624,8 @@ Bumps [react-dom](https://github.com/facebook/react/tree/HEAD/packages/react-dom
 ### Files changed (name-status)
 
 ```text
-M	package-lock.json
-M	package.json
+M  package-lock.json
+M  package.json
 ```
 
 ### Diff statistics
@@ -656,12 +656,12 @@ chore(deps): bump actions/checkout from 4 to 6
 ### Files changed (name-status)
 
 ```text
-M	.github/workflows/ci.yml
-M	.github/workflows/docs-guardrails.yml
-M	.github/workflows/lockfile-guard.yml
-M	.github/workflows/secret-scan.yml
-M	.github/workflows/sri-check.yml
-M	.github/workflows/vulnerability-scan.yml
+M  .github/workflows/ci.yml
+M  .github/workflows/docs-guardrails.yml
+M  .github/workflows/lockfile-guard.yml
+M  .github/workflows/secret-scan.yml
+M  .github/workflows/sri-check.yml
+M  .github/workflows/vulnerability-scan.yml
 ```
 
 ### Diff statistics
@@ -696,14 +696,14 @@ chore(deps): bump react-dom and @types/react-dom
 ### Files changed (name-status)
 
 ```text
-M	package-lock.json
-M	package.json
-M	.github/workflows/ci.yml
-M	.github/workflows/docs-guardrails.yml
-M	.github/workflows/lockfile-guard.yml
-M	.github/workflows/secret-scan.yml
-M	.github/workflows/sri-check.yml
-M	.github/workflows/vulnerability-scan.yml
+M  package-lock.json
+M  package.json
+M  .github/workflows/ci.yml
+M  .github/workflows/docs-guardrails.yml
+M  .github/workflows/lockfile-guard.yml
+M  .github/workflows/secret-scan.yml
+M  .github/workflows/sri-check.yml
+M  .github/workflows/vulnerability-scan.yml
 ```
 
 ### Diff statistics
@@ -734,14 +734,14 @@ Implements 5 of 6 tasks filed by atlas-starguesthouse-daily-qa 2026-05-10:  - TA
 ### Files changed (name-status)
 
 ```text
-M	src/components/availability/SearchAvailabilityWidget.tsx
-M	src/components/homepage_components/homepage_Propertydetails/Homepage_PropertyDetails.tsx
-M	src/components/homepage_components/homepage_locations/HomePage_Locations.tsx
-M	src/components/support-drawer/SupportDrawer.tsx
-M	src/components/support-drawer/SupportWidget.tsx
-M	src/config/supportDrawerCopy.ts
-M	src/pages/home/HomeDetails.tsx
-A	src/utils/formatListingTitle.ts
+M  src/components/availability/SearchAvailabilityWidget.tsx
+M  src/components/homepage_components/homepage_Propertydetails/Homepage_PropertyDetails.tsx
+M  src/components/homepage_components/homepage_locations/HomePage_Locations.tsx
+M  src/components/support-drawer/SupportDrawer.tsx
+M  src/components/support-drawer/SupportWidget.tsx
+M  src/config/supportDrawerCopy.ts
+M  src/pages/home/HomeDetails.tsx
+A  src/utils/formatListingTitle.ts
 ```
 
 ### Diff statistics
@@ -778,11 +778,11 @@ Co-authored-by: Cursor <cursoragent@cursor.com>
 ### Files changed (name-status)
 
 ```text
-M	src/api/listingClient.ts
-M	src/components/apartments/ListingCard.tsx
-M	src/hooks/useTenantListings.ts
-M	src/pages/Apartments.tsx
-M	src/pages/CityLandingPage.tsx
+M  src/api/listingClient.ts
+M  src/components/apartments/ListingCard.tsx
+M  src/hooks/useTenantListings.ts
+M  src/pages/Apartments.tsx
+M  src/pages/CityLandingPage.tsx
 ```
 
 ### Diff statistics
@@ -816,7 +816,7 @@ Update the AboutPage snapshot for the current typography class changes so the gu
 ### Files changed (name-status)
 
 ```text
-M	tests/__snapshots__/AboutPage.test.tsx.snap
+M  tests/__snapshots__/AboutPage.test.tsx.snap
 ```
 
 ### Diff statistics
@@ -846,9 +846,9 @@ Add @tailwindcss/postcss and update PostCSS config so Vitest and Vite can proces
 ### Files changed (name-status)
 
 ```text
-M	package-lock.json
-M	package.json
-M	postcss.config.js
+M  package-lock.json
+M  package.json
+M  postcss.config.js
 ```
 
 ### Diff statistics
@@ -880,7 +880,7 @@ Update the mobile date-picker snapshot for current React id output and hero fiel
 ### Files changed (name-status)
 
 ```text
-M	tests/__snapshots__/DatePicker.test.tsx.snap
+M  tests/__snapshots__/DatePicker.test.tsx.snap
 ```
 
 ### Diff statistics
@@ -910,12 +910,12 @@ Pass listing security-deposit amounts into guest checkout, require explicit ackn
 ### Files changed (name-status)
 
 ```text
-M	public/sitemap.xml
-M	src/api/listingClient.ts
-M	src/components/availability/UnitBookingWidget.tsx
-M	src/components/homepage_components/homepage_Propertydetails/Homepage_PropertyDetails.tsx
-M	src/index.css
-M	src/pages/home/HomeDetails.tsx
+M  public/sitemap.xml
+M  src/api/listingClient.ts
+M  src/components/availability/UnitBookingWidget.tsx
+M  src/components/homepage_components/homepage_Propertydetails/Homepage_PropertyDetails.tsx
+M  src/index.css
+M  src/pages/home/HomeDetails.tsx
 ```
 
 ### Diff statistics
@@ -950,11 +950,11 @@ Co-authored-by: Cursor <cursoragent@cursor.com>
 ### Files changed (name-status)
 
 ```text
-M	public/sitemap.xml
-M	src/api/listingClient.ts
-M	src/pages/CityLandingPage.test.tsx
-M	src/pages/CityLandingPage.tsx
-M	src/utils/cityListingFilter.ts
+M  public/sitemap.xml
+M  src/api/listingClient.ts
+M  src/pages/CityLandingPage.test.tsx
+M  src/pages/CityLandingPage.tsx
+M  src/utils/cityListingFilter.ts
 ```
 
 ### Diff statistics
@@ -988,7 +988,7 @@ The rule was over-matching common patterns like:   var pw = process.env.E2E_X_PA
 ### Files changed (name-status)
 
 ```text
-M	.gitleaks.toml
+M  .gitleaks.toml
 ```
 
 ### Diff statistics
@@ -1018,7 +1018,7 @@ The minimal .markdownlint.json added on 2026-05-10 didn't carry over the team's 
 ### Files changed (name-status)
 
 ```text
-M	.markdownlint.json
+M  .markdownlint.json
 ```
 
 ### Diff statistics
@@ -1048,7 +1048,7 @@ The googleMapsApiKey in public/.well-known/atlas-runtime-config.json is public-b
 ### Files changed (name-status)
 
 ```text
-M	.gitleaks.toml
+M  .gitleaks.toml
 ```
 
 ### Diff statistics
@@ -1078,7 +1078,7 @@ Bumps [dependabot/fetch-metadata](https://github.com/dependabot/fetch-metadata) 
 ### Files changed (name-status)
 
 ```text
-M	.github/workflows/dependabot-auto-merge.yml
+M  .github/workflows/dependabot-auto-merge.yml
 ```
 
 ### Diff statistics
@@ -1108,8 +1108,8 @@ Bumps [react-leaflet](https://github.com/PaulLeCam/react-leaflet) from 4.2.1 to 
 ### Files changed (name-status)
 
 ```text
-M	package-lock.json
-M	package.json
+M  package-lock.json
+M  package.json
 ```
 
 ### Diff statistics
@@ -1140,7 +1140,7 @@ chore(deps): bump dependabot/fetch-metadata from 2 to 3
 ### Files changed (name-status)
 
 ```text
-M	.github/workflows/dependabot-auto-merge.yml
+M  .github/workflows/dependabot-auto-merge.yml
 ```
 
 ### Diff statistics
@@ -1170,9 +1170,9 @@ chore(deps): bump react-leaflet from 4.2.1 to 5.0.0
 ### Files changed (name-status)
 
 ```text
-M	package-lock.json
-M	package.json
-M	.github/workflows/dependabot-auto-merge.yml
+M  package-lock.json
+M  package.json
+M  .github/workflows/dependabot-auto-merge.yml
 ```
 
 ### Diff statistics
@@ -1203,7 +1203,7 @@ Adds one-line reference to atlas-e2e/docs/agents/PARALLEL-AGENT-SAFETY.md so Cur
 ### Files changed (name-status)
 
 ```text
-M	AGENTS.md
+M  AGENTS.md
 ```
 
 ### Diff statistics
@@ -1233,10 +1233,10 @@ Cloudflare sitemap function now proxies GET /api/public/sitemap.xml when ATLAS_A
 ### Files changed (name-status)
 
 ```text
-M	functions/sitemap.xml.ts
-M	public/robots.txt
-M	public/sitemap.xml
-M	tools/generate-sitemap.mjs
+M  functions/sitemap.xml.ts
+M  public/robots.txt
+M  public/sitemap.xml
+M  tools/generate-sitemap.mjs
 ```
 
 ### Diff statistics
@@ -1269,9 +1269,9 @@ Co-authored-by: Cursor <cursoragent@cursor.com>
 ### Files changed (name-status)
 
 ```text
-A	functions/robots.txt.ts
-M	functions/sitemap.xml.ts
-A	tests/RobotsTxt.test.ts
+A  functions/robots.txt.ts
+M  functions/sitemap.xml.ts
+A  tests/RobotsTxt.test.ts
 ```
 
 ### Diff statistics
@@ -1297,9 +1297,9 @@ A	tests/RobotsTxt.test.ts
 ### Files changed (name-status)
 
 ```text
-A	functions/robots.txt.ts
-M	functions/sitemap.xml.ts
-A	tests/RobotsTxt.test.ts
+A  functions/robots.txt.ts
+M  functions/sitemap.xml.ts
+A  tests/RobotsTxt.test.ts
 ```
 
 ### Diff statistics
@@ -1331,11 +1331,11 @@ Co-authored-by: Cursor <cursoragent@cursor.com>
 ### Files changed (name-status)
 
 ```text
-M	package-lock.json
-M	package.json
-M	src/api/listingClient.ts
-M	src/main.tsx
-M	src/pages/home/HomeDetails.tsx
+M  package-lock.json
+M  package.json
+M  src/api/listingClient.ts
+M  src/main.tsx
+M  src/pages/home/HomeDetails.tsx
 ```
 
 ### Diff statistics
@@ -1369,7 +1369,7 @@ Co-authored-by: Cursor <cursoragent@cursor.com>
 ### Files changed (name-status)
 
 ```text
-A	src/utils/formatListingTitle.test.ts
+A  src/utils/formatListingTitle.test.ts
 ```
 
 ### Diff statistics
@@ -1399,12 +1399,12 @@ Wires Helmet meta tags (title/description) from public listing detail API.
 ### Files changed (name-status)
 
 ```text
-M	package-lock.json
-M	package.json
-M	src/api/listingClient.ts
-M	src/main.tsx
-M	src/pages/home/HomeDetails.tsx
-A	src/utils/formatListingTitle.test.ts
+M  package-lock.json
+M  package.json
+M  src/api/listingClient.ts
+M  src/main.tsx
+M  src/pages/home/HomeDetails.tsx
+A  src/utils/formatListingTitle.test.ts
 ```
 
 ### Diff statistics
@@ -1438,104 +1438,104 @@ Adds LodgingBusiness/LocalBusiness + WebSite JSON-LD with SearchAction, plus en-
 ### Files changed (name-status)
 
 ```text
-M	index.html
-M	.env.example
-M	.github/dependabot.yml
-M	.github/workflows/ci.yml
-M	.github/workflows/dependabot-auto-merge.yml
-M	.github/workflows/docs-guardrails.yml
-M	.github/workflows/lockfile-guard.yml
-M	.github/workflows/secret-scan.yml
-M	.github/workflows/sri-check.yml
-M	.github/workflows/vulnerability-scan.yml
-M	.gitleaks.toml
-A	.markdownlint.json
-M	AGENTS.md
-A	functions/robots.txt.ts
-M	functions/sitemap.xml.ts
-M	package-lock.json
-M	package.json
-M	postcss.config.js
-D	public/be/asset-manifest.json
-D	public/be/favicon.ico
-D	public/be/index.html
-D	public/be/logo192.f181800b.webp
-D	public/be/logo192.png
-D	public/be/logo512.f181800b.webp
-D	public/be/logo512.png
-D	public/be/manifest.json
-D	public/be/robots.txt
-D	public/be/static/css/main.5a8b9a96.css
-D	public/be/static/css/main.5a8b9a96.css.map
-D	public/be/static/js/453.cc1bb556.chunk.js
-D	public/be/static/js/453.cc1bb556.chunk.js.map
-D	public/be/static/js/main.caa69fb1.css
-D	public/be/static/js/main.caa69fb1.css.map
-D	public/be/static/js/main.caa69fb1.js
-D	public/be/static/js/main.caa69fb1.js.LICENSE.txt
-D	public/be/static/js/main.caa69fb1.js.map
-M	public/robots.txt
-M	public/sitemap.xml
-D	public/static/css/main.a475c3c1.css
-D	public/static/css/main.a475c3c1.css.map
-D	public/static/js/787.a9ed2b2b.chunk.js
-D	public/static/js/787.a9ed2b2b.chunk.js.map
-D	public/static/js/main.0f16a38a.js
-D	public/static/js/main.0f16a38a.js.LICENSE.txt
-D	public/static/js/main.0f16a38a.js.map
-A	public/sw-register.js
-A	public/sw.js
-M	src/App.tsx
-M	src/api/listingClient.ts
-M	src/components/CookieConsentBanner.tsx
-M	src/components/apartments/ListingCard.tsx
-M	src/components/availability/SearchAvailabilityWidget.tsx
-M	src/components/availability/UnitBookingWidget.tsx
-M	src/components/homepage_components/homepage_Propertydetails/Homepage_PropertyDetails.tsx
-M	src/components/homepage_components/homepage_locations/HomePage_Locations.tsx
-M	src/components/homepage_components/slider/Slider.tsx
-M	src/components/support-drawer/SupportDrawer.tsx
-M	src/components/support-drawer/SupportWidget.tsx
-A	src/config/siteOrigin.ts
-M	src/config/supportDrawerCopy.ts
-A	src/content/cities/cityLandingSlugs.ts
-A	src/content/cities/coorg.json
-A	src/content/cities/goa.json
-A	src/content/cities/hyderabad.json
-A	src/content/cities/manali.json
-M	src/hooks/useTenantListings.ts
-M	src/index.css
-M	src/main.tsx
-M	src/pages/AboutPage.tsx
-M	src/pages/Apartments.tsx
-M	src/pages/BecomeHost.tsx
-M	src/pages/BookingConfirmationPage.tsx
-A	src/pages/CityLandingPage.test.tsx
-A	src/pages/CityLandingPage.tsx
-M	src/pages/CommunicationPreferences.tsx
-M	src/pages/MyBookingsPage.tsx
-M	src/pages/Policies.tsx
-M	src/pages/PrivacyPage.tsx
-M	src/pages/ProfilePage.tsx
-M	src/pages/RecentlyViewedPage.tsx
-M	src/pages/ReviewSubmitPage.tsx
-M	src/pages/SearchPage.tsx
-M	src/pages/home/Home.tsx
-M	src/pages/home/HomeDetails.tsx
-A	src/pages/home/homeDetailsJsonLd.test.ts
-A	src/pages/home/homeDetailsJsonLd.ts
-M	src/tenant/tenantOverrides.ts
-A	src/utils/cityListingFilter.ts
-A	src/utils/directBookingPromo.ts
-A	src/utils/formatListingTitle.test.ts
-A	src/utils/formatListingTitle.ts
-M	src/vite-env.d.ts
-A	tests/RobotsTxt.test.ts
-M	tests/__snapshots__/AboutPage.test.tsx.snap
-M	tests/__snapshots__/DatePicker.test.tsx.snap
-M	tools/generate-sitemap.mjs
-M	tools/optimize-images.mjs
-M	vite.config.ts
+M  index.html
+M  .env.example
+M  .github/dependabot.yml
+M  .github/workflows/ci.yml
+M  .github/workflows/dependabot-auto-merge.yml
+M  .github/workflows/docs-guardrails.yml
+M  .github/workflows/lockfile-guard.yml
+M  .github/workflows/secret-scan.yml
+M  .github/workflows/sri-check.yml
+M  .github/workflows/vulnerability-scan.yml
+M  .gitleaks.toml
+A  .markdownlint.json
+M  AGENTS.md
+A  functions/robots.txt.ts
+M  functions/sitemap.xml.ts
+M  package-lock.json
+M  package.json
+M  postcss.config.js
+D  public/be/asset-manifest.json
+D  public/be/favicon.ico
+D  public/be/index.html
+D  public/be/logo192.f181800b.webp
+D  public/be/logo192.png
+D  public/be/logo512.f181800b.webp
+D  public/be/logo512.png
+D  public/be/manifest.json
+D  public/be/robots.txt
+D  public/be/static/css/main.5a8b9a96.css
+D  public/be/static/css/main.5a8b9a96.css.map
+D  public/be/static/js/453.cc1bb556.chunk.js
+D  public/be/static/js/453.cc1bb556.chunk.js.map
+D  public/be/static/js/main.caa69fb1.css
+D  public/be/static/js/main.caa69fb1.css.map
+D  public/be/static/js/main.caa69fb1.js
+D  public/be/static/js/main.caa69fb1.js.LICENSE.txt
+D  public/be/static/js/main.caa69fb1.js.map
+M  public/robots.txt
+M  public/sitemap.xml
+D  public/static/css/main.a475c3c1.css
+D  public/static/css/main.a475c3c1.css.map
+D  public/static/js/787.a9ed2b2b.chunk.js
+D  public/static/js/787.a9ed2b2b.chunk.js.map
+D  public/static/js/main.0f16a38a.js
+D  public/static/js/main.0f16a38a.js.LICENSE.txt
+D  public/static/js/main.0f16a38a.js.map
+A  public/sw-register.js
+A  public/sw.js
+M  src/App.tsx
+M  src/api/listingClient.ts
+M  src/components/CookieConsentBanner.tsx
+M  src/components/apartments/ListingCard.tsx
+M  src/components/availability/SearchAvailabilityWidget.tsx
+M  src/components/availability/UnitBookingWidget.tsx
+M  src/components/homepage_components/homepage_Propertydetails/Homepage_PropertyDetails.tsx
+M  src/components/homepage_components/homepage_locations/HomePage_Locations.tsx
+M  src/components/homepage_components/slider/Slider.tsx
+M  src/components/support-drawer/SupportDrawer.tsx
+M  src/components/support-drawer/SupportWidget.tsx
+A  src/config/siteOrigin.ts
+M  src/config/supportDrawerCopy.ts
+A  src/content/cities/cityLandingSlugs.ts
+A  src/content/cities/coorg.json
+A  src/content/cities/goa.json
+A  src/content/cities/hyderabad.json
+A  src/content/cities/manali.json
+M  src/hooks/useTenantListings.ts
+M  src/index.css
+M  src/main.tsx
+M  src/pages/AboutPage.tsx
+M  src/pages/Apartments.tsx
+M  src/pages/BecomeHost.tsx
+M  src/pages/BookingConfirmationPage.tsx
+A  src/pages/CityLandingPage.test.tsx
+A  src/pages/CityLandingPage.tsx
+M  src/pages/CommunicationPreferences.tsx
+M  src/pages/MyBookingsPage.tsx
+M  src/pages/Policies.tsx
+M  src/pages/PrivacyPage.tsx
+M  src/pages/ProfilePage.tsx
+M  src/pages/RecentlyViewedPage.tsx
+M  src/pages/ReviewSubmitPage.tsx
+M  src/pages/SearchPage.tsx
+M  src/pages/home/Home.tsx
+M  src/pages/home/HomeDetails.tsx
+A  src/pages/home/homeDetailsJsonLd.test.ts
+A  src/pages/home/homeDetailsJsonLd.ts
+M  src/tenant/tenantOverrides.ts
+A  src/utils/cityListingFilter.ts
+A  src/utils/directBookingPromo.ts
+A  src/utils/formatListingTitle.test.ts
+A  src/utils/formatListingTitle.ts
+M  src/vite-env.d.ts
+A  tests/RobotsTxt.test.ts
+M  tests/__snapshots__/AboutPage.test.tsx.snap
+M  tests/__snapshots__/DatePicker.test.tsx.snap
+M  tools/generate-sitemap.mjs
+M  tools/optimize-images.mjs
+M  vite.config.ts
 ```
 
 ### Diff statistics
@@ -1565,7 +1565,7 @@ Co-authored-by: Cursor <cursoragent@cursor.com>
 ### Files changed (name-status)
 
 ```text
-M	src/lib/monitoring.ts
+M  src/lib/monitoring.ts
 ```
 
 ### Diff statistics
@@ -1595,7 +1595,7 @@ Implementation already shipped via Merge task/TASK-1936-listing-seo-meta into de
 ### Files changed (name-status)
 
 ```text
-M	public/sitemap.xml
+M  public/sitemap.xml
 ```
 
 ### Diff statistics
@@ -1625,10 +1625,10 @@ Adds four trackEvent() calls from utils/analytics at canonical funnel checkpoint
 ### Files changed (name-status)
 
 ```text
-M	src/components/availability/SearchAvailabilityWidget.tsx
-M	src/components/availability/UnitBookingWidget.tsx
-M	src/pages/BookingConfirmationPage.tsx
-M	src/pages/home/HomeDetails.tsx
+M  src/components/availability/SearchAvailabilityWidget.tsx
+M  src/components/availability/UnitBookingWidget.tsx
+M  src/pages/BookingConfirmationPage.tsx
+M  src/pages/home/HomeDetails.tsx
 ```
 
 ### Diff statistics
@@ -1661,11 +1661,11 @@ Co-authored-by: Cursor <cursoragent@cursor.com>
 ### Files changed (name-status)
 
 ```text
-M	src/api/listingClient.ts
-M	src/components/apartments/ListingCard.tsx
-M	src/pages/CityLandingPage.tsx
-M	src/pages/SearchPage.tsx
-M	src/pages/home/HomeDetails.tsx
+M  src/api/listingClient.ts
+M  src/components/apartments/ListingCard.tsx
+M  src/pages/CityLandingPage.tsx
+M  src/pages/SearchPage.tsx
+M  src/pages/home/HomeDetails.tsx
 ```
 
 ### Diff statistics
@@ -1699,8 +1699,8 @@ Co-authored-by: Cursor <cursoragent@cursor.com>
 ### Files changed (name-status)
 
 ```text
-A	src/components/WeatherWidget.test.tsx
-M	src/components/WeatherWidget.tsx
+A  src/components/WeatherWidget.test.tsx
+M  src/components/WeatherWidget.tsx
 ```
 
 ### Diff statistics
@@ -1731,8 +1731,8 @@ M	src/components/WeatherWidget.tsx
 ### Files changed (name-status)
 
 ```text
-M	src/api/listingClient.ts
-M	src/pages/home/HomeDetails.tsx
+M  src/api/listingClient.ts
+M  src/pages/home/HomeDetails.tsx
 ```
 
 ### Diff statistics
@@ -1763,10 +1763,10 @@ Add Info control with portal popover (outside click + Escape), lazy GET /api/pri
 ### Files changed (name-status)
 
 ```text
-A	src/components/apartments/ListingCard.test.tsx
-M	src/components/apartments/ListingCard.tsx
-M	src/pages/Apartments.tsx
-M	src/utils/pricing.ts
+A  src/components/apartments/ListingCard.test.tsx
+M  src/components/apartments/ListingCard.tsx
+M  src/pages/Apartments.tsx
+M  src/utils/pricing.ts
 ```
 
 ### Diff statistics
@@ -1799,7 +1799,7 @@ Clicking the 20├ù20 circular avatar opens a file picker. Selected image previ
 ### Files changed (name-status)
 
 ```text
-M	src/pages/ProfilePage.tsx
+M  src/pages/ProfilePage.tsx
 ```
 
 ### Diff statistics
@@ -1823,7 +1823,7 @@ M	src/pages/ProfilePage.tsx
 ### Files changed (name-status)
 
 ```text
-M	src/components/support-drawer/SupportWidget.tsx
+M  src/components/support-drawer/SupportWidget.tsx
 ```
 
 ### Diff statistics
@@ -1853,8 +1853,8 @@ M	src/components/support-drawer/SupportWidget.tsx
 ### Files changed (name-status)
 
 ```text
-M	src/components/availability/UnitBookingWidget.tsx
-M	src/pages/home/HomeDetails.tsx
+M  src/components/availability/UnitBookingWidget.tsx
+M  src/pages/home/HomeDetails.tsx
 ```
 
 ### Diff statistics
@@ -1885,7 +1885,7 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 ### Files changed (name-status)
 
 ```text
-M	src/components/availability/UnitBookingWidget.tsx
+M  src/components/availability/UnitBookingWidget.tsx
 ```
 
 ### Diff statistics
@@ -1915,8 +1915,8 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 ### Files changed (name-status)
 
 ```text
-M	src/components/apartments/ListingCard.tsx
-M	src/pages/home/HomeDetails.tsx
+M  src/components/apartments/ListingCard.tsx
+M  src/pages/home/HomeDetails.tsx
 ```
 
 ### Diff statistics
@@ -1947,8 +1947,8 @@ Passes ?prefill= query param from Homepage_PropertyDetails to the booking widget
 ### Files changed (name-status)
 
 ```text
-M	public/sitemap.xml
-M	src/components/homepage_components/homepage_Propertydetails/Homepage_PropertyDetails.tsx
+M  public/sitemap.xml
+M  src/components/homepage_components/homepage_Propertydetails/Homepage_PropertyDetails.tsx
 ```
 
 ### Diff statistics
@@ -1979,7 +1979,7 @@ Co-authored-by: Cursor <cursoragent@cursor.com>
 ### Files changed (name-status)
 
 ```text
-M	src/components/availability/UnitBookingWidget.tsx
+M  src/components/availability/UnitBookingWidget.tsx
 ```
 
 ### Diff statistics
@@ -2009,12 +2009,12 @@ Installs i18next + react-i18next, creates src/i18n/{en,hi}.json with ~50 UI stri
 ### Files changed (name-status)
 
 ```text
-M	package-lock.json
-M	package.json
-A	src/i18n/en.json
-A	src/i18n/hi.json
-A	src/i18n/index.ts
-M	src/main.tsx
+M  package-lock.json
+M  package.json
+A  src/i18n/en.json
+A  src/i18n/hi.json
+A  src/i18n/index.ts
+M  src/main.tsx
 ```
 
 ### Diff statistics
@@ -2049,7 +2049,7 @@ Adds ENΓåöHI toggle button on desktop right and mobile menu. Persists choice 
 ### Files changed (name-status)
 
 ```text
-M	src/components/commonComponents/navbar/Navbar.tsx
+M  src/components/commonComponents/navbar/Navbar.tsx
 ```
 
 ### Diff statistics
@@ -2079,10 +2079,10 @@ M	src/components/commonComponents/navbar/Navbar.tsx
 ### Files changed (name-status)
 
 ```text
-M	src/api/listingClient.ts
-M	src/components/apartments/ListingCard.tsx
-M	src/hooks/useTenantListings.ts
-M	src/pages/Apartments.tsx
+M  src/api/listingClient.ts
+M  src/components/apartments/ListingCard.tsx
+M  src/hooks/useTenantListings.ts
+M  src/pages/Apartments.tsx
 ```
 
 ### Diff statistics
@@ -2115,12 +2115,12 @@ Updates Slider hero text, HomeDetails (amenities/reviews/location/chat), Listing
 ### Files changed (name-status)
 
 ```text
-M	src/components/CookieConsentBanner.tsx
-M	src/components/availability/SearchAvailabilityWidget.tsx
-M	src/components/commonComponents/footer/Footer.tsx
-M	src/components/homepage_components/slider/Slider.tsx
-M	src/components/ui/GuestTypeSelector.tsx
-M	src/pages/home/HomeDetails.tsx
+M  src/components/CookieConsentBanner.tsx
+M  src/components/availability/SearchAvailabilityWidget.tsx
+M  src/components/commonComponents/footer/Footer.tsx
+M  src/components/homepage_components/slider/Slider.tsx
+M  src/components/ui/GuestTypeSelector.tsx
+M  src/pages/home/HomeDetails.tsx
 ```
 
 ### Diff statistics
@@ -2155,7 +2155,7 @@ Co-authored-by: Cursor <cursoragent@cursor.com>
 ### Files changed (name-status)
 
 ```text
-M	public/sitemap.xml
+M  public/sitemap.xml
 ```
 
 ### Diff statistics
@@ -2185,10 +2185,10 @@ M	public/sitemap.xml
 ### Files changed (name-status)
 
 ```text
-M	src/App.tsx
-A	src/pages/AccountInboxPage.tsx
-M	src/pages/BookingConfirmationPage.tsx
-M	src/pages/MyBookingsPage.tsx
+M  src/App.tsx
+A  src/pages/AccountInboxPage.tsx
+M  src/pages/BookingConfirmationPage.tsx
+M  src/pages/MyBookingsPage.tsx
 ```
 
 ### Diff statistics
@@ -2221,14 +2221,14 @@ Co-authored-by: Cursor <cursoragent@cursor.com>
 ### Files changed (name-status)
 
 ```text
-M	src/components/apartments/ListingCard.test.tsx
-M	src/components/apartments/ListingCard.tsx
-M	src/components/availability/UnitBookingWidget.tsx
-M	src/components/homepage_components/homepage_Propertydetails/Homepage_PropertyDetails.tsx
-M	src/pages/Apartments.tsx
-M	src/pages/CityLandingPage.tsx
-M	src/pages/SearchPage.tsx
-M	src/pages/home/HomeDetails.tsx
+M  src/components/apartments/ListingCard.test.tsx
+M  src/components/apartments/ListingCard.tsx
+M  src/components/availability/UnitBookingWidget.tsx
+M  src/components/homepage_components/homepage_Propertydetails/Homepage_PropertyDetails.tsx
+M  src/pages/Apartments.tsx
+M  src/pages/CityLandingPage.tsx
+M  src/pages/SearchPage.tsx
+M  src/pages/home/HomeDetails.tsx
 ```
 
 ### Diff statistics
@@ -2265,8 +2265,8 @@ M	src/pages/home/HomeDetails.tsx
 ### Files changed (name-status)
 
 ```text
-A	src/components/NearbyAttractions.tsx
-M	src/pages/home/HomeDetails.tsx
+A  src/components/NearbyAttractions.tsx
+M  src/pages/home/HomeDetails.tsx
 ```
 
 ### Diff statistics
@@ -2297,8 +2297,8 @@ M	src/pages/home/HomeDetails.tsx
 ### Files changed (name-status)
 
 ```text
-A	src/components/QuoteRequestModal.tsx
-M	src/components/availability/UnitBookingWidget.tsx
+A  src/components/QuoteRequestModal.tsx
+M  src/components/availability/UnitBookingWidget.tsx
 ```
 
 ### Diff statistics
@@ -2329,7 +2329,7 @@ M	src/components/availability/UnitBookingWidget.tsx
 ### Files changed (name-status)
 
 ```text
-M	src/pages/SelfCheckIn.tsx
+M  src/pages/SelfCheckIn.tsx
 ```
 
 ### Diff statistics
@@ -2359,8 +2359,8 @@ M	src/pages/SelfCheckIn.tsx
 ### Files changed (name-status)
 
 ```text
-M	src/api/listingClient.ts
-M	src/pages/home/HomeDetails.tsx
+M  src/api/listingClient.ts
+M  src/pages/home/HomeDetails.tsx
 ```
 
 ### Diff statistics
@@ -2391,7 +2391,7 @@ UnitBookingWidget now sends guestEmail in the promo-code validate payload so the
 ### Files changed (name-status)
 
 ```text
-M	src/components/availability/UnitBookingWidget.tsx
+M  src/components/availability/UnitBookingWidget.tsx
 ```
 
 ### Diff statistics
@@ -2421,8 +2421,8 @@ Reads touristTaxAmount/touristTaxPercent from PriceBreakdownDto via fetchPricing
 ### Files changed (name-status)
 
 ```text
-M	src/api/pricingClient.ts
-M	src/components/availability/UnitBookingWidget.tsx
+M  src/api/pricingClient.ts
+M  src/components/availability/UnitBookingWidget.tsx
 ```
 
 ### Diff statistics
@@ -2453,8 +2453,8 @@ Adds longStayDiscountPct / longStayDiscountAmount to PricingBreakdown type. fetc
 ### Files changed (name-status)
 
 ```text
-M	src/api/pricingClient.ts
-M	src/components/availability/UnitBookingWidget.tsx
+M  src/api/pricingClient.ts
+M  src/components/availability/UnitBookingWidget.tsx
 ```
 
 ### Diff statistics
@@ -2485,7 +2485,7 @@ After the price breakdown, display "Earn X loyalty points on this booking" when 
 ### Files changed (name-status)
 
 ```text
-M	src/components/availability/UnitBookingWidget.tsx
+M  src/components/availability/UnitBookingWidget.tsx
 ```
 
 ### Diff statistics
@@ -2515,9 +2515,9 @@ M	src/components/availability/UnitBookingWidget.tsx
 ### Files changed (name-status)
 
 ```text
-M	src/App.tsx
-A	src/api/groupInquiryClient.ts
-A	src/pages/GroupInquiryPage.tsx
+M  src/App.tsx
+A  src/api/groupInquiryClient.ts
+A  src/pages/GroupInquiryPage.tsx
 ```
 
 ### Diff statistics
@@ -2549,7 +2549,7 @@ Matches original product URL while keeping canonical /group-inquiry route.
 ### Files changed (name-status)
 
 ```text
-M	src/App.tsx
+M  src/App.tsx
 ```
 
 ### Diff statistics
@@ -2579,7 +2579,7 @@ Co-authored-by: Cursor <cursoragent@cursor.com>
 ### Files changed (name-status)
 
 ```text
-M	src/pages/home/HomeDetails.tsx
+M  src/pages/home/HomeDetails.tsx
 ```
 
 ### Diff statistics
@@ -2609,8 +2609,8 @@ Co-authored-by: Cursor <cursoragent@cursor.com>
 ### Files changed (name-status)
 
 ```text
-M	src/components/homepage_components/slider/Slider.test.tsx
-M	src/components/homepage_components/slider/Slider.vrt.test.tsx
+M  src/components/homepage_components/slider/Slider.test.tsx
+M  src/components/homepage_components/slider/Slider.vrt.test.tsx
 ```
 
 ### Diff statistics
@@ -2641,9 +2641,9 @@ Co-authored-by: Cursor <cursoragent@cursor.com>
 ### Files changed (name-status)
 
 ```text
-M	tests/DatePicker.test.tsx
-M	tests/__snapshots__/DatePicker.test.tsx.snap
-M	tests/availability.test.tsx
+M  tests/DatePicker.test.tsx
+M  tests/__snapshots__/DatePicker.test.tsx.snap
+M  tests/availability.test.tsx
 ```
 
 ### Diff statistics
@@ -2675,8 +2675,8 @@ Infer isMarketplaceRoot when tenantSlug is atlas if the API omits the flag; alig
 ### Files changed (name-status)
 
 ```text
-M	src/components/homepage_components/slider/Slider.tsx
-M	src/tenant/tenantContext.ts
+M  src/components/homepage_components/slider/Slider.tsx
+M  src/tenant/tenantContext.ts
 ```
 
 ### Diff statistics
@@ -2707,8 +2707,8 @@ This reverts commit c58e21ab957619cfb45b984d2048b1b27ea2da15.
 ### Files changed (name-status)
 
 ```text
-M	src/components/homepage_components/slider/Slider.tsx
-M	src/tenant/tenantContext.ts
+M  src/components/homepage_components/slider/Slider.tsx
+M  src/tenant/tenantContext.ts
 ```
 
 ### Diff statistics
