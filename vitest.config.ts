@@ -35,6 +35,8 @@ export default defineConfig({
     // Heavy route smokes: full App / lazy imports exhaust Vitest worker heap on Windows
     // and can stall the suite; run explicitly (`npx vitest run <file>`) or cover via Playwright.
     exclude: [
+      // Nested git worktrees live under the repo root; do not run their Vitest suites here.
+      "atlas-guest-portal-preview-*/**",
       "**/node_modules/**",
       "**/dist/**",
       "**/cypress/**",
