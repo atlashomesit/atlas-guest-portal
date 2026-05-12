@@ -30,6 +30,7 @@ import {
     resolveStaticMaxGuests,
 } from '../../../api/listingClient';
 import SEO from '../../SEO';
+import SinglePinGoogleMap from '../../map/SinglePinGoogleMap';
 import { buildApiUrl, getApiHeaders } from '../../../api/client';
 import { addRecentlyViewed, isFavorite, toggleFavorite } from '../../../utils/guestHistory';
 import { formatCurrency, formatHumanDate } from '../../../utils/formatting';
@@ -153,6 +154,9 @@ interface Property {
     virtualTourUrl?: string | null;
     /** TASK-1385: Cancellation policy tier from listing — Flexible, Moderate, or Strict. */
     cancellationTier?: 'Flexible' | 'Moderate' | 'Strict' | null;
+    /** TL-GUEST: from GET /listings/{id} or /listings/public — drives same Google Maps JS path as Location page. */
+    latitude?: number | null;
+    longitude?: number | null;
 }
 
 /** TASK-1664: row shape from `GET /api/listings/{id}/reviews` (camelCase JSON). */
@@ -712,6 +716,20 @@ const PropertyDetails = () => {
                             const raw = (apiListing as Record<string, unknown>).cancellationTier ?? pub.cancellationTier;
                             return (raw === 'Flexible' || raw === 'Moderate' || raw === 'Strict') ? raw : null;
                         })(), // TASK-1385
+                        latitude: (() => {
+                            const raw =
+                                (apiListing as Record<string, unknown>).latitude ??
+                                (apiListing as Record<string, unknown>).Latitude;
+                            const n = raw == null || raw === '' ? NaN : Number(raw);
+                            return Number.isFinite(n) ? n : null;
+                        })(),
+                        longitude: (() => {
+                            const raw =
+                                (apiListing as Record<string, unknown>).longitude ??
+                                (apiListing as Record<string, unknown>).Longitude;
+                            const n = raw == null || raw === '' ? NaN : Number(raw);
+                            return Number.isFinite(n) ? n : null;
+                        })(),
                     };
                     const images = filterGuestImageUrls(
                         photoUrlsList.length > 0 ? photoUrlsList : (coverUrl ? [coverUrl] : []),
@@ -1038,6 +1056,34 @@ useEffect(() => {
     const mapStreet = String(data?.propertyAddress ?? data?.property_address ?? "").trim();
     const mapSearchQuery =
         [mapStreet, mapCity, mapState].filter(Boolean).join(", ") || (data?.property_location ?? "").trim();
+
+    const tenantCtxForMap = _getTenantCtx();
+    const tenantMapPin = tenantCtxForMap?.mapLocation;
+    const listingLat =
+        typeof data?.latitude === 'number' && Number.isFinite(data.latitude) ? data.latitude : null;
+    const listingLng =
+        typeof data?.longitude === 'number' && Number.isFinite(data.longitude) ? data.longitude : null;
+    const mapPinLat =
+        listingLat ??
+        (tenantMapPin && typeof tenantMapPin.lat === 'number' && Number.isFinite(tenantMapPin.lat)
+            ? tenantMapPin.lat
+            : null);
+    const mapPinLng =
+        listingLng ??
+        (tenantMapPin && typeof tenantMapPin.lng === 'number' && Number.isFinite(tenantMapPin.lng)
+            ? tenantMapPin.lng
+            : null);
+    const mapPinZoom =
+        listingLat != null && listingLng != null
+            ? 15
+            : typeof tenantMapPin?.zoom === 'number' && tenantMapPin.zoom > 0
+              ? tenantMapPin.zoom
+              : 15;
+    const mapMarkerTitle =
+        data?.property_name?.trim() ||
+        tenantMapPin?.markerLabel?.trim() ||
+        tenantCtxForMap?.name?.trim() ||
+        undefined;
 
     return (
         <>
@@ -1638,7 +1684,7 @@ useEffect(() => {
                             </button>
                         </div>
 
-                        {/* Location Map — TASK-1677: fallback when embed URL missing */}
+                        {/* Location Map — TL-GUEST: Google Maps JS + listing/tenant coords (same sources as /location). */}
                         <div className="">
                             <h2 className="text-xl sm:text-2xl font-semibold mb-4 text-text-primary">Where you'll be</h2>
                             <div className="rounded-lg overflow-hidden border border-border-subtle">
@@ -1650,6 +1696,13 @@ useEffect(() => {
                                         allowFullScreen
                                         referrerPolicy="no-referrer-when-downgrade"
                                         title="Property Location"
+                                    />
+                                ) : mapPinLat != null && mapPinLng != null ? (
+                                    <SinglePinGoogleMap
+                                        lat={mapPinLat}
+                                        lng={mapPinLng}
+                                        zoom={mapPinZoom}
+                                        markerTitle={mapMarkerTitle}
                                     />
                                 ) : (
                                     <div className="flex min-h-[16rem] flex-col items-center justify-center gap-3 bg-bg-muted px-4 py-8 text-center sm:min-h-[24rem]">
