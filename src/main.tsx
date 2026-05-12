@@ -17,6 +17,7 @@ import { validateTenant, resolveFromDomain, getTenantContext } from './tenant/te
 import { applyTenantBranding } from './tenant/tenantBranding'
 import { ConfigLoadingScreen } from './runtime-config/ConfigLoadingScreen'
 import { ConfigErrorScreen } from './runtime-config/ConfigErrorScreen'
+import TenantJsonLd from './components/TenantJsonLd'
 
 // Suppress chrome extension module loading errors in console (non-critical, expected in dev).
 // ErrorEvent.message is typed `string` but is nullish for some cross-origin / platform error
@@ -111,6 +112,7 @@ const bootstrapApp = async () => {
     root.render(
       <ThemeProvider initialTheme={DEFAULT_THEME}>
         <ErrorBoundary name="app-shell">
+          <TenantJsonLd />
           <ApiConfigGuard>
             <App />
           </ApiConfigGuard>
