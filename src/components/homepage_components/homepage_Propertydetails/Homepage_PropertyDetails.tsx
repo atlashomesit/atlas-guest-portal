@@ -30,7 +30,9 @@ import {
     resolveStaticMaxGuests,
 } from '../../../api/listingClient';
 import SEO from '../../SEO';
+import GoogleEmbedPlaceByQuery from '../../map/GoogleEmbedPlaceByQuery';
 import SinglePinGoogleMap from '../../map/SinglePinGoogleMap';
+import { GOOGLE_MAPS_API_KEY } from '../../../config/googleMaps';
 import { buildApiUrl, getApiHeaders } from '../../../api/client';
 import { addRecentlyViewed, isFavorite, toggleFavorite } from '../../../utils/guestHistory';
 import { formatCurrency, formatHumanDate } from '../../../utils/formatting';
@@ -1085,6 +1087,9 @@ useEffect(() => {
         tenantCtxForMap?.name?.trim() ||
         undefined;
 
+    /** Address string for Embed API when lat/lng are unavailable (geocoded by Google). */
+    const placeQueryForMap = (mapSearchQuery || data?.property_location || "").trim();
+
     return (
         <>
         {data && (
@@ -1704,6 +1709,26 @@ useEffect(() => {
                                         zoom={mapPinZoom}
                                         markerTitle={mapMarkerTitle}
                                     />
+                                ) : placeQueryForMap && GOOGLE_MAPS_API_KEY ? (
+                                    <div className="bg-bg-muted">
+                                        <GoogleEmbedPlaceByQuery
+                                            query={placeQueryForMap}
+                                            title={data?.property_name}
+                                        />
+                                        <div className="flex flex-col items-center justify-center gap-2 border-t border-border-subtle px-4 py-4 text-center sm:flex-row sm:justify-between sm:text-left">
+                                            <p className="text-sm text-text-primary">
+                                                📍 {placeQueryForMap}
+                                            </p>
+                                            <a
+                                                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(placeQueryForMap)}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="shrink-0 text-sm font-semibold text-accent-primary underline underline-offset-2"
+                                            >
+                                                View on Google Maps →
+                                            </a>
+                                        </div>
+                                    </div>
                                 ) : (
                                     <div className="flex min-h-[16rem] flex-col items-center justify-center gap-3 bg-bg-muted px-4 py-8 text-center sm:min-h-[24rem]">
                                         <p className="text-lg text-text-primary">
