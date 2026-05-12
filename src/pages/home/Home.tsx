@@ -216,7 +216,7 @@ const Home = () => {
                 title={
                     hideAtlasBranding && tenant?.name?.trim()
                         ? `${tenant.name.trim()} | Book your stay`
-                        : "Atlas Homestays | Find your perfect stay"
+                        : "Starguest House | Serviced apartments in Hyderabad"
                 }
                 description={
                     hideAtlasBranding && tenant?.name?.trim()
