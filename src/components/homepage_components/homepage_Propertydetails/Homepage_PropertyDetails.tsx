@@ -1,5 +1,7 @@
 import React from 'react';
 import { getTenantContext as _getTenantCtx } from '@/tenant/tenantContext';
+import { getTenantOverrides } from '@/tenant/tenantOverrides';
+import { getTenantBrandName } from '@/tenant/displayBrand';
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { FaBed, FaShower, FaSwimmingPool, FaCar, FaWifi, FaTv } from "react-icons/fa";
 import { TbAirConditioning } from "react-icons/tb";
@@ -13,6 +15,7 @@ import { FaStar } from "react-icons/fa";
 import { X, ChevronRight, Clock, KeyRound, Bookmark, Share2 } from 'lucide-react';
 import { useEffect, useMemo, useState, Suspense, lazy } from 'react';
 import { useTenantListings } from '../../../hooks/useTenantListings';
+import { usePropertyListings } from '../../../hooks/usePropertyListings';
 import { inlinePolicySnippets } from '../../../content/terms';
 import Subheading from '../../commonComponents/subheading/Subheading';
 import { trackEvent } from '../../../utils/analytics';
@@ -30,9 +33,8 @@ import {
     resolveStaticMaxGuests,
 } from '../../../api/listingClient';
 import SEO from '../../SEO';
-import GoogleEmbedPlaceByQuery, { isMappableAddressQuery } from '../../map/GoogleEmbedPlaceByQuery';
+import MultiPinMap, { type MapPin } from '../../map/MultiPinMap';
 import SinglePinGoogleMap from '../../map/SinglePinGoogleMap';
-import { GOOGLE_MAPS_API_KEY } from '../../../config/googleMaps';
 import { buildApiUrl, getApiHeaders } from '../../../api/client';
 import { addRecentlyViewed, isFavorite, toggleFavorite } from '../../../utils/guestHistory';
 import { formatCurrency, formatHumanDate } from '../../../utils/formatting';
@@ -216,6 +218,37 @@ const PropertyDetails = () => {
     const location = useLocation();
     const { propertySlug: propertySlugParam, unitSlug: unitSlugParam, id: legacyIdParam } = useParams();
     const { properties: apiProperties } = useTenantListings();
+    const { listingsById } = usePropertyListings();
+
+    // TL-GUEST: same map data + branching as LocationPage (`/location`).
+    const mapTenant = _getTenantCtx();
+    const mapTenantSlug = mapTenant?.slug;
+    const locationTenantOverrides = useMemo(
+        () => getTenantOverrides(mapTenantSlug ?? ''),
+        [mapTenantSlug],
+    );
+    const mapLocation = mapTenant?.mapLocation ?? locationTenantOverrides.mapLocation;
+    const tenantNameForMap = mapTenant?.name?.trim() || getTenantBrandName();
+    const propertyPins = useMemo<MapPin[]>(() => {
+        const seen = new Map<number, MapPin>();
+        for (const l of Object.values(listingsById)) {
+            const lat = typeof l.latitude === 'number' ? l.latitude : null;
+            const lng = typeof l.longitude === 'number' ? l.longitude : null;
+            if (lat == null || lng == null) continue;
+            const pid = l.propertyId;
+            if (pid == null || !Number.isFinite(pid)) continue;
+            if (seen.has(pid)) continue;
+            seen.set(pid, {
+                id: `property-${pid}`,
+                lat,
+                lng,
+                title: l.propertyName?.trim() || `Property ${pid}`,
+                subtitle: l.propertyAddress ?? undefined,
+            });
+        }
+        return Array.from(seen.values());
+    }, [listingsById]);
+    const useMultiPin = propertyPins.length >= 2;
 
     const normalizedLegacyParts = (legacyIdParam ?? '').split('-');
     const legacyUnitSlug = normalizedLegacyParts.pop();
@@ -1049,48 +1082,6 @@ useEffect(() => {
     const galleryUrls = filterGuestImageUrls(data?.property_img ?? []).map(buildAtlasMediaUrl);
     const primaryImage = galleryUrls[0];
     const mapSrcTrimmed = (data?.property_mapSrc ?? "").trim();
-    const locationParts = (data?.property_location ?? "")
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
-    const mapCity = locationParts[0] ?? "";
-    const mapState = locationParts.slice(1).join(", ");
-    const mapStreet = String(data?.propertyAddress ?? data?.property_address ?? "").trim();
-    const mapSearchQuery =
-        [mapStreet, mapCity, mapState].filter(Boolean).join(", ") || (data?.property_location ?? "").trim();
-
-    const tenantCtxForMap = _getTenantCtx();
-    const tenantMapPin = tenantCtxForMap?.mapLocation;
-    const listingLat =
-        typeof data?.latitude === 'number' && Number.isFinite(data.latitude) ? data.latitude : null;
-    const listingLng =
-        typeof data?.longitude === 'number' && Number.isFinite(data.longitude) ? data.longitude : null;
-    const mapPinLat =
-        listingLat ??
-        (tenantMapPin && typeof tenantMapPin.lat === 'number' && Number.isFinite(tenantMapPin.lat)
-            ? tenantMapPin.lat
-            : null);
-    const mapPinLng =
-        listingLng ??
-        (tenantMapPin && typeof tenantMapPin.lng === 'number' && Number.isFinite(tenantMapPin.lng)
-            ? tenantMapPin.lng
-            : null);
-    const mapPinZoom =
-        listingLat != null && listingLng != null
-            ? 15
-            : typeof tenantMapPin?.zoom === 'number' && tenantMapPin.zoom > 0
-              ? tenantMapPin.zoom
-              : 15;
-    const mapMarkerTitle =
-        data?.property_name?.trim() ||
-        tenantMapPin?.markerLabel?.trim() ||
-        tenantCtxForMap?.name?.trim() ||
-        undefined;
-
-    /** Address string for static map when lat/lng are unavailable (geocoded by Google). */
-    const placeQueryForMap = (mapSearchQuery || data?.property_location || "").trim();
-    const showAddressStaticMap =
-        Boolean(GOOGLE_MAPS_API_KEY) && isMappableAddressQuery(placeQueryForMap);
 
     return (
         <>
@@ -1691,7 +1682,7 @@ useEffect(() => {
                             </button>
                         </div>
 
-                        {/* Location Map — TL-GUEST: Google Maps JS + listing/tenant coords (same sources as /location). */}
+                        {/* Location Map — TL-GUEST: same APIs + UI branch as LocationPage (`/location`). */}
                         <div className="">
                             <h2 className="text-xl sm:text-2xl font-semibold mb-4 text-text-primary">Where you'll be</h2>
                             <div className="rounded-lg overflow-hidden border border-border-subtle">
@@ -1704,48 +1695,34 @@ useEffect(() => {
                                         referrerPolicy="no-referrer-when-downgrade"
                                         title="Property Location"
                                     />
-                                ) : mapPinLat != null && mapPinLng != null ? (
-                                    <SinglePinGoogleMap
-                                        lat={mapPinLat}
-                                        lng={mapPinLng}
-                                        zoom={mapPinZoom}
-                                        markerTitle={mapMarkerTitle}
-                                    />
-                                ) : showAddressStaticMap ? (
+                                ) : useMultiPin ? (
                                     <div className="bg-bg-muted">
-                                        <GoogleEmbedPlaceByQuery
-                                            query={placeQueryForMap}
-                                            title={data?.property_name}
-                                        />
-                                        <div className="flex flex-col items-center justify-center gap-2 border-t border-border-subtle px-4 py-4 text-center sm:flex-row sm:justify-between sm:text-left">
-                                            <p className="text-sm text-text-primary">
-                                                📍 {placeQueryForMap}
+                                        <div className="border-b border-border-subtle p-4">
+                                            <p className="font-semibold text-text-primary">
+                                                Our properties ({propertyPins.length})
                                             </p>
-                                            <a
-                                                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(placeQueryForMap)}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="shrink-0 text-sm font-semibold text-accent-primary underline underline-offset-2"
-                                            >
-                                                View on Google Maps →
-                                            </a>
+                                            <p className="text-sm text-text-muted">
+                                                Click a pin for details. Each marker is a separate property.
+                                            </p>
                                         </div>
+                                        <MultiPinMap pins={propertyPins} height={384} />
                                     </div>
+                                ) : mapLocation &&
+                                  typeof mapLocation.lat === 'number' &&
+                                  Number.isFinite(mapLocation.lat) &&
+                                  typeof mapLocation.lng === 'number' &&
+                                  Number.isFinite(mapLocation.lng) ? (
+                                    <SinglePinGoogleMap
+                                        lat={mapLocation.lat}
+                                        lng={mapLocation.lng}
+                                        zoom={typeof mapLocation.zoom === 'number' && mapLocation.zoom > 0 ? mapLocation.zoom : 15}
+                                        markerTitle={mapLocation.markerLabel ?? tenantNameForMap}
+                                    />
                                 ) : (
-                                    <div className="flex min-h-[16rem] flex-col items-center justify-center gap-3 bg-bg-muted px-4 py-8 text-center sm:min-h-[24rem]">
-                                        <p className="text-lg text-text-primary">
-                                            📍 {mapSearchQuery || (data?.property_location ?? "Location on map")}
+                                    <div className="flex items-center justify-center bg-bg-muted px-4 py-16 text-center">
+                                        <p className="text-text-muted">
+                                            Map location not configured for this property.
                                         </p>
-                                        {mapSearchQuery ? (
-                                            <a
-                                                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapSearchQuery)}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="text-sm font-semibold text-accent-primary underline underline-offset-2"
-                                            >
-                                                View on Google Maps →
-                                            </a>
-                                        ) : null}
                                     </div>
                                 )}
                             </div>

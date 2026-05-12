@@ -3,56 +3,7 @@ import { GOOGLE_MAPS_API_KEY } from "@/config/googleMaps";
 import OptimizedImage from "@/components/ui/OptimizedImage";
 import { Button } from "@/components/ui/Button";
 import { Typography } from "@/components/ui/Typography";
-
-/** Same script id as LocationPage / MultiPinMap so one SDK load serves all guest maps. */
-const MAP_SCRIPT_ID = "atlas-homestays-google-maps-script";
-
-declare global {
-  interface Window {
-    google?: {
-      maps?: {
-        Map: new (
-          el: HTMLElement,
-          opts: {
-            center: { lat: number; lng: number };
-            zoom: number;
-            mapTypeControl?: boolean;
-            streetViewControl?: boolean;
-            fullscreenControl?: boolean;
-          },
-        ) => unknown;
-        Marker: new (opts: {
-          position: { lat: number; lng: number };
-          map: unknown;
-          title?: string;
-        }) => unknown;
-      };
-    };
-  }
-}
-
-async function loadGoogleMapsJs(apiKey: string): Promise<void> {
-  if (window.google?.maps?.Map && window.google.maps.Marker) return;
-  const existing = document.getElementById(MAP_SCRIPT_ID) as HTMLScriptElement | null;
-  if (existing) {
-    await new Promise<void>((resolve, reject) => {
-      existing.addEventListener("load", () => resolve(), { once: true });
-      existing.addEventListener("error", () => reject(new Error("Maps script failed")), { once: true });
-      if (window.google?.maps?.Map && window.google.maps.Marker) resolve();
-    });
-    return;
-  }
-  await new Promise<void>((resolve, reject) => {
-    const script = document.createElement("script");
-    script.id = MAP_SCRIPT_ID;
-    script.async = true;
-    script.defer = true;
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}`;
-    script.addEventListener("load", () => resolve(), { once: true });
-    script.addEventListener("error", () => reject(new Error("Maps script failed")), { once: true });
-    document.head.appendChild(script);
-  });
-}
+import { loadGoogleMapsJs } from "@/components/map/googleMapsJsLoader";
 
 export interface SinglePinGoogleMapProps {
   lat: number;
@@ -128,7 +79,7 @@ export default function SinglePinGoogleMap({
   }, [apiKey, lat, lng, zoom, retryCount, markerTitle]);
 
   return (
-    <div className={`relative overflow-hidden rounded-lg border border-border-subtle bg-bg-muted ${className ?? ""}`}>
+    <div className={`relative bg-bg-muted ${className ?? ""}`}>
       <div
         ref={mapRef}
         aria-busy={status === "loading"}
