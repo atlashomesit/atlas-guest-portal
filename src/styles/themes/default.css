@@ -9,7 +9,13 @@
   --bg-muted: #fff3e8;
 
   /* Brand — vibrant coral + golden amber (only 2 primary colors) */
-  --brand-primary: #ff6b35;
+  /* --brand-primary darkened from #ff6b35 → #c2410c. navbar.css uses this
+     token as text color in ~6 spots; the original `#ff6b35` on a light
+     `#fffaf5` body background failed WCAG AA contrast (2.73:1) — flagged
+     by tests/accessibility-wcag.e2e.spec.ts:81. Brand-accent (#ffb347) and
+     gradient stops stay where they are so the orange family is preserved
+     in non-text uses (banners, gradients, hero overlays). */
+  --brand-primary: #c2410c;
   --brand-accent: #ffb347;
   --brand-soft: #ffe8d6;
   /* --accent-primary darkened from #ff6b35 → #c2410c to clear WCAG AA when used
@@ -53,8 +59,11 @@
   --gradient-cta: linear-gradient(135deg, #ff6b35, #ffb347);
   --gradient-card: linear-gradient(180deg, rgba(255, 107, 53, 0.03) 0%, transparent 100%);
 
-  /* Brand aliases for existing components */
-  --brand: #ff6b35;
+  /* Brand aliases for existing components.
+     --brand darkened to match --brand-primary so white-on-brand fills
+     (ListingCard CTA: `bg-[color:var(--brand)] text-[color:var(--text-contrast)]`)
+     meet WCAG AA contrast. */
+  --brand: #c2410c;
   --brand-ink: #1a1a2e;
   --brand-contrast: #fffaf5;
   --brand-soft: #ffe8d6;
