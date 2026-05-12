@@ -127,7 +127,7 @@ describe("inferUnitType", () => {
   it("returns the metadata unit type when provided", () => {
     expect(
       inferUnitType({
-        property_name: "Atlas Homes Room 101",
+        property_name: "Room 101",
         metadata: { unitType: "1bhk" },
       }),
     ).toBe("1bhk");
@@ -136,7 +136,7 @@ describe("inferUnitType", () => {
   it("supports snake_case metadata keys", () => {
     expect(
       inferUnitType({
-        name: "Atlas Penthouse 501",
+        name: "Penthouse 501",
         property_metadata: { unit_type: "penthouse" },
       }),
     ).toBe("penthouse");
