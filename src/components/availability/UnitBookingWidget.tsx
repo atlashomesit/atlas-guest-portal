@@ -1946,7 +1946,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       <div className="flex flex-col gap-1">
         <div className="flex items-center gap-2 flex-wrap">
           {effectiveDailyPricing && effectiveDailyPricing.globalDiscountPercent > 0 && (
-            <span className="text-sm font-semibold rounded-full bg-[color:color-mix(in_srgb,var(--cta-primary)_18%,transparent)] px-3 py-1 text-[color:color-mix(in_srgb,var(--cta-primary)_80%,transparent)]">
+            <span className="text-sm font-semibold rounded-full bg-[color:color-mix(in_srgb,var(--cta-primary)_18%,transparent)] px-3 py-1 text-[color:var(--text-body)]">
               Best price on our website
             </span>
           )}
@@ -1987,7 +1987,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                   <span className="text-sm text-gray-400">
                     {displayPrice(effectiveDailyPricing.baseAmount)}
                   </span>
-                  <span className="text-sm font-semibold text-[color:color-mix(in_srgb,var(--cta-primary)_80%,transparent)]">
+                  <span className="text-sm font-semibold text-[color:var(--cta-primary)]">
                     {priceDisplayConfig.discount.savingsPrefix} {Math.round(effectiveDailyPricing.globalDiscountPercent)}%
                   </span>
                 </>

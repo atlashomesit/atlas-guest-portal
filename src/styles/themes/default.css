@@ -9,21 +9,33 @@
   --bg-muted: #fff3e8;
 
   /* Brand — vibrant coral + golden amber (only 2 primary colors) */
-  --brand-primary: #ff6b35;
+  /* --brand-primary darkened from #ff6b35 → #c2410c. navbar.css uses this
+     token as text color in ~6 spots; the original `#ff6b35` on a light
+     `#fffaf5` body background failed WCAG AA contrast (2.73:1) — flagged
+     by tests/accessibility-wcag.e2e.spec.ts:81. Brand-accent (#ffb347) and
+     gradient stops stay where they are so the orange family is preserved
+     in non-text uses (banners, gradients, hero overlays). */
+  --brand-primary: #c2410c;
   --brand-accent: #ffb347;
   --brand-soft: #ffe8d6;
-  --accent-primary: #ff6b35;
+  /* --accent-primary darkened from #ff6b35 → #c2410c to clear WCAG AA when used
+     as text color (navbar links, etc.) against the light background tokens
+     (#fffaf5, #fff). Contrast lifts from 2.73:1 to ~4.95:1. Flagged by
+     tests/accessibility-wcag.e2e.spec.ts:81. */
+  --accent-primary: #c2410c;
   --accent-soft: #ffe8d6;
   --romance-soft: #ffe8d6;
-  --accent-primary-rgb: 255 107 53;
+  --accent-primary-rgb: 194 65 12;
   --accent-soft-rgb: 255 232 214;
 
-  /* CTA — gradient and solid coral */
-  --cta-primary: #ff6b35;
-  --cta-primary-hover: #e55a2b;
+  /* CTA — gradient and solid coral.
+     Darkened from #ff6b35 → #c2410c so white-on-CTA reaches WCAG AA 4.5:1
+     (was 2.83:1, flagged by tests/accessibility-wcag.e2e.spec.ts:88). */
+  --cta-primary: #c2410c;
+  --cta-primary-hover: #a8350a;
   --cta-secondary: #6b7280;
-  --cta-primary-rgb: 255 107 53;
-  --cta-primary-hover-rgb: 229 90 43;
+  --cta-primary-rgb: 194 65 12;
+  --cta-primary-hover-rgb: 168 53 10;
   --cta-secondary-rgb: 107 114 128;
 
   /* Text — deep navy, never pure black */
@@ -47,8 +59,11 @@
   --gradient-cta: linear-gradient(135deg, #ff6b35, #ffb347);
   --gradient-card: linear-gradient(180deg, rgba(255, 107, 53, 0.03) 0%, transparent 100%);
 
-  /* Brand aliases for existing components */
-  --brand: #ff6b35;
+  /* Brand aliases for existing components.
+     --brand darkened to match --brand-primary so white-on-brand fills
+     (ListingCard CTA: `bg-[color:var(--brand)] text-[color:var(--text-contrast)]`)
+     meet WCAG AA contrast. */
+  --brand: #c2410c;
   --brand-ink: #1a1a2e;
   --brand-contrast: #fffaf5;
   --brand-soft: #ffe8d6;
