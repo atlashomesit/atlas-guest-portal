@@ -1,5 +1,14 @@
 # Agent instructions (atlas-guest-portal)
 
+## HARD RULE — GitHub Actions workflows (Sreekar-approved 2026-05-12)
+
+**NEVER create, modify, or delete any file under `.github/workflows/`.**
+Approved workflows are listed in `atlas-e2e/docs/governance/APPROVED-WORKFLOWS.md`.
+If a task needs a new workflow, stop — add it to MANUAL-DEVELOPER-BACKLOG.md and wait
+for Sreekar's approval. Violations will be reverted.
+
+---
+
 For AI assistants (Cursor, Codex, etc.) working in this repo:
 
 - **Branch & stash discipline (READ FIRST):** Atlas multi-repo work follows 10 binding rules — push every commit in the same Bash call (no local-only branches across sessions), no stash older than 24h (convert to `wip/*` branch and push, or drop), branches max 5 days from dev, never `git add -A` after `git stash apply` or `git stash branch` (use specific paths), inventory branch state from origin refs only (local refs lie), abort on >2 file conflicts during consolidation runs. Full rules + 2026-05-10 incident postmortem: [atlas-e2e/docs/incidents/2026-05-10-multi-repo-branch-consolidation.md](../atlas-e2e/docs/incidents/2026-05-10-multi-repo-branch-consolidation.md). At session start, verify: `git status` clean, `git stash list` empty, no branch ahead of `origin/<branch>`. At session end, same verification before stopping.
