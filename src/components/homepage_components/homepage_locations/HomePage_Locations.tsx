@@ -419,7 +419,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
 
             <div className="p-6 flex flex-col gap-4">
               <div className="flex items-center gap-2">
-                <span className="rounded-full bg-[color:color-mix(in_srgb,var(--cta-primary)_12%,transparent)] px-3 py-1 text-xs font-semibold text-[color:color-mix(in_srgb,var(--cta-primary)_80%,transparent)]">
+                <span className="rounded-full bg-[color:color-mix(in_srgb,var(--cta-primary)_12%,transparent)] px-3 py-1 text-xs font-semibold text-[color:var(--cta-primary)]">
                   Featured
                 </span>
                 <span className="text-xs uppercase tracking-[0.08em] font-semibold text-text-muted">
