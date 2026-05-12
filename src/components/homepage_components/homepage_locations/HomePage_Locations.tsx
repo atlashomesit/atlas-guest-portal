@@ -267,7 +267,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
     return (
       <div className="flex flex-col gap-1">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-sm font-semibold rounded-full bg-[color:color-mix(in_srgb,var(--cta-primary)_18%,transparent)] px-3 py-1 text-[color:color-mix(in_srgb,var(--cta-primary)_80%,transparent)]">
+          <span className="text-sm font-semibold rounded-full bg-[color:color-mix(in_srgb,var(--cta-primary)_18%,transparent)] px-3 py-1 text-[color:var(--text-body)]">
             {priceDisplayConfig.discount.primaryBadgeLabel}
           </span>
           {showLimitedTimeDeal ? (
@@ -283,7 +283,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
             {todayBreakdown.globalDiscountPercent > 0 && (
               <>
                 <span className="text-sm text-gray-400">{formatCurrency(todayBreakdown.baseAmount)}</span>
-                <span className="text-sm font-semibold text-[color:color-mix(in_srgb,var(--cta-primary)_80%,transparent)]">
+                <span className="text-sm font-semibold text-[color:var(--cta-primary)]">
                   Save {Math.round(todayBreakdown.globalDiscountPercent)}%
                 </span>
               </>
@@ -295,7 +295,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
             {appliedDiscountPercent > 0 && (
               <>
                 <span className="text-sm text-gray-400 line-through">{formattedBase}</span>
-                <span className="text-sm font-semibold text-[color:color-mix(in_srgb,var(--cta-primary)_80%,transparent)]">
+                <span className="text-sm font-semibold text-[color:var(--cta-primary)]">
                   {priceDisplayConfig.discount.savingsPrefix} {appliedDiscountPercent}%
                 </span>
               </>

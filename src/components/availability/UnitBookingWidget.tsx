@@ -1987,7 +1987,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                   <span className="text-sm text-gray-400">
                     {displayPrice(effectiveDailyPricing.baseAmount)}
                   </span>
-                  <span className="text-sm font-semibold text-[color:color-mix(in_srgb,var(--cta-primary)_80%,transparent)]">
+                  <span className="text-sm font-semibold text-[color:var(--cta-primary)]">
                     {priceDisplayConfig.discount.savingsPrefix} {Math.round(effectiveDailyPricing.globalDiscountPercent)}%
                   </span>
                 </>
