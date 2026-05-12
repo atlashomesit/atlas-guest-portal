@@ -12,7 +12,7 @@ import { initAnalytics } from './utils/analytics'
 import { ThemeProvider } from './theme/ThemeProvider'
 import { loadRuntimeConfig, setRuntimeConfig, getApiBaseUrl } from './runtime-config'
 import { getApiHeaders } from './api/client'
-import { getTenantSlug, setMarketplaceMode } from './tenant/tenantResolver'
+import { getTenantSlug, isMarketplaceMode, setMarketplaceMode } from './tenant/tenantResolver'
 import { validateTenant, resolveFromDomain, getTenantContext } from './tenant/tenantContext'
 import { applyTenantBranding } from './tenant/tenantBranding'
 import { ConfigLoadingScreen } from './runtime-config/ConfigLoadingScreen'
@@ -103,6 +103,18 @@ const bootstrapApp = async () => {
       setMarketplaceMode(true);
     } else if (resolved) {
       applyTenantBranding(resolved);
+    }
+
+    // TASK-2400: `/` uses React.lazy (Home or MarketplaceHomepage). Under slow CDN or
+    // parallel E2E load, the route chunk can still be loading after domcontentloaded —
+    // body text stays tiny (Suspense fallback) and a11y/homepage tests flake. Prefetch
+    // the correct root chunk during the intentional boot delay so first paint is ready.
+    if (typeof window !== 'undefined') {
+      if (isMarketplaceMode()) {
+        void import('./pages/MarketplaceHomepage');
+      } else {
+        void import('./pages/home/Home');
+      }
     }
 
     // Keep loading screen visible briefly to prevent tenant flicker
