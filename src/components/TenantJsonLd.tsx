@@ -4,7 +4,7 @@
  * Renders Organization and FAQPage JSON-LD blocks using the tenant context
  * (brand name, logo, contact email). This component appends the JSON-LD scripts
  * to <head> after the tenant context resolves, replacing the static blocks in
- * index.html that hardcode Atlas Homestays brand strings.
+ * index.html that hardcode Atla Stays brand strings.
  *
  * Per ADR-0018: runtime DOM rewrite (no SSR, no Cloudflare Worker).
  */
@@ -86,7 +86,7 @@ export const TenantJsonLd: React.FC = () => {
     appendJsonLdScript('organization', organizationJsonLd);
 
     // ── FAQPage JSON-LD ──────────────────────────────────────────────────────────
-    // Replace "Atlas Homestays" in the FAQ question with the tenant's brand name.
+    // Replace "Atla Stays" in the FAQ question with the tenant's brand name.
     const faqPageJsonLd = {
       '@context': 'https://schema.org',
       '@type': 'FAQPage',

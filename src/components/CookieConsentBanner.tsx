@@ -45,9 +45,9 @@ const CookieConsentBanner = () => {
   const cookieBannerOverride = tenantOverrides.cookieBanner;
 
   const bannerTitle = cookieBannerOverride?.title ?? "Your privacy choice";
-  // Marketplace apex resolves to "Atlas Homestays" (full brand baseline); white-label tenants
+  // Marketplace apex resolves to "Atla Stays" (full brand baseline); white-label tenants
   // use legal/long brand from context. Aligns with cookie-consent-compliance.e2e.spec.ts which
-  // asserts banner copy starts with "Atlas Homestays uses" on the marketplace and
+  // asserts banner copy starts with "Atla Stays uses" on the marketplace and
   // "Star Guest House uses" on tenant subdomains.
   const bannerText = cookieBannerOverride?.text ??
     `${getGuestDataProcessingEntityName()} uses strictly necessary cookies to make this site work, and optional analytics cookies ` +

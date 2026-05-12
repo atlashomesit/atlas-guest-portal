@@ -2,7 +2,7 @@
 import { getTenantContext } from "./tenantContext";
 
 /** Canonical marketplace name when no tenant is resolved (apex / atlas tenant). */
-export const MARKETPLACE_BRAND_BASELINE = "Atlas Homestays";
+export const MARKETPLACE_BRAND_BASELINE = "Atla Stays";
 
 /** Marketplace support inbox when the tenant has not supplied `legalContactPack.contactEmail`. */
 const MARKETPLACE_SUPPORT_EMAIL = "support@atlashomestays.com";
