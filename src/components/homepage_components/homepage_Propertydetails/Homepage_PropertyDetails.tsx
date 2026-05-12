@@ -30,7 +30,7 @@ import {
     resolveStaticMaxGuests,
 } from '../../../api/listingClient';
 import SEO from '../../SEO';
-import GoogleEmbedPlaceByQuery from '../../map/GoogleEmbedPlaceByQuery';
+import GoogleEmbedPlaceByQuery, { isMappableAddressQuery } from '../../map/GoogleEmbedPlaceByQuery';
 import SinglePinGoogleMap from '../../map/SinglePinGoogleMap';
 import { GOOGLE_MAPS_API_KEY } from '../../../config/googleMaps';
 import { buildApiUrl, getApiHeaders } from '../../../api/client';
@@ -1087,8 +1087,10 @@ useEffect(() => {
         tenantCtxForMap?.name?.trim() ||
         undefined;
 
-    /** Address string for Embed API when lat/lng are unavailable (geocoded by Google). */
+    /** Address string for static map when lat/lng are unavailable (geocoded by Google). */
     const placeQueryForMap = (mapSearchQuery || data?.property_location || "").trim();
+    const showAddressStaticMap =
+        Boolean(GOOGLE_MAPS_API_KEY) && isMappableAddressQuery(placeQueryForMap);
 
     return (
         <>
@@ -1709,7 +1711,7 @@ useEffect(() => {
                                         zoom={mapPinZoom}
                                         markerTitle={mapMarkerTitle}
                                     />
-                                ) : placeQueryForMap && GOOGLE_MAPS_API_KEY ? (
+                                ) : showAddressStaticMap ? (
                                     <div className="bg-bg-muted">
                                         <GoogleEmbedPlaceByQuery
                                             query={placeQueryForMap}
