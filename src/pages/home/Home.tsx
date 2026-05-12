@@ -216,7 +216,7 @@ const Home = () => {
                 title={
                     hideAtlasBranding && tenant?.name?.trim()
                         ? `${tenant.name.trim()} | Book your stay`
-                        : "Atla Stays | Find your perfect stay"
+                        : "Atlas Homestays | Find your perfect stay"
                 }
                 description={
                     hideAtlasBranding && tenant?.name?.trim()
