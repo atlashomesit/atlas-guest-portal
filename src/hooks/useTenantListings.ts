@@ -36,6 +36,9 @@ export type TenantPropertyRecord = {
   losDiscount2MinNights?: number | null;
   losDiscount2Percent?: number | null;
   lastMinuteDiscountPercent?: number | null;
+  /** TL-GUEST: property pin from GET /listings/public — same source as Location page multi-pin. */
+  latitude?: number | null;
+  longitude?: number | null;
 };
 
 export type TenantListingsState = "idle" | "loading" | "error" | "success";
@@ -104,6 +107,8 @@ const mapDtoToProperty = (dto: PublicListing, photosFromEndpoint: string[]): Ten
     losDiscount2MinNights: dto.losDiscount2MinNights ?? null,
     losDiscount2Percent: dto.losDiscount2Percent ?? null,
     lastMinuteDiscountPercent: dto.lastMinuteDiscountPercent ?? null,
+    latitude: dto.latitude ?? null,
+    longitude: dto.longitude ?? null,
   };
 };
 
