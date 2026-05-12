@@ -5,7 +5,7 @@ import HomePage_Locations from './HomePage_Locations';
 
 const listingsWithGaps = [
   undefined,
-  { id: '101', title: 'Atlas Homes Room 101' },
+  { id: '101', title: 'Room 101' },
   { title: 'No ID' },
 ] as unknown[];
 
@@ -45,7 +45,7 @@ describe('HomePage_Locations', () => {
       </MemoryRouter>
     );
 
-    expect(await screen.findByText('Atlas Homes Room 101')).toBeInTheDocument();
+    expect(await screen.findByText('Room 101')).toBeInTheDocument();
     await waitFor(() => expect(trackEventMock).toHaveBeenCalledWith(
       'listings_browse',
       expect.objectContaining({ surface: 'home_locations' }),
