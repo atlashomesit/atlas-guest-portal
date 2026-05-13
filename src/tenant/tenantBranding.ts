@@ -39,9 +39,9 @@ function darkenRgb(rgb: string, amount = 20): string {
 }
 
 export function applyTenantBranding(tenant: TenantInfo): void {
-  // 1. Document title
-  if (tenant.name) {
-    document.title = tenant.name;
+  // 1. Document title — guard against whitespace-only name (WCAG: title must be non-empty)
+  if (tenant.name?.trim()) {
+    document.title = tenant.name.trim();
   }
 
   // 2. Primary color — apply to CSS RGB variables used by Tailwind and CSS custom props
