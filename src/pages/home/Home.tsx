@@ -115,7 +115,7 @@ const Home = () => {
                 url: canonicalUrl,
                 itemOffered: {
                     "@type": "Apartment",
-                    name: "Starguest House Penthouse 501",
+                    name: `${schemaBrandName} | Penthouse Suite 501`,
                     description: penthouse?.property_description,
                     ...(penthouseCover ? { image: penthouseCover } : {}),
                     address: {
@@ -145,7 +145,7 @@ const Home = () => {
                     // TASK-2064: fabricated review array removed — violates Google Structured Data Guidelines and ASCI 2025
                     offers: {
                         "@type": "Offer",
-                        name: "Starguest House Penthouse 501 direct offer",
+                        name: `${schemaBrandName} | Penthouse Suite 501 direct offer`,
                         priceCurrency: "INR",
                         price: penthouseOfferPrice,
                         availability: "https://schema.org/InStock",
@@ -216,17 +216,17 @@ const Home = () => {
                 title={
                     hideAtlasBranding && tenant?.name?.trim()
                         ? `${tenant.name.trim()} | Book your stay`
-                        : "Starguest House | Serviced apartments in Hyderabad"
+                        : "Atlas Homestays | Find your perfect stay"
                 }
                 description={
                     hideAtlasBranding && tenant?.name?.trim()
                         ? `Book your stay with ${tenant.name.trim()}. Questions? Call ${CONTACT.business.phone} or email ${contactEmail}.`
-                        : "Book serviced apartments in Hyderabad with business-ready amenities, flexible stays, and attentive on-call support from Starguest House."
+                        : "Book serviced apartments with Atlas Homestays. Flexible stays, business-ready amenities, and attentive support."
                 }
                 image={primaryOgImage}
                 url={canonicalUrl}
                 twitterCard="summary_large_image"
-                twitterSite="@starguesthouse"
+                twitterSite="@atlashomestays"
                 jsonLd={homepageJsonLd}
             />
             <section className="relative font-roboto select-none">
