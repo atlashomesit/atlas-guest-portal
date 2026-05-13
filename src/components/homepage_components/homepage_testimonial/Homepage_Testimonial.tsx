@@ -23,15 +23,15 @@ const Homepage_Testimonial = () => {
     // RA-006: substitute tenant brand into placeholder testimonial copy.
     // Brand-neutral fallback: don't leak "Atlas Homes" if tenant context hasn't resolved.
     const brandName = getTenantContext()?.name?.trim() || "Our Homestays";
-    const sub = (s: string) => s.replace(/Atlas Homes/g, brandName);
+    const sub = (s: string) => s.replace(/__BRAND__/g, brandName);
     const data: Review[] = [
         {
-            review: sub("Atlas Homes truly felt like a home away from home. The rooms were spotless, and every detail was thoughtfully arranged. I can't wait to visit again!"),
+            review: sub("__BRAND__ truly felt like a home away from home. The rooms were spotless, and every detail was thoughtfully arranged. I can't wait to visit again!"),
             clientName: 'Priya Sharma',
             rating: 5
         },
         {
-            review: sub("From the warm welcome to the luxurious amenities, everything at Atlas Homes exceeded my expectations. Highly recommended for a relaxing stay."),
+            review: sub("From the warm welcome to the luxurious amenities, everything at __BRAND__ exceeded my expectations. Highly recommended for a relaxing stay."),
             clientName: 'Rahul Mehta',
             rating: 5
         },
@@ -41,12 +41,12 @@ const Homepage_Testimonial = () => {
             rating: 4
         },
         {
-            review: sub("A delightful experience! The service was impeccable and the ambiance was so peaceful. Atlas Homes is now my go-to place in the city."),
+            review: sub("A delightful experience! The service was impeccable and the ambiance was so peaceful. __BRAND__ is now my go-to place in the city."),
             clientName: 'Sameer Kulkarni',
             rating: 5
         },
         {
-            review: sub("Spacious rooms, friendly staff, and a truly welcoming atmosphere. My family and I had a wonderful time at Atlas Homes."),
+            review: sub("Spacious rooms, friendly staff, and a truly welcoming atmosphere. My family and I had a wonderful time at __BRAND__."),
             clientName: 'Neha Gupta',
             rating: 5
         }

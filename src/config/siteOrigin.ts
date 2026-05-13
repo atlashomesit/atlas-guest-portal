@@ -11,5 +11,5 @@ export function getPublicSiteOrigin(): string {
   if (typeof window !== "undefined" && window.location?.origin) {
     return window.location.origin;
   }
-  return "https://atlashomestays.com";
+  return window.location?.origin ?? "";
 }

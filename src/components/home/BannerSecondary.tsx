@@ -16,8 +16,8 @@ const BannerSecondary = () => {
   const brandName = tenant?.name ?? "Our Homestays";
 
   const buildTitleAndDescription = () => {
-    const rawTitle = secondaryBannerDefaults.title.replace(/Atlas Homes/g, brandName);
-    const rawDescription = secondaryBannerDefaults.description.replace(/Atlas Homes/g, brandName);
+    const rawTitle = secondaryBannerDefaults.title.replace(/__BRAND__/g, brandName);
+    const rawDescription = secondaryBannerDefaults.description.replace(/__BRAND__/g, brandName);
     // Defaults may no longer include the literal "Atlas Homes"; still surface `brandName`
     // on cold load so tests and RA-006 §3.6 see a non–Atlas-branded heading.
     if (!tenant?.name && !rawTitle.includes(brandName)) {
