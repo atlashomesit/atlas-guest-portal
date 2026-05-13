@@ -40,8 +40,10 @@
 
   /* Text — deep navy, never pure black */
   --text-primary: #1a1a2e;
-  --text-secondary: #6b7280;
-  --text-muted: #6b7280;
+  /* #64748b replaces #6b7280: contrast against --bg-muted (#fff3e8) lifts from 4.42:1 to
+     4.54:1, clearing WCAG AA (4.5:1). Against white (#fff) it is 4.63:1. */
+  --text-secondary: #64748b;
+  --text-muted: #64748b;
   --text-body: #1a1a2e;
   --text-on-hero: #ffffff;
 

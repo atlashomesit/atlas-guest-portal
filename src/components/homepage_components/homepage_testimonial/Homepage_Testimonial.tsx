@@ -117,7 +117,7 @@ const Homepage_Testimonial = () => {
                                         <p className="text-text-muted flex-grow mb-4">{item.review}</p>
                                         <div className="mt-auto flex items-center gap-3">
                                             <div
-                                                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[color:color-mix(in_srgb,var(--cta-primary)_22%,var(--bg-muted))] text-sm font-bold text-[color:color-mix(in_srgb,var(--cta-primary)_90%,var(--text-primary))]"
+                                                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-bg-surface border border-border-subtle text-sm font-bold text-cta-primary"
                                                 aria-hidden
                                             >
                                                 {initialsFromName(item.clientName)}
