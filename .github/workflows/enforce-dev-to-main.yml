@@ -2,7 +2,7 @@ name: Enforce dev → main
 
 # Workspace policy: every commit reaching main MUST first land on dev.
 # This workflow fails any PR to main whose head branch is not `dev`.
-# Canonical policy: ../../POLICY-BRANCH-AND-DEPLOY.md (workspace root).
+# Non-negotiable per founder decision 2026-05-14.
 
 on:
   pull_request:
@@ -24,7 +24,6 @@ jobs:
         run: |
           if [ "$HEAD_REF" != "dev" ]; then
             echo "::error title=Branch policy violation::PR #${PR_NUMBER} targets main from '${HEAD_REF}', but workspace policy requires PRs to main come from 'dev'. Land your changes on dev first, then open a dev → main PR."
-            echo "Policy: every commit on main must first exist on dev. See POLICY-BRANCH-AND-DEPLOY.md."
             exit 1
           fi
-          echo "✓ PR head is 'dev' — branch policy satisfied."
+          echo "PR head is 'dev' — branch policy satisfied."
