@@ -140,13 +140,20 @@ const HomeDetails = () => {
 
   /** WCAG: set document.title for listing detail so assistive technology and the
    *  accessibility WCAG test can detect a non-empty title on the listing/booking route.
-   *  Restore on unmount to avoid stale title when navigating away. */
+   *  Restore on unmount to avoid stale title when navigating away (TASK-2433: never restore to blank). */
   useEffect(() => {
     if (!room?.title) return;
     const brandName = getTenantBrandName();
-    const prev = document.title;
-    document.title = `${room.title} | ${brandName}`;
-    return () => { document.title = prev; };
+    const prev = document.title?.trim() ? document.title : "";
+    const next = `${room.title} | ${brandName}`.trim();
+    document.title = next || prev || brandName || "Atlas";
+    return () => {
+      if (prev) {
+        document.title = prev;
+      } else {
+        document.title = brandName || "Atlas";
+      }
+    };
   }, [room?.title]);
 
   /** TASK-1477: inject LodgingBusiness JSON-LD for SEO (url, ratings, white-label provider). */
