@@ -3,6 +3,11 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { addDays, format, startOfMonth } from 'date-fns';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import {
+  getOrderCreationGuestErrorMessage,
+  isTransportLayerFailure,
+  NETWORK_ERROR_MESSAGE,
+} from './unitBookingPaymentOrderErrors';
 import { toast } from 'react-toastify';
 import { Button } from '@/components/ui/Button';
 import { AtlasDateRangePicker, type AtlasDateRangePickerValue } from '@/components/date/AtlasDateRangePicker';
@@ -75,8 +80,6 @@ const normalizeListingId = (value: string | number | null | undefined) =>
   String(value ?? '')
     .trim()
     .toLowerCase();
-
-const NETWORK_ERROR_MESSAGE = 'Network error. Please check your connection and try again.';
 
 /** Detect network/connection failures (timeout, offline, ECONNREFUSED, etc.). */
 function isNetworkError(error: unknown): boolean {
@@ -222,6 +225,8 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [paymentAttemptCount, setPaymentAttemptCount] = useState(0);
   const [formError, setFormError] = useState<string | null>(null);
+  /** TASK-2460: only true for TypeError / no HTTP response — drives retry hint, not API 4xx/5xx bodies. */
+  const [orderErrorWasTransportFailure, setOrderErrorWasTransportFailure] = useState(false);
   const [dateError, setDateError] = useState<string | null>(null);
   const [minStayNights] = useState(1);
   const minAdvanceDays = 0;
@@ -1013,10 +1018,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     script.onload = () => callback();
     script.onerror = () => {
       localStorage.removeItem(PENDING_PAYMENT_KEY);
-      setFormError('Unable to connect to payment service. Please check your internet connection and try again.');
+      setOrderErrorWasTransportFailure(true);
+      setFormError(NETWORK_ERROR_MESSAGE);
       setIsSubmitting(false);
       setIsLoading(false);
-      toast.error('Unable to connect to payment service. Please try again.');
+      toast.error(NETWORK_ERROR_MESSAGE);
     };
     document.body.appendChild(script);
   };
@@ -1297,6 +1303,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     setIsSubmitting(true);
     setIsLoading(true);
     setFormError(null);
+    setOrderErrorWasTransportFailure(false);
     setStatusMessage(null);
     setPaymentAttemptCount((c) => c + 1);
     // TASK-1480: start_checkout = user passed validation + clicked submit
@@ -1565,28 +1572,34 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             paymentHoldToken: null,
             holdExpiresAt: null,
           });
-          setFormError('Unable to connect to payment service. Please try again.');
+          setOrderErrorWasTransportFailure(true);
+          setFormError(NETWORK_ERROR_MESSAGE);
           setIsSubmitting(false);
           setIsLoading(false);
-          toast.error('Unable to connect to payment service. Please try again.');
+          toast.error(NETWORK_ERROR_MESSAGE);
         }
       });
     } catch (error: unknown) {
       console.error('Booking error:', error);
       localStorage.removeItem(PENDING_PAYMENT_KEY);
       const status = (error as { response?: { status?: number } })?.response?.status;
-      const code = (error as { response?: { data?: { code?: string } } })?.response?.data?.code;
-      if (status === 503 && code === 'PAYMENT_PROVIDER_NOT_CONFIGURED') {
+      const data = (error as { response?: { data?: { code?: string; Code?: string } } })?.response?.data;
+      const code =
+        (typeof data?.code === 'string' ? data.code : typeof data?.Code === 'string' ? data.Code : '') || '';
+      if (status === 503 && code === 'PAYMENT_PROVIDER_NOT_CONFIGURED_PLATFORM') {
+        setOrderErrorWasTransportFailure(false);
         setProviderBlocked(true);
         setIsSubmitting(false);
         setIsLoading(false);
         return;
       }
-      const msg = getBookingErrorMessage(error, 'order');
+      const transport = isTransportLayerFailure(error);
+      setOrderErrorWasTransportFailure(transport);
+      const msg = getOrderCreationGuestErrorMessage(error, getBookingErrorMessage(error, 'order'));
       setFormError(msg);
       setIsSubmitting(false);
       setIsLoading(false);
-      if (isNetworkError(error)) {
+      if (transport) {
         toast.error(NETWORK_ERROR_MESSAGE);
       }
     }
@@ -1601,6 +1614,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     setPaymentStatus(null);
     setRazorpayFailure(null);
     setFormError(null);
+    setOrderErrorWasTransportFailure(false);
     setIsSubmitting(false);
     setIsLoading(false);
   }, []);
@@ -2683,7 +2697,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           <p className="text-sm text-support-error" role="alert">
             {formError}
           </p>
-          {paymentAttemptCount > 0 && (formError.includes('Network') || formError.includes('connection') || formError.includes('Unable to connect')) && (
+          {paymentAttemptCount > 0 && orderErrorWasTransportFailure && (
             <p className="text-xs text-text-muted">Attempt {Math.min(paymentAttemptCount, 3)} of 3 — Click &quot;Book this home&quot; to retry</p>
           )}
         </div>
