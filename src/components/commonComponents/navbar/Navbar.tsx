@@ -291,6 +291,16 @@ const Navbar = () => {
             </Link>
           )}
 
+          <a
+            href={`${(import.meta.env.VITE_ADMIN_PORTAL_URL as string | undefined)?.trim() || 'https://app.atlaspms.in'}/login`}
+            className="nav-link"
+            data-testid="navbar-host-login"
+            rel="noopener noreferrer"
+            style={{ whiteSpace: 'nowrap' }}
+          >
+            Host Login
+          </a>
+
           <a href={telLink} className="phone flex items-center gap-1">
             <span>{formatDisplayNumber()}</span>
           </a>
@@ -403,6 +413,16 @@ const Navbar = () => {
                 List your property
               </Link>
             )}
+
+            <a
+              href={`${(import.meta.env.VITE_ADMIN_PORTAL_URL as string | undefined)?.trim() || 'https://app.atlaspms.in'}/login`}
+              onClick={closeMobile}
+              className="block py-2 font-semibold"
+              data-testid="navbar-host-login"
+              rel="noopener noreferrer"
+            >
+              Host Login
+            </a>
 
             <a href={telLink} className="phone flex items-center gap-2">
               <IoIosCall />
