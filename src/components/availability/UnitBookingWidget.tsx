@@ -171,6 +171,12 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     tenantBookingMode === 'WHATSAPP' &&
     typeof tenantWhatsappPhone === 'string' &&
     tenantWhatsappPhone.length >= 6;
+  // SL-1: only show the secondary "Book now" button when the tenant has a real online
+  // payment provider. MANUAL = pay-on-arrival (no online order); null/undefined = none.
+  const _rawPaymentProvider = getTenantContext()?.paymentProvider;
+  const hasOnlinePaymentProvider =
+    typeof _rawPaymentProvider === 'string' &&
+    _rawPaymentProvider !== 'MANUAL';
 
   const coverFromPublicListings = useMemo(() => {
     const id = listingId != null ? Number(listingId) : NaN;
@@ -2694,7 +2700,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       {!isBookingDisabled && isWhatsAppDirectBooking && (
         <div className="flex items-center gap-2 flex-wrap justify-center py-1">
           <span className="text-xs text-text-muted">
-            Continue on WhatsApp for host confirmation, or use Book now to pay securely online.
+            {hasOnlinePaymentProvider
+              ? 'Continue on WhatsApp for host confirmation, or use Book now to pay securely online.'
+              : 'Tap Continue on WhatsApp — your host will confirm availability and payment.'}
           </span>
         </div>
       )}
@@ -2723,7 +2731,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               ? 'Continue on WhatsApp'
               : 'Book Now'}
       </Button>
-      {!isBookingDisabled && isWhatsAppDirectBooking && (
+      {!isBookingDisabled && isWhatsAppDirectBooking && hasOnlinePaymentProvider && (
         <Button
           type="submit"
           value="online_payment"
