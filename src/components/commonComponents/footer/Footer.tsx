@@ -40,7 +40,7 @@ const Footer = () => {
     // copy is reached only on the Atlas marketplace root where hideAtlasBranding=false.
     const footerBrand = hideAtlasBranding
         ? (tenant?.name?.trim() || "Our homestays")
-        : (tenant?.name?.trim() || "Atlas Homes");
+        : (tenant?.name?.trim() || "Our Homestays");
     const footerTagline = hideAtlasBranding
         ? (tenant?.tagline?.trim() || "Comfortable stays with responsive support.")
         : (tenant?.tagline?.trim() || "Thoughtfully curated stays in Hyderabad");

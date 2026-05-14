@@ -138,6 +138,17 @@ const HomeDetails = () => {
     if (Number.isFinite(listingId) && listingId > 0) track('view_listing', listingId);
   }, [room]);
 
+  /** WCAG: set document.title for listing detail so assistive technology and the
+   *  accessibility WCAG test can detect a non-empty title on the listing/booking route.
+   *  Restore on unmount to avoid stale title when navigating away. */
+  useEffect(() => {
+    if (!room?.title) return;
+    const brandName = getTenantBrandName();
+    const prev = document.title;
+    document.title = `${room.title} | ${brandName}`;
+    return () => { document.title = prev; };
+  }, [room?.title]);
+
   /** TASK-1477: inject LodgingBusiness JSON-LD for SEO (url, ratings, white-label provider). */
   useEffect(() => {
     if (!room) return;
