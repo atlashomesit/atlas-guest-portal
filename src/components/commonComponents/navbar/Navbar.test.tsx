@@ -52,6 +52,8 @@ const renderNavbar = (initialEntries: string[] = ["/"]) => {
 beforeEach(() => {
   vi.clearAllMocks();
   mockNavigate.mockClear();
+  document.getElementById("booking-form")?.remove();
+  document.querySelectorAll('[data-testid="guest-booking-form"]').forEach((node) => node.remove());
 });
 
 describe("Navbar CTA", () => {
@@ -118,6 +120,27 @@ describe("Navbar CTA", () => {
       expect.objectContaining({ target: "booking-form", surface: "property_details" }),
       { route: "/property_details/123#booking-form" },
     );
+  });
+
+  it("smoothly scrolls to the booking form on current /homes detail pages", () => {
+    const scrollIntoView = vi.fn();
+    const focus = vi.fn();
+    const bookingForm = document.createElement("form");
+    bookingForm.setAttribute("data-testid", "guest-booking-form");
+    // @ts-expect-error jsdom type
+    bookingForm.scrollIntoView = scrollIntoView;
+    Object.defineProperty(bookingForm, "focus", { value: focus });
+    document.body.appendChild(bookingForm);
+
+    renderNavbar(["/homes/atlas-homes/123"]);
+
+    const bookNow = screen.getByRole("button", { name: /book now/i });
+    fireEvent.click(bookNow);
+
+    expect(screen.getByText(/bringing booking form into view/i)).toBeInTheDocument();
+    expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
+    expect(focus).toHaveBeenCalled();
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 
   it("shows the Our Homes dropdown", async () => {

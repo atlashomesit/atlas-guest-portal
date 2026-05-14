@@ -94,8 +94,11 @@ const Navbar = () => {
   ========================= */
   const handleBookNow = () => {
     const propertyMatch =
-      matchPath('/property_details/:id', location.pathname) ?? matchPath('/properties/:id', location.pathname);
-    const propertyIdFromRoute = propertyMatch?.params.id ?? null;
+      matchPath('/homes/:propertySlug/:unitSlug', location.pathname) ??
+      matchPath('/homes/:roomNo', location.pathname) ??
+      matchPath('/property_details/:id', location.pathname) ??
+      matchPath('/properties/:id', location.pathname);
+    const propertyIdFromRoute = propertyMatch?.params.unitSlug ?? propertyMatch?.params.roomNo ?? propertyMatch?.params.id ?? null;
     const isPropertyDetailsRoute = Boolean(propertyMatch);
     const bookingTarget = isPropertyDetailsRoute ? 'booking-form' : 'search';
     const bookingSurface = isPropertyDetailsRoute ? 'property_details' : 'navbar';
@@ -126,7 +129,7 @@ const Navbar = () => {
     );
 
     if (isPropertyDetailsRoute) {
-      const bookingForm = document.getElementById('booking-form');
+      const bookingForm = document.getElementById('booking-form') ?? document.querySelector('[data-testid="guest-booking-form"]');
       if (bookingForm) {
         bookingForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
