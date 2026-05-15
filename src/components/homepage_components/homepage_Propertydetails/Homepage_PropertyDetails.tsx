@@ -1140,8 +1140,9 @@ useEffect(() => {
                                     const priceText = data?.property_price && data.property_price > 0 ? ` from ₹${data.property_price}/night` : '';
                                     const text = `Check out ${data?.property_name ?? 'this home'}${priceText} on ${_getTenantCtx()?.name ?? 'our platform'}`;
                                     const share = async () => {
-                                        const nav: any = navigator;
-                                        if (nav?.share) return nav.share({ title: document.title, text, url });
+                                        if (typeof navigator.share === 'function') {
+                                            return navigator.share({ title: document.title, text, url });
+                                        }
                                         window.open(`https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`, '_blank', 'noopener,noreferrer');
                                     };
                                     void share();

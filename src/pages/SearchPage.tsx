@@ -65,6 +65,10 @@ type NormalizedListing = {
   longitude?: number | null;
   /** TASK-2076: number of verified reviews — shown as (N) next to ★ rating. */
   reviewCount?: number | null;
+  /** TASK-577/TASK-1738: WiFi speed in Mbps — drives the remote-work / digital-nomad filters and badge. */
+  wifiSpeedMbps?: number | null;
+  /** TASK-577/TASK-1738: true when the listing has a dedicated co-working desk. */
+  hasCoworkingDesk?: boolean;
 };
 
 function buildStaticListings(allowedIds?: Set<number>): NormalizedListing[] {
@@ -455,7 +459,7 @@ const SearchPage = () => {
       }
       // TASK-577: Filter by remote work friendliness (co-working desk or WiFi >= 25 Mbps)
       if (remoteWork) {
-        const isRemoteWorkFriendly = (unit as any).hasCoworkingDesk || ((unit as any).wifiSpeedMbps ?? 0) >= 25;
+        const isRemoteWorkFriendly = unit.hasCoworkingDesk || (unit.wifiSpeedMbps ?? 0) >= 25;
         if (!isRemoteWorkFriendly) return false;
       }
       // TASK-1025/TASK-1866: Filter by long-stay (7+ night minimum).
@@ -466,10 +470,10 @@ const SearchPage = () => {
       }
       // TASK-1738: Digital nomad filters.
       if (nomadWifi) {
-        if (((unit as any).wifiSpeedMbps ?? 0) < 50) return false;
+        if ((unit.wifiSpeedMbps ?? 0) < 50) return false;
       }
       if (nomadWorkspace) {
-        const hasWorkspace = hasAmenity(unit, "Workspace") || hasAmenity(unit, "Desk") || (unit as any).hasCoworkingDesk;
+        const hasWorkspace = hasAmenity(unit, "Workspace") || hasAmenity(unit, "Desk") || unit.hasCoworkingDesk;
         if (!hasWorkspace) return false;
       }
       if (monthlyStay) {
@@ -1228,12 +1232,12 @@ const SearchPage = () => {
                       {/* TASK-577: Show WiFi speed and co-working desk badges */}
                       <div className="mt-2 flex flex-wrap gap-2">
                         {/* TASK-1674: use lucide icons instead of emoji for visual consistency */}
-                        {(unit as any).wifiSpeedMbps && (unit as any).wifiSpeedMbps >= 25 && (
+                        {unit.wifiSpeedMbps && unit.wifiSpeedMbps >= 25 && (
                           <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700">
-                            <Wifi className="h-3 w-3" /> WiFi {(unit as any).wifiSpeedMbps}Mbps
+                            <Wifi className="h-3 w-3" /> WiFi {unit.wifiSpeedMbps}Mbps
                           </span>
                         )}
-                        {(unit as any).hasCoworkingDesk && (
+                        {unit.hasCoworkingDesk && (
                           <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700">
                             <Briefcase className="h-3 w-3" /> Co-working desk
                           </span>
