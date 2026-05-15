@@ -203,10 +203,10 @@ export default function AvailabilityCalendar({ listingId, onDateSelect }: Props)
         text = 'text-transparent';
       } else if (isPast) {
         bg = 'bg-bg-muted cursor-default';
-        text = 'text-text-muted opacity-50';
+        text = 'text-gray-600';
       } else if (status === 'booked' || status === 'blocked') {
         bg = 'bg-gray-100 cursor-not-allowed';
-        text = 'text-text-muted line-through opacity-60';
+        text = 'text-gray-700 line-through';
         extra = '';
       } else if (status === 'turnover') {
         // Turnover day allows same-day check-in but should be visually distinct.

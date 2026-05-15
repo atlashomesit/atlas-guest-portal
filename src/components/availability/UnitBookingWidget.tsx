@@ -1982,7 +1982,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             </span>
           )}
           {effectiveDailyPricing && effectiveDailyPricing.globalDiscountPercent > 0 ? (
-            <span className="text-xs font-medium text-[color:color-mix(in_srgb,var(--cta-primary)_75%,transparent)]">
+            <span className="text-xs font-medium text-gray-700">
               Save {Math.round(effectiveDailyPricing.globalDiscountPercent)}% — discount applied
             </span>
           ) : null}
@@ -2003,7 +2003,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               <span className="text-2xl font-bold text-black">
                 {displayPrice(selectedRangeTotalFromCalendar)}
               </span>
-              <span className="text-sm text-gray-400">
+              <span className="text-sm text-gray-600">
                 {priceDetails.nights} {priceDetails.nights === 1 ? 'night' : 'nights'}
               </span>
             </div>
@@ -2015,7 +2015,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               </span>
               {effectiveDailyPricing.globalDiscountPercent > 0 && (
                 <>
-                  <span className="text-sm text-gray-400">
+                  <span className="text-sm text-gray-600">
                     {displayPrice(effectiveDailyPricing.baseAmount)}
                   </span>
                   <span className="text-sm font-semibold text-[color:var(--cta-primary)]">

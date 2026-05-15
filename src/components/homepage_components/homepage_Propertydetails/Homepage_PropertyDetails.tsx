@@ -1157,7 +1157,7 @@ useEffect(() => {
                         <span className="text-sm sm:text-base">{data?.property_location || 'Location not available'}</span>
                     </div>
                     {(data?.property_neighborhoods || []).length > 0 && (
-                        <div className="mt-2 flex flex-wrap gap-2">
+                        <div className="mt-2 flex flex-wrap gap-2" role="list" aria-label="Neighborhoods">
                             {data?.property_neighborhoods?.map((neighborhood: string, index: number) => (
                                 <div
                                     key={`${neighborhood}-${index}`}
@@ -1244,7 +1244,8 @@ useEffect(() => {
                         })()}
                         target="_blank"
                         rel="noreferrer"
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.85rem', color: '#25d366' }}
+                        className="text-[#0B6E30] hover:text-[#085C27] font-semibold"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.85rem' }}
                     >
                         💬 Share on WhatsApp
                     </a>
