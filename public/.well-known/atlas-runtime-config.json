@@ -1,7 +1,7 @@
 {
-  "apiBaseUrl": "http://localhost:5120",
-  "globalDiscountPercent": 25,
-  "environment": "prod",
-  "googleMapsApiKey": "AIzaSyDehAUkDxOGLv7V2PRA1xM2d1S-tXEf4UM",
-  "tenantKey": "starguesthouse"
+    "apiBaseUrl":  null,
+    "globalDiscountPercent":  25,
+    "environment":  "prod",
+    "googleMapsApiKey":  "AIzaSyDehAUkDxOGLv7V2PRA1xM2d1S-tXEf4UM",
+    "tenantKey":  "starguesthouse"
 }
