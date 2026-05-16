@@ -186,7 +186,6 @@ export function useTenantListings(): UseTenantListings {
       await Promise.all(
         uniquePropertyIds.map(async (pid) => {
           try {
-            console.log(`[useTenantListings] Fetching photos for property ${pid}`);
             const photos = await fetchPropertyListingPhotos(pid, controller.signal);
             photosByPropertyId.set(pid, photos);
           } catch (error) {

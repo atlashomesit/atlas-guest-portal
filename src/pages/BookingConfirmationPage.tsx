@@ -12,6 +12,11 @@ import { getRuntimeConfig, hasRuntimeConfig } from "../runtime-config";
 import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 import { messageFromApiResponse } from "../utils/serverErrorFromResponse";
 
+/** Minimal shape of the non-standard `beforeinstallprompt` event — only `prompt()` is used here. */
+interface BeforeInstallPromptEvent extends Event {
+  prompt(): Promise<void>;
+}
+
 /** Guest summary API returns ISO dates or formatted strings (e.g. "Sat, 3 May 2026") — normalize for ICS. */
 function summaryDisplayDateToIso(displayDate: string): string {
   const t = displayDate.trim();
@@ -256,7 +261,7 @@ export default function BookingConfirmationPage() {
   const [pwaInstallDismissed, setPwaInstallDismissed] = useState(() => {
     try { return localStorage.getItem("atlas_guest_pwa_install_dismissed_v1") === "1"; } catch { return false; }
   });
-  const pwaInstallPromptRef = useRef<any>(null);
+  const pwaInstallPromptRef = useRef<BeforeInstallPromptEvent | null>(null);
   const pollAttemptsRef = useRef(0);
   const statusKeyRef = useRef<string | null>(null);
   const isPageUnloadRef = useRef(false);
@@ -298,7 +303,7 @@ export default function BookingConfirmationPage() {
   };
 
   useEffect(() => {
-    const handler = (e: Event) => { e.preventDefault(); pwaInstallPromptRef.current = e; };
+    const handler = (e: Event) => { e.preventDefault(); pwaInstallPromptRef.current = e as BeforeInstallPromptEvent; };
     window.addEventListener("beforeinstallprompt", handler);
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);

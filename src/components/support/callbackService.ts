@@ -23,13 +23,5 @@ export async function submitCallbackRequest(payload: CallbackRequestPayload) {
 
   await sleep(300);
 
-  if (typeof console !== "undefined") {
-    console.info("[callback] request captured", {
-      source: payload.source,
-      route: payload.route,
-      unitCode: payload.unitCode,
-    });
-  }
-
   return { success: true } as const;
 }

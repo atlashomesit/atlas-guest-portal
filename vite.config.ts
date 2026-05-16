@@ -89,6 +89,7 @@ export default defineConfig({
       "Permissions-Policy": "geolocation=(), microphone=(), camera=()",
     },
     proxy: {
+      "/tenants": { target: BACKEND_TARGET, changeOrigin: true, secure: false },
       "/listings": { target: BACKEND_TARGET, changeOrigin: true, secure: false },
       "/availability": { target: BACKEND_TARGET, changeOrigin: true, secure: false },
       "/bookings": { target: BACKEND_TARGET, changeOrigin: true, secure: false },

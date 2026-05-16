@@ -282,7 +282,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
             <span className="text-2xl font-bold text-black">{formatCurrency(todayBreakdown.actualPrice)}</span>
             {todayBreakdown.globalDiscountPercent > 0 && (
               <>
-                <span className="text-sm text-gray-400">{formatCurrency(todayBreakdown.baseAmount)}</span>
+                <span className="text-sm text-text-muted">{formatCurrency(todayBreakdown.baseAmount)}</span>
                 <span className="text-sm font-semibold text-[color:var(--cta-primary)]">
                   Save {Math.round(todayBreakdown.globalDiscountPercent)}%
                 </span>
@@ -294,7 +294,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
             <span className="text-2xl font-bold text-black">{formattedFinal}</span>
             {appliedDiscountPercent > 0 && (
               <>
-                <span className="text-sm text-gray-400 line-through">{formattedBase}</span>
+                <span className="text-sm text-text-muted line-through">{formattedBase}</span>
                 <span className="text-sm font-semibold text-[color:var(--cta-primary)]">
                   {priceDisplayConfig.discount.savingsPrefix} {appliedDiscountPercent}%
                 </span>

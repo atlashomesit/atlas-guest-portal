@@ -264,13 +264,11 @@ let cachePromise: Promise<PublicListing[]> | null = null;
 export const fetchPublicListings = async (signal?: AbortSignal): Promise<PublicListing[]> => {
   // Return cached result if available
   if (cachedListings != null) {
-    console.log('[fetchPublicListings] Returning cached listings');
     return cachedListings;
   }
 
   // Return existing promise if already fetching
   if (cachePromise != null) {
-    console.log('[fetchPublicListings] Returning existing fetch promise');
     return cachePromise;
   }
 
@@ -287,16 +285,12 @@ export const fetchPublicListings = async (signal?: AbortSignal): Promise<PublicL
       }
 
       const payload = (await response.json()) as unknown;
-      console.log('[fetchPublicListings] Raw API response:', payload);
-
       const rows = coercePublicListingsPayload(payload);
-      console.log('[fetchPublicListings] Coerced rows count:', rows.length);
 
       const result = rows
         .map((item) => normalizePublicListing(item))
         .filter((row): row is PublicListing => row !== null && row.id > 0);
 
-      console.log('[fetchPublicListings] Final normalized listings count:', result.length);
       cachedListings = result;
       return result;
     } finally {
@@ -401,7 +395,6 @@ export async function fetchPropertyListingPhotos(
 ): Promise<ListingPhoto[]> {
   // Return cached promise if already fetching
   if (photosCachePromises.has(propertyId)) {
-    console.log(`[fetchPropertyListingPhotos] Returning cached promise for property ${propertyId}`);
     return photosCachePromises.get(propertyId)!;
   }
 

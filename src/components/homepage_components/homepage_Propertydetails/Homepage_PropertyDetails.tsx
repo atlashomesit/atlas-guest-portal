@@ -1140,8 +1140,9 @@ useEffect(() => {
                                     const priceText = data?.property_price && data.property_price > 0 ? ` from ₹${data.property_price}/night` : '';
                                     const text = `Check out ${data?.property_name ?? 'this home'}${priceText} on ${_getTenantCtx()?.name ?? 'our platform'}`;
                                     const share = async () => {
-                                        const nav: any = navigator;
-                                        if (nav?.share) return nav.share({ title: document.title, text, url });
+                                        if (typeof navigator.share === 'function') {
+                                            return navigator.share({ title: document.title, text, url });
+                                        }
                                         window.open(`https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`, '_blank', 'noopener,noreferrer');
                                     };
                                     void share();
@@ -1157,7 +1158,7 @@ useEffect(() => {
                         <span className="text-sm sm:text-base">{data?.property_location || 'Location not available'}</span>
                     </div>
                     {(data?.property_neighborhoods || []).length > 0 && (
-                        <div className="mt-2 flex flex-wrap gap-2">
+                        <div className="mt-2 flex flex-wrap gap-2" role="list" aria-label="Neighborhoods">
                             {data?.property_neighborhoods?.map((neighborhood: string, index: number) => (
                                 <div
                                     key={`${neighborhood}-${index}`}
@@ -1244,7 +1245,8 @@ useEffect(() => {
                         })()}
                         target="_blank"
                         rel="noreferrer"
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.85rem', color: '#25d366' }}
+                        className="text-[#0B6E30] hover:text-[#085C27] font-semibold"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.85rem' }}
                     >
                         💬 Share on WhatsApp
                     </a>

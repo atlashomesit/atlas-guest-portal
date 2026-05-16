@@ -18,6 +18,7 @@ For AI assistants (Cursor, Codex, etc.) working in this repo:
 - **Feature work:** Product roadmap and execution workflow live in [atlas-e2e/docs/product/](../atlas-e2e/docs/product/) — use `backlog.md` and `ATLAS-DEVELOPER-TASKS.md` for current priorities spanning API + guest frontend.
 - **Docs:** See `docs/design-system.md`, `docs/short-links.md`, and README for theming, short links, and project map. Messaging/booking integration: `atlas-api/docs/eventing-servicebus-implementation-plan.md`.
 - **Security (CISO):** Cloudflare Pages serves `public/_headers` (CSP, HSTS, frame-ancestors). When adding third-party scripts or API origins, update `_headers` and note the change in `atlas-e2e/docs/context/integration-contract.md` if it affects payments or auth.
+- **Commit message guard (TASK-2462):** Install once per clone (Git Bash): `printf '%s\n' '#!/bin/sh' 'exec sh "$(git rev-parse --show-toplevel)/../atlas-e2e/scripts/git-hooks/commit-msg-validator.sh" "$1"' > .git/hooks/commit-msg && chmod +x .git/hooks/commit-msg` — requires sibling `atlas-e2e`. Bypass: `git commit --no-verify`.
 
 ## Current architecture conventions
 

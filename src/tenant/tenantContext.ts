@@ -102,7 +102,12 @@ export function getTenantContext(): TenantInfo | null {
  */
 export async function resolveFromDomain(apiBaseUrl: string, domain: string): Promise<TenantInfo | null> {
   try {
-    const url = `${apiBaseUrl.replace(/\/$/, '')}/tenants/from-domain?domain=${encodeURIComponent(domain)}`;
+    // Dev + browser: same-origin /tenants is proxied by Vite — avoids CORS failures on
+    // *.localhost whitelabel hosts (e2e-wa-only.localhost) that would fall back to tenantKey.
+    const url =
+      import.meta.env.DEV && typeof window !== 'undefined'
+        ? `/tenants/from-domain?domain=${encodeURIComponent(domain)}`
+        : `${apiBaseUrl.replace(/\/$/, '')}/tenants/from-domain?domain=${encodeURIComponent(domain)}`;
     const res = await fetch(url); // No auth headers — this is the bootstrap endpoint
 
     if (!res.ok) {
