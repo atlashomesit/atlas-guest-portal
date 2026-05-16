@@ -1775,7 +1775,7 @@ useEffect(() => {
                                 />
                             </Suspense>
                             <p
-                                className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-accent-soft px-3 py-1 text-xs font-semibold text-[color:var(--cta-primary)] cursor-help"
+                                className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-accent-soft px-3 py-1 text-xs font-semibold text-[color:var(--cta-primary-hover)] cursor-help"
                                 style={{ border: '1px solid color-mix(in srgb, var(--cta-primary) 22%, white)' }}
                                 title="Listing details and photos reviewed by the Atlas team before going live."
                             >
