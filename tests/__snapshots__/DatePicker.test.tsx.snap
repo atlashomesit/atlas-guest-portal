@@ -68,7 +68,7 @@ exports[`Hero date picker > captures a stable mobile viewport snapshot > date-pi
                     type="button"
                   >
                     <span
-                      class="flex items-center gap-2.5 text-[10px] font-bold uppercase tracking-[0.10em] text-[var(--text-muted)] whitespace-nowrap"
+                      class="flex items-center gap-2.5 text-[11px] font-bold uppercase tracking-[0.10em] text-[var(--text-muted)] whitespace-nowrap"
                     >
                       <svg
                         aria-hidden="true"
@@ -151,7 +151,7 @@ exports[`Hero date picker > captures a stable mobile viewport snapshot > date-pi
                   type="button"
                 >
                   <span
-                    class="flex items-center gap-2.5 text-[10px] font-bold uppercase tracking-[0.10em] text-[var(--text-muted)] whitespace-nowrap"
+                    class="flex items-center gap-2.5 text-[11px] font-bold uppercase tracking-[0.10em] text-[var(--text-muted)] whitespace-nowrap"
                   >
                     <svg
                       aria-hidden="true"
@@ -366,7 +366,7 @@ exports[`Hero date picker > captures a stable mobile viewport snapshot > date-pi
                   </span>
                 </div>
                 <p
-                  class="text-[13px] text-[var(--cta-primary)] md:border-l md:border-[var(--border-subtle)] md:pl-4"
+                  class="text-sm text-[var(--cta-primary)] md:border-l md:border-[var(--border-subtle)] md:pl-4"
                 >
                   Instant confirmation • Secure payment • Flexible cancellation
                 </p>
@@ -558,7 +558,7 @@ exports[`Hero date picker > captures a stable mobile viewport snapshot > date-pi
         </p>
         <span
           aria-label="Click to select check-in date, then choose from calendar"
-          class="inline-flex h-5 w-5 items-center justify-center rounded-full border border-[var(--border-subtle)] text-[11px] font-semibold text-[var(--text-muted)]"
+          class="inline-flex h-5 w-5 items-center justify-center rounded-full border border-[var(--border-subtle)] text-[11px] font-semibold text-[var(--text-muted)] p-2.5 -m-2.5"
           title="Click a date for check-in, then a later date for check-out."
         >
           ?
