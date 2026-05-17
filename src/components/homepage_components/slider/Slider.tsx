@@ -41,16 +41,16 @@ const Slider = () => {
 
   const overlayStyle = React.useMemo(() => {
     // With a photo, keep text readable without painting the whole viewport flat black.
+    // May 2026: backdrop-filter removed — warm-editorial guardrails ban glassmorphism.
+    // Overlay opacity dialled down so golden-hour property photography reads through.
     const style: React.CSSProperties = hasHeroPhoto
       ? {
-          backgroundColor: "rgba(7, 10, 18, 0.5)",
+          backgroundColor: "rgba(7, 10, 18, 0.42)",
           backgroundImage: HERO_OVERLAY_GRADIENT_LEGACY,
-          backdropFilter: "blur(2px) saturate(0.98)",
         }
       : {
           backgroundColor: enableWidgetExperiment ? "rgba(3, 6, 14, 0.74)" : "rgba(0, 0, 0, 0.45)",
           backgroundImage: enableWidgetExperiment ? HERO_OVERLAY_GRADIENT : HERO_OVERLAY_GRADIENT_LEGACY,
-          backdropFilter: "blur(4px) saturate(0.96)",
         };
 
     if (typeof navigator !== "undefined" && navigator.userAgent?.includes("jsdom")) {
@@ -98,7 +98,7 @@ const Slider = () => {
 
           {directPromo.show ? (
             <div
-              className="w-full max-w-2xl rounded-xl border border-emerald-400/35 bg-emerald-950/90 px-4 py-3 text-center text-emerald-50 shadow-lg backdrop-blur-sm"
+              className="w-full max-w-2xl rounded-xl border border-emerald-400/35 bg-emerald-950/95 px-4 py-3 text-center text-emerald-50 shadow-lg"
               data-testid="home-direct-booking-promo"
               role="region"
               aria-label="Direct booking savings"
@@ -132,7 +132,7 @@ const Slider = () => {
           {showListProperty && (
             <Link
               to="/become-a-host"
-              className="mt-2 inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-5 py-2.5 text-sm font-semibold text-[var(--text-on-hero)] backdrop-blur-sm transition hover:bg-white/20 hover:border-white/50"
+              className="mt-2 inline-flex items-center gap-2 rounded-full border border-white/40 bg-[rgba(255,250,245,0.16)] px-5 py-2.5 text-sm font-semibold text-[var(--text-on-hero)] transition hover:bg-[rgba(255,250,245,0.24)] hover:border-white/60"
               data-discover="true"
             >
               <Home className="h-4 w-4" />

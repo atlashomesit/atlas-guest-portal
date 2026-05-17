@@ -85,7 +85,7 @@ function PropertyDetailsSkeleton() {
                 </div>
 
                 <div className="flex flex-col gap-4 sm:flex-row">
-                    <div className="w-full sm:w-2/3 order-2 sm:order-1 space-y-6">
+                    <div className="w-full sm:w-2/3 order-1 space-y-6">
                         <div className="pb-8 border-b border-border-subtle space-y-4">
                             <div className="h-7 w-56 rounded bg-bg-muted" />
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -1387,7 +1387,7 @@ useEffect(() => {
 
                 <div className='flex flex-col gap-4 sm:flex-row '>
                     {/* Left div  */}
-                    <div className="w-full sm:w-2/3 order-2 sm:order-1">
+                    <div className="w-full sm:w-2/3 order-1">
                         {/* What this place offers */}
                         <div className="pb-8 border-b border-border-subtle">
                             <h2 className="text-xl sm:text-2xl font-semibold mb-6 text-text-primary">What this place offers</h2>
@@ -1759,7 +1759,7 @@ useEffect(() => {
                         </div>
                     </div>
                     {/* right div  */}
-                    <div className="w-full sm:w-1/3 order-1 sm:order-2">
+                    <div className="w-full sm:w-1/3 order-2">
                         <div className="sticky top-16">
                             {data.photoCount != null && data.photoCount > 0 && (
                                 <p className="text-sm text-text-muted mb-2" aria-label="Photo count">{data.photoCount} photo{data.photoCount !== 1 ? 's' : ''}</p>
@@ -1774,17 +1774,13 @@ useEffect(() => {
                                     maxGuests={data.maxGuests}
                                 />
                             </Suspense>
-                            <div className="mt-3 flex flex-wrap gap-2">
-                                <span
-                                    className="inline-flex items-center gap-1 rounded-full bg-green-50 border border-green-200 px-2.5 py-1 text-xs font-medium text-green-700 cursor-help"
-                                    title="Listing details and photos reviewed by the Atlas team before going live."
-                                >
-                                    ✓ Verified listing
-                                </span>
-                                <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2.5 py-1 text-xs font-medium text-blue-700">
-                                    ⚡ Instant book
-                                </span>
-                            </div>
+                            <p
+                                className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-accent-soft px-3 py-1 text-xs font-semibold text-[color:var(--cta-primary-hover)] cursor-help"
+                                style={{ border: '1px solid color-mix(in srgb, var(--cta-primary) 22%, white)' }}
+                                title="Listing details and photos reviewed by the Atlas team before going live."
+                            >
+                                Verified home · Instant book
+                            </p>
                             {/* TASK-545: Host profile card — builds trust (#2 signal per 2025 Indian hospitality research). */}
                             <div
                                 className="mt-3 flex items-center gap-3 rounded-2xl border border-border-subtle bg-bg-surface p-3"
@@ -1879,7 +1875,7 @@ useEffect(() => {
                             </div>
 
                             <div className="overflow-y-auto p-6" role="region" aria-label="List of all amenities">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6" role="list">
                                     {data?.amenityCodes && data.amenityCodes.length > 0 ? (
                                         data.amenityCodes.map((code) => {
                                             const label = amenityMaster.get(code.toLowerCase()) ?? formatAmenityName(code);

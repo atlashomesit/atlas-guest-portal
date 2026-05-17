@@ -16,7 +16,7 @@ exports[`Hero date picker > captures a stable mobile viewport snapshot > date-pi
           aria-hidden="true"
           class="pointer-events-none absolute inset-0 opacity-95"
           data-testid="hero-overlay"
-          style="background-color: rgba(7, 10, 18, 0.5); background-image: url("linear-gradient-overlay"); backdrop-filter: blur(2px) saturate(0.98);"
+          style="background-color: rgba(7, 10, 18, 0.42); background-image: url("linear-gradient-overlay");"
         />
         <div
           class="relative z-10 flex max-w-4xl flex-col items-center gap-7 px-4 pb-12 text-center sm:px-6 md:pt-3"
@@ -374,7 +374,7 @@ exports[`Hero date picker > captures a stable mobile viewport snapshot > date-pi
             </form>
           </div>
           <a
-            class="mt-2 inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-5 py-2.5 text-sm font-semibold text-[var(--text-on-hero)] backdrop-blur-sm transition hover:bg-white/20 hover:border-white/50"
+            class="mt-2 inline-flex items-center gap-2 rounded-full border border-white/40 bg-[rgba(255,250,245,0.16)] px-5 py-2.5 text-sm font-semibold text-[var(--text-on-hero)] transition hover:bg-[rgba(255,250,245,0.24)] hover:border-white/60"
             data-discover="true"
             href="/become-a-host"
           >
