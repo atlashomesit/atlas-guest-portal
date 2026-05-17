@@ -257,6 +257,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [appliedReferralCode, setAppliedReferralCode] = useState<string | null>(null);
   const [appliedReferralDiscount, setAppliedReferralDiscount] = useState(0);
   const [referralMessage, setReferralMessage] = useState<string | null>(null);
+  const [referralValidating, setReferralValidating] = useState(false); // TASK-2559
   const [promoCode, setPromoCode] = useState('');
   const [appliedPromoCode, setAppliedPromoCode] = useState<string | null>(null);
   const [promoValidating, setPromoValidating] = useState(false);
@@ -1125,6 +1126,26 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     return null; // No available date found
   }, [dateStatusMap, blockedSet]);
 
+  // TASK-2559: inline referral-code validation on blur — client-side format only (no /api/referral/validate endpoint exists).
+  // Valid codes: 1–32 uppercase alphanumeric chars (enforced by the onChange regex). Anything non-empty that passes
+  // that regex is "well-formed"; actual eligibility is verified at order-create time.
+  const handleReferralBlur = () => {
+    const code = referralCode.trim();
+    if (!code) { setReferralMessage(null); setAppliedReferralCode(null); return; }
+    setReferralValidating(true);
+    // Simulate brief async delay for UX consistency with promo validation
+    setTimeout(() => {
+      if (/^[A-Z0-9]{1,32}$/.test(code)) {
+        setAppliedReferralCode(code);
+        setReferralMessage('Code format looks good — reward will apply if eligible at checkout.');
+      } else {
+        setAppliedReferralCode(null);
+        setReferralMessage('Referral codes must be letters and numbers only (no spaces or symbols).');
+      }
+      setReferralValidating(false);
+    }, 300);
+  };
+
   // TASK-2074: inline promo validation on blur — calls existing [AllowAnonymous] endpoint
   const handlePromoBlur = async () => {
     const code = promoCode.trim();
@@ -1725,19 +1746,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                     </p>
                   </div>
                 )}
+                {/* TASK-2558: removed duplicate Referral Reward block that was here */}
                 {bookingDetails.promoDiscountAmount && bookingDetails.promoDiscountAmount > 0 && (
                   <div className="flex flex-col gap-1">
                     <span className="text-xs uppercase tracking-wider text-gray-500 font-medium">Promo Discount</span>
                     <p className="text-base font-semibold text-green-700">
                       {bookingDetails.promoCode ? `${bookingDetails.promoCode} applied` : 'Applied'} — saved {displayPrice(bookingDetails.promoDiscountAmount)}
-                    </p>
-                  </div>
-                )}
-                {bookingDetails.referralDiscountAmount && bookingDetails.referralDiscountAmount > 0 && (
-                  <div className="flex flex-col gap-1">
-                    <span className="text-xs uppercase tracking-wider text-gray-500 font-medium">Referral Reward</span>
-                    <p className="text-base font-semibold text-green-700">
-                      {bookingDetails.referralCode ? `${bookingDetails.referralCode} applied` : 'Applied'} — saved {displayPrice(bookingDetails.referralDiscountAmount)}
                     </p>
                   </div>
                 )}
@@ -1798,9 +1812,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               </Button>
             </div>
 
-            {/* Footer Note */}
+            {/* Footer Note — TASK-2570: tappable tel:/mailto: links matching PaymentFailedPopup */}
             <p className="text-center text-xs text-gray-500">
-              Need help? Contact us at +91-7032493290 or atlashomeskphb@gmail.com
+              Need help? Contact us at{' '}
+              <a href="tel:+917032493290" className="underline underline-offset-1">+91-7032493290</a>
+              {' '}or{' '}
+              <a href="mailto:atlashomeskphb@gmail.com" className="underline underline-offset-1">atlashomeskphb@gmail.com</a>
             </p>
           </div>
         </div>
@@ -1974,19 +1991,34 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         <ErrorBanner className="mt-2" message="Service temporarily unavailable. Booking will return soon." />
       )}
 
-      <div className="flex flex-col gap-1">
-        <div className="flex items-center gap-2 flex-wrap">
+      {/* TASK-2576: consolidated "Why book direct" block — replaces 3 separate value props */}
+      <div className="rounded-lg border border-border-subtle bg-bg-muted/40 px-3 py-2 text-xs text-text-secondary">
+        <p className="font-semibold text-text-primary mb-1">Why book direct</p>
+        <ul className="space-y-0.5 list-none m-0 p-0">
+          <li>✓ No platform fee — pay exactly what you see</li>
           {effectiveDailyPricing && effectiveDailyPricing.globalDiscountPercent > 0 && (
-            <span className="text-sm font-semibold rounded-full bg-[color:color-mix(in_srgb,var(--cta-primary)_18%,transparent)] px-3 py-1 text-[color:var(--text-body)]">
-              Best price on our website
-            </span>
+            <li>✓ Best price on our website — {Math.round(effectiveDailyPricing.globalDiscountPercent)}% discount applied</li>
           )}
-          {effectiveDailyPricing && effectiveDailyPricing.globalDiscountPercent > 0 ? (
-            <span className="text-xs font-medium text-gray-700">
-              Save {Math.round(effectiveDailyPricing.globalDiscountPercent)}% — discount applied
-            </span>
-          ) : null}
-        </div>
+          {illustrativeOtaGuestFeeComparison && (
+            <li>
+              ✓ OTA guest fee ({ILLUSTRATIVE_OTA_GUEST_FEE_PERCENT}% est.) saved:{' '}
+              <span className="font-medium text-text-primary">{displayPrice(illustrativeOtaGuestFeeComparison.illustrativeGuestFee)}</span>
+              {' '}—{' '}
+              <a
+                href={PMS_AIRBNB_2026_TERMS_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline underline-offset-1 text-cta-primary"
+              >
+                why?
+              </a>
+            </li>
+          )}
+        </ul>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-2 flex-wrap" />
         <div className="flex flex-col gap-0.5">
           {dailyPricingLoading && (
             <span className="text-sm text-text-muted">Loading price…</span>
@@ -2063,8 +2095,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               Select your check-out date (minimum one night after check-in).
             </p>
           )}
+          {/* TASK-2564: legend now documents all three cell colours */}
           <p className="text-xs text-text-secondary">
-            <span className="mr-2 inline-block rounded bg-yellow-100 px-1.5 py-0.5 text-yellow-700">Turnover</span>
+            <span className="mr-2 inline-block rounded bg-green-500/15 px-1.5 py-0.5 text-green-700">Available</span>
+            open for booking.
+            <span className="mx-2 inline-block rounded bg-yellow-100 px-1.5 py-0.5 text-yellow-700">Turnover</span>
             cleaning window (still bookable).
             <span className="mx-2 inline-block bg-[repeating-linear-gradient(-45deg,#d1d5db,#d1d5db_3px,#e5e7eb_3px,#e5e7eb_6px)] px-2 py-0.5 text-gray-700">
               Unavailable
@@ -2349,48 +2384,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             </p>
           )}
           <p className="mt-3 text-xs text-text-muted">
-            Direct booking — no platform fee. Pay securely via Razorpay.
+            Pay securely via Razorpay.
           </p>
-          {illustrativeOtaGuestFeeComparison && (
-            <details className="mt-3 rounded-lg border border-border-subtle bg-bg-muted/50 px-3 py-2 text-xs text-text-secondary">
-              <summary className="cursor-pointer select-none font-semibold text-text-primary">
-                How does this compare to Airbnb or other travel sites?
-              </summary>
-              <p className="mt-2 text-text-muted">
-                OTAs often add a guest service fee on the room subtotal (commonly in the{' '}
-                {ILLUSTRATIVE_OTA_GUEST_FEE_PERCENT}% range before taxes). This is an illustration only — your
-                actual OTA total varies by site, currency, and promotions.
-              </p>
-              <ul className="mt-2 list-inside list-disc space-y-1">
-                <li>
-                  Your direct room fare (this stay):{' '}
-                  <span className="font-semibold text-text-primary">{displayPrice(breakdownPrice)}</span>
-                </li>
-                <li>
-                  Illustrative guest fee (~{ILLUSTRATIVE_OTA_GUEST_FEE_PERCENT}% on that subtotal):{' '}
-                  <span className="font-semibold text-text-primary">
-                    {displayPrice(illustrativeOtaGuestFeeComparison.illustrativeGuestFee)}
-                  </span>
-                </li>
-                <li>
-                  Illustrative comparable subtotal:{' '}
-                  <span className="font-semibold text-text-primary">
-                    {displayPrice(illustrativeOtaGuestFeeComparison.illustrativeRoomPlusFee)}
-                  </span>
-                </li>
-              </ul>
-              <p className="mt-2">
-                <a
-                  href={PMS_AIRBNB_2026_TERMS_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-medium text-cta-primary underline underline-offset-2"
-                >
-                  Read how 2026 Airbnb terms affect hosts (opens Atlas PMS) →
-                </a>
-              </p>
-            </details>
-          )}
         </div>
 
       </div>
@@ -2547,15 +2542,27 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             onChange={(e) => {
               const next = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 32);
               setReferralCode(next);
+              setReferralMessage(null);
+              setAppliedReferralCode(null);
               if (next) window.localStorage.setItem('atlas_guest_referral_code', next);
               else window.localStorage.removeItem('atlas_guest_referral_code');
             }}
+            onBlur={handleReferralBlur}
             disabled={isBookingDisabled || isSubmitting || isLoading}
             className="w-full rounded-xl border border-border-strong bg-bg-muted px-4 py-3 text-text-primary focus:outline-none focus:ring-2 focus:ring-cta-primary"
             placeholder="Enter referral code for first-booking rewards"
             data-testid="guest-booking-referral"
           />
-          <p className="text-xs text-text-muted">First booking reward: 5% off up to ₹1,500.</p>
+          {/* TASK-2559: inline validation feedback mirroring promo-code pattern */}
+          {referralValidating && <p className="text-xs text-text-muted">Validating…</p>}
+          {!referralValidating && referralMessage && (
+            <p className={`text-xs ${appliedReferralCode ? 'text-green-700' : 'text-support-error'}`}>
+              {appliedReferralCode ? '✓ ' : '✗ '}{referralMessage}
+            </p>
+          )}
+          {!referralValidating && !referralMessage && (
+            <p className="text-xs text-text-muted">First booking reward: 5% off up to ₹1,500.</p>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -2721,9 +2728,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         </div>
       )}
 
+      {/* TASK-2565: value reflects actual booking mode — whatsapp only for WhatsApp path */}
       <Button
         type="submit"
-        value="whatsapp"
+        value={isWhatsAppDirectBooking ? 'whatsapp' : 'online_payment'}
         fullWidth
         disabled={
           isSubmitting ||
