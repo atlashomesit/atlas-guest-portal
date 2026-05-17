@@ -984,7 +984,7 @@ export default function BookingConfirmationPage() {
                   data-testid="download-invoice-btn"
                   className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-3.5 hover:opacity-95 transition-opacity"
                 >
-                  Download GST invoice (PDF)
+                  Download GST invoice (PDF, ~80 KB)
                 </a>
               </div>
             )}

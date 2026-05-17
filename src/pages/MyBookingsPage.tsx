@@ -81,10 +81,11 @@ export default function MyBookingsPage() {
     if (tab === "cancelled") return bookings.filter(isCancelled);
     return bookings.filter((b) => {
       if (isCancelled(b)) return false;
-      const cin = parseBookingDate(b.checkinDate);
-      if (tab === "upcoming") return cin >= today;
-      /* past */
-      return cin < today;
+      // TASK-2568: classify by checkout date so in-progress stays (checked in, not yet out) show under "Upcoming"
+      const cout = parseBookingDate(b.checkoutDate);
+      if (tab === "upcoming") return cout >= today;
+      /* past — checkout is in the past */
+      return cout < today;
     });
   }, [bookings, tab]);
 
@@ -209,10 +210,11 @@ export default function MyBookingsPage() {
           </div>
         )}
 
-        {guestId && token && (
+        {/* TASK-2567: only show link when there's a booking to use as context (avoids ?bookingId= empty param) */}
+        {guestId && token && bookings.length > 0 && (
           <div className="text-center pt-2">
             <Link
-              to={`/profile?bookingId=${bookings[0]?.id ?? ""}&t=${encodeURIComponent(token)}`}
+              to={`/profile?bookingId=${bookings[0].id}&t=${encodeURIComponent(token)}`}
               className="text-sm text-text-muted underline underline-offset-2 hover:text-text-primary"
             >
               Update contact details
