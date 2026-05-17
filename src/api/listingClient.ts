@@ -133,6 +133,8 @@ export type PublicListing = {
   reviewCount?: number | null;
   /** TASK-1385: Cancellation policy tier — "Flexible", "Moderate", or "Strict". Null when host hasn't set one. */
   cancellationTier?: 'Flexible' | 'Moderate' | 'Strict' | null;
+  /** TASK-2552: amenity code strings (e.g. "AC", "Pool", "WiFi") returned by PublicListingDto. */
+  amenityCodes?: string[];
 };
 
 function normalizePublicListing(payload: Record<string, unknown>): PublicListing {
@@ -212,6 +214,10 @@ function normalizePublicListing(payload: Record<string, unknown>): PublicListing
     cancellationTier: (payload.cancellationTier === 'Flexible' || payload.cancellationTier === 'Moderate' || payload.cancellationTier === 'Strict')
       ? payload.cancellationTier
       : null, // TASK-1385
+    // TASK-2552: wire amenityCodes from API so nomad/amenity filters and badges work
+    amenityCodes: Array.isArray(payload.amenityCodes)
+      ? payload.amenityCodes.filter((x): x is string => typeof x === 'string')
+      : [],
   };
 }
 
