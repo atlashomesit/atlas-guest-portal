@@ -194,7 +194,7 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
               {heading}
             </p>
             <span
-              className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-[var(--border-subtle)] text-[11px] font-semibold text-[var(--text-muted)]"
+              className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-[var(--border-subtle)] text-[11px] font-semibold text-[var(--text-muted)] p-2.5 -m-2.5"
               title="Click a date for check-in, then a later date for check-out."
               aria-label={instructionAriaLabel ?? 'Click a date for check-in, then a later date for check-out.'}
             >

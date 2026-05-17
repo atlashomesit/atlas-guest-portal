@@ -67,7 +67,7 @@ export default function LongStayCalculator({
 
   return (
     <div className="mt-2 rounded-xl border border-border-subtle bg-bg-muted px-3 py-2">
-      <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+      <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-text-muted">
         Stay calculator
       </p>
       <div className="flex gap-1.5">
@@ -87,7 +87,7 @@ export default function LongStayCalculator({
             >
               <span className="font-semibold">{nights}N</span>
               {disc > 0 && (
-                <span className="ml-0.5 text-[10px] opacity-80">-{disc}%</span>
+                <span className="ml-0.5 text-xs opacity-80">-{disc}%</span>
               )}
             </button>
           );
@@ -100,7 +100,7 @@ export default function LongStayCalculator({
         <span className="text-sm font-bold text-text-primary">
           {selected > 1 ? formatINR(totalCost) : formatINR(effectiveNightly)}
           {selected > 1 && (
-            <span className="ml-1 text-[11px] font-normal text-text-muted">
+            <span className="ml-1 text-xs font-normal text-text-muted">
               ({formatINR(effectiveNightly)}/night)
             </span>
           )}

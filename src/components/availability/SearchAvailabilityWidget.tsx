@@ -589,7 +589,7 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
     dateError ? ' border-[var(--support-error)] shadow-[0_0_0_1px_var(--support-error)] error-shake' : ''
   }`;
   const labelClass =
-    'flex items-center gap-2.5 text-[10px] font-bold uppercase tracking-[0.10em] text-[var(--text-muted)] whitespace-nowrap';
+    'flex items-center gap-2.5 text-[11px] font-bold uppercase tracking-[0.10em] text-[var(--text-muted)] whitespace-nowrap';
   return (
     <form onSubmit={handleSubmit} className={formContainerClass} data-testid="search-input" id="search-form">
       <div className="sr-only" role="status" aria-live="polite">
@@ -770,7 +770,7 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
           <ShieldCheck className="h-4 w-4 text-[var(--cta-primary)]" aria-hidden="true" />
           <span>Book with confidence</span>
         </div>
-        <p className="text-[13px] text-[var(--cta-primary)] md:border-l md:border-[var(--border-subtle)] md:pl-4">
+        <p className="text-sm text-[var(--cta-primary)] md:border-l md:border-[var(--border-subtle)] md:pl-4">
           Instant confirmation • Secure payment • Flexible cancellation
         </p>
       </div>
