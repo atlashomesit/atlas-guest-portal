@@ -1875,7 +1875,7 @@ useEffect(() => {
                             </div>
 
                             <div className="overflow-y-auto p-6" role="region" aria-label="List of all amenities">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6" role="list">
                                     {data?.amenityCodes && data.amenityCodes.length > 0 ? (
                                         data.amenityCodes.map((code) => {
                                             const label = amenityMaster.get(code.toLowerCase()) ?? formatAmenityName(code);
