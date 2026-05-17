@@ -919,8 +919,9 @@ useEffect(() => {
         const primaryImageForLd = filterGuestImageUrls(data.property_img ?? [])[0];
         const apiRev = listingReviewsFromApi;
         const useApiRatings = Boolean(apiRev && !apiRev.loading && apiRev.totalCount > 0 && apiRev.averageRating > 0);
-        const ratingValue = useApiRatings ? apiRev!.averageRating : (data.property_rating || 0);
-        const reviewCount = useApiRatings ? apiRev!.totalCount : (data.property_reviews || 0);
+        // TASK-2554: only use API-sourced rating; never fall back to static catalog counts for JSON-LD
+        const ratingValue = useApiRatings ? apiRev!.averageRating : 0;
+        const reviewCount = useApiRatings ? apiRev!.totalCount : 0;
         const reviewNodes = (apiRev?.reviews ?? [])
             .filter((r) => Number(r.rating) >= 1 && Number(r.rating) <= 5)
             .slice(0, 8)
@@ -1180,12 +1181,28 @@ useEffect(() => {
                             {String(data.propertyAddress || data.property_address).trim()}
                         </p>
                     )}
+                    {/* TASK-2555: header rating driven off live API reviews only — never static data.ts */}
                     <div className="mt-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3 text-sm text-text-muted">
-                        <div className="flex items-center gap-2 font-semibold text-text-primary">
-                            <FaStar className="text-accent-primary" />
-                            <span>{(data?.property_rating || 0).toFixed(2)}</span>
-                            <span className="text-text-muted">• {data?.property_reviews || 0} reviews</span>
-                        </div>
+                        {(() => {
+                            const apiRev = listingReviewsFromApi;
+                            const hasRealRating = apiRev && !apiRev.loading && apiRev.totalCount > 0 && apiRev.averageRating > 0;
+                            if (hasRealRating) {
+                                return (
+                                    <div className="flex items-center gap-2 font-semibold text-text-primary">
+                                        <FaStar className="text-accent-primary" />
+                                        <span>{apiRev!.averageRating.toFixed(2)}</span>
+                                        <span className="text-text-muted">• {apiRev!.totalCount} {apiRev!.totalCount === 1 ? 'review' : 'reviews'}</span>
+                                    </div>
+                                );
+                            }
+                            if (!apiRev || apiRev.loading) return null;
+                            // 0 API reviews — show "New listing" chip
+                            return (
+                                <span className="inline-flex items-center rounded-full bg-bg-muted px-2.5 py-0.5 text-xs font-medium text-text-muted border border-border-subtle">
+                                    New listing
+                                </span>
+                            );
+                        })()}
                         {heroReviewQuote && (
                             <p className="sm:pl-3 sm:border-l sm:border-border-subtle sm:ml-3 text-text-muted italic">
                                 &ldquo;{heroReviewQuote}
@@ -1570,7 +1587,8 @@ useEffect(() => {
                                         ))}
                                     </div>
                                     <span className="font-semibold text-text-primary">{rating.toFixed(1)}</span>
-                                    <span className="text-text-muted text-sm">({count} reviews)</span>
+                                    {/* TASK-2573: singular/plural */}
+                                    <span className="text-text-muted text-sm">({count} {count === 1 ? 'review' : 'reviews'})</span>
                                 </div>
                                 {showApi && api!.reviews.length > 0 ? (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1649,6 +1667,9 @@ useEffect(() => {
                                             </div>
                                         ))}
                                     </div>
+                                ) : showApi ? (
+                                    // TASK-2556: API active + count > 0 but no review bodies — show "ratings only" line, never static snippets
+                                    <p className="text-sm text-text-muted italic">Ratings only — written reviews coming soon.</p>
                                 ) : (
                                     data?.property_review_snippets && data.property_review_snippets.length > 0 && (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1774,12 +1795,17 @@ useEffect(() => {
                                     maxGuests={data.maxGuests}
                                 />
                             </Suspense>
+                            {/* TASK-2575: "Instant book" only when listing has an online payment provider */}
                             <p
                                 className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-accent-soft px-3 py-1 text-xs font-semibold text-[color:var(--cta-primary-hover)] cursor-help"
                                 style={{ border: '1px solid color-mix(in srgb, var(--cta-primary) 22%, white)' }}
                                 title="Listing details and photos reviewed by the Atlas team before going live."
                             >
-                                Verified home · Instant book
+                                {(() => {
+                                    const pp = _getTenantCtx()?.paymentProvider;
+                                    const hasOnline = typeof pp === 'string' && pp !== 'MANUAL';
+                                    return hasOnline ? 'Verified home · Instant book' : 'Verified home · Host-confirmed booking';
+                                })()}
                             </p>
                             {/* TASK-545: Host profile card — builds trust (#2 signal per 2025 Indian hospitality research). */}
                             <div
@@ -1790,14 +1816,22 @@ useEffect(() => {
                                     className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-primary text-white text-sm font-semibold"
                                     aria-hidden="true"
                                 >
-                                    {"AH"}
+                                    {/* TASK-2560: derive initials from resolved tenant name */}
+                                    {(() => {
+                                        const tenantName = _getTenantCtx()?.name ?? '';
+                                        const words = tenantName.trim().split(/\s+/).filter(Boolean);
+                                        if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
+                                        if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+                                        return '?';
+                                    })()}
                                 </div>
                                 <div className="min-w-0">
                                     <p className="text-sm font-semibold text-text-primary truncate">
                                         Managed by {_getTenantCtx()?.name ?? 'Our Team'}
                                     </p>
                                     <p className="text-xs text-text-muted">
-                                        24/7 WhatsApp support{responseTimeBadge ? ` · ${responseTimeBadge}` : " · Local team based in Hyderabad. WhatsApp-first support."}
+                                        {/* TASK-2561: removed hardcoded "Hyderabad" city */}
+                                        24/7 WhatsApp support{responseTimeBadge ? ` · ${responseTimeBadge}` : " · WhatsApp-first support."}
                                     </p>
                                     {reviewReplyRateBadge && (
                                         <p className="text-xs text-green-700 font-medium mt-0.5">

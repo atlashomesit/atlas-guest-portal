@@ -177,7 +177,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
                 {neighborhoods.map((neighborhood) => (
                   <span
                     key={neighborhood}
-                    className="inline-flex items-center gap-1 rounded-full bg-[color:color-mix(in_srgb,var(--bg-muted)_40%,var(--bg-surface))] px-2 py-1 text-[11px] font-semibold text-text-primary"
+                    className="inline-flex items-center gap-1 rounded-full bg-[color:color-mix(in_srgb,var(--bg-muted)_40%,var(--bg-surface))] px-2 py-1 text-xs font-semibold text-text-primary"
                   >
                     <span aria-hidden>📍</span>
                     <span>{neighborhood}</span>

@@ -137,12 +137,8 @@ const Home = () => {
                         { "@type": "LocationFeatureSpecification", name: "Workspace", value: true },
                         { "@type": "LocationFeatureSpecification", name: "Swimming pool access", value: true },
                     ],
-                    aggregateRating: {
-                        "@type": "AggregateRating",
-                        ratingValue: penthouse?.property_rating,
-                        reviewCount: penthouse?.property_reviews,
-                    },
                     // TASK-2064: fabricated review array removed — violates Google Structured Data Guidelines and ASCI 2025
+                    // TASK-2553: aggregateRating removed — was fed by static data.ts (not real verified reviews)
                     offers: {
                         "@type": "Offer",
                         name: `${schemaBrandName} | Penthouse Suite 501 direct offer`,
@@ -179,8 +175,6 @@ const Home = () => {
             contactEmail,
             faqHighlights,
             penthouse?.property_description,
-            penthouse?.property_rating,
-            penthouse?.property_reviews,
             penthouseCover,
             penthouseOfferPrice,
             schemaBrandName,
