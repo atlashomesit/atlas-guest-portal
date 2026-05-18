@@ -2097,7 +2097,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           )}
           {/* TASK-2564: legend now documents all three cell colours */}
           <p className="text-xs text-text-secondary">
-            <span className="mr-2 inline-block rounded bg-green-500/15 px-1.5 py-0.5 text-green-700">Available</span>
+            <span className="mr-2 inline-block rounded bg-green-500/15 px-1.5 py-0.5 text-green-800">Available</span>
             open for booking.
             <span className="mx-2 inline-block rounded bg-yellow-100 px-1.5 py-0.5 text-yellow-700">Turnover</span>
             cleaning window (still bookable).
