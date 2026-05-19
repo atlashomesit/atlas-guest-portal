@@ -1,6 +1,6 @@
 import './HomeDetails.css';
 import { Link, useParams } from "react-router-dom";
-import { Suspense, lazy, useEffect, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch } from "@/lib/http";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -164,17 +164,22 @@ const HomeDetails = () => {
   const tenantOverrides = getTenantOverrides(tenant?.slug);
   const hideAtlasBranding = shouldHideAtlasBranding(tenant, tenantOverrides);
 
-  const apiRoom = apiHomes.find((item) => item.roomNo === roomNo);
   const filteredHomes = getTenantFilteredHomes();
-  const room = apiRoom ? {
-    roomNo,
-    title: apiRoom.title,
-    href: apiRoom.href,
-    slug: apiRoom.title.toLowerCase().replace(/_/g, '-'),
-    images: [] as string[],
-    maxGuests: 2,
-    listingId: Number(apiRoom.roomNo),
-  } : filteredHomes.find((item) => item.roomNo === roomNo);
+  const room = useMemo(() => {
+    const apiRoom = apiHomes.find((item) => item.roomNo === roomNo);
+    if (apiRoom) {
+      return {
+        roomNo,
+        title: apiRoom.title,
+        href: apiRoom.href,
+        slug: apiRoom.title.toLowerCase().replace(/_/g, '-'),
+        images: [] as string[],
+        maxGuests: 2,
+        listingId: Number(apiRoom.roomNo),
+      };
+    }
+    return filteredHomes.find((item) => item.roomNo === roomNo);
+  }, [apiHomes, filteredHomes, roomNo]);
 
   const { updateBooking } = useBooking();
   const [reviewsData, setReviewsData] = useState<ListingReviewsResponse | null>(null);

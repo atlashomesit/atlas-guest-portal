@@ -224,25 +224,40 @@ const SearchPage = () => {
     };
   }, [loadFromApi]);
 
-  const checkIn = useMemo(() => parseDate(searchParams.get("checkIn")), [searchParams.get("checkIn")]);
-  const checkOut = useMemo(() => parseDate(searchParams.get("checkOut")), [searchParams.get("checkOut")]);
-  const guests = useMemo(() => Number(searchParams.get("guests")) || null, [searchParams.get("guests")]);
-  const minPrice = useMemo(() => Number(searchParams.get("minPrice")) || null, [searchParams.get("minPrice")]);
-  const maxPrice = useMemo(() => Number(searchParams.get("maxPrice")) || null, [searchParams.get("maxPrice")]);
-  const remoteWork = useMemo(() => searchParams.get("remoteWork") === "true", [searchParams.get("remoteWork")]);
-  const longStay = useMemo(() => searchParams.get("longStay") === "true", [searchParams.get("longStay")]);
+  const checkInParam = searchParams.get("checkIn");
+  const checkOutParam = searchParams.get("checkOut");
+  const guestsParam = searchParams.get("guests");
+  const minPriceParam = searchParams.get("minPrice");
+  const maxPriceParam = searchParams.get("maxPrice");
+  const remoteWorkParam = searchParams.get("remoteWork");
+  const longStayParam = searchParams.get("longStay");
+  const availableNowParam = searchParams.get("availableNow");
+  const amenitiesParamRaw = searchParams.get("amenities");
+  const sortByParam = searchParams.get("sortBy");
+  const nomadWifiParam = searchParams.get("nomadWifi");
+  const nomadWorkspaceParam = searchParams.get("nomadWorkspace");
+  const monthlyStayParam = searchParams.get("monthlyStay");
+  const viewParam = searchParams.get("view");
+
+  const checkIn = useMemo(() => parseDate(checkInParam), [checkInParam]);
+  const checkOut = useMemo(() => parseDate(checkOutParam), [checkOutParam]);
+  const guests = useMemo(() => Number(guestsParam) || null, [guestsParam]);
+  const minPrice = useMemo(() => Number(minPriceParam) || null, [minPriceParam]);
+  const maxPrice = useMemo(() => Number(maxPriceParam) || null, [maxPriceParam]);
+  const remoteWork = useMemo(() => remoteWorkParam === "true", [remoteWorkParam]);
+  const longStay = useMemo(() => longStayParam === "true", [longStayParam]);
   /** TASK-1297: filter to listings with inventory for tonight (IST). */
-  const availableNow = useMemo(() => searchParams.get("availableNow") === "true", [searchParams.get("availableNow")]);
-  const amenitiesParam = useMemo(() => searchParams.get("amenities") || "", [searchParams.get("amenities")]);
+  const availableNow = useMemo(() => availableNowParam === "true", [availableNowParam]);
+  const amenitiesParam = useMemo(() => amenitiesParamRaw || "", [amenitiesParamRaw]);
   const selectedAmenities = useMemo(() => amenitiesParam ? amenitiesParam.split(",") : [], [amenitiesParam]);
   /** TASK-1714: sort order — default "recommended" (Atlas building/floor order). */
-  const sortBy = useMemo(() => searchParams.get("sortBy") || "recommended", [searchParams.get("sortBy")]);
+  const sortBy = useMemo(() => sortByParam || "recommended", [sortByParam]);
   /** TASK-1738: Digital nomad filter chips. */
-  const nomadWifi = useMemo(() => searchParams.get("nomadWifi") === "true", [searchParams.get("nomadWifi")]);       // WiFi 50+ Mbps
-  const nomadWorkspace = useMemo(() => searchParams.get("nomadWorkspace") === "true", [searchParams.get("nomadWorkspace")]); // dedicated workspace
-  const monthlyStay = useMemo(() => searchParams.get("monthlyStay") === "true", [searchParams.get("monthlyStay")]);   // 30+ nights min stay
+  const nomadWifi = useMemo(() => nomadWifiParam === "true", [nomadWifiParam]);       // WiFi 50+ Mbps
+  const nomadWorkspace = useMemo(() => nomadWorkspaceParam === "true", [nomadWorkspaceParam]); // dedicated workspace
+  const monthlyStay = useMemo(() => monthlyStayParam === "true", [monthlyStayParam]);   // 30+ nights min stay
   /** TASK-1457: list vs map layout for search results. */
-  const mapView = useMemo(() => searchParams.get("view") === "map", [searchParams.get("view")]);
+  const mapView = useMemo(() => viewParam === "map", [viewParam]);
   const directBookingDiscountPercent = useMemo(() => getEffectiveDiscountPercent(), []);
 
   const hasInvalidDates = useMemo(() => Boolean(checkIn && checkOut && checkOut <= checkIn), [checkIn, checkOut]);
@@ -271,7 +286,7 @@ const SearchPage = () => {
   const tenantAllowedIds = useMemo(() => {
     const allowed = getTenantPublicListingIdAllowlist(overrides);
     return allowed.size > 0 ? allowed : undefined;
-  }, [tenant?.slug]);
+  }, [overrides]);
 
   const onlyApiListings = overrides.onlyApiListings === true;
   const listings = useMemo(() => {

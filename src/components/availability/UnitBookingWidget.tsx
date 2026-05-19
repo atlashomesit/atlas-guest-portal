@@ -592,7 +592,10 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         setCalendarPricingLoading(false);
       });
     return () => controller.abort();
-  }, [listingId, toISODate(startOfMonth(shownDate))]);
+  }, [listingId, shownDate]);
+
+  const rangeStartIso = dateRange?.startDate ? toISODate(dateRange.startDate) : null;
+  const rangeEndIso = dateRange?.endDate ? toISODate(dateRange.endDate) : null;
 
   // TASK-571: Fetch long-stay (LOS) discount breakdown when guest selects a valid range.
   useEffect(() => {
@@ -607,13 +610,11 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
       return;
     }
     const controller = new AbortController();
-    const checkInStr = toISODate(dateRange.startDate);
-    const checkOutStr = toISODate(dateRange.endDate);
     fetchPricingBreakdown(
       {
         listingId,
-        checkIn: checkInStr,
-        checkOut: checkOutStr,
+        checkIn: rangeStartIso!,
+        checkOut: rangeEndIso!,
       },
       controller.signal,
     )
@@ -628,7 +629,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         setLosDiscountPercent(0);
       });
     return () => controller.abort();
-  }, [listingId, dateRange.startDate ? toISODate(dateRange.startDate) : null, dateRange.endDate ? toISODate(dateRange.endDate) : null]);
+  }, [listingId, rangeStartIso, rangeEndIso, dateRange?.startDate, dateRange?.endDate]);
 
   const isCheckInAllowed = (date: Date) => {
   const iso = toISODate(getIstStartOfDay(date));

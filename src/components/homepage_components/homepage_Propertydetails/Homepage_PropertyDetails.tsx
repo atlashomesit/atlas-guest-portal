@@ -435,7 +435,7 @@ const PropertyDetails = () => {
         return () => {
             controller.abort();
         };
-    }, [listingIdParam]);
+    }, [listingIdParam, data?.listingId]);
 
     useEffect(() => {
         const lid = Number(resolvedListingId ?? data?.listingId ?? NaN);
@@ -782,7 +782,7 @@ const PropertyDetails = () => {
         }
 
         setNotFound(true);
-    }, [propertySlug, listingIdParam, listingId]);
+    }, [propertySlug, listingIdParam, listingId, apiProperties, location.state]);
 useEffect(() => {
   if (!data?.id) return;
 
@@ -824,7 +824,7 @@ useEffect(() => {
                 if (!ac.signal.aborted) setSimilarFromApi(null);
             });
         return () => ac.abort();
-    }, [resolvedListingId]);
+    }, [resolvedListingId, data?.listingId, listingId]);
 
     // TASK-2118: prefetch removed. UnitBookingWidget + AvailabilityCalendar each fetch
     // /availability-calendar on mount; an additional prefetch here pushed the listing

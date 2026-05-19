@@ -53,14 +53,12 @@ export const TenantJsonLd: React.FC = () => {
       '@context': 'https://schema.org',
       '@type': 'Organization',
       name: brandName,
-      // Use the tenant's domain if available; fallback to window.location.origin
-      url:
-        typeof window !== 'undefined'
-          ? window.location.origin + '/'
-          : 'https://atlashomestays.com/',
       telephone: tenantInfo.legalContactPack?.contactPhone || undefined,
       email: contactEmail,
     };
+    if (typeof window !== 'undefined') {
+      organizationJsonLd.url = `${window.location.origin}/`;
+    }
 
     // Add logo only if logoUrl is set
     if (tenantInfo.logoUrl) {
