@@ -10,7 +10,8 @@ import {
 } from './unitBookingPaymentOrderErrors';
 import { toast } from 'react-toastify';
 import { Button } from '@/components/ui/Button';
-import { AtlasDateRangePicker, type AtlasDateRangePickerValue } from '@/components/date/AtlasDateRangePicker';
+import { type AtlasDateRangePickerValue } from '@/components/date/AtlasDateRangePicker';
+import { AtlasBookingCalendar } from './AtlasBookingCalendar';
 import { useBooking } from '@/contexts/BookingContext';
 import { hasRuntimeConfig } from '@/runtime-config';
 import ErrorBanner from '@/components/ErrorBanner';
@@ -215,6 +216,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [losDiscountAmount, setLosDiscountAmount] = useState<number>(0);
   const [losDiscountPercent, setLosDiscountPercent] = useState<number>(0);
   const [guests, setGuests] = useState(2);
+  const [guestsOpen, setGuestsOpen] = useState(false);
   const [_bookedDates, setBookedDates] = useState<Date[]>([]);
   const [blockedSet, setBlockedSet] = useState<Set<string>>(new Set());
   const [dateStatusMap, setDateStatusMap] = useState<Map<string, ListingCalendarDayStatus>>(new Map());
@@ -375,6 +377,16 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
       // no-op
     }
   }, []);
+
+  // Close guests popover on outside click
+  useEffect(() => {
+    if (!guestsOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (!(e.target as Element).closest('.bw-guests')) setGuestsOpen(false);
+    };
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
+  }, [guestsOpen]);
 
   // TASK-1708: Auto-fill promo code from ?promo= URL param (e.g. ?promo=DIRECT5 from DirectDiscountBanner CTA)
   useEffect(() => {
@@ -851,19 +863,6 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
   /** When API has loaded, use its price (including 0). When API has not loaded or failed, we show 0. */
   const effectiveDailyPricing = dailyPricing;
-
-  const formatCalendarPrice = useCallback((price: number): string => {
-    if (price >= 10000) return `₹${(price / 1000).toFixed(1)}K`;
-    return formatCurrency(price, { maximumFractionDigits: 0 });
-  }, []);
-
-  const calendarDealThreshold = useMemo(() => {
-    const prices = Array.from(calendarDailyPrices.values()).filter((p) => p > 0);
-    if (prices.length < 4) return null;
-    const sorted = [...prices].sort((a, b) => a - b);
-    const idx = Math.floor(sorted.length * 0.25);
-    return sorted[idx] ?? null;
-  }, [calendarDailyPrices]);
 
   /** Sum of calendar daily prices for the selected date range (same as shown in calendar). */
   const selectedRangeTotalFromCalendar = useMemo(() => {
@@ -2098,9 +2097,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           )}
           {/* TASK-2564: legend now documents all three cell colours */}
           <p className="text-xs text-text-secondary">
-            <span className="mr-2 inline-block rounded bg-green-500/15 px-1.5 py-0.5 text-green-800">Available</span>
+            <span className="mr-2 inline-block rounded bg-[#ffe8d6]/60 px-1.5 py-0.5 text-[#c2410c]">Available</span>
             open for booking.
-            <span className="mx-2 inline-block rounded bg-yellow-100 px-1.5 py-0.5 text-yellow-700">Turnover</span>
+            <span className="mx-2 inline-block rounded bg-[#fff3e0] px-1.5 py-0.5 text-[#92400e]">Turnover</span>
             cleaning window (still bookable).
             <span className="mx-2 inline-block bg-[repeating-linear-gradient(-45deg,#d1d5db,#d1d5db_3px,#e5e7eb_3px,#e5e7eb_6px)] px-2 py-0.5 text-gray-700">
               Unavailable
@@ -2141,17 +2140,20 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               </div>
             )}
           </button>
-          <AtlasDateRangePicker
+          <AtlasBookingCalendar
               anchorRef={calendarButtonRef}
               open={openCalendar}
               onClose={() => setOpenCalendar(false)}
               value={dateRange}
               onChange={handleRangeChange}
-              loading={isLoading}
+              today={today}
               minDate={addDays(today, Math.max(-1, minAdvanceDays - 1))}
               maxDate={maxBookingDate}
               disabledDay={disabledDay}
-              months={2}
+              dateStatusMap={dateStatusMap}
+              calendarDailyPrices={calendarDailyPrices}
+              fallbackPrice={effectiveDailyPricing?.actualPrice ?? null}
+              pricingLoading={calendarPricingLoading}
               shownDate={shownDate}
               onShownDateChange={(date) => {
                 const nextShownDate = startOfMonth(date);
@@ -2163,230 +2165,142 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                 }
                 setShownDate(nextShownDate);
               }}
-              loadingLabel="Loading availability"
-              rangeColors={['#475569']}
-              popoverClassName="unit-booking-calendar"
-              dateRangeProps={{ preventSnapRefocus: true }}
-              dayContentRenderer={(day) => {
-                const dayStart = getIstStartOfDay(day);
-                const dayISO = toISODate(dayStart);
-                const selectionStart = dateRange.startDate ? getIstStartOfDay(dateRange.startDate).getTime() : null;
-                const selectionEnd = dateRange.endDate ? getIstStartOfDay(dateRange.endDate).getTime() : null;
-                const isRangeStart = selectionStart !== null && dayStart.getTime() === selectionStart;
-                const isRangeEnd = selectionEnd !== null && dayStart.getTime() === selectionEnd;
-                const rangeStart = selectionStart !== null && selectionEnd !== null ? Math.min(selectionStart, selectionEnd) : null;
-                const rangeEnd = selectionStart !== null && selectionEnd !== null ? Math.max(selectionStart, selectionEnd) : null;
-                const isInRange =
-                  rangeStart !== null && rangeEnd !== null
-                    ? dayStart.getTime() >= rangeStart && dayStart.getTime() <= rangeEnd
-                    : false;
-                const isBlocked = blockedSet.has(dayISO);
-                const isDisabled = disabledDay(day);
-                const status = dayStart.getTime() >= today.getTime() ? dateStatusMap.get(dayISO) : null;
-
-                const isPastDate = dayStart.getTime() < today.getTime();
-                const price = isPastDate ? 0 : (calendarDailyPrices.get(dayISO) ?? effectiveDailyPricing?.actualPrice ?? 0);
-                const isDeal =
-                  !isPastDate &&
-                  calendarDealThreshold != null &&
-                  price > 0 &&
-                  price <= calendarDealThreshold &&
-                  !isRangeStart &&
-                  !isRangeEnd &&
-                  !isInRange;
-                const priceText = isPastDate ? '—' : (calendarPricingLoading ? '…' : formatCalendarPrice(price));
-
-                let statusBg = '';
-                if (status === 'Turnover') {
-                  statusBg = 'bg-yellow-100';
-                } else if (status === 'Blocked' || status === 'Hold' || (isBlocked && !status)) {
-                  statusBg =
-                    'bg-[repeating-linear-gradient(-45deg,#d1d5db,#d1d5db_4px,#e5e7eb_4px,#e5e7eb_8px)]';
-                } else if (status === 'Available') {
-                  statusBg = 'bg-green-500/15';
-                }
-
-                const selectionClasses = isRangeStart || isRangeEnd
-                  ? 'bg-[var(--cta-primary)] text-white shadow-sm'
-                  : isInRange
-                    ? 'bg-[var(--cta-primary)]/20 text-[var(--cta-primary)]'
-                    : '';
-                const disabledClasses = isDisabled
-                  ? 'text-gray-400 cursor-not-allowed opacity-60'
-                  : status === 'Blocked' || status === 'Hold' || (isBlocked && !status)
-                    ? 'text-gray-700 cursor-not-allowed'
-                    : status === 'Turnover'
-                      ? 'text-yellow-700'
-                      : 'text-black';
-
-                const dayStatusLabel =
-                  status === 'Turnover'
-                    ? 'Turnover'
-                    : status === 'Blocked' || status === 'Hold' || (isBlocked && !status)
-                      ? 'Unavailable'
-                      : undefined;
-
-                return (
-                  <div
-                    className="unit-booking-day-cell grid h-full w-full min-h-0 overflow-hidden box-border p-0.5"
-                    title={dayStatusLabel}
-                  >
-                    {status && statusBg && (
-                      <div className={`absolute inset-0 rounded-lg ${statusBg}`} style={{ margin: '2px' }} aria-hidden />
-                    )}
-                    <div className={`unit-booking-day-cell-inner relative z-10 grid grid-cols-1 grid-rows-2 place-items-center gap-0 min-h-0 overflow-hidden box-border ${selectionClasses || disabledClasses}`}>
-                      {/* TASK-957: bump calendar day number from 11px → 12px (text-xs) for readability on 360px Android. */}
-                      <span className="unit-booking-day-num text-xs font-bold leading-none overflow-hidden truncate">{format(day, 'd')}</span>
-                      <span className={`unit-booking-day-price text-xs leading-none whitespace-nowrap overflow-hidden truncate min-w-0 ${isDeal ? 'text-green-600 font-semibold' : ''}`}>
-                        {priceText}
-                      </span>
-                    </div>
-                  </div>
-                );
-              }}
             />
         </div>
 
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-text-primary" htmlFor="unit-booking-guests">
-            Guests
-          </label>
-          <div className="flex items-center gap-3 rounded-xl border border-border-strong bg-bg-muted px-4 py-3">
-            <div className="flex items-center gap-3">
-              <Button
-                variant="secondary"
-                size="sm"
-                className="!px-2 !py-2 h-12 w-12 disabled:opacity-40 disabled:cursor-not-allowed"
-                aria-label="Decrease guests"
-                disabled={guests <= 1}
-                onClick={() => setGuests((current) => Math.max(1, current - 1))}
-              >
-                −
-              </Button>
-              <span className="text-base font-semibold text-text-primary" id="unit-booking-guests">
-                {guests} {guests === 1 ? 'guest' : 'guests'}
-              </span>
-              <Button
-                variant="secondary"
-                size="sm"
-                className="!px-2 !py-2 h-12 w-12 disabled:opacity-40 disabled:cursor-not-allowed"
-                aria-label="Increase guests"
-                disabled={guests >= effectiveMaxGuests}
-                onClick={() => setGuests((current) => Math.min(effectiveMaxGuests, current + 1))}
-              >
-                +
-              </Button>
-            </div>
-          </div>
-        </div>
-        {/* Price Breakdown */}
-        <div className="mt-4 border-t border-border-subtle pt-4 text-sm">
-          <h4 className="mb-2 text-base font-bold text-text-primary">
-            Price Breakdown
-          </h4>
-          <p className="mb-2 text-xs text-text-muted">
-            Final amount shown here is what you pay at checkout.
-          </p>
-          <div className="space-y-1.5 text-text-secondary">
-            <div className="grid grid-cols-[140px_12px_1fr]">
-              <span>Room fare</span>
-              <span>:</span>
-              <span className="text-right">
-                {displayPrice(breakdownPrice)}
-              </span>
-            </div>
-            {gstSlabPercent != null && breakdownPrice > 0 && gstLineAmount > 0 && (
-              <div className="grid grid-cols-[140px_12px_1fr] text-text-secondary">
-                <span>GST {gstSlabPercent}%</span>
-                <span>:</span>
-                <span className="text-right">{displayPrice(gstLineAmount)}</span>
-              </div>
-            )}
-            {priceDetails.extraGuestsFee > 0 && (
-              <div className="grid grid-cols-[140px_12px_1fr]">
-                <span>Extra guest fee</span>
-                <span>:</span>
-                <span className="text-right">
-                  {displayPrice(priceDetails.extraGuestsFee)}
-                </span>
-              </div>
-            )}
-            {priceDetails.discount > 0 && (
-              <div className="grid grid-cols-[140px_12px_1fr] text-green-700">
-                <span>Discount</span>
-                <span>:</span>
-                <span className="text-right">-{displayPrice(priceDetails.discount)}</span>
-              </div>
-            )}
-            {/* TASK-571: long-stay discount row */}
-            {losDiscountAmount > 0 && (
-              <>
-                <div className="grid grid-cols-[140px_12px_1fr] text-green-700">
-                  <span>
-                    Long-stay discount
-                    {losDiscountPercent > 0 ? ` (−${Math.round(losDiscountPercent)}%)` : ''}
-                  </span>
-                  <span>:</span>
-                  <span className="text-right">-{displayPrice(losDiscountAmount)}</span>
+        <div className="bw-guests">
+          <button
+            type="button"
+            id="unit-booking-guests"
+            className="bw-guests-trigger"
+            aria-label={`Guests: ${guests} ${guests === 1 ? 'guest' : 'guests'}. Click to change.`}
+            onClick={(e) => { e.stopPropagation(); setGuestsOpen((o) => !o); }}
+          >
+            <span className="bw-guests-label">Guests</span>
+            <span className="bw-guests-value">
+              {guests} {guests === 1 ? 'guest' : 'guests'}
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 'auto' }} aria-hidden="true"><polyline points="6 9 12 15 18 9" /></svg>
+            </span>
+          </button>
+          {guestsOpen && (
+            <div className="bw-guests-pop" role="group" aria-label="Guest count">
+              <div className="bw-guest-row">
+                <div>
+                  <div className="bw-guest-label">Guests</div>
+                  <div className="bw-guest-sub">Ages 2+</div>
                 </div>
-                {priceDetails.nights > 0 && (
-                  <p className="text-xs text-text-muted text-right">≈ {displayPrice(Math.round(losDiscountAmount / priceDetails.nights))}/night off</p>
-                )}
-              </>
-            )}
-            <div className="grid grid-cols-[140px_12px_1fr]">
-              <span className="inline-flex items-center gap-1">
-                Convenience fee{convenienceFeePctLabel > 0 ? ` (${convenienceFeePctLabel}%)` : ''}
-                <HelpCircle
-                  className="h-3 w-3 cursor-help text-text-muted"
-                  aria-label="Includes payment-gateway and platform handling charges. Razorpay charges this directly."
-                  title="Includes payment-gateway and platform handling charges. Razorpay charges this directly."
-                />
-              </span>
-              <span>:</span>
-              <span className="text-right">
-                {displayPrice(breakdownConvenienceFee)}
-              </span>
-            </div>
-            {referralDiscountApplied > 0 && (
-              <div className="grid grid-cols-[140px_12px_1fr] text-green-700">
-                <span>Referral reward</span>
-                <span>:</span>
-                <span className="text-right">
-                  -{displayPrice(referralDiscountApplied)}
-                </span>
+                <div className="bw-counter">
+                  <button
+                    type="button"
+                    className="bw-counter-btn"
+                    aria-label="Decrease guests"
+                    disabled={guests <= 1}
+                    onClick={() => setGuests((current) => Math.max(1, current - 1))}
+                  >−</button>
+                  <span className="bw-counter-val">{guests}</span>
+                  <button
+                    type="button"
+                    className="bw-counter-btn"
+                    aria-label="Increase guests"
+                    disabled={guests >= effectiveMaxGuests}
+                    onClick={() => setGuests((current) => Math.min(effectiveMaxGuests, current + 1))}
+                  >+</button>
+                </div>
               </div>
-            )}
-            {promoDiscountApplied > 0 && (
-              <div className="grid grid-cols-[140px_12px_1fr] text-green-700">
-                <span>Promo discount</span>
-                <span>:</span>
-                <span className="text-right">-{displayPrice(promoDiscountApplied)}</span>
-              </div>
-            )}
-          </div>
-          {addOnsTotal > 0 && (
-            <div className="grid grid-cols-[140px_12px_1fr] text-text-secondary">
-              <span>Add-ons</span>
-              <span>:</span>
-              <span className="text-right">{displayPrice(addOnsTotal)}</span>
             </div>
           )}
-          <div className="mt-3 border-t border-border-subtle pt-3 grid grid-cols-[140px_12px_1fr] text-base font-semibold text-text-primary">
-            <span>Total</span>
-            <span>:</span>
-            <span className="text-right">
-              {displayPrice(Math.max(1, finalTotal))}
-            </span>
+        </div>
+        {/* Price Breakdown */}
+        <div className="bw-breakdown">
+          <div className="bw-breakdown-title">Price breakdown</div>
+
+          <div className="bw-bd-row">
+            <span className="bw-bd-label">Room fare</span>
+            <span className="bw-bd-value">{displayPrice(breakdownPrice)}</span>
           </div>
+
+          {gstSlabPercent != null && breakdownPrice > 0 && gstLineAmount > 0 && (
+            <div className="bw-bd-row">
+              <span className="bw-bd-label">GST {gstSlabPercent}%</span>
+              <span className="bw-bd-value">{displayPrice(gstLineAmount)}</span>
+            </div>
+          )}
+
+          {priceDetails.extraGuestsFee > 0 && (
+            <div className="bw-bd-row">
+              <span className="bw-bd-label">Extra guest fee</span>
+              <span className="bw-bd-value">{displayPrice(priceDetails.extraGuestsFee)}</span>
+            </div>
+          )}
+
+          {priceDetails.discount > 0 && (
+            <div className="bw-bd-row">
+              <span className="bw-bd-label bw-bd-label-discount">Discount</span>
+              <span className="bw-bd-value bw-bd-value-discount">−{displayPrice(priceDetails.discount)}</span>
+            </div>
+          )}
+
+          {/* TASK-571: long-stay discount row */}
+          {losDiscountAmount > 0 && (
+            <>
+              <div className="bw-bd-row">
+                <span className="bw-bd-label bw-bd-label-discount">
+                  Long-stay discount{losDiscountPercent > 0 ? ` (−${Math.round(losDiscountPercent)}%)` : ''}
+                </span>
+                <span className="bw-bd-value bw-bd-value-discount">−{displayPrice(losDiscountAmount)}</span>
+              </div>
+              {priceDetails.nights > 0 && (
+                <p className="bw-bd-note" style={{ textAlign: 'right' }}>
+                  ≈ {displayPrice(Math.round(losDiscountAmount / priceDetails.nights))}/night off
+                </p>
+              )}
+            </>
+          )}
+
+          <div className="bw-bd-row">
+            <span className="bw-bd-label" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              Convenience fee{convenienceFeePctLabel > 0 ? ` (${convenienceFeePctLabel}%)` : ''}
+              <HelpCircle
+                className="h-3 w-3 cursor-help text-text-muted"
+                aria-label="Includes payment-gateway and platform handling charges. Razorpay charges this directly."
+                title="Includes payment-gateway and platform handling charges. Razorpay charges this directly."
+              />
+            </span>
+            <span className="bw-bd-value">{displayPrice(breakdownConvenienceFee)}</span>
+          </div>
+
+          {referralDiscountApplied > 0 && (
+            <div className="bw-bd-row">
+              <span className="bw-bd-label bw-bd-label-discount">Referral reward</span>
+              <span className="bw-bd-value bw-bd-value-discount">−{displayPrice(referralDiscountApplied)}</span>
+            </div>
+          )}
+
+          {promoDiscountApplied > 0 && (
+            <div className="bw-bd-row">
+              <span className="bw-bd-label bw-bd-label-discount">Promo discount</span>
+              <span className="bw-bd-value bw-bd-value-discount">−{displayPrice(promoDiscountApplied)}</span>
+            </div>
+          )}
+
+          {addOnsTotal > 0 && (
+            <div className="bw-bd-row">
+              <span className="bw-bd-label">Add-ons</span>
+              <span className="bw-bd-value">{displayPrice(addOnsTotal)}</span>
+            </div>
+          )}
+
+          <div className="bw-bd-row bw-bd-total">
+            <span>Total</span>
+            <span className="bw-bd-value">{displayPrice(Math.max(1, finalTotal))}</span>
+          </div>
+
           {referralMessage && (
-            <p className="mt-2 text-xs text-green-700">
+            <p className="bw-bd-note" style={{ color: '#15803d' }}>
               {referralMessage}{appliedReferralCode ? ` (${appliedReferralCode})` : ''}
             </p>
           )}
-          <p className="mt-3 text-xs text-text-muted">
-            Pay securely via Razorpay.
-          </p>
+          <p className="bw-bd-note">Pay securely via Razorpay.</p>
         </div>
 
       </div>

@@ -344,22 +344,22 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
     selectionState === 'IDLE'
       ? {
           label: 'Step 1: Select your check-in date',
-          bg: 'bg-cyan-50',
-          color: 'text-cyan-900',
-          dot: 'bg-cyan-500',
+          bg: 'bg-[#fffaf5]',
+          color: 'text-[#1a1a2e]',
+          dot: 'bg-[#ffb347]',
         }
       : selectionState === 'CHECK_IN_SELECTED'
       ? {
           label: 'Step 2: Select your check-out date',
-          bg: 'bg-emerald-50',
-          color: 'text-emerald-900',
-          dot: 'bg-emerald-500',
+          bg: 'bg-[#ffe8d6]',
+          color: 'text-[#1a1a2e]',
+          dot: 'bg-[#c2410c]',
         }
       : {
           label: nights ? `Range selected: ${nights} night${nights === 1 ? '' : 's'}` : 'Range selected',
-          bg: 'bg-slate-50',
-          color: 'text-slate-900',
-          dot: 'bg-slate-500',
+          bg: 'bg-[#ffe8d6]',
+          color: 'text-[#c2410c]',
+          dot: 'bg-[#c2410c]',
         };
 
   return (
@@ -391,8 +391,8 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
             onClick={() => handlePresetClick(preset.start, preset.end)}
             className={`rounded-full px-3 py-1 text-xs font-medium transition-colors
               ${preset.disabled
-                ? 'cursor-not-allowed text-slate-300 ring-1 ring-inset ring-slate-200'
-                : 'cursor-pointer bg-white text-slate-600 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 hover:text-slate-800 hover:ring-slate-400 active:bg-slate-100'
+                ? 'cursor-not-allowed text-[#d6c2a8] ring-1 ring-inset ring-[#f0e6dc]'
+                : 'cursor-pointer bg-white text-[#475569] ring-1 ring-inset ring-[#f0e6dc] hover:bg-[#ffe8d6] hover:text-[#c2410c] hover:ring-[#c2410c] active:bg-[#ffe8d6]'
               }`}
           >
             {preset.label}
@@ -409,7 +409,7 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
           {Array.from({ length: 14 }).map((_, index) => (
             <div
               key={index}
-              className="h-10 rounded-lg bg-[#F1F5F9]"
+              className="h-10 rounded-lg bg-[#f0e6dc]"
             />
           ))}
         </div>

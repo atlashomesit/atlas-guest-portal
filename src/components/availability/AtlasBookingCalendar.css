@@ -1,0 +1,488 @@
+/*
+ * AtlasBookingCalendar.css
+ * Visual styles for the hi-fi booking calendar (bc-* prefix).
+ * Extracted from booking-calendar-hifi.source.html.
+ * Uses CSS custom properties that are already defined in the guest-portal theme.
+ */
+
+/* === Calendar shared styles ============================================ */
+.bc-root { color: var(--text-primary); }
+
+/* Preset chips */
+.bc-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.bc-chip {
+  height: 32px;
+  padding: 0 14px;
+  border-radius: var(--radius-pill, 999px);
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 160ms ease;
+  letter-spacing: 0.005em;
+  white-space: nowrap;
+}
+.bc-chip:hover {
+  border-color: var(--brand-primary, #c2410c);
+  color: var(--brand-primary, #c2410c);
+  background: var(--bg-primary, #fffaf5);
+}
+.bc-chip-active {
+  background: var(--brand-soft, #ffe8d6);
+  border-color: var(--brand-soft, #ffe8d6);
+  color: var(--brand-primary, #c2410c);
+}
+
+/* Nav header */
+.bc-nav {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-bottom: 4px;
+  position: relative;
+}
+.bc-nav-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-surface, #ffffff);
+  color: var(--text-primary);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 160ms ease;
+}
+.bc-nav-btn:hover:not(:disabled) {
+  border-color: var(--brand-primary, #c2410c);
+  color: var(--brand-primary, #c2410c);
+}
+.bc-nav-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* Months layout */
+.bc-months {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  column-gap: 28px;
+  margin-top: 8px;
+}
+.bc-months-1 { grid-template-columns: minmax(0, 1fr); }
+.bc-month { min-width: 0; }
+.bc-month-title {
+  font-family: var(--font-display, "Cormorant Garamond", Georgia, serif);
+  font-size: 24px;
+  font-weight: 500;
+  color: var(--text-primary);
+  letter-spacing: -0.005em;
+  text-align: center;
+  padding: 4px 0 14px;
+  line-height: 1;
+}
+.bc-month-year {
+  color: var(--text-muted, #475569);
+  font-weight: 400;
+}
+
+/* Day-of-week header */
+.bc-dow-row {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  margin-bottom: 4px;
+}
+.bc-dow {
+  text-align: center;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--text-muted, #475569);
+  text-transform: uppercase;
+  padding-bottom: 6px;
+}
+
+/* Grid */
+.bc-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  /* No gap — cells touch so the range band is visually continuous */
+}
+.bc-cell-wrap {
+  position: relative;
+  height: 56px;
+  min-width: 0;
+}
+.bc-empty { pointer-events: none; }
+
+/* Range band underlay (z below pill) */
+.bc-band {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  background: var(--brand-soft, #ffe8d6);
+  z-index: 0;
+}
+.bc-band-l { left: 0; right: 50%; }
+.bc-band-r { left: 50%; right: 0; }
+.bc-band-full { left: 0; right: 0; }
+.bc-band-edge-l { border-top-left-radius: 16px; border-bottom-left-radius: 16px; }
+.bc-band-edge-r { border-top-right-radius: 16px; border-bottom-right-radius: 16px; }
+
+/* Endpoint coral pill — sits between band and content */
+.bc-endpoint-pill {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  right: 4px;
+  background: var(--brand-primary, #c2410c);
+  border-radius: 14px;
+  z-index: 1;
+  box-shadow: 0 4px 10px rgba(194, 65, 12, 0.22);
+}
+
+/* Day button */
+.bc-cell {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  color: var(--text-primary);
+  font-family: inherit;
+  border-radius: 14px;
+  transition: background 140ms ease;
+}
+.bc-num {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1;
+  font-feature-settings: "tnum" 1;
+  letter-spacing: -0.01em;
+}
+.bc-price {
+  font-size: 8.5px;
+  color: var(--text-muted, #475569);
+  line-height: 1;
+  font-feature-settings: "tnum" 1;
+  letter-spacing: -0.005em;
+  /* Prevent price text from overflowing its cell column */
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+  text-align: center;
+}
+
+/* Hover for available cells */
+.bc-cell:not(:disabled):hover {
+  background: rgba(26, 26, 46, 0.04);
+}
+.bc-cell.bc-endpoint:hover { background: transparent; }
+
+/* States */
+.bc-cell.bc-past {
+  color: rgba(26, 26, 46, 0.28);
+  cursor: not-allowed;
+}
+.bc-cell.bc-past .bc-price { display: none; }
+.bc-cell.bc-today .bc-num {
+  position: relative;
+}
+.bc-cell.bc-today .bc-num::after {
+  content: "";
+  position: absolute;
+  bottom: -3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--brand-primary, #c2410c);
+}
+
+/* Turnover — subtle amber dot top-right */
+.bc-cell.bc-turnover::before {
+  content: "";
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--brand-accent, #ffb347);
+  box-shadow: 0 0 0 2px rgba(255, 179, 71, 0.18);
+}
+.bc-cell.bc-turnover { background: rgba(255, 179, 71, 0.08); }
+.bc-cell.bc-turnover:not(:disabled):hover { background: rgba(255, 179, 71, 0.18); }
+
+/* Unavailable — diagonal hatch, faded number, no price */
+.bc-cell.bc-unavail {
+  color: rgba(26, 26, 46, 0.32);
+  cursor: not-allowed;
+  background-image: repeating-linear-gradient(
+    135deg,
+    transparent 0px,
+    transparent 5px,
+    var(--hatch-ink, rgba(26, 26, 46, 0.06)) 5px,
+    var(--hatch-ink, rgba(26, 26, 46, 0.06)) 6px
+  );
+}
+.bc-cell.bc-unavail .bc-price { display: none; }
+.bc-cell.bc-unavail .bc-num { text-decoration: line-through; text-decoration-thickness: 1px; }
+
+/* Endpoint white text overrides */
+.bc-cell.bc-endpoint { color: #fff; }
+.bc-cell.bc-endpoint .bc-num { font-weight: 600; }
+.bc-cell.bc-endpoint .bc-price { color: rgba(255, 255, 255, 0.85); }
+
+/* === Legend ============================================================ */
+.bc-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  padding-top: 18px;
+  margin-top: 14px;
+  border-top: 1px solid var(--border-subtle, #f0e6dc);
+  font-size: 12px;
+  color: var(--text-muted, #475569);
+}
+.bc-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.bc-sw {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+}
+.bc-sw-available {
+  background: var(--bg-surface, #ffffff);
+  border-color: var(--border-strong, #e5d9ce);
+}
+.bc-sw-turnover {
+  background: rgba(255, 179, 71, 0.18);
+  position: relative;
+}
+.bc-sw-turnover::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--brand-accent, #ffb347);
+}
+.bc-sw-unavail {
+  background-image: repeating-linear-gradient(135deg,
+    var(--bg-surface, #ffffff) 0px,
+    var(--bg-surface, #ffffff) 3px,
+    var(--hatch-ink, rgba(26, 26, 46, 0.06)) 3px,
+    var(--hatch-ink, rgba(26, 26, 46, 0.06)) 4px);
+  border-color: var(--border-subtle, #f0e6dc);
+}
+.bc-sw-selected { background: var(--brand-primary, #c2410c); }
+
+/* === Popover wrapper =================================================== */
+.bc-popover-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+.bc-popover {
+  /* JS sets position:fixed + top/left via inline style; these are fallbacks */
+  position: fixed;
+  z-index: 50;
+  background: var(--bg-surface, #ffffff);
+  border: 1px solid var(--border-subtle, #f0e6dc);
+  border-radius: 20px;
+  box-shadow: 0 12px 32px rgba(26, 26, 46, 0.10), 0 4px 12px rgba(26, 26, 46, 0.04);
+  padding: 20px 20px 16px;
+  /* Two months + gap + padding → need ~580px minimum so cells aren't cramped */
+  min-width: 580px;
+  width: max-content;
+  max-width: min(640px, calc(100vw - 16px));
+}
+
+/* On narrow viewports collapse to 1 month and anchor as bottom sheet */
+@media (max-width: 620px) {
+  .bc-months {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .bc-months .bc-month:nth-child(2) {
+    display: none;
+  }
+  .bc-popover {
+    /* Override JS-positioned fixed placement with bottom sheet */
+    left: 0 !important;
+    right: 0 !important;
+    top: auto !important;
+    bottom: 0 !important;
+    border-radius: 20px 20px 0 0;
+    min-width: unset;
+    max-width: 100vw;
+    width: 100vw;
+  }
+}
+
+/* === Guests selector =================================================== */
+.bw-guests {
+  position: relative;
+  margin-top: 4px;
+}
+.bw-guests-trigger {
+  width: 100%;
+  background: transparent;
+  border: 1px solid var(--border-strong, #e5d9ce);
+  border-radius: 14px;
+  padding: 12px 16px;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-family: inherit;
+  transition: border 160ms ease;
+}
+.bw-guests-trigger:hover { border-color: var(--brand-primary, #c2410c); }
+.bw-guests-label {
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted, #475569);
+}
+.bw-guests-value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-primary, #1a1a2e);
+}
+.bw-guests-pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  background: var(--bg-surface, #ffffff);
+  border: 1px solid var(--border-subtle, #f0e6dc);
+  border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(26, 26, 46, 0.10), 0 4px 12px rgba(26, 26, 46, 0.04);
+  padding: 8px;
+  z-index: 5;
+}
+.bw-guest-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 12px;
+}
+.bw-guest-row + .bw-guest-row { border-top: 1px solid var(--border-subtle, #f0e6dc); }
+.bw-guest-label { font-size: 15px; font-weight: 500; }
+.bw-guest-sub { font-size: 12px; color: var(--text-muted, #475569); }
+.bw-counter {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+}
+.bw-counter-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong, #e5d9ce);
+  background: var(--bg-surface, #ffffff);
+  color: var(--text-primary, #1a1a2e);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+  transition: all 140ms ease;
+}
+.bw-counter-btn:hover:not(:disabled) {
+  border-color: var(--brand-primary, #c2410c);
+  color: var(--brand-primary, #c2410c);
+}
+.bw-counter-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.bw-counter-val {
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  min-width: 14px;
+  text-align: center;
+}
+
+/* === Price breakdown =================================================== */
+.bw-breakdown {
+  margin-top: 4px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border-subtle, #f0e6dc);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.bw-breakdown-title {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted, #475569);
+  margin-bottom: 2px;
+}
+.bw-bd-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 14px;
+  color: var(--text-primary, #1a1a2e);
+}
+.bw-bd-label {
+  color: var(--text-primary, #1a1a2e);
+  text-decoration: underline;
+  text-decoration-color: var(--border-strong, #e5d9ce);
+  text-underline-offset: 3px;
+}
+.bw-bd-label-discount {
+  color: #15803d;
+  text-decoration: none;
+}
+.bw-bd-value { font-variant-numeric: tabular-nums; }
+.bw-bd-value-discount { color: #15803d; }
+.bw-bd-total {
+  border-top: 1px solid var(--border-subtle, #f0e6dc);
+  padding-top: 14px;
+  margin-top: 6px;
+  font-weight: 600;
+  font-size: 15px;
+}
+.bw-bd-note {
+  font-size: 11px;
+  color: var(--text-muted, #475569);
+  margin-top: 2px;
+}
