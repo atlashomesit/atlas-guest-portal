@@ -108,6 +108,17 @@ export type TenantOverrides = {
   /** Copy blocks for the Location page (transport, amenities, landmarks). */
   locationContent?: TenantLocationContent;
   /**
+   * GSTIN for the tenant operator — shown in the tourism registration row on
+   * property detail pages when set. Leave unset to hide the row.
+   */
+  gstin?: string;
+  /**
+   * State-level tourism / homestay registration numbers for the tenant
+   * (e.g. ["TS/HS/2024/0227", "KH/2024/0481"]). Shown in the registration
+   * row on property detail pages. Leave unset to hide the row entirely.
+   */
+  tourismRegNumbers?: string[];
+  /**
    * Noun used to refer to a stayable unit. Drives copy like "Our Homes",
    * "View home", "No homestays match…". Default = home/homes for Atlas.
    * For room-stay tenants (e.g. guest houses), set to room/rooms.
