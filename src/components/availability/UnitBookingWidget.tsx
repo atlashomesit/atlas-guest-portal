@@ -209,6 +209,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   });
   const [openCalendar, setOpenCalendar] = useState(false);
   const [shownDate, setShownDate] = useState<Date>(today);
+  const shownMonthIso = useMemo(() => toISODate(startOfMonth(shownDate)), [shownDate]);
   const [calendarDailyPrices, setCalendarDailyPrices] = useState<Map<string, number>>(new Map());
   const [calendarConvenienceFeePercent, setCalendarConvenienceFeePercent] = useState<number | undefined>(undefined);
   const [calendarPricingLoading, setCalendarPricingLoading] = useState(false);
@@ -589,9 +590,8 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   useEffect(() => {
     if (!listingId || String(listingId).trim() === '') return;
     const controller = new AbortController();
-    const startDate = toISODate(startOfMonth(shownDate));
     setCalendarPricingLoading(true);
-    fetchCalendarPricing(listingId, startDate, 3, controller.signal)
+    fetchCalendarPricing(listingId, shownMonthIso, 3, controller.signal)
       .then((result) => {
         setCalendarDailyPrices(result.dateToPrice);
         setCalendarConvenienceFeePercent(result.convenienceFeePercent);
@@ -604,7 +604,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         setCalendarPricingLoading(false);
       });
     return () => controller.abort();
-  }, [listingId, shownDate]);
+  }, [listingId, shownMonthIso]);
 
   const rangeStartIso = dateRange?.startDate ? toISODate(dateRange.startDate) : null;
   const rangeEndIso = dateRange?.endDate ? toISODate(dateRange.endDate) : null;
