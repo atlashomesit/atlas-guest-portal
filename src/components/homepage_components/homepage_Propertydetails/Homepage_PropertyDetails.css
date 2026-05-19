@@ -513,6 +513,10 @@
   .pp-cell-2, .pp-cell-3, .pp-cell-4, .pp-cell-5 { display: none; }
   .pp-cell-id-hero { font-size: 160px; }
 
+  /* Single-cell gallery: float the "View gallery" button to the top-right so
+     it never collides with the bottom-left "photos coming soon" badge. */
+  .pp-gallery-more { top: 16px; bottom: auto; }
+
   .pp-title-row h1 { font-size: 26px; }
 
   .pp-section { padding: 22px 0; }

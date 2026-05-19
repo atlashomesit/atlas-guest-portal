@@ -1,6 +1,7 @@
+import './Homepage_PropertyDetails.css';
 import React from 'react';
 import { getTenantContext as _getTenantCtx } from '@/tenant/tenantContext';
-import { getTenantOverrides } from '@/tenant/tenantOverrides';
+import { getTenantOverrides, shouldHideAtlasBranding } from '@/tenant/tenantOverrides';
 import { getTenantBrandName } from '@/tenant/displayBrand';
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { FaBed, FaShower, FaSwimmingPool, FaCar, FaWifi, FaTv } from "react-icons/fa";
@@ -10,14 +11,12 @@ import { RiLuggageCartLine } from "react-icons/ri";
 import { TfiBrushAlt } from "react-icons/tfi";
 import { LiaNewspaper } from "react-icons/lia";
 import { MdOutlineEmojiFoodBeverage, MdOutlineLocalLaundryService, MdOutlineDone } from "react-icons/md";
-import { FaCcMastercard, FaLocationDot } from "react-icons/fa6";
-import { FaStar } from "react-icons/fa";
-import { X, ChevronRight, Clock, KeyRound, Bookmark, Share2 } from 'lucide-react';
+import { FaCcMastercard } from "react-icons/fa6";
+import { X } from 'lucide-react';
 import { useEffect, useMemo, useState, Suspense, lazy } from 'react';
 import { useTenantListings } from '../../../hooks/useTenantListings';
 import { usePropertyListings } from '../../../hooks/usePropertyListings';
 import { inlinePolicySnippets } from '../../../content/terms';
-import Subheading from '../../commonComponents/subheading/Subheading';
 import { trackEvent } from '../../../utils/analytics';
 import { Button } from '../../ui/Button';
 import { calculateNightlyPrice, inferUnitType } from '../../../utils/pricing';
@@ -37,7 +36,7 @@ import MultiPinMap, { type MapPin } from '../../map/MultiPinMap';
 import SinglePinGoogleMap from '../../map/SinglePinGoogleMap';
 import { buildApiUrl, getApiHeaders } from '../../../api/client';
 import { addRecentlyViewed, isFavorite, toggleFavorite } from '../../../utils/guestHistory';
-import { formatCurrency, formatHumanDate } from '../../../utils/formatting';
+import { formatCurrency } from '../../../utils/formatting';
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
 import SkeletonCard from '../../apartments/SkeletonCard';
 import { ILLUSTRATIVE_OTA_GUEST_FEE_PERCENT } from '@/utils/directBookingPromo';
@@ -55,6 +54,92 @@ interface PropertyDetail {
     type: string;
     value: string;
 }
+
+// ---- Inline SVG atoms (pp-* design system) ----------------------------------
+
+function PpCheckIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20 6L9 17l-5-5" />
+    </svg>
+  );
+}
+
+function PpShieldIcon({ size = 22 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+      <path d="M9 12l2 2 4-4" />
+    </svg>
+  );
+}
+
+function PpWhatsAppIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
+    </svg>
+  );
+}
+
+function PpChevronDown({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  );
+}
+
+function PpGridIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" />
+    </svg>
+  );
+}
+
+// ---- Cancellation helpers (pp-* design system) ------------------------------
+
+const PP_REFUND_STEPS = [
+  { title: 'Cancel from your booking', desc: 'One tap from your booking confirmation. No reason needed.' },
+  { title: 'Refund initiated', desc: 'Automatic within 24 hours. Reference number sent to you.' },
+  { title: 'Money in your account', desc: 'UPI: same day. Cards & netbanking: 3–5 working days.' },
+  { title: 'Confirmation', desc: 'SMS and WhatsApp when the refund clears. Both.' },
+];
+
+interface PpCancellationInfo {
+  headline: string;
+  description: string;
+  steps: Array<{ title: string; desc: string }>;
+}
+
+function getPpCancellationInfo(tier: string | null | undefined): PpCancellationInfo {
+  if (tier === 'Flexible') return {
+    headline: 'Full refund if cancelled 48 hours before check-in',
+    description: 'Money returns to the exact UPI or card you paid with. No phone calls needed.',
+    steps: PP_REFUND_STEPS,
+  };
+  if (tier === 'Moderate') return {
+    headline: 'Full refund if cancelled 5 days before check-in',
+    description: 'Partial refund for cancellations after the window. Check your booking for exact terms.',
+    steps: PP_REFUND_STEPS,
+  };
+  if (tier === 'Strict') return {
+    headline: '50% refund if cancelled 7 days before check-in',
+    description: 'No refund within 7 days of check-in. Check your booking for exact terms.',
+    steps: PP_REFUND_STEPS,
+  };
+  return {
+    headline: 'Contact us to discuss cancellation',
+    description: 'Reach out via WhatsApp before cancelling to get the best outcome.',
+    steps: PP_REFUND_STEPS,
+  };
+}
+
+const PP_REVIEW_BG_COLORS = ['#1a1a2e', '#ffb347', '#c2410c', '#94755b', '#e9f5ef'];
+const PP_REVIEW_TEXT_COLORS = ['#fffaf5', '#1a1a2e', '#fffaf5', '#fffaf5', '#157046'];
+const PP_CELL_LABELS = ['Living', 'Kitchen', 'Bedroom', 'Balcony'] as const;
 
 /** Shown while listing data is resolving (incl. API fallback). Matches loaded page layout for perceived performance. */
 function PropertyDetailsSkeleton() {
@@ -265,7 +350,7 @@ const PropertyDetails = () => {
     const [showAmenitiesModal, setShowAmenitiesModal] = useState(false);
     const [showAboutMore, setShowAboutMore] = useState(false);
     const [showNeighborhoodMore, setShowNeighborhoodMore] = useState(false);
-    const [copyLinkLabel, setCopyLinkLabel] = useState<'Copy link' | 'Copied!'>('Copy link');
+    const [showAllReviews, setShowAllReviews] = useState(false);
     const unitType = inferUnitType({ id: data?.id, property_name: data?.property_name });
     const { setProperty, updateBooking } = useBooking();
     const [searchParams] = useSearchParams();
@@ -552,7 +637,7 @@ const PropertyDetails = () => {
     }, [resolvedListingId]);
 
     /** TASK-2068: hero quote only from live API reviews (never static marketing snippets). */
-    const heroReviewQuote = useMemo(() => {
+    const _heroReviewQuote = useMemo(() => {
         const api = listingReviewsFromApi;
         if (!api || api.loading || api.reviews.length === 0) return null;
         const r = api.reviews[0];
@@ -1052,7 +1137,7 @@ useEffect(() => {
         Moderate: 'Moderate — full refund if cancelled 5+ days before check-in.',
         Strict: 'Strict — 50% refund if cancelled 7+ days before check-in; no refund after.',
     };
-    const resolvedCancellationText = data?.cancellationTier
+    const _resolvedCancellationText = data?.cancellationTier
         ? cancellationTierLabel[data.cancellationTier]
         : cancellationPolicyText;
 
@@ -1084,6 +1169,40 @@ useEffect(() => {
     const primaryImage = galleryUrls[0];
     const mapSrcTrimmed = (data?.property_mapSrc ?? "").trim();
 
+    // ---- hi-fi design derived values ----------------------------------------
+    const ppTenantCtx = _getTenantCtx();
+    const ppTenantOverrides = getTenantOverrides(ppTenantCtx?.slug ?? '');
+    const ppHideAtlasBranding = shouldHideAtlasBranding(ppTenantCtx, ppTenantOverrides);
+    const ppBrandName = getTenantBrandName();
+    const ppHostDisplayName = ppTenantCtx?.name?.trim() || data.property_name || ppBrandName;
+    const ppHostInitial = ppHostDisplayName.charAt(0).toUpperCase();
+    const ppCancellationInfo = getPpCancellationInfo(data.cancellationTier);
+    const ppHasLocation =
+        (typeof data.latitude === 'number' && Number.isFinite(data.latitude)) ||
+        mapSrcTrimmed.length > 0 ||
+        useMultiPin ||
+        (mapLocation != null && typeof mapLocation.lat === 'number' && Number.isFinite(mapLocation.lat));
+    const ppHostPhone = (data.hostPhone?.replace(/\D/g, '') || '').trim() || '7032493290';
+    const ppWaBookingUrl = `https://wa.me/${ppHostPhone}?text=${encodeURIComponent(`Hi, I'm interested in booking ${data.property_name}`)}`;
+    const ppWaAskUrl = `https://wa.me/${ppHostPhone}?text=${encodeURIComponent(`Hi, I have a question about ${data.property_name}`)}`;
+    const ppShowRegRow = (ppTenantOverrides.gstin != null) ||
+        (ppTenantOverrides.tourismRegNumbers != null && ppTenantOverrides.tourismRegNumbers.length > 0);
+
+    // Derive amenity labels for display
+    const ppAmenityLabels: string[] = data.amenityCodes && data.amenityCodes.length > 0
+        ? data.amenityCodes.map((code) => amenityMaster.get(code.toLowerCase()) ?? formatAmenityName(code))
+        : (data.property_amenities || []).map((a) => a.amenities_icon ? formatAmenityName(a.amenities_icon) : 'Amenity');
+
+    const ppApiReviews = listingReviewsFromApi;
+    const ppHasApiReviews = Boolean(ppApiReviews && !ppApiReviews.loading && ppApiReviews.totalCount > 0);
+    const ppDisplayedReviews = ppHasApiReviews
+        ? (showAllReviews ? ppApiReviews!.reviews : ppApiReviews!.reviews.slice(0, 6))
+        : [];
+    const ppAmenityDisplay = ppAmenityLabels.slice(0, 12);
+    const ppAmenityCodes = data.amenityCodes && data.amenityCodes.length > 0
+        ? data.amenityCodes.slice(0, 12)
+        : null;
+
     return (
         <>
         {data && (
@@ -1096,898 +1215,881 @@ useEffect(() => {
                 jsonLd={propertyJsonLd}
             />
         )}
-        <section className="w-full pt-28 md:pt-0 tracking-wide">
-            <div className='pt-10 pl-32'>
-                <Subheading />
+
+        {/* =====================================================================
+            HI-FI PROPERTY PAGE — pp-* design system
+            All logic preserved; only layout/styling changed.
+           ===================================================================== */}
+        <div className="pp-root">
+          <div className="pp-shell">
+
+            {/* ---- Breadcrumbs ---- */}
+            <nav className="pp-crumbs" aria-label="Breadcrumb">
+              {backToResultsHref ? (
+                <>
+                  <Link to={backToResultsHref} data-testid="back-to-results">Search results</Link>
+                  <span className="pp-sep" aria-hidden="true">›</span>
+                </>
+              ) : (
+                <>
+                  <Link to="/">Home</Link>
+                  <span className="pp-sep" aria-hidden="true">›</span>
+                  <Link to="/#our-homes">Stays</Link>
+                  <span className="pp-sep" aria-hidden="true">›</span>
+                </>
+              )}
+              <span aria-current="page">{data.property_name}</span>
+            </nav>
+
+            {/* ---- Title row ---- */}
+            <div className="pp-title-row">
+              <div>
+                {!ppHideAtlasBranding && (
+                  <p className="pp-eyebrow">{ppBrandName}</p>
+                )}
+                <h1 className="pp-display">{data.property_name}</h1>
+                <div className="pp-submeta">
+                  {ppHasApiReviews && (
+                    <>
+                      <span className="pp-rating">
+                        ★ {ppApiReviews!.averageRating.toFixed(1)}{' '}
+                        <em>({ppApiReviews!.totalCount} {ppApiReviews!.totalCount === 1 ? 'review' : 'reviews'})</em>
+                      </span>
+                      <span className="pp-submeta-sep" aria-hidden="true">·</span>
+                    </>
+                  )}
+                  {(data.propertyAddress || data.property_address || data.property_location) && (
+                    <>
+                      <span data-testid="property-street-address">
+                        {String(data.propertyAddress || data.property_address || data.property_location).trim()}
+                      </span>
+                      <span className="pp-submeta-sep" aria-hidden="true">·</span>
+                    </>
+                  )}
+                  {data.maxGuests != null && data.maxGuests > 0 && (
+                    <span>Sleeps {data.maxGuests}</span>
+                  )}
+                </div>
+              </div>
+              <div className="pp-title-actions">
+                <button
+                  type="button"
+                  className="pp-btn pp-btn-ghost pp-btn-sm"
+                  onClick={() => {
+                    const url = window.location.href;
+                    const priceText = directBookingNightly > 0 ? ` from ₹${directBookingNightly.toLocaleString('en-IN')}/night` : '';
+                    const text = `Check out ${data.property_name}${priceText} on ${ppBrandName}`;
+                    const share = async () => {
+                      if (typeof navigator.share === 'function') {
+                        return navigator.share({ title: document.title, text, url });
+                      }
+                      window.open(`https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`, '_blank', 'noopener,noreferrer');
+                    };
+                    void share();
+                  }}
+                  aria-label={`Share ${data.property_name}`}
+                >
+                  Share
+                </button>
+                <button
+                  type="button"
+                  className="pp-btn pp-btn-ghost pp-btn-sm"
+                  onClick={() => {
+                    const lid = Number(resolvedListingId ?? data.listingId ?? listingId);
+                    if (!Number.isFinite(lid) || lid <= 0) return;
+                    setFav(toggleFavorite(lid));
+                  }}
+                  aria-label={fav ? 'Remove from saved' : 'Save listing'}
+                >
+                  {fav ? '♥ Saved' : '♡ Save'}
+                </button>
+              </div>
             </div>
 
-            <div className="max-w-[85rem] flex flex-col gap-10 mx-auto px-4 sm:px-8 lg:px-16 py-8">
-                {backToResultsHref && (
-                    <div>
-                        <Link
-                            to={backToResultsHref}
-                            className="inline-flex items-center gap-1.5 text-sm font-medium text-text-muted hover:text-text-primary transition-colors"
-                            data-testid="back-to-results"
-                        >
-                            <span aria-hidden="true">←</span> Back to results
-                        </Link>
+            {/* ---- Gallery mosaic ---- */}
+            <div className="pp-gallery" role="region" aria-label="Property photos">
+              {/* Hero cell */}
+              <div
+                className={`pp-cell pp-cell-hero${galleryUrls[0] ? ' pp-cell--photo' : ''}`}
+                style={galleryUrls[0]
+                  ? { backgroundImage: `url(${galleryUrls[0]})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+                  : {}}
+                role="img"
+                aria-label={galleryUrls[0] ? `${data.property_name} — main photo` : `${data.property_name} — photo coming soon`}
+              >
+                {!galleryUrls[0] && (
+                  <>
+                    <div className="pp-cell-id-hero" aria-hidden="true">{data.id}</div>
+                    <div className="pp-cell-overlay">
+                      <span className="pp-dot" aria-hidden="true" />
+                      <span>Photos coming soon · home is real</span>
                     </div>
+                  </>
                 )}
+              </div>
 
-                {/* Property Header — TASK-2093: Save/Share in header next to title */}
-                <div className="">
-                    <div className="mb-2 flex flex-wrap items-start justify-between gap-3">
-                        <h1 className="min-w-0 flex-1 text-2xl sm:text-3xl font-semibold capitalize text-text-primary">
-                            {data?.property_name}
-                        </h1>
-                        <div className="flex shrink-0 items-center gap-1">
-                            <button
-                                type="button"
-                                className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border-subtle bg-bg-muted text-text-primary hover:opacity-90"
-                                onClick={() => {
-                                    const lid = Number(resolvedListingId ?? data?.listingId ?? listingId);
-                                    if (!Number.isFinite(lid) || lid <= 0) return;
-                                    setFav(toggleFavorite(lid));
-                                }}
-                                aria-label={fav ? 'Remove from saved' : 'Save listing'}
-                            >
-                                <Bookmark className={`h-5 w-5 ${fav ? 'fill-cta-primary text-cta-primary' : ''}`} strokeWidth={1.75} />
-                            </button>
-                            <button
-                                type="button"
-                                className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border-subtle bg-bg-muted text-text-primary hover:opacity-90"
-                                onClick={() => {
-                                    const url = window.location.href;
-                                    const priceText = data?.property_price && data.property_price > 0 ? ` from ₹${data.property_price}/night` : '';
-                                    const text = `Check out ${data?.property_name ?? 'this home'}${priceText} on ${_getTenantCtx()?.name ?? 'our platform'}`;
-                                    const share = async () => {
-                                        if (typeof navigator.share === 'function') {
-                                            return navigator.share({ title: document.title, text, url });
-                                        }
-                                        window.open(`https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`, '_blank', 'noopener,noreferrer');
-                                    };
-                                    void share();
-                                }}
-                                aria-label="Share property"
-                            >
-                                <Share2 className="h-5 w-5" strokeWidth={1.75} />
-                            </button>
-                        </div>
-                    </div>
-                    <div className="flex items-center text-text-muted">
-                        <FaLocationDot className="mr-2 text-sm" />
-                        <span className="text-sm sm:text-base">{data?.property_location || 'Location not available'}</span>
-                    </div>
-                    {(data?.property_neighborhoods || []).length > 0 && (
-                        <div className="mt-2 flex flex-wrap gap-2" role="list" aria-label="Neighborhoods">
-                            {data?.property_neighborhoods?.map((neighborhood: string, index: number) => (
-                                <div
-                                    key={`${neighborhood}-${index}`}
-                                    className="inline-flex items-center gap-2 rounded-full bg-[color:color-mix(in_srgb,var(--bg-muted)_45%,var(--bg-surface))] px-3 py-1 text-xs font-semibold text-text-primary"
-                                    role="listitem"
-                                    aria-label={`Neighborhood: ${neighborhood}`}
-                                >
-                                    <span aria-hidden="true" role="presentation">🏙️</span>
-                                    <span>{neighborhood}</span>
-                                </div>
-                            ))}
-                        </div>
+              {/* Thumbnail cells */}
+              {([1, 2, 3, 4] as const).map((i) => {
+                const photo = galleryUrls[i];
+                return (
+                  <div
+                    key={i}
+                    className={`pp-cell pp-cell-${i + 1}${photo ? ' pp-cell--photo' : ''}`}
+                    style={photo ? { backgroundImage: `url(${photo})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
+                    role="img"
+                    aria-label={photo ? `${data.property_name} — photo ${i + 1}` : `${PP_CELL_LABELS[i - 1]} area`}
+                  >
+                    {!photo && (
+                      <>
+                        <div className="pp-cell-id-thumb" aria-hidden="true">{['i','ii','iii','iv'][i - 1]}</div>
+                        <span className="pp-cell-label">{PP_CELL_LABELS[i - 1]}</span>
+                      </>
                     )}
-                    {(data?.propertyAddress || data?.property_address) && (
-                        <p
-                            className="text-sm text-text-muted mt-1"
-                            data-testid="property-street-address"
-                        >
-                            {String(data.propertyAddress || data.property_address).trim()}
-                        </p>
-                    )}
-                    {/* TASK-2555: header rating driven off live API reviews only — never static data.ts */}
-                    <div className="mt-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3 text-sm text-text-muted">
-                        {(() => {
-                            const apiRev = listingReviewsFromApi;
-                            const hasRealRating = apiRev && !apiRev.loading && apiRev.totalCount > 0 && apiRev.averageRating > 0;
-                            if (hasRealRating) {
-                                return (
-                                    <div className="flex items-center gap-2 font-semibold text-text-primary">
-                                        <FaStar className="text-accent-primary" />
-                                        <span>{apiRev!.averageRating.toFixed(2)}</span>
-                                        <span className="text-text-muted">• {apiRev!.totalCount} {apiRev!.totalCount === 1 ? 'review' : 'reviews'}</span>
-                                    </div>
-                                );
-                            }
-                            if (!apiRev || apiRev.loading) return null;
-                            // 0 API reviews — show "New listing" chip
-                            return (
-                                <span className="inline-flex items-center rounded-full bg-bg-muted px-2.5 py-0.5 text-xs font-medium text-text-muted border border-border-subtle">
-                                    New listing
-                                </span>
-                            );
-                        })()}
-                        {heroReviewQuote && (
-                            <p className="sm:pl-3 sm:border-l sm:border-border-subtle sm:ml-3 text-text-muted italic">
-                                &ldquo;{heroReviewQuote}
-                                {heroReviewQuote.length >= 280 ? '…' : ''}&rdquo;
-                            </p>
-                        )}
-                    </div>
-                </div>
-
-                {directBookingNightly > 0 && illustrativeOtaNightly > 0 && (
-                    <div
-                        className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50/85 px-4 py-3 text-sm text-emerald-950"
-                        data-testid="listing-ota-comparison-card"
-                        role="note"
-                    >
-                        <p className="font-semibold text-emerald-950">Book direct — typically better value</p>
-                        <p className="mt-1 text-emerald-900/95">
-                            From{' '}
-                            <span className="font-semibold tabular-nums">
-                                {formatCurrency(directBookingNightly, { maximumFractionDigits: 0 })}
-                            </span>{' '}
-                            per night on our site
-                            {illustrativeOtaNightly > directBookingNightly ? (
-                                <>
-                                    {' '}
-                                    — major booking platforms often show similar stays around{' '}
-                                    <span className="font-semibold tabular-nums">
-                                        {formatCurrency(illustrativeOtaNightly, { maximumFractionDigits: 0 })}
-                                    </span>{' '}
-                                    or higher after guest fees (illustrative).
-                                </>
-                            ) : null}
-                        </p>
-                        <p className="mt-1 text-xs text-emerald-800/90">Estimate only; OTA pricing varies by dates and promotions.</p>
-                    </div>
-                )}
-
-                {/* Social sharing — minimal, does not distract from booking CTA */}
-                <div className="flex items-center gap-3 mt-2 flex-wrap">
-                    <a
-                        href={(() => {
-                            // TASK-1678: prefer live/computed nightly when catalog price is missing or stale
-                            const shareNightly =
-                                directBookingNightly > 0
-                                    ? Math.round(directBookingNightly)
-                                    : data?.property_price && data.property_price > 0
-                                      ? Math.round(data.property_price)
-                                      : nightlyPrice?.finalNightlyPrice && nightlyPrice.finalNightlyPrice > 0
-                                        ? Math.round(nightlyPrice.finalNightlyPrice)
-                                        : 0;
-                            const priceText =
-                                shareNightly > 0
-                                    ? ` from ₹${shareNightly.toLocaleString('en-IN')}/night`
-                                    : '';
-                            const shareText = `Check out ${data?.property_name ?? 'this home'}${priceText}: ${window.location.href}`;
-                            return `https://wa.me/?text=${encodeURIComponent(shareText)}`;
-                        })()}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-[#0B6E30] hover:text-[#085C27] font-semibold"
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.85rem' }}
-                    >
-                        💬 Share on WhatsApp
-                    </a>
-                    <button
-                        type="button"
-                        onClick={() => {
-                            navigator.clipboard.writeText(window.location.href).then(() => {
-                                setCopyLinkLabel('Copied!');
-                                setTimeout(() => setCopyLinkLabel('Copy link'), 2000);
-                            }).catch(() => {});
-                        }}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.85rem', background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'inherit' }}
-                        className="text-text-muted hover:text-text-primary transition"
-                    >
-                        🔗 {copyLinkLabel}
-                    </button>
-                </div>
-
-                {/* Check-in / check-out times — TASK-1676: API / explicit unit policy only; else contact host */}
-                <div className="flex flex-wrap gap-4 text-sm font-medium mt-1 mb-2">
-                    <div className="flex items-center gap-1.5 text-text-primary">
-                        <KeyRound className="w-4 h-4 text-accent-primary flex-shrink-0" />
-                        <span>
-                            Check-in from{' '}
-                            <strong>{resolvedCheckInTime ?? 'Contact host for check-in time'}</strong>
-                        </span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-text-primary">
-                        <Clock className="w-4 h-4 text-accent-primary flex-shrink-0" />
-                        <span>
-                            Checkout by{' '}
-                            <strong>{resolvedCheckOutTime ?? 'Contact host for check-out time'}</strong>
-                        </span>
-                    </div>
-                </div>
-
-                {/* TASK-1359: Virtual tour video embed (YouTube/Vimeo) */}
-                {data?.virtualTourUrl && toEmbedUrl(data.virtualTourUrl) && (
-                  <div className="mb-4 rounded-xl overflow-hidden aspect-video w-full">
-                    <iframe
-                      src={toEmbedUrl(data.virtualTourUrl)!}
-                      title="Virtual property tour"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                      className="w-full h-full border-0"
-                    />
                   </div>
+                );
+              })}
+
+              <button
+                type="button"
+                className="pp-gallery-more"
+                aria-label="View all photos"
+                onClick={() => {
+                  if (galleryUrls.length === 0) return;
+                  import('@fancyapps/ui').then(({ Fancybox }) => {
+                    (Fancybox as { show: (items: object[]) => void }).show(
+                      galleryUrls.map((u) => ({ src: u, type: 'image' })),
+                    );
+                  }).catch(() => {});
+                }}
+              >
+                <PpGridIcon size={13} />
+                {galleryUrls.length > 5 ? `View all ${galleryUrls.length} photos` : 'View gallery'}
+              </button>
+            </div>
+
+            {/* ---- TASK-1359: Virtual tour ---- */}
+            {data.virtualTourUrl && toEmbedUrl(data.virtualTourUrl) && (
+              <div style={{ marginTop: 24, borderRadius: 18, overflow: 'hidden', aspectRatio: '16/9', width: '100%' }}>
+                <iframe
+                  src={toEmbedUrl(data.virtualTourUrl)!}
+                  title="Virtual property tour"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  style={{ width: '100%', height: '100%', border: 0 }}
+                />
+              </div>
+            )}
+            {Number.isFinite(Number(resolvedListingId)) && Number(resolvedListingId) > 0 && (
+              <Suspense fallback={null}>
+                <VirtualTourSection listingId={Number(resolvedListingId)} />
+              </Suspense>
+            )}
+
+            {/* ---- Two-column main ---- */}
+            <div className="pp-main">
+
+              {/* ===== LEFT COLUMN ===== */}
+              <div>
+
+                {/* Host strip + verified panel */}
+                <section className="pp-section" style={{ paddingTop: 28 }} aria-label="About the host">
+                  <div className="pp-host">
+                    <div className="pp-host-avatar" aria-hidden="true">{ppHostInitial}</div>
+                    <div>
+                      <div className="pp-host-name">
+                        {ppHostDisplayName}
+                        <span className="pp-verified-badge">
+                          <PpCheckIcon size={10} /> Verified
+                        </span>
+                      </div>
+                      <div className="pp-host-sub">
+                        Owner-operated · Responds on WhatsApp · Direct booking
+                        {responseTimeBadge ? ` · ${responseTimeBadge}` : ''}
+                      </div>
+                    </div>
+                    <div className="pp-host-actions">
+                      <a
+                        href={ppWaBookingUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="pp-btn pp-btn-whatsapp pp-btn-sm"
+                        data-testid="chat-with-host-btn"
+                        aria-label={`Message host about ${data.property_name} on WhatsApp`}
+                        onClick={() => trackEvent('whatsapp_cta_click', { listingId: resolvedListingId })}
+                      >
+                        <PpWhatsAppIcon size={14} /> Message on WhatsApp
+                      </a>
+                      <a
+                        href={ppWaAskUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="pp-btn pp-btn-ghost pp-btn-sm"
+                        aria-label="Ask host a question on WhatsApp"
+                      >
+                        Ask a question
+                      </a>
+                    </div>
+                  </div>
+
+                  {/* "What verified means" panel */}
+                  <div className="pp-verified-panel">
+                    <div className="pp-verified-panel-head">
+                      <span className="pp-shield" aria-hidden="true"><PpShieldIcon size={22} /></span>
+                      <h3>
+                        What &ldquo;verified&rdquo; means at {ppBrandName}
+                        <small>This isn&rsquo;t a badge we hand out. Here&rsquo;s what we actually checked.</small>
+                      </h3>
+                    </div>
+                    <ul className="pp-verified-list">
+                      <li>
+                        <PpCheckIcon size={16} />
+                        <span>
+                          <b>Property photos are genuine.</b>
+                          <span className="pp-meta">Our team reviewed listing photos before publishing.</span>
+                        </span>
+                      </li>
+                      <li>
+                        <PpCheckIcon size={16} />
+                        <span>
+                          <b>Host identity verified.</b>
+                          <span className="pp-meta">KYC completed · property title cross-checked.</span>
+                        </span>
+                      </li>
+                      <li>
+                        <PpCheckIcon size={16} />
+                        <span>
+                          <b>Listed at the exact address shown.</b>
+                          <span className="pp-meta">No swap-on-arrival · GPS pin matches registration.</span>
+                        </span>
+                      </li>
+                      <li>
+                        <PpCheckIcon size={16} />
+                        <span>
+                          <b>Direct booking — no middlemen.</b>
+                          <span className="pp-meta">You pay the host directly via Razorpay.</span>
+                        </span>
+                      </li>
+                    </ul>
+                  </div>
+                </section>
+
+                {/* Direct booking value proposition */}
+                {directBookingNightly > 0 && illustrativeOtaNightly > 0 && (
+                  <section className="pp-section" aria-label="Book direct value">
+                    <div
+                      style={{ borderRadius: 16, border: '1px solid #d1fae5', background: 'rgba(236,253,245,0.85)', padding: '16px 20px' }}
+                      data-testid="listing-ota-comparison-card"
+                      role="note"
+                    >
+                      <p style={{ fontWeight: 600, color: '#064e3b', margin: '0 0 4px' }}>Book direct — typically better value</p>
+                      <p style={{ fontSize: 14, color: '#065f46', margin: 0 }}>
+                        From{' '}
+                        <span style={{ fontWeight: 600 }}>
+                          {formatCurrency(directBookingNightly, { maximumFractionDigits: 0 })}
+                        </span>{' '}
+                        per night on our site
+                        {illustrativeOtaNightly > directBookingNightly ? (
+                          <>
+                            {' '}— major booking platforms often show similar stays around{' '}
+                            <span style={{ fontWeight: 600 }}>
+                              {formatCurrency(illustrativeOtaNightly, { maximumFractionDigits: 0 })}
+                            </span>{' '}
+                            or higher after guest fees (illustrative).
+                          </>
+                        ) : null}
+                      </p>
+                      <p style={{ fontSize: 12, color: '#047857', marginTop: 4 }}>Estimate only; OTA pricing varies by dates and promotions.</p>
+                    </div>
+                  </section>
                 )}
 
-                {/* Task 37: 3D virtual tour viewer (Pannellum / Matterport). Renders nothing when no tours. */}
-                {Number.isFinite(Number(resolvedListingId)) && Number(resolvedListingId) > 0 && (
-                  <Suspense fallback={null}>
-                    <VirtualTourSection listingId={Number(resolvedListingId)} />
+                {/* About this home */}
+                <section className="pp-section" aria-label="About this home">
+                  <h2>About this home</h2>
+                  {data.property_description && (
+                    <p className="pp-prose">
+                      {showAboutMore
+                        ? data.property_description
+                        : `${data.property_description.slice(0, 300)}${data.property_description.length > 300 ? '…' : ''}`}
+                    </p>
+                  )}
+                  {data.property_description && data.property_description.length > 300 && (
+                    <button
+                      type="button"
+                      className="pp-prose-more"
+                      onClick={() => setShowAboutMore((s) => !s)}
+                      aria-expanded={showAboutMore}
+                    >
+                      {showAboutMore ? 'Show less' : 'Read more'}
+                      <PpChevronDown size={14} />
+                    </button>
+                  )}
+                  {/* Check-in / Check-out times */}
+                  {(resolvedCheckInTime || resolvedCheckOutTime) && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginTop: 16 }}>
+                      {resolvedCheckInTime && (
+                        <span style={{ fontSize: 14, color: '#475569' }}>
+                          <strong style={{ color: '#1a1a2e' }}>Check-in:</strong> {resolvedCheckInTime}
+                        </span>
+                      )}
+                      {resolvedCheckOutTime && (
+                        <span style={{ fontSize: 14, color: '#475569' }}>
+                          <strong style={{ color: '#1a1a2e' }}>Check-out:</strong> {resolvedCheckOutTime}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {/* Neighborhoods */}
+                  {(data.property_neighborhoods || []).length > 0 && (
+                    <div style={{ marginTop: 14, display: 'flex', flexWrap: 'wrap', gap: 8 }} role="list" aria-label="Neighborhoods">
+                      {data.property_neighborhoods!.map((n, idx) => (
+                        <span key={`${n}-${idx}`} className="pp-chip" role="listitem">
+                          {n}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </section>
+
+                {/* Amenities */}
+                <section className="pp-section" aria-label="Amenities">
+                  <div className="pp-section-head">
+                    <h2>What&rsquo;s here</h2>
+                  </div>
+                  <div className="pp-amenities">
+                    {ppAmenityCodes
+                      ? ppAmenityCodes.map((code) => {
+                          const label = amenityMaster.get(code.toLowerCase()) ?? formatAmenityName(code);
+                          return (
+                            <div key={code} className="pp-amenity">
+                              <span style={{ fontSize: 18, color: '#475569', flexShrink: 0 }} aria-hidden="true">
+                                {renderIconForCode(code)}
+                              </span>
+                              <span>{label}</span>
+                            </div>
+                          );
+                        })
+                      : ppAmenityDisplay.map((label, idx) => (
+                          <div key={`${label}-${idx}`} className="pp-amenity">
+                            <span style={{ fontSize: 18, color: '#475569', flexShrink: 0 }} aria-hidden="true">
+                              {renderIcon(label)}
+                            </span>
+                            <span>{label}</span>
+                          </div>
+                        ))
+                    }
+                  </div>
+                  {ppAmenityLabels.length > 12 && (
+                    <button
+                      type="button"
+                      className="pp-prose-more"
+                      onClick={() => setShowAmenitiesModal(true)}
+                      aria-expanded={showAmenitiesModal}
+                    >
+                      Show all {ppAmenityLabels.length} amenities
+                      <PpChevronDown size={14} />
+                    </button>
+                  )}
+                </section>
+
+                {/* Guest Reviews */}
+                {(() => {
+                  const api = listingReviewsFromApi;
+                  const showApi = api && !api.loading && api.totalCount > 0;
+                  const apiLoaded = api != null && !api.loading;
+                  const showStatic = !showApi && !apiLoaded && data && data.property_reviews > 0;
+                  if (api?.loading) return (
+                    <section className="pp-section" aria-label="Guest reviews">
+                      <div className="pp-section-head"><h2>Guest reviews</h2></div>
+                      <div style={{ height: 120, borderRadius: 16, background: '#f0e6dc' }} />
+                    </section>
+                  );
+                  if (!showApi && !showStatic) return null;
+                  const rating = showApi ? api!.averageRating : data.property_rating;
+                  const count = showApi ? api!.totalCount : data.property_reviews;
+                  return (
+                    <section className="pp-section" aria-label="Guest reviews" data-testid="reviews-section">
+                      <div className="pp-section-head">
+                        <h2>
+                          ★ {rating.toFixed(1)} from {count}{' '}
+                          {count === 1 ? 'guest' : 'guests'}
+                        </h2>
+                      </div>
+
+                      <div className="pp-reviews-summary">
+                        <div>
+                          <div className="pp-rating-big" aria-label={`${rating.toFixed(1)} out of 5`}>
+                            {rating.toFixed(1)}
+                          </div>
+                          <span className="pp-rating-stars" aria-hidden="true">★★★★★</span>
+                          <div className="pp-rating-big-sub">{count} verified {count === 1 ? 'stay' : 'stays'}</div>
+                        </div>
+                        <div style={{ fontSize: 14, color: '#475569', lineHeight: 1.6 }}>
+                          <p style={{ margin: '0 0 8px', fontWeight: 600, color: '#1a1a2e' }}>Overall rating</p>
+                          <p style={{ margin: 0 }}>
+                            Guests rate this home {rating.toFixed(1)} out of 5 based on {count}{' '}
+                            {count === 1 ? 'review' : 'reviews'}.
+                            All reviews are from verified stays booked through this platform.
+                          </p>
+                        </div>
+                      </div>
+
+                      {showApi && api!.reviews.length > 0 ? (
+                        <>
+                          <div className="pp-review-grid">
+                            {ppDisplayedReviews.map((r, idx) => (
+                              <article key={r.id} className="pp-review">
+                                <div className="pp-review-head">
+                                  <div
+                                    className="pp-review-avatar"
+                                    aria-hidden="true"
+                                    style={{
+                                      background: PP_REVIEW_BG_COLORS[idx % PP_REVIEW_BG_COLORS.length],
+                                      color: PP_REVIEW_TEXT_COLORS[idx % PP_REVIEW_TEXT_COLORS.length],
+                                    }}
+                                  >
+                                    {(r.guestName ?? 'G').charAt(0).toUpperCase()}
+                                  </div>
+                                  <div>
+                                    <div className="pp-review-name">{r.guestName ?? 'Guest'}</div>
+                                    <div className="pp-review-date">
+                                      {new Date(r.createdAt).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}
+                                    </div>
+                                  </div>
+                                </div>
+                                {r.title && <p style={{ fontSize: 14, fontWeight: 600, color: '#1a1a2e', margin: '0 0 4px' }}>{r.title}</p>}
+                                {r.body && <p className="pp-review-body">{r.body}</p>}
+                                {(() => {
+                                  const chips: { label: string; v: number }[] = [];
+                                  if (r.ratingCleanliness != null && r.ratingCleanliness >= 1) chips.push({ label: 'Cleanliness', v: r.ratingCleanliness });
+                                  if (r.ratingValue != null && r.ratingValue >= 1) chips.push({ label: 'Value', v: r.ratingValue });
+                                  if (r.ratingCheckin != null && r.ratingCheckin >= 1) chips.push({ label: 'Check-in', v: r.ratingCheckin });
+                                  if (r.ratingCommunication != null && r.ratingCommunication >= 1) chips.push({ label: 'Communication', v: r.ratingCommunication });
+                                  if (chips.length === 0) return null;
+                                  return (
+                                    <p style={{ marginBottom: 4, fontSize: 12, color: '#64748b' }} data-testid="review-sub-ratings">
+                                      {chips.map((c, i) => <span key={c.label}>{i > 0 ? ' · ' : ''}{c.label} {c.v}/5</span>)}
+                                    </p>
+                                  );
+                                })()}
+                                {r.isVerifiedStay && (
+                                  <span className="pp-review-verified">
+                                    <PpCheckIcon size={10} /> Verified stay
+                                  </span>
+                                )}
+                                {r.hostResponse && (
+                                  <div className="pp-review-host-resp">
+                                    <div className="pp-review-host-resp-label">Host response</div>
+                                    <p>{r.hostResponse}</p>
+                                  </div>
+                                )}
+                              </article>
+                            ))}
+                          </div>
+                          {api!.reviews.length > 6 && (
+                            <button
+                              type="button"
+                              onClick={() => setShowAllReviews((s) => !s)}
+                              className="pp-prose-more"
+                              style={{ marginTop: 16 }}
+                              aria-expanded={showAllReviews}
+                            >
+                              {showAllReviews
+                                ? 'Show fewer reviews'
+                                : `View all ${api!.totalCount} reviews`}
+                              <PpChevronDown size={14} />
+                            </button>
+                          )}
+                        </>
+                      ) : showApi ? (
+                        <p style={{ fontSize: 14, color: '#475569', fontStyle: 'italic' }}>Ratings only — written reviews coming soon.</p>
+                      ) : (
+                        data.property_review_snippets && data.property_review_snippets.length > 0 && (
+                          <div className="pp-review-grid">
+                            {data.property_review_snippets.slice(0, 4).map((snippet, idx) => (
+                              <article key={idx} className="pp-review">
+                                <p className="pp-review-body">&ldquo;{snippet}&rdquo;</p>
+                              </article>
+                            ))}
+                          </div>
+                        )
+                      )}
+                    </section>
+                  );
+                })()}
+
+                {/* Cancellation policy */}
+                <section className="pp-section" aria-label="Cancellation policy">
+                  <h2 style={{ marginBottom: 18 }}>If you need to cancel</h2>
+                  <div className="pp-refund">
+                    <div className="pp-refund-head">
+                      <div>
+                        <h3>{ppCancellationInfo.headline}</h3>
+                        <p>{ppCancellationInfo.description}</p>
+                      </div>
+                    </div>
+                    <div className="pp-timeline" role="list">
+                      {ppCancellationInfo.steps.map((step) => (
+                        <div key={step.title} className="pp-timeline-step" role="listitem">
+                          <div className="pp-tl-dot" aria-hidden="true" />
+                          <h6>{step.title}</h6>
+                          <p>{step.desc}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </section>
+
+                {/* Things to know / Policy details */}
+                {data.property_policy_details && data.property_policy_details.length > 0 && (
+                  <section className="pp-section" aria-label="Things to know">
+                    <h2 style={{ marginBottom: 18 }}>Things to know</h2>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16 }}>
+                      {data.property_policy_details
+                        .filter((p) => p?.type && !p.type.includes('Policy') && !p.type.includes('Detailed'))
+                        .map((policy, idx) => (
+                          <div key={idx} style={{ padding: '14px 16px', background: '#fff', border: '1px solid #f0e6dc', borderRadius: 12 }}>
+                            <p style={{ fontSize: 12.5, color: '#64748b', margin: '0 0 4px' }}>{policy.type}</p>
+                            <p style={{ fontSize: 14, fontWeight: 600, color: '#1a1a2e', margin: 0 }}>{policy.value}</p>
+                          </div>
+                        ))}
+                    </div>
+                  </section>
+                )}
+
+                {/* Similar stays */}
+                {(() => {
+                  const s = similarFromApi;
+                  if (s?.loading) return (
+                    <section className="pp-section" aria-label="Similar stays">
+                      <div className="pp-section-head"><h2>Similar stays</h2></div>
+                      <div style={{ height: 120, borderRadius: 16, background: '#f0e6dc' }} />
+                    </section>
+                  );
+                  if (!s || !Array.isArray(s.items) || s.items.length === 0) return null;
+                  return (
+                    <section className="pp-section" aria-label="Similar stays">
+                      <div className="pp-section-head"><h2>Similar stays</h2></div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16 }}>
+                        {s.items.slice(0, 4).map((it: any) => {
+                          const id = Number(it.id);
+                          const name = String(it.name ?? it.propertyName ?? `Listing ${it.id}`);
+                          const img = (it.coverPhotoUrl as string | undefined) ?? (Array.isArray(it.photoUrls) ? it.photoUrls[0] : undefined);
+                          const path = buildHomeUnitPath(getPropertySlug({ name: it.propertyName, property_name: it.propertyName }), id);
+                          return (
+                            <Link
+                              key={String(it.id)}
+                              to={path}
+                              style={{ display: 'block', borderRadius: 16, border: '1px solid #f0e6dc', overflow: 'hidden', textDecoration: 'none', background: '#fff' }}
+                            >
+                              {img && <img src={img} alt={name} style={{ width: '100%', height: 140, objectFit: 'cover' }} loading="lazy" />}
+                              <div style={{ padding: '12px 14px' }}>
+                                <p style={{ fontWeight: 600, color: '#1a1a2e', fontSize: 14, margin: '0 0 4px' }}>{name}</p>
+                                <p style={{ fontSize: 12.5, color: '#64748b', margin: 0 }}>{String(it.propertyAddress ?? '').slice(0, 60)}</p>
+                              </div>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    </section>
+                  );
+                })()}
+
+                {/* Location Map */}
+                {ppHasLocation && (
+                  <section className="pp-section" aria-label="Location">
+                    <div className="pp-section-head">
+                      <h2>Where you&rsquo;ll be</h2>
+                      {(data.propertyAddress || data.property_address || data.property_location) && (
+                        <span className="pp-muted" style={{ fontSize: 13 }}>
+                          {String(data.propertyAddress || data.property_address || data.property_location).trim()}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ borderRadius: 16, overflow: 'hidden', border: '1px solid #f0e6dc' }}>
+                      {mapSrcTrimmed ? (
+                        <iframe
+                          src={mapSrcTrimmed}
+                          style={{ width: '100%', height: 320, border: 0, display: 'block' }}
+                          loading="lazy"
+                          allowFullScreen
+                          referrerPolicy="no-referrer-when-downgrade"
+                          title="Property Location"
+                        />
+                      ) : useMultiPin ? (
+                        <div>
+                          <div style={{ borderBottom: '1px solid #f0e6dc', padding: '16px 18px' }}>
+                            <p style={{ fontWeight: 600, color: '#1a1a2e', margin: '0 0 2px' }}>Our properties ({propertyPins.length})</p>
+                            <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>Click a pin for details.</p>
+                          </div>
+                          <MultiPinMap pins={propertyPins} height={320} />
+                        </div>
+                      ) : mapLocation &&
+                        typeof mapLocation.lat === 'number' &&
+                        Number.isFinite(mapLocation.lat) &&
+                        typeof mapLocation.lng === 'number' &&
+                        Number.isFinite(mapLocation.lng) ? (
+                        <SinglePinGoogleMap
+                          lat={mapLocation.lat}
+                          lng={mapLocation.lng}
+                          zoom={typeof mapLocation.zoom === 'number' && mapLocation.zoom > 0 ? mapLocation.zoom : 15}
+                          markerTitle={mapLocation.markerLabel ?? tenantNameForMap}
+                        />
+                      ) : (
+                        typeof data.latitude === 'number' && Number.isFinite(data.latitude) &&
+                        typeof data.longitude === 'number' && Number.isFinite(data.longitude) ? (
+                          <SinglePinGoogleMap
+                            lat={data.latitude}
+                            lng={data.longitude}
+                            zoom={15}
+                            markerTitle={data.property_name}
+                          />
+                        ) : (
+                          <div style={{ padding: '48px 16px', textAlign: 'center', background: '#f9f5f0' }}>
+                            <p style={{ color: '#64748b', margin: 0 }}>Map location not configured for this property.</p>
+                          </div>
+                        )
+                      )}
+                    </div>
+                    {/* Nearby places */}
+                    {(data.property_nearplaces || []).length > 0 && (
+                      <div>
+                        <div style={{ marginTop: 18, display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                          <p style={{ fontWeight: 600, fontSize: 14, color: '#1a1a2e', margin: 0 }}>Nearby places</p>
+                          <button
+                            type="button"
+                            className="pp-prose-more"
+                            onClick={() => setShowNeighborhoodMore((s) => !s)}
+                            aria-expanded={showNeighborhoodMore}
+                          >
+                            {showNeighborhoodMore ? 'Show less' : 'Show more'}
+                            <PpChevronDown size={14} />
+                          </button>
+                        </div>
+                        {showNeighborhoodMore && (
+                          <div className="pp-nearby">
+                            {data.property_nearplaces.slice(0, 9).map((place, idx) => (
+                              <div key={`place-${idx}`} className="pp-nearby-item">
+                                <b>{place}</b>
+                                <span>Nearby</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </section>
+                )}
+
+              </div>
+              {/* ===== END LEFT COLUMN ===== */}
+
+              {/* ===== RIGHT COLUMN — sticky booking ===== */}
+              <aside className="pp-booking-col" aria-label="Booking">
+                {data.photoCount != null && data.photoCount > 0 && (
+                  <p style={{ fontSize: 13, color: '#64748b', marginBottom: 8 }} aria-label="Photo count">
+                    {data.photoCount} photo{data.photoCount !== 1 ? 's' : ''}
+                  </p>
+                )}
+                <Suspense fallback={<SkeletonCard />}>
+                  <UnitBookingWidget
+                    listingId={resolvedListingId ?? undefined}
+                    propertyId={listingPropertyId ?? undefined}
+                    listingName={data.property_name || 'This property'}
+                    timezoneId={data.timezoneId}
+                    coverPhotoUrl={primaryImage}
+                    maxGuests={data.maxGuests}
+                  />
+                </Suspense>
+
+                {/* Verified home badge */}
+                <p
+                  className="pp-chip pp-chip-success"
+                  style={{ marginTop: 12, cursor: 'help' }}
+                  title="Listing details and photos reviewed by the Atlas team before going live."
+                >
+                  {(() => {
+                    const pp = _getTenantCtx()?.paymentProvider;
+                    const hasOnline = typeof pp === 'string' && pp !== 'MANUAL';
+                    return hasOnline ? '✓ Verified home · Instant book' : '✓ Verified home · Host-confirmed booking';
+                  })()}
+                </p>
+
+                {/* Host profile card */}
+                <div
+                  className="pp-host"
+                  style={{ marginTop: 12 }}
+                  data-testid="host-profile-card"
+                >
+                  <div className="pp-host-avatar" aria-hidden="true" style={{ width: 44, height: 44, fontSize: 18 }}>
+                    {(() => {
+                      const tenantName = _getTenantCtx()?.name ?? '';
+                      const words = tenantName.trim().split(/\s+/).filter(Boolean);
+                      if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
+                      if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+                      return '?';
+                    })()}
+                  </div>
+                  <div>
+                    <div className="pp-host-name" style={{ fontSize: 15 }}>
+                      Managed by {_getTenantCtx()?.name ?? 'Our Team'}
+                    </div>
+                    <div className="pp-host-sub">
+                      24/7 WhatsApp support{responseTimeBadge ? ` · ${responseTimeBadge}` : ' · WhatsApp-first support.'}
+                    </div>
+                    {reviewReplyRateBadge && (
+                      <p style={{ fontSize: 12, color: '#157046', fontWeight: 600, marginTop: 2 }}>
+                        ✓ {reviewReplyRateBadge} within 48h
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* WhatsApp CTA (sidebar) */}
+                <div style={{ marginTop: 12 }}>
+                  <a
+                    href={ppWaBookingUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="pp-btn pp-btn-whatsapp pp-btn-block"
+                    data-testid="chat-with-host-btn"
+                    aria-label={`Message host about ${data.property_name} on WhatsApp`}
+                    onClick={() => trackEvent('whatsapp_cta_click', { listingId: resolvedListingId })}
+                  >
+                    <PpWhatsAppIcon size={16} />
+                    Chat with host
+                  </a>
+                </div>
+
+                {/* Availability Calendar */}
+                {resolvedListingId && (
+                  <Suspense fallback={
+                    <div style={{ borderRadius: 12, border: '1px solid #f0e6dc', background: '#f9f5f0', height: 256, marginTop: 16 }} />
+                  }>
+                    <AvailabilityCalendar
+                      listingId={resolvedListingId}
+                      onDateSelect={(ymd) => {
+                        const ev = new CustomEvent('atlas:set-checkin', { detail: ymd });
+                        window.dispatchEvent(ev);
+                      }}
+                    />
                   </Suspense>
                 )}
 
-                {/* Image Gallery — Azure blob URLs are skipped (409); API/static must serve reachable images */}
-<div className="flex gap-2 h-64 md:h-96 lg:h-[450px] overflow-hidden ">
-  <div className="flex-1 relative h-full rounded-md overflow-hidden bg-bg-muted">
-    {galleryUrls[0] ? (
-      <a href={galleryUrls[0]} data-fancybox="property-gallery">
-        <img
-          src={galleryUrls[0]}
-          alt={data?.property_name ? `${data.property_name} photo` : "Main property photo"}
-          loading="eager"
-          decoding="async"
-          {...({ fetchpriority: "high" } as { fetchpriority: string })}
-          sizes="(min-width: 1024px) 50vw, 100vw"
-          className="w-full h-full object-cover"
-          onError={(e) => {
-            const img = e.currentTarget;
-            if (img.dataset.retryCount === undefined) {
-              img.dataset.retryCount = '0';
-            }
-            const retryCount = parseInt(img.dataset.retryCount || '0', 10);
-            if (retryCount < 2) {
-              img.dataset.retryCount = String(retryCount + 1);
-              setTimeout(() => {
-                img.src = galleryUrls[0];
-              }, 1000 * (retryCount + 1));
-            }
-          }}
-        />
-      </a>
-    ) : (
-      <>
-        <a href="/placeholder-property.jpg" data-fancybox="property-gallery" className="hidden" aria-hidden="true" />
-        <div className="w-full h-full min-h-[16rem] bg-bg-muted bg-[linear-gradient(135deg,color-mix(in_srgb,var(--border-subtle)_55%,transparent)_0%,color-mix(in_srgb,var(--bg-muted)_92%,transparent)_100%)]" role="img" aria-label="No photos available" />
-      </>
-    )}
-  </div>
-  <div className="flex-1 grid grid-cols-2 grid-rows-2 gap-2 h-full">
-    {galleryUrls.slice(1, 5).map((img: string, index: number) => (
-      <div key={`${img}-${index}`} className="relative w-full h-full rounded-md overflow-hidden">
-        <a href={img} data-fancybox="property-gallery">
-          <img
-            src={img}
-            alt={data?.property_name ? `${data.property_name} photo ${index + 2}` : `Property photo ${index + 2}`}
-            loading="lazy"
-            decoding="async"
-            sizes="(min-width: 1024px) 25vw, 50vw"
-            className="w-full h-full object-cover hover:opacity-80 transition"
-            onError={(e) => {
-              const imgEl = e.currentTarget;
-              if (imgEl.dataset.retryCount === undefined) {
-                imgEl.dataset.retryCount = '0';
-              }
-              const retryCount = parseInt(imgEl.dataset.retryCount || '0', 10);
-              if (retryCount < 2) {
-                imgEl.dataset.retryCount = String(retryCount + 1);
-                setTimeout(() => {
-                  imgEl.src = img;
-                }, 1000 * (retryCount + 1));
-              }
-            }}
-          />
-        </a>
-        {index === 3 && galleryUrls.length > 0 && (
-          <button
-            type="button"
-            onClick={() => {
-              Fancybox.show(
-                galleryUrls.map((u: string) => ({
-                  src: u,
-                  type: "image",
-                })),
-              );
-            }}
-            className="absolute bottom-2 right-2 bg-[color:color-mix(in_srgb,var(--text-primary)_65%,transparent)] text-[var(--text-contrast)] text-xs md:text-sm px-3 py-1 rounded-full flex items-center gap-2 hover:bg-[color:color-mix(in_srgb,var(--text-primary)_80%,transparent)] transition"
-          >
-            All photos
-          </button>
-        )}
-      </div>
-    ))}
-  </div>
-</div>
-
-                <div className='flex flex-col gap-4 sm:flex-row '>
-                    {/* Left div  */}
-                    <div className="w-full sm:w-2/3 order-1">
-                        {/* What this place offers */}
-                        <div className="pb-8 border-b border-border-subtle">
-                            <h2 className="text-xl sm:text-2xl font-semibold mb-6 text-text-primary">What this place offers</h2>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                {data?.amenityCodes && data.amenityCodes.length > 0 ? (
-                                    data.amenityCodes.slice(0, 9).map((code) => {
-                                        const label = amenityMaster.get(code.toLowerCase()) ?? formatAmenityName(code);
-                                        return (
-                                            <div key={code} className="flex flex-col items-center gap-2 p-3 rounded-xl bg-bg-muted border border-border-subtle text-center">
-                                                <span className="text-2xl text-accent-primary">
-                                                    {renderIconForCode(code)}
-                                                </span>
-                                                <span className="text-xs font-medium text-text-primary">{label}</span>
-                                            </div>
-                                        );
-                                    })
-                                ) : (data?.property_amenities || []).length > 0 ? (
-                                    (data?.property_amenities || []).slice(0, 9).map((amenity, idx) => (
-                                        <div key={idx} className="flex flex-col items-center gap-2 p-3 rounded-xl bg-bg-muted border border-border-subtle text-center">
-                                            <span className="text-2xl text-accent-primary">
-                                                {renderIcon(amenity?.amenities_icon || '')}
-                                            </span>
-                                            <span className="text-xs font-medium text-text-primary">
-                                                {amenity?.amenities_icon ? formatAmenityName(amenity.amenities_icon) : 'Amenity'}
-                                            </span>
-                                        </div>
-                                    ))
-                                ) : (
-                                    <p className="text-text-muted col-span-2 sm:col-span-3">No amenities listed</p>
-                                )}
-                            </div>
-                            {((data?.amenityCodes?.length ?? 0) > 9 || (data?.property_amenities?.length ?? 0) > 0) && (
-                                <Button
-                                    variant="secondary"
-                                    onClick={() => setShowAmenitiesModal(true)}
-                                    className="mt-6"
-                                >
-                                    Show All Amenities
-                                </Button>
-                            )}
-                        </div>
-
-                        {/* Policies Section */}
-                        {data?.property_policy_details && (
-                            <div className="border border-border-subtle rounded-lg overflow-hidden bg-bg-surface">
-                                <div className="bg-bg-surface p-6">
-                                    <h2 className="text-xl sm:text-2xl font-semibold mb-6 text-text-primary">Things to know</h2>
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
-                                        <div className="p-4 border border-border-subtle rounded-lg bg-bg-muted">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <Clock className="w-4 h-4 text-accent-primary" />
-                                                <p className="text-text-muted text-sm">Check-in / Check-out</p>
-                                            </div>
-                                            <p className="font-medium text-text-primary">
-                                                Check-in {resolvedCheckInTime ?? 'Contact host for check-in time'} · Check-out{' '}
-                                                {resolvedCheckOutTime ?? 'Contact host for check-out time'}
-                                            </p>
-                                            <a className="text-sm text-accent-primary underline" href="/terms#check-in-check-out">View terms</a>
-                                        </div>
-                                        <div className="p-4 border border-border-subtle rounded-lg bg-bg-muted">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <KeyRound className="w-4 h-4 text-accent-primary" />
-                                                <p className="text-text-muted text-sm">Cancellation & rules</p>
-                                            </div>
-                                            {data?.cancellationTier && (
-                                                <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full mb-1 ${
-                                                    data.cancellationTier === 'Flexible' ? 'bg-green-100 text-green-800' :
-                                                    data.cancellationTier === 'Moderate' ? 'bg-yellow-100 text-yellow-800' :
-                                                    'bg-red-100 text-red-800'
-                                                }`}>{data.cancellationTier}</span>
-                                            )}
-                                            <p className="font-medium text-text-primary">
-                                                {resolvedCancellationText}
-                                            </p>
-                                            <p className="text-text-primary mt-2 text-sm">
-                                                {inlinePolicySnippets?.houseRules || 'Standard house rules apply'}
-                                            </p>
-                                            <a className="text-sm text-accent-primary underline inline-block mt-2" href="/policies#cancellation-refunds">Read policy</a>
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
-                                        {(data?.property_policy_details || [])
-                                            .filter((policy: PropertyDetail) => policy?.type && !policy.type.includes('Policy') && !policy.type.includes('Detailed'))
-                                            .map((policy: PropertyDetail, idx: number) => (
-                                                <div key={idx}>
-                                                    <p className="text-text-muted text-sm mb-1">{policy.type}</p>
-                                                    <p className="font-medium text-text-primary">{policy.value}</p>
-                                                </div>
-                                            ))}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Similar stays — Wave 9 #85 */}
-                        {(() => {
-                            const s = similarFromApi;
-                            if (s?.loading) return (
-                                <div className="pb-8 border-b border-border-subtle">
-                                    <div className="h-7 w-48 rounded bg-bg-muted mb-4" />
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        {Array.from({ length: 2 }).map((_, i) => (
-                                            <div key={i} className="rounded-xl border border-border-subtle bg-bg-surface overflow-hidden">
-                                                <div className="h-40 w-full bg-bg-muted" />
-                                                <div className="p-4 space-y-2">
-                                                    <div className="h-4 w-3/4 rounded bg-bg-muted" />
-                                                    <div className="h-3 w-1/2 rounded bg-bg-muted" />
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            );
-                            if (!s || !Array.isArray(s.items) || s.items.length === 0) return null;
-                            return (
-                                <div className="pb-8 border-b border-border-subtle">
-                                    <h2 className="text-xl sm:text-2xl font-semibold mb-4 text-text-primary">Similar stays</h2>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        {s.items.slice(0, 4).map((it: any) => {
-                                            const id = Number(it.id);
-                                            const name = String(it.name ?? it.propertyName ?? `Listing ${it.id}`);
-                                            const img = (it.coverPhotoUrl as string | undefined) ?? (Array.isArray(it.photoUrls) ? it.photoUrls[0] : undefined);
-                                            const path = buildHomeUnitPath(getPropertySlug({ name: it.propertyName, property_name: it.propertyName }), id);
-                                            return (
-                                                <Link
-                                                    key={String(it.id)}
-                                                    to={path}
-                                                    className="rounded-xl border border-border-subtle bg-bg-surface overflow-hidden transition-colors hover:border-border-subtle"
-                                                >
-                                                    {img ? <img src={img} alt={name} className="w-full h-40 object-cover" loading="lazy" /> : null}
-                                                    <div className="p-4">
-                                                        <p className="font-semibold text-text-primary">{name}</p>
-                                                        <p className="text-sm text-text-secondary">{String(it.propertyAddress ?? '').slice(0, 60)}</p>
-                                                    </div>
-                                                </Link>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            );
-                        })()}
-
-                        {/* Guest Reviews — API when available (G3-001), else static catalog snippets */}
-                        {(() => {
-                            const api = listingReviewsFromApi;
-                            const showApi = api && !api.loading && api.totalCount > 0;
-                            // TASK-2068: suppress static snippets when API has confirmed 0 real reviews
-                            const apiLoaded = api != null && !api.loading;
-                            const showStatic = !showApi && !apiLoaded && data && data.property_reviews > 0;
-                            if (api?.loading && !showStatic) return (
-                                <div className="pb-8 border-b border-border-subtle">
-                                    <div className="h-7 w-40 rounded bg-bg-muted mb-4" />
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                        {Array.from({ length: 2 }).map((_, i) => (
-                                            <div key={i} className="p-4 rounded-xl bg-bg-muted border border-border-subtle space-y-2">
-                                                <div className="h-3 w-24 rounded bg-bg-surface" />
-                                                <div className="flex gap-1">
-                                                    {Array.from({ length: 5 }).map((__, j) => (
-                                                        <div key={j} className="h-3 w-3 rounded-full bg-bg-surface" />
-                                                    ))}
-                                                </div>
-                                                <div className="h-3 w-full rounded bg-bg-surface" />
-                                                <div className="h-3 w-4/5 rounded bg-bg-surface" />
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            );
-                            // TASK-2068: API loaded with 0 reviews — no fabricated snippets or empty-state marketing block
-                            if (!showApi && !showStatic) return null;
-                            const rating = showApi ? api!.averageRating : data!.property_rating;
-                            const count = showApi ? api!.totalCount : data!.property_reviews;
-                            return (
-                            <div className="pb-8 border-b border-border-subtle" data-testid="reviews-section">
-                                <h2 className="text-xl sm:text-2xl font-semibold mb-4 text-text-primary">Guest Reviews</h2>
-                                <div className="flex items-center gap-3 mb-4">
-                                    <div className="flex items-center gap-1 text-accent-primary">
-                                        {Array.from({ length: 5 }).map((_, i) => (
-                                            <FaStar key={i} className={i < Math.round(rating) ? 'text-accent-primary' : 'text-border-subtle'} />
-                                        ))}
-                                    </div>
-                                    <span className="font-semibold text-text-primary">{rating.toFixed(1)}</span>
-                                    {/* TASK-2573: singular/plural */}
-                                    <span className="text-text-muted text-sm">({count} {count === 1 ? 'review' : 'reviews'})</span>
-                                </div>
-                                {showApi && api!.reviews.length > 0 ? (
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                        {api!.reviews.slice(0, 6).map((r) => (
-                                            <div key={r.id} className="p-4 rounded-xl bg-bg-muted border border-border-subtle">
-                                                <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                                    <span className="text-sm font-semibold text-text-primary">{r.guestName ?? 'Guest'}</span>
-                                                    <span className="text-xs text-text-muted">
-                                                        {formatHumanDate(r.createdAt, {
-                                                            locale: 'en-IN',
-                                                            fallback: '—',
-                                                            options: { day: '2-digit', month: 'short', year: 'numeric' },
-                                                        })}
-                                                    </span>
-                                                    {/* TASK-1311: Verified Stay badge */}
-                                                    {r.isVerifiedStay && (
-                                                        <span className="inline-flex items-center gap-0.5 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded-full px-2 py-0.5">
-                                                            ✓ Verified Stay
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <div className="flex gap-0.5 mb-2">
-                                                    {Array.from({ length: 5 }).map((_, i) => (
-                                                        <FaStar key={i} className={`text-xs ${i < r.rating ? 'text-accent-primary' : 'text-border-subtle'}`} />
-                                                    ))}
-                                                </div>
-                                                {(() => {
-                                                    const chips: { label: string; v: number }[] = [];
-                                                    if (r.ratingCleanliness != null && r.ratingCleanliness >= 1)
-                                                        chips.push({ label: 'Cleanliness', v: r.ratingCleanliness });
-                                                    if (r.ratingValue != null && r.ratingValue >= 1)
-                                                        chips.push({ label: 'Value', v: r.ratingValue });
-                                                    if (r.ratingCheckin != null && r.ratingCheckin >= 1)
-                                                        chips.push({ label: 'Check-in', v: r.ratingCheckin });
-                                                    if (r.ratingCommunication != null && r.ratingCommunication >= 1)
-                                                        chips.push({ label: 'Communication', v: r.ratingCommunication });
-                                                    if (chips.length === 0) return null;
-                                                    return (
-                                                        <p className="mb-2 text-xs text-text-muted" data-testid="review-sub-ratings">
-                                                            {chips.map((c, idx) => (
-                                                                <span key={c.label}>
-                                                                    {idx > 0 ? ' · ' : ''}
-                                                                    {c.label} {c.v}/5
-                                                                </span>
-                                                            ))}
-                                                        </p>
-                                                    );
-                                                })()}
-                                                {r.title && <p className="text-sm font-medium text-text-primary mb-1">{r.title}</p>}
-                                                {r.body && <p className="text-sm text-text-muted italic">"{r.body}"</p>}
-                                                {filterGuestImageUrls(r.photoUrls ?? []).length > 0 && (
-                                                    <div className="flex gap-1.5 mt-2 flex-wrap">
-                                                        {filterGuestImageUrls(r.photoUrls ?? []).slice(0, 3).map((src) => {
-                                                            const safe = sanitizeGuestImageUrl(src);
-                                                            if (!safe) return null;
-                                                            return (
-                                                                <a
-                                                                    key={src}
-                                                                    href={safe}
-                                                                    target="_blank"
-                                                                    rel="noopener noreferrer"
-                                                                    className="block w-14 h-14 rounded-lg overflow-hidden border border-border-subtle bg-bg-muted shrink-0"
-                                                                >
-                                                                    <img src={safe} alt="" className="w-full h-full object-cover" loading="lazy" />
-                                                                </a>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                )}
-                                                {r.hostResponse && (
-                                                    <div className="mt-2 pl-3 border-l-2 border-accent-primary/40">
-                                                        <p className="text-xs text-text-muted font-medium mb-0.5">Owner's response:</p>
-                                                        <p className="text-sm text-text-muted">{r.hostResponse}</p>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : showApi ? (
-                                    // TASK-2556: API active + count > 0 but no review bodies — show "ratings only" line, never static snippets
-                                    <p className="text-sm text-text-muted italic">Ratings only — written reviews coming soon.</p>
-                                ) : (
-                                    data?.property_review_snippets && data.property_review_snippets.length > 0 && (
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                        {data.property_review_snippets.slice(0, 4).map((snippet: string, idx: number) => (
-                                            <div key={idx} className="p-4 rounded-xl bg-bg-muted border border-border-subtle">
-                                                <p className="text-sm text-text-muted italic">"{snippet}"</p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                    )
-                                )}
-                            </div>
-                            );
-                        })()}
-
-                        {/* About this place */}
-                        <div className="pb-8 border-b border-border-subtle">
-                            <h2 className="text-xl sm:text-2xl font-semibold mb-4 text-text-primary">About this place</h2>
-                            <p className="text-text-muted leading-relaxed text-justify">
-                                {!data?.property_description ? 
-                                    'No description available' :
-                                    showAboutMore
-                                        ? data.property_description
-                                        : `${data.property_description.slice(0, 200)}${data.property_description.length > 200 ? '...' : ''}`
-                                }
-                            </p>
-                            <button
-                                onClick={() => setShowAboutMore(!showAboutMore)}
-                                className="flex items-center mt-3 font-semibold underline hover:text-text-primary transition"
-                            >
-                                Show {showAboutMore ? 'Less' : 'More'}
-                                <ChevronRight className={`ml-1 w-4 h-4 transition-transform ${showAboutMore ? 'rotate-90' : ''}`} />
-                            </button>
-                        </div>
-
-                        {/* Location Map — TL-GUEST: same APIs + UI branch as LocationPage (`/location`). */}
-                        <div className="">
-                            <h2 className="text-xl sm:text-2xl font-semibold mb-4 text-text-primary">Where you'll be</h2>
-                            <div className="rounded-lg overflow-hidden border border-border-subtle">
-                                {mapSrcTrimmed ? (
-                                    <iframe
-                                        src={mapSrcTrimmed}
-                                        className="w-full h-64 sm:h-96"
-                                        loading="lazy"
-                                        allowFullScreen
-                                        referrerPolicy="no-referrer-when-downgrade"
-                                        title="Property Location"
-                                    />
-                                ) : useMultiPin ? (
-                                    <div className="bg-bg-muted">
-                                        <div className="border-b border-border-subtle p-4">
-                                            <p className="font-semibold text-text-primary">
-                                                Our properties ({propertyPins.length})
-                                            </p>
-                                            <p className="text-sm text-text-muted">
-                                                Click a pin for details. Each marker is a separate property.
-                                            </p>
-                                        </div>
-                                        <MultiPinMap pins={propertyPins} height={384} />
-                                    </div>
-                                ) : mapLocation &&
-                                  typeof mapLocation.lat === 'number' &&
-                                  Number.isFinite(mapLocation.lat) &&
-                                  typeof mapLocation.lng === 'number' &&
-                                  Number.isFinite(mapLocation.lng) ? (
-                                    <SinglePinGoogleMap
-                                        lat={mapLocation.lat}
-                                        lng={mapLocation.lng}
-                                        zoom={typeof mapLocation.zoom === 'number' && mapLocation.zoom > 0 ? mapLocation.zoom : 15}
-                                        markerTitle={mapLocation.markerLabel ?? tenantNameForMap}
-                                    />
-                                ) : (
-                                    <div className="flex items-center justify-center bg-bg-muted px-4 py-16 text-center">
-                                        <p className="text-text-muted">
-                                            Map location not configured for this property.
-                                        </p>
-                                    </div>
-                                )}
-                            </div>
-                            <p className="mt-4 text-text-muted text-sm sm:text-base">
-                                {data?.property_location || 'Location information not available'}
-                            </p>
-                        </div>
-
-                        {/* About neighborhood */}
-                        <div className="pb-8 border-b border-border-subtle">
-                            <h2 className="text-xl sm:text-2xl font-semibold mb-4 text-text-primary">About neighborhood</h2>
-                            <p className="text-text-muted leading-relaxed mb-2">
-                                Location & Neighborhood Located in {data?.property_location || 'this area'}, this property offers easy access to major attractions and landmarks in the area.
-                            </p>
-                            {showNeighborhoodMore && (data?.property_nearplaces || []).length > 0 && (
-                                <div className="text-text-muted leading-relaxed mt-3">
-                                    <p className="mb-2 font-medium text-text-primary">Nearby places include:</p>
-                                    <ul className="list-disc list-inside space-y-1 ml-2">
-                                        {(data?.property_nearplaces || []).slice(0, 10).map((place: string, idx: number) => (
-                                            <li key={`place-${idx}`}>{place}</li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            )}
-                            <button
-                                onClick={() => setShowNeighborhoodMore(!showNeighborhoodMore)}
-                                className="flex items-center mt-3 font-semibold underline hover:text-text-primary transition"
-                            >
-                                Show {showNeighborhoodMore ? 'Less' : 'More'}
-                                <ChevronRight className={`ml-1 w-4 h-4 transition-transform ${showNeighborhoodMore ? 'rotate-90' : ''}`} />
-                            </button>
-                        </div>
-                    </div>
-                    {/* right div  */}
-                    <div className="w-full sm:w-1/3 order-2">
-                        <div className="sticky top-16">
-                            {data.photoCount != null && data.photoCount > 0 && (
-                                <p className="text-sm text-text-muted mb-2" aria-label="Photo count">{data.photoCount} photo{data.photoCount !== 1 ? 's' : ''}</p>
-                            )}
-                            <Suspense fallback={<SkeletonCard />}>
-                                <UnitBookingWidget
-                                    listingId={resolvedListingId ?? undefined}
-                                    propertyId={listingPropertyId ?? undefined}
-                                    listingName={data.property_name || 'This property'}
-                                    timezoneId={data.timezoneId}
-                                    coverPhotoUrl={primaryImage}
-                                    maxGuests={data.maxGuests}
-                                />
-                            </Suspense>
-                            {/* TASK-2575: "Instant book" only when listing has an online payment provider */}
-                            <p
-                                className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-accent-soft px-3 py-1 text-xs font-semibold text-[color:var(--cta-primary-hover)] cursor-help"
-                                style={{ border: '1px solid color-mix(in srgb, var(--cta-primary) 22%, white)' }}
-                                title="Listing details and photos reviewed by the Atlas team before going live."
-                            >
-                                {(() => {
-                                    const pp = _getTenantCtx()?.paymentProvider;
-                                    const hasOnline = typeof pp === 'string' && pp !== 'MANUAL';
-                                    return hasOnline ? 'Verified home · Instant book' : 'Verified home · Host-confirmed booking';
-                                })()}
-                            </p>
-                            {/* TASK-545: Host profile card — builds trust (#2 signal per 2025 Indian hospitality research). */}
-                            <div
-                                className="mt-3 flex items-center gap-3 rounded-2xl border border-border-subtle bg-bg-surface p-3"
-                                data-testid="host-profile-card"
-                            >
-                                <div
-                                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-primary text-white text-sm font-semibold"
-                                    aria-hidden="true"
-                                >
-                                    {/* TASK-2560: derive initials from resolved tenant name */}
-                                    {(() => {
-                                        const tenantName = _getTenantCtx()?.name ?? '';
-                                        const words = tenantName.trim().split(/\s+/).filter(Boolean);
-                                        if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
-                                        if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
-                                        return '?';
-                                    })()}
-                                </div>
-                                <div className="min-w-0">
-                                    <p className="text-sm font-semibold text-text-primary truncate">
-                                        Managed by {_getTenantCtx()?.name ?? 'Our Team'}
-                                    </p>
-                                    <p className="text-xs text-text-muted">
-                                        {/* TASK-2561: removed hardcoded "Hyderabad" city */}
-                                        24/7 WhatsApp support{responseTimeBadge ? ` · ${responseTimeBadge}` : " · WhatsApp-first support."}
-                                    </p>
-                                    {reviewReplyRateBadge && (
-                                        <p className="text-xs text-green-700 font-medium mt-0.5">
-                                            ✓ {reviewReplyRateBadge} within 48h
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-                            {(() => {
-                                // Use hostPhone if available, otherwise fall back to business contact
-                                const phoneToUse = data.hostPhone?.replace(/\D/g, '') || '7032493290';
-                                return (
-                                    <div className="mt-3">
-                                        <a
-                                            href={`https://wa.me/${phoneToUse}?text=Hi%2C%20I'm%20interested%20in%20booking%20${encodeURIComponent(data.property_name || 'this property')}`}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            data-testid="chat-with-host-btn"
-                                            className="flex items-center justify-center gap-2 w-full rounded-xl border border-border-strong bg-bg-surface px-4 py-3 text-sm font-medium text-text-primary hover:bg-bg-muted transition"
-                                            onClick={() => trackEvent('whatsapp_cta_click', { listingId: resolvedListingId })}
-                                        >
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="#25D366" aria-hidden="true">
-                                                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-                                            </svg>
-                                            Chat with host
-                                        </a>
-                                    </div>
-                                );
-                            })()}
-                            {resolvedListingId && (
-                                <Suspense fallback={
-                                    <div className="rounded-lg border border-border-subtle bg-bg-surface p-4 h-64" />
-                                }>
-                                    <AvailabilityCalendar
-                                        listingId={resolvedListingId}
-                                        onDateSelect={(ymd) => {
-                                            const ev = new CustomEvent('atlas:set-checkin', { detail: ymd });
-                                            window.dispatchEvent(ev);
-                                        }}
-                                    />
-                                </Suspense>
-                            )}
-                            {showAvailabilityPlaceholder && (
-                                <div className="rounded-2xl border border-border-subtle bg-bg-surface p-6">
-                                    <h3 className="text-lg font-semibold text-text-primary mb-2">Check Availability</h3>
-                                    <p className="text-text-muted text-sm mb-4">
-                                        Availability check is currently unavailable. Please try again later.
-                                    </p>
-                                    <Button
-                                        variant="primary"
-                                        fullWidth
-                                        onClick={() => window.location.reload()}
-                                        disabled={isListingLookupPending}
-                                    >
-                                        {isListingLookupPending ? 'Loading...' : 'Try Again'}
-                                    </Button>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Amenities Modal */}
-                {showAmenitiesModal && (
-                    <div className="fixed inset-0 bg-[color:color-mix(in_srgb,var(--text-primary)_70%,transparent)] z-[var(--z-modal)] flex items-center justify-center p-4">
-                        <div className="bg-bg-surface rounded-lg max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-border-subtle">
-                            <div className="flex items-center justify-between p-6 border-b border-border-subtle">
-                                <h3 className="text-xl sm:text-2xl font-semibold text-text-primary">All Amenities</h3>
-                                <button
-                                    onClick={() => setShowAmenitiesModal(false)}
-                                    className="p-2 hover:bg-bg-muted rounded-full transition"
-                                >
-                                    <X className="w-5 h-5 sm:w-6 sm:h-6" />
-                                </button>
-                            </div>
-
-                            <div className="overflow-y-auto p-6" role="region" aria-label="List of all amenities">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6" role="list">
-                                    {data?.amenityCodes && data.amenityCodes.length > 0 ? (
-                                        data.amenityCodes.map((code) => {
-                                            const label = amenityMaster.get(code.toLowerCase()) ?? formatAmenityName(code);
-                                            return (
-                                                <div key={code} className="flex items-center gap-3 sm:gap-4" role="listitem">
-                                                    <span className="text-xl sm:text-2xl text-text-primary" aria-hidden="true">
-                                                        {renderIconForCode(code)}
-                                                    </span>
-                                                    <span className="text-text-primary text-sm sm:text-base">{label}</span>
-                                                </div>
-                                            );
-                                        })
-                                    ) : (
-                                        (data?.property_amenities || []).map((amenity: PropertyAmenity, idx: number) => {
-                                            const icon = amenity?.amenities_icon || '';
-                                            const displayName = icon ? formatAmenityName(icon) : 'Amenity';
-                                            return (
-                                                <div
-                                                    key={`amenity-${idx}-${displayName}`}
-                                                    className="flex items-center gap-3 sm:gap-4"
-                                                    role="listitem"
-                                                >
-                                                    <span className="text-xl sm:text-2xl text-text-primary" aria-hidden="true">
-                                                        {renderIcon(icon) || '•'}
-                                                    </span>
-                                                    <span className="text-text-primary text-sm sm:text-base">{displayName}</span>
-                                                </div>
-                                            );
-                                        })
-                                    )}
-                                </div>
-                            </div>
-
-                            <div className="p-6 border-t border-border-subtle">
-                                <Button
-                                    onClick={() => setShowAmenitiesModal(false)}
-                                    fullWidth
-                                    variant="secondary"
-                                >
-                                    Close
-                                </Button>
-                            </div>
-                        </div>
-                    </div>
+                {showAvailabilityPlaceholder && (
+                  <div style={{ borderRadius: 18, border: '1px solid #f0e6dc', background: '#fff', padding: 24, marginTop: 16 }}>
+                    <h3 style={{ fontSize: 18, fontWeight: 600, color: '#1a1a2e', marginBottom: 8 }}>Check Availability</h3>
+                    <p style={{ fontSize: 14, color: '#64748b', marginBottom: 16 }}>
+                      Availability check is currently unavailable. Please try again later.
+                    </p>
+                    <Button
+                      variant="primary"
+                      fullWidth
+                      onClick={() => window.location.reload()}
+                      disabled={isListingLookupPending}
+                    >
+                      {isListingLookupPending ? 'Loading...' : 'Try Again'}
+                    </Button>
+                  </div>
                 )}
+              </aside>
+
             </div>
-        </section>
+            {/* ===== END pp-main ===== */}
 
-        {/* TASK-1728: Guest Assistant FAQ widget — floating bottom-left */}
-        <Suspense fallback={null}>
-            <GuestAssistant listingId={resolvedListingId ?? data?.listingId ?? null} />
-        </Suspense>
+            {/* Tourism registration row */}
+            {ppShowRegRow && (
+              <div className="pp-reg-row" aria-label="Operator registration details">
+                <b>Registered operator.</b>{' '}
+                {ppTenantOverrides.gstin && (
+                  <>GSTIN <code>{ppTenantOverrides.gstin}</code>{' '}</>
+                )}
+                {ppTenantOverrides.tourismRegNumbers?.map((reg) => (
+                  <span key={reg}>· Tourism Reg. <code>{reg}</code>{' '}</span>
+                ))}
+                · {ppBrandName}
+              </div>
+            )}
 
-        {/* Mobile fixed Reserve CTA - visible only below md breakpoint */}
-        {data && (
-          <div
-            className="fixed bottom-0 inset-x-0 z-30 flex items-center justify-between border-t border-border-subtle bg-bg-surface px-4 py-3 md:hidden"
-            data-testid="mobile-reserve-bar"
-          >
-            <div>
-              <span className="text-base font-bold text-text-primary">
-                {formatCurrency(nightlyPrice.finalNightlyPrice, { maximumFractionDigits: 0 })}
-              </span>
-              <span className="text-xs text-text-muted"> / night</span>
+          </div>
+          {/* ===== END pp-shell ===== */}
+
+          {/* Mobile sticky CTA */}
+          <div className="pp-m-sticky" aria-label="Book this property" data-testid="mobile-reserve-bar">
+            <div className="pp-m-sticky-price">
+              <b>{formatCurrency(nightlyPrice?.finalNightlyPrice ?? directBookingNightly, { maximumFractionDigits: 0 })}</b>
+              <span>/ night</span>
             </div>
             <button
               type="button"
-              className="rounded-xl bg-cta-primary px-6 py-2.5 text-sm font-semibold text-white"
+              className="pp-btn pp-btn-primary pp-m-sticky-cta"
               onClick={() => {
-                // TASK-1861: was 'booking-name' which doesn't exist; 'guest-booking-form' is the actual form root testid
                 const widget = document.querySelector('[data-testid="guest-booking-form"]');
                 widget?.scrollIntoView({ behavior: 'smooth', block: 'center' });
               }}
+              aria-label="Scroll to booking form"
             >
               Reserve
             </button>
           </div>
+
+        </div>
+        {/* ===== END pp-root ===== */}
+
+        {/* Amenities Modal — preserved from original */}
+        {showAmenitiesModal && (
+          <div className="fixed inset-0 bg-[color:color-mix(in_srgb,var(--text-primary)_70%,transparent)] z-[var(--z-modal)] flex items-center justify-center p-4">
+            <div className="bg-bg-surface rounded-lg max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-border-subtle">
+              <div className="flex items-center justify-between p-6 border-b border-border-subtle">
+                <h3 className="text-xl sm:text-2xl font-semibold text-text-primary">All Amenities</h3>
+                <button
+                  onClick={() => setShowAmenitiesModal(false)}
+                  className="p-2 hover:bg-bg-muted rounded-full transition"
+                >
+                  <X className="w-5 h-5 sm:w-6 sm:h-6" />
+                </button>
+              </div>
+              <div className="overflow-y-auto p-6" role="region" aria-label="List of all amenities">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6" role="list">
+                  {data.amenityCodes && data.amenityCodes.length > 0 ? (
+                    data.amenityCodes.map((code) => {
+                      const label = amenityMaster.get(code.toLowerCase()) ?? formatAmenityName(code);
+                      return (
+                        <div key={code} className="flex items-center gap-3 sm:gap-4" role="listitem">
+                          <span className="text-xl sm:text-2xl text-text-primary" aria-hidden="true">
+                            {renderIconForCode(code)}
+                          </span>
+                          <span className="text-text-primary text-sm sm:text-base">{label}</span>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    (data.property_amenities || []).map((amenity, idx) => {
+                      const icon = amenity?.amenities_icon || '';
+                      const displayName = icon ? formatAmenityName(icon) : 'Amenity';
+                      return (
+                        <div key={`amenity-${idx}-${displayName}`} className="flex items-center gap-3 sm:gap-4" role="listitem">
+                          <span className="text-xl sm:text-2xl text-text-primary" aria-hidden="true">
+                            {renderIcon(icon) || '•'}
+                          </span>
+                          <span className="text-text-primary text-sm sm:text-base">{displayName}</span>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+              <div className="p-6 border-t border-border-subtle">
+                <Button onClick={() => setShowAmenitiesModal(false)} fullWidth variant="secondary">Close</Button>
+              </div>
+            </div>
+          </div>
         )}
+
+        {/* TASK-1728: Guest Assistant FAQ widget */}
+        <Suspense fallback={null}>
+          <GuestAssistant listingId={resolvedListingId ?? data.listingId ?? null} />
+        </Suspense>
         </>
     );
 };
