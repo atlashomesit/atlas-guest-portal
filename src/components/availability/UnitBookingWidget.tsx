@@ -297,6 +297,37 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     }
   }, []);
 
+  // TASK-2630: Listen for custom event from bottom Availability calendar (BUG-15b).
+  // When user clicks a date in the AvailabilityCalendar, it dispatches atlas:set-checkin with the date (ISO string).
+  // We update the booking widget to reflect that check-in date.
+  useEffect(() => {
+    const handleAvailabilityDateSelect = (event: Event) => {
+      const customEvent = event as CustomEvent<string>;
+      const dateStr = customEvent.detail;
+      if (!dateStr || typeof dateStr !== 'string') return;
+
+      try {
+        // Parse the date string (expected format: YYYY-MM-DD)
+        const selectedDate = getIstStartOfDay(new Date(dateStr));
+        if (Number.isNaN(selectedDate.getTime())) return;
+
+        // Update the date range: set check-in to the selected date, clear check-out
+        // This prompts the user to select a check-out date
+        setDateRange({ startDate: selectedDate, endDate: null });
+
+        // Optionally scroll to the date picker to make it visible
+        if (calendarButtonRef.current) {
+          calendarButtonRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      } catch {
+        // Silently handle parse errors
+      }
+    };
+
+    window.addEventListener('atlas:set-checkin', handleAvailabilityDateSelect);
+    return () => window.removeEventListener('atlas:set-checkin', handleAvailabilityDateSelect);
+  }, []);
+
   // Hydrate widget from booking context (e.g. ?checkIn=&checkOut=&guests= from property URL)
   // TASK-2630: Ensure AtlasBookingCalendar displays URL-param dates, not today+1/today+2 defaults
   useEffect(() => {
@@ -1182,11 +1213,14 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           <button
             id="unit-booking-dates"
             ref={calendarButtonRef}
+            type="button"
             className="w-full rounded-xl border border-border-strong bg-bg-muted px-4 py-3 text-left text-text-primary hover:border-cta-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary"
             aria-label="Click to select check-in date, then choose from calendar"
             title="Click to select check-in date, then choose from calendar"
             disabled={isBookingDisabled}
-            onClick={() => {
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
               if (isBookingDisabled) return;
               setOpenCalendar(true);
             }}
