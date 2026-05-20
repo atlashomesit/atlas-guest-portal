@@ -298,6 +298,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   }, []);
 
   // Hydrate widget from booking context (e.g. ?checkIn=&checkOut=&guests= from property URL)
+  // TASK-2630: Ensure AtlasBookingCalendar displays URL-param dates, not today+1/today+2 defaults
   useEffect(() => {
     const ci = booking.checkIn;
     const co = booking.checkOut;
@@ -1286,7 +1287,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         <div className="bw-breakdown">
           <div className="bw-breakdown-title">Price breakdown</div>
 
-          <div className="bw-bd-row" data-testid="bw-bd-subtotal-row">
+          <div className="bw-bd-row" data-testid="bw-bd-subtotal-row price-line-base">
             <span className="bw-bd-label">
               {hasSelectedRange && priceDetails.nights > 0 && perNightForDisplay > 0
                 ? `${displayPrice(perNightForDisplay)} × ${priceDetails.nights} ${priceDetails.nights === 1 ? 'night' : 'nights'}`

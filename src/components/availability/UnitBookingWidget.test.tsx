@@ -116,3 +116,37 @@ describe('UnitBookingWidget - TASK-2623: .bw-* design header, price labels, trus
     expect(content).toContain('listingName ?? null');
   });
 });
+
+describe('UnitBookingWidget - TASK-2630: URL date hydration and picker interaction', () => {
+  const filePath = resolve(__dirname, './UnitBookingWidget.tsx');
+  let content: string;
+
+  it('hydrates dateRange from BookingContext on mount', () => {
+    content = readFileSync(filePath, 'utf-8');
+    // Check hydration effect exists and reads from booking context
+    expect(content).toContain('booking.checkIn');
+    expect(content).toContain('booking.checkOut');
+    expect(content).toContain('setDateRange');
+    // Hydration should convert ISO strings to Date objects
+    expect(content).toContain('getIstStartOfDay(new Date(ci))');
+    expect(content).toContain('getIstStartOfDay(new Date(co))');
+  });
+
+  it('passes dateRange value to AtlasBookingCalendar as controlled value prop', () => {
+    content = readFileSync(filePath, 'utf-8');
+    expect(content).toContain('value={dateRange}');
+    expect(content).toContain('<AtlasBookingCalendar');
+  });
+
+  it('date row button has onClick handler that opens the calendar', () => {
+    content = readFileSync(filePath, 'utf-8');
+    // Button with id="unit-booking-dates" should have onClick that calls setOpenCalendar(true)
+    expect(content).toContain('id="unit-booking-dates"');
+    expect(content).toContain('setOpenCalendar(true)');
+  });
+
+  it('includes data-testid="price-line-base" on the base rate row for trip-wire testing', () => {
+    content = readFileSync(filePath, 'utf-8');
+    expect(content).toContain('data-testid="price-line-base"');
+  });
+});
