@@ -255,27 +255,23 @@ const GuestDetailsPage: React.FC = () => {
   const nights = priceBreakdown?.nights ?? 0;
   // cleaningFeeAmount not in BookingPriceBreakdown — convenienceFee covers cleaning + service combined
   const cleaningFeeAmount = 0;
-  const displayTotal = Math.max(
-    1,
-    baseAmount + convenienceFeeAmount + addOnsTotal - promoDiscountAmount - referralDiscountAmount,
-  );
-  // Note: baseAmount already includes GST from the API, so no need to add gstLineAmount separately here.
-  // The price breakdown displays GST as a separate line item for transparency, but it's already
-  // included in baseAmount per the CPO formula.
+
   const displayPrice = (n: number) => formatCurrency(n, { maximumFractionDigits: 0 });
 
-  // GST: 12% on accommodation (back-calculated from base if base > 0)
-  // Base amount from API already includes GST — extract it.
+  // GST: 5% or 12% on accommodation (ADDITIVE per CPO-canonical formula 2026-05-21)
+  // baseAmount from API is pre-GST (price_per_night × nights)
   const perNight = nights > 0 ? Math.round(baseAmount / nights) : 0;
   const gstSlabPercent = perNight > 0 ? (perNight <= 7500 ? 5 : 12) : null;
-  const accommodationExGst =
-    gstSlabPercent != null && baseAmount > 0
-      ? Math.round((baseAmount * 100) / (100 + gstSlabPercent))
-      : baseAmount;
   const gstLineAmount =
     gstSlabPercent != null && baseAmount > 0
-      ? Math.max(1, baseAmount - accommodationExGst)
+      ? Math.max(1, Math.round(baseAmount * gstSlabPercent / 100))
       : 0;
+
+  // TASK-2631: Total = Base + GST + Service Fee + Add-ons − Discounts (CPO-canonical formula)
+  const displayTotal = Math.max(
+    1,
+    baseAmount + gstLineAmount + convenienceFeeAmount + addOnsTotal - promoDiscountAmount - referralDiscountAmount,
+  );
 
   // ── Check-in/out display ─────────────────────────────────────────────────
   const checkInDisplay = booking.checkIn

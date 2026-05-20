@@ -837,15 +837,15 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   const gstSlabPercent =
     hasSelectedRange && perNightForDisplay > 0 ? (perNightForDisplay <= 7500 ? 5 : 12) : null;
 
-  /** GST component of room fare (tax-inclusive extraction). */
+  /** GST component of room fare (ADDITIVE — CPO formula per 2026-05-21). */
   const gstLineAmount =
     gstSlabPercent != null && breakdownPrice > 0
-      ? Math.max(1, Math.round((breakdownPrice * gstSlabPercent) / (100 + gstSlabPercent)))
+      ? Math.max(1, Math.round(breakdownPrice * gstSlabPercent / 100))
       : 0;
 
-  // BUG-5 fix: Total must include base (with GST) + service fee
-  // The baseAmount already includes GST, so we just add the service fee
-  const breakdownFinalTotal = Math.max(1, breakdownPrice + breakdownConvenienceFee);
+  // TASK-2631: Total = Base + GST + Service Fee (CPO-canonical formula).
+  // GST is additive (5% or 12% of base, not inclusive extraction).
+  const breakdownFinalTotal = Math.max(1, breakdownPrice + gstLineAmount + breakdownConvenienceFee);
 
   const finalTotal =
     hasSelectedRange && selectedRangeTotalFromCalendar != null
@@ -1357,8 +1357,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             </div>
           )}
 
-          {/* TASK-571: long-stay discount row */}
-          {losDiscountAmount > 0 && (
+          {/* TASK-571: long-stay discount row — only render if nights >= 7 AND discount > 0 */}
+          {losDiscountAmount > 0 && priceDetails.nights >= 7 && (
             <>
               <div className="bw-bd-row">
                 <span className="bw-bd-label bw-bd-label-discount">
