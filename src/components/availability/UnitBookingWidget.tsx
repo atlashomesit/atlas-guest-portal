@@ -21,7 +21,6 @@ import { doesRangeIntersectBlocked, toISODate } from '@/utils/dateRange';
 import { formatCurrency } from '@/utils/formatting';
 import { HelpCircle } from 'lucide-react';
 import { calculateNightlyPrice, inferUnitType } from '@/utils/pricing';
-import priceDisplayConfig from '@/config/priceDisplay.config';
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
 import { fetchCalendarPricing, fetchPricingBreakdown } from '@/api/pricingClient';
 import { useListingPhotosFromApi } from '@/contexts/ListingPhotosContext';
