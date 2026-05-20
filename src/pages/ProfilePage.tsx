@@ -57,7 +57,10 @@ export default function ProfilePage() {
         setEmail(p.email ?? "");
         setPhone(p.phone ?? "");
       })
-      .catch((err: Error) => setError(err.message))
+      .catch((err: Error) => {
+        console.error(err);
+        setError("We couldn't load your profile — please try again.");
+      })
       .finally(() => setLoading(false));
   }, [bookingId, token]);
 

@@ -26,6 +26,14 @@ import pricingConfig from "../../config/pricing.config";
 import { getEffectiveDiscountPercent } from "../../utils/pricing";
 import { getPublicSiteOrigin } from "../../config/siteOrigin";
 
+// Atlas social handles only published as sameAs when running under the Atlas brand.
+const ATLAS_SOCIAL_SAME_AS = [
+    "https://www.facebook.com/profile.php?id=100040632723189",
+    "https://www.instagram.com/atlashomeskphb/",
+    "https://x.com/atlashomeskphb",
+    "https://www.youtube.com/@atlashomestays",
+];
+
 const Home = () => {
     const { pendingScrollTarget, setPendingScrollTarget } = useBooking();
     const location = useLocation();
@@ -52,13 +60,6 @@ const Home = () => {
     // CPO-007: derive canonical from the actual host (or VITE_PUBLIC_SITE_ORIGIN for SSR) so tenant
     // subdomains emit the right URL in JSON-LD instead of defaulting to the marketplace domain.
     const canonicalUrl = `${getPublicSiteOrigin()}/`;
-    // Atlas social handles only published as sameAs when running under the Atlas brand.
-    const atlasSocialSameAs = [
-        "https://www.facebook.com/profile.php?id=100040632723189",
-        "https://www.instagram.com/atlashomeskphb/",
-        "https://x.com/atlashomeskphb",
-        "https://www.youtube.com/@atlashomestays",
-    ];
     const homepageJsonLd = useMemo(
         () => [
         {
@@ -69,7 +70,7 @@ const Home = () => {
             ...(schemaLogo ? { logo: schemaLogo } : {}),
             description:
                 "Serviced apartments in Hyderabad designed for business travel, family trips, and extended stays.",
-            ...(hideAtlasBranding ? {} : { sameAs: atlasSocialSameAs }),
+            ...(hideAtlasBranding ? {} : { sameAs: ATLAS_SOCIAL_SAME_AS }),
             contactPoint: [
                 {
                     "@type": "ContactPoint",
@@ -137,12 +138,8 @@ const Home = () => {
                         { "@type": "LocationFeatureSpecification", name: "Workspace", value: true },
                         { "@type": "LocationFeatureSpecification", name: "Swimming pool access", value: true },
                     ],
-                    aggregateRating: {
-                        "@type": "AggregateRating",
-                        ratingValue: penthouse?.property_rating,
-                        reviewCount: penthouse?.property_reviews,
-                    },
                     // TASK-2064: fabricated review array removed — violates Google Structured Data Guidelines and ASCI 2025
+                    // TASK-2553: aggregateRating removed — was fed by static data.ts (not real verified reviews)
                     offers: {
                         "@type": "Offer",
                         name: `${schemaBrandName} | Penthouse Suite 501 direct offer`,
@@ -179,8 +176,6 @@ const Home = () => {
             contactEmail,
             faqHighlights,
             penthouse?.property_description,
-            penthouse?.property_rating,
-            penthouse?.property_reviews,
             penthouseCover,
             penthouseOfferPrice,
             schemaBrandName,

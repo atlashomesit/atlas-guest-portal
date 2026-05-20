@@ -58,24 +58,6 @@ const Navbar = () => {
     };
   }, [location.pathname]);
 
-  /* Navbar scroll blur */
-  useEffect(() => {
-    const onScroll = () => {
-      const navbar = document.getElementById('navbar_container');
-      if (!navbar) return;
-
-      if (window.scrollY > 20) {
-        navbar.classList.add('backdrop-blur');
-      } else {
-        navbar.classList.remove('backdrop-blur');
-      }
-    };
-
-    window.addEventListener('scroll', onScroll);
-    onScroll();
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
-
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
     `nav-link ${isActive ? 'text-white' : ''}`;
 

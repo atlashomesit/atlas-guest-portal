@@ -68,7 +68,7 @@ exports[`Hero date picker > captures a stable mobile viewport snapshot > date-pi
                     type="button"
                   >
                     <span
-                      class="flex items-center gap-2.5 text-[10px] font-bold uppercase tracking-[0.10em] text-[var(--text-muted)] whitespace-nowrap"
+                      class="flex items-center gap-2.5 text-[11px] font-bold uppercase tracking-[0.10em] text-[var(--text-muted)] whitespace-nowrap"
                     >
                       <svg
                         aria-hidden="true"
@@ -151,7 +151,7 @@ exports[`Hero date picker > captures a stable mobile viewport snapshot > date-pi
                   type="button"
                 >
                   <span
-                    class="flex items-center gap-2.5 text-[10px] font-bold uppercase tracking-[0.10em] text-[var(--text-muted)] whitespace-nowrap"
+                    class="flex items-center gap-2.5 text-[11px] font-bold uppercase tracking-[0.10em] text-[var(--text-muted)] whitespace-nowrap"
                   >
                     <svg
                       aria-hidden="true"
@@ -366,7 +366,7 @@ exports[`Hero date picker > captures a stable mobile viewport snapshot > date-pi
                   </span>
                 </div>
                 <p
-                  class="text-[13px] text-[var(--cta-primary)] md:border-l md:border-[var(--border-subtle)] md:pl-4"
+                  class="text-sm text-[var(--cta-primary)] md:border-l md:border-[var(--border-subtle)] md:pl-4"
                 >
                   Instant confirmation • Secure payment • Flexible cancellation
                 </p>
@@ -558,7 +558,7 @@ exports[`Hero date picker > captures a stable mobile viewport snapshot > date-pi
         </p>
         <span
           aria-label="Click to select check-in date, then choose from calendar"
-          class="inline-flex h-5 w-5 items-center justify-center rounded-full border border-[var(--border-subtle)] text-[11px] font-semibold text-[var(--text-muted)]"
+          class="inline-flex h-5 w-5 items-center justify-center rounded-full border border-[var(--border-subtle)] text-[11px] font-semibold text-[var(--text-muted)] p-2.5 -m-2.5"
           title="Click a date for check-in, then a later date for check-out."
         >
           ?
@@ -571,11 +571,11 @@ exports[`Hero date picker > captures a stable mobile viewport snapshot > date-pi
     >
       <div
         aria-live="polite"
-        class="mx-5 mt-4 mb-2 rounded-lg px-4 py-2 text-sm font-semibold bg-slate-50 text-slate-900"
+        class="mx-5 mt-4 mb-2 rounded-lg px-4 py-2 text-sm font-semibold bg-[#ffe8d6] text-[#c2410c]"
       >
         <span
           aria-hidden="true"
-          class="mr-2 inline-block h-2.5 w-2.5 rounded-full bg-slate-500"
+          class="mr-2 inline-block h-2.5 w-2.5 rounded-full bg-[#c2410c]"
         />
         Range selected: 1 night
       </div>
@@ -586,35 +586,35 @@ exports[`Hero date picker > captures a stable mobile viewport snapshot > date-pi
       >
         <button
           class="rounded-full px-3 py-1 text-xs font-medium transition-colors
-              cursor-pointer bg-white text-slate-600 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 hover:text-slate-800 hover:ring-slate-400 active:bg-slate-100"
+              cursor-pointer bg-white text-[#475569] ring-1 ring-inset ring-[#f0e6dc] hover:bg-[#ffe8d6] hover:text-[#c2410c] hover:ring-[#c2410c] active:bg-[#ffe8d6]"
           type="button"
         >
           Tonight
         </button>
         <button
           class="rounded-full px-3 py-1 text-xs font-medium transition-colors
-              cursor-pointer bg-white text-slate-600 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 hover:text-slate-800 hover:ring-slate-400 active:bg-slate-100"
+              cursor-pointer bg-white text-[#475569] ring-1 ring-inset ring-[#f0e6dc] hover:bg-[#ffe8d6] hover:text-[#c2410c] hover:ring-[#c2410c] active:bg-[#ffe8d6]"
           type="button"
         >
           This weekend
         </button>
         <button
           class="rounded-full px-3 py-1 text-xs font-medium transition-colors
-              cursor-pointer bg-white text-slate-600 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 hover:text-slate-800 hover:ring-slate-400 active:bg-slate-100"
+              cursor-pointer bg-white text-[#475569] ring-1 ring-inset ring-[#f0e6dc] hover:bg-[#ffe8d6] hover:text-[#c2410c] hover:ring-[#c2410c] active:bg-[#ffe8d6]"
           type="button"
         >
           Next weekend
         </button>
         <button
           class="rounded-full px-3 py-1 text-xs font-medium transition-colors
-              cursor-pointer bg-white text-slate-600 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 hover:text-slate-800 hover:ring-slate-400 active:bg-slate-100"
+              cursor-pointer bg-white text-[#475569] ring-1 ring-inset ring-[#f0e6dc] hover:bg-[#ffe8d6] hover:text-[#c2410c] hover:ring-[#c2410c] active:bg-[#ffe8d6]"
           type="button"
         >
           This week
         </button>
         <button
           class="rounded-full px-3 py-1 text-xs font-medium transition-colors
-              cursor-pointer bg-white text-slate-600 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 hover:text-slate-800 hover:ring-slate-400 active:bg-slate-100"
+              cursor-pointer bg-white text-[#475569] ring-1 ring-inset ring-[#f0e6dc] hover:bg-[#ffe8d6] hover:text-[#c2410c] hover:ring-[#c2410c] active:bg-[#ffe8d6]"
           type="button"
         >
           Next month

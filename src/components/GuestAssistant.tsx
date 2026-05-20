@@ -169,7 +169,7 @@ export default function GuestAssistant({ listingId }: GuestAssistantProps) {
                   Questions &amp; Answers
                 </h2>
                 {!loading && (
-                  <p className="text-[11px] text-text-muted mt-0.5">
+                  <p className="text-xs text-text-muted mt-0.5">
                     {faqs.length === 0
                       ? 'No FAQs available'
                       : `${faqs.length} FAQ${faqs.length !== 1 ? 's' : ''} for this listing`}
@@ -243,7 +243,7 @@ export default function GuestAssistant({ listingId }: GuestAssistantProps) {
                       )}
                       {aiReply && (
                         <div className="mt-2 rounded-xl border border-border-subtle bg-bg-subtle p-3 text-left text-sm text-text-secondary">
-                          <p className="text-[10px] font-semibold uppercase tracking-wide text-text-muted mb-1">AI answer</p>
+                          <p className="text-xs font-semibold uppercase tracking-wide text-text-muted mb-1">AI answer</p>
                           {aiReply}
                         </div>
                       )}
@@ -292,7 +292,7 @@ export default function GuestAssistant({ listingId }: GuestAssistantProps) {
 
             {/* Footer */}
             <div className="px-4 py-2 border-t border-border-subtle bg-bg-subtle rounded-b-2xl md:rounded-b-2xl">
-              <p className="text-[10px] text-text-muted text-center">
+              <p className="text-xs text-text-muted text-center">
                 Keyword search · AI answers available
               </p>
             </div>

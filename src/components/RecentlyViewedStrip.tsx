@@ -71,7 +71,11 @@ export default function RecentlyViewedStrip() {
                   </div>
                 )}
               </div>
-              <div className="line-clamp-2 p-2 text-xs font-medium text-text-primary">{it.name ?? `Listing ${it.listingId}`}</div>
+              <div className="line-clamp-2 p-2 pb-0 text-xs font-medium text-text-primary">{it.name ?? `Listing ${it.listingId}`}</div>
+              {/* TASK-2578: re-engagement nudge */}
+              <div className="px-2 pb-2">
+                <span className="block text-[10px] text-text-muted leading-tight">Still available? Book now →</span>
+              </div>
             </Link>
             <button
               type="button"

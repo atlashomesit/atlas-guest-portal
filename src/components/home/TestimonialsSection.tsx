@@ -34,7 +34,7 @@ const TestimonialsSection = () => {
                 </p>
                 <p className="mt-4 text-amber-300" aria-hidden>★★★★★</p>
                 <p className="mt-4 font-semibold text-white">Guest name</p>
-                <p className="text-[11px] uppercase tracking-[0.08em] text-white/60">Source pending verification</p>              </div>
+                <p className="text-xs uppercase tracking-[0.08em] text-white/60">Source pending verification</p>              </div>
             ))}
           </div>
         </div>
@@ -60,7 +60,7 @@ const TestimonialsSection = () => {
               </p>
               <p className="mt-4 text-amber-300" aria-hidden>★★★★★</p>
               <p className="mt-4 font-semibold text-white">Guest name</p>
-              <p className="text-[11px] uppercase tracking-[0.08em] text-white/60">Source pending verification</p>            </div>
+              <p className="text-xs uppercase tracking-[0.08em] text-white/60">Source pending verification</p>            </div>
           </div>
         </div>
       </section>

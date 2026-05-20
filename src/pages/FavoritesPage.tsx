@@ -248,7 +248,11 @@ export default function FavoritesPage() {
                     </p>
                   ) : null}
                 </Link>
-                <div className="px-4 pb-4">
+                <div className="px-4 pb-4 space-y-2">
+                  {/* TASK-2578: re-engagement nudge for saved-but-not-booked listings */}
+                  <p className="text-xs text-text-secondary">
+                    You saved this — still available for your dates?
+                  </p>
                   <Link
                     to={path}
                     className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-3 hover:opacity-95 transition-opacity"

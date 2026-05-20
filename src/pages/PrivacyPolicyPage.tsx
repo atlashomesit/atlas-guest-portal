@@ -109,7 +109,7 @@ export default function PrivacyPolicyPage() {
             {privacyEmail}
           </a>
           <br />
-          Phone: <a href="tel:+917246161981" className="text-brand-primary underline">+91 72461 61981</a>
+          Phone: <a href="tel:+917416261981" className="text-brand-primary underline">+91 74162 61981</a>
         </address>
 
         <h2 className="mt-6 text-lg font-semibold">9. Changes to this Policy</h2>

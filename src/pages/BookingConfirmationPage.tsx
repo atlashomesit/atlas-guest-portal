@@ -355,7 +355,10 @@ export default function BookingConfirmationPage() {
             .catch(() => {});
         }
       })
-      .catch((err: Error) => setError(err.message))
+      .catch((err: Error) => {
+        console.error(err);
+        setError("We couldn't load your booking — please try again.");
+      })
       .finally(() => setLoading(false));
   }, [bookingId, token]);
 
@@ -787,7 +790,7 @@ export default function BookingConfirmationPage() {
                   setCopyRefFeedback(false);
                 }
               }}
-              className="text-xs font-medium text-brand-primary underline underline-offset-2 rounded px-1 py-0.5 hover:bg-brand-primary/5"
+              className="text-sm font-medium text-brand-primary underline underline-offset-2 rounded px-1 py-2 hover:bg-brand-primary/5"
             >
               {copyRefFeedback ? "Copied!" : "Copy ID"}
             </button>
@@ -981,7 +984,7 @@ export default function BookingConfirmationPage() {
                   data-testid="download-invoice-btn"
                   className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-3.5 hover:opacity-95 transition-opacity"
                 >
-                  Download GST invoice (PDF)
+                  Download GST invoice (PDF, ~80 KB)
                 </a>
               </div>
             )}
@@ -1154,7 +1157,7 @@ export default function BookingConfirmationPage() {
             <div className="flex items-center gap-2 shrink-0">
               <button
                 type="button"
-                className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-xs font-medium px-3 py-1.5 hover:opacity-90 transition-opacity"
+                className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-3 py-3 hover:opacity-90 transition-opacity"
                 onClick={() => {
                   if (pwaInstallPromptRef.current) {
                     pwaInstallPromptRef.current.prompt();

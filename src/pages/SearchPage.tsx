@@ -128,8 +128,8 @@ function apiToNormalized(listings: PublicListing[]): NormalizedListing[] {
         maxGuests: l.maxGuests,
         imageUrl:
           filterGuestImageUrls(l.photoUrls ?? [])[0] ?? sanitizeGuestImageUrl(l.coverPhotoUrl) ?? "",
-        // TASK-1868: map amenityCodes to amenities_icon objects when API exposes them; empty until API adds the field
-        amenities: ((l as unknown as { amenityCodes?: string[] }).amenityCodes ?? []).map((code) => ({ amenities_icon: code })),
+        // TASK-2552: use l.amenityCodes directly (now a proper field on PublicListing)
+        amenities: (l.amenityCodes ?? []).map((code) => ({ amenities_icon: code })),
         canonicalPath,
         rating: l.propertyRating ?? undefined,
         reviewCount: l.reviewCount ?? null,
@@ -145,6 +145,9 @@ function apiToNormalized(listings: PublicListing[]): NormalizedListing[] {
         isGstRegistered: l.isGstRegistered ?? false,
         latitude: l.latitude ?? null,
         longitude: l.longitude ?? null,
+        // TASK-2552: wire nomad fields so WiFi/co-working badges and filters work on API listings
+        wifiSpeedMbps: l.wifiSpeedMbps ?? null,
+        hasCoworkingDesk: l.hasCoworkingDesk ?? false,
       };
     })
     .filter((l) => l.numericId > 0);
@@ -221,25 +224,40 @@ const SearchPage = () => {
     };
   }, [loadFromApi]);
 
-  const checkIn = useMemo(() => parseDate(searchParams.get("checkIn")), [searchParams.get("checkIn")]);
-  const checkOut = useMemo(() => parseDate(searchParams.get("checkOut")), [searchParams.get("checkOut")]);
-  const guests = useMemo(() => Number(searchParams.get("guests")) || null, [searchParams.get("guests")]);
-  const minPrice = useMemo(() => Number(searchParams.get("minPrice")) || null, [searchParams.get("minPrice")]);
-  const maxPrice = useMemo(() => Number(searchParams.get("maxPrice")) || null, [searchParams.get("maxPrice")]);
-  const remoteWork = useMemo(() => searchParams.get("remoteWork") === "true", [searchParams.get("remoteWork")]);
-  const longStay = useMemo(() => searchParams.get("longStay") === "true", [searchParams.get("longStay")]);
+  const checkInParam = searchParams.get("checkIn");
+  const checkOutParam = searchParams.get("checkOut");
+  const guestsParam = searchParams.get("guests");
+  const minPriceParam = searchParams.get("minPrice");
+  const maxPriceParam = searchParams.get("maxPrice");
+  const remoteWorkParam = searchParams.get("remoteWork");
+  const longStayParam = searchParams.get("longStay");
+  const availableNowParam = searchParams.get("availableNow");
+  const amenitiesParamRaw = searchParams.get("amenities");
+  const sortByParam = searchParams.get("sortBy");
+  const nomadWifiParam = searchParams.get("nomadWifi");
+  const nomadWorkspaceParam = searchParams.get("nomadWorkspace");
+  const monthlyStayParam = searchParams.get("monthlyStay");
+  const viewParam = searchParams.get("view");
+
+  const checkIn = useMemo(() => parseDate(checkInParam), [checkInParam]);
+  const checkOut = useMemo(() => parseDate(checkOutParam), [checkOutParam]);
+  const guests = useMemo(() => Number(guestsParam) || null, [guestsParam]);
+  const minPrice = useMemo(() => Number(minPriceParam) || null, [minPriceParam]);
+  const maxPrice = useMemo(() => Number(maxPriceParam) || null, [maxPriceParam]);
+  const remoteWork = useMemo(() => remoteWorkParam === "true", [remoteWorkParam]);
+  const longStay = useMemo(() => longStayParam === "true", [longStayParam]);
   /** TASK-1297: filter to listings with inventory for tonight (IST). */
-  const availableNow = useMemo(() => searchParams.get("availableNow") === "true", [searchParams.get("availableNow")]);
-  const amenitiesParam = useMemo(() => searchParams.get("amenities") || "", [searchParams.get("amenities")]);
+  const availableNow = useMemo(() => availableNowParam === "true", [availableNowParam]);
+  const amenitiesParam = useMemo(() => amenitiesParamRaw || "", [amenitiesParamRaw]);
   const selectedAmenities = useMemo(() => amenitiesParam ? amenitiesParam.split(",") : [], [amenitiesParam]);
   /** TASK-1714: sort order — default "recommended" (Atlas building/floor order). */
-  const sortBy = useMemo(() => searchParams.get("sortBy") || "recommended", [searchParams.get("sortBy")]);
+  const sortBy = useMemo(() => sortByParam || "recommended", [sortByParam]);
   /** TASK-1738: Digital nomad filter chips. */
-  const nomadWifi = useMemo(() => searchParams.get("nomadWifi") === "true", [searchParams.get("nomadWifi")]);       // WiFi 50+ Mbps
-  const nomadWorkspace = useMemo(() => searchParams.get("nomadWorkspace") === "true", [searchParams.get("nomadWorkspace")]); // dedicated workspace
-  const monthlyStay = useMemo(() => searchParams.get("monthlyStay") === "true", [searchParams.get("monthlyStay")]);   // 30+ nights min stay
+  const nomadWifi = useMemo(() => nomadWifiParam === "true", [nomadWifiParam]);       // WiFi 50+ Mbps
+  const nomadWorkspace = useMemo(() => nomadWorkspaceParam === "true", [nomadWorkspaceParam]); // dedicated workspace
+  const monthlyStay = useMemo(() => monthlyStayParam === "true", [monthlyStayParam]);   // 30+ nights min stay
   /** TASK-1457: list vs map layout for search results. */
-  const mapView = useMemo(() => searchParams.get("view") === "map", [searchParams.get("view")]);
+  const mapView = useMemo(() => viewParam === "map", [viewParam]);
   const directBookingDiscountPercent = useMemo(() => getEffectiveDiscountPercent(), []);
 
   const hasInvalidDates = useMemo(() => Boolean(checkIn && checkOut && checkOut <= checkIn), [checkIn, checkOut]);
@@ -268,7 +286,7 @@ const SearchPage = () => {
   const tenantAllowedIds = useMemo(() => {
     const allowed = getTenantPublicListingIdAllowlist(overrides);
     return allowed.size > 0 ? allowed : undefined;
-  }, [tenant?.slug]);
+  }, [overrides]);
 
   const onlyApiListings = overrides.onlyApiListings === true;
   const listings = useMemo(() => {
@@ -718,11 +736,13 @@ const SearchPage = () => {
       }),
     [sortedUnits],
   );
-  /** TASK-1451: first three catalog listings as "you might also like" (same pool as `fetchPublicListings`; no extra round-trip). */
-  const emptyStateSuggestions = useMemo(
-    () => (listings.length > 0 ? listings.slice(0, 3) : []),
-    [listings],
-  );
+  /** TASK-1451 / TASK-2572: cheapest 3 listings as "you might also like" — avoids re-offering the filtered-out listings. */
+  const emptyStateSuggestions = useMemo(() => {
+    if (listings.length === 0) return [];
+    return [...listings]
+      .sort((a, b) => a.pricePerNight - b.pricePerNight)
+      .slice(0, 3);
+  }, [listings]);
 
   return (
     <div className="min-h-screen bg-bg-muted py-10">
@@ -958,7 +978,7 @@ const SearchPage = () => {
               onChange={(e) => updateParam("sortBy", e.target.value === "recommended" ? "" : e.target.value)}
               className="rounded-lg border border-border-subtle bg-bg-surface px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-cta-primary"
             >
-              <option value="recommended" title="Sorted by Starguest House building/floor preference">Recommended</option>
+              <option value="recommended" title={`Sorted by ${getTenantBrandName()} suggested order — building, floor, and availability`}>Recommended</option>
               <option value="price_asc">Price: low to high</option>
               <option value="price_desc">Price: high to low</option>
               <option value="rating_desc">Highest rated</option>
@@ -1099,7 +1119,8 @@ const SearchPage = () => {
             aria-busy="true"
             aria-label="Loading search results"
           >
-            {Array.from({ length: 6 }).map((_, i) => (
+            {/* TASK-2566: 8 skeletons to fill wider grid layouts */}
+            {Array.from({ length: 8 }).map((_, i) => (
               <div key={i}>
                 <SkeletonCard />
               </div>
@@ -1143,7 +1164,7 @@ const SearchPage = () => {
                 <Link
                   key={`map-strip-${unit.id}`}
                   to={`${unit.canonicalPath}${querySuffix}`}
-                  className="flex w-28 shrink-0 flex-col gap-1 rounded-xl border border-border-subtle bg-bg-surface p-2 shadow-sm"
+                  className="flex w-32 shrink-0 flex-col gap-1 rounded-xl border border-border-subtle bg-bg-surface p-2 shadow-sm"
                 >
                   <div className="h-16 w-full overflow-hidden rounded-lg bg-bg-muted">
                     <OptimizedImage
@@ -1151,10 +1172,11 @@ const SearchPage = () => {
                       alt={unit.title ?? "Listing"}
                       className="h-full w-full object-cover"
                       wrapperClassName="h-full"
-                      sizes="112px"
+                      sizes="128px"
                     />
                   </div>
-                  <p className="line-clamp-2 text-xs font-medium text-text-primary">{unit.title}</p>
+                  {/* TASK-2574: text-sm for readability on 360px Android */}
+                  <p className="line-clamp-2 text-sm font-medium text-text-primary">{unit.title}</p>
                   <p className="text-xs font-semibold text-cta-primary">{formatDisplayCurrency(unit.pricePerNight)}</p>
                 </Link>
               ))}
@@ -1313,7 +1335,8 @@ const SearchPage = () => {
                       <p className="text-sm text-text-muted">per night</p>
                       <p className="text-xs text-text-muted">
                         {/* TASK-1869 / TASK-1451: Sept 2025 GST reform — 5% for ≤₹7,500/night, 18% above */}
-                        {(() => { const gstMult = unit.pricePerNight > 7500 ? 1.12 : 1.05; const pct = unit.pricePerNight > 7500 ? 12 : 5; return `Est. total: ${formatDisplayCurrency(Math.round(unit.pricePerNight * gstMult))} (incl. ${pct}% GST)`; })()}
+                        {/* TASK-2557: corrected >₹7,500 slab from 12% to 18% */}
+                        {(() => { const gstMult = unit.pricePerNight > 7500 ? 1.18 : 1.05; const pct = unit.pricePerNight > 7500 ? 18 : 5; return `Est. total: ${formatDisplayCurrency(Math.round(unit.pricePerNight * gstMult))} (incl. ${pct}% GST)`; })()}
                       </p>
                       {longStay && (
                         <div className="text-sm font-semibold text-cta-primary">

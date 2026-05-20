@@ -22,3 +22,6 @@ _worker.bundle/
 _worker.bundledesktop.ini
 *.ini
 eslint-violations.json
+
+# Claude Design handoff bundles — scratch inbox, not source
+Claude Design Patches/
