@@ -45,8 +45,8 @@
 .pp-btn-secondary:hover { border-color: #c2410c; color: #c2410c; }
 .pp-btn-ghost { background: transparent; color: #1a1a2e; border-color: #f0e6dc; }
 .pp-btn-ghost:hover { border-color: #1a1a2e; }
-.pp-btn-whatsapp { background: #25D366; color: #fff; border-color: #25D366; }
-.pp-btn-whatsapp:hover { background: #1da851; border-color: #1da851; }
+.pp-btn-whatsapp { background: #075e54; color: #fff; border-color: #075e54; }
+.pp-btn-whatsapp:hover { background: #0a6b62; border-color: #0a6b62; }
 .pp-btn-sm { padding: 8px 14px; font-size: 13px; }
 .pp-btn-block { width: 100%; }
 .pp-btn-lg { padding: 14px 24px; font-size: 15px; }
