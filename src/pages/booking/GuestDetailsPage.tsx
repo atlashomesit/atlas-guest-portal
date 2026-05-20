@@ -259,6 +259,9 @@ const GuestDetailsPage: React.FC = () => {
     1,
     baseAmount + convenienceFeeAmount + addOnsTotal - promoDiscountAmount - referralDiscountAmount,
   );
+  // Note: baseAmount already includes GST from the API, so no need to add gstLineAmount separately here.
+  // The price breakdown displays GST as a separate line item for transparency, but it's already
+  // included in baseAmount per the CPO formula.
   const displayPrice = (n: number) => formatCurrency(n, { maximumFractionDigits: 0 });
 
   // GST: 12% on accommodation (back-calculated from base if base > 0)
@@ -1192,7 +1195,7 @@ const GuestDetailsPage: React.FC = () => {
 
           {/* Price block */}
           <div className="gd-price-rows">
-            <div className="gd-price-row">
+            <div className="gd-price-row" data-testid="price-line-base">
               <div className="desc">
                 <span>
                   {nights > 0 && perNight > 0
@@ -1200,7 +1203,7 @@ const GuestDetailsPage: React.FC = () => {
                     : 'Accommodation'}
                 </span>
               </div>
-              <span className="num">{displayPrice(accommodationExGst > 0 ? accommodationExGst : baseAmount)}</span>
+              <span className="num">{displayPrice(baseAmount)}</span>
             </div>
             {cleaningFeeAmount > 0 && (
               <div className="gd-price-row">

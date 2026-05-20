@@ -824,14 +824,6 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   const convenienceFeePercent = calendarConvenienceFeePercent != null ? calendarConvenienceFeePercent / 100 : 0;
   const _convenienceFee = Math.round(priceDetails.total * convenienceFeePercent);
   const breakdownConvenienceFee = Math.round(breakdownPrice * convenienceFeePercent);
-  const breakdownFinalTotal = Math.max(1, breakdownPrice + breakdownConvenienceFee);
-
-  const finalTotal =
-    hasSelectedRange && selectedRangeTotalFromCalendar != null
-      ? breakdownFinalTotal
-      : effectiveDailyPricing != null
-        ? breakdownFinalTotal
-        : 0;
 
   // Per-night: when API has loaded use API/calendar data; when API not loaded show 0.
   const perNightForDisplay =
@@ -850,6 +842,17 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     gstSlabPercent != null && breakdownPrice > 0
       ? Math.max(1, Math.round((breakdownPrice * gstSlabPercent) / (100 + gstSlabPercent)))
       : 0;
+
+  // BUG-5 fix: Total must include base (with GST) + service fee
+  // The baseAmount already includes GST, so we just add the service fee
+  const breakdownFinalTotal = Math.max(1, breakdownPrice + breakdownConvenienceFee);
+
+  const finalTotal =
+    hasSelectedRange && selectedRangeTotalFromCalendar != null
+      ? breakdownFinalTotal
+      : effectiveDailyPricing != null
+        ? breakdownFinalTotal
+        : 0;
 
   /** Format price; show ₹0 when 0 (e.g. when API not loaded or API returned 0). */
   const displayPrice = (n: number) =>
