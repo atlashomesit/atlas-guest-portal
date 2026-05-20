@@ -32,8 +32,6 @@ type ListingCardProps = {
   losDiscount2MinNights?: number | null;
   /** TASK-1695: LOS auto-discount tier 2 — discount percentage (0-100). */
   losDiscount2Percent?: number | null;
-  /** TASK-1943: global / tenant direct-booking discount percent for badge (0–100). */
-  directBookingDiscountPercent?: number | null;
   onClick?: () => void;
 };
 
@@ -61,7 +59,6 @@ const ListingCard: React.FC<ListingCardProps> = ({
   losDiscountPercent,
   losDiscount2MinNights,
   losDiscount2Percent,
-  directBookingDiscountPercent,
   onClick,
 }) => {
   const { format: formatCurrency } = useCurrency();
