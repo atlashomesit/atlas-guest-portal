@@ -1901,6 +1901,8 @@ useEffect(() => {
                     maxGuests={data.maxGuests}
                     propertySlug={propertySlugParam}
                     unitSlug={unitSlugParam}
+                    reviewRating={ppHasApiReviews ? ppApiReviews!.averageRating : undefined}
+                    reviewCount={ppHasApiReviews ? ppApiReviews!.totalCount : undefined}
                   />
                 </Suspense>
 

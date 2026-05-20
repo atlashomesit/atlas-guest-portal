@@ -35,6 +35,8 @@ type BookingState = {
   holdPriceBreakdown: BookingPriceBreakdown | null;
   /** ListingId for the hold — needed for add-on service loading on GuestDetailsPage. */
   holdListingId: number | null;
+  /** Human-readable listing/unit name forwarded from the widget (session-only; not persisted). */
+  holdListingName: string | null;
 };
 
 type BookingContextValue = {
@@ -65,6 +67,7 @@ const defaultState: BookingState = {
   holdUnitSlug: null,
   holdPriceBreakdown: null,
   holdListingId: null,
+  holdListingName: null,
 };
 
 // eslint-disable-next-line react-refresh/only-export-components -- context co-located with provider
@@ -98,6 +101,7 @@ const loadState = (): BookingState => {
       holdUnitSlug: null,
       holdPriceBreakdown: null,
       holdListingId: null,
+      holdListingName: null,
     };
   } catch (error) {
     console.warn('[BookingContext] Failed to load persisted booking state', error);

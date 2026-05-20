@@ -56,6 +56,10 @@ interface UnitBookingWidgetProps {
   propertySlug?: string;
   /** TASK-2612: Unit route slug — used for navigate to /book/:propertySlug/:unitSlug/details */
   unitSlug?: string;
+  /** TASK-2623: Average rating from the listing API (e.g. 4.92). Only shown when reviewCount > 0. */
+  reviewRating?: number;
+  /** TASK-2623: Total review count from the listing API. 0 or undefined = hide rating row. */
+  reviewCount?: number;
 }
 
 const PENDING_PAYMENT_KEY = 'atlas_pending_razorpay_order';
@@ -140,6 +144,8 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   hostPhone,
   propertySlug,
   unitSlug,
+  reviewRating,
+  reviewCount,
 }) => {
   if (import.meta.env.DEV) {
     console.assert(Boolean(propertyId), '[UnitBookingWidget] propertyId is required for unit mode');
@@ -924,6 +930,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         holdPropertySlug: propertySlug ?? null,
         holdUnitSlug: unitSlug ?? null,
         holdListingId: numericListingId,
+        holdListingName: listingName ?? null,
         holdPriceBreakdown: {
           baseAmount: breakdownPrice,
           discountAmount: 0,
@@ -961,7 +968,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     }
   }, [
     isSubmitting, isBookingDisabled, dateRange, dateStatusMap, blockedSet,
-    listingId, guests, propertySlug, unitSlug, breakdownPrice, breakdownConvenienceFee,
+    listingId, guests, propertySlug, unitSlug, listingName, breakdownPrice, breakdownConvenienceFee,
     breakdownFinalTotal, finalTotal, updateBooking, navigate,
   ]);
 
@@ -1028,10 +1035,29 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         <FomoBar listingId={Number(listingId)} />
       )}
 
-      <div className="space-y-1">
-        <p className="text-sm uppercase tracking-[0.12em] text-text-muted font-semibold">Reserve</p>
-        {listingName && <h3 className="text-xl sm:text-2xl font-semibold text-text-primary">{listingName}</h3>}
-        <p className="text-text-secondary text-sm">Choose your dates to confirm availability for this apartment.</p>
+      {/* TASK-2623: .bw-head — "From ₹X / night · ⭐ rating · review count" */}
+      <div className="bw-head" data-testid="bw-header">
+        <div className="bw-price-block">
+          <span className="bw-from">From</span>
+          <span className="bw-amount" data-testid="bw-per-night-price">
+            {effectiveDailyPricing != null
+              ? formatCurrency(effectiveDailyPricing.actualPrice, { maximumFractionDigits: 0 })
+              : perNightForDisplay > 0
+                ? formatCurrency(perNightForDisplay, { maximumFractionDigits: 0 })
+                : '—'}
+          </span>
+          <span className="bw-per">/ night</span>
+        </div>
+        {reviewCount != null && reviewCount > 0 && reviewRating != null && (
+          <div className="bw-rating" data-testid="bw-rating-block">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="#c2410c" aria-hidden="true">
+              <path d="M12 2l2.9 6.9 7.1.6-5.4 4.7 1.6 7.3-6.2-3.8-6.2 3.8 1.6-7.3L2 9.5l7.1-.6L12 2z"/>
+            </svg>
+            <span className="bw-rating-num">{reviewRating.toFixed(2)}</span>
+            <span className="bw-rating-sep" aria-hidden="true">·</span>
+            <span className="bw-rating-link">{reviewCount} {reviewCount === 1 ? 'review' : 'reviews'}</span>
+          </div>
+        )}
       </div>
       {isBookingDisabled && (
         <ErrorBanner className="mt-2" message="Service temporarily unavailable. Booking will return soon." />
@@ -1260,14 +1286,21 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         <div className="bw-breakdown">
           <div className="bw-breakdown-title">Price breakdown</div>
 
-          <div className="bw-bd-row">
-            <span className="bw-bd-label">Room fare</span>
+          <div className="bw-bd-row" data-testid="bw-bd-subtotal-row">
+            <span className="bw-bd-label">
+              {hasSelectedRange && priceDetails.nights > 0 && perNightForDisplay > 0
+                ? `${displayPrice(perNightForDisplay)} × ${priceDetails.nights} ${priceDetails.nights === 1 ? 'night' : 'nights'}`
+                : 'Subtotal'}
+            </span>
             <span className="bw-bd-value">{displayPrice(breakdownPrice)}</span>
           </div>
 
           {gstSlabPercent != null && breakdownPrice > 0 && gstLineAmount > 0 && (
-            <div className="bw-bd-row">
-              <span className="bw-bd-label">GST {gstSlabPercent}%</span>
+            <div className="bw-bd-row" data-testid="bw-bd-gst-row">
+              <span className="bw-bd-label">
+                <span>GST {gstSlabPercent}% on accommodation</span>
+                <span className="bw-bd-sublabel" style={{ display: 'block', fontSize: 11, color: 'var(--text-muted, #475569)', fontWeight: 400, textDecoration: 'none' }}>On accommodation only</span>
+              </span>
               <span className="bw-bd-value">{displayPrice(gstLineAmount)}</span>
             </div>
           )}
@@ -1303,13 +1336,13 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             </>
           )}
 
-          <div className="bw-bd-row">
+          <div className="bw-bd-row" data-testid="bw-bd-service-fee-row">
             <span className="bw-bd-label" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-              Convenience fee{convenienceFeePctLabel > 0 ? ` (${convenienceFeePctLabel}%)` : ''}
+              Service fee{convenienceFeePctLabel > 0 ? ` (${convenienceFeePctLabel}%)` : ''}
               <HelpCircle
                 className="h-3 w-3 cursor-help text-text-muted"
-                aria-label="Includes payment-gateway and platform handling charges. Razorpay charges this directly."
-                title="Includes payment-gateway and platform handling charges. Razorpay charges this directly."
+                aria-label="Includes payment-gateway and platform handling charges."
+                title="Includes payment-gateway and platform handling charges."
               />
             </span>
             <span className="bw-bd-value">{displayPrice(breakdownConvenienceFee)}</span>
@@ -1363,7 +1396,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         </p>
       )}
 
-      {/* TASK-2612: Reserve button — init-hold mode, navigates to GuestDetailsPage */}
+      {/* TASK-2612/2623: Reserve button — init-hold mode, navigates to GuestDetailsPage */}
       <Button
         type="submit"
         fullWidth
@@ -1376,7 +1409,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           invalidIstStayRange ||
           priceDetails.nights < 1
         }
-        className={isSubmitting || isLoading ? 'opacity-75' : ''}
+        className={`bw-reserve${isSubmitting || isLoading ? ' opacity-75' : ''}`}
         data-testid="guest-booking-submit"
       >
         {isBookingDisabled
@@ -1385,6 +1418,15 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             ? 'Reserving…'
             : 'Reserve'}
       </Button>
+      <p className="bw-charge-note" data-testid="bw-charge-note">You won&apos;t be charged yet</p>
+
+      {/* TASK-2623: Trust strip — free cancellation */}
+      <div className="bw-trust" data-testid="bw-trust-strip">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+        <span>Free cancellation until 48 hours before check-in</span>
+      </div>
     </form>
     </>
   );

@@ -283,7 +283,11 @@ const GuestDetailsPage: React.FC = () => {
     : '—';
   // propertyName: prefer booking.propertyName (set by BookingContext), fallback to deriving from slug
   const propertyName = booking.propertyName ?? (propertySlug ? propertySlug.replace(/-/g, ' ') : '');
-  const unitName = unitSlug ? unitSlug.replace(/-/g, ' ') : '';
+  // TASK-2623: prefer holdListingName (the actual listing name passed from UnitBookingWidget);
+  // fall back to unitSlug-derived display only when holdListingName is unavailable.
+  // When unitSlug is purely numeric (e.g. "5"), skip the slug→name fallback entirely.
+  const unitName = booking.holdListingName?.trim()
+    || (unitSlug && /\D/.test(unitSlug) ? unitSlug.replace(/-/g, ' ') : unitSlug ?? '');
 
   // Free cancellation date = 48h before check-in
   const freeCancelDisplay = useMemo(() => {
@@ -538,7 +542,7 @@ const GuestDetailsPage: React.FC = () => {
                     updateBooking({
                       holdId: null, holdExpiresAt: null, holdPropertySlug: null,
                       holdUnitSlug: null, holdPriceBreakdown: null, holdListingId: null,
-                      paymentHoldBookingId: null, paymentHoldToken: null,
+                      holdListingName: null, paymentHoldBookingId: null, paymentHoldToken: null,
                     });
                     const token = pendingBookingTokenRef.current;
                     navigate(
@@ -618,7 +622,7 @@ const GuestDetailsPage: React.FC = () => {
   const handleBackToProperty = useCallback(() => {
     updateBooking({
       holdId: null, holdExpiresAt: null, holdPropertySlug: null,
-      holdUnitSlug: null, holdPriceBreakdown: null, holdListingId: null,
+      holdUnitSlug: null, holdPriceBreakdown: null, holdListingId: null, holdListingName: null,
     });
     navigate(propertySlug && unitSlug ? `/homes/${propertySlug}/${unitSlug}` : '/', { replace: true });
   }, [updateBooking, navigate, propertySlug, unitSlug]);
@@ -718,7 +722,7 @@ const GuestDetailsPage: React.FC = () => {
               <h4 className="gd-recap-name">
                 {propertyName}{unitName ? ` · ${unitName}` : ''}
               </h4>
-              <div className="gd-recap-dates">{checkInDisplay} → {checkOutDisplay} · {nights > 0 ? `${nights} nights` : ''}</div>
+              <div className="gd-recap-dates">{checkInDisplay} → {checkOutDisplay} · {nights > 0 ? `${nights} ${nights === 1 ? 'night' : 'nights'}` : ''}</div>
               <div className="gd-recap-guests">
                 <span>{booking.guests ?? 1} guest{(booking.guests ?? 1) !== 1 ? 's' : ''}</span>
                 <span style={{ color: '#d6c2a8' }}>·</span>
@@ -1181,7 +1185,7 @@ const GuestDetailsPage: React.FC = () => {
             <div>
               <h4 className="gd-aside-stay-name">{propertyName}{unitName ? ` · ${unitName}` : ''}</h4>
               <div className="gd-aside-stay-dates">
-                {checkInDisplay} → {checkOutDisplay} · {nights > 0 ? `${nights} nights` : ''} · {booking.guests ?? 1} guest{(booking.guests ?? 1) !== 1 ? 's' : ''}
+                {checkInDisplay} → {checkOutDisplay} · {nights > 0 ? `${nights} ${nights === 1 ? 'night' : 'nights'}` : ''} · {booking.guests ?? 1} guest{(booking.guests ?? 1) !== 1 ? 's' : ''}
               </div>
             </div>
           </div>
@@ -1192,7 +1196,7 @@ const GuestDetailsPage: React.FC = () => {
               <div className="desc">
                 <span>
                   {nights > 0 && perNight > 0
-                    ? `${displayPrice(perNight)} × ${nights} nights`
+                    ? `${displayPrice(perNight)} × ${nights} ${nights === 1 ? 'night' : 'nights'}`
                     : 'Accommodation'}
                 </span>
               </div>
