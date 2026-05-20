@@ -48,6 +48,8 @@ const PrivacyPolicyPage = React.lazy(() => import("./pages/PrivacyPolicyPage"))
 const CookieConsentBanner = React.lazy(() => import("./components/CookieConsentBanner"))
 const PageNotFound = React.lazy(() => import("./pages/pagenotfound/PageNotFound"))
 const CityLandingPage = React.lazy(() => import("./pages/CityLandingPage"))
+// TASK-2612: Two-step booking flow — guest details step after Reserve
+const GuestDetailsPage = React.lazy(() => import("./pages/booking/GuestDetailsPage"))
 
 function LazyFallback() {
   return (
@@ -181,6 +183,8 @@ function AppWrapper() {
           <Route path="/recent" element={withBoundary(<Suspense fallback={<LazyFallback />}><RecentlyViewedPage /></Suspense>, "recent-route")} />
           <Route path="/become-a-host" element={withBoundary(<Suspense fallback={<LazyFallback />}><BecomeHost /></Suspense>, "become-host-route")} />
           <Route path="/property_LocationDetails/:id" element={withBoundary(<Suspense fallback={<LazyFallback />}><Homepage_LocationDetails /></Suspense>, "location-details-route")} />
+          {/* TASK-2612: Guest details step — MUST be before /:shortCode catch-all */}
+          <Route path="/book/:propertySlug/:unitSlug/details" element={withBoundary(<Suspense fallback={<LazyFallback />}><GuestDetailsPage /></Suspense>, "guest-details-route")} />
           <Route path="/:shortCode" element={withBoundary(<Suspense fallback={<LazyFallback />}><ShortLinkRedirect /></Suspense>, "shortlink-route")} />
           <Route path="/*" element={withBoundary(<Suspense fallback={<LazyFallback />}><PageNotFound /></Suspense>, "fallback-route")} />
         </Routes>

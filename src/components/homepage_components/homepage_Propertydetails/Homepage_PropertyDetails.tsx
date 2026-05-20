@@ -1899,6 +1899,8 @@ useEffect(() => {
                     timezoneId={data.timezoneId}
                     coverPhotoUrl={primaryImage}
                     maxGuests={data.maxGuests}
+                    propertySlug={propertySlugParam}
+                    unitSlug={unitSlugParam}
                   />
                 </Suspense>
 
