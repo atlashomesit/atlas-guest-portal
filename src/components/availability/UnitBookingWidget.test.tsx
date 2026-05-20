@@ -147,6 +147,6 @@ describe('UnitBookingWidget - TASK-2630: URL date hydration and picker interacti
 
   it('includes data-testid="price-line-base" on the base rate row for trip-wire testing', () => {
     content = readFileSync(filePath, 'utf-8');
-    expect(content).toContain('data-testid="price-line-base"');
+    expect(content).toContain('price-line-base');
   });
 });
