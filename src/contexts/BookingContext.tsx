@@ -1,5 +1,15 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
+/** Price breakdown forwarded from the widget to GuestDetailsPage (session-only, not persisted). */
+export type BookingPriceBreakdown = {
+  baseAmount: number;
+  discountAmount: number;
+  convenienceFeeAmount: number;
+  finalAmount: number;
+  nights: number;
+  currency: string;
+};
+
 type BookingState = {
   propertyId: string | number | null;
   propertyName: string | null;
@@ -13,6 +23,20 @@ type BookingState = {
   paymentHoldToken: string | null;
   /** ISO8601 UTC instant when the server-side hold window ends (aligned with `/bookings/{id}/payment-status`). */
   holdExpiresAt: string | null;
+
+  // TASK-2612: Two-step booking flow — set at Reserve, read at GuestDetailsPage.
+  /** BookingId of the PaymentPending hold created by init-hold mode. */
+  holdId: number | null;
+  /** Route slug of the property being booked — used to navigate back if hold expires. */
+  holdPropertySlug: string | null;
+  /** Route slug of the listing unit being booked. */
+  holdUnitSlug: string | null;
+  /** Price breakdown forwarded from the widget (session-only; not persisted to localStorage). */
+  holdPriceBreakdown: BookingPriceBreakdown | null;
+  /** ListingId for the hold — needed for add-on service loading on GuestDetailsPage. */
+  holdListingId: number | null;
+  /** Human-readable listing/unit name forwarded from the widget (session-only; not persisted). */
+  holdListingName: string | null;
 };
 
 type BookingContextValue = {
@@ -38,6 +62,12 @@ const defaultState: BookingState = {
   paymentHoldBookingId: null,
   paymentHoldToken: null,
   holdExpiresAt: null,
+  holdId: null,
+  holdPropertySlug: null,
+  holdUnitSlug: null,
+  holdPriceBreakdown: null,
+  holdListingId: null,
+  holdListingName: null,
 };
 
 // eslint-disable-next-line react-refresh/only-export-components -- context co-located with provider
@@ -62,9 +92,16 @@ const loadState = (): BookingState => {
         typeof parsed.listingDetailPath === 'string' && parsed.listingDetailPath.trim()
           ? parsed.listingDetailPath.trim()
           : null,
+      // Hold state is session-only — never hydrate from localStorage
       paymentHoldBookingId: null,
       paymentHoldToken: null,
       holdExpiresAt: null,
+      holdId: null,
+      holdPropertySlug: null,
+      holdUnitSlug: null,
+      holdPriceBreakdown: null,
+      holdListingId: null,
+      holdListingName: null,
     };
   } catch (error) {
     console.warn('[BookingContext] Failed to load persisted booking state', error);

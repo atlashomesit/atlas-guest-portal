@@ -486,3 +486,77 @@
   color: var(--text-muted, #475569);
   margin-top: 2px;
 }
+
+/* === TASK-2623: Widget header (.bw-head) and trust strip (.bw-trust) ======= */
+.bw-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.bw-price-block {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+.bw-from {
+  font-size: 13px;
+  color: var(--text-muted, #475569);
+  font-weight: 400;
+}
+.bw-amount {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--text-primary, #1a1a2e);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.bw-per {
+  font-size: 14px;
+  color: var(--text-muted, #475569);
+  font-weight: 400;
+}
+.bw-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text-primary, #1a1a2e);
+  flex-shrink: 0;
+}
+.bw-rating-num {
+  font-weight: 600;
+}
+.bw-rating-sep {
+  color: var(--text-muted, #475569);
+}
+.bw-rating-link {
+  color: var(--text-primary, #1a1a2e);
+  text-underline-offset: 2px;
+}
+
+/* === Reserve button + charge note ========================================= */
+.bw-reserve {
+  /* inherits Button base; these add bw-specific weight */
+  font-weight: 600 !important;
+  letter-spacing: 0.01em;
+}
+.bw-charge-note {
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-muted, #475569);
+  margin-top: 4px;
+}
+
+/* === Trust strip =========================================================== */
+.bw-trust {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted, #475569);
+  padding: 8px 0 2px;
+  border-top: 1px solid var(--border-subtle, #f0e6dc);
+  margin-top: 4px;
+}

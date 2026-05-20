@@ -115,6 +115,7 @@ const PRESETS: Preset[] = [
   { id: 'this-weekend', label: 'This weekend' },
   { id: 'next-weekend', label: 'Next weekend' },
   { id: 'this-week',    label: 'This week' },
+  { id: 'next-month',   label: 'Next month' },
 ];
 
 function computePreset(id: string, today: Date): { startDate: Date; endDate: Date } | null {
@@ -135,6 +136,11 @@ function computePreset(id: string, today: Date): { startDate: Date; endDate: Dat
   if (id === 'this-week') {
     const toSun = (7 - dow) % 7 || 7;
     return { startDate: today, endDate: addDays(today, toSun) };
+  }
+  if (id === 'next-month') {
+    // First day of next month → 3-night sample stay (the "explore later dates" affordance)
+    const nextMonthStart = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+    return { startDate: nextMonthStart, endDate: addDays(nextMonthStart, 3) };
   }
   return null;
 }

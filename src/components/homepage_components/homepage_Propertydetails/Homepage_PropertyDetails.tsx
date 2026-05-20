@@ -1899,6 +1899,10 @@ useEffect(() => {
                     timezoneId={data.timezoneId}
                     coverPhotoUrl={primaryImage}
                     maxGuests={data.maxGuests}
+                    propertySlug={propertySlugParam}
+                    unitSlug={unitSlugParam}
+                    reviewRating={ppHasApiReviews ? ppApiReviews!.averageRating : undefined}
+                    reviewCount={ppHasApiReviews ? ppApiReviews!.totalCount : undefined}
                   />
                 </Suspense>
 

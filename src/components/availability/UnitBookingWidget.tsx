@@ -1,13 +1,9 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { addDays, format, startOfMonth } from 'date-fns';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import {
-  getOrderCreationGuestErrorMessage,
-  isTransportLayerFailure,
-  NETWORK_ERROR_MESSAGE,
-} from './unitBookingPaymentOrderErrors';
+import { NETWORK_ERROR_MESSAGE } from './unitBookingPaymentOrderErrors';
 import { toast } from 'react-toastify';
 import { Button } from '@/components/ui/Button';
 import { type AtlasDateRangePickerValue } from '@/components/date/AtlasDateRangePicker';
@@ -22,17 +18,9 @@ import { monitoredFetch } from '@/lib/monitoring';
 import { getIstStartOfDay } from '@/utils/date';
 import { calculateNights, formatNightCount, formatDateInTimezone } from '@/utils/dateHelpers';
 import { doesRangeIntersectBlocked, toISODate } from '@/utils/dateRange';
-import { formatCurrency, formatHumanDate } from '@/utils/formatting';
+import { formatCurrency } from '@/utils/formatting';
 import { HelpCircle } from 'lucide-react';
-import {
-  clampNationalDigits,
-  getGuestDialOption,
-  GUEST_DIAL_OPTIONS,
-  toGuestPhoneE164,
-  toRazorpayContactDigits,
-} from '@/utils/guestPhoneDial';
 import { calculateNightlyPrice, inferUnitType } from '@/utils/pricing';
-import { mapRazorpayFailureCode } from '@/utils/razorpayGuestErrors';
 import priceDisplayConfig from '@/config/priceDisplay.config';
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
 import { fetchCalendarPricing, fetchPricingBreakdown } from '@/api/pricingClient';
@@ -40,8 +28,7 @@ import { useListingPhotosFromApi } from '@/contexts/ListingPhotosContext';
 import OptimizedImage from '@/components/ui/OptimizedImage';
 import FomoBar from '@/components/FomoBar';
 import { track } from '@/lib/events'; // TASK-1480
-import { getTenantContext } from '@/tenant/tenantContext';
-import { getGuestDataProcessingEntityName, getTenantBrandNameLong } from '@/tenant/displayBrand';
+// getTenantContext removed — widget no longer needs it (TASK-2612 stripped form)
 import {
   ILLUSTRATIVE_OTA_GUEST_FEE_PERCENT,
   PMS_AIRBNB_2026_TERMS_URL,
@@ -65,17 +52,17 @@ interface UnitBookingWidgetProps {
   maxGuests?: number;
   /** Optional host WhatsApp/phone for payment-failure support CTA. */
   hostPhone?: string | null;
+  /** TASK-2612: Property route slug — used for navigate to /book/:propertySlug/:unitSlug/details */
+  propertySlug?: string;
+  /** TASK-2612: Unit route slug — used for navigate to /book/:propertySlug/:unitSlug/details */
+  unitSlug?: string;
+  /** TASK-2623: Average rating from the listing API (e.g. 4.92). Only shown when reviewCount > 0. */
+  reviewRating?: number;
+  /** TASK-2623: Total review count from the listing API. 0 or undefined = hide rating row. */
+  reviewCount?: number;
 }
 
 const PENDING_PAYMENT_KEY = 'atlas_pending_razorpay_order';
-/** TASK-1468: browser-local last UPI VPA for Razorpay prefill (also persisted server-side on Guests when verify returns it). */
-const LAST_UPI_VPA_KEY = 'atlas_last_upi_vpa';
-
-/** COMP-001: keep wording aligned with Atlas.Api.Constants.GuestConsentConstants.BuildGuestConsentDisplayText (tenant via getTenantBrandNameLong). */
-function guestDataConsentLabel(): string {
-  const brand = getTenantBrandNameLong();
-  return `I consent to ${brand} collecting and using my name, phone, and email to process my booking and send booking communications.`;
-}
 
 const normalizeListingId = (value: string | number | null | undefined) =>
   String(value ?? '')
@@ -131,7 +118,7 @@ function getBookingErrorMessage(error: unknown, context: 'order' | 'verify'): st
 }
 
 /** TASK-255: Best-effort removal of PaymentPending row after Razorpay dismiss/failure (token = order response bookingToken). */
-async function abandonPaymentPendingCheckout(bookingId: number, bookingToken: string | null | undefined) {
+async function _abandonPaymentPendingCheckout(bookingId: number, bookingToken: string | null | undefined) {
   const token = typeof bookingToken === 'string' ? bookingToken.trim() : '';
   if (!token) return;
   try {
@@ -155,6 +142,10 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   coverPhotoUrl,
   maxGuests = 16,
   hostPhone,
+  propertySlug,
+  unitSlug,
+  reviewRating,
+  reviewCount,
 }) => {
   if (import.meta.env.DEV) {
     console.assert(Boolean(propertyId), '[UnitBookingWidget] propertyId is required for unit mode');
@@ -166,21 +157,8 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const { getUrlsForListingId } = useListingPhotosFromApi();
   const isBookingDisabled = !hasRuntimeConfig();
 
-  // RA-006 + WhatsApp-fallback: when the tenant has no online payment provider configured
-  // we hand the booking off to the host's WhatsApp instead of attempting a Razorpay order.
-  // Money never flows through Atlas; the tenant collects directly.
-  const tenantBookingMode = getTenantContext()?.bookingMode;
-  const tenantWhatsappPhone = getTenantContext()?.whatsappBookingPhone;
-  const isWhatsAppDirectBooking =
-    tenantBookingMode === 'WHATSAPP' &&
-    typeof tenantWhatsappPhone === 'string' &&
-    tenantWhatsappPhone.length >= 6;
-  // SL-1: only show the secondary "Book now" button when the tenant has a real online
-  // payment provider. MANUAL = pay-on-arrival (no online order); null/undefined = none.
-  const _rawPaymentProvider = getTenantContext()?.paymentProvider;
-  const hasOnlinePaymentProvider =
-    typeof _rawPaymentProvider === 'string' &&
-    _rawPaymentProvider !== 'MANUAL';
+  // TASK-2612: WhatsApp direct-booking handled on GuestDetailsPage (after Reserve).
+  // Widget now only handles init-hold; provider routing happens on details page.
 
   const coverFromPublicListings = useMemo(() => {
     const id = listingId != null ? Number(listingId) : NaN;
@@ -189,14 +167,8 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   }, [listingId, getUrlsForListingId]);
 
   const displayCoverUrl = (coverPhotoUrl?.trim() || coverFromPublicListings || '').trim() || undefined;
-  const hostWhatsAppDigits = useMemo(() => {
-    const raw = (hostPhone ?? '').trim();
-    if (!raw) return '';
-    const cleaned = raw.replace(/\D/g, '');
-    if (cleaned.length === 10) return `91${cleaned}`;
-    if (cleaned.length >= 11) return cleaned;
-    return '';
-  }, [hostPhone]);
+  // hostPhone retained in props for future WhatsApp support on GuestDetailsPage
+  void hostPhone;
 
   const today = useMemo(() => getIstStartOfDay(), []);
   const maxBookingDate = useMemo(() => addDays(today, 365), [today]);
@@ -226,70 +198,13 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const lastAvailabilityKeyRef = useRef<string | null>(null);
   const hasAutoAdjustedRef = useRef(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [paymentAttemptCount, setPaymentAttemptCount] = useState(0);
   const [formError, setFormError] = useState<string | null>(null);
-  /** TASK-2460: only true for TypeError / no HTTP response — drives retry hint, not API 4xx/5xx bodies. */
-  const [orderErrorWasTransportFailure, setOrderErrorWasTransportFailure] = useState(false);
   const [dateError, setDateError] = useState<string | null>(null);
   const [minStayNights] = useState(1);
   const minAdvanceDays = 0;
   const effectiveMaxGuests = maxGuests;
-  /** TASK-1881: E.164 country code for phone; national digits in formData.phone */
-  const [phoneDialCode, setPhoneDialCode] = useState(() => GUEST_DIAL_OPTIONS[0].code);
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    /** QW-005: special requests / notes to host (max 500 server-side) */
-    notes: '',
-    /** TASK-782: Guest nationality for Indian police homestay reporting (default India). */
-    nationality: 'India',
-  });
-  const [formErrors, setFormErrors] = useState({
-    name: '',
-    email: '',
-    phone: ''
-  });
-  useEffect(() => {
-    const dial = getGuestDialOption(phoneDialCode);
-    setFormData((prev) => ({ ...prev, phone: clampNationalDigits(prev.phone, dial.maxDigits) }));
-  }, [phoneDialCode]);
-  const [guestConsentAccepted, setGuestConsentAccepted] = useState(false);
-  const [consentError, setConsentError] = useState('');
-  const [referralCode, setReferralCode] = useState('');
-  const [appliedReferralCode, setAppliedReferralCode] = useState<string | null>(null);
-  const [appliedReferralDiscount, setAppliedReferralDiscount] = useState(0);
-  const [referralMessage, setReferralMessage] = useState<string | null>(null);
-  const [referralValidating, setReferralValidating] = useState(false); // TASK-2559
-  const [promoCode, setPromoCode] = useState('');
-  const [appliedPromoCode, setAppliedPromoCode] = useState<string | null>(null);
-  const [promoValidating, setPromoValidating] = useState(false);
-  // TASK-1710: DPDP WhatsApp marketing opt-in — unchecked by default
-  const [whatsappMarketingOptIn, setWhatsappMarketingOptIn] = useState(false);
-  const [appliedPromoDiscount, setAppliedPromoDiscount] = useState(0);
-  const [promoMessage, setPromoMessage] = useState<string | null>(null);
-  // TASK-171: add-on services for this listing
-  const [availableAddOns, setAvailableAddOns] = useState<Array<{ addOnServiceId: number; name: string; description?: string | null; price: number; priceType: string }>>([]);
-  const [selectedAddOns, setSelectedAddOns] = useState<Record<number, number>>({}); // addOnServiceId -> quantity (0 = not selected)
-  const [paymentStatus, setPaymentStatus] = useState<'success' | 'failed' | null>(null);
   /** RA-006: payment provider not configured for this tenant. */
   const [providerBlocked, setProviderBlocked] = useState(false);
-  /** TASK-1469: Razorpay `payment.failed` metadata for richer failure UI. */
-  const [razorpayFailure, setRazorpayFailure] = useState<{ code: string; description: string } | null>(null);
-  const [bookingDetails, setBookingDetails] = useState<{
-    bookingId: string;
-    bookingToken?: string;
-    amount: number;
-    propertyName: string;
-    checkIn: Date;
-    checkOut: Date;
-    nights: number;
-    email: string;
-    referralCode?: string;
-    referralDiscountAmount?: number;
-    promoCode?: string;
-    promoDiscountAmount?: number;
-  } | null>(null);
 
   // Availability range always starts from today, independent of selected dates or shown date
   const availabilityRange = useMemo(() => {
@@ -338,22 +253,6 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     hasAutoAdjustedRef.current = false;
   }, [listingId]);
 
-  // TASK-171: fetch add-on services available for this listing
-  useEffect(() => {
-    const id = listingId != null ? Number(listingId) : NaN;
-    if (!Number.isFinite(id) || id <= 0) return;
-    const headers = getApiHeaders();
-    void (async () => {
-      try {
-        const url = buildApiUrl(`/listings/${id}/add-ons`);
-        const res = await fetch(url, { headers });
-        if (res.ok) {
-          const data = await res.json() as Array<{ addOnServiceId: number; name: string; description?: string | null; price: number; priceType: string }>;
-          setAvailableAddOns(Array.isArray(data) ? data : []);
-        }
-      } catch { /* non-critical: just don't show add-ons */ }
-    })();
-  }, [listingId]);
 
   // On mount: clear any stale pending payment (e.g. user refreshed during Razorpay modal)
   useEffect(() => {
@@ -366,13 +265,11 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
 
   useEffect(() => {
     try {
+      // Persist referral code from URL to localStorage so GuestDetailsPage can pick it up
       const url = new URL(window.location.href);
-      const ref = (url.searchParams.get('ref') || '').trim();
-      const stored = (window.localStorage.getItem('atlas_guest_referral_code') || '').trim();
-      const seed = (ref || stored).slice(0, 32);
-      if (seed) {
-        setReferralCode(seed);
-        window.localStorage.setItem('atlas_guest_referral_code', seed);
+      const ref = (url.searchParams.get('ref') || '').trim().slice(0, 32);
+      if (ref) {
+        window.localStorage.setItem('atlas_guest_referral_code', ref);
       }
     } catch {
       // no-op
@@ -389,18 +286,50 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     return () => document.removeEventListener('click', handler);
   }, [guestsOpen]);
 
-  // TASK-1708: Auto-fill promo code from ?promo= URL param (e.g. ?promo=DIRECT5 from DirectDiscountBanner CTA)
+  // TASK-1708: Persist promo code from ?promo= URL param to localStorage so GuestDetailsPage can pick it up
   useEffect(() => {
     try {
       const url = new URL(window.location.href);
       const promo = (url.searchParams.get('promo') || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 32);
-      if (promo) setPromoCode(promo);
+      if (promo) window.localStorage.setItem('atlas_guest_promo_code', promo);
     } catch {
       // no-op
     }
   }, []);
 
+  // TASK-2630: Listen for custom event from bottom Availability calendar (BUG-15b).
+  // When user clicks a date in the AvailabilityCalendar, it dispatches atlas:set-checkin with the date (ISO string).
+  // We update the booking widget to reflect that check-in date.
+  useEffect(() => {
+    const handleAvailabilityDateSelect = (event: Event) => {
+      const customEvent = event as CustomEvent<string>;
+      const dateStr = customEvent.detail;
+      if (!dateStr || typeof dateStr !== 'string') return;
+
+      try {
+        // Parse the date string (expected format: YYYY-MM-DD)
+        const selectedDate = getIstStartOfDay(new Date(dateStr));
+        if (Number.isNaN(selectedDate.getTime())) return;
+
+        // Update the date range: set check-in to the selected date, clear check-out
+        // This prompts the user to select a check-out date
+        setDateRange({ startDate: selectedDate, endDate: null });
+
+        // Optionally scroll to the date picker to make it visible
+        if (calendarButtonRef.current) {
+          calendarButtonRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      } catch {
+        // Silently handle parse errors
+      }
+    };
+
+    window.addEventListener('atlas:set-checkin', handleAvailabilityDateSelect);
+    return () => window.removeEventListener('atlas:set-checkin', handleAvailabilityDateSelect);
+  }, []);
+
   // Hydrate widget from booking context (e.g. ?checkIn=&checkOut=&guests= from property URL)
+  // TASK-2630: Ensure AtlasBookingCalendar displays URL-param dates, not today+1/today+2 defaults
   useEffect(() => {
     const ci = booking.checkIn;
     const co = booking.checkOut;
@@ -895,14 +824,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   const convenienceFeePercent = calendarConvenienceFeePercent != null ? calendarConvenienceFeePercent / 100 : 0;
   const _convenienceFee = Math.round(priceDetails.total * convenienceFeePercent);
   const breakdownConvenienceFee = Math.round(breakdownPrice * convenienceFeePercent);
-  const referralDiscountApplied = Math.max(0, appliedReferralDiscount || 0);
-  const promoDiscountApplied = Math.max(0, appliedPromoDiscount || 0);
-  // TASK-171: compute add-ons subtotal from guest selections
-  const addOnsTotal = availableAddOns.reduce((sum, ao) => {
-    const qty = selectedAddOns[ao.addOnServiceId] ?? 0;
-    return sum + (qty > 0 ? ao.price * qty : 0);
-  }, 0);
-  const breakdownFinalTotal = Math.max(1, breakdownPrice + breakdownConvenienceFee - referralDiscountApplied - promoDiscountApplied + addOnsTotal);
+  const breakdownFinalTotal = Math.max(1, breakdownPrice + breakdownConvenienceFee);
 
   const finalTotal =
     hasSelectedRange && selectedRangeTotalFromCalendar != null
@@ -934,6 +856,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     formatCurrency(n, { maximumFractionDigits: 0 });
 
   const convenienceFeePctLabel = Math.round(convenienceFeePercent * 100);
+  const referralDiscountApplied = 0;
+  const promoDiscountApplied = 0;
+  const addOnsTotal = 0;
 
   const illustrativeOtaGuestFeeComparison = useMemo(() => {
     if (!hasSelectedRange || breakdownPrice <= 0) return null;
@@ -948,156 +873,140 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     ? `${timezoneId ? formatDateInTimezone(dateRange.startDate, timezoneId) : format(dateRange.startDate, 'EEE, dd MMM')} – ${timezoneId ? formatDateInTimezone(dateRange.endDate, timezoneId) : format(dateRange.endDate, 'EEE, dd MMM')} • ${priceDetails.nights} ${priceDetails.nights === 1 ? 'night' : 'nights'}`
     : 'Add your travel dates';
 
-  const validateForm = () => {
-    const errors = {
-      name: '',
-      email: '',
-      phone: ''
-    };
-    let isValid = true;
-
-    if (!formData.name.trim()) {
-      errors.name = 'Name is required';
-      isValid = false;
-    }
-
-    if (!formData.email) {
-      errors.email = 'Email is required';
-      isValid = false;
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
-      errors.email = 'Please enter a valid email address';
-      isValid = false;
-    }
-
-    const dial = getGuestDialOption(phoneDialCode);
-    const national = clampNationalDigits(formData.phone, dial.maxDigits);
-    if (!national) {
-      errors.phone = 'Phone number is required';
-      isValid = false;
-    } else if (!dial.validate(national)) {
-      errors.phone = dial.invalidMessage;
-      isValid = false;
-    }
-
-    if (!guestConsentAccepted) {
-      setConsentError('Please accept the consent to continue.');
-      isValid = false;
-    } else {
-      setConsentError('');
-    }
-
-    setFormErrors(errors);
-    return isValid;
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    if (name === 'phone') {
-      const dial = getGuestDialOption(phoneDialCode);
-      const national = clampNationalDigits(value, dial.maxDigits);
-      setFormData(prev => ({ ...prev, phone: national }));
+  // TASK-2612: handleReserve replaces the old handleSubmit.
+  // Calls init-hold mode (GuestInfo absent), stores holdId+holdExpiresAt in context, navigates to details page.
+  const handleReserve = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isSubmitting) return;
+    if (isBookingDisabled) {
+      setFormError('Service temporarily unavailable. Please try again later.');
       return;
     }
-    if (name === 'notes' && value.length > 500) {
+    setDateError(null);
+    setFormError(null);
+
+    // Date validation
+    if (!dateRange.startDate || !dateRange.endDate) {
+      setDateError('Please select check-in and check-out dates.');
       return;
     }
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  const loadRazorpayScript = (callback: () => void) => {
-    if (window.Razorpay) {
-      callback();
+    const checkinIst = getIstStartOfDay(dateRange.startDate);
+    const checkoutIst = getIstStartOfDay(dateRange.endDate);
+    if (checkoutIst.getTime() <= checkinIst.getTime()) {
+      setDateError('Check-out must be after check-in.');
+      return;
+    }
+    const stayNights = calculateNights(checkinIst, checkoutIst);
+    if (stayNights < 1) {
+      setDateError('Check-out must be after check-in.');
       return;
     }
 
-    const script = document.createElement('script');
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-    script.async = true;
-    script.onload = () => callback();
-    script.onerror = () => {
-      localStorage.removeItem(PENDING_PAYMENT_KEY);
-      setOrderErrorWasTransportFailure(true);
-      setFormError(NETWORK_ERROR_MESSAGE);
-      setIsSubmitting(false);
-      setIsLoading(false);
-      toast.error(NETWORK_ERROR_MESSAGE);
-    };
-    document.body.appendChild(script);
-  };
+    const checkinISO = toISODate(checkinIst);
+    const checkinStatus = dateStatusMap.get(checkinISO);
+    if (checkinStatus === 'Blocked' || checkinStatus === 'Hold' || blockedSet.has(checkinISO)) {
+      setFormError('Check-in date is not available. Please select a different check-in date.');
+      return;
+    }
 
-  const verifyPayment = async (paymentData: {
-    bookingId: string;
-    razorpay_payment_id: string;
-    razorpay_order_id: string;
-    razorpay_signature: string;
-  }) => {
+    const numericListingId = listingId != null ? Number(listingId) : NaN;
+    if (!Number.isFinite(numericListingId)) {
+      setFormError('Property could not be loaded. Please refresh the page and try again.');
+      return;
+    }
+
+    let orderUrl: string;
     try {
-      if (isBookingDisabled) {
-        const message = 'Service temporarily unavailable. Please try again later.';
-        setFormError(message);
-        throw new Error(message);
-      }
+      orderUrl = buildApiUrl('/api/Razorpay/order');
+    } catch {
+      setFormError('Unable to start checkout. Please try again later.');
+      return;
+    }
 
-      if (!hasRuntimeConfig()) {
-        const message = 'Payment service is unavailable. Please try again later.';
-        setFormError(message);
-        throw new Error(message);
-      }
+    setIsSubmitting(true);
+    track('start_checkout', numericListingId);
 
-      const requestData = {
-        bookingId: Number(paymentData.bookingId),
-        razorpayOrderId: paymentData.razorpay_order_id,
-        razorpayPaymentId: paymentData.razorpay_payment_id,
-        razorpaySignature: paymentData.razorpay_signature,
-        guestInfo: {
-          name: formData.name.trim(),
-          email: formData.email.trim(),
-          phone: toGuestPhoneE164(
-            phoneDialCode,
-            clampNationalDigits(formData.phone, getGuestDialOption(phoneDialCode).maxDigits),
-          ),
+    try {
+      const orderPayload = {
+        bookingDraft: {
+          listingId: numericListingId,
+          checkinDate: toISODate(checkinIst),
+          checkoutDate: toISODate(checkoutIst),
+          guests,
         },
+        currency: 'INR',
+        // GuestInfo absent — init-hold mode
+        guestConsentAccepted: false,
       };
 
-      const response = await axios.post(buildApiUrl('/api/Razorpay/verify'), requestData, {
+      const idempotencyKey = crypto.randomUUID();
+      const response = await axios.post(orderUrl, orderPayload, {
         headers: {
           ...getApiHeaders(),
           'Content-Type': 'application/json',
-          'Accept': 'application/json'
+          'Accept': 'application/json',
+          'Idempotency-Key': idempotencyKey,
         },
-        timeout: 15000
+        timeout: 15000,
       });
-      
-      if (response.data.success) {
-        setStatusMessage('Payment successful! Your booking is confirmed.');
-        const vpa = typeof response.data.lastUpiVpa === 'string' ? response.data.lastUpiVpa.trim() : '';
-        if (vpa) {
-          try {
-            localStorage.setItem(LAST_UPI_VPA_KEY, vpa);
-          } catch {
-            /* ignore quota / private mode */
-          }
-        }
+
+      const { holdId, holdExpiresAt } = response.data ?? {};
+      if (!holdId || !holdExpiresAt) {
+        throw new Error('Hold could not be created. Please try again.');
+      }
+
+      // Store hold state in context and navigate to details page
+      updateBooking({
+        holdId: Number(holdId),
+        holdExpiresAt: typeof holdExpiresAt === 'string' ? holdExpiresAt : new Date(holdExpiresAt).toISOString(),
+        holdPropertySlug: propertySlug ?? null,
+        holdUnitSlug: unitSlug ?? null,
+        holdListingId: numericListingId,
+        holdListingName: listingName ?? null,
+        holdPriceBreakdown: {
+          baseAmount: breakdownPrice,
+          discountAmount: 0,
+          convenienceFeeAmount: breakdownConvenienceFee,
+          finalAmount: finalTotal > 0 ? finalTotal : breakdownFinalTotal,
+          nights: stayNights,
+          currency: 'INR',
+        },
+        // Forward dates/guests into context for the details page
+        checkIn: checkinIst.toISOString(),
+        checkOut: checkoutIst.toISOString(),
+        guests,
+      });
+
+      const targetSlug = propertySlug ?? '';
+      const targetUnit = unitSlug ?? '';
+      if (targetSlug && targetUnit) {
+        navigate(`/book/${targetSlug}/${targetUnit}/details`);
       } else {
-        throw new Error(response.data.message || 'Payment verification failed');
+        // Fallback: navigate to reserve page (should not happen in normal flow)
+        navigate('/reserve');
       }
     } catch (error: unknown) {
-      console.error('Payment verification error:', {
-        error: (error as { response?: { data?: unknown }; message?: string }).response?.data || (error as Error).message,
-        status: (error as { response?: { status?: number } }).response?.status,
-        headers: (error as { response?: { headers?: unknown } }).response?.headers
-      });
-      setFormError(getBookingErrorMessage(error, 'verify'));
-      throw error;
+      console.error('[UnitBookingWidget] Reserve error:', error);
+      const data = (error as { response?: { data?: { code?: string; Code?: string } } })?.response?.data;
+      const code = (typeof data?.code === 'string' ? data.code : typeof data?.Code === 'string' ? data.Code : '') || '';
+      const status = (error as { response?: { status?: number } })?.response?.status;
+      if (status === 503 && code === 'PAYMENT_PROVIDER_NOT_CONFIGURED_PLATFORM') {
+        setProviderBlocked(true);
+      } else {
+        setFormError(getBookingErrorMessage(error, 'order'));
+      }
+    } finally {
+      setIsSubmitting(false);
     }
-  };
+  }, [
+    isSubmitting, isBookingDisabled, dateRange, dateStatusMap, blockedSet,
+    listingId, guests, propertySlug, unitSlug, listingName, breakdownPrice, breakdownConvenienceFee,
+    breakdownFinalTotal, finalTotal, updateBooking, navigate,
+  ]);
 
   // Helper function to find next available date starting from a given date
   // Returns dates that are not blocked/hold
-  const findNextAvailableDate = useCallback((startDate: Date): Date | null => {
+  const _findNextAvailableDate = useCallback((startDate: Date): Date | null => {
     // Find next available date (up to 60 days ahead)
     for (let i = 0; i <= 60; i++) {
       const checkDate = addDays(startDate, i);
@@ -1126,829 +1035,6 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     return null; // No available date found
   }, [dateStatusMap, blockedSet]);
 
-  // TASK-2559: inline referral-code validation on blur — client-side format only (no /api/referral/validate endpoint exists).
-  // Valid codes: 1–32 uppercase alphanumeric chars (enforced by the onChange regex). Anything non-empty that passes
-  // that regex is "well-formed"; actual eligibility is verified at order-create time.
-  const handleReferralBlur = () => {
-    const code = referralCode.trim();
-    if (!code) { setReferralMessage(null); setAppliedReferralCode(null); return; }
-    setReferralValidating(true);
-    // Simulate brief async delay for UX consistency with promo validation
-    setTimeout(() => {
-      if (/^[A-Z0-9]{1,32}$/.test(code)) {
-        setAppliedReferralCode(code);
-        setReferralMessage('Code format looks good — reward will apply if eligible at checkout.');
-      } else {
-        setAppliedReferralCode(null);
-        setReferralMessage('Referral codes must be letters and numbers only (no spaces or symbols).');
-      }
-      setReferralValidating(false);
-    }, 300);
-  };
-
-  // TASK-2074: inline promo validation on blur — calls existing [AllowAnonymous] endpoint
-  const handlePromoBlur = async () => {
-    const code = promoCode.trim();
-    if (!code || !listingId) return;
-    setPromoValidating(true);
-    setPromoMessage(null);
-    try {
-      const res = await fetch(buildApiUrl('/api/promo-codes/validate'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getApiHeaders() },
-        body: JSON.stringify({ code, listingId: Number(listingId), subtotal: priceDetails.total }),
-      });
-      if (!res.ok) { setPromoMessage('Could not validate code — try again.'); return; }
-      const data = (await res.json()) as { valid: boolean; message: string; discountAmount?: number };
-      setPromoMessage(data.message);
-      if (data.valid) setAppliedPromoCode(code);
-    } catch {
-      setPromoMessage('Could not validate code — check your connection.');
-    } finally {
-      setPromoValidating(false);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (isSubmitting) return;
-
-    const submitter = (e.nativeEvent as SubmitEvent).submitter as
-      | HTMLButtonElement
-      | HTMLInputElement
-      | null;
-    const bookingIntent = submitter?.value === 'online_payment' ? 'online_payment' : 'whatsapp';
-
-    if (isBookingDisabled) {
-      setFormError('Service temporarily unavailable. Please try again later.');
-      return;
-    }
-
-    setDateError(null);
-
-    if (!validateForm()) {
-      return;
-    }
-
-    // RA-006 WhatsApp direct-booking handoff: keep WhatsApp as default CTA.
-    // When users explicitly pick the secondary "Book now" button, continue to
-    // the normal checkout path below (Razorpay order/verify flow).
-    if (isWhatsAppDirectBooking && bookingIntent === 'whatsapp' && tenantWhatsappPhone) {
-      const tenantNameForMessage = getTenantContext()?.name?.trim() || 'your team';
-      const checkinForMessage = dateRange.startDate
-        ? formatHumanDate(dateRange.startDate)
-        : 'a date to be confirmed';
-      const checkoutForMessage = dateRange.endDate
-        ? formatHumanDate(dateRange.endDate)
-        : 'a date to be confirmed';
-      const guestsForMessage = formData.guests || '1';
-      const propertyForMessage = listingName?.trim() || 'your property';
-      const guestNameForMessage = formData.name.trim() || 'a guest';
-      const noteForMessage = formData.notes.trim()
-        ? `\nSpecial requests: ${formData.notes.trim()}`
-        : '';
-
-      const messageLines = [
-        `Hi ${tenantNameForMessage} — I'd like to book ${propertyForMessage}.`,
-        `Check-in: ${checkinForMessage}`,
-        `Check-out: ${checkoutForMessage}`,
-        `Guests: ${guestsForMessage}`,
-        `Name: ${guestNameForMessage}`,
-        formData.email.trim() ? `Email: ${formData.email.trim()}` : null,
-      ].filter(Boolean) as string[];
-
-      const message = messageLines.join('\n') + noteForMessage;
-      const url = `https://wa.me/${encodeURIComponent(tenantWhatsappPhone)}?text=${encodeURIComponent(message)}`;
-      try {
-        const lid = listingId != null ? Number(listingId) : NaN;
-        if (Number.isFinite(lid) && lid > 0) track("whatsapp_direct_booking_handoff", lid);
-      } catch { /* analytics best-effort */ }
-      window.open(url, '_blank', 'noopener');
-      toast.info('Opening WhatsApp — your host will confirm availability and payment with you.');
-      return;
-    }
-
-    // Auto-generate dates if not selected
-    let checkinDate: Date;
-    let checkoutDate: Date;
-    
-    if (!dateRange.startDate || !dateRange.endDate) {
-      // Ensure availability data is loaded before auto-generating dates
-      if (dateStatusMap.size === 0) {
-        setFormError('Please wait for availability data to load, or select dates manually.');
-        return;
-      }
-      // Start from today
-      const todayISO = toISODate(today);
-      const todayStatus = dateStatusMap.get(todayISO);
-      const isTodayBlocked = todayStatus === 'Blocked' || todayStatus === 'Hold' || blockedSet.has(todayISO);
-      
-      let startFromDate: Date | null = null;
-      
-      // Use today if it's not blocked/hold
-      // Checkout date can be blocked/hold - that's allowed (you're leaving, not staying)
-      if (!isTodayBlocked) {
-        startFromDate = today;
-      }
-      
-      // If today is blocked, find next available date
-      if (!startFromDate) {
-        const nextAvailable = findNextAvailableDate(today);
-        if (!nextAvailable) {
-          setFormError('No available dates found. Please try again later.');
-          return;
-        }
-        startFromDate = nextAvailable;
-      }
-      
-      // Verify dates are within the availability range we fetched
-      if (startFromDate.getTime() < availabilityRange.startDate.getTime() || 
-          addDays(startFromDate, 1).getTime() > availabilityRange.endDate.getTime()) {
-        setFormError('Selected dates are outside the available range. Please select dates manually.');
-        return;
-      }
-      
-      checkinDate = startFromDate;
-      checkoutDate = addDays(startFromDate, 1);
-    } else {
-      checkinDate = dateRange.startDate;
-      checkoutDate = dateRange.endDate;
-    }
-
-    const checkinIst = getIstStartOfDay(checkinDate);
-    const checkoutIst = getIstStartOfDay(checkoutDate);
-    if (checkoutIst.getTime() <= checkinIst.getTime()) {
-      setDateError('Check-out must be after check-in.');
-      return;
-    }
-    const stayNights = calculateNights(checkinIst, checkoutIst);
-    if (stayNights < 1) {
-      setDateError('Check-out must be after check-in.');
-      return;
-    }
-
-    // Final validation: Only check-in date must be available
-    // Checkout date can be blocked/hold - that's allowed (you're leaving, not staying)
-    const checkinISO = toISODate(checkinDate);
-    const checkinStatus = dateStatusMap.get(checkinISO);
-    const isCheckinBlocked = checkinStatus === 'Blocked' || checkinStatus === 'Hold' || blockedSet.has(checkinISO);
-    
-    // Reject if check-in date is blocked or hold
-    if (isCheckinBlocked) {
-      setFormError('Check-in date is not available. Please select a different check-in date.');
-      return;
-    }
-    
-    // Verify dates are within the availability range we fetched
-    if (checkinDate.getTime() < availabilityRange.startDate.getTime() || 
-        checkoutDate.getTime() > availabilityRange.endDate.getTime()) {
-      setFormError('Selected dates are outside the available range. Please select dates manually.');
-      return;
-    }
-
-    let orderUrl: string;
-    try {
-      orderUrl = buildApiUrl('/api/Razorpay/order');
-    } catch {
-      setFormError('Unable to start checkout. Please try again later.');
-      return;
-    }
-
-    const numericListingId = listingId != null ? Number(listingId) : NaN;
-    if (!Number.isFinite(numericListingId)) {
-      setFormError('Property could not be loaded. Please refresh the page and try again.');
-      return;
-    }
-
-    setIsSubmitting(true);
-    setIsLoading(true);
-    setFormError(null);
-    setOrderErrorWasTransportFailure(false);
-    setStatusMessage(null);
-    setPaymentAttemptCount((c) => c + 1);
-    // TASK-1480: start_checkout = user passed validation + clicked submit
-    track('start_checkout', numericListingId);
-    // TASK-1480: enter_contact = contact info filled in (email/name present)
-    if (formData.name.trim() && formData.email.trim()) track('enter_contact', numericListingId);
-
-    try {
-      // 1. Create booking draft
-      // Normalize dates to IST start of day and format as YYYY-MM-DD (not full ISO string)
-      const normalizedCheckin = getIstStartOfDay(checkinDate);
-      const normalizedCheckout = getIstStartOfDay(checkoutDate);
-      
-      const bookingDraft = {
-        listingId: numericListingId,
-        checkinDate: toISODate(normalizedCheckin),  // Format as YYYY-MM-DD
-        checkoutDate: toISODate(normalizedCheckout),  // Format as YYYY-MM-DD
-        guests,
-        notes: formData.notes.trim().slice(0, 500),
-        // TASK-782: guest nationality for Indian police homestay records.
-        guestNationality: (formData.nationality || 'India').slice(0, 50),
-      };
-
-      // 2. Prepare order payload with the exact structure expected by the backend
-      // TASK-171: build selectedAddOns array for bookingDraft
-      const selectedAddOnsList = availableAddOns
-        .filter(ao => (selectedAddOns[ao.addOnServiceId] ?? 0) > 0)
-        .map(ao => ({ addOnServiceId: ao.addOnServiceId, quantity: selectedAddOns[ao.addOnServiceId] }));
-
-      const orderPayload = {
-        bookingDraft: {
-          listingId: bookingDraft.listingId,
-          checkinDate: bookingDraft.checkinDate,
-          checkoutDate: bookingDraft.checkoutDate,
-          guests: bookingDraft.guests,
-          notes: bookingDraft.notes,
-          guestNationality: bookingDraft.guestNationality,
-          selectedAddOns: selectedAddOnsList.length > 0 ? selectedAddOnsList : undefined,
-        },
-        // TASK-1228: final amount is computed server-side from bookingDraft + pricing; do not send client amount.
-        currency: 'INR',
-        referralCode: referralCode.trim() ? referralCode.trim().slice(0, 32) : undefined,
-        promoCode: promoCode.trim() ? promoCode.trim().slice(0, 32) : undefined,
-        guestConsentAccepted: true,
-        guestInfo: {
-          name: formData.name.trim(),
-          email: formData.email.trim(),
-          phone: toGuestPhoneE164(
-            phoneDialCode,
-            clampNationalDigits(formData.phone, getGuestDialOption(phoneDialCode).maxDigits)
-          ),
-          // TASK-1710: DPDP WhatsApp opt-in — only true when guest explicitly checks the box
-          marketingWhatsAppOptIn: whatsappMarketingOptIn,
-        }
-      };
-
-      // 3. Create Razorpay order (idempotency key helps backend detect duplicate submissions)
-      const idempotencyKey = crypto.randomUUID();
-      const orderResponse = await axios.post(orderUrl, orderPayload, {
-        headers: {
-          ...getApiHeaders(),
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Idempotency-Key': idempotencyKey
-        },
-        timeout: 15000
-      });
-
-      const {
-        keyId: key,
-        orderId,
-        bookingId,
-        bookingToken,
-        amount: responseAmount,
-        appliedReferralCode: appliedCode,
-        referralDiscountAmount,
-        referralRewardMessage,
-        appliedPromoCode: promoAppliedCode,
-        promoDiscountAmount,
-        promoMessage: orderPromoMessage,
-      } = orderResponse.data ?? {};
-      if (!key || !orderId || !bookingId) {
-        throw new Error('Checkout could not start: invalid response from payment service. Please try again.');
-      }
-      setAppliedReferralCode(typeof appliedCode === 'string' && appliedCode.trim() ? appliedCode.trim() : null);
-      setAppliedReferralDiscount(Number(referralDiscountAmount) > 0 ? Number(referralDiscountAmount) : 0);
-      setReferralMessage(typeof referralRewardMessage === 'string' && referralRewardMessage.trim() ? referralRewardMessage.trim() : null);
-      setAppliedPromoCode(typeof promoAppliedCode === 'string' && promoAppliedCode.trim() ? promoAppliedCode.trim() : null);
-      setAppliedPromoDiscount(Number(promoDiscountAmount) > 0 ? Number(promoDiscountAmount) : 0);
-      setPromoMessage(typeof orderPromoMessage === 'string' && orderPromoMessage.trim() ? orderPromoMessage.trim() : null);
-
-      // Store pending payment for recovery if user refreshes during modal
-      localStorage.setItem(PENDING_PAYMENT_KEY, orderId);
-
-      // 4. Load Razorpay script and open checkout
-      loadRazorpayScript(() => {
-        try {
-          let paymentCompleted = false; // Track if payment handler was called
-
-          let lastUpiVpaPrefill = '';
-          try {
-            lastUpiVpaPrefill = localStorage.getItem(LAST_UPI_VPA_KEY)?.trim() ?? '';
-          } catch {
-            /* ignore */
-          }
-
-          const handleRazorpayClose = () => {
-            if (paymentCompleted) return;
-            paymentCompleted = true; // Prevent double-reset from ondismiss + close event
-            void abandonPaymentPendingCheckout(bookingId, bookingToken);
-            localStorage.removeItem(PENDING_PAYMENT_KEY);
-            updateBooking({
-              paymentHoldBookingId: null,
-              paymentHoldToken: null,
-              holdExpiresAt: null,
-            });
-            setIsSubmitting(false);
-            setIsLoading(false);
-            setPaymentStatus(null);
-            setRazorpayFailure(null);
-            setFormError('Payment was cancelled. You can try booking again.');
-            toast.info('Payment cancelled. You can try booking again.');
-          };
-
-          const options = {
-            key,
-            amount: orderResponse.data.amount,
-            currency: orderResponse.data.currency,
-            name: getTenantContext()?.displayMerchantName ?? getTenantContext()?.name ?? 'Our Property',
-            description: `Booking for ${listingName || 'selected property'}`,
-            order_id: orderId,
-            prefill: {
-              name: formData.name.trim(),
-              email: formData.email.trim(),
-              contact: toRazorpayContactDigits(
-                phoneDialCode,
-                clampNationalDigits(formData.phone, getGuestDialOption(phoneDialCode).maxDigits)
-              ),
-              method: 'upi',
-              ...(lastUpiVpaPrefill ? { vpa: lastUpiVpaPrefill } : {}),
-            },
-            upi: {
-              flow: 'collect',
-              ...(lastUpiVpaPrefill ? { vpa: lastUpiVpaPrefill } : {}),
-            },
-            config: {
-              display: {
-                blocks: {
-                  upi_collect: {
-                    name: 'Pay using UPI ID',
-                    instruments: [{ method: 'upi', flows: ['collect'] }],
-                  },
-                },
-                sequence: ['block.upi_collect', 'block.card', 'block.netbanking', 'block.wallet'],
-                preferences: { show_default_blocks: true },
-              },
-            },
-            theme: {
-              color: '#2563eb'
-            },
-            modal: {
-              ondismiss: handleRazorpayClose
-            },
-            handler: async (response: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => {
-              paymentCompleted = true; // Mark payment as completed
-              localStorage.removeItem(PENDING_PAYMENT_KEY);
-              try {
-                await verifyPayment({
-                  bookingId,
-                  razorpay_payment_id: response.razorpay_payment_id,
-                  razorpay_order_id: response.razorpay_order_id,
-                  razorpay_signature: response.razorpay_signature
-                });
-                
-                // Store booking details for success popup
-                const nights = checkinDate && checkoutDate 
-                  ? calculateNights(checkinDate, checkoutDate) 
-                  : 1;
-                
-                setBookingDetails({
-                  bookingId,
-                  bookingToken: bookingToken ?? undefined,
-                  amount: Number(responseAmount) > 0 ? Number(responseAmount) : Math.max(1, finalTotal),
-                  propertyName: listingName || 'Selected Property',
-                  checkIn: checkinDate,
-                  checkOut: checkoutDate,
-                  nights,
-                  email: formData.email.trim(),
-                  referralCode: typeof appliedCode === 'string' ? appliedCode : undefined,
-                  referralDiscountAmount: Number(referralDiscountAmount) > 0 ? Number(referralDiscountAmount) : 0,
-                  promoCode: typeof promoAppliedCode === 'string' ? promoAppliedCode : undefined,
-                  promoDiscountAmount: Number(promoDiscountAmount) > 0 ? Number(promoDiscountAmount) : 0,
-                });
-                
-                // Set payment status to success to show popup
-                setPaymentStatus('success');
-
-                // TASK-1709: store guest email/name so toggleFavorite can sync saved listings.
-                try {
-                  localStorage.setItem("atlas_guest_email", formData.email.trim());
-                  if (formData.name.trim()) localStorage.setItem("atlas_guest_name", formData.name.trim());
-                } catch { /* ignore quota / private mode */ }
-                
-                // Update booking context on success
-                updateBooking({
-                  propertyId: propertyId ?? undefined,
-                  propertyName: listingName ?? undefined,
-                  checkIn: checkinDate.toISOString(),
-                  checkOut: checkoutDate.toISOString(),
-                  guests,
-                  paymentHoldBookingId: null,
-                  paymentHoldToken: null,
-                  holdExpiresAt: null,
-                });
-              } catch (error) {
-                console.error('Payment processing error:', error);
-                setPaymentStatus('failed');
-                setFormError(getBookingErrorMessage(error, 'verify'));
-                updateBooking({
-                  paymentHoldBookingId: null,
-                  paymentHoldToken: null,
-                  holdExpiresAt: null,
-                });
-                if (isNetworkError(error)) toast.error(NETWORK_ERROR_MESSAGE);
-              } finally {
-                setIsSubmitting(false);
-                setIsLoading(false);
-              }
-            }
-          };
-
-          const rzp = new window.Razorpay(options);
-          rzp.on('payment.failed', (response: { error?: { code?: string; description?: string } }) => {
-            paymentCompleted = true; // Payment attempt was made
-            void abandonPaymentPendingCheckout(bookingId, bookingToken);
-            localStorage.removeItem(PENDING_PAYMENT_KEY);
-            updateBooking({
-              paymentHoldBookingId: null,
-              paymentHoldToken: null,
-              holdExpiresAt: null,
-            });
-            const code = String(response?.error?.code ?? '');
-            const description = String(response?.error?.description ?? '');
-            setRazorpayFailure({ code, description });
-            setPaymentStatus('failed');
-            setFormError(mapRazorpayFailureCode(code, description));
-            setIsSubmitting(false);
-            setIsLoading(false);
-          });
-          // Fallback for modal close (ondismiss may not fire in all scenarios)
-          rzp.on('close', handleRazorpayClose);
-
-          // TASK-1480: payment_init = Razorpay modal is about to open
-          track('payment_init', numericListingId);
-          updateBooking({
-            paymentHoldBookingId: Number(bookingId),
-            paymentHoldToken: typeof bookingToken === 'string' && bookingToken.trim() ? bookingToken.trim() : null,
-            holdExpiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
-          });
-          rzp.open();
-        } catch (error) {
-          console.error('Error initializing Razorpay:', error);
-          localStorage.removeItem(PENDING_PAYMENT_KEY);
-          updateBooking({
-            paymentHoldBookingId: null,
-            paymentHoldToken: null,
-            holdExpiresAt: null,
-          });
-          setOrderErrorWasTransportFailure(true);
-          setFormError(NETWORK_ERROR_MESSAGE);
-          setIsSubmitting(false);
-          setIsLoading(false);
-          toast.error(NETWORK_ERROR_MESSAGE);
-        }
-      });
-    } catch (error: unknown) {
-      console.error('Booking error:', error);
-      localStorage.removeItem(PENDING_PAYMENT_KEY);
-      const status = (error as { response?: { status?: number } })?.response?.status;
-      const data = (error as { response?: { data?: { code?: string; Code?: string } } })?.response?.data;
-      const code =
-        (typeof data?.code === 'string' ? data.code : typeof data?.Code === 'string' ? data.Code : '') || '';
-      if (status === 503 && code === 'PAYMENT_PROVIDER_NOT_CONFIGURED_PLATFORM') {
-        setOrderErrorWasTransportFailure(false);
-        setProviderBlocked(true);
-        setIsSubmitting(false);
-        setIsLoading(false);
-        return;
-      }
-      const transport = isTransportLayerFailure(error);
-      setOrderErrorWasTransportFailure(transport);
-      const msg = getOrderCreationGuestErrorMessage(error, getBookingErrorMessage(error, 'order'));
-      setFormError(msg);
-      setIsSubmitting(false);
-      setIsLoading(false);
-      if (transport) {
-        toast.error(NETWORK_ERROR_MESSAGE);
-      }
-    }
-  };
-
-  const closePaymentPopup = useCallback(() => {
-    setPaymentStatus(null);
-    setRazorpayFailure(null);
-  }, []);
-
-  const handleRetryPayment = useCallback(() => {
-    setPaymentStatus(null);
-    setRazorpayFailure(null);
-    setFormError(null);
-    setOrderErrorWasTransportFailure(false);
-    setIsSubmitting(false);
-    setIsLoading(false);
-  }, []);
-
-  // Reset attempt count on successful payment
-  const prevPaymentStatus = useRef<'success' | 'failed' | null>(null);
-  useEffect(() => {
-    if (prevPaymentStatus.current !== 'success' && paymentStatus === 'success') {
-      setPaymentAttemptCount(0);
-    }
-    prevPaymentStatus.current = paymentStatus;
-  }, [paymentStatus]);
-
-  const goToDashboard = useCallback(() => {
-    closePaymentPopup();
-    if (bookingDetails?.bookingId && bookingDetails.bookingToken) {
-      navigate(`/booking/${bookingDetails.bookingId}?t=${encodeURIComponent(bookingDetails.bookingToken)}`, { replace: true });
-    } else {
-      navigate('/', { replace: true });
-    }
-  }, [navigate, closePaymentPopup, bookingDetails]);
-
-  // Auto-close timers in parent so they are not reset by inner component re-mounts
-  useEffect(() => {
-    if (paymentStatus === 'failed') {
-      // TASK-1469: keep failure dialog until the guest dismisses or retries (no auto-dismiss).
-      return undefined;
-    }
-    if (paymentStatus === 'success') {
-      const t = window.setTimeout(() => setPaymentStatus(null), 6000);
-      return () => window.clearTimeout(t);
-    }
-  }, [paymentStatus]);
-
-  // Payment Success Popup Component
-  const PaymentSuccessPopup = () => {
-    if (!bookingDetails) return null;
-
-    // eslint-disable-next-line react-hooks/rules-of-hooks -- PaymentSuccessPopup only mounts when bookingDetails exists; hook runs in same order when mounted
-    useEffect(() => {
-      const handleEscape = (e: KeyboardEvent) => {
-        if (e.key === 'Escape') closePaymentPopup();
-      };
-      document.addEventListener('keydown', handleEscape);
-      return () => document.removeEventListener('keydown', handleEscape);
-      // closePaymentPopup is a stable useCallback from the outer component; outer-scope values
-      // are not valid deps for inner component useEffect (react-hooks/exhaustive-deps).
-    }, []);
-
-
-    return (
-      <div 
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
-        onClick={(e) => {
-          if (e.target === e.currentTarget) closePaymentPopup();
-        }}
-      >
-        <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full mx-4 flex flex-col animate-in zoom-in-95 duration-200 relative">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setPaymentStatus(null);
-            }}
-            className="absolute top-4 right-4 z-[60] p-1.5 rounded-full text-gray-500 hover:text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-300 transition-colors"
-            aria-label="Close"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-          <div className="p-10">
-            {/* Header with Success Icon */}
-            <div className="flex flex-col items-center mb-6">
-              <div className="w-16 h-16 rounded-full bg-green-500 flex items-center justify-center mb-4 shadow-md">
-                <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Payment Successful!</h2>
-            </div>
-
-            {/* Primary Message */}
-            <p className="text-center text-gray-700 mb-6">
-              Thank you for your booking. Your payment has been processed successfully.
-            </p>
-
-            {/* Booking Details Section */}
-            <div className="bg-gray-100 rounded-xl p-6 mb-6 space-y-4 border border-gray-200">
-              <h3 className="font-bold text-gray-900 text-lg">Booking Details</h3>
-              <div className="space-y-4">
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs uppercase tracking-wider text-gray-500 font-medium">Booking Reference</span>
-                  <p className="text-base font-semibold text-gray-900 break-all">{bookingDetails.bookingId}</p>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs uppercase tracking-wider text-gray-500 font-medium">Amount Paid</span>
-                  <p className="text-lg font-bold text-gray-900">
-                    {displayPrice(bookingDetails.amount)}
-                  </p>
-                </div>
-                {bookingDetails.referralDiscountAmount && bookingDetails.referralDiscountAmount > 0 && (
-                  <div className="flex flex-col gap-1">
-                    <span className="text-xs uppercase tracking-wider text-gray-500 font-medium">Referral Reward</span>
-                    <p className="text-base font-semibold text-green-700">
-                      {bookingDetails.referralCode ? `${bookingDetails.referralCode} applied` : 'Applied'} — saved {displayPrice(bookingDetails.referralDiscountAmount)}
-                    </p>
-                  </div>
-                )}
-                {/* TASK-2558: removed duplicate Referral Reward block that was here */}
-                {bookingDetails.promoDiscountAmount && bookingDetails.promoDiscountAmount > 0 && (
-                  <div className="flex flex-col gap-1">
-                    <span className="text-xs uppercase tracking-wider text-gray-500 font-medium">Promo Discount</span>
-                    <p className="text-base font-semibold text-green-700">
-                      {bookingDetails.promoCode ? `${bookingDetails.promoCode} applied` : 'Applied'} — saved {displayPrice(bookingDetails.promoDiscountAmount)}
-                    </p>
-                  </div>
-                )}
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs uppercase tracking-wider text-gray-500 font-medium">Property</span>
-                  <p className="text-base font-semibold text-gray-900">{bookingDetails.propertyName}</p>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex flex-col gap-1">
-                    <span className="text-xs uppercase tracking-wider text-gray-500 font-medium">Check-in</span>
-                    <p className="text-base font-semibold text-gray-900">
-                      {formatHumanDate(bookingDetails.checkIn, {
-                        locale: 'en-IN',
-                        fallback: '—',
-                        options: { day: '2-digit', month: 'short', year: 'numeric' },
-                      })}
-                    </p>
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <span className="text-xs uppercase tracking-wider text-gray-500 font-medium">Check-out</span>
-                    <p className="text-base font-semibold text-gray-900">
-                      {formatHumanDate(bookingDetails.checkOut, {
-                        locale: 'en-IN',
-                        fallback: '—',
-                        options: { day: '2-digit', month: 'short', year: 'numeric' },
-                      })}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs uppercase tracking-wider text-gray-500 font-medium">Duration</span>
-                  <p className="text-base font-semibold text-gray-900">{bookingDetails.nights} {bookingDetails.nights === 1 ? 'night' : 'nights'}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Confirmation Email Message */}
-            <p className="text-center text-gray-700 mb-4">
-              A confirmation email has been sent to <span className="font-semibold">{bookingDetails.email}</span> with your booking details and house rules.
-            </p>
-
-            {/* Secondary Message */}
-            <p className="text-center text-gray-600 mb-6">
-              Your booking is confirmed. You will receive check-in instructions 24 hours before arrival.
-            </p>
-          </div>
-
-          {/* Fixed Bottom Section */}
-          <div className="px-10 pb-10 pt-4 border-t border-gray-200 bg-white rounded-b-2xl">
-            {/* Buttons */}
-            <div className="flex justify-center mb-4">
-              <Button
-                type="button"
-                onClick={goToDashboard}
-                className="px-10 py-3 text-lg font-semibold bg-green-600 hover:bg-green-700 text-white shadow-lg"
-              >
-                View My Booking
-              </Button>
-            </div>
-
-            {/* Footer Note — TASK-2570: tappable tel:/mailto: links matching PaymentFailedPopup */}
-            <p className="text-center text-xs text-gray-500">
-              Need help? Contact us at{' '}
-              <a href="tel:+917032493290" className="underline underline-offset-1">+91-7032493290</a>
-              {' '}or{' '}
-              <a href="mailto:atlashomeskphb@gmail.com" className="underline underline-offset-1">atlashomeskphb@gmail.com</a>
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // Payment Failed Popup Component
-  const PaymentFailedPopup = () => {
-    useEffect(() => {
-      const handleEscape = (e: KeyboardEvent) => {
-        if (e.key === 'Escape') handleRetryPayment();
-      };
-      document.addEventListener('keydown', handleEscape);
-      return () => document.removeEventListener('keydown', handleEscape);
-      // handleRetryPayment is a stable useCallback from the outer component; outer-scope values
-      // are not valid deps for inner component useEffect (react-hooks/exhaustive-deps).
-    }, []);
-
-    return (
-      <div 
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
-        onClick={(e) => {
-          if (e.target === e.currentTarget) handleRetryPayment();
-        }}
-      >
-        <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full mx-4 max-h-[70vh] overflow-hidden animate-in zoom-in-95 duration-200 relative">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              handleRetryPayment();
-            }}
-            className="absolute top-4 right-4 z-[60] p-1.5 rounded-full text-gray-500 hover:text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-300 transition-colors"
-            aria-label="Close"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-          <div className="p-8">
-            {/* Header with Error Icon */}
-            <div className="flex flex-col items-center mb-6">
-              <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mb-4">
-                <svg className="w-10 h-10 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Payment Could Not Be Processed</h2>
-            </div>
-
-            {/* Primary Message (TASK-1469: Razorpay code → friendly copy) */}
-            <p className="text-center text-gray-700 mb-6">
-              {mapRazorpayFailureCode(razorpayFailure?.code, razorpayFailure?.description)}
-            </p>
-
-            {/* Possible Reasons Section */}
-            <div className="bg-gray-50 rounded-xl p-6 mb-6">
-              <h3 className="font-semibold text-gray-900 mb-3">This might happen due to:</h3>
-              <ul className="list-disc list-inside space-y-2 text-sm text-gray-700">
-                <li>Insufficient funds</li>
-                <li>Incorrect payment details</li>
-                <li>Network issue</li>
-                <li>Card declined</li>
-                <li>Payment timeout</li>
-              </ul>
-            </div>
-
-            {/* Refund Message */}
-            <p className="text-center text-gray-600 mb-4">
-              If an amount was deducted from your account, it will be refunded to your original payment method within 3-5 business days.
-            </p>
-
-            {/* Support Message */}
-            <p className="text-center text-gray-700 mb-6 font-medium">
-              Persistent issues? Our team is here to help.
-            </p>
-
-            {/* Support Message */}
-            <div className="text-center text-xs text-gray-500 mb-6">
-              {hostWhatsAppDigits ? (
-                <a
-                  href={`https://wa.me/${hostWhatsAppDigits}?text=${encodeURIComponent(
-                    `Hi, I need help completing payment for ${listingName || 'this booking'}.`
-                  )}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center rounded-lg border border-[#25D366] px-3 py-2 text-sm font-medium text-[#1a9e4f] hover:bg-[#f0fdf4]"
-                >
-                  Contact host on WhatsApp
-                </a>
-              ) : (
-                // TASK-2067: actionable fallback when host phone unknown
-                <div className="flex flex-col gap-2">
-                  <a
-                    href="tel:+917032493290"
-                    className="inline-flex items-center justify-center rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                  >
-                    📞 Call +91 7032 493 290
-                  </a>
-                  <a
-                    href="mailto:atlashomeskphb@gmail.com"
-                    className="inline-flex items-center justify-center rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                  >
-                    ✉️ Email support
-                  </a>
-                </div>
-              )}
-            </div>
-
-            {/* Try Again Button */}
-            <div className="flex justify-center">
-              <Button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleRetryPayment();
-                }}
-                className="px-8 py-3 text-base font-semibold bg-[var(--cta-primary)] hover:bg-[var(--cta-primary)]/90 text-white rounded-xl"
-              >
-                Try Again
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   if (providerBlocked) {
     return (
       <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-8 text-center space-y-3" data-testid="provider-blocked-banner">
@@ -1962,10 +1048,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   }
 
   return (
+    // TASK-2612: fragment wrapper intentional — avoids extra DOM nesting
     <>
-      {paymentStatus === 'success' && <PaymentSuccessPopup />}
-      {paymentStatus === 'failed' && <PaymentFailedPopup />}
-      <form id="booking-form" onSubmit={handleSubmit} className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6 space-y-5" role="region" aria-label="Booking and availability" data-testid="guest-booking-form">
+      <form id="booking-form" onSubmit={handleReserve} className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6 space-y-5" role="region" aria-label="Booking and availability" data-testid="guest-booking-form">
 
       {displayCoverUrl && (
         <div className="overflow-hidden rounded-xl border border-border-subtle -mt-1 mb-1">
@@ -1982,10 +1067,29 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         <FomoBar listingId={Number(listingId)} />
       )}
 
-      <div className="space-y-1">
-        <p className="text-sm uppercase tracking-[0.12em] text-text-muted font-semibold">Reserve</p>
-        {listingName && <h3 className="text-xl sm:text-2xl font-semibold text-text-primary">{listingName}</h3>}
-        <p className="text-text-secondary text-sm">Choose your dates to confirm availability for this apartment.</p>
+      {/* TASK-2623: .bw-head — "From ₹X / night · ⭐ rating · review count" */}
+      <div className="bw-head" data-testid="bw-header">
+        <div className="bw-price-block">
+          <span className="bw-from">From</span>
+          <span className="bw-amount" data-testid="bw-per-night-price">
+            {effectiveDailyPricing != null
+              ? formatCurrency(effectiveDailyPricing.actualPrice, { maximumFractionDigits: 0 })
+              : perNightForDisplay > 0
+                ? formatCurrency(perNightForDisplay, { maximumFractionDigits: 0 })
+                : '—'}
+          </span>
+          <span className="bw-per">/ night</span>
+        </div>
+        {reviewCount != null && reviewCount > 0 && reviewRating != null && (
+          <div className="bw-rating" data-testid="bw-rating-block">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="#c2410c" aria-hidden="true">
+              <path d="M12 2l2.9 6.9 7.1.6-5.4 4.7 1.6 7.3-6.2-3.8-6.2 3.8 1.6-7.3L2 9.5l7.1-.6L12 2z"/>
+            </svg>
+            <span className="bw-rating-num">{reviewRating.toFixed(2)}</span>
+            <span className="bw-rating-sep" aria-hidden="true">·</span>
+            <span className="bw-rating-link">{reviewCount} {reviewCount === 1 ? 'review' : 'reviews'}</span>
+          </div>
+        )}
       </div>
       {isBookingDisabled && (
         <ErrorBanner className="mt-2" message="Service temporarily unavailable. Booking will return soon." />
@@ -2109,11 +1213,14 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           <button
             id="unit-booking-dates"
             ref={calendarButtonRef}
+            type="button"
             className="w-full rounded-xl border border-border-strong bg-bg-muted px-4 py-3 text-left text-text-primary hover:border-cta-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary"
             aria-label="Click to select check-in date, then choose from calendar"
             title="Click to select check-in date, then choose from calendar"
             disabled={isBookingDisabled}
-            onClick={() => {
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
               if (isBookingDisabled) return;
               setOpenCalendar(true);
             }}
@@ -2214,14 +1321,21 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         <div className="bw-breakdown">
           <div className="bw-breakdown-title">Price breakdown</div>
 
-          <div className="bw-bd-row">
-            <span className="bw-bd-label">Room fare</span>
+          <div className="bw-bd-row" data-testid="bw-bd-subtotal-row price-line-base">
+            <span className="bw-bd-label">
+              {hasSelectedRange && priceDetails.nights > 0 && perNightForDisplay > 0
+                ? `${displayPrice(perNightForDisplay)} × ${priceDetails.nights} ${priceDetails.nights === 1 ? 'night' : 'nights'}`
+                : 'Subtotal'}
+            </span>
             <span className="bw-bd-value">{displayPrice(breakdownPrice)}</span>
           </div>
 
           {gstSlabPercent != null && breakdownPrice > 0 && gstLineAmount > 0 && (
-            <div className="bw-bd-row">
-              <span className="bw-bd-label">GST {gstSlabPercent}%</span>
+            <div className="bw-bd-row" data-testid="bw-bd-gst-row">
+              <span className="bw-bd-label">
+                <span>GST {gstSlabPercent}% on accommodation</span>
+                <span className="bw-bd-sublabel" style={{ display: 'block', fontSize: 11, color: 'var(--text-muted, #475569)', fontWeight: 400, textDecoration: 'none' }}>On accommodation only</span>
+              </span>
               <span className="bw-bd-value">{displayPrice(gstLineAmount)}</span>
             </div>
           )}
@@ -2257,13 +1371,13 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             </>
           )}
 
-          <div className="bw-bd-row">
+          <div className="bw-bd-row" data-testid="bw-bd-service-fee-row">
             <span className="bw-bd-label" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-              Convenience fee{convenienceFeePctLabel > 0 ? ` (${convenienceFeePctLabel}%)` : ''}
+              Service fee{convenienceFeePctLabel > 0 ? ` (${convenienceFeePctLabel}%)` : ''}
               <HelpCircle
                 className="h-3 w-3 cursor-help text-text-muted"
-                aria-label="Includes payment-gateway and platform handling charges. Razorpay charges this directly."
-                title="Includes payment-gateway and platform handling charges. Razorpay charges this directly."
+                aria-label="Includes payment-gateway and platform handling charges."
+                title="Includes payment-gateway and platform handling charges."
               />
             </span>
             <span className="bw-bd-value">{displayPrice(breakdownConvenienceFee)}</span>
@@ -2295,59 +1409,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             <span className="bw-bd-value">{displayPrice(Math.max(1, finalTotal))}</span>
           </div>
 
-          {referralMessage && (
-            <p className="bw-bd-note" style={{ color: '#15803d' }}>
-              {referralMessage}{appliedReferralCode ? ` (${appliedReferralCode})` : ''}
-            </p>
-          )}
           <p className="bw-bd-note">Pay securely via Razorpay.</p>
         </div>
 
       </div>
 
-      {/* TASK-171: add-on services selection */}
-      {availableAddOns.length > 0 && (
-        <div className="rounded-xl border border-border-subtle bg-bg-muted/40 p-4 space-y-3">
-          <p className="text-sm font-semibold text-text-primary">Add-on services</p>
-          {availableAddOns.map(ao => {
-            const qty = selectedAddOns[ao.addOnServiceId] ?? 0;
-            return (
-              <div key={ao.addOnServiceId} className="flex items-center justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-text-primary truncate">{ao.name}</p>
-                  {ao.description && <p className="text-xs text-text-muted truncate">{ao.description}</p>}
-                  <p className="text-xs text-text-secondary">{displayPrice(ao.price)} / {ao.priceType.replace('_', ' ')}</p>
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  {qty > 0 && (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedAddOns(prev => ({ ...prev, [ao.addOnServiceId]: Math.max(0, (prev[ao.addOnServiceId] ?? 0) - 1) }))}
-                        className="w-11 h-11 rounded-full border border-border-strong text-text-primary flex items-center justify-center text-base leading-none"
-                        aria-label={`Remove one ${ao.name}`}
-                      >−</button>
-                      <span className="text-sm font-medium w-4 text-center">{qty}</span>
-                    </>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setSelectedAddOns(prev => ({ ...prev, [ao.addOnServiceId]: (prev[ao.addOnServiceId] ?? 0) + 1 }))}
-                    className="w-11 h-11 rounded-full border border-border-strong text-text-primary flex items-center justify-center text-base leading-none"
-                    aria-label={`Add ${ao.name}`}
-                  >+</button>
-                </div>
-              </div>
-            );
-          })}
-          {addOnsTotal > 0 && (
-            <div className="pt-2 border-t border-border-subtle grid grid-cols-[120px_12px_1fr] text-sm text-text-secondary">
-              <span>Add-ons</span><span>:</span>
-              <span className="text-right">{displayPrice(addOnsTotal)}</span>
-            </div>
-          )}
-        </div>
-      )}
+      {/* TASK-2612: Add-ons moved to GuestDetailsPage */}
 
       {dateError && (
         <p role="alert" data-testid="guest-booking-date-error" className="text-sm text-support-error">
@@ -2355,298 +1422,18 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         </p>
       )}
       {statusMessage && <p className="text-sm text-text-secondary">{statusMessage}</p>}
-      <div className="space-y-4">
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-text-primary" htmlFor="name">
-            Full Name *
-          </label>
-          <input
-            type="text"
-            id="name"
-            name="name"
-            value={formData.name}
-            onChange={handleInputChange}
-            disabled={isBookingDisabled}
-            className={`w-full rounded-xl border ${formErrors.name ? 'border-support-error' : 'border-border-strong'} bg-bg-muted px-4 py-3 text-text-primary focus:outline-none focus:ring-2 focus:ring-cta-primary`}
-            placeholder="Enter your full name"
-            data-testid="guest-booking-name"
-          />
-          {formErrors.name && (
-            <p className="text-sm text-support-error" role="alert">
-              {formErrors.name}
-            </p>
-          )}
-        </div>
 
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-text-primary" htmlFor="email">
-            Email *
-          </label>
-          <input
-            type="email"
-            id="email"
-            name="email"
-            value={formData.email}
-            onChange={handleInputChange}
-            disabled={isBookingDisabled}
-            className={`w-full rounded-xl border ${formErrors.email ? 'border-support-error' : 'border-border-strong'} bg-bg-muted px-4 py-3 text-text-primary focus:outline-none focus:ring-2 focus:ring-cta-primary`}
-            placeholder="Enter your email"
-            data-testid="guest-booking-email"
-          />
-          {formErrors.email && (
-            <p className="text-sm text-support-error" role="alert">
-              {formErrors.email}
-            </p>
-          )}
-        </div>
-
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-text-primary" htmlFor="phone">
-            Phone Number *
-          </label>
-          <div
-            className={`flex min-h-[52px] items-stretch overflow-hidden rounded-xl border ${formErrors.phone ? 'border-support-error' : 'border-border-strong'} bg-bg-muted`}
-          >
-            <select
-              id="phone-country"
-              aria-label="Country calling code"
-              value={phoneDialCode}
-              onChange={(e) => setPhoneDialCode(e.target.value)}
-              disabled={isBookingDisabled}
-              className="shrink-0 max-w-[10.5rem] border-0 border-r border-border-strong bg-transparent py-3 pl-2 pr-1 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-inset focus:ring-cta-primary"
-              data-testid="guest-booking-phone-dial"
-            >
-              {GUEST_DIAL_OPTIONS.map((o) => (
-                <option key={o.code} value={o.code}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-            <input
-              type="tel"
-              id="phone"
-              name="phone"
-              inputMode="numeric"
-              autoComplete="tel-national"
-              value={formData.phone}
-              onChange={handleInputChange}
-              disabled={isBookingDisabled}
-              className="min-w-0 flex-1 bg-transparent px-3 py-3 text-text-primary focus:outline-none"
-              placeholder={getGuestDialOption(phoneDialCode).placeholder}
-              maxLength={getGuestDialOption(phoneDialCode).maxDigits}
-              data-testid="guest-booking-phone"
-            />
-          </div>
-          <p className="text-xs text-text-muted">{getGuestDialOption(phoneDialCode).hint}</p>
-          {formErrors.phone && (
-            <p className="text-sm text-support-error" role="alert">
-              {formErrors.phone}
-            </p>
-          )}
-        </div>
-
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-text-primary" htmlFor="referral-code">
-            Referral code <span className="text-text-muted font-normal">(optional)</span>
-          </label>
-          <input
-            type="text"
-            id="referral-code"
-            name="referralCode"
-            value={referralCode}
-            onChange={(e) => {
-              const next = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 32);
-              setReferralCode(next);
-              setReferralMessage(null);
-              setAppliedReferralCode(null);
-              if (next) window.localStorage.setItem('atlas_guest_referral_code', next);
-              else window.localStorage.removeItem('atlas_guest_referral_code');
-            }}
-            onBlur={handleReferralBlur}
-            disabled={isBookingDisabled || isSubmitting || isLoading}
-            className="w-full rounded-xl border border-border-strong bg-bg-muted px-4 py-3 text-text-primary focus:outline-none focus:ring-2 focus:ring-cta-primary"
-            placeholder="Enter referral code for first-booking rewards"
-            data-testid="guest-booking-referral"
-          />
-          {/* TASK-2559: inline validation feedback mirroring promo-code pattern */}
-          {referralValidating && <p className="text-xs text-text-muted">Validating…</p>}
-          {!referralValidating && referralMessage && (
-            <p className={`text-xs ${appliedReferralCode ? 'text-green-700' : 'text-support-error'}`}>
-              {appliedReferralCode ? '✓ ' : '✗ '}{referralMessage}
-            </p>
-          )}
-          {!referralValidating && !referralMessage && (
-            <p className="text-xs text-text-muted">First booking reward: 5% off up to ₹1,500.</p>
-          )}
-        </div>
-
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-text-primary" htmlFor="promo-code">
-            Promo code <span className="text-text-muted font-normal">(optional)</span>
-          </label>
-          <input
-            type="text"
-            id="promo-code"
-            name="promoCode"
-            value={promoCode}
-            onChange={(e) => { setPromoCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 32)); setPromoMessage(null); setAppliedPromoCode(null); }}
-            onBlur={handlePromoBlur}
-            disabled={isBookingDisabled || isSubmitting || isLoading}
-            className="w-full rounded-xl border border-border-strong bg-bg-muted px-4 py-3 text-text-primary focus:outline-none focus:ring-2 focus:ring-cta-primary"
-            placeholder="Enter promo code"
-            data-testid="guest-booking-promo"
-          />
-          {promoValidating && <p className="text-xs text-text-muted">Validating…</p>}
-          {!promoValidating && promoMessage && (
-            <p className={`text-xs ${appliedPromoCode ? 'text-green-700' : 'text-support-error'}`}>
-              {appliedPromoCode ? '✓ ' : '✗ '}{promoMessage}
-            </p>
-          )}
-        </div>
-
-        {/* TASK-782: Guest nationality for Indian police homestay reporting. India is pre-selected; Other is free-text via Notes. */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-text-primary" htmlFor="booking-nationality">
-            Nationality <span className="text-text-muted font-normal">(required)</span>
-          </label>
-          <select
-            id="booking-nationality"
-            name="nationality"
-            value={formData.nationality}
-            onChange={handleInputChange}
-            disabled={isBookingDisabled}
-            className="w-full rounded-xl border border-border-strong bg-bg-muted px-4 py-3 text-text-primary focus:outline-none focus:ring-2 focus:ring-cta-primary"
-            data-testid="guest-booking-nationality"
-          >
-            <option value="India">India</option>
-            <option value="Australia">Australia</option>
-            <option value="Bangladesh">Bangladesh</option>
-            <option value="Bhutan">Bhutan</option>
-            <option value="Canada">Canada</option>
-            <option value="China">China</option>
-            <option value="France">France</option>
-            <option value="Germany">Germany</option>
-            <option value="Indonesia">Indonesia</option>
-            <option value="Japan">Japan</option>
-            <option value="Malaysia">Malaysia</option>
-            <option value="Maldives">Maldives</option>
-            <option value="Nepal">Nepal</option>
-            <option value="Pakistan">Pakistan</option>
-            <option value="Philippines">Philippines</option>
-            <option value="Singapore">Singapore</option>
-            <option value="South Korea">South Korea</option>
-            <option value="Sri Lanka">Sri Lanka</option>
-            <option value="Thailand">Thailand</option>
-            <option value="UAE">UAE</option>
-            <option value="UK">UK</option>
-            <option value="USA">USA</option>
-            <option value="Vietnam">Vietnam</option>
-            <option value="Other">Other</option>
-          </select>
-          <p className="text-xs text-text-muted">Required by Indian police homestay guest-record rules.</p>
-        </div>
-
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-text-primary" htmlFor="booking-notes">
-            Special requests <span className="text-text-muted font-normal">(optional)</span>
-          </label>
-          <textarea
-            id="booking-notes"
-            name="notes"
-            rows={3}
-            value={formData.notes}
-            onChange={handleInputChange}
-            disabled={isBookingDisabled}
-            maxLength={500}
-            placeholder="e.g. late check-in, dietary needs, celebration setup"
-            className="w-full rounded-xl border border-border-strong bg-bg-muted px-4 py-3 text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-cta-primary resize-y min-h-[88px]"
-            data-testid="guest-booking-notes"
-          />
-          <p className="text-xs text-text-muted">{formData.notes.length}/500</p>
-        </div>
-
-        <div className="space-y-2 rounded-xl border border-border-subtle bg-bg-muted/40 px-4 py-3">
-          <label className="flex items-start gap-3 cursor-pointer text-sm text-text-primary">
-            <input
-              type="checkbox"
-              name="guestConsent"
-              checked={guestConsentAccepted}
-              onChange={(e) => {
-                setGuestConsentAccepted(e.target.checked);
-                if (e.target.checked) setConsentError('');
-              }}
-              disabled={isBookingDisabled}
-              required
-              className="mt-1 h-4 w-4 shrink-0 rounded border-border-strong text-cta-primary focus:ring-cta-primary"
-              data-testid="guest-booking-consent"
-              aria-invalid={Boolean(consentError)}
-            />
-            <span>
-              I agree to {getGuestDataProcessingEntityName()} processing my data for this booking —{' '}
-              <Link to="/privacy" className="text-cta-primary underline underline-offset-2 hover:opacity-90">
-                see Privacy Policy
-              </Link>
-              .{' '}
-              <details className="inline">
-                <summary className="cursor-pointer text-cta-primary underline underline-offset-2 text-xs">Show details</summary>
-                <span className="text-xs text-text-muted block mt-1">{guestDataConsentLabel()}</span>
-              </details>
-            </span>
-          </label>
-          {consentError ? (
-            <p className="text-sm text-support-error" role="alert">
-              {consentError}
-            </p>
-          ) : null}
-          {/* TASK-1710: DPDP-compliant WhatsApp marketing opt-in — unchecked by default */}
-          <label className="flex items-start gap-3 cursor-pointer text-sm text-text-muted mt-2">
-            <input
-              type="checkbox"
-              name="whatsappMarketingOptIn"
-              checked={whatsappMarketingOptIn}
-              onChange={(e) => setWhatsappMarketingOptIn(e.target.checked)}
-              disabled={isBookingDisabled}
-              className="mt-1 h-4 w-4 shrink-0 rounded border-border-strong text-cta-primary focus:ring-cta-primary"
-              aria-label="Send me deals and exclusive offers on WhatsApp (optional)"
-            />
-            <span>Send me exclusive deals and offers on WhatsApp <em className="not-italic text-text-muted">(optional)</em></span>
-          </label>
-        </div>
-      </div>
+      {/* TASK-2612: Guest form fields moved to GuestDetailsPage */}
 
       {formError && (
-        <div className="space-y-1">
-          <p className="text-sm text-support-error" role="alert">
-            {formError}
-          </p>
-          {paymentAttemptCount > 0 && orderErrorWasTransportFailure && (
-            <p className="text-xs text-text-muted">Attempt {Math.min(paymentAttemptCount, 3)} of 3 — Click &quot;Book this home&quot; to retry</p>
-          )}
-        </div>
+        <p className="text-sm text-support-error" role="alert">
+          {formError}
+        </p>
       )}
 
-      {!isBookingDisabled && !isWhatsAppDirectBooking && (
-        <div className="flex items-center gap-2 flex-wrap justify-center py-1">
-          <img src="/icons/upi.svg" alt="UPI" className="h-5" loading="lazy" decoding="async" />
-          <img src="/icons/visa.svg" alt="Visa" className="h-4" loading="lazy" decoding="async" />
-          <img src="/icons/rupay.svg" alt="RuPay" className="h-4" loading="lazy" decoding="async" />
-          <span className="text-xs text-text-muted">Secured by Razorpay · UPI / Visa / RuPay</span>
-        </div>
-      )}
-      {!isBookingDisabled && isWhatsAppDirectBooking && (
-        <div className="flex items-center gap-2 flex-wrap justify-center py-1">
-          <span className="text-xs text-text-muted">
-            {hasOnlinePaymentProvider
-              ? 'Continue on WhatsApp for host confirmation, or use Book now to pay securely online.'
-              : 'Tap Continue on WhatsApp — your host will confirm availability and payment.'}
-          </span>
-        </div>
-      )}
-
-      {/* TASK-2565: value reflects actual booking mode — whatsapp only for WhatsApp path */}
+      {/* TASK-2612/2623: Reserve button — init-hold mode, navigates to GuestDetailsPage */}
       <Button
         type="submit"
-        value={isWhatsAppDirectBooking ? 'whatsapp' : 'online_payment'}
         fullWidth
         disabled={
           isSubmitting ||
@@ -2657,37 +1444,24 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           invalidIstStayRange ||
           priceDetails.nights < 1
         }
-        className={isSubmitting || isLoading ? 'opacity-75' : ''}
+        className={`bw-reserve${isSubmitting || isLoading ? ' opacity-75' : ''}`}
         data-testid="guest-booking-submit"
       >
         {isBookingDisabled
           ? 'Unavailable'
           : isSubmitting || isLoading
-            ? 'Processing…'
-            : isWhatsAppDirectBooking
-              ? 'Continue on WhatsApp'
-              : 'Book Now'}
+            ? 'Reserving…'
+            : 'Reserve'}
       </Button>
-      {!isBookingDisabled && isWhatsAppDirectBooking && hasOnlinePaymentProvider && (
-        <Button
-          type="submit"
-          value="online_payment"
-          fullWidth
-          disabled={
-            isSubmitting ||
-            isLoading ||
-            !dateRange.startDate ||
-            !dateRange.endDate ||
-            isBookingDisabled ||
-            invalidIstStayRange ||
-            priceDetails.nights < 1
-          }
-          className={`mt-2 ${isSubmitting || isLoading ? 'opacity-75' : ''}`}
-          data-testid="guest-booking-submit-online"
-        >
-          {isSubmitting || isLoading ? 'Processing…' : 'Book now'}
-        </Button>
-      )}
+      <p className="bw-charge-note" data-testid="bw-charge-note">You won&apos;t be charged yet</p>
+
+      {/* TASK-2623: Trust strip — free cancellation */}
+      <div className="bw-trust" data-testid="bw-trust-strip">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+        <span>Free cancellation until 48 hours before check-in</span>
+      </div>
     </form>
     </>
   );
