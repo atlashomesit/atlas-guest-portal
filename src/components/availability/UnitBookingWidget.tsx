@@ -1103,9 +1103,6 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         <p className="font-semibold text-text-primary mb-1">Why book direct</p>
         <ul className="space-y-0.5 list-none m-0 p-0">
           <li>✓ No platform fee — pay exactly what you see</li>
-          {effectiveDailyPricing && effectiveDailyPricing.globalDiscountPercent > 0 && (
-            <li>✓ Best price on our website — {Math.round(effectiveDailyPricing.globalDiscountPercent)}% discount applied</li>
-          )}
           {illustrativeOtaGuestFeeComparison && (
             <li>
               ✓ OTA guest fee ({ILLUSTRATIVE_OTA_GUEST_FEE_PERCENT}% est.) saved:{' '}
@@ -1152,16 +1149,6 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               <span className="text-2xl font-bold text-black">
                 {displayPrice(effectiveDailyPricing.actualPrice)}
               </span>
-              {effectiveDailyPricing.globalDiscountPercent > 0 && (
-                <>
-                  <span className="text-sm text-gray-600">
-                    {displayPrice(effectiveDailyPricing.baseAmount)}
-                  </span>
-                  <span className="text-sm font-semibold text-[color:var(--cta-primary)]">
-                    {priceDisplayConfig.discount.savingsPrefix} {Math.round(effectiveDailyPricing.globalDiscountPercent)}%
-                  </span>
-                </>
-              )}
             </div>
           )}
           {!dailyPricingLoading && !dailyPricingError && selectedRangeTotalFromCalendar == null && !effectiveDailyPricing && (

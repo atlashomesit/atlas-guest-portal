@@ -280,14 +280,6 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
         {!dailyPricingLoading && todayBreakdown ? (
           <div className="flex items-baseline gap-2 flex-wrap">
             <span className="text-2xl font-bold text-black">{formatCurrency(todayBreakdown.actualPrice)}</span>
-            {todayBreakdown.globalDiscountPercent > 0 && (
-              <>
-                <span className="text-sm text-text-muted">{formatCurrency(todayBreakdown.baseAmount)}</span>
-                <span className="text-sm font-semibold text-[color:var(--cta-primary)]">
-                  Save {Math.round(todayBreakdown.globalDiscountPercent)}%
-                </span>
-              </>
-            )}
           </div>
         ) : !dailyPricingLoading && (
           <div className="flex items-baseline gap-2">

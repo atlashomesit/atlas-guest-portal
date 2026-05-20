@@ -25,7 +25,6 @@ import {
 } from "../api/availabilitySummaryClient";
 import RecentlyViewedStrip from "../components/RecentlyViewedStrip";
 import { fallbackCoordsForListing, hasMapCoords } from "../utils/mapCoords";
-import { getEffectiveDiscountPercent } from "../utils/pricing";
 
 const SearchResultsMap = lazy(() => import("../components/search/SearchResultsMap"));
 
@@ -258,7 +257,6 @@ const SearchPage = () => {
   const monthlyStay = useMemo(() => monthlyStayParam === "true", [monthlyStayParam]);   // 30+ nights min stay
   /** TASK-1457: list vs map layout for search results. */
   const mapView = useMemo(() => viewParam === "map", [viewParam]);
-  const directBookingDiscountPercent = useMemo(() => getEffectiveDiscountPercent(), []);
 
   const hasInvalidDates = useMemo(() => Boolean(checkIn && checkOut && checkOut <= checkIn), [checkIn, checkOut]);
   const explicitDateSearch = useMemo(() => Boolean(checkIn && checkOut), [checkIn, checkOut]);
@@ -1300,14 +1298,6 @@ const SearchPage = () => {
                             🏷️ Stay {unit.losDiscountMinNights}+ nights — {unit.losDiscountPercent}% off
                           </span>
                         ) : null}
-                        {directBookingDiscountPercent > 0 && (
-                          <span
-                            data-testid="search-listing-direct-discount"
-                            className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800"
-                          >
-                            {Math.round(directBookingDiscountPercent)}% off direct
-                          </span>
-                        )}
                       </div>
                       {/* TASK-1660: match ListingCard — no catalog star average without verified review count */}
                       {(unit.reviewCount ?? 0) > 0 && unit.rating != null && unit.rating > 0 && (
