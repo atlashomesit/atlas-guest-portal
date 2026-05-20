@@ -1350,12 +1350,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             </div>
           )}
 
-          {priceDetails.discount > 0 && (
-            <div className="bw-bd-row">
-              <span className="bw-bd-label bw-bd-label-discount">Discount</span>
-              <span className="bw-bd-value bw-bd-value-discount">−{displayPrice(priceDetails.discount)}</span>
-            </div>
-          )}
+          {/* TASK-2631 final fix: phantom discount line — appliedDiscountPercent from globalDiscountPercent is not applied to finalTotal, so we hide it to prevent "vapor" discount display */}
 
           {/* TASK-571: long-stay discount row — only render if nights >= 7 AND discount > 0 */}
           {losDiscountAmount > 0 && priceDetails.nights >= 7 && (
