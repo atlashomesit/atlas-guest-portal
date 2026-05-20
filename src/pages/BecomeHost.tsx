@@ -1,4 +1,4 @@
-/* eslint-disable atlas-brand/no-atlas-string-leak -- TODO Task 16: Atlas-specific host signup; per-tenant version needed */
+ 
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Card } from "../components/ui/Card";

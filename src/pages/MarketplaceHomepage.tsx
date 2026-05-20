@@ -45,7 +45,10 @@ export default function MarketplaceHomepage() {
   const [loading, setLoading] = useState(true);
   // TASK-1873: save-heart state keyed by listing id
   const [favEpoch, setFavEpoch] = useState(0);
-  const favIds = useMemo(() => new Set(getFavoriteIds()), [favEpoch]);
+  const favIds = useMemo(() => {
+    void favEpoch;
+    return new Set(getFavoriteIds());
+  }, [favEpoch]);
   // TL-PROP: map view of all marketplace properties. Toggle to show/hide.
   const [showMap, setShowMap] = useState(false);
   const [mapPins, setMapPins] = useState<MapPin[]>([]);

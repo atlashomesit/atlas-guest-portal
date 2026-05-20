@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import SEO from "../components/SEO";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
@@ -101,7 +101,7 @@ const LocationPage = () => {
     console.error(`[LocationPage] ${message}`, detail);
   };
 
-  const initializeMap = () => {
+  const initializeMap = useCallback(() => {
     if (hasInitializedMap.current) return;
     if (!mapLocation) throw new Error("No map coordinates configured for this tenant");
 
@@ -131,7 +131,7 @@ const LocationPage = () => {
 
     hasInitializedMap.current = true;
     setMapStatus("ready");
-  };
+  }, [mapLocation, tenantName]);
 
   useEffect(() => {
     setMapStatus("loading");
@@ -195,7 +195,7 @@ const LocationPage = () => {
       script.removeEventListener("load", handleLoad);
       script.removeEventListener("error", handleError);
     };
-  }, [apiKey, retryCount, mapLocation, useMultiPin]);
+  }, [apiKey, retryCount, mapLocation, useMultiPin, initializeMap]);
 
   return (
     <div className="px-4 md:px-10 lg:px-20 py-16 bg-bg-muted">

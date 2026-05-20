@@ -19,7 +19,7 @@
  * `localhost` which is harmless because both tenants share the same origin.
  */
 
-/* eslint-disable no-restricted-globals */
+ 
 
 const TENANT_SLUG = (() => {
   try {
