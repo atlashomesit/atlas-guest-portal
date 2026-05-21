@@ -1357,11 +1357,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
           <div className="bw-bd-row" data-testid="bw-bd-service-fee-row">
             <span className="bw-bd-label" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-              Service fee{convenienceFeePctLabel > 0 ? ` (${convenienceFeePctLabel}%)` : ''}
+              Payment processing{convenienceFeePctLabel > 0 ? ` (${convenienceFeePctLabel}%)` : ''}
               <HelpCircle
                 className="h-3 w-3 cursor-help text-text-muted"
-                aria-label="Includes payment-gateway and platform handling charges."
-                title="Includes payment-gateway and platform handling charges."
+                aria-label="Razorpay payment gateway fee — passed through, not an Atlas markup."
+                title="Razorpay payment gateway fee — passed through, not an Atlas markup."
               />
             </span>
             <span className="bw-bd-value">{displayPrice(breakdownConvenienceFee)}</span>

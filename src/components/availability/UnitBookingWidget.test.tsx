@@ -90,11 +90,13 @@ describe('UnitBookingWidget - TASK-2623: .bw-* design header, price labels, trus
     expect(content).toContain('On accommodation only');
   });
 
-  it('service fee label replaces "Convenience fee"', () => {
+  it('payment-processing label replaces older "Service fee" / "Convenience fee" wording (TASK-2633)', () => {
     content = readFileSync(filePath, 'utf-8');
-    expect(content).toContain('Service fee');
-    // "Convenience fee" should not appear as the primary label
+    // Honest label — "Payment processing" makes clear the 3% is a Razorpay pass-through, not an Atlas markup.
+    expect(content).toContain('Payment processing');
+    // Older labels must not appear as the primary user-visible label.
     expect(content).not.toContain('>Convenience fee');
+    expect(content).not.toContain('Service fee');
   });
 
   it('has "You won\'t be charged yet" microcopy after Reserve', () => {
