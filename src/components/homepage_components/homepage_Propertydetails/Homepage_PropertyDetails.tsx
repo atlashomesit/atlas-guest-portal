@@ -90,6 +90,37 @@ function PpChevronDown({ size = 14 }: { size?: number }) {
   );
 }
 
+// ---- v2 Things-to-know icons -------------------------------------------
+function PpV2UsersIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/>
+      <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+    </svg>
+  );
+}
+function PpV2ClockInIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
+    </svg>
+  );
+}
+function PpV2ClockOutIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="9"/><path d="M12 7v5l-3 2"/>
+    </svg>
+  );
+}
+function PpV2PinIcon({ size = 12 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/>
+    </svg>
+  );
+}
+
 function PpGridIcon({ size = 14 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -1385,6 +1416,56 @@ useEffect(() => {
               </Suspense>
             )}
 
+            {/* ---- v2: Location/Map promoted to upper-third (below gallery) ---- */}
+            {ppHasLocation && (
+              <div className="pp-v2-location">
+                <div className="pp-v2-location-head">
+                  <h2>Where you&rsquo;ll be</h2>
+                  {(data.propertyAddress || data.property_address || data.property_location) && (
+                    <span className="pp-v2-loc-chip">
+                      <PpV2PinIcon size={12} />
+                      {String(data.propertyAddress || data.property_address || data.property_location).trim()}
+                    </span>
+                  )}
+                </div>
+                <div style={{ borderRadius: 16, overflow: 'hidden', border: '1px solid #f0e6dc' }}>
+                  {mapSrcTrimmed ? (
+                    <iframe
+                      src={mapSrcTrimmed}
+                      style={{ width: '100%', height: 300, border: 0, display: 'block' }}
+                      loading="lazy"
+                      allowFullScreen
+                      referrerPolicy="no-referrer-when-downgrade"
+                      title="Property Location"
+                    />
+                  ) : useMultiPin ? (
+                    <MultiPinMap pins={propertyPins} height={300} />
+                  ) : mapLocation &&
+                    typeof mapLocation.lat === 'number' &&
+                    Number.isFinite(mapLocation.lat) &&
+                    typeof mapLocation.lng === 'number' &&
+                    Number.isFinite(mapLocation.lng) ? (
+                    <SinglePinGoogleMap
+                      lat={mapLocation.lat}
+                      lng={mapLocation.lng}
+                      zoom={typeof mapLocation.zoom === 'number' && mapLocation.zoom > 0 ? mapLocation.zoom : 15}
+                      markerTitle={mapLocation.markerLabel ?? tenantNameForMap}
+                    />
+                  ) : (
+                    typeof data.latitude === 'number' && Number.isFinite(data.latitude) &&
+                    typeof data.longitude === 'number' && Number.isFinite(data.longitude) ? (
+                      <SinglePinGoogleMap
+                        lat={data.latitude}
+                        lng={data.longitude}
+                        zoom={15}
+                        markerTitle={data.property_name}
+                      />
+                    ) : null
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* ---- Two-column main ---- */}
             <div className="pp-main">
 
@@ -1616,32 +1697,94 @@ useEffect(() => {
                         </h2>
                       </div>
 
-                      <div className="pp-reviews-summary">
+                      {/* v2 reviews summary: big rating + breakdown bars */}
+                      <div className="pp-v2-reviews-summary">
                         <div>
-                          <div className="pp-rating-big" aria-label={`${rating.toFixed(1)} out of 5`}>
+                          <div className="pp-v2-rating-big" aria-label={`${rating.toFixed(1)} out of 5`}>
                             {rating.toFixed(1)}
                           </div>
                           <span className="pp-rating-stars" aria-hidden="true">★★★★★</span>
-                          <div className="pp-rating-big-sub">{count} verified {count === 1 ? 'stay' : 'stays'}</div>
+                          <div className="pp-v2-rating-big-sub">{count} verified {count === 1 ? 'stay' : 'stays'}</div>
                         </div>
-                        <div style={{ fontSize: 14, color: '#475569', lineHeight: 1.6 }}>
-                          <p style={{ margin: '0 0 8px', fontWeight: 600, color: '#1a1a2e' }}>Overall rating</p>
-                          <p style={{ margin: 0 }}>
-                            Guests rate this home {rating.toFixed(1)} out of 5 based on {count}{' '}
-                            {count === 1 ? 'review' : 'reviews'}.
-                            All reviews are from verified stays booked through this platform.
-                          </p>
-                        </div>
+                        {/* Sub-rating bars derived from API reviews if available */}
+                        {showApi && api!.reviews.length > 0 && (() => {
+                          const rs = api!.reviews;
+                          const avg = (vals: (number | null | undefined)[]) => {
+                            const valid = vals.filter((v): v is number => v != null && v >= 1);
+                            return valid.length > 0 ? (valid.reduce((a, b) => a + b, 0) / valid.length) : null;
+                          };
+                          const cleanliness = avg(rs.map(r => r.ratingCleanliness));
+                          const comms = avg(rs.map(r => r.ratingCommunication));
+                          const checkin = avg(rs.map(r => r.ratingCheckin));
+                          const value = avg(rs.map(r => r.ratingValue));
+                          const bars = [
+                            { label: 'Cleanliness', v: cleanliness },
+                            { label: 'Communication', v: comms },
+                            { label: 'Check-in', v: checkin },
+                            { label: 'Value', v: value },
+                          ].filter(b => b.v != null);
+                          if (bars.length === 0) {
+                            return (
+                              <div style={{ fontSize: 14, color: '#475569', lineHeight: 1.6 }}>
+                                <p style={{ margin: '0 0 4px', fontWeight: 600, color: '#1a1a2e' }}>Overall rating</p>
+                                <p style={{ margin: 0 }}>
+                                  {count} verified {count === 1 ? 'review' : 'reviews'} · all through this platform.
+                                </p>
+                              </div>
+                            );
+                          }
+                          return (
+                            <div className="pp-v2-rating-bars">
+                              {bars.map(b => (
+                                <div key={b.label} className="pp-v2-rating-bar-row">
+                                  <span>{b.label}</span>
+                                  <div className="pp-v2-rating-bar">
+                                    <span style={{ width: `${Math.round((b.v! / 5) * 100)}%` }} />
+                                  </div>
+                                  <span className="pp-v2-rating-bar-val">{b.v!.toFixed(1)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
+                        {!showApi && (
+                          <div style={{ fontSize: 14, color: '#475569', lineHeight: 1.6 }}>
+                            <p style={{ margin: '0 0 4px', fontWeight: 600, color: '#1a1a2e' }}>Overall rating</p>
+                            <p style={{ margin: 0 }}>
+                              {count} verified {count === 1 ? 'review' : 'reviews'} · all through this platform.
+                            </p>
+                          </div>
+                        )}
                       </div>
 
                       {showApi && api!.reviews.length > 0 ? (
                         <>
-                          <div className="pp-review-grid">
+                          {/* v2: 3-col card layout with quote marks */}
+                          <div className="pp-v2-review-grid" data-testid="reviews-grid">
                             {ppDisplayedReviews.map((r, idx) => (
-                              <article key={r.id} className="pp-review">
-                                <div className="pp-review-head">
+                              <article key={r.id} className="pp-v2-review-card">
+                                <span className="pp-v2-review-quote" aria-hidden="true">&ldquo;</span>
+                                {r.body && <p className="pp-v2-review-body">{r.body}</p>}
+                                {!r.body && r.title && <p className="pp-v2-review-body">{r.title}</p>}
+                                {(() => {
+                                  const chips: { label: string; v: number }[] = [];
+                                  if (r.ratingCleanliness != null && r.ratingCleanliness >= 1) chips.push({ label: 'Cleanliness', v: r.ratingCleanliness });
+                                  if (r.ratingValue != null && r.ratingValue >= 1) chips.push({ label: 'Value', v: r.ratingValue });
+                                  if (chips.length === 0) return null;
+                                  return (
+                                    <p style={{ marginBottom: 6, fontSize: 11.5, color: '#64748b' }} data-testid="review-sub-ratings">
+                                      {chips.map((c, i) => <span key={c.label}>{i > 0 ? ' · ' : ''}{c.label} {c.v}/5</span>)}
+                                    </p>
+                                  );
+                                })()}
+                                {r.isVerifiedStay && (
+                                  <span className="pp-review-verified" style={{ marginBottom: 10 }}>
+                                    <PpCheckIcon size={10} /> Verified stay
+                                  </span>
+                                )}
+                                <div className="pp-v2-review-foot">
                                   <div
-                                    className="pp-review-avatar"
+                                    className="pp-v2-review-avatar"
                                     aria-hidden="true"
                                     style={{
                                       background: PP_REVIEW_BG_COLORS[idx % PP_REVIEW_BG_COLORS.length],
@@ -1651,34 +1794,14 @@ useEffect(() => {
                                     {(r.guestName ?? 'G').charAt(0).toUpperCase()}
                                   </div>
                                   <div>
-                                    <div className="pp-review-name">{r.guestName ?? 'Guest'}</div>
-                                    <div className="pp-review-date">
-                                      {new Date(r.createdAt).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}
+                                    <div className="pp-v2-review-name">{r.guestName ?? 'Guest'}</div>
+                                    <div className="pp-v2-review-date">
+                                      {new Date(r.createdAt).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}
                                     </div>
                                   </div>
                                 </div>
-                                {r.title && <p style={{ fontSize: 14, fontWeight: 600, color: '#1a1a2e', margin: '0 0 4px' }}>{r.title}</p>}
-                                {r.body && <p className="pp-review-body">{r.body}</p>}
-                                {(() => {
-                                  const chips: { label: string; v: number }[] = [];
-                                  if (r.ratingCleanliness != null && r.ratingCleanliness >= 1) chips.push({ label: 'Cleanliness', v: r.ratingCleanliness });
-                                  if (r.ratingValue != null && r.ratingValue >= 1) chips.push({ label: 'Value', v: r.ratingValue });
-                                  if (r.ratingCheckin != null && r.ratingCheckin >= 1) chips.push({ label: 'Check-in', v: r.ratingCheckin });
-                                  if (r.ratingCommunication != null && r.ratingCommunication >= 1) chips.push({ label: 'Communication', v: r.ratingCommunication });
-                                  if (chips.length === 0) return null;
-                                  return (
-                                    <p style={{ marginBottom: 4, fontSize: 12, color: '#64748b' }} data-testid="review-sub-ratings">
-                                      {chips.map((c, i) => <span key={c.label}>{i > 0 ? ' · ' : ''}{c.label} {c.v}/5</span>)}
-                                    </p>
-                                  );
-                                })()}
-                                {r.isVerifiedStay && (
-                                  <span className="pp-review-verified">
-                                    <PpCheckIcon size={10} /> Verified stay
-                                  </span>
-                                )}
                                 {r.hostResponse && (
-                                  <div className="pp-review-host-resp">
+                                  <div className="pp-review-host-resp" style={{ marginTop: 10 }}>
                                     <div className="pp-review-host-resp-label">Host response</div>
                                     <p>{r.hostResponse}</p>
                                   </div>
@@ -1705,10 +1828,11 @@ useEffect(() => {
                         <p style={{ fontSize: 14, color: '#475569', fontStyle: 'italic' }}>Ratings only — written reviews coming soon.</p>
                       ) : (
                         data.property_review_snippets && data.property_review_snippets.length > 0 && (
-                          <div className="pp-review-grid">
-                            {data.property_review_snippets.slice(0, 4).map((snippet, idx) => (
-                              <article key={idx} className="pp-review">
-                                <p className="pp-review-body">&ldquo;{snippet}&rdquo;</p>
+                          <div className="pp-v2-review-grid">
+                            {data.property_review_snippets.slice(0, 3).map((snippet, idx) => (
+                              <article key={idx} className="pp-v2-review-card">
+                                <span className="pp-v2-review-quote" aria-hidden="true">&ldquo;</span>
+                                <p className="pp-v2-review-body">{snippet}</p>
                               </article>
                             ))}
                           </div>
@@ -1740,22 +1864,52 @@ useEffect(() => {
                   </div>
                 </section>
 
-                {/* Things to know / Policy details */}
-                {data.property_policy_details && data.property_policy_details.length > 0 && (
-                  <section className="pp-section" aria-label="Things to know">
-                    <h2 style={{ marginBottom: 18 }}>Things to know</h2>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16 }}>
+                {/* Things to know — v2 3-card structure */}
+                <section className="pp-section" aria-label="Things to know">
+                  <h2 style={{ marginBottom: 18 }}>Things to know</h2>
+                  <div className="pp-v2-knowgrid">
+                    {/* Base occupancy card */}
+                    <div className="pp-v2-knowcard">
+                      <div className="pp-v2-knowicon"><PpV2UsersIcon /></div>
+                      <small>Base occupancy</small>
+                      <strong>
+                        {data.maxGuests != null && data.maxGuests > 0 ? `${data.maxGuests} guests` : 'Ask host'}
+                      </strong>
+                      <span>
+                        {data.maxGuests != null && data.maxGuests > 0
+                          ? `Up to ${data.maxGuests} guests welcome.`
+                          : 'Contact host for occupancy details.'}
+                      </span>
+                    </div>
+                    {/* Check-in card */}
+                    <div className="pp-v2-knowcard">
+                      <div className="pp-v2-knowicon"><PpV2ClockInIcon /></div>
+                      <small>Check-in</small>
+                      <strong>{resolvedCheckInTime ?? '2:00 PM'}</strong>
+                      <span>Self-check-in via lockbox. Early check-in subject to availability.</span>
+                    </div>
+                    {/* Check-out card */}
+                    <div className="pp-v2-knowcard">
+                      <div className="pp-v2-knowicon"><PpV2ClockOutIcon /></div>
+                      <small>Check-out</small>
+                      <strong>{resolvedCheckOutTime ?? '11:00 AM'}</strong>
+                      <span>Drop keys in the lockbox. Luggage can stay till evening on request.</span>
+                    </div>
+                  </div>
+                  {/* Additional policy details if present */}
+                  {data.property_policy_details && data.property_policy_details.length > 0 && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 14, marginTop: 16 }}>
                       {data.property_policy_details
                         .filter((p) => p?.type && !p.type.includes('Policy') && !p.type.includes('Detailed'))
                         .map((policy, idx) => (
-                          <div key={idx} style={{ padding: '14px 16px', background: '#fff', border: '1px solid #f0e6dc', borderRadius: 12 }}>
-                            <p style={{ fontSize: 12.5, color: '#64748b', margin: '0 0 4px' }}>{policy.type}</p>
-                            <p style={{ fontSize: 14, fontWeight: 600, color: '#1a1a2e', margin: 0 }}>{policy.value}</p>
+                          <div key={idx} style={{ padding: '12px 14px', background: '#fff', border: '1px solid #f0e6dc', borderRadius: 12 }}>
+                            <p style={{ fontSize: 12, color: '#64748b', margin: '0 0 3px' }}>{policy.type}</p>
+                            <p style={{ fontSize: 13.5, fontWeight: 600, color: '#1a1a2e', margin: 0 }}>{policy.value}</p>
                           </div>
                         ))}
                     </div>
-                  </section>
-                )}
+                  )}
+                </section>
 
                 {/* Similar stays */}
                 {(() => {
@@ -1795,8 +1949,25 @@ useEffect(() => {
                   );
                 })()}
 
-                {/* Location Map */}
-                {ppHasLocation && (
+                {/* Nearby places — standalone section (map promoted to upper-third in v2) */}
+                {(data.property_nearplaces || []).length > 0 && (
+                  <section className="pp-section" aria-label="Nearby places">
+                    <div className="pp-section-head">
+                      <h2>Nearby places</h2>
+                    </div>
+                    <div className="pp-nearby">
+                      {data.property_nearplaces!.slice(0, 9).map((place, idx) => (
+                        <div key={`place-${idx}`} className="pp-nearby-item">
+                          <b>{place}</b>
+                          <span>Nearby</span>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {/* Suppressed old Location section — kept to prevent breaking the region (ppHasLocation guard) */}
+                {false && ppHasLocation && (
                   <section className="pp-section" aria-label="Location">
                     <div className="pp-section-head">
                       <h2>Where you&rsquo;ll be</h2>

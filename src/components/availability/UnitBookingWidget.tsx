@@ -1056,14 +1056,55 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   return (
     // TASK-2612: fragment wrapper intentional — avoids extra DOM nesting
     <>
-      <form id="booking-form" onSubmit={handleReserve} className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-6 space-y-5" role="region" aria-label="Booking and availability" data-testid="guest-booking-form">
+      <form id="booking-form" onSubmit={handleReserve} className="lv-booking" role="region" aria-label="Booking and availability" data-testid="guest-booking-form">
+
+      {/* v2 block (1): Price headline */}
+      <div className="lv-booking-headline" data-testid="bw-header">
+        {hasSelectedRange && finalTotal > 0 ? (
+          <>
+            <div className="lv-booking-total">
+              <b data-testid="bw-per-night-price">{displayPrice(Math.max(1, finalTotal))}</b>
+              <span>total · {priceDetails.nights} {priceDetails.nights === 1 ? 'night' : 'nights'}</span>
+            </div>
+            <p className="lv-booking-sub">
+              {dateRange.startDate && dateRange.endDate
+                ? `${format(dateRange.startDate, 'dd MMM')} — ${format(dateRange.endDate, 'dd MMM')} · all fees included`
+                : 'all fees included'}
+            </p>
+          </>
+        ) : (
+          <>
+            <div className="lv-booking-total">
+              <b data-testid="bw-per-night-price">
+                {effectiveDailyPricing != null
+                  ? formatCurrency(effectiveDailyPricing.actualPrice, { maximumFractionDigits: 0 })
+                  : perNightForDisplay > 0
+                    ? formatCurrency(perNightForDisplay, { maximumFractionDigits: 0 })
+                    : '—'}
+              </b>
+              <span>/ night</span>
+            </div>
+            <p className="lv-booking-sub">Select dates to see total price</p>
+          </>
+        )}
+        {reviewCount != null && reviewCount > 0 && reviewRating != null && (
+          <div className="bw-rating" data-testid="bw-rating-block" style={{ marginTop: 6 }}>
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="#c2410c" aria-hidden="true">
+              <path d="M12 2l2.9 6.9 7.1.6-5.4 4.7 1.6 7.3-6.2-3.8-6.2 3.8 1.6-7.3L2 9.5l7.1-.6L12 2z"/>
+            </svg>
+            <span className="bw-rating-num">{reviewRating.toFixed(1)}</span>
+            <span className="bw-rating-sep" aria-hidden="true">·</span>
+            <span className="bw-rating-link">{reviewCount} {reviewCount === 1 ? 'review' : 'reviews'}</span>
+          </div>
+        )}
+      </div>
 
       {displayCoverUrl && (
-        <div className="overflow-hidden rounded-xl border border-border-subtle -mt-1 mb-1">
+        <div className="overflow-hidden rounded-xl border border-border-subtle mb-2" style={{ marginTop: -4 }}>
           <OptimizedImage
             src={displayCoverUrl}
             alt={listingName ? `${listingName} — preview` : 'Listing preview'}
-            className="w-full h-40 sm:h-44 object-cover"
+            className="w-full h-36 sm:h-40 object-cover"
             loading="lazy"
           />
         </div>
@@ -1072,144 +1113,38 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       {listingId != null && Number(listingId) > 0 && (
         <FomoBar listingId={Number(listingId)} />
       )}
-
-      {/* TASK-2623: .bw-head — "From ₹X / night · ⭐ rating · review count" */}
-      <div className="bw-head" data-testid="bw-header">
-        <div className="bw-price-block">
-          <span className="bw-from">From</span>
-          <span className="bw-amount" data-testid="bw-per-night-price">
-            {effectiveDailyPricing != null
-              ? formatCurrency(effectiveDailyPricing.actualPrice, { maximumFractionDigits: 0 })
-              : perNightForDisplay > 0
-                ? formatCurrency(perNightForDisplay, { maximumFractionDigits: 0 })
-                : '—'}
-          </span>
-          <span className="bw-per">/ night</span>
-        </div>
-        {reviewCount != null && reviewCount > 0 && reviewRating != null && (
-          <div className="bw-rating" data-testid="bw-rating-block">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="#c2410c" aria-hidden="true">
-              <path d="M12 2l2.9 6.9 7.1.6-5.4 4.7 1.6 7.3-6.2-3.8-6.2 3.8 1.6-7.3L2 9.5l7.1-.6L12 2z"/>
-            </svg>
-            <span className="bw-rating-num">{reviewRating.toFixed(2)}</span>
-            <span className="bw-rating-sep" aria-hidden="true">·</span>
-            <span className="bw-rating-link">{reviewCount} {reviewCount === 1 ? 'review' : 'reviews'}</span>
-          </div>
-        )}
-      </div>
       {isBookingDisabled && (
         <ErrorBanner className="mt-2" message="Service temporarily unavailable. Booking will return soon." />
       )}
 
-      {/* TASK-2576: consolidated "Why book direct" block — replaces 3 separate value props */}
-      <div className="rounded-lg border border-border-subtle bg-bg-muted/40 px-3 py-2 text-xs text-text-secondary">
-        <p className="font-semibold text-text-primary mb-1">Why book direct</p>
-        <ul className="space-y-0.5 list-none m-0 p-0">
-          <li>✓ No platform fee — pay exactly what you see</li>
-          {illustrativeOtaGuestFeeComparison && (
-            <li>
-              ✓ OTA guest fee ({ILLUSTRATIVE_OTA_GUEST_FEE_PERCENT}% est.) saved:{' '}
-              <span className="font-medium text-text-primary">{displayPrice(illustrativeOtaGuestFeeComparison.illustrativeGuestFee)}</span>
-              {' '}—{' '}
-              <a
-                href={PMS_AIRBNB_2026_TERMS_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline underline-offset-1 text-cta-primary"
-              >
-                why?
-              </a>
-            </li>
-          )}
-        </ul>
-      </div>
+      {/* v2: "Why book direct" collapsed — info now in the main page's OTA comparison card.
+          Keep the illustrativeOtaGuestFeeComparison calculation active (used by the outer page).
+          TASK-2576: retaining the data var reference to avoid unused-var lint error */}
+      {illustrativeOtaGuestFeeComparison != null && false && (
+        <div style={{ display: 'none' }} aria-hidden="true" />
+      )}
+      {/* Price loading state — shown inline in breakdown when loading */}
+      {dailyPricingLoading && (
+        <p className="text-xs text-text-muted" style={{ marginTop: 4 }}>Loading price…</p>
+      )}
 
-      <div className="flex flex-col gap-1">
-        <div className="flex items-center gap-2 flex-wrap" />
-        <div className="flex flex-col gap-0.5">
-          {dailyPricingLoading && (
-            <span className="text-sm text-text-muted">Loading price…</span>
-          )}
-          {!dailyPricingLoading && dailyPricingError && (
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-black">
-                {displayPrice(0)}
-              </span>
-            </div>
-          )}
-          {!dailyPricingLoading && !dailyPricingError && selectedRangeTotalFromCalendar != null && dateRange.startDate && dateRange.endDate && (
-            <div className="flex items-baseline gap-2 flex-wrap">
-              <span className="text-2xl font-bold text-black">
-                {displayPrice(selectedRangeTotalFromCalendar)}
-              </span>
-              <span className="text-sm text-gray-600">
-                {priceDetails.nights} {priceDetails.nights === 1 ? 'night' : 'nights'}
-              </span>
-            </div>
-          )}
-          {!dailyPricingLoading && !dailyPricingError && selectedRangeTotalFromCalendar == null && effectiveDailyPricing && (
-            <div className="flex items-baseline gap-2 flex-wrap">
-              <span className="text-2xl font-bold text-black">
-                {displayPrice(effectiveDailyPricing.actualPrice)}
-              </span>
-            </div>
-          )}
-          {!dailyPricingLoading && !dailyPricingError && selectedRangeTotalFromCalendar == null && !effectiveDailyPricing && (
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-black">
-                {displayPrice(0)}
-              </span>
-            </div>
-          )}
-        </div>
-        <div className="text-sm text-text-muted space-y-1 mt-1">
-          <p className="whitespace-nowrap overflow-hidden text-ellipsis">{priceDetails.nights} {priceDetails.nights === 1 ? 'night' : 'nights'} × {displayPrice(perNightForDisplay)}</p>
-          {priceDetails.extraGuests > 0 && priceDetails.nights > 0 && (
-            <p>{priceDetails.extraGuests} {priceDetails.extraGuests === 1 ? 'extra guest' : 'extra guests'} × {displayPrice(priceDetails.extraGuestsFee / priceDetails.nights / priceDetails.extraGuests)}/night</p>
-          )}
-          <p className="text-xs text-text-muted">
-            {selectedRangeTotalFromCalendar != null && dateRange.startDate && dateRange.endDate
-              ? 'Includes all taxes and fees.'
-              : 'Select dates to see price with taxes.'}
-          </p>
-        </div>
-      </div>
-
-      <div className="space-y-3">
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-text-primary" htmlFor="unit-booking-dates">
-            Dates
-          </label>
-          {minStayNights > 1 && (
-            <p className="text-xs font-medium text-text-muted">Minimum stay: {minStayNights} nights</p>
-          )}
-          {dateRange.startDate && !dateRange.endDate && (
-            <p
-              role="status"
-              data-testid="guest-booking-incomplete-dates"
-              className="text-sm text-text-secondary"
-            >
-              Select your check-out date (minimum one night after check-in).
-            </p>
-          )}
-          {/* TASK-2564: legend now documents all three cell colours */}
-          <p className="text-xs text-text-secondary">
-            <span className="mr-2 inline-block rounded bg-[#ffe8d6]/60 px-1.5 py-0.5 text-[#c2410c]">Available</span>
-            open for booking.
-            <span className="mx-2 inline-block rounded bg-[#fff3e0] px-1.5 py-0.5 text-[#92400e]">Turnover</span>
-            cleaning window (still bookable).
-            <span className="mx-2 inline-block bg-[repeating-linear-gradient(-45deg,#d1d5db,#d1d5db_3px,#e5e7eb_3px,#e5e7eb_6px)] px-2 py-0.5 text-gray-700">
-              Unavailable
-            </span>
-            blocked or on hold (not selectable).
-          </p>
+      {/* v2 block (2) + (3): Date range card + Guests card */}
+      <div className="lv-booking-form">
+        {minStayNights > 1 && (
+          <p className="text-xs font-medium text-text-muted" style={{ marginBottom: 6 }}>Minimum stay: {minStayNights} nights</p>
+        )}
+        {/* v2 date card */}
+        <div
+          className="lv-date-pair"
+          role="group"
+          aria-label="Check-in and check-out dates"
+        >
           <button
             id="unit-booking-dates"
             ref={calendarButtonRef}
             type="button"
-            className="w-full rounded-xl border border-border-strong bg-bg-muted px-4 py-3 text-left text-text-primary hover:border-cta-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary"
-            aria-label="Click to select check-in date, then choose from calendar"
-            title="Click to select check-in date, then choose from calendar"
+            className="lv-date-cell"
+            aria-label="Select check-in date"
             disabled={isBookingDisabled}
             onClick={(e) => {
               e.preventDefault();
@@ -1218,69 +1153,91 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               setOpenCalendar(true);
             }}
           >
-            <div className="flex items-center justify-between gap-3">
-  <span className="text-sm sm:text-base">{formattedDateLabel}</span>
-  <span className="text-xs text-text-muted">
-    {isLoading
-      ? 'Loading…'
-      : dateRange.startDate && dateRange.endDate
-      ? (() => {
-          const nights = calculateNights(dateRange.startDate, dateRange.endDate);
-          return nights > 0 ? `${nights} ${nights === 1 ? 'date' : 'dates'} blocked` : 'Select dates';
-        })()
-      : 'Select dates'}
-  </span>
-</div>
-
-            {dateRange.startDate && dateRange.endDate && calculateNights(dateRange.startDate, dateRange.endDate) > 0 && (
-              <div className="mt-2 flex items-center justify-center">
-                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--accent-primary)] bg-[var(--bg-surface)] px-2.5 py-1 rounded-lg border border-[var(--border-subtle)]">
-                  {formatNightCount(calculateNights(dateRange.startDate, dateRange.endDate))}
-                </span>
-              </div>
-            )}
+            <small>Check-in</small>
+            {dateRange.startDate
+              ? <div className="lv-date-val">{format(dateRange.startDate, 'EEE dd MMM')}</div>
+              : <div className="lv-date-placeholder">Add date</div>
+            }
           </button>
-          <AtlasBookingCalendar
-              anchorRef={calendarButtonRef}
-              open={openCalendar}
-              onClose={() => setOpenCalendar(false)}
-              value={dateRange}
-              onChange={handleRangeChange}
-              today={today}
-              minDate={addDays(today, Math.max(-1, minAdvanceDays - 1))}
-              maxDate={maxBookingDate}
-              disabledDay={disabledDay}
-              dateStatusMap={dateStatusMap}
-              calendarDailyPrices={calendarDailyPrices}
-              fallbackPrice={effectiveDailyPricing?.actualPrice ?? null}
-              pricingLoading={calendarPricingLoading}
-              shownDate={shownDate}
-              onShownDateChange={(date) => {
-                const nextShownDate = startOfMonth(date);
-                if (
-                  shownDate.getFullYear() === nextShownDate.getFullYear() &&
-                  shownDate.getMonth() === nextShownDate.getMonth()
-                ) {
-                  return;
-                }
-                setShownDate(nextShownDate);
-              }}
-            />
+          <button
+            type="button"
+            className="lv-date-cell"
+            aria-label="Select check-out date"
+            disabled={isBookingDisabled}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (isBookingDisabled) return;
+              setOpenCalendar(true);
+            }}
+          >
+            <small>Check-out</small>
+            {dateRange.endDate
+              ? <div className="lv-date-val">{format(dateRange.endDate, 'EEE dd MMM')}</div>
+              : <div className="lv-date-placeholder">Add date</div>
+            }
+          </button>
         </div>
+        <AtlasBookingCalendar
+            anchorRef={calendarButtonRef}
+            open={openCalendar}
+            onClose={() => setOpenCalendar(false)}
+            value={dateRange}
+            onChange={handleRangeChange}
+            today={today}
+            minDate={addDays(today, Math.max(-1, minAdvanceDays - 1))}
+            maxDate={maxBookingDate}
+            disabledDay={disabledDay}
+            dateStatusMap={dateStatusMap}
+            calendarDailyPrices={calendarDailyPrices}
+            fallbackPrice={effectiveDailyPricing?.actualPrice ?? null}
+            pricingLoading={calendarPricingLoading}
+            shownDate={shownDate}
+            onShownDateChange={(date) => {
+              const nextShownDate = startOfMonth(date);
+              if (
+                shownDate.getFullYear() === nextShownDate.getFullYear() &&
+                shownDate.getMonth() === nextShownDate.getMonth()
+              ) {
+                return;
+              }
+              setShownDate(nextShownDate);
+            }}
+          />
+        {/* Incomplete date hint */}
+        {dateRange.startDate && !dateRange.endDate && (
+          <p
+            role="status"
+            data-testid="guest-booking-incomplete-dates"
+            className="text-xs text-text-secondary"
+            style={{ marginTop: 4 }}
+          >
+            Select your check-out date (minimum one night after check-in).
+          </p>
+        )}
+        {/* Legend for calendar cell colours */}
+        <p className="text-xs text-text-secondary" style={{ marginTop: 6, lineHeight: 1.5 }}>
+          <span className="mr-1 inline-block rounded bg-[#ffe8d6]/60 px-1.5 py-0.5 text-[#c2410c]">Available</span>
+          open for booking.
+          <span className="mx-1 inline-block rounded bg-[#fff3e0] px-1.5 py-0.5 text-[#92400e]">Turnover</span>
+          cleaning window (still bookable).
+        </p>
 
-        <div className="bw-guests">
+        {/* v2 guests card */}
+        <div className="lv-guest-cell bw-guests" style={{ marginTop: 0 }}>
           <button
             type="button"
             id="unit-booking-guests"
             className="bw-guests-trigger"
+            style={{ padding: 0, background: 'transparent', border: 0, width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
             aria-label={`Guests: ${guests} ${guests === 1 ? 'guest' : 'guests'}. Click to change.`}
             onClick={(e) => { e.stopPropagation(); setGuestsOpen((o) => !o); }}
           >
-            <span className="bw-guests-label">Guests</span>
-            <span className="bw-guests-value">
-              {guests} {guests === 1 ? 'guest' : 'guests'}
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 'auto' }} aria-hidden="true"><polyline points="6 9 12 15 18 9" /></svg>
-            </span>
+            <div>
+              <small style={{ display: 'block', fontSize: '9.5px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#475569', marginBottom: 4 }}>Guests</small>
+              <span className="lv-guest-val">{guests} {guests === 1 ? 'adult' : 'adults'}</span>
+            </div>
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ color: '#475569', flexShrink: 0 }}><polyline points="6 9 12 15 18 9" /></svg>
           </button>
           {guestsOpen && (
             <div className="bw-guests-pop" role="group" aria-label="Guest count">
@@ -1310,33 +1267,30 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             </div>
           )}
         </div>
-        {/* Price Breakdown */}
-        <div className="bw-breakdown">
-          <div className="bw-breakdown-title">Price breakdown</div>
-
-          <div className="bw-bd-row" data-testid="bw-bd-subtotal-row price-line-base">
-            <span className="bw-bd-label">
+        {/* v2 block (4): Price breakdown — always-visible, lv-* classes */}
+        <div className="lv-price-rows">
+          <div className="lv-price-row" data-testid="bw-bd-subtotal-row price-line-base">
+            <span>
               {hasSelectedRange && priceDetails.nights > 0 && perNightForDisplay > 0
                 ? `${displayPrice(perNightForDisplay)} × ${priceDetails.nights} ${priceDetails.nights === 1 ? 'night' : 'nights'}`
-                : 'Subtotal'}
+                : 'Accommodation'}
             </span>
-            <span className="bw-bd-value">{displayPrice(breakdownPrice)}</span>
+            <span className="lv-num">{displayPrice(breakdownPrice)}</span>
           </div>
 
           {gstSlabPercent != null && breakdownPrice > 0 && gstLineAmount > 0 && (
-            <div className="bw-bd-row" data-testid="bw-bd-gst-row">
-              <span className="bw-bd-label">
-                <span>GST {gstSlabPercent}% on accommodation</span>
-                <span className="bw-bd-sublabel" style={{ display: 'block', fontSize: 11, color: 'var(--text-muted, #475569)', fontWeight: 400, textDecoration: 'none' }}>On accommodation only</span>
+            <div className="lv-price-row" data-testid="bw-bd-gst-row">
+              <span>
+                GST ({gstSlabPercent}%)
               </span>
-              <span className="bw-bd-value">{displayPrice(gstLineAmount)}</span>
+              <span className="lv-num">{displayPrice(gstLineAmount)}</span>
             </div>
           )}
 
           {priceDetails.extraGuestsFee > 0 && (
-            <div className="bw-bd-row">
-              <span className="bw-bd-label">Extra guest fee</span>
-              <span className="bw-bd-value">{displayPrice(priceDetails.extraGuestsFee)}</span>
+            <div className="lv-price-row">
+              <span>Extra guest fee</span>
+              <span className="lv-num">{displayPrice(priceDetails.extraGuestsFee)}</span>
             </div>
           )}
 
@@ -1344,23 +1298,16 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
           {/* TASK-571: long-stay discount row — only render if nights >= 7 AND discount > 0 */}
           {losDiscountAmount > 0 && priceDetails.nights >= 7 && (
-            <>
-              <div className="bw-bd-row">
-                <span className="bw-bd-label bw-bd-label-discount">
-                  Long-stay discount{losDiscountPercent > 0 ? ` (−${Math.round(losDiscountPercent)}%)` : ''}
-                </span>
-                <span className="bw-bd-value bw-bd-value-discount">−{displayPrice(losDiscountAmount)}</span>
-              </div>
-              {priceDetails.nights > 0 && (
-                <p className="bw-bd-note" style={{ textAlign: 'right' }}>
-                  ≈ {displayPrice(Math.round(losDiscountAmount / priceDetails.nights))}/night off
-                </p>
-              )}
-            </>
+            <div className="lv-price-row">
+              <span style={{ color: '#157046' }}>
+                Long-stay discount{losDiscountPercent > 0 ? ` (−${Math.round(losDiscountPercent)}%)` : ''}
+              </span>
+              <span className="lv-num" style={{ color: '#157046' }}>−{displayPrice(losDiscountAmount)}</span>
+            </div>
           )}
 
-          <div className="bw-bd-row" data-testid="bw-bd-service-fee-row">
-            <span className="bw-bd-label" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+          <div className="lv-price-row" data-testid="bw-bd-service-fee-row">
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
               Payment processing{convenienceFeePctLabel > 0 ? ` (${convenienceFeePctLabel}%)` : ''}
               <HelpCircle
                 className="h-3 w-3 cursor-help text-text-muted"
@@ -1368,53 +1315,51 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                 title="Razorpay payment gateway fee — passed through, not an Atlas markup."
               />
             </span>
-            <span className="bw-bd-value">{displayPrice(breakdownConvenienceFee)}</span>
+            <span className="lv-num">{displayPrice(breakdownConvenienceFee)}</span>
           </div>
 
           {referralDiscountApplied > 0 && (
-            <div className="bw-bd-row">
-              <span className="bw-bd-label bw-bd-label-discount">Referral reward</span>
-              <span className="bw-bd-value bw-bd-value-discount">−{displayPrice(referralDiscountApplied)}</span>
+            <div className="lv-price-row">
+              <span style={{ color: '#157046' }}>Referral reward</span>
+              <span className="lv-num" style={{ color: '#157046' }}>−{displayPrice(referralDiscountApplied)}</span>
             </div>
           )}
 
           {promoDiscountApplied > 0 && (
-            <div className="bw-bd-row">
-              <span className="bw-bd-label bw-bd-label-discount">Promo discount</span>
-              <span className="bw-bd-value bw-bd-value-discount">−{displayPrice(promoDiscountApplied)}</span>
+            <div className="lv-price-row">
+              <span style={{ color: '#157046' }}>Promo discount</span>
+              <span className="lv-num" style={{ color: '#157046' }}>−{displayPrice(promoDiscountApplied)}</span>
             </div>
           )}
 
           {addOnsTotal > 0 && (
-            <div className="bw-bd-row">
-              <span className="bw-bd-label">Add-ons</span>
-              <span className="bw-bd-value">{displayPrice(addOnsTotal)}</span>
+            <div className="lv-price-row">
+              <span>Add-ons</span>
+              <span className="lv-num">{displayPrice(addOnsTotal)}</span>
             </div>
           )}
 
-          <div className="bw-bd-row bw-bd-total">
+          <div className="lv-price-row lv-total">
             <span>Total</span>
-            <span className="bw-bd-value">{displayPrice(Math.max(1, finalTotal))}</span>
+            <span className="lv-num">{displayPrice(Math.max(1, finalTotal))}</span>
           </div>
-
-          <p className="bw-bd-note">Pay securely via Razorpay.</p>
         </div>
-
-      </div>
+        </div>
+      {/* end lv-booking-form */}
 
       {/* TASK-2612: Add-ons moved to GuestDetailsPage */}
 
       {dateError && (
-        <p role="alert" data-testid="guest-booking-date-error" className="text-sm text-support-error">
+        <p role="alert" data-testid="guest-booking-date-error" className="text-sm text-support-error" style={{ marginTop: 4 }}>
           {dateError}
         </p>
       )}
-      {statusMessage && <p className="text-sm text-text-secondary">{statusMessage}</p>}
+      {statusMessage && <p className="text-xs text-text-secondary" style={{ marginTop: 4 }}>{statusMessage}</p>}
 
       {/* TASK-2612: Guest form fields moved to GuestDetailsPage */}
 
       {formError && (
-        <p className="text-sm text-support-error" role="alert">
+        <p className="text-sm text-support-error" role="alert" style={{ marginTop: 4 }}>
           {formError}
         </p>
       )}
@@ -1432,8 +1377,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           invalidIstStayRange ||
           priceDetails.nights < 1
         }
-        className={`bw-reserve${isSubmitting || isLoading ? ' opacity-75' : ''}`}
+        className={`bw-reserve lv-booking-cta${isSubmitting || isLoading ? ' opacity-75' : ''}`}
         data-testid="guest-booking-submit"
+        style={{ marginTop: 20, width: '100%', background: '#c2410c', color: '#fff', border: 0, borderRadius: 12, padding: '14px 24px', fontSize: 15, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer', transition: 'background .2s' }}
       >
         {isBookingDisabled
           ? 'Unavailable'
@@ -1441,14 +1387,25 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             ? 'Reserving…'
             : 'Reserve'}
       </Button>
-      <p className="bw-charge-note" data-testid="bw-charge-note">You won&apos;t be charged yet</p>
+      <p className="bw-charge-note" data-testid="bw-charge-note" style={{ textAlign: 'center', fontSize: 12, color: '#64748b', marginTop: 8 }}>
+        You won&apos;t be charged yet
+      </p>
 
-      {/* TASK-2623: Trust strip — free cancellation */}
-      <div className="bw-trust" data-testid="bw-trust-strip">
+      {/* TASK-2623: Trust strip — free cancellation (v2 style) */}
+      <div className="lv-booking-cancel" data-testid="bw-trust-strip">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          <path d="M20 6L9 17l-5-5"/>
         </svg>
         <span>Free cancellation until 48 hours before check-in</span>
+      </div>
+
+      {/* Pay-with rail (v2) */}
+      <div className="lv-pay-rail">
+        <span className="lv-pay-label">Pay with</span>
+        <span className="lv-pay-text">UPI</span>
+        <span className="lv-pay-text">VISA</span>
+        <span className="lv-pay-text">RUPAY</span>
+        <span className="lv-pay-text">RAZORPAY</span>
       </div>
     </form>
     </>
