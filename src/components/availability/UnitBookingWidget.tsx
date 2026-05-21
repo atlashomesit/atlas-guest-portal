@@ -1074,6 +1074,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         ) : (
           <>
             <div className="lv-booking-total">
+              <span className="lv-booking-from-prefix">From </span>
               <b data-testid="bw-per-night-price">
                 {effectiveDailyPricing != null
                   ? formatCurrency(effectiveDailyPricing.actualPrice, { maximumFractionDigits: 0 })
@@ -1081,7 +1082,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                     ? formatCurrency(perNightForDisplay, { maximumFractionDigits: 0 })
                     : '—'}
               </b>
-              <span>/ night</span>
+              <span> / night</span>
             </div>
             <p className="lv-booking-sub">Select dates to see total price</p>
           </>
@@ -1304,11 +1305,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
           <div className="lv-price-row" data-testid="bw-bd-service-fee-row">
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-              Payment processing{convenienceFeePctLabel > 0 ? ` (${convenienceFeePctLabel}%)` : ''}
+              Service fee{convenienceFeePctLabel > 0 ? ` (${convenienceFeePctLabel}%)` : ''}
               <HelpCircle
                 className="h-3 w-3 cursor-help text-text-muted"
-                aria-label="Razorpay payment gateway fee — passed through, not an Atlas markup."
-                title="Razorpay payment gateway fee — passed through, not an Atlas markup."
+                aria-label="Service fee — Razorpay payment gateway fee, passed through and not an Atlas markup."
+                title="Service fee — Razorpay payment gateway fee, passed through and not an Atlas markup."
               />
             </span>
             <span className="lv-num">{displayPrice(breakdownConvenienceFee)}</span>

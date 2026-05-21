@@ -626,7 +626,8 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #94755b;
+  /* Darkened from #94755b (4.05:1 vs white) to #7A5D44 (~5.89:1) for WCAG AA. */
+  color: #7A5D44;
   margin-bottom: 4px;
 }
 .pp-v2-knowcard strong {
@@ -828,7 +829,8 @@
 }
 .pp-root .lv-date-placeholder {
   font-size: 13.5px;
-  color: #94a3b8;
+  /* Darkened from #94a3b8 (2.48:1 vs white) to #5C697E (~5.34:1) for WCAG AA. */
+  color: #5C697E;
   font-weight: 400;
 }
 .pp-root .lv-guest-cell {
@@ -907,7 +909,8 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #94755b;
+  /* Darkened from #94755b (4.05:1 vs white) to #7A5D44 (~5.89:1) for WCAG AA. */
+  color: #7A5D44;
 }
 .pp-root .lv-pay-text {
   display: inline-flex;
