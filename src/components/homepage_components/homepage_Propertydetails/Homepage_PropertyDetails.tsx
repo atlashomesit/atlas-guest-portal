@@ -380,7 +380,6 @@ const PropertyDetails = () => {
     const [isListingLookupPending, setIsListingLookupPending] = useState(false);
     const [showAmenitiesModal, setShowAmenitiesModal] = useState(false);
     const [showAboutMore, setShowAboutMore] = useState(false);
-    const [showNeighborhoodMore, setShowNeighborhoodMore] = useState(false);
     const [showAllReviews, setShowAllReviews] = useState(false);
     const unitType = inferUnitType({ id: data?.id, property_name: data?.property_name });
     const { setProperty, updateBooking } = useBooking();
@@ -1966,91 +1965,6 @@ useEffect(() => {
                   </section>
                 )}
 
-                {/* Suppressed old Location section — kept to prevent breaking the region (ppHasLocation guard) */}
-                {false && ppHasLocation && (
-                  <section className="pp-section" aria-label="Location">
-                    <div className="pp-section-head">
-                      <h2>Where you&rsquo;ll be</h2>
-                      {(data.propertyAddress || data.property_address || data.property_location) && (
-                        <span className="pp-muted" style={{ fontSize: 13 }}>
-                          {String(data.propertyAddress || data.property_address || data.property_location).trim()}
-                        </span>
-                      )}
-                    </div>
-                    <div style={{ borderRadius: 16, overflow: 'hidden', border: '1px solid #f0e6dc' }}>
-                      {mapSrcTrimmed ? (
-                        <iframe
-                          src={mapSrcTrimmed}
-                          style={{ width: '100%', height: 320, border: 0, display: 'block' }}
-                          loading="lazy"
-                          allowFullScreen
-                          referrerPolicy="no-referrer-when-downgrade"
-                          title="Property Location"
-                        />
-                      ) : useMultiPin ? (
-                        <div>
-                          <div style={{ borderBottom: '1px solid #f0e6dc', padding: '16px 18px' }}>
-                            <p style={{ fontWeight: 600, color: '#1a1a2e', margin: '0 0 2px' }}>Our properties ({propertyPins.length})</p>
-                            <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>Click a pin for details.</p>
-                          </div>
-                          <MultiPinMap pins={propertyPins} height={320} />
-                        </div>
-                      ) : mapLocation &&
-                        typeof mapLocation.lat === 'number' &&
-                        Number.isFinite(mapLocation.lat) &&
-                        typeof mapLocation.lng === 'number' &&
-                        Number.isFinite(mapLocation.lng) ? (
-                        <SinglePinGoogleMap
-                          lat={mapLocation.lat}
-                          lng={mapLocation.lng}
-                          zoom={typeof mapLocation.zoom === 'number' && mapLocation.zoom > 0 ? mapLocation.zoom : 15}
-                          markerTitle={mapLocation.markerLabel ?? tenantNameForMap}
-                        />
-                      ) : (
-                        typeof data.latitude === 'number' && Number.isFinite(data.latitude) &&
-                        typeof data.longitude === 'number' && Number.isFinite(data.longitude) ? (
-                          <SinglePinGoogleMap
-                            lat={data.latitude}
-                            lng={data.longitude}
-                            zoom={15}
-                            markerTitle={data.property_name}
-                          />
-                        ) : (
-                          <div style={{ padding: '48px 16px', textAlign: 'center', background: '#f9f5f0' }}>
-                            <p style={{ color: '#64748b', margin: 0 }}>Map location not configured for this property.</p>
-                          </div>
-                        )
-                      )}
-                    </div>
-                    {/* Nearby places */}
-                    {(data.property_nearplaces || []).length > 0 && (
-                      <div>
-                        <div style={{ marginTop: 18, display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-                          <p style={{ fontWeight: 600, fontSize: 14, color: '#1a1a2e', margin: 0 }}>Nearby places</p>
-                          <button
-                            type="button"
-                            className="pp-prose-more"
-                            onClick={() => setShowNeighborhoodMore((s) => !s)}
-                            aria-expanded={showNeighborhoodMore}
-                          >
-                            {showNeighborhoodMore ? 'Show less' : 'Show more'}
-                            <PpChevronDown size={14} />
-                          </button>
-                        </div>
-                        {showNeighborhoodMore && (
-                          <div className="pp-nearby">
-                            {data.property_nearplaces.slice(0, 9).map((place, idx) => (
-                              <div key={`place-${idx}`} className="pp-nearby-item">
-                                <b>{place}</b>
-                                <span>Nearby</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </section>
-                )}
 
               </div>
               {/* ===== END LEFT COLUMN ===== */}

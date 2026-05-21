@@ -16,7 +16,7 @@ import { buildApiUrl, getApiHeaders } from '@/api/client';
 import { apiFetch } from '@/lib/http';
 import { monitoredFetch } from '@/lib/monitoring';
 import { getIstStartOfDay } from '@/utils/date';
-import { calculateNights, formatNightCount, formatDateInTimezone } from '@/utils/dateHelpers';
+import { calculateNights, formatDateInTimezone } from '@/utils/dateHelpers';
 import { doesRangeIntersectBlocked, toISODate } from '@/utils/dateRange';
 import { formatCurrency } from '@/utils/formatting';
 import { HelpCircle } from 'lucide-react';
@@ -30,7 +30,6 @@ import { track } from '@/lib/events'; // TASK-1480
 // getTenantContext removed — widget no longer needs it (TASK-2612 stripped form)
 import {
   ILLUSTRATIVE_OTA_GUEST_FEE_PERCENT,
-  PMS_AIRBNB_2026_TERMS_URL,
 } from '@/utils/directBookingPromo';
 
 declare global {
@@ -787,7 +786,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     const e = getIstStartOfDay(dateRange.endDate).getTime();
     return e <= s;
   }, [dateRange.startDate, dateRange.endDate]);
-  const { loading: dailyPricingLoading, error: dailyPricingError, getListingPricing } = useDailyPricingSummary();
+  const { loading: dailyPricingLoading, error: _dailyPricingError, getListingPricing } = useDailyPricingSummary();
   const dailyPricing = useMemo(
     () => (listingId != null && String(listingId).trim() !== '' ? getListingPricing(listingId) : null),
     [listingId, getListingPricing],
@@ -866,7 +865,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   const promoDiscountApplied = 0;
   const addOnsTotal = 0;
 
-  const illustrativeOtaGuestFeeComparison = useMemo(() => {
+  // v2: "Why book direct" block removed from widget JSX. Calculation kept (prefixed _) for future
+  // OTA comparison card on the listing page. TASK-2576 context: data was used to show OTA fee delta.
+  const _illustrativeOtaGuestFeeComparison = useMemo(() => {
     if (!hasSelectedRange || breakdownPrice <= 0) return null;
     const illustrativeGuestFee = Math.round((breakdownPrice * ILLUSTRATIVE_OTA_GUEST_FEE_PERCENT) / 100);
     return {
@@ -875,9 +876,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     };
   }, [hasSelectedRange, breakdownPrice]);
 
-  const formattedDateLabel = dateRange.startDate && dateRange.endDate
-    ? `${timezoneId ? formatDateInTimezone(dateRange.startDate, timezoneId) : format(dateRange.startDate, 'EEE, dd MMM')} – ${timezoneId ? formatDateInTimezone(dateRange.endDate, timezoneId) : format(dateRange.endDate, 'EEE, dd MMM')} • ${priceDetails.nights} ${priceDetails.nights === 1 ? 'night' : 'nights'}`
-    : 'Add your travel dates';
+  // v2 date display uses split check-in/check-out cells (see lv-date-cell blocks below).
 
   // TASK-2612: handleReserve replaces the old handleSubmit.
   // Calls init-hold mode (GuestInfo absent), stores holdId+holdExpiresAt in context, navigates to details page.
@@ -1117,12 +1116,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         <ErrorBanner className="mt-2" message="Service temporarily unavailable. Booking will return soon." />
       )}
 
-      {/* v2: "Why book direct" collapsed — info now in the main page's OTA comparison card.
-          Keep the illustrativeOtaGuestFeeComparison calculation active (used by the outer page).
-          TASK-2576: retaining the data var reference to avoid unused-var lint error */}
-      {illustrativeOtaGuestFeeComparison != null && false && (
-        <div style={{ display: 'none' }} aria-hidden="true" />
-      )}
+      {/* v2: "Why book direct" info collapsed — illustrativeOtaGuestFeeComparison kept for outer page
+          comparison card usage. Reference kept alive by the calculation above (line ~870). */}
       {/* Price loading state — shown inline in breakdown when loading */}
       {dailyPricingLoading && (
         <p className="text-xs text-text-muted" style={{ marginTop: 4 }}>Loading price…</p>
@@ -1155,7 +1150,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           >
             <small>Check-in</small>
             {dateRange.startDate
-              ? <div className="lv-date-val">{format(dateRange.startDate, 'EEE dd MMM')}</div>
+              ? <div className="lv-date-val">{timezoneId ? formatDateInTimezone(dateRange.startDate, timezoneId) : format(dateRange.startDate, 'EEE dd MMM')}</div>
               : <div className="lv-date-placeholder">Add date</div>
             }
           </button>
@@ -1173,7 +1168,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           >
             <small>Check-out</small>
             {dateRange.endDate
-              ? <div className="lv-date-val">{format(dateRange.endDate, 'EEE dd MMM')}</div>
+              ? <div className="lv-date-val">{timezoneId ? formatDateInTimezone(dateRange.endDate, timezoneId) : format(dateRange.endDate, 'EEE dd MMM')}</div>
               : <div className="lv-date-placeholder">Add date</div>
             }
           </button>
