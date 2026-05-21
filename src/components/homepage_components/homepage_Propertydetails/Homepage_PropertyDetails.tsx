@@ -5,7 +5,7 @@ import { getTenantContext as _getTenantCtx } from '@/tenant/tenantContext';
 import { getTenantOverrides, shouldHideAtlasBranding } from '@/tenant/tenantOverrides';
 import { getTenantBrandName } from '@/tenant/displayBrand';
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
-import { FaBed, FaShower, FaSwimmingPool, FaCar, FaWifi, FaTv } from "react-icons/fa";
+import { FaBed, FaShower, FaSwimmingPool, FaCar, FaWifi, FaTv, FaDumbbell } from "react-icons/fa";
 import { TbAirConditioning } from "react-icons/tb";
 import { PiElevatorDuotone, PiCoatHangerLight } from "react-icons/pi";
 import { RiLuggageCartLine } from "react-icons/ri";
@@ -40,7 +40,6 @@ import { addRecentlyViewed, isFavorite, toggleFavorite } from '../../../utils/gu
 import { formatCurrency } from '../../../utils/formatting';
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
 import SkeletonCard from '../../apartments/SkeletonCard';
-import { ILLUSTRATIVE_OTA_GUEST_FEE_PERCENT } from '@/utils/directBookingPromo';
 
 const UnitBookingWidget = lazy(() => import('../../availability/UnitBookingWidget'));
 const AvailabilityCalendar = lazy(() => import('../../AvailabilityCalendar'));
@@ -492,10 +491,6 @@ const PropertyDetails = () => {
         return nightlyPrice?.finalNightlyPrice ?? 0;
     }, [dailyPricingRow?.finalAmount, nightlyPrice?.finalNightlyPrice]);
 
-    const illustrativeOtaNightly = useMemo(() => {
-        if (directBookingNightly <= 0) return 0;
-        return Math.round(directBookingNightly * (1 + ILLUSTRATIVE_OTA_GUEST_FEE_PERCENT / 100));
-    }, [directBookingNightly]);
 
     useEffect(() => {
         const lookupId = listingIdParam;
@@ -911,7 +906,7 @@ useEffect(() => {
       addRecentlyViewed({
           listingId: lid,
           path,
-          name: data.property_name,
+          name: getListingDisplayName(lid, data.property_name),
           coverPhotoUrl: Array.isArray(data.property_img) ? data.property_img[0] : undefined,
           location: data.property_location,
           pricePerNight:
@@ -1021,6 +1016,7 @@ useEffect(() => {
         if (name.includes('breakfast') || name.includes('food')) return <MdOutlineEmojiFoodBeverage />;
         if (name.includes('card') || name.includes('payment')) return <FaCcMastercard />;
         if (name.includes('laundry')) return <MdOutlineLocalLaundryService />;
+        if (name.includes('gym') || name.includes('fitness') || name.includes('dumbbell')) return <FaDumbbell />;
         return <MdOutlineDone />;
     };
 
@@ -1554,35 +1550,6 @@ useEffect(() => {
                   </div>
                 </section>
 
-                {/* Direct booking value proposition */}
-                {directBookingNightly > 0 && illustrativeOtaNightly > 0 && (
-                  <section className="pp-section" aria-label="Book direct value">
-                    <div
-                      style={{ borderRadius: 16, border: '1px solid #d1fae5', background: 'rgba(236,253,245,0.85)', padding: '16px 20px' }}
-                      data-testid="listing-ota-comparison-card"
-                      role="note"
-                    >
-                      <p style={{ fontWeight: 600, color: '#064e3b', margin: '0 0 4px' }}>Book direct — typically better value</p>
-                      <p style={{ fontSize: 14, color: '#065f46', margin: 0 }}>
-                        From{' '}
-                        <span style={{ fontWeight: 600 }}>
-                          {formatCurrency(directBookingNightly, { maximumFractionDigits: 0 })}
-                        </span>{' '}
-                        per night on our site
-                        {illustrativeOtaNightly > directBookingNightly ? (
-                          <>
-                            {' '}— major booking platforms often show similar stays around{' '}
-                            <span style={{ fontWeight: 600 }}>
-                              {formatCurrency(illustrativeOtaNightly, { maximumFractionDigits: 0 })}
-                            </span>{' '}
-                            or higher after guest fees (illustrative).
-                          </>
-                        ) : null}
-                      </p>
-                      <p style={{ fontSize: 12, color: '#047857', marginTop: 4 }}>Estimate only; OTA pricing varies by dates and promotions.</p>
-                    </div>
-                  </section>
-                )}
 
                 {/* About this home */}
                 <section className="pp-section" aria-label="About this home">
@@ -1896,19 +1863,6 @@ useEffect(() => {
                       <span>Drop keys in the lockbox. Luggage can stay till evening on request.</span>
                     </div>
                   </div>
-                  {/* Additional policy details if present */}
-                  {data.property_policy_details && data.property_policy_details.length > 0 && (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 14, marginTop: 16 }}>
-                      {data.property_policy_details
-                        .filter((p) => p?.type && !p.type.includes('Policy') && !p.type.includes('Detailed'))
-                        .map((policy, idx) => (
-                          <div key={idx} style={{ padding: '12px 14px', background: '#fff', border: '1px solid #f0e6dc', borderRadius: 12 }}>
-                            <p style={{ fontSize: 12, color: '#64748b', margin: '0 0 3px' }}>{policy.type}</p>
-                            <p style={{ fontSize: 13.5, fontWeight: 600, color: '#1a1a2e', margin: 0 }}>{policy.value}</p>
-                          </div>
-                        ))}
-                    </div>
-                  )}
                 </section>
 
                 {/* Similar stays */}
@@ -1982,7 +1936,7 @@ useEffect(() => {
                   <UnitBookingWidget
                     listingId={resolvedListingId ?? undefined}
                     propertyId={listingPropertyId ?? undefined}
-                    listingName={data.property_name || 'This property'}
+                    listingName={getListingDisplayName(data.id ?? data.listingId, data.property_name) || 'This property'}
                     timezoneId={data.timezoneId}
                     coverPhotoUrl={primaryImage}
                     maxGuests={data.maxGuests}
