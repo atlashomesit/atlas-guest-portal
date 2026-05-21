@@ -13,8 +13,8 @@ import { hasRuntimeConfig } from '@/runtime-config';
 import ErrorBanner from '@/components/ErrorBanner';
 import { type AvailabilityNightlyRate, type AvailabilityResponse } from '@/api/availabilityClient';
 import { buildApiUrl, getApiHeaders } from '@/api/client';
+import { dedupedAvailabilityCalendarFetch } from '@/api/availabilityCalendarClient';
 import { apiFetch } from '@/lib/http';
-import { monitoredFetch } from '@/lib/monitoring';
 import { getIstStartOfDay } from '@/utils/date';
 import { calculateNights, formatDateInTimezone } from '@/utils/dateHelpers';
 import { doesRangeIntersectBlocked, toISODate } from '@/utils/dateRange';
@@ -377,11 +377,12 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         setIsLoading(true);
         setStatusMessage('Checking availability...');
 
-        // TASK-2118: use monitoredFetch (single attempt) instead of apiFetch (retries on
-        // 5xx/network). Retries against a cold dev API push GET count above the
-        // duplicate-fetch guard's MAX_GETS=2 cap. Matches the public AvailabilityCalendar
-        // component's no-retry behavior.
-        const response = await monitoredFetch(availabilityKey, { headers: getApiHeaders() });
+        // TASK-2118: use dedupedAvailabilityCalendarFetch — module-level in-flight
+        // dedup shares a single GET with the sibling AvailabilityCalendar component
+        // and across React StrictMode double-mount. Single attempt (no apiFetch
+        // retries on 5xx/network — retries against a cold dev API push the count
+        // above MAX_GETS=4).
+        const response = await dedupedAvailabilityCalendarFetch(availabilityKey, { headers: getApiHeaders() });
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}`);
         }
