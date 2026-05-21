@@ -1276,7 +1276,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           {gstSlabPercent != null && breakdownPrice > 0 && gstLineAmount > 0 && (
             <div className="lv-price-row" data-testid="bw-bd-gst-row">
               <span>
-                GST ({gstSlabPercent}%)
+                GST ({gstSlabPercent}%) <small style={{ color: '#94a3b8', fontWeight: 400 }}>on accommodation</small>
+                <br /><small style={{ color: '#94a3b8', fontWeight: 400, fontSize: 11 }}>On accommodation only</small>
               </span>
               <span className="lv-num">{displayPrice(gstLineAmount)}</span>
             </div>
@@ -1387,7 +1388,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       </p>
 
       {/* TASK-2623: Trust strip — free cancellation (v2 style) */}
-      <div className="lv-booking-cancel" data-testid="bw-trust-strip">
+      <div className="lv-booking-cancel bw-trust" data-testid="bw-trust-strip">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M20 6L9 17l-5-5"/>
         </svg>

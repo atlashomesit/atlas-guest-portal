@@ -50,13 +50,12 @@ describe('UnitBookingWidget - TASK-2623: .bw-* design header, price labels, trus
     expect(content).toBeTruthy();
   });
 
-  it('has .bw-head header block with "From" and "/ night" copy', () => {
+  it('has v2 headline block with per-night price display and "/ night" copy (listing-detail-v2 redesign)', () => {
+    // v2 redesign (2026-05-21): lv-booking-headline replaces bw-head/bw-price-block.
+    // bw-* layout classes removed; lv-* design tokens now drive the headline.
     content = readFileSync(filePath, 'utf-8');
-    expect(content).toContain('bw-head');
-    expect(content).toContain('bw-price-block');
-    expect(content).toContain('bw-from');
-    expect(content).toContain('bw-amount');
-    expect(content).toContain('From');
+    expect(content).toContain('lv-booking-headline');
+    expect(content).toContain('lv-booking-total');
     expect(content).toContain('/ night');
   });
 
