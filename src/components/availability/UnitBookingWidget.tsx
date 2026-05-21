@@ -196,6 +196,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const lastAvailabilityKeyRef = useRef<string | null>(null);
   const hasAutoAdjustedRef = useRef(false);
+  const hasHydratedFromContextRef = useRef(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [dateError, setDateError] = useState<string | null>(null);
@@ -250,6 +251,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   // Reset auto-adjust flag when listing changes
   useEffect(() => {
     hasAutoAdjustedRef.current = false;
+    hasHydratedFromContextRef.current = false;
   }, [listingId]);
 
 
@@ -338,6 +340,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return;
     if (end.getTime() <= start.getTime()) return;
     setDateRange({ startDate: start, endDate: end });
+    hasHydratedFromContextRef.current = true;
   }, [booking.checkIn, booking.checkOut]);
 
   useEffect(() => {
@@ -474,7 +477,8 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   // Auto-select next available date if today is blocked or hold
   useEffect(() => {
     // Only run once when availability data is loaded and we haven't auto-adjusted yet
-    if (dateStatusMap.size === 0 || hasAutoAdjustedRef.current) return;
+    // Also skip if we've already hydrated dates from the booking context (URL params)
+    if (dateStatusMap.size === 0 || hasAutoAdjustedRef.current || hasHydratedFromContextRef.current) return;
     
     const todayISO = toISODate(today);
     const todayStatus = dateStatusMap.get(todayISO);
