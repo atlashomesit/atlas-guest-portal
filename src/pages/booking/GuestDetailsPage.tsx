@@ -1208,8 +1208,8 @@ const GuestDetailsPage: React.FC = () => {
               </div>
             )}
             {convenienceFeeAmount > 0 && (
-              <div className="gd-price-row">
-                <span>Service fee</span>
+              <div className="gd-price-row" title="Razorpay payment gateway fee — passed through, not an Atlas markup.">
+                <span>Payment processing</span>
                 <span className="num">{displayPrice(convenienceFeeAmount)}</span>
               </div>
             )}
