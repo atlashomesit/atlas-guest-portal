@@ -1278,8 +1278,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           {gstSlabPercent != null && breakdownPrice > 0 && gstLineAmount > 0 && (
             <div className="lv-price-row" data-testid="bw-bd-gst-row">
               <span>
-                GST ({gstSlabPercent}%) <small style={{ color: '#94a3b8', fontWeight: 400 }}>on accommodation</small>
-                <br /><small style={{ color: '#94a3b8', fontWeight: 400, fontSize: 11 }}>On accommodation only</small>
+                GST ({gstSlabPercent}%) <small style={{ color: '#475569', fontWeight: 400 }}>on accommodation</small>
+                <br /><small style={{ color: '#475569', fontWeight: 400, fontSize: 11 }}>On accommodation only</small>
               </span>
               <span className="lv-num">{displayPrice(gstLineAmount)}</span>
             </div>
