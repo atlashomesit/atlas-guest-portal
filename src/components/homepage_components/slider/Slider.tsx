@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { HERO_IMAGE_URL } from '../../../config/hero';
 import { heroWidgetLayoutFlag } from '../../../config/abFlags';
 import { getTenantContext } from '../../../tenant/tenantContext';
+import { getTenantBrandName } from '../../../tenant/displayBrand';
 import { getTenantOverrides } from '../../../tenant/tenantOverrides';
 import {
   PMS_AIRBNB_2026_TERMS_URL,
@@ -81,7 +82,7 @@ const Slider = () => {
               style={{ background: 'var(--brand-primary, #ea580c)' }}
               aria-hidden="true"
             />
-            Atlas Homestays · Hyderabad
+            {isAtlasRoot ? `${getTenantBrandName()} · Hyderabad` : getTenantBrandName()}
           </div>
 
           <div className="space-y-4 max-w-3xl">
