@@ -1,7 +1,7 @@
 import React from 'react';
-import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { addDays, format, startOfDay, startOfMonth } from 'date-fns';
-import { CalendarRange, ChevronDown, ShieldCheck } from 'lucide-react';
+import { CalendarRange, ChevronDown } from 'lucide-react';
 import { heroWidgetLayoutFlag } from '../../config/abFlags';
 import { getApiBaseUrl } from '../../runtime-config';
 import { getApiHeaders } from '../../api/client';
@@ -579,9 +579,10 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
     ? 'hero-form w-full max-w-5xl rounded-[24px] bg-[var(--bg-surface)] shadow-[var(--shadow-level-3)] backdrop-blur-sm border border-[var(--border-subtle)] p-8 flex flex-col gap-6'
     : 'hero-form w-full max-w-5xl rounded-[24px] bg-[var(--bg-surface)] shadow-[var(--shadow-level-3)] backdrop-blur-sm border border-[var(--border-subtle)] p-8 flex flex-col gap-6';
 
+  // Gap 2 fix: give CTA column 1.4× share so "Check availability" text is never clipped
   const formGridClass = enableWidgetExperiment
-    ? 'hero-form-grid grid grid-cols-1 gap-6 md:grid-cols-2 md:auto-rows-fr lg:grid-cols-4'
-    : 'hero-form-grid grid grid-cols-1 gap-6 md:grid-cols-2 md:auto-rows-fr lg:grid-cols-4';
+    ? 'hero-form-grid grid grid-cols-1 gap-6 md:grid-cols-2 md:auto-rows-fr lg:grid-cols-[1fr_1fr_1fr_1.4fr]'
+    : 'hero-form-grid grid grid-cols-1 gap-6 md:grid-cols-2 md:auto-rows-fr lg:grid-cols-[1fr_1fr_1fr_1.4fr]';
 
   const fieldShellClass =
     'field-card flex h-full min-h-[120px] flex-col justify-between rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-7 py-7 shadow-[var(--shadow-level-1)] hover:shadow-[var(--shadow-level-2)] hover:scale-[1.01]';
@@ -743,14 +744,6 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
           >
             {isSubmitting ? 'Checking...' : 'Check availability'}
           </button>
-          <Link
-            to="/#our-homes"
-            className="group inline-flex items-center justify-center gap-1 text-[14px] font-medium text-[var(--cta-primary)] transition-all hover:text-[var(--text-body)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#475569] whitespace-nowrap mt-3"
-            data-discover="true"
-          >
-            Browse all apartments
-            <span className="inline-block transition-transform group-hover:translate-x-1">→</span>
-          </Link>
         </div>
       </div>
 
@@ -764,16 +757,6 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
           {statusMessage}
         </p>
       )}
-
-      <div className="flex flex-col gap-3 rounded-2xl bg-[var(--bg-surface)] border border-[var(--bg-muted)] px-6 py-5 text-left md:flex-row md:items-center md:gap-4">
-        <div className="flex items-center gap-2 text-[15px] font-bold text-[var(--text-body)]">
-          <ShieldCheck className="h-4 w-4 text-[var(--cta-primary)]" aria-hidden="true" />
-          <span>Book with confidence</span>
-        </div>
-        <p className="text-sm text-[var(--cta-primary)] md:border-l md:border-[var(--border-subtle)] md:pl-4">
-          Instant confirmation • Secure payment • Flexible cancellation
-        </p>
-      </div>
 
       {isAvailabilityModalOpen && (
         <div

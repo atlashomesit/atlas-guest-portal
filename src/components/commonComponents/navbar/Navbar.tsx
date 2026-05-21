@@ -2,18 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useNavigate, useLocation, matchPath } from 'react-router-dom';
 import './navbar.css';
 
-import { IoIosCall } from 'react-icons/io';
-import { Loader } from 'lucide-react';
 import { primaryNav, ctaNav } from '../../../config/navigation';
 import { LOGO_URL } from '../../../config/branding';
 import { getTenantContext } from '../../../tenant/tenantContext';
-import { getTenantOverrides, getUnitNoun, shouldHideAtlasBranding } from '../../../tenant/tenantOverrides';
+import { getTenantOverrides, shouldHideAtlasBranding } from '../../../tenant/tenantOverrides';
 import { formatDisplayNumber, getTelLink } from '../../../config/contact';
 import { trackEvent } from '../../../utils/analytics';
 import { getFavoriteIds } from '../../../utils/guestHistory';
 import { useBooking } from '../../../contexts/BookingContext';
-import { usePropertyListings } from '../../../hooks/usePropertyListings';
-import CurrencySelector from '../../CurrencySelector';
 
 const Navbar = () => {
   const tenant = getTenantContext();
@@ -26,19 +22,10 @@ const Navbar = () => {
     : (tenant?.name ?? 'Home');
   const showLogo = !overrides.hideLogo;
   const showListProperty = !overrides.hideListProperty;
-  const unitNoun = getUnitNoun(overrides);
-  const homesLabel = `Our ${unitNoun.capitalPlural}`;
-
-  const apiListings = usePropertyListings();
-  const homesEntries = apiListings.homes;
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isHomesOpen, setIsHomesOpen] = useState(false);
-  const [isHomesMobileOpen, setIsHomesMobileOpen] = useState(false);
   const [ctaStatus, setCtaStatus] = useState<'idle' | 'navigating' | 'scrolling'>('idle');
   const [savedCount, setSavedCount] = useState(0);
-
-  const homesDropdownRef = useRef<HTMLDivElement | null>(null);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -63,12 +50,6 @@ const Navbar = () => {
 
   const closeMobile = () => {
     setIsMenuOpen(false);
-    setIsHomesMobileOpen(false);
-  };
-
-  const handleHomeSelect = () => {
-    setIsHomesOpen(false);
-    closeMobile();
   };
 
   /* =========================
@@ -135,30 +116,7 @@ const Navbar = () => {
     closeMobile();
   };
 
-  const handleOutsideClick = (event: MouseEvent) => {
-    if (homesDropdownRef.current && !homesDropdownRef.current.contains(event.target as Node)) {
-      setIsHomesOpen(false);
-    }
-  };
-
-  const handleEscape = (event: KeyboardEvent) => {
-    if (event.key === 'Escape') {
-      setIsHomesOpen(false);
-    }
-  };
-
   useEffect(() => {
-    document.addEventListener('mousedown', handleOutsideClick);
-    document.addEventListener('keydown', handleEscape);
-    return () => {
-      document.removeEventListener('mousedown', handleOutsideClick);
-      document.removeEventListener('keydown', handleEscape);
-    };
-  }, []);
-
-  useEffect(() => {
-    setIsHomesOpen(false);
-    setIsHomesMobileOpen(false);
     setIsMenuOpen(false);
   }, [location.pathname, location.search, location.hash]);
 
@@ -228,53 +186,10 @@ const Navbar = () => {
           </div>
         </div>
 
-        {/* CENTER - Desktop Navigation */}
+        {/* CENTER - Desktop Navigation: Stays | Hyderabad | Trips | Help */}
         <div className="hidden lg:flex items-center">
           <div className="navbar-center flex gap-6">
-          {visibleNavItems.map((item) => (
-            item.label === 'Our Homes' ? (
-              <div
-                key={item.label}
-                className={`dropdown ${isHomesOpen ? 'open' : ''}`}
-                ref={homesDropdownRef}
-                onMouseEnter={() => setIsHomesOpen(true)}
-                onMouseLeave={() => setIsHomesOpen(false)}
-              >
-                <button
-                  type="button"
-                  className="dropdown-button"
-                  aria-haspopup="menu"
-                  aria-expanded={isHomesOpen}
-                  aria-controls="homes-menu"
-                  onClick={() => setIsHomesOpen((prev) => !prev)}
-                >
-                  {homesLabel}
-                </button>
-
-                <div className="dropdown-menu dropdown-menu-scrollable" role="menu" id="homes-menu">
-                  {apiListings.isLoading ? (
-                    <div className="flex items-center justify-center py-4">
-                      <Loader size={20} className="animate-spin text-brand-primary" />
-                    </div>
-                  ) : homesEntries.length === 0 ? (
-                    <div className="dropdown-menu-empty" role="presentation">
-                      No listings available
-                    </div>
-                  ) : (
-                    homesEntries.map((home) => (
-                      <Link
-                        key={home.roomNo}
-                        to={home.href}
-                        role="menuitem"
-                        onClick={handleHomeSelect}
-                      >
-                        {home.title}
-                      </Link>
-                    ))
-                  )}
-                </div>
-              </div>
-            ) : (
+            {visibleNavItems.map((item) => (
               <NavLink
                 key={item.label}
                 to={item.to}
@@ -282,40 +197,12 @@ const Navbar = () => {
               >
                 {item.label}
               </NavLink>
-            )
-          ))}
+            ))}
           </div>
         </div>
 
-        {/* RIGHT - Desktop Actions */}
+        {/* RIGHT - Desktop Actions: Saved | Book Now only (utility bar has phone/login/currency) */}
         <div className="hidden lg:flex items-center gap-6">
-          {showListProperty && (
-            <Link
-              to="/become-a-host"
-              className="nav-link"
-              data-testid="navbar-list-property"
-              style={{ fontWeight: 600, whiteSpace: 'nowrap' }}
-            >
-              List your property
-            </Link>
-          )}
-
-          <a
-            href={`${(import.meta.env.VITE_ADMIN_PORTAL_URL as string | undefined)?.trim() || 'https://app.atlaspms.in'}/login`}
-            className="nav-link"
-            data-testid="navbar-host-login"
-            rel="noopener noreferrer"
-            style={{ whiteSpace: 'nowrap' }}
-          >
-            Host Login
-          </a>
-
-          <a href={telLink} className="phone flex items-center gap-1">
-            <span>{formatDisplayNumber()}</span>
-          </a>
-
-          <CurrencySelector />
-
           <NavLink
             to="/favorites"
             className={navLinkClass}
@@ -359,87 +246,18 @@ const Navbar = () => {
       {isMenuOpen && (
         <div className="mobile-menu lg:hidden open" id="mobile-menu-panel">
           {visibleNavItems.map((item) => (
-            item.label === 'Our Homes' ? (
-              <div key={item.label}>
-                <button
-                  type="button"
-                  className="block py-2 text-left font-semibold"
-                  aria-expanded={isHomesMobileOpen}
-                  aria-controls="mobile-homes-menu"
-                  aria-haspopup="menu"
-                  onClick={() => setIsHomesMobileOpen((prev) => !prev)}
-                >
-                  Our Homes
-                </button>
-
-                {isHomesMobileOpen && (
-                  <div id="mobile-homes-menu" className="mobile-submenu">
-                    {apiListings.isLoading ? (
-                      <div className="flex items-center justify-center py-3">
-                        <Loader size={20} className="animate-spin text-brand-primary" />
-                      </div>
-                    ) : homesEntries.length === 0 ? (
-                      <div className="dropdown-menu-empty px-2 py-2 text-sm" role="presentation">
-                        No listings available
-                      </div>
-                    ) : (
-                      homesEntries.map((home) => (
-                        <Link
-                          key={home.roomNo}
-                          to={home.href}
-                          role="menuitem"
-                          className="block py-1 text-sm"
-                          onClick={handleHomeSelect}
-                        >
-                          {home.title}
-                        </Link>
-                      ))
-                    )}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <NavLink
-                key={item.label}
-                onClick={closeMobile}
-                to={item.to}
-                className="block py-2"
-              >
-                {item.label}
-              </NavLink>
-            )
+            <NavLink
+              key={item.label}
+              onClick={closeMobile}
+              to={item.to}
+              className="block py-2"
+            >
+              {item.label}
+            </NavLink>
           ))}
 
           {/* MOBILE ACTIONS */}
           <div className="mt-2 flex flex-col gap-3">
-            {showListProperty && (
-              <Link
-                to="/become-a-host"
-                onClick={closeMobile}
-                className="block py-2 font-semibold"
-                style={{ color: 'var(--cta-primary, #2563eb)' }}
-              >
-                List your property
-              </Link>
-            )}
-
-            <a
-              href={`${(import.meta.env.VITE_ADMIN_PORTAL_URL as string | undefined)?.trim() || 'https://app.atlaspms.in'}/login`}
-              onClick={closeMobile}
-              className="block py-2 font-semibold"
-              data-testid="navbar-host-login"
-              rel="noopener noreferrer"
-            >
-              Host Login
-            </a>
-
-            <a href={telLink} className="phone flex items-center gap-2">
-              <IoIosCall />
-              <span>{formatDisplayNumber()}</span>
-            </a>
-
-            <CurrencySelector />
-
             <NavLink
               to="/favorites"
               onClick={closeMobile}

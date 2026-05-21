@@ -12,10 +12,10 @@ export const helpNav: NavItem[] = [
 ];
 
 export const primaryNav: NavItem[] = [
-    { label: 'Home', to: '/' },
-    { label: 'Our Homes', to: '/#our-homes' },
-    { label: 'Location', to: '/location' },
-    { label: 'Contact', to: '/contact' },
+    { label: 'Stays', to: '/#our-homes' },
+    { label: 'Hyderabad', to: '/location' },
+    { label: 'Trips', to: '/search' },
+    { label: 'Help', to: '/contact' },
 ];
 
 export const moreNav: NavItem[] = [

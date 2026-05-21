@@ -20,20 +20,8 @@ vi.mock("../../../utils/analytics", async () => {
   };
 });
 
-vi.mock("../../../hooks/usePropertyListings", async () => {
-  const { homes } = await import("../../../content/homes");
-  return {
-    usePropertyListings: () => ({
-      homes: homes.map((h) => ({ roomNo: h.roomNo, title: h.title, href: h.href })),
-      isLoading: false,
-      usedFallback: true,
-    }),
-  };
-});
-
 import Navbar from "./Navbar";
 import { trackEvent } from "../../../utils/analytics";
-import { homes } from "../../../content/homes";
 import { BookingProvider } from "../../../contexts/BookingContext";
 import { CurrencyProvider } from "../../../contexts/CurrencyContext";
 
@@ -57,21 +45,24 @@ beforeEach(() => {
 });
 
 describe("Navbar CTA", () => {
-  it("renders Contact navigation as internal links across desktop and mobile", () => {
+  it("renders Help navigation as internal link (replaces Contact — Gap 1 simplification)", () => {
     renderNavbar();
 
-    const contactLink = screen.getByRole("link", { name: /^Contact$/i });
-    expect(contactLink).toHaveAttribute("href", "/contact");
+    const helpLink = screen.getByRole("link", { name: /^Help$/i });
+    expect(helpLink).toHaveAttribute("href", "/contact");
+  });
 
-    const menuToggle = screen.getByRole("button", { name: /toggle navigation/i });
-    fireEvent.click(menuToggle);
+  it("renders simplified center nav: Stays, Hyderabad, Trips, Help — no duplicates of utility bar", () => {
+    renderNavbar();
 
-    const contactMobile = screen
-      .getAllByRole("link", { name: /^Contact$/i })
-      .find((link) => link.closest("#mobile-menu-panel"));
+    expect(screen.getByRole("link", { name: /^Stays$/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /^Hyderabad$/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /^Trips$/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /^Help$/i })).toBeInTheDocument();
 
-    expect(contactMobile).toBeDefined();
-    expect(contactMobile).toHaveAttribute("href", "/contact");
+    // Utility-bar items must NOT appear in the main navbar right section
+    expect(screen.queryByTestId("navbar-list-property")).toBeNull();
+    expect(screen.queryByTestId("navbar-host-login")).toBeNull();
   });
 
   it("routes Book Now to the dedicated search/reserve flow with a visible transition", () => {
@@ -141,16 +132,5 @@ describe("Navbar CTA", () => {
     expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
     expect(focus).toHaveBeenCalled();
     expect(mockNavigate).not.toHaveBeenCalled();
-  });
-
-  it("shows the Our Homes dropdown", async () => {
-    renderNavbar();
-
-    const trigger = screen.getByRole("button", { name: /our homes/i });
-    fireEvent.click(trigger);
-
-    for (const home of homes) {
-      expect(await screen.findByRole("menuitem", { name: home.title })).toBeInTheDocument();
-    }
   });
 });

@@ -134,11 +134,11 @@ describe("Slider hero search", () => {
     expect(screen.getByText(/Verified homes/i)).toBeInTheDocument();
   });
 
-  it("shows CTA hierarchy with primary button and secondary link", () => {
+  it("shows Check availability CTA button (Browse all apartments link removed — Home v2 Gap 3)", () => {
     renderSlider();
     expect(screen.getByRole("button", { name: /check availability/i })).toBeInTheDocument();
-    const browseLink = screen.getByRole("link", { name: /browse all apartments/i });
-    expect(browseLink.tagName.toLowerCase()).toBe("a");
+    // "Browse all apartments" link removed per Home v2 Gap 3 — duplicate of trust strip
+    expect(screen.queryByRole("link", { name: /browse all apartments/i })).toBeNull();
   });
 
   it("blocks past dates from being selected", () => {

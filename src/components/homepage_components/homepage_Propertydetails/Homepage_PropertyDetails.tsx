@@ -1,5 +1,6 @@
 import './Homepage_PropertyDetails.css';
 import React from 'react';
+import { getListingDisplayName } from '@/lib/listingDisplayName';
 import { getTenantContext as _getTenantCtx } from '@/tenant/tenantContext';
 import { getTenantOverrides, shouldHideAtlasBranding } from '@/tenant/tenantOverrides';
 import { getTenantBrandName } from '@/tenant/displayBrand';
@@ -1237,8 +1238,8 @@ useEffect(() => {
         <>
         {data && (
             <SEO
-                title={`${data.property_name} | ${_getTenantCtx()?.name ?? 'Our Property'}`}
-                description={data.property_description?.slice(0, 160) || `Book ${data.property_name} in ${data.property_location || 'Hyderabad'} on ${_getTenantCtx()?.name ?? 'our platform'}.`}
+                title={`${getListingDisplayName(data.id, data.property_name)} | ${_getTenantCtx()?.name ?? 'Our Property'}`}
+                description={data.property_description?.slice(0, 160) || `Book ${getListingDisplayName(data.id, data.property_name)} in ${data.property_location || 'Hyderabad'} on ${_getTenantCtx()?.name ?? 'our platform'}.`}
                 image={primaryImage}
                 url={pageUrl}
                 type="lodgingBusiness"
@@ -1268,7 +1269,7 @@ useEffect(() => {
                   <span className="pp-sep" aria-hidden="true">›</span>
                 </>
               )}
-              <span aria-current="page">{data.property_name}</span>
+              <span aria-current="page">{getListingDisplayName(data.id, data.property_name)}</span>
             </nav>
 
             {/* ---- Title row ---- */}
@@ -1277,7 +1278,7 @@ useEffect(() => {
                 {!ppHideAtlasBranding && (
                   <p className="pp-eyebrow">{ppBrandName}</p>
                 )}
-                <h1 className="pp-display">{data.property_name}</h1>
+                <h1 className="pp-display">{getListingDisplayName(data.id, data.property_name)}</h1>
                 <div className="pp-submeta">
                   {ppHasApiReviews && (
                     <>
@@ -1926,7 +1927,8 @@ useEffect(() => {
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16 }}>
                         {s.items.slice(0, 4).map((it: any) => {
                           const id = Number(it.id);
-                          const name = String(it.name ?? it.propertyName ?? `Listing ${it.id}`);
+                          const rawName = String(it.name ?? it.propertyName ?? `Listing ${it.id}`);
+                          const name = getListingDisplayName(id, rawName);
                           const img = (it.coverPhotoUrl as string | undefined) ?? (Array.isArray(it.photoUrls) ? it.photoUrls[0] : undefined);
                           const path = buildHomeUnitPath(getPropertySlug({ name: it.propertyName, property_name: it.propertyName }), id);
                           return (

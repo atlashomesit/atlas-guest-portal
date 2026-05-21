@@ -45,7 +45,8 @@ describe('HomePage_Locations', () => {
       </MemoryRouter>
     );
 
-    expect(await screen.findByText('Room 101')).toBeInTheDocument();
+    // Gap 4b: listing cards now show human display names (SKU→human mapping applied)
+    expect(await screen.findByText('Studio 101')).toBeInTheDocument();
     await waitFor(() => expect(trackEventMock).toHaveBeenCalledWith(
       'listings_browse',
       expect.objectContaining({ surface: 'home_locations' }),

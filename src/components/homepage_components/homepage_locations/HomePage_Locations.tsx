@@ -19,6 +19,7 @@ import { getTenantContext } from "../../../tenant/tenantContext";
 import { getTenantBrandName } from "../../../tenant/displayBrand";
 import { getTenantOverrides, getUnitNoun, shouldHideAtlasBranding, type TenantOverrides } from "../../../tenant/tenantOverrides";
 import { useCurrency } from "../../../contexts/CurrencyContext";
+import { getListingDisplayName } from "../../../lib/listingDisplayName";
 
 import "./homepage_location.css";
 
@@ -249,14 +250,11 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
 
     return (
       <div className="flex flex-col gap-1">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-sm font-semibold rounded-full bg-[color:color-mix(in_srgb,var(--cta-primary)_18%,transparent)] px-3 py-1 text-[color:var(--text-body)]">
-            {priceDisplayConfig.discount.primaryBadgeLabel}
-          </span>
-          {showLimitedTimeDeal ? (
+        {showLimitedTimeDeal ? (
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs text-text-muted">{priceDisplayConfig.discount.secondaryBadgeLabel}</span>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
         {dailyPricingLoading && (
           <span className="text-sm text-text-muted">Loading price…</span>
         )}
@@ -378,7 +376,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
                       className="text-xl font-semibold text-text-primary mt-0.5"
                       style={{ fontFamily: 'var(--font-family-display)', letterSpacing: '-0.005em' }}
                     >
-                      {model.listing.title}
+                      {getListingDisplayName(model.listing.id, model.listing.title)}
                     </h3>
                     {model.listing.subtitle ? (
                       <p className="text-sm text-text-muted mt-1 line-clamp-2">{model.listing.subtitle}</p>
