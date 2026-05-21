@@ -9,35 +9,62 @@ exports[`Hero date picker > captures a stable mobile viewport snapshot > date-pi
       class="w-full bg-bg-muted text-text-primary"
     >
       <div
-        class="relative isolate overflow-hidden min-h-[min(78vh,820px)] md:min-h-[min(72vh,760px)] flex items-center justify-center bg-bg-muted bg-cover bg-center bg-no-repeat pt-[calc(var(--nav-height,80px)+1rem)] pb-8"
+        class="relative isolate overflow-hidden min-h-[min(78vh,820px)] md:min-h-[min(72vh,760px)] flex items-end justify-center bg-bg-muted bg-cover bg-center bg-no-repeat pt-[calc(var(--nav-height,116px)+1rem)] pb-12"
         style="background-image: url("https://atlashomestorage.blob.core.windows.net/listing-images/501/cover.jpg");"
       >
         <div
           aria-hidden="true"
-          class="pointer-events-none absolute inset-0 opacity-95"
+          class="pointer-events-none absolute inset-0"
           data-testid="hero-overlay"
           style="background-color: rgba(7, 10, 18, 0.42); background-image: url("linear-gradient-overlay");"
         />
         <div
-          class="relative z-10 flex max-w-4xl flex-col items-center gap-7 px-4 pb-12 text-center sm:px-6 md:pt-3"
+          class="relative z-10 w-full max-w-6xl mx-auto flex flex-col gap-6 px-5 sm:px-8 items-center md:items-start text-center md:text-left pb-4"
         >
+          <div
+            class="inline-flex items-center gap-2.5 text-xs font-semibold tracking-[0.18em] uppercase"
+            style="color: rgb(255, 232, 214);"
+          >
+            <span
+              aria-hidden="true"
+              class="w-1.5 h-1.5 rounded-full"
+              style="background: var(--brand-primary, #ea580c);"
+            />
+            Atlas Homestays · Hyderabad
+          </div>
           <div
             class="space-y-4 max-w-3xl"
           >
             <h1
-              class="text-4xl md:text-6xl font-bold leading-tight text-[var(--text-on-hero)] drop-shadow-lg text-pretty"
-              style="text-wrap: balance;"
+              class="font-bold leading-[1.04] text-[#fffaf5] drop-shadow-lg"
+              style="text-wrap: balance; letter-spacing: -0.005em; font-family: var(--font-family-display);"
             >
-              Thoughtfully curated stays in Hyderabad
+              Thoughtfully curated stays
+               
+              <em
+                style="font-style: italic; color: rgb(255, 217, 179); font-weight: 400;"
+              >
+                in Hyderabad.
+              </em>
             </h1>
-            <h2
-              class="text-lg md:text-xl font-medium text-[color-mix(in_srgb,var(--text-on-hero)_88%,transparent)] text-pretty"
-              style="text-wrap: balance;"
+            <p
+              class="text-base sm:text-lg leading-relaxed max-w-xl"
+              style="color: rgba(255, 250, 245, 0.86);"
             >
-              Discover verified apartments with flexible bookings, transparent pricing, and secure payments.
-            </h2>
+              Direct from the owner —
+               
+              <strong
+                style="color: rgb(255, 232, 214); font-weight: 600;"
+              >
+                no platform fee
+              </strong>
+              ,
+               
+              verified addresses, and WhatsApp-first support from a team that lives down the street.
+            </p>
           </div>
           <div
+            class="w-full max-w-2xl"
             data-testid="hero-widget"
           >
             <form
@@ -373,153 +400,97 @@ exports[`Hero date picker > captures a stable mobile viewport snapshot > date-pi
               </div>
             </form>
           </div>
-          <a
-            class="mt-2 inline-flex items-center gap-2 rounded-full border border-white/40 bg-[rgba(255,250,245,0.16)] px-5 py-2.5 text-sm font-semibold text-[var(--text-on-hero)] transition hover:bg-[rgba(255,250,245,0.24)] hover:border-white/60"
-            data-discover="true"
-            href="/become-a-host"
-          >
-            <svg
-              aria-hidden="true"
-              class="lucide lucide-house h-4 w-4"
-              fill="none"
-              height="24"
-              stroke="currentColor"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              viewBox="0 0 24 24"
-              width="24"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"
-              />
-              <path
-                d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"
-              />
-            </svg>
-            List your property — it's free
-          </a>
-        </div>
-      </div>
-      <div
-        class="bg-bg-surface"
-        data-testid="trust-badges"
-      >
-        <div
-          class="mx-auto -mt-4 flex max-w-5xl flex-wrap items-center justify-center gap-3 px-4 pb-6 pt-2 sm:px-6 md:gap-4 md:pb-8 md:pt-0"
-        >
           <div
-            class="rb-trust-badge min-w-[215px] justify-center sm:min-w-[0]"
-            tabindex="0"
+            aria-label="Booking guarantees"
+            class="flex flex-wrap items-center gap-3 text-[13.5px]"
+            role="list"
+            style="color: rgba(255, 250, 245, 0.85);"
           >
             <span
-              aria-hidden="true"
-              class="rb-trust-badge__icon"
+              class="inline-flex items-center gap-2"
+              role="listitem"
             >
               <svg
                 aria-hidden="true"
-                class="lucide lucide-circle-check"
                 fill="none"
-                height="20"
+                height="16"
                 stroke="currentColor"
                 stroke-linecap="round"
                 stroke-linejoin="round"
-                stroke-width="2.1"
+                stroke-width="2.2"
+                style="color: var(--brand-primary, #ea580c);"
                 viewBox="0 0 24 24"
-                width="20"
-                xmlns="http://www.w3.org/2000/svg"
+                width="16"
               >
-                <circle
-                  cx="12"
-                  cy="12"
-                  r="10"
+                <path
+                  d="M20 6 9 17l-5-5"
+                />
+              </svg>
+              Instant confirmation
+            </span>
+            <span
+              aria-hidden="true"
+              class="w-1 h-1 rounded-full hidden sm:block"
+              style="background: rgba(255, 250, 245, 0.4);"
+            />
+            <span
+              class="inline-flex items-center gap-2"
+              role="listitem"
+            >
+              <svg
+                aria-hidden="true"
+                fill="none"
+                height="16"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.8"
+                style="color: var(--brand-primary, #ea580c);"
+                viewBox="0 0 24 24"
+                width="16"
+              >
+                <path
+                  d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"
                 />
                 <path
                   d="m9 12 2 2 4-4"
                 />
               </svg>
-            </span>
-            <span
-              class="rb-trust-badge__label"
-            >
               Verified homes
             </span>
-          </div>
-          <div
-            class="rb-trust-badge min-w-[215px] justify-center sm:min-w-[0]"
-            tabindex="0"
-          >
             <span
               aria-hidden="true"
-              class="rb-trust-badge__icon"
+              class="w-1 h-1 rounded-full hidden sm:block"
+              style="background: rgba(255, 250, 245, 0.4);"
+            />
+            <span
+              class="inline-flex items-center gap-2"
+              role="listitem"
             >
               <svg
                 aria-hidden="true"
-                class="lucide lucide-shield-check"
                 fill="none"
-                height="20"
+                height="16"
                 stroke="currentColor"
                 stroke-linecap="round"
                 stroke-linejoin="round"
-                stroke-width="2.1"
+                stroke-width="1.8"
+                style="color: var(--brand-primary, #ea580c);"
                 viewBox="0 0 24 24"
-                width="20"
-                xmlns="http://www.w3.org/2000/svg"
+                width="16"
               >
-                <path
-                  d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"
+                <rect
+                  height="16"
+                  rx="2"
+                  width="18"
+                  x="3"
+                  y="5"
                 />
                 <path
-                  d="m9 12 2 2 4-4"
+                  d="M3 10h18M8 3v4M16 3v4"
                 />
               </svg>
-            </span>
-            <span
-              class="rb-trust-badge__label"
-            >
-              Secure Razorpay payments
-            </span>
-          </div>
-          <div
-            class="rb-trust-badge min-w-[215px] justify-center sm:min-w-[0]"
-            tabindex="0"
-          >
-            <span
-              aria-hidden="true"
-              class="rb-trust-badge__icon"
-            >
-              <svg
-                aria-hidden="true"
-                class="lucide lucide-badge-percent"
-                fill="none"
-                height="20"
-                stroke="currentColor"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2.1"
-                viewBox="0 0 24 24"
-                width="20"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z"
-                />
-                <path
-                  d="m15 9-6 6"
-                />
-                <path
-                  d="M9 9h.01"
-                />
-                <path
-                  d="M15 15h.01"
-                />
-              </svg>
-            </span>
-            <span
-              class="rb-trust-badge__label"
-            >
-              No hidden fees
+              Free cancellation 48h before check-in
             </span>
           </div>
         </div>

@@ -170,6 +170,30 @@ const Navbar = () => {
 
   return (
     <header className="navbar-container" id="navbar_container">
+      {/* Slim utility bar — Home v2 design §1: dark strip above main header */}
+      <div className="util-bar" aria-hidden="false">
+        <div className="util-bar-inner">
+          <div className="util-bar-left">
+            {showListProperty && (
+              <a href="/become-a-host">List your property</a>
+            )}
+            <a
+              href={`${(import.meta.env.VITE_ADMIN_PORTAL_URL as string | undefined)?.trim() || 'https://app.atlaspms.in'}/login`}
+              rel="noopener noreferrer"
+            >
+              Host login
+            </a>
+          </div>
+          <div className="util-bar-right">
+            <a className="util-bar-phone" href={telLink}>{formatDisplayNumber()}</a>
+            <span className="util-bar-sep" aria-hidden="true" />
+            <span className="util-bar-locale">INR ₹</span>
+            <span className="util-bar-sep" aria-hidden="true" />
+            <span className="util-bar-locale">EN</span>
+          </div>
+        </div>
+      </div>
+
       <div className="navbar-main">
 
         {/* LEFT - Logo and Mobile Menu Button */}

@@ -173,24 +173,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
     });
   }, [safeListings]);
 
-  const heroListing = sortedListings.find((item) => item.featured) ?? sortedListings[0];
-  const otherListings = sortedListings.filter((item) => item !== heroListing);
-
-  const heroModel = React.useMemo(
-    () =>
-      heroListing
-        ? createListingModel(heroListing, propertyLookup, checkIn, guests, getUrlsForListingId, tenantOverrides)
-        : null,
-    [checkIn, guests, heroListing, propertyLookup, getUrlsForListingId, tenantOverrides],
-  );
-
-  const listingModels = React.useMemo(
-    () =>
-      otherListings.map((item) =>
-        createListingModel(item, propertyLookup, checkIn, guests, getUrlsForListingId, tenantOverrides),
-      ),
-    [checkIn, guests, otherListings, propertyLookup, getUrlsForListingId, tenantOverrides],
-  );
+  /* Home v2: hero+sidebar layout removed — all listings rendered in uniform grid below */
 
   React.useEffect(() => {
     if (!sortedListings.length) return;
@@ -318,271 +301,130 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
     );
   };
 
-  if (!heroModel) {
+  /* Home v2: uniform 3-col grid across all listings — no split hero card */
+  const allListingModels = React.useMemo(
+    () =>
+      sortedListings.map((item) =>
+        createListingModel(item, propertyLookup, checkIn, guests, getUrlsForListingId, tenantOverrides),
+      ),
+    [checkIn, guests, sortedListings, propertyLookup, getUrlsForListingId, tenantOverrides],
+  );
+
+  if (allListingModels.length === 0) {
     return null;
   }
 
   return (
-    <section className="py-12 px-4 sm:px-6 lg:px-8 bg-bg-surface scroll-mt-28" id="our-homes">
-      <div className="max-w-7xl mx-auto flex flex-col gap-8">
-        <Heading title={`Our ${unitNoun.capitalPlural}`} id="our-homes" />
+    <section className="py-16 px-4 sm:px-6 lg:px-8 bg-bg-surface scroll-mt-28" id="our-homes">
+      <div className="max-w-7xl mx-auto flex flex-col gap-10">
+        {/* Section header */}
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+          <div>
+            <Heading title={`Our ${unitNoun.capitalPlural}`} id="our-homes" />
+          </div>
+          <p className="text-sm text-text-muted max-w-xs sm:text-right leading-relaxed">
+            {sortedListings.length} owner-run {sortedListings.length === 1 ? unitNoun.singular : unitNoun.plural} in KPHB, Kukatpally. Same hands clean them, restock them, and answer the door.
+          </p>
+        </div>
 
-        <div className="grid gap-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch rounded-3xl overflow-hidden shadow-sm bg-white border border-border-subtle property-card">
-            <div className="relative h-full">
-              <OptimizedImage
-                key={`${heroModel.listing.id}-${activeImageIndex[heroModel.listing.id] ?? 0}`}
-                src={heroModel.images[activeImageIndex[heroModel.listing.id] ?? 0] ?? ""}
-                alt={heroModel.listing.title}
-                className="w-full h-full object-cover min-h-[280px]"
-                wrapperClassName="h-full"
-                sizes="(max-width: 1023px) 100vw, 50vw"
-                loading="eager"
-                fetchPriority="high"
-              />
-              {heroModel.images.length > 1 && (
-                <div className="absolute bottom-4 left-0 right-0">
-                  <div className="flex justify-center gap-2">
-                    {heroModel.images.length <= 5 ? (
-                      // Show all dots if 5 or fewer images
-                      heroModel.images.map((_, index) => (
-                        <button
-                          key={index}
-                          type="button"
-                          aria-label={`Go to image ${index + 1}`}
-                          onClick={() => {
-                            setActiveImageIndex(prev => ({
-                              ...prev,
-                              [heroModel.listing.id]: index
-                            }));
-                          }}
-                          className={`w-2.5 h-2.5 rounded-full transition-all ${(activeImageIndex[heroModel.listing.id] ?? 0) === index
-                              ? 'bg-white scale-125'
-                              : 'bg-white/50 hover:bg-white/70'
-                            }`}
-                        />
-                      ))
-                    ) : (
-                      // Show 5 dots with active dot in context when more than 5 images
-                      Array.from({ length: 5 }).map((_, i) => {
-                        const activeIndex = activeImageIndex[heroModel.listing.id] ?? 0;
-                        let dotIndex = i;
+        {/* Uniform 3-col grid — Home v2 design */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-7">
+          {allListingModels.map((model, index) => {
+            const navigation = getListingNavigation(model);
+            const activeIndex = activeImageIndex[model.listing.id] ?? 0;
+            const imageSrc = model.images[activeIndex] ?? "";
 
-                        // Adjust dot positions based on active index
-                        if (activeIndex <= 1) {
-                          // First two dots are 0 and 1
-                          dotIndex = i;
-                        } else if (activeIndex >= heroModel.images.length - 2) {
-                          // Last two dots are last two images
-                          dotIndex = heroModel.images.length - 5 + i;
-                        } else {
-                          // Middle dots center around active index
-                          dotIndex = activeIndex - 2 + i;
-                        }
-
-                        // Ensure dotIndex stays within bounds
-                        dotIndex = Math.min(Math.max(0, dotIndex), heroModel.images.length - 1);
-
-                        const isActive = activeIndex === dotIndex;
-
-                        return (
+            return (
+              <article
+                key={getItemKey(model.listing, index)}
+                className="property-card rounded-2xl shadow-sm bg-white overflow-hidden border border-border-subtle flex flex-col transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-md"
+              >
+                {/* Photo */}
+                <div className="relative" style={{ aspectRatio: '4 / 3' }}>
+                  <OptimizedImage
+                    key={`${model.listing.id}-${activeIndex}`}
+                    src={imageSrc}
+                    alt={model.listing.title}
+                    className="w-full h-full object-cover"
+                    wrapperClassName="h-full"
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                    loading={index < 3 ? "eager" : undefined}
+                    fetchPriority={index === 0 ? "high" : undefined}
+                  />
+                  {model.images.length > 1 && (
+                    <div className="absolute bottom-2 left-0 right-0">
+                      <div className="flex justify-center gap-1.5">
+                        {model.images.slice(0, Math.min(model.images.length, 5)).map((_, dotIdx) => (
                           <button
-                            key={i}
+                            key={dotIdx}
                             type="button"
-                            aria-label={`Go to image ${dotIndex + 1}`}
-                            onClick={() => {
-                              setActiveImageIndex(prev => ({
-                                ...prev,
-                                [heroModel.listing.id]: dotIndex
-                              }));
-                            }}
-                            className={`w-2.5 h-2.5 rounded-full transition-all ${isActive
-                                ? 'bg-white scale-125'
-                                : 'bg-white/50 hover:bg-white/70'
-                              }`}
+                            aria-label={`Go to image ${dotIdx + 1}`}
+                            onClick={() => setActiveImageIndex(prev => ({ ...prev, [model.listing.id]: dotIdx }))}
+                            className={`w-2 h-2 rounded-full transition-all ${activeIndex === dotIdx ? 'bg-white scale-125' : 'bg-white/50 hover:bg-white/70'}`}
                           />
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="p-6 flex flex-col gap-4">
-              <div className="flex items-center gap-2">
-                <span className="rounded-full bg-[color:color-mix(in_srgb,var(--cta-primary)_18%,transparent)] px-3 py-1 text-xs font-semibold text-[color:var(--text-body)]">
-                  Featured
-                </span>
-                <span className="text-xs uppercase tracking-[0.08em] font-semibold text-text-muted">
-                  {heroModel.listing.unitType === "penthouse"
-                    ? "Penthouse"
-                    : heroModel.listing.unitType === "1bhk"
-                      ? "Apartment"
-                      : formatAmenityName(heroModel.listing.unitType)}
-                </span>
-              </div>
-              <div>
-                {!hideAtlasBranding && (
-                  <p className="text-sm font-semibold uppercase tracking-wide text-text-muted">{getTenantBrandName()}</p>
-                )}
-                <h3 className="text-3xl font-bold text-text-primary">{heroModel.listing.title}</h3>
-                {heroModel.listing.subtitle && (
-                  <p className="text-base text-text-secondary mt-1">{heroModel.listing.subtitle}</p>
-                )}
-              </div>
-
-              {renderPrice(heroModel)}
-
-              {renderAmenities(heroModel.property)}
-
-              <div className="property-card__actions flex gap-3 flex-wrap mt-auto">
-                <button
-                  type="button"
-                  onClick={() => handleNavigate(heroModel)}
-                  className="property-card__button inline-flex items-center justify-center rounded-full bg-[color:var(--cta-primary)] px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors"
-                >
-                  Check availability
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleNavigate(heroModel)}
-                  className="property-card__button inline-flex items-center justify-center rounded-full border border-border-subtle px-5 py-3 text-sm font-semibold text-text-primary transition hover:border-[color:var(--cta-primary)] hover:text-[color:var(--cta-primary)]"
-                >
-                  {`View ${unitNoun.singular}`}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {listingModels.map((model, index) => {
-              const navigation = getListingNavigation(model);
-              const activeIndex = activeImageIndex[model.listing.id] ?? 0;
-              const imageSrc = model.images[activeIndex] ?? "";
-
-              return (
-                <div
-                  key={getItemKey(model.listing, index)}
-                  className="property-card rounded-2xl shadow-sm bg-white overflow-hidden border border-border-subtle flex flex-col"
-                >
-                  <div className="relative h-56">
-                    <OptimizedImage
-                      key={`${model.listing.id}-${activeIndex}`}
-                      src={imageSrc}
-                      alt={model.listing.title}
-                      className="w-full h-full object-cover"
-                      wrapperClassName="h-full"
-                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                    />
-                    {model.images.length > 1 && (
-                      <div className="absolute bottom-2 left-0 right-0">
-                        <div className="flex justify-center gap-1.5">
-                          {model.images.length <= 5 ? (
-                            // Show all dots if 5 or fewer images
-                            model.images.map((_, index) => (
-                              <button
-                                key={index}
-                                type="button"
-                                aria-label={`Go to image ${index + 1}`}
-                                onClick={() => {
-                                  setActiveImageIndex(prev => ({
-                                    ...prev,
-                                    [model.listing.id]: index
-                                  }));
-                                }}
-                                className={`w-2 h-2 rounded-full transition-all ${(activeImageIndex[model.listing.id] ?? 0) === index
-                                    ? 'bg-white scale-125'
-                                    : 'bg-white/50 hover:bg-white/70'
-                                  }`}
-                              />
-                            ))
-                          ) : (
-                            // Show 5 dots with active dot in context when more than 5 images
-                            Array.from({ length: 5 }).map((_, i) => {
-                              const activeIndex = activeImageIndex[model.listing.id] ?? 0;
-                              let dotIndex = i;
-
-                              // Adjust dot positions based on active index
-                              if (activeIndex <= 1) {
-                                // First two dots are 0 and 1
-                                dotIndex = i;
-                              } else if (activeIndex >= model.images.length - 2) {
-                                // Last two dots are last two images
-                                dotIndex = model.images.length - 5 + i;
-                              } else {
-                                // Middle dots center around active index
-                                dotIndex = activeIndex - 2 + i;
-                              }
-
-                              // Ensure dotIndex stays within bounds
-                              dotIndex = Math.min(Math.max(0, dotIndex), model.images.length - 1);
-
-                              const isActive = activeIndex === dotIndex;
-
-                              return (
-                                <button
-                                  key={i}
-                                  type="button"
-                                  aria-label={`Go to image ${dotIndex + 1}`}
-                                  onClick={() => {
-                                    setActiveImageIndex(prev => ({
-                                      ...prev,
-                                      [model.listing.id]: dotIndex
-                                    }));
-                                  }}
-                                  className={`w-2 h-2 rounded-full transition-all ${isActive
-                                      ? 'bg-white scale-125'
-                                      : 'bg-white/50 hover:bg-white/70'
-                                    }`}
-                                />
-                              );
-                            })
-                          )}
-                        </div>
+                        ))}
                       </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Body */}
+                <div className="p-5 flex flex-col gap-3 flex-1">
+                  <div>
+                    {!hideAtlasBranding && (
+                      <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">{getTenantBrandName()}</p>
+                    )}
+                    <h3
+                      className="text-xl font-semibold text-text-primary mt-0.5"
+                      style={{ fontFamily: 'var(--font-family-display)', letterSpacing: '-0.005em' }}
+                    >
+                      {model.listing.title}
+                    </h3>
+                    {model.listing.subtitle ? (
+                      <p className="text-sm text-text-muted mt-1 line-clamp-2">{model.listing.subtitle}</p>
+                    ) : (
+                      /* TODO: per-listing copy — wire to property_description when available */
+                      model.property?.property_description ? (
+                        <p className="text-sm text-text-muted mt-1 line-clamp-2">{model.property.property_description}</p>
+                      ) : null
                     )}
                   </div>
 
-                  <div className="p-4 flex flex-col gap-3 flex-1">
-                    <div>
-                      {!hideAtlasBranding && (
-                        <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">{getTenantBrandName()}</p>
-                      )}
-                      <h3 className="text-lg font-semibold text-text-primary">{model.listing.title}</h3>
-                      {model.listing.subtitle && (
-                        <p className="text-sm text-text-secondary mt-1">{model.listing.subtitle}</p>
-                      )}
-                    </div>
+                  {/* Bed / bath / sleeps row */}
+                  <div className="flex items-center gap-4 text-[13.5px] text-text-muted flex-wrap">
+                    {model.listing.maxGuests ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                        Sleeps {model.listing.maxGuests}
+                      </span>
+                    ) : null}
+                    <span className="inline-flex items-center gap-1.5">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                      KPHB 7th Phase
+                    </span>
+                  </div>
 
-                    {renderPrice(model)}
+                  {renderPrice(model)}
 
-                    {renderAmenities(model.property)}
+                  {renderAmenities(model.property)}
 
-                    <div className="property-card__actions flex gap-3 flex-wrap mt-auto">
-                      <button
-                        type="button"
-                        onClick={() => handleNavigate(model)}
-                        className="property-card__button inline-flex items-center justify-center rounded-full bg-[color:var(--cta-primary)] px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors"
-                      >
-                        Book now
-                      </button>
-                      <Link
-                        to={{ pathname: navigation?.path ?? "#", search: searchString ? `?${searchString}` : "" }}
-                        onClick={(event) => {
-                          event.preventDefault();
-                          handleNavigate(model);
-                        }}
-                        className="property-card__button inline-flex items-center justify-center rounded-full border border-border-subtle px-5 py-3 text-sm font-semibold text-text-primary transition hover:border-[color:var(--cta-primary)] hover:text-[color:var(--cta-primary)]"
-                      >
-                        {`View ${unitNoun.singular}`}
-                      </Link>
-                    </div>
+                  {/* Single ghost "View home" CTA — no Book now on cards (Home v2) */}
+                  <div className="mt-auto pt-4 border-t border-border-subtle">
+                    <Link
+                      to={{ pathname: navigation?.path ?? "#", search: searchString ? `?${searchString}` : "" }}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        handleNavigate(model);
+                      }}
+                      className="property-card__button w-full inline-flex items-center justify-center rounded-full border border-border-subtle px-5 py-2.5 text-sm font-semibold text-text-primary transition hover:border-[color:var(--cta-primary)] hover:text-[color:var(--cta-primary)] hover:bg-[color:color-mix(in_srgb,var(--cta-primary)_6%,transparent)]"
+                    >
+                      {`View ${unitNoun.singular}`}
+                    </Link>
                   </div>
                 </div>
-              );
-            })}
-          </div>
+              </article>
+            );
+          })}
         </div>
       </div>
     </section>

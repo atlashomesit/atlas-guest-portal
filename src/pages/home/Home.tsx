@@ -7,7 +7,6 @@ import { getTenantOverrides, shouldHideAtlasBranding } from "../../tenant/tenant
 import { getTenantContext } from "../../tenant/tenantContext";
 import { getFaqHighlights } from "../../content/faqHighlights";
 import { trackEvent } from "../../utils/analytics";
-import BannerSecondary from "../../components/home/BannerSecondary";
 import ServicesSection from "../../components/home/ServicesSection";
 import TestimonialsSection from "../../components/home/TestimonialsSection";
 import FooterCtaStrip from "../../components/home/FooterCtaStrip";
@@ -25,6 +24,40 @@ import FaqHighlights from "../../components/faq/FaqHighlights";
 import pricingConfig from "../../config/pricing.config";
 import { getEffectiveDiscountPercent } from "../../utils/pricing";
 import { getPublicSiteOrigin } from "../../config/siteOrigin";
+
+/* ---- Why-direct 3-pillar strip — Home v2 design §5 ---- */
+const WHY_DIRECT_ITEMS = [
+    {
+        icon: (
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                <path d="m9 12 2 2 4-4"/>
+            </svg>
+        ),
+        heading: "We verify every home",
+        body: "Every address is one we own and operate. The photos on this page are the rooms you'll walk into.",
+    },
+    {
+        icon: (
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M21 12V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-1"/>
+                <path d="M16 12h6v4h-6a2 2 0 0 1 0-4z"/>
+            </svg>
+        ),
+        heading: "You pay the host directly",
+        body: "No platform mark-up, no third-party booking fee. The price you see is the price you pay.",
+    },
+    {
+        icon: (
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <rect x="3" y="5" width="18" height="16" rx="2"/>
+                <path d="M3 10h18M8 3v4M16 3v4"/>
+            </svg>
+        ),
+        heading: "Free cancellation 48h before",
+        body: "Plans change. Cancel up to 48 hours before check-in and we'll refund the full amount, no questions.",
+    },
+] as const;
 
 // Atlas social handles only published as sameAs when running under the Atlas brand.
 const ATLAS_SOCIAL_SAME_AS = [
@@ -231,7 +264,38 @@ const Home = () => {
                 <div>
                     <HomePage_Locations />
                 </div>
-                <BannerSecondary />
+
+                {/* Why-direct 3-pillar strip — Home v2 design §5 */}
+                <section
+                    className="border-t border-b border-border-subtle mt-0"
+                    style={{ background: 'var(--bg-secondary, #f9f6f2)' }}
+                    aria-labelledby="why-direct-heading"
+                >
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+                        <h2 id="why-direct-heading" className="sr-only">Why book direct</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
+                            {WHY_DIRECT_ITEMS.map((item) => (
+                                <div key={item.heading} className="flex flex-col gap-3">
+                                    <span
+                                        className="inline-flex items-center justify-center w-11 h-11 rounded-xl border border-border-subtle"
+                                        style={{ background: '#fff', color: 'var(--brand-primary, #ea580c)' }}
+                                        aria-hidden="true"
+                                    >
+                                        {item.icon}
+                                    </span>
+                                    <h3
+                                        className="text-2xl font-medium text-text-primary"
+                                        style={{ fontFamily: 'var(--font-family-display)', letterSpacing: '-0.005em', lineHeight: '1.15' }}
+                                    >
+                                        {item.heading}
+                                    </h3>
+                                    <p className="text-sm text-text-muted leading-relaxed">{item.body}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </section>
+
                 <div className="">
                     <ServicesSection />
                 </div>

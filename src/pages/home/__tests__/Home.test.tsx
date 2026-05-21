@@ -25,11 +25,6 @@ vi.mock("../../../components/home/TestimonialsSection", () => ({
   default: () => <div>Hear What Our Happy Guests Are Saying</div>,
 }));
 
-vi.mock("../../../components/home/BannerSecondary", () => ({
-  __esModule: true,
-  default: () => <div>Atlas Homes – Where Every Stay Feels Like Home</div>,
-}));
-
 vi.mock("../../../utils/analytics", async () => {
   const actual = await vi.importActual<typeof import("../../../utils/analytics")>("../../../utils/analytics");
   return {
@@ -48,7 +43,10 @@ describe("Home", () => {
       </BookingProvider>,
     );
 
-    expect(screen.getByText(/Atlas Homes – Where Every Stay Feels Like Home/i)).toBeInTheDocument();
+    // BannerSecondary removed in Home v2 — replaced by inline why-direct section
+    expect(screen.getByText(/We verify every home/i)).toBeInTheDocument();
+    expect(screen.getByText(/You pay the host directly/i)).toBeInTheDocument();
+    expect(screen.getByText(/Free cancellation 48h before/i)).toBeInTheDocument();
     expect(screen.getByText(/Discover Our Exclusive Services/i)).toBeInTheDocument();
     expect(screen.getByText(/Hear What Our Happy Guests Are Saying/i)).toBeInTheDocument();
   });

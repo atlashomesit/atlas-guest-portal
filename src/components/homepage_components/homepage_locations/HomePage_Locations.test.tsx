@@ -75,7 +75,7 @@ describe('HomePage_Locations', () => {
     });
   });
 
-  it('preserves search params when navigating from hero CTAs', async () => {
+  it('preserves search params when navigating from listing CTAs', async () => {
     mockSearch = '?checkIn=2025-02-01&checkOut=2025-02-05&guests=4';
 
     render(
@@ -84,8 +84,9 @@ describe('HomePage_Locations', () => {
       </MemoryRouter>
     );
 
-    const cta = await screen.findByText('Check availability');
-    fireEvent.click(cta);
+    // Home v2: uniform grid — all cards have a single "View home" ghost CTA (no "Book now")
+    const cta = await screen.findAllByText(/view (home|apartment|room|unit|property)/i);
+    fireEvent.click(cta[0]);
 
     const [navigateArgs] = navigateMock.mock.calls[0] ?? [];
     expect(navigateArgs).toEqual(
