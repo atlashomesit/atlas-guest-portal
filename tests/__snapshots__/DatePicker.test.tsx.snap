@@ -328,13 +328,6 @@ exports[`Hero date picker > captures a stable mobile viewport snapshot > date-pi
                         />
                       </svg>
                     </span>
-                    <p
-                      class="mt-3 text-[12px] leading-relaxed text-[var(--text-muted)]"
-                    >
-                      Maximum 
-                      20
-                       guests
-                    </p>
                   </button>
                 </div>
                 <div

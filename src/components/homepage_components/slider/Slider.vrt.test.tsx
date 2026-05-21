@@ -61,7 +61,7 @@ describe("Slider VRT snapshots", () => {
       [
         "Check-in22 Dec 2025",
         "Check-out23 Dec 20251 night",
-        "Guests1 guestMaximum 20 guests",
+        "Guests1 guest",
         "Check availability",
       ]
     `);
