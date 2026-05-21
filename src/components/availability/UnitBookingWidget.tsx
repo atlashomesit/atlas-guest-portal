@@ -825,8 +825,6 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         ? Math.round(effectiveDailyPricing.actualPrice * (hasSelectedRange ? priceDetails.nights : 1))
         : 0;
   const convenienceFeePercent = calendarConvenienceFeePercent != null ? calendarConvenienceFeePercent / 100 : 0;
-  const _convenienceFee = Math.round(priceDetails.total * convenienceFeePercent);
-  const breakdownConvenienceFee = Math.round(breakdownPrice * convenienceFeePercent);
 
   // Per-night: when API has loaded use API/calendar data; when API not loaded show 0.
   const perNightForDisplay =
@@ -845,6 +843,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     gstSlabPercent != null && breakdownPrice > 0
       ? Math.max(1, Math.round(breakdownPrice * gstSlabPercent / 100))
       : 0;
+
+  // Razorpay charges its 3% fee on the FULL amount it processes (base + GST), not just base.
+  // Sreekar canonical clarification 2026-05-21 (memory: project_guest_booking_pricing_formula).
+  const _convenienceFee = Math.round(priceDetails.total * convenienceFeePercent);
+  const breakdownConvenienceFee = Math.round((breakdownPrice + gstLineAmount) * convenienceFeePercent);
 
   // TASK-2631: Total = Base + GST + Service Fee (CPO-canonical formula).
   // GST is additive (5% or 12% of base, not inclusive extraction).
