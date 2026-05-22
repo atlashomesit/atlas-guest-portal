@@ -1,11 +1,8 @@
 import React from 'react';
-import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { addDays, format, startOfDay, startOfMonth } from 'date-fns';
-import { CalendarRange, ChevronDown, ShieldCheck } from 'lucide-react';
+import { CalendarRange, ChevronDown } from 'lucide-react';
 import { heroWidgetLayoutFlag } from '../../config/abFlags';
-import { getApiBaseUrl } from '../../runtime-config';
-import { getApiHeaders } from '../../api/client';
-import { messageFromApiResponse } from '../../utils/serverErrorFromResponse';
 import { trackEvent } from '../../utils/analytics';
 import { useBooking } from '../../contexts/BookingContext';
 import { AtlasDateRangePicker, type AtlasDateRangePickerValue } from '../date/AtlasDateRangePicker';
@@ -58,11 +55,10 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
   const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
   const [isGuestsOpen, setIsGuestsOpen] = React.useState(false);
   const [activeField, setActiveField] = React.useState<'checkin' | 'checkout' | null>(null);
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [isSubmitting, _setIsSubmitting] = React.useState(false);
   const [statusMessage, setStatusMessage] = React.useState<string>('');
   const [hasInteracted, setHasInteracted] = React.useState(false);
-  const [isAvailabilityModalOpen, setIsAvailabilityModalOpen] = React.useState(false);
-  const [pendingSearchParams, setPendingSearchParams] = React.useState<URLSearchParams | null>(null);
+  // P0 fix (5th-pass): modal state removed — Check availability navigates directly to /search
   // Initialize calendar as ready - no async data needed, calendar renders client-side
   const [calendarReady] = React.useState(true);
   const [shownDate, setShownDate] = React.useState<Date>(() => defaultRange.startDate ?? today);
@@ -414,96 +410,8 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
       { route: `/search?${validation.searchParams.toString()}` },
     );
 
-    setPendingSearchParams(validation.searchParams);
-    setIsAvailabilityModalOpen(true);
-  };
-
-  const performAvailabilityCheck = async (params: URLSearchParams) => {
-    if (isSubmitting) return;
-    const formattedCheckIn = params.get('checkIn');
-    const formattedCheckOut = params.get('checkOut');
-
-    if (!formattedCheckIn || !formattedCheckOut) return;
-
-    const listingSearchRoute = `/search?${params.toString()}`;
-    let availabilityUrl: string;
-    let controller: AbortController | null;
-    let timeoutId: number | null;
-    const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
-
-    try {
-      // GET /availability requires propertyId (contract); hero has no listing selected, so skip API call and just navigate to search
-      const apiBaseUrl = getApiBaseUrl();
-      const totalGuests = guestCounts.adults + guestCounts.children;
-      const hasPropertyId = false; // Hero form does not select a property
-      availabilityUrl =
-        apiBaseUrl && hasPropertyId
-          ? `${apiBaseUrl}/availability?propertyId=${0}&checkIn=${formattedCheckIn}&checkOut=${formattedCheckOut}&guests=${totalGuests}&adults=${guestCounts.adults}&children=${guestCounts.children}&infants=${guestCounts.infants}&pets=${guestCounts.pets}`
-          : '';
-      controller = availabilityUrl && typeof AbortController !== 'undefined' ? new AbortController() : null;
-      timeoutId = controller ? window.setTimeout(() => controller.abort(), 10_000) : null;
-    } catch (configError) {
-      console.error('Hero availability configuration error:', configError);
-      trackEvent(
-        'availability_search_config_error',
-        {
-          surface: 'hero_form',
-          message: configError instanceof Error ? configError.message : 'Unknown configuration error',
-        },
-        { route: listingSearchRoute },
-      );
-      setStatusMessage('Showing all homes while we resolve a configuration issue.');
-      setError('We could not confirm availability due to a configuration issue. Showing all homes instead.');
-      navigate({ pathname: '/search', search: params.toString() });
-      return;
-    }
-
-    setIsSubmitting(true);
-    setStatusMessage(availabilityUrl ? 'Checking availability...' : 'Showing all homes while we confirm availability.');
-
-    try {
-      if (availabilityUrl) {
-        const response = await fetch(availabilityUrl, { signal: controller?.signal, headers: getApiHeaders() });
-        const durationMs = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - startedAt);
-
-        trackEvent(
-          'availability_search_result',
-          { surface: 'hero_form', ok: response.ok, status: response.status, durationMs },
-          { route: listingSearchRoute },
-        );
-
-        if (!response.ok) {
-          throw new Error(await messageFromApiResponse(response));
-        }
-
-        setStatusMessage('Showing available homes for your dates.');
-      } else {
-        setStatusMessage('Showing all homes while we confirm availability.');
-      }
-    } catch (fetchError: unknown) {
-      const durationMs = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - startedAt);
-      trackEvent(
-        'availability_search_result',
-        { surface: 'hero_form', ok: false, status: 'error', durationMs },
-        { route: listingSearchRoute },
-      );
-      const message =
-        fetchError instanceof Error && fetchError.message?.trim()
-          ? fetchError.message.trim()
-          : 'We could not confirm availability right now. Showing all homes instead.';
-      setError(message);
-      setStatusMessage(
-        fetchError instanceof Error && fetchError.message?.trim()
-          ? `${fetchError.message.trim()} Showing all homes.`
-          : 'Unable to confirm availability right now. Showing all homes.',
-      );
-      console.error('Hero availability check failed:', fetchError);
-    } finally {
-      if (timeoutId) window.clearTimeout(timeoutId);
-      setIsSubmitting(false);
-      setIsAvailabilityModalOpen(false);
-      navigate({ pathname: '/search', search: params.toString() });
-    }
+    // P0 fix (5th-pass): navigate directly to /search — no split-stays modal
+    navigate({ pathname: '/search', search: validation.searchParams.toString() });
   };
 
   const handleRangeChange = (selection: AtlasDateRangePickerValue) => {
@@ -559,29 +467,14 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
     setHasInteracted(true);
   };
 
-  React.useEffect(() => {
-    if (!isAvailabilityModalOpen) return;
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setIsAvailabilityModalOpen(false);
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isAvailabilityModalOpen]);
-
   const formContainerClass = enableWidgetExperiment
     ? 'hero-form w-full max-w-5xl rounded-[24px] bg-[var(--bg-surface)] shadow-[var(--shadow-level-3)] backdrop-blur-sm border border-[var(--border-subtle)] p-8 flex flex-col gap-6'
     : 'hero-form w-full max-w-5xl rounded-[24px] bg-[var(--bg-surface)] shadow-[var(--shadow-level-3)] backdrop-blur-sm border border-[var(--border-subtle)] p-8 flex flex-col gap-6';
 
+  // Gap 2 fix: give CTA column 1.4× share so "Check availability" text is never clipped
   const formGridClass = enableWidgetExperiment
-    ? 'hero-form-grid grid grid-cols-1 gap-6 md:grid-cols-2 md:auto-rows-fr lg:grid-cols-4'
-    : 'hero-form-grid grid grid-cols-1 gap-6 md:grid-cols-2 md:auto-rows-fr lg:grid-cols-4';
+    ? 'hero-form-grid grid grid-cols-1 gap-6 md:grid-cols-2 md:auto-rows-fr lg:grid-cols-[1fr_1fr_1fr_1.4fr]'
+    : 'hero-form-grid grid grid-cols-1 gap-6 md:grid-cols-2 md:auto-rows-fr lg:grid-cols-[1fr_1fr_1fr_1.4fr]';
 
   const fieldShellClass =
     'field-card flex h-full min-h-[120px] flex-col justify-between rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-7 py-7 shadow-[var(--shadow-level-1)] hover:shadow-[var(--shadow-level-2)] hover:scale-[1.01]';
@@ -743,14 +636,6 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
           >
             {isSubmitting ? 'Checking...' : 'Check availability'}
           </button>
-          <Link
-            to="/#our-homes"
-            className="group inline-flex items-center justify-center gap-1 text-[14px] font-medium text-[var(--cta-primary)] transition-all hover:text-[var(--text-body)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#475569] whitespace-nowrap mt-3"
-            data-discover="true"
-          >
-            Browse all apartments
-            <span className="inline-block transition-transform group-hover:translate-x-1">→</span>
-          </Link>
         </div>
       </div>
 
@@ -765,58 +650,6 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
         </p>
       )}
 
-      <div className="flex flex-col gap-3 rounded-2xl bg-[var(--bg-surface)] border border-[var(--bg-muted)] px-6 py-5 text-left md:flex-row md:items-center md:gap-4">
-        <div className="flex items-center gap-2 text-[15px] font-bold text-[var(--text-body)]">
-          <ShieldCheck className="h-4 w-4 text-[var(--cta-primary)]" aria-hidden="true" />
-          <span>Book with confidence</span>
-        </div>
-        <p className="text-sm text-[var(--cta-primary)] md:border-l md:border-[var(--border-subtle)] md:pl-4">
-          Instant confirmation • Secure payment • Flexible cancellation
-        </p>
-      </div>
-
-      {isAvailabilityModalOpen && (
-        <div
-          className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-[color:color-mix(in_srgb,var(--text-primary)_70%,transparent)]"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="availability-modal-title"
-          aria-describedby="availability-modal-description"
-          onClick={() => setIsAvailabilityModalOpen(false)}
-        >
-          <div
-            className="relative w-[90%] max-w-lg rounded-2xl bg-bg-surface p-6 shadow-level3"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <h3 id="availability-modal-title" className="text-xl font-semibold text-text-primary">
-              Availability
-            </h3>
-            <p id="availability-modal-description" className="mt-3 text-sm text-text-muted">
-              Good news! More than one home is available for your dates.
-            </p>
-            <p className="mt-2 text-sm text-text-muted">
-              Soon you’ll be able to book split stays across multiple apartments without leaving this page.
-            </p>
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                type="button"
-                className="inline-flex items-center justify-center rounded-lg px-4 py-3 text-sm font-semibold text-text-primary underline-offset-4 transition hover:text-cta-secondary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
-                onClick={() => setIsAvailabilityModalOpen(false)}
-              >
-                Close
-              </button>
-              <button
-                type="button"
-                className="inline-flex items-center justify-center rounded-lg bg-cta-primary px-4 py-2 text-sm font-semibold text-[var(--text-contrast)] shadow-sm transition hover:bg-cta-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
-                onClick={() => pendingSearchParams && performAvailabilityCheck(pendingSearchParams)}
-                disabled={!pendingSearchParams || isSubmitting}
-              >
-                Continue
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </form>
   );
 };

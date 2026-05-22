@@ -1,3 +1,83 @@
+/* ---- Utility bar (slim dark strip above main header, Home v2) ---- */
+.util-bar {
+  background: var(--brand-ink, #1a1a2e);
+  color: #cbb89b;
+  font-size: 12.5px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  width: 100%;
+}
+
+.util-bar-inner {
+  max-width: 1360px;
+  margin: 0 auto;
+  padding: 0 32px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.util-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+
+.util-bar-left a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #cbb89b;
+  text-decoration: none;
+  transition: color 200ms ease;
+}
+
+.util-bar-left a:hover {
+  color: #ffe8d6;
+}
+
+.util-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.util-bar-sep {
+  width: 1px;
+  height: 14px;
+  background: rgba(255, 255, 255, 0.12);
+  flex-shrink: 0;
+}
+
+.util-bar-phone {
+  color: #ffe8d6;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-decoration: none;
+}
+
+.util-bar-phone:hover {
+  color: #fff;
+}
+
+.util-bar-locale {
+  color: #cbb89b;
+  font-size: 12.5px;
+  text-decoration: none;
+}
+
+.util-bar-locale:hover {
+  color: #ffe8d6;
+}
+
+/* Hide utility bar on mobile — the design hides it at ≤760px */
+@media (max-width: 760px) {
+  .util-bar {
+    display: none;
+  }
+}
+
 /* Premium, minimal navbar with elegant design */
 .navbar-container {
   width: 100%;

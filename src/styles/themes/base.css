@@ -64,8 +64,8 @@ html {
   --safe-area-bottom: env(safe-area-inset-bottom, 0px);
   --safe-area-left: env(safe-area-inset-left, 0px);
 
-  /* Layout */
-  --nav-height: 80px;
+  /* Layout — 80px main header + 36px utility bar on desktop = 116px total */
+  --nav-height: 116px;
 
   /* Layering / z-index scale */
   --z-base: 0;
@@ -127,4 +127,11 @@ button,
 .field-card {
   box-shadow: var(--shadow-level-1);
   border-radius: var(--radius-lg);
+}
+
+/* Mobile: utility bar is hidden so nav-height reverts to main header only */
+@media (max-width: 760px) {
+  :root {
+    --nav-height: 80px;
+  }
 }

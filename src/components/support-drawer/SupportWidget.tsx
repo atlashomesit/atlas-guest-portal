@@ -34,7 +34,6 @@ const SupportWidgetContent = () => {
   const [callbackError, setCallbackError] = useState<string | null>(null);
   const {
     enableCompactDrawer,
-    enableClickOutsideToClose,
     enableSupportCtaHierarchy,
     enableSupportLayoutVariants,
     enableChatbotPlaceholder,
@@ -253,14 +252,16 @@ const SupportWidgetContent = () => {
 
       {isOpen ? (
         <>
-          {enableClickOutsideToClose ? (
-            <div
-              role="presentation"
-              className="fixed inset-0 bg-transparent"
-              style={{ zIndex: "calc(var(--z-floating) - 1)" }}
-              onClick={handleClose}
-            />
-          ) : null}
+          {/*
+            TASK-2647: removed the click-outside <div> overlay. It sat at zIndex var(--z-floating)-1
+            (=29), above the listing detail's sticky booking widget (z-sticky=20), and intercepted
+            clicks targeting #unit-booking-guests on /homes/{slug}/{unit} — the guests popover
+            could not be opened while the support drawer was open. SupportDrawer already installs
+            a document-level mousedown listener (see SupportDrawer.tsx ~L109-124) that closes the
+            drawer on any click outside drawerRef, so the overlay was redundant. With the overlay
+            gone, the booking-widget click both closes the drawer (via the document listener) AND
+            reaches its target.
+          */}
           {/* Enable layoutVariants + ctaHierarchy (e.g., ?ff=layoutVariants,compactDrawer,ctaHierarchy)
               to trial the compact drawer and CTA priority without changing the default experience. */}
           <SupportDrawer

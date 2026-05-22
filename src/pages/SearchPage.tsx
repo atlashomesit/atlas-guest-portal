@@ -4,6 +4,8 @@ import { AlertTriangle, Briefcase, CalendarDays, CalendarRange, Wifi } from "luc
 
 import { propertyData } from "../data";
 import { fetchPublicListings, type PublicListing } from "../api/listingClient";
+import { getListingDisplayName } from "../lib/listingDisplayName";
+import { useDailyPricingSummary } from "../hooks/useDailyPricingSummary";
 import { parseDate } from "../utils/formatting";
 import { useCurrency } from "../contexts/CurrencyContext";
 import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
@@ -89,7 +91,7 @@ function buildStaticListings(allowedIds?: Set<number>): NormalizedListing[] {
       return {
         id: `${propertySlug}-${id}`,
         numericId: id,
-        title: property.property_name,
+        title: getListingDisplayName(id, property.property_name),
         location: property.property_location ?? "Hyderabad",
         pricePerNight: property.property_price ?? 0,
         maxGuests: property.maxCapacity ?? 4,
@@ -121,7 +123,7 @@ function apiToNormalized(listings: PublicListing[]): NormalizedListing[] {
       return {
         id: `api-${l.id}`,
         numericId: l.id,
-        title: l.name || l.propertyName,
+        title: getListingDisplayName(l.id, l.name || l.propertyName),
         location: l.propertyAddress ?? "Hyderabad",
         pricePerNight: l.baseNightlyRate ?? 0,
         maxGuests: l.maxGuests,
@@ -281,6 +283,8 @@ const SearchPage = () => {
   const overrides = getTenantOverrides(tenant?.slug);
   const hideAtlasBranding = shouldHideAtlasBranding(tenant, overrides);
   const unitNoun = getUnitNoun(overrides);
+  // P0#3: use API-driven daily price (same source as Home page) so prices are consistent.
+  const { getListingPricing: getDailyListingPricing } = useDailyPricingSummary();
   const tenantAllowedIds = useMemo(() => {
     const allowed = getTenantPublicListingIdAllowlist(overrides);
     return allowed.size > 0 ? allowed : undefined;
@@ -1094,7 +1098,7 @@ const SearchPage = () => {
                       <div className="flex flex-1 flex-col gap-2 p-4">
                         <h4 className="line-clamp-2 text-base font-semibold text-text-primary">{unit.title}</h4>
                         <p className="text-sm text-text-muted">{unit.location}</p>
-                        <p className="text-lg font-bold text-text-primary">{formatDisplayCurrency(unit.pricePerNight)}<span className="text-sm font-normal text-text-muted"> / night</span></p>
+                        <p className="text-lg font-bold text-text-primary">{formatDisplayCurrency((getDailyListingPricing(unit.numericId)?.actualPrice ?? 0) > 0 ? getDailyListingPricing(unit.numericId)!.actualPrice : unit.pricePerNight)}<span className="text-sm font-normal text-text-muted"> / night</span></p>
                         <Link
                           to={`${unit.canonicalPath}${querySuffix}`}
                           className="mt-auto inline-flex min-h-[44px] items-center justify-center rounded-xl bg-[var(--cta-primary-hover)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--cta-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
@@ -1248,7 +1252,6 @@ const SearchPage = () => {
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <h2 className="text-xl font-semibold text-text-primary">{unit.title}</h2>
-                      <p className="text-sm text-text-muted">Sleeps up to {unit.maxGuests} guests</p>
                       {/* TASK-577: Show WiFi speed and co-working desk badges */}
                       <div className="mt-2 flex flex-wrap gap-2">
                         {/* TASK-1674: use lucide icons instead of emoji for visual consistency */}
@@ -1318,16 +1321,26 @@ const SearchPage = () => {
                   <OwnerShareBadge className="self-start" />
                   <div className="flex items-center justify-between gap-4">
                     <div className="space-y-1">
-                      <p className="text-2xl font-bold text-text-primary" data-testid="guest-listing-nightly-price">{formatDisplayCurrency(unit.pricePerNight)}</p>
-                      {isConverted && (
-                        <p className="text-xs text-text-muted">{formatINR(unit.pricePerNight)} on payment</p>
-                      )}
-                      <p className="text-sm text-text-muted">per night</p>
-                      <p className="text-xs text-text-muted">
-                        {/* TASK-1869 / TASK-1451: Sept 2025 GST reform — 5% for ≤₹7,500/night, 18% above */}
-                        {/* TASK-2557: corrected >₹7,500 slab from 12% to 18% */}
-                        {(() => { const gstMult = unit.pricePerNight > 7500 ? 1.18 : 1.05; const pct = unit.pricePerNight > 7500 ? 18 : 5; return `Est. total: ${formatDisplayCurrency(Math.round(unit.pricePerNight * gstMult))} (incl. ${pct}% GST)`; })()}
-                      </p>
+                      {(() => {
+                        const dailyBreakdown = getDailyListingPricing(unit.numericId);
+                        const displayedPrice = (dailyBreakdown?.actualPrice ?? 0) > 0 ? dailyBreakdown!.actualPrice : unit.pricePerNight;
+                        const gstMult = displayedPrice > 7500 ? 1.18 : 1.05;
+                        const gstPct = displayedPrice > 7500 ? 18 : 5;
+                        return (
+                          <>
+                            <p className="text-2xl font-bold text-text-primary" data-testid="guest-listing-nightly-price">{formatDisplayCurrency(displayedPrice)}</p>
+                            {isConverted && (
+                              <p className="text-xs text-text-muted">{formatINR(displayedPrice)} on payment</p>
+                            )}
+                            <p className="text-sm text-text-muted">per night</p>
+                            <p className="text-xs text-text-muted">
+                              {/* TASK-1869 / TASK-1451: Sept 2025 GST reform — 5% for ≤₹7,500/night, 18% above */}
+                              {/* TASK-2557: corrected >₹7,500 slab from 12% to 18% */}
+                              {`Est. total: ${formatDisplayCurrency(Math.round(displayedPrice * gstMult))} (incl. ${gstPct}% GST)`}
+                            </p>
+                          </>
+                        );
+                      })()}
                       {longStay && (
                         <div className="text-sm font-semibold text-cta-primary">
                           {/* TASK-2077 / TASK-1661: monthly line uses configured LOS tier; otherwise nightly×30 + honest hint */}

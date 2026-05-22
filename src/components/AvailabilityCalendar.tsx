@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { buildApiUrl, getApiHeaders } from '../api/client';
+import { dedupedAvailabilityCalendarFetch } from '../api/availabilityCalendarClient';
 import { messageFromApiResponse } from '../utils/serverErrorFromResponse';
 import { useBooking } from '../contexts/BookingContext';
 
@@ -152,7 +153,9 @@ export default function AvailabilityCalendar({ listingId, onDateSelect }: Props)
     const url = new URL(buildApiUrl(`/api/public/listings/${listingId}/availability-calendar`));
     url.searchParams.set('from', fromStr);
     url.searchParams.set('to', toStr);
-    fetch(url.toString(), { headers: getApiHeaders() })
+    // TASK-2118: module-level dedup keeps this fetch shared across StrictMode
+    // double-mount and across the sibling UnitBookingWidget for the same URL.
+    dedupedAvailabilityCalendarFetch(url.toString(), { headers: getApiHeaders() })
       .then(async (r) => {
         if (!r.ok) {
           if (import.meta.env.DEV) {

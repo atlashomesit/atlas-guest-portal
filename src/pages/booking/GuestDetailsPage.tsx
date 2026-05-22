@@ -1207,12 +1207,6 @@ const GuestDetailsPage: React.FC = () => {
                 <span className="num">{displayPrice(cleaningFeeAmount)}</span>
               </div>
             )}
-            {convenienceFeeAmount > 0 && (
-              <div className="gd-price-row" title="Razorpay payment gateway fee — passed through, not an Atlas markup.">
-                <span>Payment processing</span>
-                <span className="num">{displayPrice(convenienceFeeAmount)}</span>
-              </div>
-            )}
             {addOnsTotal > 0 && (
               <div className="gd-price-row">
                 <span>Add-on services</span>
@@ -1238,6 +1232,12 @@ const GuestDetailsPage: React.FC = () => {
                   <small>On accommodation only</small>
                 </div>
                 <span className="num">{displayPrice(gstLineAmount)}</span>
+              </div>
+            )}
+            {convenienceFeeAmount > 0 && (
+              <div className="gd-price-row" title="Razorpay payment gateway fee — passed through, not an Atlas markup.">
+                <span>Payment processing</span>
+                <span className="num">{displayPrice(convenienceFeeAmount)}</span>
               </div>
             )}
           </div>

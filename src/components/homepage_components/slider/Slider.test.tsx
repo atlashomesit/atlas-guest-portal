@@ -1,6 +1,6 @@
 import React from "react";
 import { addDays, format } from "date-fns";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 
@@ -134,11 +134,11 @@ describe("Slider hero search", () => {
     expect(screen.getByText(/Verified homes/i)).toBeInTheDocument();
   });
 
-  it("shows CTA hierarchy with primary button and secondary link", () => {
+  it("shows Check availability CTA button (Browse all apartments link removed — Home v2 Gap 3)", () => {
     renderSlider();
     expect(screen.getByRole("button", { name: /check availability/i })).toBeInTheDocument();
-    const browseLink = screen.getByRole("link", { name: /browse all apartments/i });
-    expect(browseLink.tagName.toLowerCase()).toBe("a");
+    // "Browse all apartments" link removed per Home v2 Gap 3 — duplicate of trust strip
+    expect(screen.queryByRole("link", { name: /browse all apartments/i })).toBeNull();
   });
 
   it("blocks past dates from being selected", () => {
@@ -154,14 +154,15 @@ describe("Slider hero search", () => {
     expect(screen.getByRole("status")).toHaveTextContent(/hero form ready/i);
   });
 
-  it("shows exactly three high-signal trust badges", () => {
+  it("shows the inline trust strip with three canonical guarantees (Home v2)", () => {
     renderSlider();
-    const trustBadges = screen.getByTestId("trust-badges");
-    expect(trustBadges).toBeInTheDocument();
-    expect(screen.getByText(/verified homes/i)).toBeInTheDocument();
-    expect(screen.getByText(/secure razorpay payments/i)).toBeInTheDocument();
-    expect(screen.getByText(/no hidden fees/i)).toBeInTheDocument();
-    expect(trustBadges).not.toHaveTextContent(/flexible cancellation/i);
-    expect(trustBadges.querySelectorAll(".rb-trust-badge").length).toBe(3);
+    // Home v2: trust badges section replaced with inline strip inside the hero.
+    // Three items: Instant confirmation, Verified homes, Free cancellation 48h before check-in.
+    const trustStrip = screen.getByRole("list", { name: /booking guarantees/i });
+    expect(trustStrip).toBeInTheDocument();
+    // Scope to the trust strip to avoid false matches from SearchAvailabilityWidget
+    expect(within(trustStrip).getByText(/instant confirmation/i)).toBeInTheDocument();
+    expect(within(trustStrip).getByText(/verified homes/i)).toBeInTheDocument();
+    expect(within(trustStrip).getByText(/free cancellation 48h before check-in/i)).toBeInTheDocument();
   });
 });

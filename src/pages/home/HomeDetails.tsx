@@ -1,5 +1,5 @@
 import { Link, useParams } from "react-router-dom";
-import { Suspense, lazy, useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/http";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -96,20 +96,23 @@ const HomeDetails = () => {
   const tenantOverrides = getTenantOverrides(tenant?.slug);
   const hideAtlasBranding = shouldHideAtlasBranding(tenant, tenantOverrides);
 
-  // First try to find in API data (by listing ID)
-  const apiRoom = apiHomes.find((item) => item.roomNo === roomNo);
-
-  // Fallback to tenant-filtered homes
-  const filteredHomes = getTenantFilteredHomes();
-  const room = apiRoom ? {
-    roomNo,
-    title: apiRoom.title,
-    href: apiRoom.href,
-    slug: apiRoom.title.toLowerCase().replace(/_/g, '-'),
-    images: [] as string[],
-    maxGuests: 2,
-    listingId: Number(apiRoom.roomNo),
-  } : filteredHomes.find((item) => item.roomNo === roomNo);
+  const room = useMemo(() => {
+    // First try to find in API data (by listing ID)
+    const apiRoom = apiHomes.find((item) => item.roomNo === roomNo);
+    if (apiRoom) {
+      return {
+        roomNo,
+        title: apiRoom.title,
+        href: apiRoom.href,
+        slug: apiRoom.title.toLowerCase().replace(/_/g, '-'),
+        images: [] as string[],
+        maxGuests: 2,
+        listingId: Number(apiRoom.roomNo),
+      };
+    }
+    // Fallback to tenant-filtered homes
+    return getTenantFilteredHomes().find((item) => item.roomNo === roomNo);
+  }, [apiHomes, roomNo]);
 
   const { updateBooking } = useBooking();
   const [reviewsData, setReviewsData] = useState<ListingReviewsResponse | null>(null);

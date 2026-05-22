@@ -164,9 +164,11 @@ export const GuestTypeSelector: React.FC<GuestTypeSelectorProps> = ({
           {summary}
           <ChevronDown className={`h-[18px] w-[18px] shrink-0 text-[var(--text-muted)] transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} aria-hidden />
         </span>
-        <p className="mt-3 text-[12px] leading-relaxed text-[var(--text-muted)]">
-          Maximum {maxCapacity} guests
-        </p>
+        {isAtCapacity && (
+          <p className="mt-3 text-[12px] leading-relaxed text-[var(--support-error)] font-medium">
+            Maximum {maxCapacity} guests
+          </p>
+        )}
       </button>
       
       {isOpen && (
