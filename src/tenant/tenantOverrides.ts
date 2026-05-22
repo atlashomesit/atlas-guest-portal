@@ -176,6 +176,12 @@ const TENANT_OVERRIDES: Record<string, TenantOverrides> = {
       businessPhone: '9502244053',
       whatsappPhone: '9502244053',
     },
+    mapLocation: {
+      lat: 17.4948,
+      lng: 78.3996,
+      zoom: 15,
+      markerLabel: 'Atlas Homes, KPHB',
+    },
     locationContent: {
       transport: [
         {
