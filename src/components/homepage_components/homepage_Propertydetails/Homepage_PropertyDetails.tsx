@@ -35,6 +35,7 @@ import {
 import SEO from '../../SEO';
 import MultiPinMap, { type MapPin } from '../../map/MultiPinMap';
 import SinglePinGoogleMap from '../../map/SinglePinGoogleMap';
+import { selectPropertyMapMode } from './propertyMapMode';
 import { buildApiUrl, getApiHeaders } from '../../../api/client';
 import { addRecentlyViewed, isFavorite, toggleFavorite } from '../../../utils/guestHistory';
 import { formatCurrency } from '../../../utils/formatting';
@@ -1425,39 +1426,51 @@ useEffect(() => {
                   )}
                 </div>
                 <div style={{ borderRadius: 16, overflow: 'hidden', border: '1px solid #f0e6dc' }}>
-                  {mapSrcTrimmed ? (
-                    <iframe
-                      src={mapSrcTrimmed}
-                      style={{ width: '100%', height: 300, border: 0, display: 'block' }}
-                      loading="lazy"
-                      allowFullScreen
-                      referrerPolicy="no-referrer-when-downgrade"
-                      title="Property Location"
-                    />
-                  ) : useMultiPin ? (
-                    <MultiPinMap pins={propertyPins} height={300} />
-                  ) : mapLocation &&
-                    typeof mapLocation.lat === 'number' &&
-                    Number.isFinite(mapLocation.lat) &&
-                    typeof mapLocation.lng === 'number' &&
-                    Number.isFinite(mapLocation.lng) ? (
-                    <SinglePinGoogleMap
-                      lat={mapLocation.lat}
-                      lng={mapLocation.lng}
-                      zoom={typeof mapLocation.zoom === 'number' && mapLocation.zoom > 0 ? mapLocation.zoom : 15}
-                      markerTitle={mapLocation.markerLabel ?? tenantNameForMap}
-                    />
-                  ) : (
-                    typeof data.latitude === 'number' && Number.isFinite(data.latitude) &&
-                    typeof data.longitude === 'number' && Number.isFinite(data.longitude) ? (
-                      <SinglePinGoogleMap
-                        lat={data.latitude}
-                        lng={data.longitude}
-                        zoom={15}
-                        markerTitle={data.property_name}
-                      />
-                    ) : null
-                  )}
+                  {(() => {
+                    // Task 3: property's own coords win over custom embed / multi-pin / tenant default.
+                    const mapSelection = selectPropertyMapMode({
+                      latitude: data.latitude,
+                      longitude: data.longitude,
+                      mapSrc: mapSrcTrimmed,
+                      useMultiPin,
+                      mapLocation,
+                    });
+                    switch (mapSelection.kind) {
+                      case 'coords':
+                        return (
+                          <SinglePinGoogleMap
+                            lat={mapSelection.lat}
+                            lng={mapSelection.lng}
+                            zoom={15}
+                            markerTitle={data.property_name}
+                          />
+                        );
+                      case 'iframe':
+                        return (
+                          <iframe
+                            src={mapSrcTrimmed}
+                            style={{ width: '100%', height: 300, border: 0, display: 'block' }}
+                            loading="lazy"
+                            allowFullScreen
+                            referrerPolicy="no-referrer-when-downgrade"
+                            title="Property Location"
+                          />
+                        );
+                      case 'multipin':
+                        return <MultiPinMap pins={propertyPins} height={300} />;
+                      case 'tenant':
+                        return (
+                          <SinglePinGoogleMap
+                            lat={mapSelection.lat}
+                            lng={mapSelection.lng}
+                            zoom={mapLocation && typeof mapLocation.zoom === 'number' && mapLocation.zoom > 0 ? mapLocation.zoom : 15}
+                            markerTitle={mapLocation?.markerLabel ?? tenantNameForMap}
+                          />
+                        );
+                      default:
+                        return null;
+                    }
+                  })()}
                 </div>
               </div>
             )}
