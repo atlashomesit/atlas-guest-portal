@@ -15,6 +15,9 @@ function isAtlasPrimaryHostname(): boolean {
     h.endsWith(".atlashomestays.com") ||
     h === "atlashomes.in" ||
     h.endsWith(".atlashomes.in") ||
+    // New marketplace primary hostnames (atlastays.com); white-label tenant subdomains intentionally excluded.
+    h === "atlastays.com" ||
+    h === "www.atlastays.com" ||
     // Local dev and CI environments.
     h === "localhost" ||
     h === "127.0.0.1"

@@ -1,14 +1,14 @@
-/* eslint-disable atlas-brand/no-atlas-string-leak -- single canonical marketplace baseline string (CPO-001); use getTenantBrandName() in UI. */
+/* CPO-001: MARKETPLACE_BRAND_BASELINE is the single canonical marketplace name; use getTenantBrandName() in UI. */
 import { getTenantContext } from "./tenantContext";
 
 /** Canonical marketplace name when no tenant is resolved (apex / atlas tenant). */
-export const MARKETPLACE_BRAND_BASELINE = "Atlas Homestays";
+export const MARKETPLACE_BRAND_BASELINE = "Atlastays";
 
 /** Marketplace support inbox when the tenant has not supplied `legalContactPack.contactEmail`. */
-const MARKETPLACE_SUPPORT_EMAIL = "support@atlashomestays.com";
+const MARKETPLACE_SUPPORT_EMAIL = "support@atlastays.com";
 
 /** Marketplace privacy inbox when the tenant has not supplied a contact email. */
-const MARKETPLACE_PRIVACY_EMAIL = "privacy@atlashomestays.com";
+const MARKETPLACE_PRIVACY_EMAIL = "privacy@atlastays.com";
 
 /** @deprecated Prefer MARKETPLACE_BRAND_BASELINE — kept for call sites using DEFAULT_TENANT_BRAND_NAME. */
 export const DEFAULT_TENANT_BRAND_NAME = MARKETPLACE_BRAND_BASELINE;
@@ -39,7 +39,7 @@ export function getTenantBrandNameLong(): string {
 
 /**
  * Entity name in the short booking-consent line ("I agree to … processing my data").
- * Marketplace apex uses the full baseline so copy reads "Atlas Homestays"; whitelabel
+ * Marketplace apex uses the full baseline so copy reads "Atlastays"; whitelabel
  * tenants use legal/long brand from context (RA-006/AC-5).
  */
 export function getGuestDataProcessingEntityName(): string {
