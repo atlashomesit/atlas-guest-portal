@@ -45,10 +45,10 @@ const CookieConsentBanner = () => {
   const cookieBannerOverride = tenantOverrides.cookieBanner;
 
   const bannerTitle = cookieBannerOverride?.title ?? "Your privacy choice";
-  // Marketplace apex resolves to "Atlas Homestays" (full brand baseline); white-label tenants
-  // use legal/long brand from context. Aligns with cookie-consent-compliance.e2e.spec.ts which
-  // asserts banner copy starts with "Atlas Homestays uses" on the marketplace and
-  // "Star Guest House uses" on tenant subdomains.
+  // Marketplace apex resolves to "Atlastays" (full brand baseline post-2026-05 rebrand);
+  // white-label tenants use legal/long brand from context. Aligns with
+  // cookie-consent-compliance.e2e.spec.ts which asserts banner copy starts with
+  // "Atlastays uses" on the marketplace and "Star Guest House uses" on tenant subdomains.
   const bannerText = cookieBannerOverride?.text ??
     `${getGuestDataProcessingEntityName()} uses strictly necessary cookies to make this site work, and optional analytics cookies ` +
     "to understand how it is used. Under India’s DPDP Act 2023 we ask for your consent " +
