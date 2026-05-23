@@ -13,7 +13,8 @@ import { ThemeProvider } from './theme/ThemeProvider'
 import { loadRuntimeConfig, setRuntimeConfig, getApiBaseUrl } from './runtime-config'
 import { getApiHeaders } from './api/client'
 import { getTenantSlug, isMarketplaceMode, setMarketplaceMode } from './tenant/tenantResolver'
-import { validateTenant, resolveFromDomain, getTenantContext } from './tenant/tenantContext'
+import { validateTenant, resolveFromDomain, getTenantContext, SubdomainNotActivatedError } from './tenant/tenantContext'
+import SubdomainNotActivatedScreen from './components/SubdomainNotActivatedScreen'
 import { applyTenantBranding } from './tenant/tenantBranding'
 import { ConfigLoadingScreen } from './runtime-config/ConfigLoadingScreen'
 import { ConfigErrorScreen } from './runtime-config/ConfigErrorScreen'
@@ -76,7 +77,19 @@ const bootstrapApp = async () => {
     //    Calls /tenants/from-domain?domain=<hostname> — no auth needed.
     //    Sets the resolved slug so all subsequent API calls use X-Tenant-Slug from context.
     const domain = typeof window !== 'undefined' ? window.location.hostname : '';
-    const domainResolved = domain ? await resolveFromDomain(apiBaseUrl, domain) : null;
+    let domainResolved = null;
+    try {
+      domainResolved = domain ? await resolveFromDomain(apiBaseUrl, domain) : null;
+    } catch (e) {
+      // TASK-2642: the subdomain belongs to a tenant without the WEBSITE add-on. Render the
+      // brand-neutral "not activated" page and STOP — do not fall back to validateTenant(),
+      // which would leak Atlas branding onto a stranger's branded subdomain.
+      if (e instanceof SubdomainNotActivatedError) {
+        root.render(<SubdomainNotActivatedScreen />);
+        return;
+      }
+      throw e;
+    }
 
     if (!domainResolved) {
       // 2. Fall back to runtime config tenantKey (legacy / explicit override)

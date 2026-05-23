@@ -525,7 +525,13 @@ const PropertyDetails = () => {
                 setResolvedListingId(listing.id);
                 const mgFromResolve = parseMaxGuestsFromPayload(listing as Record<string, unknown>);
                 if (mgFromResolve != null) {
-                    setData((prev) => (prev ? { ...prev, maxGuests: mgFromResolve } : prev));
+                    // TASK-2635: converge on the largest known capacity so the static-catalog
+                    // default (homes.ts `?? 2`) can never clobber the API's real max-occupancy.
+                    // Math.max is order-independent, so competing write paths can't make the
+                    // displayed "Sleeps" flip between renders of the same URL.
+                    setData((prev) =>
+                        prev ? { ...prev, maxGuests: Math.max(prev.maxGuests ?? 0, mgFromResolve) } : prev,
+                    );
                 }
             } catch {
                 if (controller.signal.aborted) return;
@@ -578,7 +584,9 @@ const PropertyDetails = () => {
                 setData((prev) => {
                     if (!prev) return prev;
                     const updates: Partial<typeof prev> = {};
-                    if (mg != null && !(typeof prev.maxGuests === 'number' && prev.maxGuests >= 1)) {
+                    // TASK-2635: raise to the API's max-occupancy when it exceeds what we have
+                    // (e.g. the static default of 2); never downgrade. Keeps "Sleeps" stable.
+                    if (mg != null && mg > (typeof prev.maxGuests === 'number' ? prev.maxGuests : 0)) {
                         updates.maxGuests = mg;
                     }
                     if (phone !== null && !prev.hostPhone) {

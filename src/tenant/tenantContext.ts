@@ -100,6 +100,18 @@ export function getTenantContext(): TenantInfo | null {
  * On success: stores tenant info + sets the resolved slug for all subsequent API calls.
  * On failure (404 / network error): returns null — caller should fall back to validateTenant().
  */
+/**
+ * TASK-2642: thrown by resolveFromDomain when the host resolves to a real tenant slug whose
+ * branded subdomain is NOT activated (no WEBSITE add-on). Boot catches this to render a
+ * brand-neutral "site not set up" page instead of falling back to the Atlas-branded default.
+ */
+export class SubdomainNotActivatedError extends Error {
+  constructor() {
+    super('SUBDOMAIN_NOT_ACTIVATED');
+    this.name = 'SubdomainNotActivatedError';
+  }
+}
+
 export async function resolveFromDomain(apiBaseUrl: string, domain: string): Promise<TenantInfo | null> {
   try {
     // Dev + browser: same-origin /tenants is proxied by Vite — avoids CORS failures on
@@ -111,6 +123,20 @@ export async function resolveFromDomain(apiBaseUrl: string, domain: string): Pro
     const res = await fetch(url); // No auth headers — this is the bootstrap endpoint
 
     if (!res.ok) {
+      // TASK-2642: a 404 SUBDOMAIN_NOT_ACTIVATED means the slug is a real tenant that hasn't bought
+      // the WEBSITE add-on. Surface it distinctly so boot does NOT fall back to validateTenant()
+      // (which would render Atlas branding on a stranger's branded subdomain).
+      if (res.status === 404) {
+        try {
+          const body = await res.json();
+          if (body?.error === 'SUBDOMAIN_NOT_ACTIVATED') {
+            throw new SubdomainNotActivatedError();
+          }
+        } catch (bodyErr) {
+          if (bodyErr instanceof SubdomainNotActivatedError) throw bodyErr;
+          // Non-JSON body / parse failure → fall through to the null return below.
+        }
+      }
       if (import.meta.env.DEV) {
         console.warn('[tenantContext] resolveFromDomain non-OK response', {
           domain,
@@ -200,6 +226,8 @@ export async function resolveFromDomain(apiBaseUrl: string, domain: string): Pro
     };
     return tenantInfo;
   } catch (error) {
+    // TASK-2642: propagate the not-activated signal; never swallow it into the null fallback.
+    if (error instanceof SubdomainNotActivatedError) throw error;
     if (import.meta.env.DEV) {
       console.warn('[tenantContext] resolveFromDomain failed', {
         domain,
