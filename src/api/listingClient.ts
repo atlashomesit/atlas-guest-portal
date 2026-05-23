@@ -265,11 +265,26 @@ export async function fetchListingContact(
 }
 
 let cachedListings: PublicListing[] | null = null;
+let cachedListingsAt = 0;
 let cachePromise: Promise<PublicListing[]> | null = null;
 
+/**
+ * Public listings change rarely, so we cache them for the page session — but bound the
+ * staleness so a long-open tab eventually reflects admin edits (e.g. a property's map
+ * coordinates). A fresh navigation already re-fetches; this only matters for tabs left open.
+ */
+export const PUBLIC_LISTINGS_TTL_MS = 60_000;
+
+/** Drop the cached public listings so the next fetch hits the network. */
+export function invalidatePublicListingsCache(): void {
+  cachedListings = null;
+  cachedListingsAt = 0;
+  cachePromise = null;
+}
+
 export const fetchPublicListings = async (signal?: AbortSignal): Promise<PublicListing[]> => {
-  // Return cached result if available
-  if (cachedListings != null) {
+  // Return cached result if still within the freshness window
+  if (cachedListings != null && Date.now() - cachedListingsAt < PUBLIC_LISTINGS_TTL_MS) {
     return cachedListings;
   }
 
@@ -298,6 +313,7 @@ export const fetchPublicListings = async (signal?: AbortSignal): Promise<PublicL
         .filter((row): row is PublicListing => row !== null && row.id > 0);
 
       cachedListings = result;
+      cachedListingsAt = Date.now();
       return result;
     } finally {
       cachePromise = null;
