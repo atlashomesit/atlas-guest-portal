@@ -85,8 +85,8 @@ describe('HomePage_Locations', () => {
       </MemoryRouter>
     );
 
-    // Home v2: uniform grid — all cards have a single "View home" ghost CTA (no "Book now")
-    const cta = await screen.findAllByText(/view (home|apartment|room|unit|property)/i);
+    // Guest-home v2: each card is a single tap target with a "See the home" link CTA
+    const cta = await screen.findAllByText(/see the (home|apartment|room|unit|property)/i);
     fireEvent.click(cta[0]);
 
     const [navigateArgs] = navigateMock.mock.calls[0] ?? [];
