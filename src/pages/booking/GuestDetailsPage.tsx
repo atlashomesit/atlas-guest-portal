@@ -21,7 +21,7 @@ import React, {
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { useBooking } from '@/contexts/BookingContext';
-import { buildApiUrl, getApiHeaders } from '@/api/client';
+import { buildApiUrl, getApiHeaders, getOrderRequestHeaders } from '@/api/client';
 import { apiFetch } from '@/lib/http';
 import {
   clampNationalDigits,
@@ -423,12 +423,7 @@ const GuestDetailsPage: React.FC = () => {
         track('start_checkout', numericListingId);
 
         const response = await axios.post(buildApiUrl('/api/Razorpay/order'), payload, {
-          headers: {
-            ...getApiHeaders(),
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Idempotency-Key': idempotencyKey,
-          },
+          headers: getOrderRequestHeaders(idempotencyKey),
           timeout: 15000,
         });
 

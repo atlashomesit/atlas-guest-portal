@@ -232,6 +232,11 @@ const BecomeHost = () => {
   const [step, setStep] = useState(0);
   const [submitStatus, setSubmitStatus] = useState<SubmitStatus>("idle");
   const [showResumeBanner, setShowResumeBanner] = useState(false);
+  // TASK-2609: partner referral code from ?ref= (optional; redeemed server-side at /onboarding/start)
+  const [referralCode, setReferralCode] = useState(() => {
+    try { return (new URLSearchParams(window.location.search).get("ref") || "").toUpperCase().slice(0, 32); }
+    catch { return ""; }
+  });
 
   const [contact, setContact] = useState<ContactInfo>({
     displayName: "",
@@ -408,6 +413,7 @@ const BecomeHost = () => {
         address: property.address.trim(),
         roomCount: property.roomCount,
         airbnbUrl: airbnb.url.trim() || undefined,
+        referralCode: referralCode.trim() || undefined,
       };
 
       const res = await fetch(buildApiUrl("/onboarding/start"), {
@@ -840,6 +846,23 @@ const BecomeHost = () => {
                 />
                 <p style={styles.hint}>
                   You'll use this to log in to the admin portal.
+                </p>
+              </div>
+              <div style={styles.fieldGroup}>
+                <label htmlFor="referralCode" style={styles.label}>
+                  Referral code (optional)
+                </label>
+                <Input
+                  id="referralCode"
+                  name="referralCode"
+                  type="text"
+                  placeholder="Partner code, if you have one"
+                  value={referralCode}
+                  onChange={(e) => setReferralCode(e.target.value.toUpperCase().slice(0, 32))}
+                  data-testid="host-onboard-referral-code"
+                />
+                <p style={styles.hint}>
+                  Referred by an Atlas partner? Enter their code to claim your sign-up discount.
                 </p>
               </div>
             </>

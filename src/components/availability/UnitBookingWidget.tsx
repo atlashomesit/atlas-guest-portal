@@ -12,7 +12,7 @@ import { useBooking } from '@/contexts/BookingContext';
 import { hasRuntimeConfig } from '@/runtime-config';
 import ErrorBanner from '@/components/ErrorBanner';
 import { type AvailabilityNightlyRate, type AvailabilityResponse } from '@/api/availabilityClient';
-import { buildApiUrl, getApiHeaders } from '@/api/client';
+import { buildApiUrl, getApiHeaders, getOrderRequestHeaders } from '@/api/client';
 import { dedupedAvailabilityCalendarFetch } from '@/api/availabilityCalendarClient';
 import { apiFetch } from '@/lib/http';
 import { getIstStartOfDay } from '@/utils/date';
@@ -950,12 +950,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
       const idempotencyKey = crypto.randomUUID();
       const response = await axios.post(orderUrl, orderPayload, {
-        headers: {
-          ...getApiHeaders(),
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Idempotency-Key': idempotencyKey,
-        },
+        headers: getOrderRequestHeaders(idempotencyKey),
         timeout: 15000,
       });
 
