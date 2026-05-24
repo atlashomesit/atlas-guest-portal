@@ -172,10 +172,6 @@ const STAR_GUEST_HOUSE_LISTING_IDS: number[] = [
 
 const TENANT_OVERRIDES: Record<string, TenantOverrides> = {
   atlas: {
-    contact: {
-      businessPhone: '9502244053',
-      whatsappPhone: '9502244053',
-    },
     mapLocation: {
       lat: 17.4948,
       lng: 78.3996,

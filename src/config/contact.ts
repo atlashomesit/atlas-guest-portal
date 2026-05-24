@@ -12,18 +12,40 @@ function tenantContact() {
   return getTenantOverrides(slug).contact;
 }
 
+/**
+ * Reduce a host-entered or API phone to a 10-digit Indian national number,
+ * dropping +91 / leading 91 / leading 0 and any spaces, dashes or punctuation.
+ * Returns null when the input can't be reduced to a clean 10-digit number so
+ * callers fall back to the next source.
+ */
+function toNationalDigits(raw?: string | null): string | null {
+  if (!raw) return null;
+  let d = raw.replace(/\D/g, "");
+  if (d.length === 12 && d.startsWith("91")) d = d.slice(2);
+  else if (d.length === 11 && d.startsWith("0")) d = d.slice(1);
+  return d.length === 10 ? d : null;
+}
+
 export function getContactPhone(channel: ContactChannel = "business"): string {
   const overrides = tenantContact();
   if (channel === "owner") {
     return overrides?.ownerPhone ?? DEFAULT_OWNER_PHONE;
   }
-  return overrides?.businessPhone ?? DEFAULT_BUSINESS_PHONE;
+  // Precedence: explicit override → the tenant's own number from the API →
+  // Atlas default. The API value (host's admin-profile phone) MUST win over the
+  // default, otherwise every tenant without a hardcoded override would show the
+  // Atlas marketplace number to its own guests.
+  if (overrides?.businessPhone) return overrides.businessPhone;
+  const fromApi = toNationalDigits(getTenantContext()?.legalContactPack?.contactPhone);
+  return fromApi ?? DEFAULT_BUSINESS_PHONE;
 }
 
 export function getWhatsAppPhone(channel: ContactChannel = "business"): string {
   const overrides = tenantContact();
-  if (channel === "business" && overrides?.whatsappPhone) {
-    return overrides.whatsappPhone;
+  if (channel === "business") {
+    if (overrides?.whatsappPhone) return overrides.whatsappPhone;
+    const fromApi = toNationalDigits(getTenantContext()?.whatsappBookingPhone);
+    if (fromApi) return fromApi;
   }
   return getContactPhone(channel);
 }
