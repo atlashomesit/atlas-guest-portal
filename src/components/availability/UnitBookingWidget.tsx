@@ -353,6 +353,9 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     setGuests((current) => Math.min(effectiveMaxGuests, Math.max(1, current)));
   }, [effectiveMaxGuests]);
 
+  // Bumped after an availability conflict (409) to force a fresh calendar fetch.
+  const [availabilityRefreshNonce, setAvailabilityRefreshNonce] = useState(0);
+
   // Fetch availability automatically on component load and when the calendar is opened
   // Availability always starts from today, independent of selected dates
   useEffect(() => {
@@ -472,7 +475,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
       isActive = false;
     };
     // availabilityRange is memoized and stable; rely on lastAvailabilityKeyRef deduplication for same requests
-  }, [listingId, isBookingDisabled, availabilityRange, today]);
+  }, [listingId, isBookingDisabled, availabilityRange, today, availabilityRefreshNonce]);
 
   // Auto-select next available date if today is blocked or hold
   useEffect(() => {
@@ -998,6 +1001,13 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         setProviderBlocked(true);
       } else {
         setFormError(getBookingErrorMessage(error, 'order'));
+        // AVAILABILITY_CONFLICT (409): the dates were just taken by another in-flight checkout.
+        // Force-refresh the calendar so the now-unavailable dates show as blocked and the guest
+        // isn't re-picking the same taken dates from a stale calendar.
+        if (status === 409 || code === 'AVAILABILITY_CONFLICT') {
+          lastAvailabilityKeyRef.current = null;
+          setAvailabilityRefreshNonce((n) => n + 1);
+        }
       }
     } finally {
       setIsSubmitting(false);
