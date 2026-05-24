@@ -100,6 +100,26 @@ const IconNote = ({ size = 14 }: { size?: number }) => (
 // ── Utilities ─────────────────────────────────────────────────────────────────
 
 const LAST_UPI_VPA_KEY = 'atlas_last_upi_vpa';
+const CHECKOUT_DRAFT_KEY = 'atlas_guest_checkout_draft';
+
+/** Guest PII typed on this page, persisted to sessionStorage so a reload/Back doesn't lose it. */
+type CheckoutDraft = {
+  name: string;
+  email: string;
+  phone: string;
+  nationality: string;
+  notes: string;
+  phoneDialCode: string;
+};
+
+function loadCheckoutDraft(): Partial<CheckoutDraft> {
+  try {
+    const saved = window.sessionStorage.getItem(CHECKOUT_DRAFT_KEY);
+    return saved ? (JSON.parse(saved) as Partial<CheckoutDraft>) : {};
+  } catch {
+    return {};
+  }
+}
 
 function formatCountdown(expiresAt: string): string {
   const ms = new Date(expiresAt).getTime() - Date.now();
@@ -146,16 +166,9 @@ const GuestDetailsPage: React.FC = () => {
   const holdListingId = booking.holdListingId;
   const priceBreakdown = booking.holdPriceBreakdown;
 
-  // Redirect if no hold state (user navigated directly without Reserve)
-  useEffect(() => {
-    if (!holdId || !holdExpiresAt) {
-      const backPath =
-        propertySlug && unitSlug
-          ? `/homes/${propertySlug}/${unitSlug}`
-          : '/';
-      navigate(backPath, { replace: true });
-    }
-  }, [holdId, holdExpiresAt, propertySlug, unitSlug, navigate]);
+  // No hold state (direct navigation or hard reload): instead of a silent redirect,
+  // we render a "pick your dates again" card (see early return in Render) and keep the
+  // guest's typed details, which are persisted to sessionStorage below.
 
   // ── Hold countdown ───────────────────────────────────────────────────────
   const [countdown, setCountdown] = useState(() =>
@@ -185,18 +198,40 @@ const GuestDetailsPage: React.FC = () => {
   }, [holdExpiresAt]);
 
   // ── Form state ────────────────────────────────────────────────────────────
-  const [phoneDialCode, setPhoneDialCode] = useState(() => GUEST_DIAL_OPTIONS[0].code);
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    nationality: 'India',
-    notes: '',
+  const [phoneDialCode, setPhoneDialCode] = useState(() => {
+    const draft = loadCheckoutDraft();
+    return typeof draft.phoneDialCode === 'string'
+      && GUEST_DIAL_OPTIONS.some((o) => o.code === draft.phoneDialCode)
+      ? draft.phoneDialCode
+      : GUEST_DIAL_OPTIONS[0].code;
+  });
+  const [formData, setFormData] = useState(() => {
+    const draft = loadCheckoutDraft();
+    return {
+      name: typeof draft.name === 'string' ? draft.name : '',
+      email: typeof draft.email === 'string' ? draft.email : '',
+      phone: typeof draft.phone === 'string' ? draft.phone : '',
+      nationality: typeof draft.nationality === 'string' && draft.nationality ? draft.nationality : 'India',
+      notes: typeof draft.notes === 'string' ? draft.notes : '',
+    };
   });
   const [formErrors, setFormErrors] = useState({ name: '', email: '', phone: '' });
   const [consentAccepted, setConsentAccepted] = useState(false);
   const [consentError, setConsentError] = useState('');
+  const [consentFlash, setConsentFlash] = useState(false);
+  const consentRowRef = useRef<HTMLDivElement>(null);
   const [whatsappOptIn, setWhatsappOptIn] = useState(true); // pre-checked per spec
+
+  // Persist guest PII to sessionStorage so a hard reload / Back nav doesn't lose it.
+  // Consent is intentionally NOT persisted — DPDP consent must be actively given each session.
+  useEffect(() => {
+    try {
+      window.sessionStorage.setItem(
+        CHECKOUT_DRAFT_KEY,
+        JSON.stringify({ ...formData, phoneDialCode }),
+      );
+    } catch { /* ignore */ }
+  }, [formData, phoneDialCode]);
 
   // ── Progressive disclosure state ──────────────────────────────────────────
   const [promoOpen, setPromoOpen] = useState(false);
@@ -533,6 +568,7 @@ const GuestDetailsPage: React.FC = () => {
                       localStorage.setItem('atlas_guest_email', formData.email.trim());
                       if (formData.name.trim()) localStorage.setItem('atlas_guest_name', formData.name.trim());
                     } catch { /* ignore */ }
+                    try { sessionStorage.removeItem(CHECKOUT_DRAFT_KEY); } catch { /* ignore */ }
                     updateBooking({
                       holdId: null, holdExpiresAt: null, holdPropertySlug: null,
                       holdUnitSlug: null, holdPriceBreakdown: null, holdListingId: null,
@@ -613,6 +649,15 @@ const GuestDetailsPage: React.FC = () => {
     setOrderErrorIs409(false);
   }, []);
 
+  // Mobile: the sticky Pay bar can't show the desktop "tick consent" microcopy, so tapping
+  // it while consent is unchecked scrolls the consent box into view and flashes it.
+  const scrollToConsent = useCallback(() => {
+    setConsentError('Please accept the consent to continue.');
+    consentRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setConsentFlash(true);
+    window.setTimeout(() => setConsentFlash(false), 1200);
+  }, []);
+
   const handleBackToProperty = useCallback(() => {
     updateBooking({
       holdId: null, holdExpiresAt: null, holdPropertySlug: null,
@@ -622,7 +667,29 @@ const GuestDetailsPage: React.FC = () => {
   }, [updateBooking, navigate, propertySlug, unitSlug]);
 
   // ── Render ────────────────────────────────────────────────────────────────
-  if (!holdId || !holdExpiresAt) return null;
+  // No active hold (direct navigation or hard reload wiped the session-only hold).
+  // Show a friendly "pick your dates again" card instead of silently bouncing the
+  // guest out — their typed details are already saved to sessionStorage.
+  if (!holdId || !holdExpiresAt) {
+    return (
+      <div className="gd-page">
+        <div className="gd-modal-shade" role="dialog" aria-modal="true" aria-labelledby="gd-nohold-title">
+          <div className="gd-modal">
+            <div className="gd-modal-icon"><IconClock size={22} /></div>
+            <h3 id="gd-nohold-title">Let's pick your dates again</h3>
+            <p>
+              Your 15-minute hold isn't active anymore — reservations are released when the
+              page reloads. Any details you entered are saved and will be waiting for you.
+            </p>
+            <button type="button" className="gd-modal-cta" onClick={handleBackToProperty}>
+              Choose dates
+            </button>
+          </div>
+        </div>
+        <style>{gdStyles}</style>
+      </div>
+    );
+  }
 
   const tenantCtx = getTenantContext();
   const brandName = tenantCtx?.name ?? 'Atlas';
@@ -1043,7 +1110,8 @@ const GuestDetailsPage: React.FC = () => {
             <div className="gd-consent">
               {/* DPDP required consent */}
               <div
-                className={`gd-consent-row required${consentAccepted ? ' checked' : ''}`}
+                ref={consentRowRef}
+                className={`gd-consent-row required${consentAccepted ? ' checked' : ''}${consentFlash ? ' gd-consent-flash' : ''}`}
                 onClick={() => { setConsentAccepted((v) => !v); if (!consentAccepted) setConsentError(''); }}
                 role="checkbox"
                 aria-checked={consentAccepted}
@@ -1296,10 +1364,11 @@ const GuestDetailsPage: React.FC = () => {
           <small>Held</small>
         </div>
         <button
-          type="submit"
+          type={consentAccepted ? 'submit' : 'button'}
           form="gd-details-form"
           className="gd-mobile-bar-cta"
-          disabled={payDisabled}
+          disabled={isSubmitting || holdExpired}
+          onClick={consentAccepted ? undefined : scrollToConsent}
           data-testid="guest-booking-submit-mobile"
         >
           {isSubmitting
@@ -1929,6 +1998,12 @@ const gdStyles = `
 }
 .gd-consent-row.required { border-color: var(--gd-coral); background: #fff8f2; }
 .gd-consent-row.checked { border-color: var(--gd-success); background: var(--gd-success-bg); }
+.gd-consent-flash { animation: gd-consent-flash 1.2s ease-out; }
+@keyframes gd-consent-flash {
+  0%   { box-shadow: 0 0 0 0 rgba(194, 65, 12, 0); }
+  25%  { box-shadow: 0 0 0 4px rgba(194, 65, 12, 0.35); }
+  100% { box-shadow: 0 0 0 0 rgba(194, 65, 12, 0); }
+}
 .gd-consent-body { font-size: 13px; color: var(--gd-ink-soft); line-height: 1.5; }
 .gd-consent-body b { color: var(--gd-ink); font-weight: 600; }
 .gd-consent-link { color: var(--gd-coral); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
