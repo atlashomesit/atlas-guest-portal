@@ -123,13 +123,51 @@ async function _abandonHold(holdId: number, prepToken: string | null) {
   } catch { /* non-blocking */ }
 }
 
-function loadRazorpayScript(callback: () => void) {
-  if (window.Razorpay) { callback(); return; }
+function loadRazorpayScript(onSuccess: () => void, onError: (msg: string) => void) {
+  if (window.Razorpay) { onSuccess(); return; }
   const script = document.createElement('script');
   script.src = 'https://checkout.razorpay.com/v1/checkout.js';
   script.async = true;
-  script.onload = () => callback();
-  script.onerror = () => callback(); // let caller handle failure
+  let loaded = false;
+
+  script.onload = () => {
+    loaded = true;
+    if (window.Razorpay) {
+      onSuccess();
+    } else {
+      onError('Razorpay script loaded but window.Razorpay is undefined');
+    }
+  };
+
+  script.onerror = () => {
+    if (!loaded) {
+      onError('Failed to load Razorpay payment gateway. Check your connection and try again.');
+    }
+  };
+
+  // Timeout safety: if script doesn't load in 10 seconds, fail gracefully
+  const timeout = setTimeout(() => {
+    if (!loaded && window.Razorpay === undefined) {
+      onError('Razorpay payment gateway took too long to load. Please check your connection and try again.');
+    }
+  }, 10000);
+
+  script.onload = (() => {
+    const originalOnLoad = script.onload;
+    return () => {
+      clearTimeout(timeout);
+      originalOnLoad?.call(script);
+    };
+  })();
+
+  script.onerror = (() => {
+    const originalOnError = script.onerror;
+    return () => {
+      clearTimeout(timeout);
+      originalOnError?.call(script);
+    };
+  })();
+
   document.body.appendChild(script);
 }
 
@@ -422,6 +460,7 @@ const GuestDetailsPage: React.FC = () => {
         const numericListingId = holdListingId ? Number(holdListingId) : 0;
         track('start_checkout', numericListingId);
 
+        console.log('[GuestDetailsPage] Creating Razorpay order for booking...');
         const response = await axios.post(buildApiUrl('/api/Razorpay/order'), payload, {
           headers: {
             ...getApiHeaders(),
@@ -429,8 +468,10 @@ const GuestDetailsPage: React.FC = () => {
             'Accept': 'application/json',
             'Idempotency-Key': idempotencyKey,
           },
-          timeout: 15000,
+          timeout: 20000, // Increased to 20s to account for slow connections
         });
+
+        console.log('[GuestDetailsPage] Razorpay order created successfully:', response.data?.orderId);
 
         const {
           keyId,
@@ -461,133 +502,142 @@ const GuestDetailsPage: React.FC = () => {
         setRazorpayAmount(Number(amount));
         pendingBookingTokenRef.current = typeof bookingToken === 'string' ? bookingToken.trim() : null;
 
-        loadRazorpayScript(() => {
-          if (!window.Razorpay) {
-            setOrderError("Couldn't reach our servers. Your details are saved — check your connection and try again. No payment was taken.");
-            setIsSubmitting(false);
-            return;
-          }
-          try {
-            let paymentCompleted = false;
+        loadRazorpayScript(
+          () => {
+            // Script loaded successfully
+            try {
+              let paymentCompleted = false;
 
-            let lastUpiVpa = '';
-            try { lastUpiVpa = localStorage.getItem(LAST_UPI_VPA_KEY)?.trim() ?? ''; } catch { /* ignore */ }
+              let lastUpiVpa = '';
+              try { lastUpiVpa = localStorage.getItem(LAST_UPI_VPA_KEY)?.trim() ?? ''; } catch { /* ignore */ }
 
-            const handleClose = () => {
-              if (paymentCompleted) return;
-              paymentCompleted = true;
-              setIsSubmitting(false);
-              setPaymentCancelled(true);
-              setRazorpayOrderId(null);
-            };
-
-            const options = {
-              key: keyId,
-              amount: Number(amount),
-              currency: 'INR',
-              name: getTenantContext()?.displayMerchantName ?? getTenantContext()?.name ?? 'Our Property',
-              description: `Booking confirmation`,
-              order_id: orderId,
-              prefill: {
-                name: formData.name.trim(),
-                email: formData.email.trim(),
-                contact: toRazorpayContactDigits(
-                  phoneDialCode,
-                  clampNationalDigits(formData.phone, dial.maxDigits),
-                ),
-                method: 'upi',
-                ...(lastUpiVpa ? { vpa: lastUpiVpa } : {}),
-              },
-              upi: { flow: 'collect', ...(lastUpiVpa ? { vpa: lastUpiVpa } : {}) },
-              config: {
-                display: {
-                  blocks: {
-                    upi_collect: {
-                      name: 'Pay using UPI ID',
-                      instruments: [{ method: 'upi', flows: ['collect'] }],
-                    },
-                  },
-                  sequence: ['block.upi_collect', 'block.card', 'block.netbanking', 'block.wallet'],
-                  preferences: { show_default_blocks: true },
-                },
-              },
-              theme: { color: '#c2410c' },
-              modal: { ondismiss: handleClose },
-              handler: async (res: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => {
+              const handleClose = () => {
+                if (paymentCompleted) return;
                 paymentCompleted = true;
-                try {
-                  const verifyRes = await axios.post(
-                    buildApiUrl('/api/Razorpay/verify'),
-                    {
-                      bookingId: Number(bookingId),
-                      razorpayOrderId: res.razorpay_order_id,
-                      razorpayPaymentId: res.razorpay_payment_id,
-                      razorpaySignature: res.razorpay_signature,
-                      guestInfo: {
-                        name: formData.name.trim(),
-                        email: formData.email.trim(),
-                        phone: e164Phone,
+                setIsSubmitting(false);
+                setPaymentCancelled(true);
+                setRazorpayOrderId(null);
+              };
+
+              const options = {
+                key: keyId,
+                amount: Number(amount),
+                currency: 'INR',
+                name: getTenantContext()?.displayMerchantName ?? getTenantContext()?.name ?? 'Our Property',
+                description: `Booking confirmation`,
+                order_id: orderId,
+                prefill: {
+                  name: formData.name.trim(),
+                  email: formData.email.trim(),
+                  contact: toRazorpayContactDigits(
+                    phoneDialCode,
+                    clampNationalDigits(formData.phone, dial.maxDigits),
+                  ),
+                  method: 'upi',
+                  ...(lastUpiVpa ? { vpa: lastUpiVpa } : {}),
+                },
+                upi: { flow: 'collect', ...(lastUpiVpa ? { vpa: lastUpiVpa } : {}) },
+                config: {
+                  display: {
+                    blocks: {
+                      upi_collect: {
+                        name: 'Pay using UPI ID',
+                        instruments: [{ method: 'upi', flows: ['collect'] }],
                       },
                     },
-                    { headers: { ...getApiHeaders(), 'Content-Type': 'application/json' }, timeout: 15000 },
-                  );
-                  if (verifyRes.data?.success) {
-                    const vpa = typeof verifyRes.data.lastUpiVpa === 'string' ? verifyRes.data.lastUpiVpa.trim() : '';
-                    if (vpa) { try { localStorage.setItem(LAST_UPI_VPA_KEY, vpa); } catch { /* ignore */ } }
-                    try {
-                      localStorage.setItem('atlas_guest_email', formData.email.trim());
-                      if (formData.name.trim()) localStorage.setItem('atlas_guest_name', formData.name.trim());
-                    } catch { /* ignore */ }
-                    updateBooking({
-                      holdId: null, holdExpiresAt: null, holdPropertySlug: null,
-                      holdUnitSlug: null, holdPriceBreakdown: null, holdListingId: null,
-                      holdListingName: null, paymentHoldBookingId: null, paymentHoldToken: null,
-                    });
-                    const token = pendingBookingTokenRef.current;
-                    navigate(
-                      token
-                        ? `/booking/${bookingId}?t=${encodeURIComponent(token)}`
-                        : `/booking/${bookingId}`,
-                      { replace: true },
+                    sequence: ['block.upi_collect', 'block.card', 'block.netbanking', 'block.wallet'],
+                    preferences: { show_default_blocks: true },
+                  },
+                },
+                theme: { color: '#c2410c' },
+                modal: { ondismiss: handleClose },
+                handler: async (res: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => {
+                  paymentCompleted = true;
+                  try {
+                    const verifyRes = await axios.post(
+                      buildApiUrl('/api/Razorpay/verify'),
+                      {
+                        bookingId: Number(bookingId),
+                        razorpayOrderId: res.razorpay_order_id,
+                        razorpayPaymentId: res.razorpay_payment_id,
+                        razorpaySignature: res.razorpay_signature,
+                        guestInfo: {
+                          name: formData.name.trim(),
+                          email: formData.email.trim(),
+                          phone: e164Phone,
+                        },
+                      },
+                      { headers: { ...getApiHeaders(), 'Content-Type': 'application/json' }, timeout: 15000 },
                     );
-                  } else {
-                    throw new Error(verifyRes.data?.message || 'Payment verification failed.');
+                    if (verifyRes.data?.success) {
+                      const vpa = typeof verifyRes.data.lastUpiVpa === 'string' ? verifyRes.data.lastUpiVpa.trim() : '';
+                      if (vpa) { try { localStorage.setItem(LAST_UPI_VPA_KEY, vpa); } catch { /* ignore */ } }
+                      try {
+                        localStorage.setItem('atlas_guest_email', formData.email.trim());
+                        if (formData.name.trim()) localStorage.setItem('atlas_guest_name', formData.name.trim());
+                      } catch { /* ignore */ }
+                      updateBooking({
+                        holdId: null, holdExpiresAt: null, holdPropertySlug: null,
+                        holdUnitSlug: null, holdPriceBreakdown: null, holdListingId: null,
+                        holdListingName: null, paymentHoldBookingId: null, paymentHoldToken: null,
+                      });
+                      const token = pendingBookingTokenRef.current;
+                      navigate(
+                        token
+                          ? `/booking/${bookingId}?t=${encodeURIComponent(token)}`
+                          : `/booking/${bookingId}`,
+                        { replace: true },
+                      );
+                    } else {
+                      throw new Error(verifyRes.data?.message || 'Payment verification failed.');
+                    }
+                  } catch (err) {
+                    console.error('[GuestDetailsPage] verify error:', err);
+                    setOrderError(`Payment verification failed. Please contact support with your payment ID if you were charged.`);
+                  } finally {
+                    setIsSubmitting(false);
                   }
-                } catch (err) {
-                  console.error('[GuestDetailsPage] verify error:', err);
-                  setOrderError(`Payment verification failed. Please contact support with your payment ID if you were charged.`);
-                } finally {
-                  setIsSubmitting(false);
-                }
-              },
-            };
+                },
+              };
 
-            const rzp = new window.Razorpay(options);
-            rzp.on('payment.failed', (failRes: unknown) => {
-              paymentCompleted = true;
-              const fr = failRes as { error?: { code?: string; description?: string } };
-              const code = String(fr?.error?.code ?? '');
-              const desc = String(fr?.error?.description ?? '');
-              setOrderError(mapRazorpayFailureCode(code, desc));
+              const rzp = new window.Razorpay(options);
+              rzp.on('payment.failed', (failRes: unknown) => {
+                paymentCompleted = true;
+                const fr = failRes as { error?: { code?: string; description?: string } };
+                const code = String(fr?.error?.code ?? '');
+                const desc = String(fr?.error?.description ?? '');
+                setOrderError(mapRazorpayFailureCode(code, desc));
+                setIsSubmitting(false);
+              });
+              rzp.on('close', handleClose);
+
+              console.log('[GuestDetailsPage] Opening Razorpay modal for order:', orderId);
+              track('payment_init', holdListingId ? Number(holdListingId) : 0);
+              rzp.open();
+            } catch (err) {
+              console.error('[GuestDetailsPage] Razorpay init error:', err);
+              setOrderError("Couldn't initialize payment modal. Please check your connection and try again. No payment was taken.");
               setIsSubmitting(false);
-            });
-            rzp.on('close', handleClose);
-
-            track('payment_init', holdListingId ? Number(holdListingId) : 0);
-            rzp.open();
-          } catch (err) {
-            console.error('[GuestDetailsPage] Razorpay init error:', err);
-            setOrderError("Couldn't reach our servers. Your details are saved — check your connection and try again. No payment was taken.");
+            }
+          },
+          (errorMsg: string) => {
+            // Script failed to load
+            console.error('[GuestDetailsPage] Razorpay script load error:', errorMsg);
+            setOrderError(errorMsg);
             setIsSubmitting(false);
           }
-        });
+        );
       } catch (err: unknown) {
         console.error('[GuestDetailsPage] order error:', err);
-        const status = (err as { response?: { status?: number } })?.response?.status;
-        const data = (err as { response?: { data?: { message?: string; code?: string } } })?.response?.data;
+        const axiosErr = err as { code?: string; response?: { status?: number; data?: { message?: string; code?: string } }; message?: string };
+        const status = axiosErr?.response?.status;
+        const data = axiosErr?.response?.data;
         const serverMessage = typeof data?.message === 'string' ? data.message : '';
+        const isTimeout = axiosErr?.code === 'ECONNABORTED' || axiosErr?.message?.includes('timeout');
 
-        if (status === 409) {
+        if (isTimeout) {
+          setOrderError("Payment initialization timed out. Please check your connection and try again. Your details are saved.");
+        } else if (status === 409) {
           const datesLabel =
             booking.checkIn && booking.checkOut
               ? `${checkInDisplay} – ${checkOutDisplay}`
@@ -596,8 +646,12 @@ const GuestDetailsPage: React.FC = () => {
             `Someone else just booked these dates. We couldn't confirm ${datesLabel}. Pick different dates to continue. No payment was taken.`,
           );
           setOrderErrorIs409(true);
+        } else if (status === 400 || status === 422) {
+          setOrderError(`Invalid booking data. ${serverMessage || 'Please check your details and try again.'}`);
         } else if (serverMessage) {
           setOrderError(`Couldn't start payment. ${serverMessage}`);
+        } else if (status && status >= 500) {
+          setOrderError("Server error. Please try again in a moment. Your details are saved.");
         } else {
           setOrderError("Couldn't reach our servers. Your details are saved — check your connection and try again. No payment was taken.");
         }
