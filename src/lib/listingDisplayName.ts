@@ -41,28 +41,37 @@ function displayNameFromSku(sku: string): string | null {
 /**
  * Returns the human display name for a listing.
  *
+ * TASK-2635: the displayed name must be STABLE for a given listing across renders of the
+ * same URL. The upstream `name` field arrives sometimes as the raw SKU ("Atlas501_PH") and
+ * sometimes already-friendly ("Penthouse 501"), and callers pass an `id` arg that is not
+ * always a floor number — so an id-first lookup made the result depend on volatile inputs
+ * (it flipped between "Atlas501_PH" and "Penthouse 501" on prod). Resolve the Atlas SKU
+ * FIRST so both SKU and friendly inputs collapse to the same friendly name regardless of
+ * the id arg.
+ *
  * Priority:
- * 1. Look up by numeric propertyId (101, 201, 301, 501).
- * 2. If propertyId not found, try to extract a number from rawName (SKU).
- * 3. Fall back to rawName as-is.
+ * 1. Atlas SKU → friendly. Gated to names containing "atlas" so cross-tenant marketplace /
+ *    search names (e.g. "Sea View 501") are NEVER remapped onto Atlas's unit names.
+ * 2. Numeric floor/unit id lookup (101, 201, 301, 501) for callers that pass a real number.
+ * 3. Fall back to rawName as-is (already-friendly names and unknown listings).
  */
 export function getListingDisplayName(
   propertyId: number | string | undefined | null,
   rawName?: string,
 ): string {
-  // Strategy 1: numeric property ID lookup
+  // Strategy 1: Atlas SKU extraction (only for Atlas-owned SKU-style names).
+  if (rawName && /atlas/i.test(rawName)) {
+    const fromSku = displayNameFromSku(rawName);
+    if (fromSku) return fromSku;
+  }
+
+  // Strategy 2: numeric property/floor ID lookup.
   const id = Number(propertyId);
   if (Number.isFinite(id) && id > 0) {
     const byId = DISPLAY_NAME_BY_PROPERTY_ID[id];
     if (byId) return byId;
   }
 
-  // Strategy 2: SKU string extraction from rawName
-  if (rawName) {
-    const fromSku = displayNameFromSku(rawName);
-    if (fromSku) return fromSku;
-  }
-
-  // Strategy 3: raw fallback
+  // Strategy 3: raw fallback.
   return rawName ?? String(propertyId ?? '');
 }

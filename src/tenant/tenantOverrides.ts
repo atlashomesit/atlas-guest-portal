@@ -172,9 +172,11 @@ const STAR_GUEST_HOUSE_LISTING_IDS: number[] = [
 
 const TENANT_OVERRIDES: Record<string, TenantOverrides> = {
   atlas: {
-    contact: {
-      businessPhone: '9502244053',
-      whatsappPhone: '9502244053',
+    mapLocation: {
+      lat: 17.4948,
+      lng: 78.3996,
+      zoom: 15,
+      markerLabel: 'Atlas Homes, KPHB',
     },
     locationContent: {
       transport: [
@@ -397,6 +399,14 @@ export function shouldHideAtlasBranding(
 ): boolean {
   if (overrides.hideAtlasHomesBranding === true) return true;
   if (overrides.hideAtlasHomesBranding === false) return false;
-  // Default: only the Atlas marketplace root keeps Atlas branding.
+  // Default: only the Atlas marketplace tenant keeps Atlas branding. The API's
+  // TenantFromDomainDto does not currently emit `isMarketplaceRoot`, so on hosted
+  // dev `dev.atlashomestays.com` the atlas tenant was treated as a white-label
+  // tenant — Home.tsx then rendered "Atlas | Book your stay" instead of the
+  // brand-bearing "Atlas Homestays | Find your perfect stay" fallback, and the
+  // ra006-ac5 sanity spec failed. Mirror getGuestDataProcessingEntityName()'s
+  // slug-based marketplace detection so the marketplace stays branded everywhere.
+  const slug = (tenantHint?.slug ?? "").trim().toLowerCase();
+  if (slug === "atlas") return false;
   return !tenantHint?.isMarketplaceRoot;
 }

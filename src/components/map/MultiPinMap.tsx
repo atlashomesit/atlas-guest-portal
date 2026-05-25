@@ -59,7 +59,7 @@ export default function MultiPinMap({
   pins,
   height = 420,
   className,
-  fallbackCenter = { lat: 17.385, lng: 78.487, zoom: 11 },
+  fallbackCenter = { lat: 17.4948, lng: 78.3996, zoom: 11 },
 }: MultiPinMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<any>(null);

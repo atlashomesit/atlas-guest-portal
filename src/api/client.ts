@@ -24,6 +24,30 @@ export const getApiHeaders = (): Record<string, string> => {
   return { 'X-Tenant-Slug': slug };
 };
 
+/**
+ * Request headers the Atlas API's CORS layer permits on cross-origin browser calls.
+ * MUST stay in sync with atlas-api's DynamicCorsMiddleware Access-Control-Allow-Headers. A header sent
+ * from the browser but absent there makes the preflight fail, so the request never leaves the browser
+ * (axios "Network Error") and checkout silently breaks. ('Accept' is CORS-safelisted — no server entry
+ * needed.)
+ */
+export const CORS_ALLOWED_REQUEST_HEADERS = [
+  'Content-Type',
+  'Authorization',
+  'X-Tenant-Slug',
+  'X-Correlation-Id',
+  'X-Request-Id',
+  'Idempotency-Key',
+] as const;
+
+/** Headers for an idempotent JSON write to the API (Razorpay order create / booking hold). */
+export const getOrderRequestHeaders = (idempotencyKey: string): Record<string, string> => ({
+  ...getApiHeaders(),
+  'Content-Type': 'application/json',
+  'Accept': 'application/json',
+  'Idempotency-Key': idempotencyKey,
+});
+
 export const buildApiUrl = (path: string): string => {
   const baseUrl = resolveApiBaseUrl();
   if (!baseUrl) {

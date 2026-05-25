@@ -4,9 +4,12 @@ import {
   fetchListingById,
   fetchListingPhotos,
   fetchPropertyListingPhotos,
+  fetchPublicListings,
+  invalidatePublicListingsCache,
   listingPhotosToSortedUrls,
   normalizeListingPhotoResponse,
   parseListingPhotosResponse,
+  PUBLIC_LISTINGS_TTL_MS,
 } from "./listingClient";
 
 const API_BASE = "https://api.example.com";
@@ -23,6 +26,25 @@ describe("listingClient", () => {
   afterEach(() => {
     clearRuntimeConfig();
     vi.unstubAllGlobals();
+  });
+
+  it("fetchPublicListings caches within the TTL and refetches after it expires", async () => {
+    vi.useFakeTimers();
+    try {
+      invalidatePublicListingsCache();
+      fetchMock.mockResolvedValue({ ok: true, json: async () => [] });
+
+      await fetchPublicListings();
+      await fetchPublicListings();
+      expect(fetchMock).toHaveBeenCalledTimes(1); // second call served from cache
+
+      vi.advanceTimersByTime(PUBLIC_LISTINGS_TTL_MS + 1);
+      await fetchPublicListings();
+      expect(fetchMock).toHaveBeenCalledTimes(2); // TTL expired -> network refetch
+    } finally {
+      invalidatePublicListingsCache();
+      vi.useRealTimers();
+    }
   });
 
   it("fetchListingById(2) calls /listings/2", async () => {

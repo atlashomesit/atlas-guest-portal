@@ -1,6 +1,6 @@
 User-agent: *
 Allow: /
-Sitemap: https://atlashomestays.com/sitemap.xml
+Sitemap: https://atlastays.com/sitemap.xml
 
 # AI search crawlers — explicitly allow for GEO visibility
 User-agent: GPTBot

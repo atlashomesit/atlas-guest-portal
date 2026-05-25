@@ -3,9 +3,16 @@ name: Enforce dev → main
 # Workspace policy: every commit reaching main MUST first land on dev.
 # This workflow fails any PR to main whose head branch is not `dev`.
 # Non-negotiable per founder decision 2026-05-14.
+#
+# Trigger scope: `opened` + `reopened` only — the head branch of an open PR
+# cannot change without closing + reopening, so re-validating on every
+# `synchronize` (default) is pure waste. The trim cut billed GHA minutes
+# ~95% on 2026-05-23 (was ~1,600 min/mo across 5 repos, now ~50).
+# Do NOT add `synchronize` back without a cost review.
 
 on:
   pull_request:
+    types: [opened, reopened]
     branches: [main]
 
 permissions:

@@ -21,7 +21,7 @@ import React, {
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { useBooking } from '@/contexts/BookingContext';
-import { buildApiUrl, getApiHeaders } from '@/api/client';
+import { buildApiUrl, getApiHeaders, getOrderRequestHeaders } from '@/api/client';
 import { apiFetch } from '@/lib/http';
 import {
   clampNationalDigits,
@@ -100,6 +100,26 @@ const IconNote = ({ size = 14 }: { size?: number }) => (
 // ── Utilities ─────────────────────────────────────────────────────────────────
 
 const LAST_UPI_VPA_KEY = 'atlas_last_upi_vpa';
+const CHECKOUT_DRAFT_KEY = 'atlas_guest_checkout_draft';
+
+/** Guest PII typed on this page, persisted to sessionStorage so a reload/Back doesn't lose it. */
+type CheckoutDraft = {
+  name: string;
+  email: string;
+  phone: string;
+  nationality: string;
+  notes: string;
+  phoneDialCode: string;
+};
+
+function loadCheckoutDraft(): Partial<CheckoutDraft> {
+  try {
+    const saved = window.sessionStorage.getItem(CHECKOUT_DRAFT_KEY);
+    return saved ? (JSON.parse(saved) as Partial<CheckoutDraft>) : {};
+  } catch {
+    return {};
+  }
+}
 
 function formatCountdown(expiresAt: string): string {
   const ms = new Date(expiresAt).getTime() - Date.now();
@@ -125,50 +145,45 @@ async function _abandonHold(holdId: number, prepToken: string | null) {
 
 function loadRazorpayScript(onSuccess: () => void, onError: (msg: string) => void) {
   if (window.Razorpay) { onSuccess(); return; }
+
+  let timeoutId: NodeJS.Timeout | null = null;
+  let alreadyFired = false;
+
+  const cleanup = () => {
+    if (timeoutId) clearTimeout(timeoutId);
+  };
+
+  const handleSuccess = () => {
+    if (alreadyFired) return;
+    alreadyFired = true;
+    cleanup();
+    onSuccess();
+  };
+
+  const handleError = (msg: string) => {
+    if (alreadyFired) return;
+    alreadyFired = true;
+    cleanup();
+    onError(msg);
+  };
+
   const script = document.createElement('script');
   script.src = 'https://checkout.razorpay.com/v1/checkout.js';
   script.async = true;
-  let loaded = false;
-
   script.onload = () => {
-    loaded = true;
-    if (window.Razorpay) {
-      onSuccess();
-    } else {
-      onError('Razorpay script loaded but window.Razorpay is undefined');
+    if (!window.Razorpay) {
+      handleError('Razorpay SDK loaded but failed to initialize.');
+      return;
     }
+    handleSuccess();
   };
-
-  script.onerror = () => {
-    if (!loaded) {
-      onError('Failed to load Razorpay payment gateway. Check your connection and try again.');
-    }
-  };
-
-  // Timeout safety: if script doesn't load in 10 seconds, fail gracefully
-  const timeout = setTimeout(() => {
-    if (!loaded && window.Razorpay === undefined) {
-      onError('Razorpay payment gateway took too long to load. Please check your connection and try again.');
-    }
-  }, 10000);
-
-  script.onload = (() => {
-    const originalOnLoad = script.onload;
-    return () => {
-      clearTimeout(timeout);
-      originalOnLoad?.call(script);
-    };
-  })();
-
-  script.onerror = (() => {
-    const originalOnError = script.onerror;
-    return () => {
-      clearTimeout(timeout);
-      originalOnError?.call(script);
-    };
-  })();
-
+  script.onerror = () => handleError('Failed to load Razorpay checkout script.');
   document.body.appendChild(script);
+
+  // 10-second timeout safety
+  timeoutId = setTimeout(() => {
+    handleError('Razorpay script loading timed out. Please check your connection and try again.');
+  }, 10000);
 }
 
 // ── GuestDetailsPage ─────────────────────────────────────────────────────────
@@ -184,16 +199,9 @@ const GuestDetailsPage: React.FC = () => {
   const holdListingId = booking.holdListingId;
   const priceBreakdown = booking.holdPriceBreakdown;
 
-  // Redirect if no hold state (user navigated directly without Reserve)
-  useEffect(() => {
-    if (!holdId || !holdExpiresAt) {
-      const backPath =
-        propertySlug && unitSlug
-          ? `/homes/${propertySlug}/${unitSlug}`
-          : '/';
-      navigate(backPath, { replace: true });
-    }
-  }, [holdId, holdExpiresAt, propertySlug, unitSlug, navigate]);
+  // No hold state (direct navigation or hard reload): instead of a silent redirect,
+  // we render a "pick your dates again" card (see early return in Render) and keep the
+  // guest's typed details, which are persisted to sessionStorage below.
 
   // ── Hold countdown ───────────────────────────────────────────────────────
   const [countdown, setCountdown] = useState(() =>
@@ -223,18 +231,40 @@ const GuestDetailsPage: React.FC = () => {
   }, [holdExpiresAt]);
 
   // ── Form state ────────────────────────────────────────────────────────────
-  const [phoneDialCode, setPhoneDialCode] = useState(() => GUEST_DIAL_OPTIONS[0].code);
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    nationality: 'India',
-    notes: '',
+  const [phoneDialCode, setPhoneDialCode] = useState(() => {
+    const draft = loadCheckoutDraft();
+    return typeof draft.phoneDialCode === 'string'
+      && GUEST_DIAL_OPTIONS.some((o) => o.code === draft.phoneDialCode)
+      ? draft.phoneDialCode
+      : GUEST_DIAL_OPTIONS[0].code;
+  });
+  const [formData, setFormData] = useState(() => {
+    const draft = loadCheckoutDraft();
+    return {
+      name: typeof draft.name === 'string' ? draft.name : '',
+      email: typeof draft.email === 'string' ? draft.email : '',
+      phone: typeof draft.phone === 'string' ? draft.phone : '',
+      nationality: typeof draft.nationality === 'string' && draft.nationality ? draft.nationality : 'India',
+      notes: typeof draft.notes === 'string' ? draft.notes : '',
+    };
   });
   const [formErrors, setFormErrors] = useState({ name: '', email: '', phone: '' });
   const [consentAccepted, setConsentAccepted] = useState(false);
   const [consentError, setConsentError] = useState('');
+  const [consentFlash, setConsentFlash] = useState(false);
+  const consentRowRef = useRef<HTMLDivElement>(null);
   const [whatsappOptIn, setWhatsappOptIn] = useState(true); // pre-checked per spec
+
+  // Persist guest PII to sessionStorage so a hard reload / Back nav doesn't lose it.
+  // Consent is intentionally NOT persisted — DPDP consent must be actively given each session.
+  useEffect(() => {
+    try {
+      window.sessionStorage.setItem(
+        CHECKOUT_DRAFT_KEY,
+        JSON.stringify({ ...formData, phoneDialCode }),
+      );
+    } catch { /* ignore */ }
+  }, [formData, phoneDialCode]);
 
   // ── Progressive disclosure state ──────────────────────────────────────────
   const [promoOpen, setPromoOpen] = useState(false);
@@ -462,15 +492,9 @@ const GuestDetailsPage: React.FC = () => {
 
         console.log('[GuestDetailsPage] Creating Razorpay order for booking...');
         const response = await axios.post(buildApiUrl('/api/Razorpay/order'), payload, {
-          headers: {
-            ...getApiHeaders(),
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Idempotency-Key': idempotencyKey,
-          },
-          timeout: 20000, // Increased to 20s to account for slow connections
+          headers: getOrderRequestHeaders(idempotencyKey),
+          timeout: 20000,
         });
-
         console.log('[GuestDetailsPage] Razorpay order created successfully:', response.data?.orderId);
 
         const {
@@ -504,7 +528,7 @@ const GuestDetailsPage: React.FC = () => {
 
         loadRazorpayScript(
           () => {
-            // Script loaded successfully
+            // Script loaded successfully, initialize Razorpay
             try {
               let paymentCompleted = false;
 
@@ -576,6 +600,7 @@ const GuestDetailsPage: React.FC = () => {
                         localStorage.setItem('atlas_guest_email', formData.email.trim());
                         if (formData.name.trim()) localStorage.setItem('atlas_guest_name', formData.name.trim());
                       } catch { /* ignore */ }
+                      try { sessionStorage.removeItem(CHECKOUT_DRAFT_KEY); } catch { /* ignore */ }
                       updateBooking({
                         holdId: null, holdExpiresAt: null, holdPropertySlug: null,
                         holdUnitSlug: null, holdPriceBreakdown: null, holdListingId: null,
@@ -611,32 +636,33 @@ const GuestDetailsPage: React.FC = () => {
               });
               rzp.on('close', handleClose);
 
-              console.log('[GuestDetailsPage] Opening Razorpay modal for order:', orderId);
               track('payment_init', holdListingId ? Number(holdListingId) : 0);
+              console.log('[GuestDetailsPage] Opening Razorpay modal for order:', orderId);
               rzp.open();
             } catch (err) {
               console.error('[GuestDetailsPage] Razorpay init error:', err);
-              setOrderError("Couldn't initialize payment modal. Please check your connection and try again. No payment was taken.");
+              setOrderError("Couldn't reach our servers. Your details are saved — check your connection and try again. No payment was taken.");
               setIsSubmitting(false);
             }
           },
           (errorMsg: string) => {
-            // Script failed to load
-            console.error('[GuestDetailsPage] Razorpay script load error:', errorMsg);
+            // Script loading failed
             setOrderError(errorMsg);
             setIsSubmitting(false);
-          }
+          },
         );
       } catch (err: unknown) {
         console.error('[GuestDetailsPage] order error:', err);
-        const axiosErr = err as { code?: string; response?: { status?: number; data?: { message?: string; code?: string } }; message?: string };
+        const axiosErr = err as { code?: string; message?: string; response?: { status?: number; data?: { message?: string; code?: string } } };
         const status = axiosErr?.response?.status;
         const data = axiosErr?.response?.data;
         const serverMessage = typeof data?.message === 'string' ? data.message : '';
+
+        // Detect timeout errors
         const isTimeout = axiosErr?.code === 'ECONNABORTED' || axiosErr?.message?.includes('timeout');
 
         if (isTimeout) {
-          setOrderError("Payment initialization timed out. Please check your connection and try again. Your details are saved.");
+          setOrderError('Payment initialization timed out. Please check your connection and try again.');
         } else if (status === 409) {
           const datesLabel =
             booking.checkIn && booking.checkOut
@@ -647,11 +673,11 @@ const GuestDetailsPage: React.FC = () => {
           );
           setOrderErrorIs409(true);
         } else if (status === 400 || status === 422) {
-          setOrderError(`Invalid booking data. ${serverMessage || 'Please check your details and try again.'}`);
+          setOrderError(`Validation error: ${serverMessage || 'Please check your details and try again.'}`);
+        } else if (status && status >= 500) {
+          setOrderError(`Server error: ${serverMessage || 'Please try again in a few moments.'}`);
         } else if (serverMessage) {
           setOrderError(`Couldn't start payment. ${serverMessage}`);
-        } else if (status && status >= 500) {
-          setOrderError("Server error. Please try again in a moment. Your details are saved.");
         } else {
           setOrderError("Couldn't reach our servers. Your details are saved — check your connection and try again. No payment was taken.");
         }
@@ -672,6 +698,15 @@ const GuestDetailsPage: React.FC = () => {
     setOrderErrorIs409(false);
   }, []);
 
+  // Mobile: the sticky Pay bar can't show the desktop "tick consent" microcopy, so tapping
+  // it while consent is unchecked scrolls the consent box into view and flashes it.
+  const scrollToConsent = useCallback(() => {
+    setConsentError('Please accept the consent to continue.');
+    consentRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setConsentFlash(true);
+    window.setTimeout(() => setConsentFlash(false), 1200);
+  }, []);
+
   const handleBackToProperty = useCallback(() => {
     updateBooking({
       holdId: null, holdExpiresAt: null, holdPropertySlug: null,
@@ -681,7 +716,29 @@ const GuestDetailsPage: React.FC = () => {
   }, [updateBooking, navigate, propertySlug, unitSlug]);
 
   // ── Render ────────────────────────────────────────────────────────────────
-  if (!holdId || !holdExpiresAt) return null;
+  // No active hold (direct navigation or hard reload wiped the session-only hold).
+  // Show a friendly "pick your dates again" card instead of silently bouncing the
+  // guest out — their typed details are already saved to sessionStorage.
+  if (!holdId || !holdExpiresAt) {
+    return (
+      <div className="gd-page">
+        <div className="gd-modal-shade" role="dialog" aria-modal="true" aria-labelledby="gd-nohold-title">
+          <div className="gd-modal">
+            <div className="gd-modal-icon"><IconClock size={22} /></div>
+            <h3 id="gd-nohold-title">Let's pick your dates again</h3>
+            <p>
+              Your 15-minute hold isn't active anymore — reservations are released when the
+              page reloads. Any details you entered are saved and will be waiting for you.
+            </p>
+            <button type="button" className="gd-modal-cta" onClick={handleBackToProperty}>
+              Choose dates
+            </button>
+          </div>
+        </div>
+        <style>{gdStyles}</style>
+      </div>
+    );
+  }
 
   const tenantCtx = getTenantContext();
   const brandName = tenantCtx?.name ?? 'Atlas';
@@ -1102,7 +1159,8 @@ const GuestDetailsPage: React.FC = () => {
             <div className="gd-consent">
               {/* DPDP required consent */}
               <div
-                className={`gd-consent-row required${consentAccepted ? ' checked' : ''}`}
+                ref={consentRowRef}
+                className={`gd-consent-row required${consentAccepted ? ' checked' : ''}${consentFlash ? ' gd-consent-flash' : ''}`}
                 onClick={() => { setConsentAccepted((v) => !v); if (!consentAccepted) setConsentError(''); }}
                 role="checkbox"
                 aria-checked={consentAccepted}
@@ -1355,10 +1413,11 @@ const GuestDetailsPage: React.FC = () => {
           <small>Held</small>
         </div>
         <button
-          type="submit"
+          type={consentAccepted ? 'submit' : 'button'}
           form="gd-details-form"
           className="gd-mobile-bar-cta"
-          disabled={payDisabled}
+          disabled={isSubmitting || holdExpired}
+          onClick={consentAccepted ? undefined : scrollToConsent}
           data-testid="guest-booking-submit-mobile"
         >
           {isSubmitting
@@ -1988,6 +2047,12 @@ const gdStyles = `
 }
 .gd-consent-row.required { border-color: var(--gd-coral); background: #fff8f2; }
 .gd-consent-row.checked { border-color: var(--gd-success); background: var(--gd-success-bg); }
+.gd-consent-flash { animation: gd-consent-flash 1.2s ease-out; }
+@keyframes gd-consent-flash {
+  0%   { box-shadow: 0 0 0 0 rgba(194, 65, 12, 0); }
+  25%  { box-shadow: 0 0 0 4px rgba(194, 65, 12, 0.35); }
+  100% { box-shadow: 0 0 0 0 rgba(194, 65, 12, 0); }
+}
 .gd-consent-body { font-size: 13px; color: var(--gd-ink-soft); line-height: 1.5; }
 .gd-consent-body b { color: var(--gd-ink); font-weight: 600; }
 .gd-consent-link { color: var(--gd-coral); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }

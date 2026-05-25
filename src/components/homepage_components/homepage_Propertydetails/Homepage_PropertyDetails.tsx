@@ -35,6 +35,7 @@ import {
 import SEO from '../../SEO';
 import MultiPinMap, { type MapPin } from '../../map/MultiPinMap';
 import SinglePinGoogleMap from '../../map/SinglePinGoogleMap';
+import { selectPropertyMapMode } from './propertyMapMode';
 import { buildApiUrl, getApiHeaders } from '../../../api/client';
 import { addRecentlyViewed, isFavorite, toggleFavorite } from '../../../utils/guestHistory';
 import { formatCurrency } from '../../../utils/formatting';
@@ -524,7 +525,13 @@ const PropertyDetails = () => {
                 setResolvedListingId(listing.id);
                 const mgFromResolve = parseMaxGuestsFromPayload(listing as Record<string, unknown>);
                 if (mgFromResolve != null) {
-                    setData((prev) => (prev ? { ...prev, maxGuests: mgFromResolve } : prev));
+                    // TASK-2635: converge on the largest known capacity so the static-catalog
+                    // default (homes.ts `?? 2`) can never clobber the API's real max-occupancy.
+                    // Math.max is order-independent, so competing write paths can't make the
+                    // displayed "Sleeps" flip between renders of the same URL.
+                    setData((prev) =>
+                        prev ? { ...prev, maxGuests: Math.max(prev.maxGuests ?? 0, mgFromResolve) } : prev,
+                    );
                 }
             } catch {
                 if (controller.signal.aborted) return;
@@ -577,7 +584,9 @@ const PropertyDetails = () => {
                 setData((prev) => {
                     if (!prev) return prev;
                     const updates: Partial<typeof prev> = {};
-                    if (mg != null && !(typeof prev.maxGuests === 'number' && prev.maxGuests >= 1)) {
+                    // TASK-2635: raise to the API's max-occupancy when it exceeds what we have
+                    // (e.g. the static default of 2); never downgrade. Keeps "Sleeps" stable.
+                    if (mg != null && mg > (typeof prev.maxGuests === 'number' ? prev.maxGuests : 0)) {
                         updates.maxGuests = mg;
                     }
                     if (phone !== null && !prev.hostPhone) {
@@ -1425,39 +1434,51 @@ useEffect(() => {
                   )}
                 </div>
                 <div style={{ borderRadius: 16, overflow: 'hidden', border: '1px solid #f0e6dc' }}>
-                  {mapSrcTrimmed ? (
-                    <iframe
-                      src={mapSrcTrimmed}
-                      style={{ width: '100%', height: 300, border: 0, display: 'block' }}
-                      loading="lazy"
-                      allowFullScreen
-                      referrerPolicy="no-referrer-when-downgrade"
-                      title="Property Location"
-                    />
-                  ) : useMultiPin ? (
-                    <MultiPinMap pins={propertyPins} height={300} />
-                  ) : mapLocation &&
-                    typeof mapLocation.lat === 'number' &&
-                    Number.isFinite(mapLocation.lat) &&
-                    typeof mapLocation.lng === 'number' &&
-                    Number.isFinite(mapLocation.lng) ? (
-                    <SinglePinGoogleMap
-                      lat={mapLocation.lat}
-                      lng={mapLocation.lng}
-                      zoom={typeof mapLocation.zoom === 'number' && mapLocation.zoom > 0 ? mapLocation.zoom : 15}
-                      markerTitle={mapLocation.markerLabel ?? tenantNameForMap}
-                    />
-                  ) : (
-                    typeof data.latitude === 'number' && Number.isFinite(data.latitude) &&
-                    typeof data.longitude === 'number' && Number.isFinite(data.longitude) ? (
-                      <SinglePinGoogleMap
-                        lat={data.latitude}
-                        lng={data.longitude}
-                        zoom={15}
-                        markerTitle={data.property_name}
-                      />
-                    ) : null
-                  )}
+                  {(() => {
+                    // Task 3: property's own coords win over custom embed / multi-pin / tenant default.
+                    const mapSelection = selectPropertyMapMode({
+                      latitude: data.latitude,
+                      longitude: data.longitude,
+                      mapSrc: mapSrcTrimmed,
+                      useMultiPin,
+                      mapLocation,
+                    });
+                    switch (mapSelection.kind) {
+                      case 'coords':
+                        return (
+                          <SinglePinGoogleMap
+                            lat={mapSelection.lat}
+                            lng={mapSelection.lng}
+                            zoom={15}
+                            markerTitle={data.property_name}
+                          />
+                        );
+                      case 'iframe':
+                        return (
+                          <iframe
+                            src={mapSrcTrimmed}
+                            style={{ width: '100%', height: 300, border: 0, display: 'block' }}
+                            loading="lazy"
+                            allowFullScreen
+                            referrerPolicy="no-referrer-when-downgrade"
+                            title="Property Location"
+                          />
+                        );
+                      case 'multipin':
+                        return <MultiPinMap pins={propertyPins} height={300} />;
+                      case 'tenant':
+                        return (
+                          <SinglePinGoogleMap
+                            lat={mapSelection.lat}
+                            lng={mapSelection.lng}
+                            zoom={mapLocation && typeof mapLocation.zoom === 'number' && mapLocation.zoom > 0 ? mapLocation.zoom : 15}
+                            markerTitle={mapLocation?.markerLabel ?? tenantNameForMap}
+                          />
+                        );
+                      default:
+                        return null;
+                    }
+                  })()}
                 </div>
               </div>
             )}
