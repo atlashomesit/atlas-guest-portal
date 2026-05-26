@@ -495,7 +495,8 @@ const GuestDetailsPage: React.FC = () => {
           headers: getOrderRequestHeaders(idempotencyKey),
           timeout: 20000,
         });
-        console.log('[GuestDetailsPage] Razorpay order created successfully:', response.data?.orderId);
+        const responseData = response.data;
+        console.log('[GuestDetailsPage] Razorpay order created successfully:', { orderId: responseData?.orderId, amount: responseData?.amount, keyId: responseData?.keyId });
 
         const {
           keyId,
@@ -507,10 +508,21 @@ const GuestDetailsPage: React.FC = () => {
           referralDiscountAmount: serverReferralDiscount,
           appliedPromoCode: serverPromoCode,
           promoDiscountAmount: serverPromoDiscount,
-        } = response.data ?? {};
+        } = responseData ?? {};
 
-        if (!keyId || !orderId || !bookingId) {
-          throw new Error('Checkout could not start: invalid response. Please try again.');
+        // Validate all required fields with explicit type checks
+        if (!keyId || typeof keyId !== 'string') {
+          throw new Error('Checkout error: missing payment key. Please try again.');
+        }
+        if (!orderId || typeof orderId !== 'string') {
+          throw new Error('Checkout error: missing order ID from backend. Please try again.');
+        }
+        if (!bookingId || (typeof bookingId !== 'number' && typeof bookingId !== 'string')) {
+          throw new Error('Checkout error: missing booking ID. Please try again.');
+        }
+        if (!amount || typeof amount !== 'number' || amount <= 0) {
+          console.error('[GuestDetailsPage] Invalid amount:', amount);
+          throw new Error('Checkout error: invalid payment amount. Please try again.');
         }
 
         if (typeof serverReferralCode === 'string' && serverReferralCode.trim()) {
@@ -625,12 +637,20 @@ const GuestDetailsPage: React.FC = () => {
                 },
               };
 
+              if (!window.Razorpay) {
+                throw new Error('Razorpay SDK is not available. Please refresh and try again.');
+              }
+
+              console.log('[GuestDetailsPage] Creating Razorpay instance with order:', { orderId, amount, keyId });
               const rzp = new window.Razorpay(options);
+              console.log('[GuestDetailsPage] Razorpay instance created successfully');
+
               rzp.on('payment.failed', (failRes: unknown) => {
                 paymentCompleted = true;
                 const fr = failRes as { error?: { code?: string; description?: string } };
                 const code = String(fr?.error?.code ?? '');
                 const desc = String(fr?.error?.description ?? '');
+                console.log('[GuestDetailsPage] Payment failed:', { code, desc });
                 setOrderError(mapRazorpayFailureCode(code, desc));
                 setIsSubmitting(false);
               });
@@ -639,6 +659,7 @@ const GuestDetailsPage: React.FC = () => {
               track('payment_init', holdListingId ? Number(holdListingId) : 0);
               console.log('[GuestDetailsPage] Opening Razorpay modal for order:', orderId);
               rzp.open();
+              console.log('[GuestDetailsPage] Modal open call completed');
             } catch (err) {
               console.error('[GuestDetailsPage] Razorpay init error:', err);
               setOrderError("Couldn't reach our servers. Your details are saved — check your connection and try again. No payment was taken.");
