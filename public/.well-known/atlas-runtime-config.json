@@ -1,5 +1,5 @@
 {
-    "apiBaseUrl":  "http://127.0.0.1:5120",
+    "apiBaseUrl":  null,
     "globalDiscountPercent":  25,
     "environment":  "local",
     "googleMapsApiKey":  "AIzaSyDehAUkDxOGLv7V2PRA1xM2d1S-tXEf4UM",
