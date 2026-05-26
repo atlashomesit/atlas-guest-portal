@@ -100,6 +100,26 @@ const IconNote = ({ size = 14 }: { size?: number }) => (
 // ── Utilities ─────────────────────────────────────────────────────────────────
 
 const LAST_UPI_VPA_KEY = 'atlas_last_upi_vpa';
+const CHECKOUT_DRAFT_KEY = 'atlas_guest_checkout_draft';
+
+/** Guest PII typed on this page, persisted to sessionStorage so a reload/Back doesn't lose it. */
+type CheckoutDraft = {
+  name: string;
+  email: string;
+  phone: string;
+  nationality: string;
+  notes: string;
+  phoneDialCode: string;
+};
+
+function loadCheckoutDraft(): Partial<CheckoutDraft> {
+  try {
+    const saved = window.sessionStorage.getItem(CHECKOUT_DRAFT_KEY);
+    return saved ? (JSON.parse(saved) as Partial<CheckoutDraft>) : {};
+  } catch {
+    return {};
+  }
+}
 
 function formatCountdown(expiresAt: string): string {
   const ms = new Date(expiresAt).getTime() - Date.now();
@@ -123,14 +143,47 @@ async function _abandonHold(holdId: number, prepToken: string | null) {
   } catch { /* non-blocking */ }
 }
 
-function loadRazorpayScript(callback: () => void) {
-  if (window.Razorpay) { callback(); return; }
+function loadRazorpayScript(onSuccess: () => void, onError: (msg: string) => void) {
+  if (window.Razorpay) { onSuccess(); return; }
+
+  let timeoutId: NodeJS.Timeout | null = null;
+  let alreadyFired = false;
+
+  const cleanup = () => {
+    if (timeoutId) clearTimeout(timeoutId);
+  };
+
+  const handleSuccess = () => {
+    if (alreadyFired) return;
+    alreadyFired = true;
+    cleanup();
+    onSuccess();
+  };
+
+  const handleError = (msg: string) => {
+    if (alreadyFired) return;
+    alreadyFired = true;
+    cleanup();
+    onError(msg);
+  };
+
   const script = document.createElement('script');
   script.src = 'https://checkout.razorpay.com/v1/checkout.js';
   script.async = true;
-  script.onload = () => callback();
-  script.onerror = () => callback(); // let caller handle failure
+  script.onload = () => {
+    if (!window.Razorpay) {
+      handleError('Razorpay SDK loaded but failed to initialize.');
+      return;
+    }
+    handleSuccess();
+  };
+  script.onerror = () => handleError('Failed to load Razorpay checkout script.');
   document.body.appendChild(script);
+
+  // 10-second timeout safety
+  timeoutId = setTimeout(() => {
+    handleError('Razorpay script loading timed out. Please check your connection and try again.');
+  }, 10000);
 }
 
 // ── GuestDetailsPage ─────────────────────────────────────────────────────────
@@ -146,16 +199,9 @@ const GuestDetailsPage: React.FC = () => {
   const holdListingId = booking.holdListingId;
   const priceBreakdown = booking.holdPriceBreakdown;
 
-  // Redirect if no hold state (user navigated directly without Reserve)
-  useEffect(() => {
-    if (!holdId || !holdExpiresAt) {
-      const backPath =
-        propertySlug && unitSlug
-          ? `/homes/${propertySlug}/${unitSlug}`
-          : '/';
-      navigate(backPath, { replace: true });
-    }
-  }, [holdId, holdExpiresAt, propertySlug, unitSlug, navigate]);
+  // No hold state (direct navigation or hard reload): instead of a silent redirect,
+  // we render a "pick your dates again" card (see early return in Render) and keep the
+  // guest's typed details, which are persisted to sessionStorage below.
 
   // ── Hold countdown ───────────────────────────────────────────────────────
   const [countdown, setCountdown] = useState(() =>
@@ -185,18 +231,40 @@ const GuestDetailsPage: React.FC = () => {
   }, [holdExpiresAt]);
 
   // ── Form state ────────────────────────────────────────────────────────────
-  const [phoneDialCode, setPhoneDialCode] = useState(() => GUEST_DIAL_OPTIONS[0].code);
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    nationality: 'India',
-    notes: '',
+  const [phoneDialCode, setPhoneDialCode] = useState(() => {
+    const draft = loadCheckoutDraft();
+    return typeof draft.phoneDialCode === 'string'
+      && GUEST_DIAL_OPTIONS.some((o) => o.code === draft.phoneDialCode)
+      ? draft.phoneDialCode
+      : GUEST_DIAL_OPTIONS[0].code;
+  });
+  const [formData, setFormData] = useState(() => {
+    const draft = loadCheckoutDraft();
+    return {
+      name: typeof draft.name === 'string' ? draft.name : '',
+      email: typeof draft.email === 'string' ? draft.email : '',
+      phone: typeof draft.phone === 'string' ? draft.phone : '',
+      nationality: typeof draft.nationality === 'string' && draft.nationality ? draft.nationality : 'India',
+      notes: typeof draft.notes === 'string' ? draft.notes : '',
+    };
   });
   const [formErrors, setFormErrors] = useState({ name: '', email: '', phone: '' });
   const [consentAccepted, setConsentAccepted] = useState(false);
   const [consentError, setConsentError] = useState('');
+  const [consentFlash, setConsentFlash] = useState(false);
+  const consentRowRef = useRef<HTMLDivElement>(null);
   const [whatsappOptIn, setWhatsappOptIn] = useState(true); // pre-checked per spec
+
+  // Persist guest PII to sessionStorage so a hard reload / Back nav doesn't lose it.
+  // Consent is intentionally NOT persisted — DPDP consent must be actively given each session.
+  useEffect(() => {
+    try {
+      window.sessionStorage.setItem(
+        CHECKOUT_DRAFT_KEY,
+        JSON.stringify({ ...formData, phoneDialCode }),
+      );
+    } catch { /* ignore */ }
+  }, [formData, phoneDialCode]);
 
   // ── Progressive disclosure state ──────────────────────────────────────────
   const [promoOpen, setPromoOpen] = useState(false);
@@ -422,10 +490,13 @@ const GuestDetailsPage: React.FC = () => {
         const numericListingId = holdListingId ? Number(holdListingId) : 0;
         track('start_checkout', numericListingId);
 
+        console.log('[GuestDetailsPage] Creating Razorpay order for booking...');
         const response = await axios.post(buildApiUrl('/api/Razorpay/order'), payload, {
           headers: getOrderRequestHeaders(idempotencyKey),
-          timeout: 15000,
+          timeout: 20000,
         });
+        const responseData = response.data;
+        console.log('[GuestDetailsPage] Razorpay order created successfully:', { orderId: responseData?.orderId, amount: responseData?.amount, keyId: responseData?.keyId });
 
         const {
           keyId,
@@ -437,10 +508,21 @@ const GuestDetailsPage: React.FC = () => {
           referralDiscountAmount: serverReferralDiscount,
           appliedPromoCode: serverPromoCode,
           promoDiscountAmount: serverPromoDiscount,
-        } = response.data ?? {};
+        } = responseData ?? {};
 
-        if (!keyId || !orderId || !bookingId) {
-          throw new Error('Checkout could not start: invalid response. Please try again.');
+        // Validate all required fields with explicit type checks
+        if (!keyId || typeof keyId !== 'string') {
+          throw new Error('Checkout error: missing payment key. Please try again.');
+        }
+        if (!orderId || typeof orderId !== 'string') {
+          throw new Error('Checkout error: missing order ID from backend. Please try again.');
+        }
+        if (!bookingId || (typeof bookingId !== 'number' && typeof bookingId !== 'string')) {
+          throw new Error('Checkout error: missing booking ID. Please try again.');
+        }
+        if (!amount || typeof amount !== 'number' || amount <= 0) {
+          console.error('[GuestDetailsPage] Invalid amount:', amount);
+          throw new Error('Checkout error: invalid payment amount. Please try again.');
         }
 
         if (typeof serverReferralCode === 'string' && serverReferralCode.trim()) {
@@ -456,133 +538,153 @@ const GuestDetailsPage: React.FC = () => {
         setRazorpayAmount(Number(amount));
         pendingBookingTokenRef.current = typeof bookingToken === 'string' ? bookingToken.trim() : null;
 
-        loadRazorpayScript(() => {
-          if (!window.Razorpay) {
-            setOrderError("Couldn't reach our servers. Your details are saved — check your connection and try again. No payment was taken.");
-            setIsSubmitting(false);
-            return;
-          }
-          try {
-            let paymentCompleted = false;
+        loadRazorpayScript(
+          () => {
+            // Script loaded successfully, initialize Razorpay
+            try {
+              let paymentCompleted = false;
 
-            let lastUpiVpa = '';
-            try { lastUpiVpa = localStorage.getItem(LAST_UPI_VPA_KEY)?.trim() ?? ''; } catch { /* ignore */ }
+              let lastUpiVpa = '';
+              try { lastUpiVpa = localStorage.getItem(LAST_UPI_VPA_KEY)?.trim() ?? ''; } catch { /* ignore */ }
 
-            const handleClose = () => {
-              if (paymentCompleted) return;
-              paymentCompleted = true;
-              setIsSubmitting(false);
-              setPaymentCancelled(true);
-              setRazorpayOrderId(null);
-            };
-
-            const options = {
-              key: keyId,
-              amount: Number(amount),
-              currency: 'INR',
-              name: getTenantContext()?.displayMerchantName ?? getTenantContext()?.name ?? 'Our Property',
-              description: `Booking confirmation`,
-              order_id: orderId,
-              prefill: {
-                name: formData.name.trim(),
-                email: formData.email.trim(),
-                contact: toRazorpayContactDigits(
-                  phoneDialCode,
-                  clampNationalDigits(formData.phone, dial.maxDigits),
-                ),
-                method: 'upi',
-                ...(lastUpiVpa ? { vpa: lastUpiVpa } : {}),
-              },
-              upi: { flow: 'collect', ...(lastUpiVpa ? { vpa: lastUpiVpa } : {}) },
-              config: {
-                display: {
-                  blocks: {
-                    upi_collect: {
-                      name: 'Pay using UPI ID',
-                      instruments: [{ method: 'upi', flows: ['collect'] }],
-                    },
-                  },
-                  sequence: ['block.upi_collect', 'block.card', 'block.netbanking', 'block.wallet'],
-                  preferences: { show_default_blocks: true },
-                },
-              },
-              theme: { color: '#c2410c' },
-              modal: { ondismiss: handleClose },
-              handler: async (res: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => {
+              const handleClose = () => {
+                if (paymentCompleted) return;
                 paymentCompleted = true;
-                try {
-                  const verifyRes = await axios.post(
-                    buildApiUrl('/api/Razorpay/verify'),
-                    {
-                      bookingId: Number(bookingId),
-                      razorpayOrderId: res.razorpay_order_id,
-                      razorpayPaymentId: res.razorpay_payment_id,
-                      razorpaySignature: res.razorpay_signature,
-                      guestInfo: {
-                        name: formData.name.trim(),
-                        email: formData.email.trim(),
-                        phone: e164Phone,
+                setIsSubmitting(false);
+                setPaymentCancelled(true);
+                setRazorpayOrderId(null);
+              };
+
+              const options = {
+                key: keyId,
+                amount: Number(amount),
+                currency: 'INR',
+                name: getTenantContext()?.displayMerchantName ?? getTenantContext()?.name ?? 'Our Property',
+                description: `Booking confirmation`,
+                order_id: orderId,
+                prefill: {
+                  name: formData.name.trim(),
+                  email: formData.email.trim(),
+                  contact: toRazorpayContactDigits(
+                    phoneDialCode,
+                    clampNationalDigits(formData.phone, dial.maxDigits),
+                  ),
+                  method: 'upi',
+                  ...(lastUpiVpa ? { vpa: lastUpiVpa } : {}),
+                },
+                upi: { flow: 'collect', ...(lastUpiVpa ? { vpa: lastUpiVpa } : {}) },
+                config: {
+                  display: {
+                    blocks: {
+                      upi_collect: {
+                        name: 'Pay using UPI ID',
+                        instruments: [{ method: 'upi', flows: ['collect'] }],
                       },
                     },
-                    { headers: { ...getApiHeaders(), 'Content-Type': 'application/json' }, timeout: 15000 },
-                  );
-                  if (verifyRes.data?.success) {
-                    const vpa = typeof verifyRes.data.lastUpiVpa === 'string' ? verifyRes.data.lastUpiVpa.trim() : '';
-                    if (vpa) { try { localStorage.setItem(LAST_UPI_VPA_KEY, vpa); } catch { /* ignore */ } }
-                    try {
-                      localStorage.setItem('atlas_guest_email', formData.email.trim());
-                      if (formData.name.trim()) localStorage.setItem('atlas_guest_name', formData.name.trim());
-                    } catch { /* ignore */ }
-                    updateBooking({
-                      holdId: null, holdExpiresAt: null, holdPropertySlug: null,
-                      holdUnitSlug: null, holdPriceBreakdown: null, holdListingId: null,
-                      holdListingName: null, paymentHoldBookingId: null, paymentHoldToken: null,
-                    });
-                    const token = pendingBookingTokenRef.current;
-                    navigate(
-                      token
-                        ? `/booking/${bookingId}?t=${encodeURIComponent(token)}`
-                        : `/booking/${bookingId}`,
-                      { replace: true },
+                    sequence: ['block.upi_collect', 'block.card', 'block.netbanking', 'block.wallet'],
+                    preferences: { show_default_blocks: true },
+                  },
+                },
+                theme: { color: '#c2410c' },
+                modal: { ondismiss: handleClose },
+                handler: async (res: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => {
+                  paymentCompleted = true;
+                  try {
+                    const verifyRes = await axios.post(
+                      buildApiUrl('/api/Razorpay/verify'),
+                      {
+                        bookingId: Number(bookingId),
+                        razorpayOrderId: res.razorpay_order_id,
+                        razorpayPaymentId: res.razorpay_payment_id,
+                        razorpaySignature: res.razorpay_signature,
+                        guestInfo: {
+                          name: formData.name.trim(),
+                          email: formData.email.trim(),
+                          phone: e164Phone,
+                        },
+                      },
+                      { headers: { ...getApiHeaders(), 'Content-Type': 'application/json' }, timeout: 15000 },
                     );
-                  } else {
-                    throw new Error(verifyRes.data?.message || 'Payment verification failed.');
+                    if (verifyRes.data?.success) {
+                      const vpa = typeof verifyRes.data.lastUpiVpa === 'string' ? verifyRes.data.lastUpiVpa.trim() : '';
+                      if (vpa) { try { localStorage.setItem(LAST_UPI_VPA_KEY, vpa); } catch { /* ignore */ } }
+                      try {
+                        localStorage.setItem('atlas_guest_email', formData.email.trim());
+                        if (formData.name.trim()) localStorage.setItem('atlas_guest_name', formData.name.trim());
+                      } catch { /* ignore */ }
+                      try { sessionStorage.removeItem(CHECKOUT_DRAFT_KEY); } catch { /* ignore */ }
+                      updateBooking({
+                        holdId: null, holdExpiresAt: null, holdPropertySlug: null,
+                        holdUnitSlug: null, holdPriceBreakdown: null, holdListingId: null,
+                        holdListingName: null, paymentHoldBookingId: null, paymentHoldToken: null,
+                      });
+                      const token = pendingBookingTokenRef.current;
+                      navigate(
+                        token
+                          ? `/booking/${bookingId}?t=${encodeURIComponent(token)}`
+                          : `/booking/${bookingId}`,
+                        { replace: true },
+                      );
+                    } else {
+                      throw new Error(verifyRes.data?.message || 'Payment verification failed.');
+                    }
+                  } catch (err) {
+                    console.error('[GuestDetailsPage] verify error:', err);
+                    setOrderError(`Payment verification failed. Please contact support with your payment ID if you were charged.`);
+                  } finally {
+                    setIsSubmitting(false);
                   }
-                } catch (err) {
-                  console.error('[GuestDetailsPage] verify error:', err);
-                  setOrderError(`Payment verification failed. Please contact support with your payment ID if you were charged.`);
-                } finally {
-                  setIsSubmitting(false);
-                }
-              },
-            };
+                },
+              };
 
-            const rzp = new window.Razorpay(options);
-            rzp.on('payment.failed', (failRes: unknown) => {
-              paymentCompleted = true;
-              const fr = failRes as { error?: { code?: string; description?: string } };
-              const code = String(fr?.error?.code ?? '');
-              const desc = String(fr?.error?.description ?? '');
-              setOrderError(mapRazorpayFailureCode(code, desc));
+              if (!window.Razorpay) {
+                throw new Error('Razorpay SDK is not available. Please refresh and try again.');
+              }
+
+              console.log('[GuestDetailsPage] Creating Razorpay instance with order:', { orderId, amount, keyId });
+              const rzp = new window.Razorpay(options);
+              console.log('[GuestDetailsPage] Razorpay instance created successfully');
+
+              rzp.on('payment.failed', (failRes: unknown) => {
+                paymentCompleted = true;
+                const fr = failRes as { error?: { code?: string; description?: string } };
+                const code = String(fr?.error?.code ?? '');
+                const desc = String(fr?.error?.description ?? '');
+                console.log('[GuestDetailsPage] Payment failed:', { code, desc });
+                setOrderError(mapRazorpayFailureCode(code, desc));
+                setIsSubmitting(false);
+              });
+              rzp.on('close', handleClose);
+
+              track('payment_init', holdListingId ? Number(holdListingId) : 0);
+              console.log('[GuestDetailsPage] Opening Razorpay modal for order:', orderId);
+              rzp.open();
+              console.log('[GuestDetailsPage] Modal open call completed');
+            } catch (err) {
+              console.error('[GuestDetailsPage] Razorpay init error:', err);
+              setOrderError("Couldn't reach our servers. Your details are saved — check your connection and try again. No payment was taken.");
               setIsSubmitting(false);
-            });
-            rzp.on('close', handleClose);
-
-            track('payment_init', holdListingId ? Number(holdListingId) : 0);
-            rzp.open();
-          } catch (err) {
-            console.error('[GuestDetailsPage] Razorpay init error:', err);
-            setOrderError("Couldn't reach our servers. Your details are saved — check your connection and try again. No payment was taken.");
+            }
+          },
+          (errorMsg: string) => {
+            // Script loading failed
+            setOrderError(errorMsg);
             setIsSubmitting(false);
-          }
-        });
+          },
+        );
       } catch (err: unknown) {
         console.error('[GuestDetailsPage] order error:', err);
-        const status = (err as { response?: { status?: number } })?.response?.status;
-        const data = (err as { response?: { data?: { message?: string; code?: string } } })?.response?.data;
+        const axiosErr = err as { code?: string; message?: string; response?: { status?: number; data?: { message?: string; code?: string } } };
+        const status = axiosErr?.response?.status;
+        const data = axiosErr?.response?.data;
         const serverMessage = typeof data?.message === 'string' ? data.message : '';
 
-        if (status === 409) {
+        // Detect timeout errors
+        const isTimeout = axiosErr?.code === 'ECONNABORTED' || axiosErr?.message?.includes('timeout');
+
+        if (isTimeout) {
+          setOrderError('Payment initialization timed out. Please check your connection and try again.');
+        } else if (status === 409) {
           const datesLabel =
             booking.checkIn && booking.checkOut
               ? `${checkInDisplay} – ${checkOutDisplay}`
@@ -591,6 +693,10 @@ const GuestDetailsPage: React.FC = () => {
             `Someone else just booked these dates. We couldn't confirm ${datesLabel}. Pick different dates to continue. No payment was taken.`,
           );
           setOrderErrorIs409(true);
+        } else if (status === 400 || status === 422) {
+          setOrderError(`Validation error: ${serverMessage || 'Please check your details and try again.'}`);
+        } else if (status && status >= 500) {
+          setOrderError(`Server error: ${serverMessage || 'Please try again in a few moments.'}`);
         } else if (serverMessage) {
           setOrderError(`Couldn't start payment. ${serverMessage}`);
         } else {
@@ -613,6 +719,15 @@ const GuestDetailsPage: React.FC = () => {
     setOrderErrorIs409(false);
   }, []);
 
+  // Mobile: the sticky Pay bar can't show the desktop "tick consent" microcopy, so tapping
+  // it while consent is unchecked scrolls the consent box into view and flashes it.
+  const scrollToConsent = useCallback(() => {
+    setConsentError('Please accept the consent to continue.');
+    consentRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setConsentFlash(true);
+    window.setTimeout(() => setConsentFlash(false), 1200);
+  }, []);
+
   const handleBackToProperty = useCallback(() => {
     updateBooking({
       holdId: null, holdExpiresAt: null, holdPropertySlug: null,
@@ -622,7 +737,29 @@ const GuestDetailsPage: React.FC = () => {
   }, [updateBooking, navigate, propertySlug, unitSlug]);
 
   // ── Render ────────────────────────────────────────────────────────────────
-  if (!holdId || !holdExpiresAt) return null;
+  // No active hold (direct navigation or hard reload wiped the session-only hold).
+  // Show a friendly "pick your dates again" card instead of silently bouncing the
+  // guest out — their typed details are already saved to sessionStorage.
+  if (!holdId || !holdExpiresAt) {
+    return (
+      <div className="gd-page">
+        <div className="gd-modal-shade" role="dialog" aria-modal="true" aria-labelledby="gd-nohold-title">
+          <div className="gd-modal">
+            <div className="gd-modal-icon"><IconClock size={22} /></div>
+            <h3 id="gd-nohold-title">Let's pick your dates again</h3>
+            <p>
+              Your 15-minute hold isn't active anymore — reservations are released when the
+              page reloads. Any details you entered are saved and will be waiting for you.
+            </p>
+            <button type="button" className="gd-modal-cta" onClick={handleBackToProperty}>
+              Choose dates
+            </button>
+          </div>
+        </div>
+        <style>{gdStyles}</style>
+      </div>
+    );
+  }
 
   const tenantCtx = getTenantContext();
   const brandName = tenantCtx?.name ?? 'Atlas';
@@ -1043,7 +1180,8 @@ const GuestDetailsPage: React.FC = () => {
             <div className="gd-consent">
               {/* DPDP required consent */}
               <div
-                className={`gd-consent-row required${consentAccepted ? ' checked' : ''}`}
+                ref={consentRowRef}
+                className={`gd-consent-row required${consentAccepted ? ' checked' : ''}${consentFlash ? ' gd-consent-flash' : ''}`}
                 onClick={() => { setConsentAccepted((v) => !v); if (!consentAccepted) setConsentError(''); }}
                 role="checkbox"
                 aria-checked={consentAccepted}
@@ -1296,10 +1434,11 @@ const GuestDetailsPage: React.FC = () => {
           <small>Held</small>
         </div>
         <button
-          type="submit"
+          type={consentAccepted ? 'submit' : 'button'}
           form="gd-details-form"
           className="gd-mobile-bar-cta"
-          disabled={payDisabled}
+          disabled={isSubmitting || holdExpired}
+          onClick={consentAccepted ? undefined : scrollToConsent}
           data-testid="guest-booking-submit-mobile"
         >
           {isSubmitting
@@ -1929,6 +2068,12 @@ const gdStyles = `
 }
 .gd-consent-row.required { border-color: var(--gd-coral); background: #fff8f2; }
 .gd-consent-row.checked { border-color: var(--gd-success); background: var(--gd-success-bg); }
+.gd-consent-flash { animation: gd-consent-flash 1.2s ease-out; }
+@keyframes gd-consent-flash {
+  0%   { box-shadow: 0 0 0 0 rgba(194, 65, 12, 0); }
+  25%  { box-shadow: 0 0 0 4px rgba(194, 65, 12, 0.35); }
+  100% { box-shadow: 0 0 0 0 rgba(194, 65, 12, 0); }
+}
 .gd-consent-body { font-size: 13px; color: var(--gd-ink-soft); line-height: 1.5; }
 .gd-consent-body b { color: var(--gd-ink); font-weight: 600; }
 .gd-consent-link { color: var(--gd-coral); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }

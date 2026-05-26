@@ -1,0 +1,592 @@
+/* ============================================================
+   Atlas Guest Home v2 — Hero, Neighbourhood Ribbon, Home Cards
+   Ported from Claude Design output. All classes are prefixed
+   `ahv2-` to avoid collisions with global styles (e.g. .card in
+   styles/listings.css). Colours reference the existing theme
+   tokens (src/styles/themes/default.css) with hex fallbacks so
+   the v2 surfaces never drift from the brand palette.
+   ============================================================ */
+
+.ahv2-hero,
+.ahv2-ribbon,
+.ahv2-card {
+  --ahv2-ivory: var(--bg-primary, #fffaf5);
+  --ahv2-card: var(--bg-card, #ffffff);
+  --ahv2-muted: var(--bg-secondary, #fff3e8);
+  --ahv2-coral: var(--cta-primary, #c2410c);
+  --ahv2-coral-hover: var(--cta-primary-hover, #a8350a);
+  --ahv2-amber: var(--brand-accent, #ffb347);
+  --ahv2-ink: var(--text-primary, #1a1a2e);
+  /* AA-safe muted (>=4.5:1 on ivory/white) for small 12-13px secondary text —
+     reuses the theme's verified --text-muted instead of a low-contrast alpha. */
+  --ahv2-ink-60: var(--text-muted, #475569);
+  --ahv2-ink-45: rgba(26, 26, 46, 0.45);
+  --ahv2-ink-12: rgba(26, 26, 46, 0.12);
+  --ahv2-ink-08: rgba(26, 26, 46, 0.08);
+  --ahv2-r-md: 0.75rem;
+  --ahv2-r-lg: 1rem;
+  --ahv2-r-2xl: 1.5rem;
+  --ahv2-r-pill: 999px;
+  --ahv2-shadow-soft: 0 2px 8px rgba(26, 26, 46, 0.05);
+  --ahv2-shadow-elev: 0 12px 32px rgba(26, 26, 46, 0.06);
+  --ahv2-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --ahv2-display: "Cormorant Garamond", "Cormorant", Georgia, serif;
+}
+
+/* Scoped focus ring — 2px coral with 2px ivory offset */
+.ahv2-see-link:focus-visible,
+.ahv2-ribbon-right:focus-visible,
+.property-card:focus-visible {
+  outline: 2px solid var(--ahv2-coral);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--ahv2-ivory);
+  border-radius: 6px;
+}
+
+/* Shared eyebrow — 10px tracked caps with a coral dot */
+.ahv2-eyebrow {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ahv2-coral);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.ahv2-eyebrow::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ahv2-coral);
+}
+
+/* ============ HERO ============ */
+.ahv2-hero {
+  display: grid;
+  grid-template-columns: 55fr 45fr;
+  align-items: stretch;
+  min-height: min(72vh, 760px);
+  position: relative;
+  background: var(--ahv2-ivory);
+  color: var(--ahv2-ink);
+}
+.ahv2-hero-left {
+  background: var(--ahv2-ivory);
+  padding: calc(var(--nav-height, 96px) + clamp(16px, 2vw, 32px))
+    clamp(20px, 4vw, 72px) clamp(40px, 6vw, 88px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: relative;
+  z-index: 2;
+}
+.ahv2-hero-eyebrow {
+  margin-bottom: 24px;
+}
+.ahv2-hero-h1 {
+  font-family: var(--ahv2-display);
+  font-weight: 600;
+  font-size: clamp(42px, 5.2vw, 68px);
+  line-height: 1.06;
+  letter-spacing: -0.01em;
+  margin: 0 0 24px;
+  text-wrap: balance;
+  max-width: 18ch;
+  color: var(--ahv2-ink);
+}
+.ahv2-hero-h1 .ahv2-city {
+  font-style: italic;
+  font-weight: 500;
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 600ms var(--ahv2-ease) 280ms,
+    transform 600ms var(--ahv2-ease) 280ms;
+}
+.ahv2-hero-h1.ahv2-in .ahv2-city {
+  opacity: 1;
+  transform: none;
+}
+.ahv2-hero-sub {
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--ahv2-ink);
+  opacity: 0.85;
+  max-width: 44ch;
+  margin: 0 0 32px;
+}
+.ahv2-hero-widget {
+  width: 100%;
+  max-width: 640px;
+  margin-bottom: 24px;
+}
+.ahv2-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ahv2-chip {
+  font-size: 13px;
+  color: var(--ahv2-ink);
+  background: rgba(255, 179, 71, 0.18);
+  border-radius: var(--ahv2-r-pill);
+  padding: 7px 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 500;
+}
+.ahv2-chip .ahv2-tick {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--ahv2-amber);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ahv2-ink);
+}
+
+/* Hero right (photo) */
+.ahv2-hero-right {
+  position: relative;
+  overflow: hidden;
+  min-height: 460px;
+}
+.ahv2-hero-photo {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  animation: ahv2-kenburns 12s var(--ahv2-ease) infinite alternate;
+  will-change: transform;
+}
+.ahv2-hero-photo--fallback {
+  background: var(--gradient-hero,
+      linear-gradient(135deg, #fffaf5 0%, #ffe8d6 50%, #fff3e8 100%));
+  animation: none;
+}
+@keyframes ahv2-kenburns {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.04);
+  }
+}
+/* Single overlay element carries the ivory seam + coral wash.
+   Its gradient is also set inline so jsdom-based tests can read
+   backgroundImage (data-testid="hero-overlay"). */
+.ahv2-hero-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+.ahv2-caption-pill {
+  position: absolute;
+  left: 24px;
+  bottom: 24px;
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: var(--ahv2-r-pill);
+  padding: 8px 14px;
+  font-size: 12px;
+  color: var(--ahv2-ink);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: var(--ahv2-shadow-soft);
+  z-index: 3;
+  font-weight: 500;
+}
+.ahv2-caption-pill .ahv2-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ahv2-coral);
+  display: inline-block;
+}
+
+@media (max-width: 900px) {
+  .ahv2-hero {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+  .ahv2-hero-right {
+    order: -1;
+    aspect-ratio: 16 / 11;
+    min-height: 0;
+    margin: calc(var(--nav-height, 96px) + 12px) 20px 0;
+    border-radius: var(--ahv2-r-lg);
+  }
+  .ahv2-hero-left {
+    padding: 24px 20px 36px;
+  }
+  .ahv2-hero-h1 {
+    font-size: clamp(34px, 9vw, 46px);
+  }
+}
+
+/* ============ NEIGHBOURHOOD RIBBON ============ */
+.ahv2-ribbon {
+  background: var(--ahv2-ivory);
+  border-top: 1px solid var(--ahv2-ink-08);
+  border-bottom: 1px solid var(--ahv2-ink-08);
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  padding: 0 clamp(20px, 4vw, 56px);
+  gap: 24px;
+}
+.ahv2-ribbon--closer {
+  justify-content: center;
+}
+.ahv2-ribbon-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--ahv2-display);
+  font-style: italic;
+  font-size: 18px;
+  color: var(--ahv2-ink);
+  white-space: nowrap;
+}
+.ahv2-ribbon-left .ahv2-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ahv2-amber);
+}
+.ahv2-ribbon-middle {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ahv2-ribbon-stat {
+  font-size: 13px;
+  color: var(--ahv2-ink);
+  padding: 0 22px;
+  position: relative;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 360ms var(--ahv2-ease), transform 360ms var(--ahv2-ease);
+  white-space: nowrap;
+}
+.ahv2-ribbon-stat::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 1px;
+  background: var(--ahv2-ink-12);
+}
+.ahv2-ribbon-stat:last-child::after {
+  display: none;
+}
+.ahv2-ribbon.ahv2-in .ahv2-ribbon-stat:nth-child(1) {
+  opacity: 1;
+  transform: none;
+  transition-delay: 0ms;
+}
+.ahv2-ribbon.ahv2-in .ahv2-ribbon-stat:nth-child(2) {
+  opacity: 1;
+  transform: none;
+  transition-delay: 80ms;
+}
+.ahv2-ribbon.ahv2-in .ahv2-ribbon-stat:nth-child(3) {
+  opacity: 1;
+  transform: none;
+  transition-delay: 160ms;
+}
+.ahv2-ribbon-right {
+  font-size: 14px;
+  color: var(--ahv2-coral);
+  font-weight: 500;
+  position: relative;
+  white-space: nowrap;
+}
+.ahv2-ribbon-right::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 100%;
+  bottom: -3px;
+  height: 1px;
+  background: var(--ahv2-coral);
+  transition: right 240ms var(--ahv2-ease);
+}
+.ahv2-ribbon-right:hover::after {
+  right: 0;
+}
+.ahv2-arrow {
+  display: inline-block;
+  margin-left: 6px;
+  transition: transform 240ms var(--ahv2-ease);
+}
+.ahv2-ribbon-right:hover .ahv2-arrow {
+  transform: translateX(3px);
+}
+
+@media (max-width: 900px) {
+  .ahv2-ribbon {
+    min-height: 0;
+    padding: 14px 16px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    gap: 8px;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+  .ahv2-ribbon::-webkit-scrollbar {
+    display: none;
+  }
+  .ahv2-ribbon-left,
+  .ahv2-ribbon-right,
+  .ahv2-ribbon-stat {
+    background: var(--ahv2-muted);
+    border-radius: var(--ahv2-r-pill);
+    padding: 10px 16px;
+    font-size: 13px;
+    scroll-snap-align: start;
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+  .ahv2-ribbon-left {
+    font-family: "DM Sans", sans-serif;
+    font-style: normal;
+    font-size: 13px;
+  }
+  .ahv2-ribbon-middle {
+    display: contents;
+  }
+  .ahv2-ribbon-stat {
+    opacity: 1;
+    transform: none;
+  }
+  .ahv2-ribbon-stat::after {
+    display: none;
+  }
+  .ahv2-ribbon-right {
+    background: var(--ahv2-coral);
+    color: var(--ahv2-ivory);
+  }
+  .ahv2-ribbon-right::after {
+    display: none;
+  }
+}
+
+/* ============ HOME CARD ============ */
+.ahv2-card {
+  background: transparent;
+  border: 0;
+  border-radius: var(--ahv2-r-lg);
+  cursor: pointer;
+  transition: transform 240ms var(--ahv2-ease);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: relative;
+}
+.ahv2-card:hover {
+  transform: translateY(-2px);
+}
+.ahv2-card-photo-wrap {
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+  aspect-ratio: 4 / 5;
+  /* warm dusty-rose loading wash, never flat beige */
+  background: linear-gradient(135deg, #d9a89b 0%, #c8907f 100%);
+  transition: box-shadow 240ms var(--ahv2-ease);
+}
+.ahv2-card:hover .ahv2-card-photo-wrap {
+  box-shadow: var(--ahv2-shadow-elev);
+}
+.ahv2-card-photo-inner {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+}
+.ahv2-card-photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 360ms var(--ahv2-ease);
+}
+.ahv2-card:hover .ahv2-card-photo {
+  transform: scale(1.02);
+}
+.ahv2-card-photo-wrap::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(194, 65, 12, 0);
+  transition: background 240ms var(--ahv2-ease);
+  pointer-events: none;
+}
+.ahv2-card:hover .ahv2-card-photo-wrap::after {
+  background: rgba(194, 65, 12, 0.06);
+}
+
+/* Pagination dots — revealed only on hover/focus */
+.ahv2-card-dots {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 200ms var(--ahv2-ease);
+  z-index: 2;
+}
+.ahv2-card:hover .ahv2-card-dots,
+.ahv2-card:focus-within .ahv2-card-dots {
+  opacity: 1;
+}
+.ahv2-card-dot {
+  width: 6px;
+  height: 6px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.55);
+  transition: background 160ms var(--ahv2-ease);
+  cursor: pointer;
+}
+.ahv2-card-dot.ahv2-active {
+  background: #fff;
+}
+
+.ahv2-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 2px 4px 6px;
+}
+.ahv2-card-title {
+  font-family: var(--ahv2-display);
+  font-weight: 600;
+  font-size: 22px;
+  line-height: 1.27;
+  letter-spacing: -0.005em;
+  margin: 4px 0 0;
+  color: var(--ahv2-ink);
+}
+.ahv2-card-desc {
+  font-size: 14px;
+  line-height: 1.57;
+  color: var(--ahv2-ink);
+  opacity: 0.78;
+  margin: 0;
+  max-width: 38ch;
+}
+.ahv2-amenities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+.ahv2-amen-chip {
+  font-size: 12px;
+  padding: 5px 11px;
+  border-radius: var(--ahv2-r-pill);
+  background: var(--ahv2-muted);
+  color: var(--ahv2-ink);
+}
+.ahv2-amen-chip.ahv2-more {
+  background: transparent;
+  border: 1px solid var(--ahv2-ink-12);
+  color: var(--ahv2-ink-60);
+}
+.ahv2-card-foot {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-top: 8px;
+  gap: 12px;
+}
+.ahv2-price {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ahv2-price-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ahv2-price-amt {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--ahv2-ink);
+  font-feature-settings: "tnum" 1;
+}
+.ahv2-price-strike {
+  font-size: 13px;
+  color: var(--ahv2-ink-60);
+  text-decoration: line-through;
+}
+.ahv2-price-save {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ahv2-coral);
+}
+.ahv2-price-meta {
+  font-size: 12px;
+  color: var(--ahv2-ink-60);
+}
+.ahv2-see-link {
+  font-size: 13px;
+  color: var(--ahv2-coral);
+  font-weight: 500;
+  position: relative;
+  white-space: nowrap;
+  align-self: flex-end;
+  padding-bottom: 2px;
+}
+.ahv2-see-link::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 100%;
+  bottom: 0;
+  height: 1px;
+  background: var(--ahv2-coral);
+  transition: right 240ms var(--ahv2-ease);
+}
+.ahv2-card:hover .ahv2-see-link::after,
+.ahv2-see-link:hover::after {
+  right: 0;
+}
+.ahv2-see-link .ahv2-arrow {
+  margin-left: 4px;
+}
+.ahv2-card:hover .ahv2-see-link .ahv2-arrow {
+  transform: translateX(3px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ahv2-hero-photo,
+  .ahv2-hero-h1 .ahv2-city,
+  .ahv2-ribbon-stat,
+  .ahv2-card,
+  .ahv2-card-photo,
+  .ahv2-see-link::after,
+  .ahv2-ribbon-right::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

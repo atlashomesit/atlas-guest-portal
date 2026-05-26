@@ -10,6 +10,7 @@ import { trackEvent } from "../../utils/analytics";
 import ServicesSection from "../../components/home/ServicesSection";
 import TestimonialsSection from "../../components/home/TestimonialsSection";
 import FooterCtaStrip from "../../components/home/FooterCtaStrip";
+import AtlasNeighbourhoodRibbon from "../../components/home/AtlasNeighbourhoodRibbon";
 import SEO from "../../components/SEO";
 import { LOGO_URL } from "../../config/branding";
 import { sanitizeGuestImageUrl } from "../../utils/guestImageUrl";
@@ -261,9 +262,11 @@ const Home = () => {
                 <div className="w-full h-fit relative ">
                     <Slider />
                 </div>
+                <AtlasNeighbourhoodRibbon />
                 <div>
                     <HomePage_Locations />
                 </div>
+                <AtlasNeighbourhoodRibbon variant="closer" />
 
                 {/* Why-direct 3-pillar strip — Home v2 design §5 */}
                 <section

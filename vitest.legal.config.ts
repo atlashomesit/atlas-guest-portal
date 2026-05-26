@@ -9,5 +9,9 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["src/content/legal/validateLegalContent.test.ts"],
+    // Use threads pool instead of forks (default) to avoid subprocess
+    // fork-timeout failures when running under heavy parallel build load
+    // (release gate runs API, admin, and guest builds simultaneously).
+    pool: "threads",
   },
 });

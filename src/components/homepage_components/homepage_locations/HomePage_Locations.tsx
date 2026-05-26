@@ -20,8 +20,10 @@ import { getTenantBrandName } from "../../../tenant/displayBrand";
 import { getTenantOverrides, getUnitNoun, shouldHideAtlasBranding, type TenantOverrides } from "../../../tenant/tenantOverrides";
 import { useCurrency } from "../../../contexts/CurrencyContext";
 import { getListingDisplayName } from "../../../lib/listingDisplayName";
+import { getHomeDescriptor } from "../../../content/homeDescriptors";
 
 import "./homepage_location.css";
+import "../atlas-home-v2.css";
 
 type HomePageLocationsProps = {
   listings?: unknown;
@@ -243,59 +245,63 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
     const specialLabel = priceDisplayConfig.specialPricingLabels[dateKey];
     const apiListingId = model.property?.listingId ?? model.listing.id;
     const todayBreakdown = getListingPricing(apiListingId);
-    const showLimitedTimeDeal =
-      (model.property?.losDiscountPercent ?? 0) > 0 ||
-      (model.property?.losDiscount2Percent ?? 0) > 0 ||
-      (model.property?.lastMinuteDiscountPercent ?? 0) > 0;
+
+    if (dailyPricingLoading) {
+      return (
+        <div className="ahv2-price">
+          <span className="ahv2-price-meta">Loading price…</span>
+        </div>
+      );
+    }
 
     return (
-      <div className="flex flex-col gap-1">
-        {showLimitedTimeDeal ? (
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs text-text-muted">{priceDisplayConfig.discount.secondaryBadgeLabel}</span>
-          </div>
-        ) : null}
-        {dailyPricingLoading && (
-          <span className="text-sm text-text-muted">Loading price…</span>
-        )}
-        {!dailyPricingLoading && todayBreakdown ? (
-          <div className="flex items-baseline gap-2 flex-wrap">
-            <span className="text-2xl font-bold text-black">{formatCurrency(todayBreakdown.actualPrice)}</span>
-          </div>
-        ) : !dailyPricingLoading && (
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-black">{formattedFinal}</span>
-            {appliedDiscountPercent > 0 && (
-              <>
-                <span className="text-sm text-text-muted line-through">{formattedBase}</span>
-                <span className="text-sm font-semibold text-[color:var(--cta-primary)]">
-                  {priceDisplayConfig.discount.savingsPrefix} {appliedDiscountPercent}%
-                </span>
-              </>
-            )}
-          </div>
-        )}
-        {(hasSpecialDateMultiplier || specialLabel) && (
-          <p className="text-xs font-medium text-[color:color-mix(in_srgb,var(--cta-primary)_85%,transparent)]">
-            {specialLabel ?? priceDisplayConfig.defaultSpecialLabel}
-          </p>
-        )}
+      <div className="ahv2-price">
+        <div className="ahv2-price-row">
+          {todayBreakdown ? (
+            <span className="ahv2-price-amt">{formatCurrency(todayBreakdown.actualPrice)}</span>
+          ) : (
+            <>
+              <span className="ahv2-price-amt">{formattedFinal}</span>
+              {appliedDiscountPercent > 0 && (
+                <>
+                  <span className="ahv2-price-strike">{formattedBase}</span>
+                  <span className="ahv2-price-save">
+                    {priceDisplayConfig.discount.savingsPrefix} {appliedDiscountPercent}%
+                  </span>
+                </>
+              )}
+            </>
+          )}
+        </div>
+        <span className="ahv2-price-meta">
+          per night · taxes included
+          {hasSpecialDateMultiplier || specialLabel
+            ? ` · ${specialLabel ?? priceDisplayConfig.defaultSpecialLabel}`
+            : ""}
+        </span>
       </div>
     );
   };
 
   const renderAmenities = (property?: PropertyRecord) => {
-    if (!property?.property_amenities?.length) return null;
+    const all = property?.property_amenities ?? [];
+    if (!all.length) return null;
+
+    // Two host-picked chips + a "+N more" pill — no spreadsheet of bullets.
+    const shown = all.slice(0, 2);
+    const remaining = all.length - shown.length;
 
     return (
-      <ul className="grid grid-cols-2 gap-2 text-sm text-text-secondary">
-        {property.property_amenities.slice(0, 6).map((amenity, index) => (
-          <li key={`${amenity.amenities_icon}-${index}`} className="flex items-center gap-2">
-            <span className="text-lg">•</span>
-            <span>{formatAmenityName(amenity.amenities_icon)}</span>
-          </li>
+      <div className="ahv2-amenities">
+        {shown.map((amenity, index) => (
+          <span key={`${amenity.amenities_icon}-${index}`} className="ahv2-amen-chip">
+            {amenity.name?.trim() || formatAmenityName(amenity.amenities_icon)}
+          </span>
         ))}
-      </ul>
+        {remaining > 0 && (
+          <span className="ahv2-amen-chip ahv2-more">+{remaining} more</span>
+        )}
+      </div>
     );
   };
 
@@ -329,98 +335,77 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-7">
           {allListingModels.map((model, index) => {
             const navigation = getListingNavigation(model);
-            const activeIndex = activeImageIndex[model.listing.id] ?? 0;
-            const imageSrc = model.images[activeIndex] ?? "";
+            const photos = model.images.slice(0, Math.min(model.images.length, 5));
+            const activeIndex = (activeImageIndex[model.listing.id] ?? 0) % Math.max(photos.length, 1);
+            const imageSrc = photos[activeIndex] ?? model.images[0] ?? "";
+            const cardTitle = getListingDisplayName(model.listing.id, model.listing.title);
+            const descriptor =
+              getHomeDescriptor(model.listing.id) ??
+              model.listing.subtitle ??
+              model.property?.property_description ??
+              "A calm, owner-run home in KPHB 7th Phase.";
 
             return (
-              <article
+              <Link
                 key={getItemKey(model.listing, index)}
-                className="property-card rounded-2xl shadow-sm bg-white overflow-hidden border border-border-subtle flex flex-col transition-transform transition-shadow duration-200 hover:-translate-y-1 hover:shadow-md"
+                to={{ pathname: navigation?.path ?? "#", search: searchString ? `?${searchString}` : "" }}
+                onClick={(event) => {
+                  event.preventDefault();
+                  handleNavigate(model);
+                }}
+                onMouseEnter={() => {
+                  if (photos.length > 1) {
+                    setActiveImageIndex((prev) => ({
+                      ...prev,
+                      [model.listing.id]: ((prev[model.listing.id] ?? 0) + 1) % photos.length,
+                    }));
+                  }
+                }}
+                className="ahv2-card property-card"
+                aria-label={`See ${cardTitle}`}
               >
-                {/* Photo */}
-                <div className="relative" style={{ aspectRatio: '4 / 3' }}>
+                {/* Photo — 4:5 portrait, dusty-rose wash, dots reveal on hover/focus */}
+                <div className="ahv2-card-photo-wrap">
                   <OptimizedImage
                     key={`${model.listing.id}-${activeIndex}`}
                     src={imageSrc}
-                    alt={model.listing.title}
-                    className="w-full h-full object-cover"
-                    wrapperClassName="h-full"
+                    alt={cardTitle}
+                    className="ahv2-card-photo"
+                    wrapperClassName="ahv2-card-photo-inner"
                     sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                     loading={index < 3 ? "eager" : undefined}
                     fetchPriority={index === 0 ? "high" : undefined}
+                    showSkeleton={false}
                   />
-                  {model.images.length > 1 && (
-                    <div className="absolute bottom-2 left-0 right-0">
-                      <div className="flex justify-center gap-1.5">
-                        {model.images.slice(0, Math.min(model.images.length, 5)).map((_, dotIdx) => (
-                          <button
-                            key={dotIdx}
-                            type="button"
-                            aria-label={`Go to image ${dotIdx + 1}`}
-                            onClick={() => setActiveImageIndex(prev => ({ ...prev, [model.listing.id]: dotIdx }))}
-                            className={`w-2 h-2 rounded-full transition-all ${activeIndex === dotIdx ? 'bg-white scale-125' : 'bg-white/50 hover:bg-white/70'}`}
-                          />
-                        ))}
-                      </div>
+                  {photos.length > 1 && (
+                    <div className="ahv2-card-dots" aria-hidden="true">
+                      {photos.map((_, dotIdx) => (
+                        <span
+                          key={dotIdx}
+                          className={`ahv2-card-dot${activeIndex === dotIdx ? " ahv2-active" : ""}`}
+                        />
+                      ))}
                     </div>
                   )}
                 </div>
 
                 {/* Body */}
-                <div className="p-5 flex flex-col gap-3 flex-1">
-                  <div>
-                    {!hideAtlasBranding && (
-                      <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">{getTenantBrandName()}</p>
-                    )}
-                    <h3
-                      className="text-xl font-semibold text-text-primary mt-0.5"
-                      style={{ fontFamily: 'var(--font-family-display)', letterSpacing: '-0.005em' }}
-                    >
-                      {getListingDisplayName(model.listing.id, model.listing.title)}
-                    </h3>
-                    {model.listing.subtitle ? (
-                      <p className="text-sm text-text-muted mt-1 line-clamp-2">{model.listing.subtitle}</p>
-                    ) : (
-                      /* TODO: per-listing copy — wire to property_description when available */
-                      model.property?.property_description ? (
-                        <p className="text-sm text-text-muted mt-1 line-clamp-2">{model.property.property_description}</p>
-                      ) : null
-                    )}
-                  </div>
-
-                  {/* Bed / bath / sleeps row */}
-                  <div className="flex items-center gap-4 text-[13.5px] text-text-muted flex-wrap">
-                    {model.listing.maxGuests ? (
-                      <span className="inline-flex items-center gap-1.5">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                        Sleeps {model.listing.maxGuests}
-                      </span>
-                    ) : null}
-                    <span className="inline-flex items-center gap-1.5">
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                      KPHB 7th Phase
-                    </span>
-                  </div>
-
-                  {renderPrice(model)}
+                <div className="ahv2-card-body">
+                  {!hideAtlasBranding && <span className="ahv2-eyebrow">{getTenantBrandName()}</span>}
+                  <h3 className="ahv2-card-title">{cardTitle}</h3>
+                  <p className="ahv2-card-desc">{descriptor}</p>
 
                   {renderAmenities(model.property)}
 
-                  {/* Single ghost "View home" CTA — no Book now on cards (Home v2) */}
-                  <div className="mt-auto pt-4 border-t border-border-subtle">
-                    <Link
-                      to={{ pathname: navigation?.path ?? "#", search: searchString ? `?${searchString}` : "" }}
-                      onClick={(event) => {
-                        event.preventDefault();
-                        handleNavigate(model);
-                      }}
-                      className="property-card__button w-full inline-flex items-center justify-center rounded-full border border-border-subtle px-5 py-2.5 text-sm font-semibold text-text-primary transition hover:border-[color:var(--cta-primary)] hover:text-[color:var(--cta-primary)] hover:bg-[color:color-mix(in_srgb,var(--cta-primary)_6%,transparent)]"
-                    >
-                      {`View ${unitNoun.singular}`}
-                    </Link>
+                  <div className="ahv2-card-foot">
+                    {renderPrice(model)}
+                    <span className="ahv2-see-link">
+                      {`See the ${unitNoun.singular}`}
+                      <span className="ahv2-arrow" aria-hidden="true">→</span>
+                    </span>
                   </div>
                 </div>
-              </article>
+              </Link>
             );
           })}
         </div>
