@@ -75,8 +75,8 @@
 }
 .ahv2-hero-left {
   background: var(--ahv2-ivory);
-  padding: calc(var(--nav-height, 96px) + clamp(16px, 2vw, 32px))
-    clamp(20px, 4vw, 72px) clamp(40px, 6vw, 88px);
+  padding: calc(var(--nav-height, 96px) + clamp(20px, 3vw, 40px))
+    clamp(24px, 5vw, 80px) clamp(48px, 7vw, 96px);
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -89,44 +89,45 @@
 .ahv2-hero-h1 {
   font-family: var(--ahv2-display);
   font-weight: 600;
-  font-size: clamp(42px, 5.2vw, 68px);
-  line-height: 1.06;
-  letter-spacing: -0.01em;
-  margin: 0 0 24px;
+  font-size: clamp(44px, 5.8vw, 72px);
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+  margin: 0 0 28px;
   text-wrap: balance;
-  max-width: 18ch;
+  max-width: 20ch;
   color: var(--ahv2-ink);
+  opacity: 0;
+  transform: translateY(8px);
+  animation: ahv2-headline-in 700ms var(--ahv2-ease) 200ms forwards;
 }
 .ahv2-hero-h1 .ahv2-city {
   font-style: italic;
   font-weight: 500;
   display: inline-block;
-  opacity: 0;
-  transform: translateY(4px);
-  transition: opacity 600ms var(--ahv2-ease) 280ms,
-    transform 600ms var(--ahv2-ease) 280ms;
-}
-.ahv2-hero-h1.ahv2-in .ahv2-city {
-  opacity: 1;
-  transform: none;
 }
 .ahv2-hero-sub {
-  font-size: 16px;
-  line-height: 1.5;
+  font-size: 17px;
+  line-height: 1.6;
   color: var(--ahv2-ink);
-  opacity: 0.85;
-  max-width: 44ch;
-  margin: 0 0 32px;
+  opacity: 0.8;
+  max-width: 48ch;
+  margin: 0 0 40px;
+  opacity: 0;
+  transform: translateY(8px);
+  animation: ahv2-subtitle-in 700ms var(--ahv2-ease) 350ms forwards;
 }
 .ahv2-hero-widget {
   width: 100%;
   max-width: 640px;
-  margin-bottom: 24px;
+  margin-bottom: 32px;
+  opacity: 0;
+  transform: translateY(12px);
+  animation: ahv2-widget-in 700ms var(--ahv2-ease) 400ms forwards;
 }
 .ahv2-chip-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 10px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -136,11 +137,23 @@
   color: var(--ahv2-ink);
   background: rgba(255, 179, 71, 0.18);
   border-radius: var(--ahv2-r-pill);
-  padding: 7px 14px;
+  padding: 8px 16px;
   display: inline-flex;
   align-items: center;
   gap: 7px;
   font-weight: 500;
+  opacity: 0;
+  transform: translateY(8px);
+  animation: ahv2-chip-in 500ms var(--ahv2-ease) forwards;
+}
+.ahv2-chip:nth-child(1) {
+  animation-delay: 500ms;
+}
+.ahv2-chip:nth-child(2) {
+  animation-delay: 580ms;
+}
+.ahv2-chip:nth-child(3) {
+  animation-delay: 660ms;
 }
 .ahv2-chip .ahv2-tick {
   width: 14px;
@@ -179,6 +192,46 @@
   }
   to {
     transform: scale(1.04);
+  }
+}
+@keyframes ahv2-headline-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes ahv2-subtitle-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes ahv2-chip-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes ahv2-widget-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 /* Single overlay element carries the ivory seam + coral wash.
@@ -223,14 +276,28 @@
     order: -1;
     aspect-ratio: 16 / 11;
     min-height: 0;
-    margin: calc(var(--nav-height, 96px) + 12px) 20px 0;
+    margin: calc(var(--nav-height, 96px) + 12px) 16px 0;
     border-radius: var(--ahv2-r-lg);
   }
   .ahv2-hero-left {
-    padding: 24px 20px 36px;
+    padding: 28px 18px 40px;
   }
   .ahv2-hero-h1 {
-    font-size: clamp(34px, 9vw, 46px);
+    font-size: clamp(32px, 8.5vw, 44px);
+    margin-bottom: 20px;
+  }
+  .ahv2-hero-sub {
+    font-size: 15px;
+    margin-bottom: 32px;
+  }
+  .ahv2-chip-row {
+    gap: 8px;
+    flex-direction: column;
+  }
+  .ahv2-chip {
+    width: 100%;
+    justify-content: flex-start;
+    padding: 10px 14px;
   }
 }
 
