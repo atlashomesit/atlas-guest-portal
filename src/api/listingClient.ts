@@ -135,6 +135,12 @@ export type PublicListing = {
   cancellationTier?: 'Flexible' | 'Moderate' | 'Strict' | null;
   /** TASK-2552: amenity code strings (e.g. "AC", "Pool", "WiFi") returned by PublicListingDto. */
   amenityCodes?: string[];
+  /**
+   * TASK-2739-v1: publish state ("Draft" | "Published"). Discovery lists only ever contain
+   * "Published" rows; on a detail fetch a "Draft" value drives noindex + the "not yet available
+   * for booking" notice. Undefined on legacy payloads (treated as published/live).
+   */
+  publishStatus?: string;
 };
 
 function normalizePublicListing(payload: Record<string, unknown>): PublicListing {
@@ -218,6 +224,8 @@ function normalizePublicListing(payload: Record<string, unknown>): PublicListing
     amenityCodes: Array.isArray(payload.amenityCodes)
       ? payload.amenityCodes.filter((x): x is string => typeof x === 'string')
       : [],
+    // TASK-2739-v1: publish state drives noindex + the "not yet available" notice on Draft detail pages.
+    publishStatus: typeof payload.publishStatus === 'string' ? payload.publishStatus : undefined,
   };
 }
 
