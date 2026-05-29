@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import SEO from "../components/SEO";
+import StateMessage from "../components/StateMessage";
 import { buildApiUrl, getApiHeaders } from "../api/client";
 import { messageFromApiResponse } from "../utils/serverErrorFromResponse";
 import { getContactEmail } from "../config/contact";
@@ -102,32 +103,24 @@ export default function MyBookingsPage() {
 
   if (error) {
     return (
-      <div className="min-h-[60vh] flex items-center justify-center px-4">
-        <div className="max-w-md text-center space-y-4">
-          <div className="text-4xl">📋</div>
-          <h1 className="text-xl font-bold text-text-primary">Bookings not found</h1>
-          <p className="text-sm text-text-secondary">{error}</p>
-          <button
-            type="button"
-            onClick={() => window.location.reload()}
-            className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-base font-medium px-4 py-3 hover:opacity-95 transition-opacity"
-            data-testid="my-bookings-retry"
-          >
-            Try again
-          </button>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center items-stretch">
-            <a
-              href={`mailto:${getContactEmail()}?subject=${encodeURIComponent("Atlas booking history link")}`}
-              className="inline-flex items-center justify-center rounded-lg border border-border-subtle bg-bg-surface text-text-primary text-base font-medium px-4 py-3 hover:bg-bg-muted transition-colors"
-            >
-              Email support
-            </a>
-            <Link to="/" className="inline-flex items-center justify-center text-base text-brand-primary underline underline-offset-2 px-2 py-3">
-              Return to homepage
-            </Link>
-          </div>
-        </div>
-      </div>
+      <StateMessage
+        data-testid="my-bookings-error-state"
+        icon="📋"
+        title="Bookings not found"
+        message={error}
+        primaryAction={{
+          label: "Try again",
+          onClick: () => window.location.reload(),
+          "data-testid": "my-bookings-retry",
+        }}
+        secondaryActions={[
+          {
+            label: "Email support",
+            href: `mailto:${getContactEmail()}?subject=${encodeURIComponent(`${brandName} booking history link`)}`,
+          },
+          { label: "Return to homepage", to: "/" },
+        ]}
+      />
     );
   }
 
@@ -162,20 +155,14 @@ export default function MyBookingsPage() {
         )}
 
         {bookings.length === 0 ? (
-          <div className="text-center py-12 space-y-4">
-            <p className="text-text-secondary text-sm">No bookings found.</p>
-            <Link to="/" className="btn-chip inline-block">
-              Browse our homes
-            </Link>
-            <p className="text-text-secondary text-xs max-w-md mx-auto">
-              Bookings are linked to the email or phone used during checkout. If you booked with a different contact, open the confirmation link from that email or WhatsApp message instead.
-            </p>
-            <p className="text-text-secondary text-xs max-w-md mx-auto">
-              Need help? Call us at{" "}
-              <a href="tel:+917032493290" className="underline underline-offset-2 text-brand-primary">+91 7032 493 290</a>{" "}
-              to locate a booking by reference number.
-            </p>
-          </div>
+          <StateMessage
+            data-testid="my-bookings-empty-state"
+            icon="🧳"
+            title="No bookings yet"
+            message="Once you book a home it’ll show up here. Bookings are linked to the email or phone used at checkout — if you used a different contact, open the link from that confirmation email or WhatsApp message."
+            primaryAction={{ label: "Browse our homes", to: "/" }}
+            secondaryActions={[{ label: "Call us to find a booking", href: "tel:+917032493290" }]}
+          />
         ) : filteredBookings.length === 0 ? (
           <div className="rounded-xl border border-border-subtle bg-bg-muted/40 px-4 py-6 text-center text-sm text-text-secondary">
             No {tab === "upcoming" ? "upcoming" : tab === "past" ? "past" : "cancelled"} bookings in this view.

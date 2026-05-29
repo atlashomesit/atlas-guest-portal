@@ -13,7 +13,7 @@ import { TfiBrushAlt } from "react-icons/tfi";
 import { LiaNewspaper } from "react-icons/lia";
 import { MdOutlineEmojiFoodBeverage, MdOutlineLocalLaundryService, MdOutlineDone } from "react-icons/md";
 import { FaCcMastercard } from "react-icons/fa6";
-import { X } from 'lucide-react';
+import { X, ShieldCheck, CalendarClock, CreditCard } from 'lucide-react';
 import { useEffect, useMemo, useState, Suspense, lazy } from 'react';
 import { useTenantListings } from '../../../hooks/useTenantListings';
 import { usePropertyListings } from '../../../hooks/usePropertyListings';
@@ -1968,18 +1968,46 @@ useEffect(() => {
                   />
                 </Suspense>
 
-                {/* Verified home badge */}
-                <p
-                  className="pp-chip pp-chip-success"
-                  style={{ marginTop: 12, cursor: 'help' }}
-                  title="Listing details and photos reviewed by the Atlas team before going live."
-                >
-                  {(() => {
-                    const pp = _getTenantCtx()?.paymentProvider;
-                    const hasOnline = typeof pp === 'string' && pp !== 'MANUAL';
-                    return hasOnline ? '✓ Verified home · Instant book' : '✓ Verified home · Host-confirmed booking';
-                  })()}
-                </p>
+                {/* Trust band — consolidates legitimacy, cancellation & payment
+                    (DESIGN-003). Absorbs the former standalone verified pill.
+                    Each row degrades gracefully on missing data. */}
+                {(() => {
+                  const pp = _getTenantCtx()?.paymentProvider;
+                  const hasOnline = typeof pp === 'string' && pp !== 'MANUAL';
+                  return (
+                    <div className="pp-trust" data-testid="property-trust-band" aria-label="Booking trust details">
+                      <div className="pp-trust-row">
+                        <ShieldCheck className="pp-trust-ic" size={18} aria-hidden="true" />
+                        <div>
+                          <div className="pp-trust-t">
+                            {hasOnline ? `Verified home · Instant book` : `Verified home · Host-confirmed booking`}
+                          </div>
+                          <div className="pp-trust-s">
+                            Listing details and photos reviewed by {ppBrandName} before going live.
+                          </div>
+                        </div>
+                      </div>
+                      <div className="pp-trust-row">
+                        <CalendarClock className="pp-trust-ic" size={18} aria-hidden="true" />
+                        <div>
+                          <div className="pp-trust-t">{ppCancellationInfo.headline}</div>
+                          <div className="pp-trust-s">{ppCancellationInfo.description}</div>
+                        </div>
+                      </div>
+                      <div className="pp-trust-row">
+                        <CreditCard className="pp-trust-ic" size={18} aria-hidden="true" />
+                        <div>
+                          <div className="pp-trust-t">Direct booking · no OTA fees</div>
+                          <div className="pp-trust-s">
+                            {hasOnline
+                              ? 'You pay the host directly. Secure payment via Razorpay (UPI, cards, netbanking).'
+                              : 'You pay the host directly — no middle-man fees. The host confirms your dates.'}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Host profile card */}
                 <div

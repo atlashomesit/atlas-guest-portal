@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import SEO from "../components/SEO";
+import StateMessage from "../components/StateMessage";
 import { buildApiUrl, getApiHeaders } from "../api/client";
 import { toast } from "react-toastify";
 import { messageFromApiResponse } from "../utils/serverErrorFromResponse";
@@ -117,14 +118,14 @@ export default function ProfilePage() {
 
   if (error || !profile) {
     return (
-      <div className="min-h-[60vh] flex items-center justify-center px-4">
-        <div className="max-w-md text-center space-y-4">
-          <div className="text-4xl">👤</div>
-          <h1 className="text-xl font-bold text-text-primary">Profile not found</h1>
-          <p className="text-sm text-text-secondary">{error ?? "We could not find your profile."}</p>
-          <Link to="/" className="inline-block mt-2 text-sm text-brand-primary underline underline-offset-2">Return to homepage</Link>
-        </div>
-      </div>
+      <StateMessage
+        data-testid="profile-error-state"
+        icon="👤"
+        title="Profile not found"
+        message={error ?? "We couldn’t load your profile right now. Please try again in a moment."}
+        primaryAction={{ label: "Try again", onClick: () => window.location.reload() }}
+        secondaryActions={[{ label: "Return to homepage", to: "/" }]}
+      />
     );
   }
 
