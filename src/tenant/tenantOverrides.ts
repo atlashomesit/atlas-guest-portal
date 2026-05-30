@@ -165,11 +165,6 @@ export function getUnitNoun(overrides: TenantOverrides): {
   };
 }
 
-/** Star Guest House public listing IDs from API (9-29). */
-const STAR_GUEST_HOUSE_LISTING_IDS: number[] = [
-  9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
-];
-
 const TENANT_OVERRIDES: Record<string, TenantOverrides> = {
   atlas: {
     mapLocation: {
@@ -223,129 +218,6 @@ const TENANT_OVERRIDES: Record<string, TenantOverrides> = {
       ],
     },
   },
-  starguesthouse: {
-    hideLogo: true,
-    hideAtlasHomesBranding: true,
-    hideListProperty: true,
-    onlyApiListings: true,
-    publicListingIdAllowlist: STAR_GUEST_HOUSE_LISTING_IDS,
-    // Star Guest House is a room-stay (not a homestay) — use "room"/"rooms"
-    unitNoun: {
-      singular: 'room',
-      plural: 'rooms',
-      capitalSingular: 'Room',
-      capitalPlural: 'Rooms',
-      marketingPlural: 'rooms',
-    },
-    mapLocation: {
-      lat: 17.467607975653657,
-      lng: 78.36671473489571,
-      markerLabel: 'Star Guest House',
-      zoom: 15,
-    },
-    locationContent: {
-      subtitle:
-        'Find transport options, nearby dining, shopping, and corporate hubs close to Star Guest House so you can plan your arrival and daily commute with ease.',
-      transport: [
-        {
-          title: 'Metro',
-          details: 'Hitech City and Raidurg Metro stations are within 10 minutes for quick access across the city.',
-        },
-        {
-          title: 'Airport',
-          details: 'Rajiv Gandhi International Airport is about 30 minutes away with reliable cab availability day and night.',
-        },
-        {
-          title: 'Road connectivity',
-          details: 'Easy access to Gachibowli, Hitech City, Miyapur, and ORR towards Financial District and Manikonda.',
-        },
-      ],
-      nearbyAmenities: [
-        {
-          title: 'Daily essentials',
-          details: 'Nearby Ratnadeep supermarket, pharmacies, and local bakeries for everyday needs.',
-        },
-        {
-          title: 'Dining',
-          details: 'Restaurants and eateries in Kondapur, Hitech City, Raidurg, Gachibowli, Madhapur, and Miyapur.',
-        },
-        {
-          title: 'Healthcare',
-          details: 'KIIMS Hospital and Apollo Hospital nearby to handle routine visits and emergencies.',
-        },
-      ],
-      landmarks: [
-        {
-          title: 'Business hubs',
-          details: 'Proximity to Hitech City, Gachibowli, Manikonda, and Financial District for tech parks and corporate offices.',
-        },
-        {
-          title: 'Transport hubs',
-          details: 'Close to Raidurg and Miyapur with excellent connectivity via metro and road networks.',
-        },
-        {
-          title: 'Premium localities',
-          details: 'Located in a prime area with easy access to Hitech City and Financial District.',
-        },
-      ],
-    },
-    contact: {
-      address: 'Shop No 2, 10, opposite Shilpa Park, Kondapur, Hanuman Nagar, Telangana 500084',
-      businessPhone: '7799779192',
-      ownerPhone: '7799779192',
-      whatsappPhone: '7799779192',
-      email: 'starguesthousekondapur@gmail.com',
-    },
-    // TASK-1877 / TASK-1672: white-label cookie banner heading + copy + privacy link
-    cookieBanner: {
-      title: 'Your privacy at Star Guest House',
-      text:
-        'Star Guest House uses strictly necessary cookies to make this site work, and optional ' +
-        "analytics cookies to understand how it's used. Under India's DPDP Act 2023 we ask for " +
-        'your consent before loading anything non-essential. Read our',
-      privacyUrl: '/privacy',
-      privacyLinkLabel: 'privacy notice',
-    },
-    // TASK-1878: tenant-specific FAQ entries for Star Guest House, Kondapur
-    faq: [
-      {
-        id: 'sgh-checkin-checkout',
-        question: 'How do check-in and check-out work?',
-        answer:
-          'Check-in is from 2:00 PM and check-out is by 11:00 AM. Self check-in with ID is supported. Early or late arrangements can be made based on availability — contact us on WhatsApp.',
-      },
-      {
-        id: 'sgh-cancellation',
-        question: 'What is the cancellation and change policy?',
-        answer:
-          'Date changes are allowed when the room is available. Cancellations follow the notice-based policy shown at the time of booking. Refunds are processed within 5–7 business days.',
-      },
-      {
-        id: 'sgh-wifi-amenities',
-        question: 'Is Wi-Fi included? What other amenities are available?',
-        answer:
-          'Yes, high-speed Wi-Fi is included in all rooms. Rooms include AC, TV, geyser, and daily housekeeping. Parking is available on-site on a first-come basis.',
-      },
-      {
-        id: 'sgh-meals',
-        question: 'Are meals or kitchen access available?',
-        answer:
-          'Star Guest House does not provide meals. A shared kitchen facility is available for guests. Kondapur has excellent dining options within walking distance.',
-      },
-      {
-        id: 'sgh-long-stay',
-        question: 'Do you offer monthly or long-stay rates?',
-        answer:
-          'Yes, we offer discounted monthly rates for stays of 30 nights or more. Contact us directly on WhatsApp at 7799779192 to get a custom quote for extended stays.',
-      },
-      {
-        id: 'sgh-contact',
-        question: 'How can I reach Star Guest House during my stay?',
-        answer:
-          'WhatsApp or call us at 7799779192 for any assistance. Our team is available 9 AM–9 PM. For after-hours emergencies, the owner line is the same number.',
-      },
-    ],
-  },
 };
 
 const EMPTY_OVERRIDES: TenantOverrides = {};
@@ -364,17 +236,8 @@ export function getTenantPublicListingIdAllowlist(overrides: TenantOverrides): S
 }
 
 export function getTenantOverrides(slug?: string | null): TenantOverrides {
-  // Check overrides by slug first
   if (slug && TENANT_OVERRIDES[slug]) {
     return TENANT_OVERRIDES[slug];
-  }
-
-  // Fallback: check hostname for domain-based overrides
-  if (typeof window !== 'undefined' && window.location?.hostname) {
-    const hostname = window.location.hostname.toLowerCase();
-    if (hostname.includes('starguesthouse')) {
-      return TENANT_OVERRIDES.starguesthouse;
-    }
   }
 
   return EMPTY_OVERRIDES;

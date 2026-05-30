@@ -21,8 +21,8 @@ describe("AboutPage", () => {
     render(<AboutPage />);
 
     const descriptionMeta = document.head.querySelector("meta[name='description']");
-    expect(descriptionMeta?.getAttribute("content")).toContain("Starguest House");
-    expect(document.title).toContain("About Starguest House");
+    expect(descriptionMeta?.getAttribute("content")).toContain("Atlas Homestays");
+    expect(document.title).toContain("About Atlas Homestays");
   });
 
   it("matches the snapshot", () => {
