@@ -22,6 +22,8 @@ _worker.bundle/
 _worker.bundledesktop.ini
 *.ini
 eslint-violations.json
+# Wrangler local state/cache (regenerated locally; never commit)
+.wrangler/
 
 # Claude Design handoff bundles — scratch inbox, not source
 Claude Design Patches/
