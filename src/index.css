@@ -1,3 +1,4 @@
+/* TASK-2748: content-hash bump clears poisoned CORS cache keys on /assets/* after deploy. */
 @import "./styles/themes/index.css";
 @import "./styles/responsive.css";
 
@@ -10,6 +11,7 @@
    ============================================ */
 :root {
   --platinum-50: #F8FAFB;
+  --task-2748-cache-bust: 1;
   --platinum-100: #F1F5F9;
   --platinum-200: #E2E8F0;
   --platinum-300: #CBD5E1;
