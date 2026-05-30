@@ -59,6 +59,7 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
   srcSet,
   wrapperClassName,
   showSkeleton = true,
+  fetchPriority,
   ...props
 }) => {
   const [isLoaded, setIsLoaded] = React.useState(false);
@@ -104,6 +105,9 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
         alt={alt}
         className={`${isLoaded ? "opacity-100" : "opacity-0"} ${className ?? ""}`}
         decoding={decoding}
+        {...(fetchPriority != null && fetchPriority !== ""
+          ? { fetchpriority: fetchPriority }
+          : {})}
         loading={loading}
         onError={(event) => {
           setLoadFailed(true);
