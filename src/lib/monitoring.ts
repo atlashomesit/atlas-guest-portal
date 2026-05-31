@@ -1,4 +1,4 @@
-const API_HOST_PATTERN = /atlas-homes-api-[^.]+\.azurewebsites\.net/i;
+const API_HOST_PATTERN = /(?:atlas-homes-api-[^.]+\.azurewebsites\.net|api\.atlaspms\.in)/i;
 const DEFAULT_TIMEOUT_MS = 20000;
 
 export type MonitoringBreadcrumb = {
