@@ -80,6 +80,33 @@ function isApiRequest(url) {
   return apiPrefixes.some((p) => url.pathname === p || url.pathname.startsWith(p));
 }
 
+/**
+ * TASK-2748 — guards the runtime cache against storing a wrong-typed response,
+ * e.g. an SPA-fallback `text/html` body served for a missing static file under a
+ * stylesheet / script / font / image URL. Caching that would make the browser
+ * later "Refuse to apply" the asset (MIME mismatch) on every load. Returns true
+ * only when the response's Content-Type is consistent with the request's
+ * destination. `/assets/*` is bypassed entirely upstream and never reaches here.
+ */
+function isResponseTypeSafeToCache(req, response) {
+  const contentType = (response.headers.get('content-type') || '').toLowerCase();
+  const dest = req.destination; // 'style' | 'script' | 'font' | 'image' | 'document' | 'manifest' | '' …
+
+  // A real document/navigation is legitimately HTML; the navigation branch above
+  // owns those. Opaque/unknown destinations ('') can't be validated — leave them.
+  if (dest === 'document' || dest === '') return true;
+
+  // HTML for any sub-resource destination means a missing file fell through to
+  // the SPA fallback — never cache it under an asset URL.
+  if (contentType.includes('text/html')) return false;
+
+  const expected = { style: 'text/css', script: 'javascript', font: 'font', image: 'image' };
+  const needle = expected[dest];
+  // Destinations we model must match; ones we don't (e.g. 'manifest', 'audio')
+  // already passed the not-HTML check, which is the bug we care about.
+  return needle ? contentType.includes(needle) : true;
+}
+
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   // Only intercept GETs — mutations must always hit the network.
@@ -90,6 +117,16 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return;
   // Never cache API responses.
   if (isApiRequest(url)) return;
+
+  // TASK-2748 — never intercept Vite's immutable, content-hashed build output.
+  // `/assets/*` is already `Cache-Control: immutable, max-age=31536000` at the
+  // CDN (public/_headers), so SW caching buys nothing and is actively harmful:
+  // if a hashed file is momentarily un-propagated after a deploy, the SPA
+  // fallback returns index.html (text/html, 200) and a cache-first SW would
+  // persist that HTML under a `.css`/`.js` URL → "Refused to apply style (MIME
+  // text/html)" on every later load. Let the browser fetch these directly; a
+  // missing one is handled honestly by functions/assets/[[path]].ts (→ 404).
+  if (url.pathname.startsWith('/assets/')) return;
 
   // Navigation requests → NetworkFirst with cached-shell fallback.
   if (req.mode === 'navigate') {
@@ -135,7 +172,8 @@ self.addEventListener('fetch', (event) => {
         if (
           fresh.ok &&
           !fresh.headers.get('authorization') &&
-          !fresh.headers.get('set-cookie')
+          !fresh.headers.get('set-cookie') &&
+          isResponseTypeSafeToCache(req, fresh) // TASK-2748 — don't cache HTML under an asset URL
         ) {
           cache.put(req, fresh.clone()).catch(() => {});
         }

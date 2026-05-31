@@ -13,7 +13,7 @@ import { TfiBrushAlt } from "react-icons/tfi";
 import { LiaNewspaper } from "react-icons/lia";
 import { MdOutlineEmojiFoodBeverage, MdOutlineLocalLaundryService, MdOutlineDone } from "react-icons/md";
 import { FaCcMastercard } from "react-icons/fa6";
-import { X } from 'lucide-react';
+import { X, ShieldCheck, CalendarClock, CreditCard } from 'lucide-react';
 import { useEffect, useMemo, useState, Suspense, lazy } from 'react';
 import { useTenantListings } from '../../../hooks/useTenantListings';
 import { usePropertyListings } from '../../../hooks/usePropertyListings';
@@ -377,6 +377,8 @@ const PropertyDetails = () => {
     const [notFound, setNotFound] = useState(false);
     const [listingPropertyId, setListingPropertyId] = useState<string | number | null>(null);
     const [resolvedListingId, setResolvedListingId] = useState<string | number | null>(null);
+    // TASK-2739-v1: "Draft" | "Published" (undefined on legacy payloads = treated as live).
+    const [publishStatus, setPublishStatus] = useState<string | undefined>(undefined);
     const [, setListingLookupError] = useState<string | null>(null);
     const [isListingLookupPending, setIsListingLookupPending] = useState(false);
     const [showAmenitiesModal, setShowAmenitiesModal] = useState(false);
@@ -523,6 +525,10 @@ const PropertyDetails = () => {
                 }
                 setListingPropertyId(listing.propertyId);
                 setResolvedListingId(listing.id);
+                // TASK-2739-v1: resolveListing hits GET /listings/{id} (detail, unfiltered) which
+                // returns publishStatus even for Draft listings — drive noindex + the booking notice.
+                const psFromResolve = (listing as { publishStatus?: unknown }).publishStatus;
+                if (typeof psFromResolve === 'string') setPublishStatus(psFromResolve);
                 const mgFromResolve = parseMaxGuestsFromPayload(listing as Record<string, unknown>);
                 if (mgFromResolve != null) {
                     // TASK-2635: converge on the largest known capacity so the static-catalog
@@ -567,6 +573,8 @@ const PropertyDetails = () => {
         void fetchListingById(lid, ac.signal)
             .then((detail) => {
                 const d = detail as Record<string, unknown>;
+                // TASK-2739-v1: GET /listings/{id} also carries publishStatus; keep state in sync.
+                if (typeof d.publishStatus === 'string') setPublishStatus(d.publishStatus);
                 const mg = parseMaxGuestsFromPayload(d);
                 const rawPhone = d.hostPhone ?? d.contactPhone;
                 const phone = typeof rawPhone === 'string' && rawPhone.trim() ? rawPhone.trim() : null;
@@ -808,6 +816,11 @@ const PropertyDetails = () => {
                     );
                     const photoCount = Number((apiListing as Record<string, unknown>).photoCount) || 0;
                     const pub = apiListing as unknown as Partial<PublicListing>;
+                    // TASK-2739-v1: capture publishStatus on the API-fallback render path too.
+                    {
+                        const psFallback = (apiListing as Record<string, unknown>).publishStatus;
+                        if (typeof psFallback === 'string') setPublishStatus(psFallback);
+                    }
                     const rawAddr =
                         (apiListing as Record<string, unknown>).propertyAddress ??
                         (apiListing as Record<string, unknown>).property_address;
@@ -1239,6 +1252,12 @@ useEffect(() => {
         ? data.amenityCodes.slice(0, 12)
         : null;
 
+    // TASK-2739-v1: a Draft listing is reachable by direct/preview link but is not yet live —
+    // hide it from search engines (noindex) and replace the booking surfaces with a notice.
+    // v1.1: scope the "Draft — not yet live" badge to admin viewers (no admin-session detection
+    // exists in the guest portal today, so v1 shows it to all viewers of a Draft listing).
+    const ppIsDraft = publishStatus === 'Draft';
+
     return (
         <>
         {data && (
@@ -1249,6 +1268,7 @@ useEffect(() => {
                 url={pageUrl}
                 type="lodgingBusiness"
                 jsonLd={propertyJsonLd}
+                robots={ppIsDraft ? 'noindex, nofollow' : undefined}
             />
         )}
 
@@ -1282,6 +1302,28 @@ useEffect(() => {
               <div>
                 {!ppHideAtlasBranding && (
                   <p className="pp-eyebrow">{ppBrandName}</p>
+                )}
+                {/* TASK-2739-v1: "Draft — not yet live" badge. v1 shows it to ALL viewers of a Draft
+                    listing; v1.1 will scope it to admin viewers once the guest portal gains an
+                    admin-session signal. */}
+                {ppIsDraft && (
+                  <span
+                    className="pp-draft-badge"
+                    data-testid="draft-badge"
+                    style={{
+                      display: 'inline-block',
+                      marginBottom: 8,
+                      padding: '3px 10px',
+                      borderRadius: 999,
+                      background: '#fef3c7',
+                      color: '#92400e',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      border: '1px solid #fcd34d',
+                    }}
+                  >
+                    Draft — not yet live
+                  </span>
                 )}
                 <h1 className="pp-display">{getListingDisplayName(data.id, data.property_name)}</h1>
                 <div className="pp-submeta">
@@ -1953,33 +1995,86 @@ useEffect(() => {
                     {data.photoCount} photo{data.photoCount !== 1 ? 's' : ''}
                   </p>
                 )}
-                <Suspense fallback={<SkeletonCard />}>
-                  <UnitBookingWidget
-                    listingId={resolvedListingId ?? undefined}
-                    propertyId={listingPropertyId ?? undefined}
-                    listingName={getListingDisplayName(data.id ?? data.listingId, data.property_name) || 'This property'}
-                    timezoneId={data.timezoneId}
-                    coverPhotoUrl={primaryImage}
-                    maxGuests={data.maxGuests}
-                    propertySlug={propertySlugParam}
-                    unitSlug={unitSlugParam}
-                    reviewRating={ppHasApiReviews ? ppApiReviews!.averageRating : undefined}
-                    reviewCount={ppHasApiReviews ? ppApiReviews!.totalCount : undefined}
-                  />
-                </Suspense>
+                {ppIsDraft ? (
+                  <div
+                    className="pp-draft-notice"
+                    data-testid="draft-booking-notice"
+                    aria-label="Listing not yet available for booking"
+                    style={{
+                      border: '1px solid #e2e8f0',
+                      borderRadius: 12,
+                      padding: '20px 18px',
+                      background: '#f8fafc',
+                      color: '#64748b',
+                      textAlign: 'center',
+                      opacity: 0.85,
+                    }}
+                  >
+                    <div style={{ fontWeight: 600, color: '#475569', marginBottom: 6 }}>
+                      Not yet available for booking
+                    </div>
+                    <div style={{ fontSize: 13 }}>
+                      This listing is still being prepared and isn’t open for reservations yet. Please
+                      check back soon.
+                    </div>
+                  </div>
+                ) : (
+                  <Suspense fallback={<SkeletonCard />}>
+                    <UnitBookingWidget
+                      listingId={resolvedListingId ?? undefined}
+                      propertyId={listingPropertyId ?? undefined}
+                      listingName={getListingDisplayName(data.id ?? data.listingId, data.property_name) || 'This property'}
+                      timezoneId={data.timezoneId}
+                      coverPhotoUrl={primaryImage}
+                      maxGuests={data.maxGuests}
+                      propertySlug={propertySlugParam}
+                      unitSlug={unitSlugParam}
+                      reviewRating={ppHasApiReviews ? ppApiReviews!.averageRating : undefined}
+                      reviewCount={ppHasApiReviews ? ppApiReviews!.totalCount : undefined}
+                    />
+                  </Suspense>
+                )}
 
-                {/* Verified home badge */}
-                <p
-                  className="pp-chip pp-chip-success"
-                  style={{ marginTop: 12, cursor: 'help' }}
-                  title="Listing details and photos reviewed by the Atlas team before going live."
-                >
-                  {(() => {
-                    const pp = _getTenantCtx()?.paymentProvider;
-                    const hasOnline = typeof pp === 'string' && pp !== 'MANUAL';
-                    return hasOnline ? '✓ Verified home · Instant book' : '✓ Verified home · Host-confirmed booking';
-                  })()}
-                </p>
+                {/* Trust band — consolidates legitimacy, cancellation & payment
+                    (DESIGN-003). Absorbs the former standalone verified pill.
+                    Each row degrades gracefully on missing data. */}
+                {(() => {
+                  const pp = _getTenantCtx()?.paymentProvider;
+                  const hasOnline = typeof pp === 'string' && pp !== 'MANUAL';
+                  return (
+                    <div className="pp-trust" data-testid="property-trust-band" aria-label="Booking trust details">
+                      <div className="pp-trust-row">
+                        <ShieldCheck className="pp-trust-ic" size={18} aria-hidden="true" />
+                        <div>
+                          <div className="pp-trust-t">
+                            {hasOnline ? `Verified home · Instant book` : `Verified home · Host-confirmed booking`}
+                          </div>
+                          <div className="pp-trust-s">
+                            Listing details and photos reviewed by {ppBrandName} before going live.
+                          </div>
+                        </div>
+                      </div>
+                      <div className="pp-trust-row">
+                        <CalendarClock className="pp-trust-ic" size={18} aria-hidden="true" />
+                        <div>
+                          <div className="pp-trust-t">{ppCancellationInfo.headline}</div>
+                          <div className="pp-trust-s">{ppCancellationInfo.description}</div>
+                        </div>
+                      </div>
+                      <div className="pp-trust-row">
+                        <CreditCard className="pp-trust-ic" size={18} aria-hidden="true" />
+                        <div>
+                          <div className="pp-trust-t">Direct booking · no OTA fees</div>
+                          <div className="pp-trust-s">
+                            {hasOnline
+                              ? 'You pay the host directly. Secure payment via Razorpay (UPI, cards, netbanking).'
+                              : 'You pay the host directly — no middle-man fees. The host confirms your dates.'}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Host profile card */}
                 <div
@@ -2080,24 +2175,38 @@ useEffect(() => {
           </div>
           {/* ===== END pp-shell ===== */}
 
-          {/* Mobile sticky CTA */}
-          <div className="pp-m-sticky" aria-label="Book this property" data-testid="mobile-reserve-bar">
-            <div className="pp-m-sticky-price">
-              <b>{formatCurrency(nightlyPrice?.finalNightlyPrice ?? directBookingNightly, { maximumFractionDigits: 0 })}</b>
-              <span>/ night</span>
-            </div>
-            <button
-              type="button"
-              className="pp-btn pp-btn-primary pp-m-sticky-cta"
-              onClick={() => {
-                const widget = document.querySelector('[data-testid="guest-booking-form"]');
-                widget?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              }}
-              aria-label="Scroll to booking form"
+          {/* Mobile sticky CTA — TASK-2739-v1: Draft listings show a "not yet available" notice
+              instead of the reserve bar (no booking surface until published). */}
+          {ppIsDraft ? (
+            <div
+              className="pp-m-sticky"
+              aria-label="Listing not yet available for booking"
+              data-testid="mobile-draft-notice"
             >
-              Reserve
-            </button>
-          </div>
+              <div className="pp-m-sticky-price" style={{ color: '#64748b' }}>
+                <b style={{ fontWeight: 600 }}>Not yet available</b>
+                <span>for booking</span>
+              </div>
+            </div>
+          ) : (
+            <div className="pp-m-sticky" aria-label="Book this property" data-testid="mobile-reserve-bar">
+              <div className="pp-m-sticky-price">
+                <b>{formatCurrency(nightlyPrice?.finalNightlyPrice ?? directBookingNightly, { maximumFractionDigits: 0 })}</b>
+                <span>/ night</span>
+              </div>
+              <button
+                type="button"
+                className="pp-btn pp-btn-primary pp-m-sticky-cta"
+                onClick={() => {
+                  const widget = document.querySelector('[data-testid="guest-booking-form"]');
+                  widget?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }}
+                aria-label="Scroll to booking form"
+              >
+                Reserve
+              </button>
+            </div>
+          )}
 
         </div>
         {/* ===== END pp-root ===== */}

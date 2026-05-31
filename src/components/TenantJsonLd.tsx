@@ -97,7 +97,7 @@ export const TenantJsonLd: React.FC = () => {
             text: `Browse properties on ${
               typeof window !== 'undefined'
                 ? window.location.hostname
-                : 'starguesthouse.atlastays.com'
+                : 'your property site'
             }, select your dates, and complete booking via UPI or card. You will receive an instant confirmation.`,
           },
         },

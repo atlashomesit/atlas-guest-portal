@@ -40,7 +40,7 @@ describe("contact resolution — per-tenant number from the API", () => {
   it("never leaks the Atlas default when the tenant carries its own number (regression)", () => {
     ovr.mockReturnValue({});
     ctx.mockReturnValue(
-      tenant({ slug: "nightnest", legalContactPack: { contactPhone: "9812345678", showAtlasFooterCredit: false } }),
+      tenant({ slug: "e2e-whitelabel", legalContactPack: { contactPhone: "9812345678", showAtlasFooterCredit: false } }),
     );
     expect(getContactPhone("business")).not.toBe(ATLAS_DEFAULT);
     expect(getContactPhone("business")).toBe("9812345678");

@@ -5,5 +5,14 @@
 /301  /property_details/atlas-homes-room-301  301
 /302  /property_details/atlas-homes-room-302  301
 /501  /property_details/atlas-homes-room-501  301
+# TASK-2748: the SPA fallback below also matches /assets/* — so a *missing* hashed
+# file (un-propagated edge after a deploy, or a stale index.html referencing a
+# removed chunk) would be served index.html (text/html, 200) and cached as the
+# asset, breaking CSS/JS in browsers ("Refused to apply style (MIME text/html)").
+# Cloudflare Pages _redirects cannot express "404 this path" (only 200 rewrites and
+# 3xx redirects are supported), so /assets/* integrity is enforced in code by
+# functions/assets/[[path]].ts, which rewrites that fallback HTML into a 404.
+# Do NOT add a /assets/* rule here expecting a 404 — it will not work.
+#
 # SPA fallback: keep last. The trailing "!" prevents Cloudflare Pages from flagging an infinite loop.
 /* /index.html 200!

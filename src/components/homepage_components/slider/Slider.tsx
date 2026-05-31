@@ -34,12 +34,8 @@ const Slider = () => {
   const heroImageUrl = showAtlasContent ? HERO_IMAGE_URL : '';
   const hasHeroPhoto = Boolean(heroImageUrl.trim());
 
-  // Delayed italic-city fade-in (280ms after the rest of the headline lands).
-  const [headlineIn, setHeadlineIn] = React.useState(false);
-  React.useEffect(() => {
-    const t = window.setTimeout(() => setHeadlineIn(true), 60);
-    return () => window.clearTimeout(t);
-  }, []);
+  // CSS-driven animations replace the manual headlineIn state
+  // All entrance animations are now in atlas-home-v2.css
 
   const overlayStyle = React.useMemo(() => {
     const style: React.CSSProperties = { backgroundImage: HERO_OVERLAY_GRADIENT };
@@ -56,9 +52,9 @@ const Slider = () => {
       <div className="ahv2-hero-left">
         <span className="ahv2-eyebrow ahv2-hero-eyebrow">{getTenantBrandName()}</span>
 
-        <h1 className={`ahv2-hero-h1${headlineIn ? ' ahv2-in' : ''}`}>
-          Thoughtfully curated stays{' '}
-          <span className="ahv2-city">in Hyderabad</span>
+        <h1 className="ahv2-hero-h1">
+          Thoughtfully curated{' '}
+          <span className="ahv2-city">stays in Hyderabad</span>
         </h1>
 
         <p className="ahv2-hero-sub">

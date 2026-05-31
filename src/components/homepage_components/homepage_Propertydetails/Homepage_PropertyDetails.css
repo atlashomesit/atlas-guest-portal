@@ -65,6 +65,22 @@
   border-color: #d2ebde; font-weight: 600;
 }
 
+/* Trust band (DESIGN-003) — legitimacy, cancellation & payment in one block */
+.pp-trust {
+  margin-top: 12px;
+  border: 1px solid #f0e6dc;
+  border-radius: 14px;
+  background: #fffaf5;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.pp-trust-row { display: flex; gap: 10px; align-items: flex-start; }
+.pp-trust-ic { flex: 0 0 auto; color: #c2410c; margin-top: 1px; }
+.pp-trust-t { font-size: 13.5px; font-weight: 600; color: #1a1a2e; line-height: 1.4; }
+.pp-trust-s { font-size: 12.5px; color: #64748b; line-height: 1.45; margin-top: 2px; }
+
 .pp-eyebrow {
   font-family: inherit;
   font-size: 11.5px; font-weight: 700;

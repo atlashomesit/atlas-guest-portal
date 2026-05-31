@@ -1,5 +1,6 @@
 import { CheckCircle2, HeartHandshake, ShieldCheck, Sparkles, Users, MapPin, Clock4, BedDouble, Medal } from "lucide-react";
 import SEO from "../components/SEO";
+import { getTenantContext } from "../tenant/tenantContext";
 
 const stayIllustration = `data:image/svg+xml;utf8,${encodeURIComponent(`
   <svg width="640" height="360" viewBox="0 0 640 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
@@ -128,26 +129,31 @@ const missionHighlights = [
   "Design calm, tech-enabled spaces that help guests feel grounded—whether for a night or a month.",
 ];
 
-const AboutPage = () => (
+const AboutPage = () => {
+  const brandName = getTenantContext()?.name?.trim() || "Atlas Homestays";
+  const aboutUrl =
+    typeof window !== "undefined" ? `${window.location.origin}/about` : "https://www.atlashomestays.com/about";
+
+  return (
   <div className="bg-bg-muted text-text-primary min-h-screen">
     <SEO
-      title="About Starguest House | Mission, Team & Hospitality Standards"
-      description="Discover the mission behind Starguest House, meet the team that powers guest experiences, and explore the hospitality standards and trust badges that guide every stay."
+      title={`About ${brandName} | Mission, Team & Hospitality Standards`}
+      description={`Discover the mission behind ${brandName}, meet the team that powers guest experiences, and explore the hospitality standards and trust badges that guide every stay.`}
       jsonLd={{
         '@context': 'https://schema.org',
         '@type': 'Organization',
-        name: 'Starguest House',
+        name: brandName,
         description:
           'Serviced apartments designed for modern travelers with verified hosts, trusted standards, and responsive local teams.',
-        url: 'https://starguesthouse.com/about',
-        brand: 'Starguest House',
+        url: aboutUrl,
+        brand: brandName,
       }}
     />
 
     <div className="px-4 md:px-10 lg:px-20 py-20 space-y-16">
       <section className="bg-bg-surface border border-border-subtle shadow-level2 rounded-3xl p-8 md:p-12 grid gap-10 lg:grid-cols-[1.1fr_0.9fr] items-center" data-testid="mission-section">
         <div className="space-y-6">
-          <p className="uppercase tracking-[0.2em] text-primary font-semibold">Starguest House</p>
+          <p className="uppercase tracking-[0.2em] text-primary font-semibold">{brandName}</p>
           <h1 className="text-3xl md:text-4xl font-bold leading-tight">Where dependable stays meet human hospitality</h1>
           <p className="text-lg text-text-muted max-w-2xl">
             We are a collective of hosts, designers, and operators who believe every serviced apartment should feel personal—without sacrificing reliability. From the first message to checkout, our mission is to keep guests at ease and make every city feel familiar.
@@ -267,6 +273,7 @@ const AboutPage = () => (
       </section>
     </div>
   </div>
-);
+  );
+};
 
 export default AboutPage;
