@@ -641,3 +641,116 @@
     transform: scale(1);
   }
 }
+
+.rb-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 600;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+}
+
+.rb-badge--sm {
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--font-size-xs);
+}
+
+.rb-badge--md {
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--font-size-sm);
+}
+
+.rb-badge--lg {
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--font-size-md);
+}
+
+.rb-badge--primary {
+  background: var(--cta-primary);
+  color: white;
+}
+
+.rb-badge--secondary {
+  background: var(--bg-muted);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
+}
+
+.rb-badge--success {
+  background: color-mix(in srgb, var(--support-success) 15%, transparent);
+  color: var(--support-success);
+}
+
+.rb-badge--error {
+  background: color-mix(in srgb, var(--support-error) 15%, transparent);
+  color: var(--support-error);
+}
+
+.rb-badge--warning {
+  background: color-mix(in srgb, var(--support-warning) 15%, transparent);
+  color: var(--support-warning);
+}
+
+.rb-badge--info {
+  background: color-mix(in srgb, var(--accent-primary) 15%, transparent);
+  color: var(--accent-primary);
+}
+
+.rb-badge__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rb-tabs {
+  width: 100%;
+}
+
+.rb-tabs__list {
+  display: flex;
+  border-bottom: 1px solid var(--border-subtle);
+  gap: 0;
+}
+
+.rb-tabs__trigger {
+  background: none;
+  border: none;
+  padding: var(--space-4) var(--space-5);
+  font-size: var(--font-size-md);
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  position: relative;
+  transition: color 150ms ease;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.rb-tabs__trigger:hover:not(:disabled) {
+  color: var(--text-primary);
+}
+
+.rb-tabs__trigger:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: -2px;
+}
+
+.rb-tabs__trigger--active {
+  color: var(--cta-primary);
+  border-bottom-color: var(--cta-primary);
+}
+
+.rb-tabs__trigger--disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.rb-tabs__content {
+  display: block;
+}
+
+.rb-tabs__content--hidden {
+  display: none;
+}
