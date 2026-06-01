@@ -13,6 +13,8 @@
   background: linear-gradient(135deg, var(--cta-primary) 0%, var(--cta-secondary) 100%);
   box-shadow: var(--shadow-level-1);
   transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease;
+  min-height: 48px;
+  min-width: 48px;
 }
 
 .rb-button:hover {
@@ -24,6 +26,11 @@
 .rb-button:active {
   transform: translateY(0);
   box-shadow: var(--shadow-level-1);
+}
+
+.rb-button:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
 }
 
 .rb-button:disabled {
@@ -80,6 +87,44 @@
 .rb-button--lg {
   padding: var(--space-4) var(--space-6);
   font-size: var(--font-size-lg);
+}
+
+.rb-button--loading {
+  color: transparent;
+  pointer-events: none;
+  position: relative;
+}
+
+.rb-button--loading .rb-button__spinner {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 1em;
+  height: 1em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: rb-spin 0.75s linear infinite;
+  opacity: 0.7;
+}
+
+@keyframes rb-spin {
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }
 
 .rb-input {
