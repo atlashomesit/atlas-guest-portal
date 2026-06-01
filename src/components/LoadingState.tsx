@@ -1,16 +1,18 @@
 import React from "react";
 
-export type LoadingShape = "skeleton-card" | "skeleton-grid" | "skeleton-list" | "spinner";
+export type LoadingShape = "skeleton-card" | "skeleton-grid" | "skeleton-list" | "skeleton-table" | "skeleton-form" | "spinner";
 
 export interface LoadingStateProps {
   kind: LoadingShape;
   count?: number;
+  rows?: number;
   message?: string;
 }
 
 export const LoadingState: React.FC<LoadingStateProps> = ({
   kind,
   count = 6,
+  rows = 6,
   message = "Loading…",
 }) => {
   return (
@@ -19,6 +21,8 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
       {kind === "skeleton-card" && <SkeletonCards count={count} />}
       {kind === "skeleton-grid" && <SkeletonGrid count={count} />}
       {kind === "skeleton-list" && <SkeletonList count={count} />}
+      {kind === "skeleton-table" && <SkeletonTable rows={rows} />}
+      {kind === "skeleton-form" && <SkeletonForm />}
       {kind === "spinner" && <Spinner />}
     </div>
   );
@@ -80,6 +84,42 @@ const SkeletonList: React.FC<{ count: number }> = ({ count }) => (
         </div>
       </div>
     ))}
+  </div>
+);
+
+const SkeletonTable: React.FC<{ rows: number }> = ({ rows }) => (
+  <div className="overflow-hidden rounded-lg border border-border-subtle">
+    <div className="bg-bg-muted p-4 flex gap-4" aria-hidden>
+      <div className="h-4 bg-bg-surface rounded w-1/4 animate-pulse" />
+      <div className="h-4 bg-bg-surface rounded w-1/4 animate-pulse" />
+      <div className="h-4 bg-bg-surface rounded w-1/4 animate-pulse" />
+      <div className="h-4 bg-bg-surface rounded w-1/4 animate-pulse" />
+    </div>
+    <div className="divide-y divide-border-subtle">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="p-4 flex gap-4">
+          <div className="h-4 bg-bg-muted rounded w-1/4 animate-pulse" />
+          <div className="h-4 bg-bg-muted rounded w-1/4 animate-pulse" />
+          <div className="h-4 bg-bg-muted rounded w-1/4 animate-pulse" />
+          <div className="h-4 bg-bg-muted rounded w-1/4 animate-pulse" />
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+const SkeletonForm: React.FC = () => (
+  <div className="space-y-6" aria-hidden>
+    {Array.from({ length: 3 }).map((_, i) => (
+      <div key={i} className="space-y-2">
+        <div className="h-4 w-32 bg-bg-muted rounded animate-pulse" />
+        <div className="h-10 w-full bg-bg-muted rounded animate-pulse" />
+      </div>
+    ))}
+    <div className="flex gap-3">
+      <div className="h-10 w-32 bg-bg-muted rounded animate-pulse" />
+      <div className="h-10 w-32 bg-bg-muted rounded animate-pulse" />
+    </div>
   </div>
 );
 
