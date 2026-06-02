@@ -11,12 +11,12 @@ import { useVerifiedReviews } from "../../hooks/useVerifiedReviews";
 
 /** Solid fallback + gradient so axe color-contrast sees a dark effective background (not body ivory). */
 const testimonialsBandStyle: CSSProperties = {
-  backgroundColor: "var(--dark-footer-start)",
-  backgroundImage: "linear-gradient(180deg, var(--dark-footer-start) 0%, var(--dark-footer-end) 100%)",
+  backgroundColor: "#071624",
+  backgroundImage: "linear-gradient(180deg, #071624 0%, #10243a 100%)",
 };
 
 const reviewCardClassName =
-  "rounded-2xl border border-white/20 bg-[var(--dark-footer-end)] p-6 md:p-8 transition-all duration-[180ms] hover:-translate-y-1.5 hover:scale-[1.02] min-w-[280px]";
+  "rounded-2xl border border-white/20 bg-[#10243a] p-6 md:p-8 transition-all duration-[180ms] hover:-translate-y-1.5 hover:scale-[1.02] min-w-[280px]";
 
 const TestimonialsSection = () => {
   // TASK-2872: drive testimonials from real verified-stay reviews. Hooks run
@@ -33,7 +33,7 @@ const TestimonialsSection = () => {
   if (enableTestimonialsStatic3) {
     return (
       <section
-        className="py-section-gap md:py-section-gap-md lg:py-section-gap-lg text-white"
+        className="py-section-gap md:py-section-gap-md lg:py-section-gap-lg text-white bg-[#071624] isolate relative"
         style={testimonialsBandStyle}
         aria-labelledby="testimonials-heading"
       >
@@ -69,7 +69,7 @@ const TestimonialsSection = () => {
   if (enableTestimonialsSingleCentered) {
     return (
       <section
-        className="py-section-gap md:py-section-gap-md lg:py-section-gap-lg text-white"
+        className="py-section-gap md:py-section-gap-md lg:py-section-gap-lg text-white bg-[#071624] isolate relative"
         style={testimonialsBandStyle}
       >
         <div className="mx-auto max-w-prose px-[5%]">
@@ -97,7 +97,7 @@ const TestimonialsSection = () => {
 
   return (
     <section
-      className="py-section-gap md:py-section-gap-md lg:py-section-gap-lg text-white"
+      className="py-section-gap md:py-section-gap-md lg:py-section-gap-lg text-white bg-[#071624] isolate relative"
       style={testimonialsBandStyle}
       aria-labelledby="testimonials-heading"
     >
