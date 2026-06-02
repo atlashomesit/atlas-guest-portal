@@ -31,8 +31,12 @@ const Slider = () => {
   // `atlas` tenant) but never on white-label tenant subdomains (RA-006). This is
   // the same canonical check the "Our Homes" grid uses for its Atlas eyebrow.
   const showAtlasContent = !shouldHideAtlasBranding(tenant, overrides);
+  const brandName = getTenantBrandName();
   const heroImageUrl = showAtlasContent ? HERO_IMAGE_URL : '';
   const hasHeroPhoto = Boolean(heroImageUrl.trim());
+  const heroPhotoAriaLabel = showAtlasContent
+    ? `A warm, owner-run ${brandName} living room in KPHB`
+    : `Welcome to ${brandName}`;
 
   // CSS-driven animations replace the manual headlineIn state
   // All entrance animations are now in atlas-home-v2.css
@@ -132,7 +136,7 @@ const Slider = () => {
             className="ahv2-hero-photo"
             style={{ backgroundImage: `url("${heroImageUrl}")` }}
             role="img"
-            aria-label="A warm, owner-run Atlas living room in KPHB"
+            aria-label={heroPhotoAriaLabel}
           />
         ) : (
           <div className="ahv2-hero-photo ahv2-hero-photo--fallback" aria-hidden="true" />

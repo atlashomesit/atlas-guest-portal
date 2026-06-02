@@ -14,7 +14,7 @@ const StubPage = ({ title, description, heading, body, ctaHref, ctaLabel }: Stub
   const brandName = getTenantBrandName();
   return (
     <div className="px-4 md:px-10 lg:px-20 py-28 bg-bg-muted min-h-screen">
-      <SEO title={title} description={description} />
+      <SEO title={`${title} | ${brandName}`} description={description} />
       <div className="max-w-4xl mx-auto space-y-6">
         <div className="space-y-2">
           <p className="uppercase tracking-[0.2em] text-primary font-semibold">{brandName}</p>

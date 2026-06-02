@@ -59,7 +59,7 @@ const LocationPage = () => {
       landmarks: fromApi?.landmarks?.length ? fromApi.landmarks : fallback?.landmarks,
     };
   }, [overrides.locationContent, tenant?.locationContent]);
-  const tenantName = tenant?.name?.trim() || getTenantBrandName();
+  const tenantName = getTenantBrandName();
 
   // TL-PROP: aggregate per-property pins. When the tenant has 2+ properties with lat/lng,
   // we render a multi-pin map; otherwise we fall back to the single tenant pin below.

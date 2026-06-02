@@ -1,4 +1,4 @@
-import { MARKETPLACE_BRAND_BASELINE, getTenantBrandNameLong } from "../tenant/displayBrand";
+import { getTenantBrandNameLong } from "../tenant/displayBrand";
 
 export type TermsSection = {
   id: string;
@@ -9,7 +9,7 @@ export type TermsSection = {
 };
 
 export const termsMetadata = {
-  title: `Terms & Conditions – ${MARKETPLACE_BRAND_BASELINE}`,
+  /** Title is localized on the live Terms page via `getTenantBrandName()`. */
   lastUpdated: "Last updated: January 10, 2025",
 };
 

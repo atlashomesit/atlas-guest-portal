@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { buildApiUrl, getApiHeaders } from "../api/client";
+import SEO from "../components/SEO";
 import { getTenantBrandName } from "../tenant/displayBrand";
 
 interface CheckinDetails {
@@ -24,6 +25,7 @@ interface CheckinDetails {
 type Step = "auth" | "summary" | "id-upload" | "house-rules" | "done";
 
 export default function SelfCheckIn() {
+  const brandName = getTenantBrandName();
   const { bookingRef: urlRef } = useParams<{ bookingRef: string }>();
 
   const [bookingRef, setBookingRef] = useState(urlRef ?? "");
@@ -96,10 +98,14 @@ export default function SelfCheckIn() {
 
   return (
     <div className="min-h-screen bg-bg-page px-4 py-10">
+      <SEO
+        title={`Self check-in | ${brandName}`}
+        description={`Complete web check-in for your ${brandName} booking — arrival details, ID, and house rules.`}
+      />
       <div className="mx-auto max-w-lg">
         {/* Logo / Brand */}
         <p className="text-center text-sm font-semibold uppercase tracking-widest text-text-muted mb-6">
-          {getTenantBrandName()} · Self Check-in
+          {brandName} · Self Check-in
         </p>
 
         {/* Step dots (auth is hidden once verified) */}
