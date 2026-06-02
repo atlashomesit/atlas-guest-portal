@@ -15,7 +15,7 @@ import { useBooking } from '../../../contexts/BookingContext';
 const Navbar = () => {
   const tenant = getTenantContext();
   const overrides = getTenantOverrides(tenant?.slug);
-  const hideAtlasBranding = shouldHideAtlasBranding(tenant, overrides);
+  const _hideAtlasBranding = shouldHideAtlasBranding(tenant, overrides);
   const logoSrc = tenant?.logoUrl ?? LOGO_URL;
   // RA-006 §3.5: prefer tenant name everywhere; only fall back to "Home" on the Atlas root.
   const brandName = getTenantBrandName();

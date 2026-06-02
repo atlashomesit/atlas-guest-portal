@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getTenantContext } from "../tenant/tenantContext";
 import { getTenantBrandName } from "../tenant/displayBrand";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react"; // TASK-1476

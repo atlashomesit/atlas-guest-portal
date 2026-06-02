@@ -1,4 +1,3 @@
-/* eslint-disable atlas-brand/no-atlas-string-leak -- baseline marketplace notice; tenant substitution in PrivacyPage (RA-006). */
 import { MARKETPLACE_BRAND_BASELINE } from "../../tenant/displayBrand";
 
 // DPDPA 2023 notice content for the marketplace data fiduciary (see MARKETPLACE_BRAND_BASELINE).

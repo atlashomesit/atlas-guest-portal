@@ -28,7 +28,7 @@ const GalleryPage = () => {
   const tenant = getTenantContext();
   const brandName = getTenantBrandName();
   const tenantOverrides = getTenantOverrides(tenant?.slug);
-  const hideAtlasBranding = shouldHideAtlasBranding(tenant, tenantOverrides);
+  const _hideAtlasBranding = shouldHideAtlasBranding(tenant, tenantOverrides);
   const [activeSegment, setActiveSegment] = useState<string>("all");
   const [propertyFilter, setPropertyFilter] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState<string>("");

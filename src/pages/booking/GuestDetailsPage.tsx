@@ -917,7 +917,7 @@ const GuestDetailsPage: React.FC = () => {
       isSubmitting, holdExpired, validateForm, holdId, phoneDialCode, formData,
       availableAddOns, selectedAddOns, referralCode, promoCode, whatsappOptIn,
       holdListingId, updateBooking, navigate, booking.checkIn, booking.checkOut, displayTotal,
-      checkInDisplay, checkOutDisplay,
+      checkInDisplay, checkOutDisplay, brandName,
     ],
   );
 

@@ -241,7 +241,7 @@ export const Apartments = () => {
   const tenant = getTenantContext();
   const brandName = getTenantBrandName();
   const tenantOverrides = getTenantOverrides(tenant?.slug);
-  const hideAtlasBranding = shouldHideAtlasBranding(tenant, tenantOverrides);
+  const _hideAtlasBranding = shouldHideAtlasBranding(tenant, tenantOverrides);
   const directBookingDiscountPercent = React.useMemo(() => getEffectiveDiscountPercent(), []);
 
   const safeListings = React.useMemo(() => sanitizeListings(listingsSource), [listingsSource]);
