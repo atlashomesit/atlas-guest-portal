@@ -134,7 +134,11 @@ export default function ReviewSubmitPage() {
         return res.json() as Promise<ReviewEligibility>;
       })
       .then(setEligibility)
-      .catch((err: Error) => setError(err.message))
+      .catch((err: Error) => {
+        // TASK-2896: never surface raw server strings to the guest.
+        console.error("Review form load failed:", err);
+        setError("We couldn't load your review form. Please use the link from your check-out message again, or try later.");
+      })
       .finally(() => setLoading(false));
   }, [bookingId, token]);
 
@@ -171,7 +175,8 @@ export default function ReviewSubmitPage() {
         setPhotoUrls((prev) => [...prev, ...additions].slice(0, 3));
       }
     } catch (err: unknown) {
-      setPhotoError((err as Error).message);
+      console.error("Review photo upload failed:", err); // TASK-2896
+      setPhotoError("That photo couldn't be uploaded. Please try a different image.");
     } finally {
       setPhotoBusy(false);
     }
@@ -220,7 +225,8 @@ export default function ReviewSubmitPage() {
 
       setSubmitted(true);
     } catch (err: unknown) {
-      setSubmitError((err as Error).message);
+      console.error("Review submit failed:", err); // TASK-2896
+      setSubmitError("We couldn't submit your review just now. Please try again in a moment.");
     } finally {
       setSubmitting(false);
     }
