@@ -90,7 +90,7 @@ export const privacySections: PrivacySection[] = [
     details: [
       "Razorpay Software Private Limited — payment processing. Razorpay is a RBI-regulated payment aggregator.",
       "Interakt (Haptik Inc.) — WhatsApp Business API provider for transactional and consented marketing messages.",
-      "Microsoft Azure — cloud hosting (Azure App Service, Azure SQL) in Central India and Central US regions.",
+      "Microsoft Azure — cloud hosting (Azure App Service, Azure SQL) in the Central India region.",
       "Cloudflare, Inc. — content delivery and DDoS protection for our websites.",
       "Auth0 (Okta, Inc.) — identity provider for the admin portal (hosts, not guests).",
       "Online Travel Agencies (Airbnb, Booking.com, Vrbo, MakeMyTrip, Agoda) — only when you book through them and only the booking data necessary to fulfil your reservation.",
@@ -105,7 +105,7 @@ export const privacySections: PrivacySection[] = [
       "Most of your personal data is stored on servers physically located in India (Microsoft Azure Central India). Some processors operate from other countries.",
     details: [
       "Primary database: Azure SQL, Central India region (Pune).",
-      "Backup / secondary region: Azure Central US region, used only for disaster recovery.",
+      "All data is stored in India (Azure Central India). No secondary region backup is currently configured.",
       `Cloudflare and Auth0 operate global networks and may process request metadata outside India. They are bound by contractual data-protection terms with ${MARKETPLACE_BRAND_BASELINE}.`,
       "We do not transfer personal data to any country notified as restricted under Section 16 of the DPDP Act.",
     ],
