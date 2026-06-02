@@ -283,6 +283,7 @@ const SearchPage = () => {
   const [availabilityFetchDone, setAvailabilityFetchDone] = useState(false);
 
   const tenant = getTenantContext();
+  const brandName = getTenantBrandName();
   const overrides = getTenantOverrides(tenant?.slug);
   const hideAtlasBranding = shouldHideAtlasBranding(tenant, overrides);
   const unitNoun = getUnitNoun(overrides);
@@ -1324,7 +1325,7 @@ const SearchPage = () => {
                             className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700 border border-emerald-200 cursor-help"
                             title="Verified photos and GST registration on file. Listing details reviewed before publish."
                           >
-                            ✅ Atlas Trusted Host
+                            {`✅ ${brandName} Trusted Host`}
                           </span>
                         ) : (
                           <>

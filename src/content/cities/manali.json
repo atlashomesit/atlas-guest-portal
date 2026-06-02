@@ -65,7 +65,7 @@
       "answer": "Mountain connectivity varies. Use WiFi badges as hints, download offline maps, and ask hosts about recent outages before assuming fibre uptime during storms."
     },
     {
-      "question": "Why book Manali homestays direct on Atlas?",
+      "question": "Why book Manali homestays direct on {{TENANT_BRAND}}?",
       "answer": "You see nightly rates without OTA markup layers where hosts publish direct, and you can open listing detail for cancellation clarity. Supporting direct bookings helps hosts reinvest in safety and upkeep."
     }
   ]

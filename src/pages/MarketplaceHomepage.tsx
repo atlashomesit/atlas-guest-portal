@@ -117,10 +117,10 @@ export default function MarketplaceHomepage() {
     <section className="mx-auto w-full max-w-6xl px-4 py-8" data-testid="marketplace-homepage">
       {/* TASK-1876: SEO meta for marketplace homepage */}
       <SEO
-        title="Atlas Stays Marketplace — Verified homes & rooms across India"
-        description="Discover homes and rooms across verified hosts on Atlas Stays. Direct booking, no platform fee."
+        title="Atlastays Marketplace — Verified homes & rooms across India"
+        description="Discover homes and rooms across verified hosts on Atlastays. Direct booking, no platform fee."
       />
-      <h1 className="text-3xl font-bold text-text-primary">Atlas Stays Marketplace</h1>
+      <h1 className="text-3xl font-bold text-text-primary">Atlastays Marketplace</h1>
       <p className="mt-2 text-text-body">Discover homes and rooms across verified hosts.</p>
 
       <div className="mt-6 flex flex-wrap items-center gap-3">

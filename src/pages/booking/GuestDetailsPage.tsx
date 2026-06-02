@@ -31,7 +31,7 @@ import {
   toRazorpayContactDigits,
 } from '@/utils/guestPhoneDial';
 import { getTenantContext } from '@/tenant/tenantContext';
-import { getGuestDataProcessingEntityName } from '@/tenant/displayBrand';
+import { getGuestDataProcessingEntityName, getTenantBrandName } from '@/tenant/displayBrand';
 import { formatCurrency } from '@/utils/formatting';
 import { formatDateInTimezone } from '@/utils/dateHelpers';
 import { track } from '@/lib/events';
@@ -976,7 +976,7 @@ const GuestDetailsPage: React.FC = () => {
   }
 
   const tenantCtx = getTenantContext();
-  const brandName = tenantCtx?.name ?? 'Atlas';
+  const brandName = getTenantBrandName();
   const brandInitial = brandName.charAt(0).toUpperCase();
   const whatsappNumber = tenantCtx?.whatsappBookingPhone ?? '';
   const consentEntityName = getGuestDataProcessingEntityName();

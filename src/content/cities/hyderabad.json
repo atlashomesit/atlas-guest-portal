@@ -68,7 +68,7 @@
       "answer": "Some do via trusted drivers. Use booking messaging to confirm rates, luggage capacity, and midnight surcharge policies rather than informal verbal quotes."
     },
     {
-      "question": "Why book Hyderabad stays direct on Atlas?",
+      "question": "Why book Hyderabad stays direct on {{TENANT_BRAND}}?",
       "answer": "You retain a clear listing record, see cancellation tiers when provided, and support hosts maintaining standards without stacking OTA-only fees. Confirmation emails anchor support if plans change."
     }
   ]

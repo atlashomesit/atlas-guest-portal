@@ -1,5 +1,5 @@
  
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { Card } from "../components/ui/Card";
 import { Typography } from "../components/ui/Typography";
@@ -7,7 +7,7 @@ import { Input } from "../components/ui/Input";
 import { Button } from "../components/ui/Button";
 import { toast } from "react-toastify";
 import { buildApiUrl, getApiHeaders } from "../api/client";
-import { getTenantContactEmail } from "../tenant/displayBrand";
+import { getTenantBrandNameLong, getTenantContactEmail } from "../tenant/displayBrand";
 import { messageFromApiResponse } from "../utils/serverErrorFromResponse";
 import { logUserAction, reportError } from "../lib/monitoring";
 
@@ -26,10 +26,10 @@ const PROPERTY_TYPES = [
 
 const TOTAL_STEPS = 3;
 
-const HOST_TESTIMONIALS = [
+const buildHostTestimonials = (pmsLabel: string) => [
   {
     quote:
-      "Atlas handles all my bookings and guest communication. My occupancy went from 40% to 85% in three months.",
+      `${pmsLabel} handles all my bookings and guest communication. My occupancy went from 40% to 85% in three months.`,
     name: "Priya Sharma",
     detail: "Villa owner, Lonavala",
   },
@@ -229,6 +229,10 @@ function StepIndicator({ current }: { current: number }) {
 const DRAFT_KEY = "becomehost_draft";
 
 const BecomeHost = () => {
+  const pmsLabel = `${getTenantBrandNameLong()} PMS`;
+  const partnerBrand = getTenantBrandNameLong();
+  const hostTestimonials = useMemo(() => buildHostTestimonials(pmsLabel), [pmsLabel]);
+
   const [step, setStep] = useState(0);
   const [submitStatus, setSubmitStatus] = useState<SubmitStatus>("idle");
   const [showResumeBanner, setShowResumeBanner] = useState(false);
@@ -519,7 +523,7 @@ const BecomeHost = () => {
           className="mt-4 text-lg"
           style={{ color: "#64748b", maxWidth: 560, margin: "16px auto 0" }}
         >
-          Atlas PMS gives you the tools to manage guest bookings, pricing, and
+          {pmsLabel} gives you the tools to manage guest bookings, pricing, and
           channels — so you earn more while staying in control.
         </p>
         <a
@@ -615,7 +619,7 @@ const BecomeHost = () => {
               ₹{formatINR(estimatorRooms * 15000)} – ₹{formatINR(estimatorRooms * 40000)}
             </p>
             <p className="text-sm mt-2" style={{ color: "#94a3b8" }}>
-              Based on average occupancy for properties using Atlas PMS
+              Based on average occupancy for properties using {pmsLabel}
             </p>
           </div>
         </div>
@@ -635,10 +639,10 @@ const BecomeHost = () => {
               className="text-2xl font-bold"
               style={{ color: "var(--text-primary, #1e293b)" }}
             >
-              DIY vs Atlas PMS Software
+              DIY vs {pmsLabel} Software
             </h2>
             <p className="text-sm mt-1" style={{ color: "#64748b" }}>
-              See what you get with Atlas PMS software
+              See what you get with {pmsLabel} software
             </p>
           </div>
           <div className="overflow-x-auto">
@@ -661,7 +665,7 @@ const BecomeHost = () => {
                     className="p-3 pr-6 text-center font-semibold"
                     style={{ color: "var(--cta-primary, #2563eb)" }}
                   >
-                    Atlas PMS
+                    {pmsLabel}
                   </th>
                 </tr>
               </thead>
@@ -711,7 +715,7 @@ const BecomeHost = () => {
           Hear from our hosts
         </h2>
         <div className="grid sm:grid-cols-3 gap-4">
-          {HOST_TESTIMONIALS.map((t) => (
+          {hostTestimonials.map((t) => (
             <div
               key={t.name}
               className="rounded-2xl p-5 flex flex-col"
@@ -862,7 +866,7 @@ const BecomeHost = () => {
                   data-testid="host-onboard-referral-code"
                 />
                 <p style={styles.hint}>
-                  Referred by an Atlas partner? Enter their code to claim your sign-up discount.
+                  Referred by a {partnerBrand} partner? Enter their code to claim your sign-up discount.
                 </p>
               </div>
             </>

@@ -12,6 +12,7 @@ import { getRuntimeConfig, hasRuntimeConfig } from "../runtime-config";
 import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 import { messageFromApiResponse } from "../utils/serverErrorFromResponse";
 import { getContactEmail } from "../config/contact";
+import { useGuestBookingQrToken } from "../hooks/useGuestBookingQrToken";
 
 /** Minimal shape of the non-standard `beforeinstallprompt` event — only `prompt()` is used here. */
 interface BeforeInstallPromptEvent extends Event {
@@ -319,6 +320,12 @@ export default function BookingConfirmationPage() {
   const { bookingId } = useParams<{ bookingId: string }>();
   const [searchParams] = useSearchParams();
   const token = searchParams.get("t");
+  const bookingIdNum = bookingId ? Number(bookingId) : undefined;
+  const { qrToken, expiresAtUtc: qrExpiresAtUtc } = useGuestBookingQrToken(
+    Number.isFinite(bookingIdNum) ? bookingIdNum : undefined,
+    token ?? undefined,
+  );
+  const qrEncodeToken = qrToken ?? token;
 
   const [booking, setBooking] = useState<BookingSummary | null>(null);
   const [addOns, setAddOns] = useState<ListingAddOnPublic[]>([]);
@@ -1038,10 +1045,10 @@ export default function BookingConfirmationPage() {
         </div>
 
         {/* TASK-1476: QR check-in code — guests can scan on arrival to confirm identity */}
-        {!isCancelled && token && (
+        {!isCancelled && token && qrEncodeToken && (
           <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-5 flex flex-col items-center gap-3" data-testid="confirmation-qr-section">
             <QRCodeSVG
-              value={`${window.location.origin}/booking/${bookingId}?t=${encodeURIComponent(token)}`}
+              value={`${window.location.origin}/booking/${bookingId}?t=${encodeURIComponent(qrEncodeToken)}`}
               size={180}
               bgColor="#ffffff"
               fgColor="#0F172A"
@@ -1051,6 +1058,12 @@ export default function BookingConfirmationPage() {
             <p className="text-sm text-center text-text-secondary max-w-xs">
               Show this to the host on arrival
             </p>
+            {qrToken && qrExpiresAtUtc ? (
+              <p className="text-xs text-center text-text-muted max-w-xs" data-testid="confirmation-qr-expiry">
+                This code refreshes automatically and expires at{" "}
+                {new Date(qrExpiresAtUtc).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}.
+              </p>
+            ) : null}
             <p className="text-xs text-center text-support-error/80 max-w-xs">
               Don't share this QR publicly — anyone who scans it can access your booking details.
             </p>

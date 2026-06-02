@@ -3,7 +3,7 @@ import { Send, Mic, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { buildApiUrl, getApiHeaders } from '@/api/client';
 import { messageFromApiResponse } from '@/utils/serverErrorFromResponse';
-import { getTenantContext } from '@/tenant/tenantContext';
+import { getTenantBrandName } from '@/tenant/displayBrand';
 
 type AtlasChatProps = {
   onClose?: (e: React.MouseEvent) => void;
@@ -12,9 +12,10 @@ type AtlasChatProps = {
 };
 
 const AtlasChat = ({ onClose, listingId = null }: AtlasChatProps) => {
+  const brandName = getTenantBrandName();
   const [isOpen, setIsOpen] = useState(true); // 🔴 control visibility
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: `Welcome to ${getTenantContext()?.name ?? 'our property'}. How can I help you today?` }
+    { role: 'assistant', content: `Welcome to ${brandName}. How can I help you today?` }
   ]);
   const [input, setInput] = useState('');
   const [isListening, setIsListening] = useState(false);
@@ -93,7 +94,7 @@ const AtlasChat = ({ onClose, listingId = null }: AtlasChatProps) => {
       {/* Header */}
       <div className="p-1.5 bg-[#2c5282] text-white flex justify-between items-center border-b border-slate-200">
         <div className="flex items-center gap-2">
-          <h2 className="font-medium text-xs">{`${getTenantContext()?.name ?? "Atlas"} Concierge`}</h2>
+          <h2 className="font-medium text-xs">{`${brandName} Concierge`}</h2>
           <span className="text-xs opacity-80">•</span>
           <p className="text-xs opacity-90">24/7</p>
         </div>

@@ -149,12 +149,12 @@ const HomeDetails = () => {
     const brandName = getTenantBrandName();
     const prev = document.title?.trim() ? document.title : "";
     const next = `${room.title} | ${brandName}`.trim();
-    document.title = next || prev || brandName || "Atlas";
+    document.title = next || prev || brandName;
     return () => {
       if (prev) {
         document.title = prev;
       } else {
-        document.title = brandName || "Atlas";
+        document.title = brandName;
       }
     };
   }, [room?.title]);

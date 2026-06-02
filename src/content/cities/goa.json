@@ -63,7 +63,7 @@
     },
     {
       "question": "Can I book a Goa homestay for remote work?",
-      "answer": "Look for WiFi speed badges and desk mentions on cards. Atlas listings surface connectivity hints when hosts provide them. Confirm backup power expectations for monsoon months if video calls are critical."
+      "answer": "Look for WiFi speed badges and desk mentions on cards. {{TENANT_BRAND}} listings surface connectivity hints when hosts provide them. Confirm backup power expectations for monsoon months if video calls are critical."
     },
     {
       "question": "What should I know about beach safety and local rules?",
@@ -71,7 +71,7 @@
     },
     {
       "question": "Why book Goa homestays direct instead of only through OTAs?",
-      "answer": "Direct booking on Atlas keeps communication with the host transparent, shows clearer cancellation tiers when configured, and avoids OTA-only surprises on arrival instructions. You still get structured confirmations for your records."
+      "answer": "Direct booking on {{TENANT_BRAND}} keeps communication with the host transparent, shows clearer cancellation tiers when configured, and avoids OTA-only surprises on arrival instructions. You still get structured confirmations for your records."
     }
   ]
 }

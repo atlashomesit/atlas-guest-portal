@@ -82,6 +82,20 @@ export function applyTenantBranding(tenant: TenantInfo): void {
   }
 
   applyTenantWebManifest(tenant);
+  applyAppleWebAppTitle(tenant);
+}
+
+function applyAppleWebAppTitle(tenant: TenantInfo): void {
+  const short =
+    tenant.brandName?.trim() || tenant.name?.trim() || MARKETPLACE_BRAND_BASELINE;
+  const appleTitle = short.length > 12 ? short.slice(0, 12) : short;
+  let meta = document.querySelector<HTMLMetaElement>('meta[name="apple-mobile-web-app-title"]');
+  if (!meta) {
+    meta = document.createElement("meta");
+    meta.name = "apple-mobile-web-app-title";
+    document.head.appendChild(meta);
+  }
+  meta.content = appleTitle;
 }
 
 /** Per-tenant PWA manifest name (CPO-001 / module #14). */
