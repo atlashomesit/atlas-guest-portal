@@ -1300,8 +1300,8 @@ useEffect(() => {
         <>
         {data && (
             <SEO
-                title={`${getListingDisplayName(data.id, data.property_name)} | ${_getTenantCtx()?.name ?? 'Our Property'}`}
-                description={data.property_description?.slice(0, 160) || `Book ${getListingDisplayName(data.id, data.property_name)} in ${data.property_location || 'Hyderabad'} on ${_getTenantCtx()?.name ?? 'our platform'}.`}
+                title={`${getListingDisplayName(data.id, data.property_name)} | ${getTenantBrandName()}`}
+                description={data.property_description?.slice(0, 160) || `Book ${getListingDisplayName(data.id, data.property_name)} in ${data.property_location || 'Hyderabad'} on ${getTenantBrandName()}.`}
                 image={primaryImage}
                 url={pageUrl}
                 type="lodgingBusiness"

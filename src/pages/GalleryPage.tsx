@@ -90,27 +90,13 @@ const GalleryPage = () => {
   return (
     <div className="px-4 md:px-10 lg:px-20 py-24 bg-bg-muted min-h-screen">
       <SEO
-        title={
-          hideAtlasBranding && tenant?.name?.trim()
-            ? `Gallery | ${tenant.name.trim()}`
-            : `Gallery | ${brandName}`
-        }
-        description={
-          hideAtlasBranding && tenant?.name?.trim()
-            ? `Browse property photos for ${tenant.name.trim()}.`
-            : `Browse ${brandName} property photos, grouped by floor and suite type.`
-        }
+        title={`Gallery | ${brandName}`}
+        description={`Browse property photos for ${brandName}, grouped by floor and suite type.`}
       />
 
       <div className="max-w-6xl mx-auto space-y-10">
         <div className="space-y-3 text-center md:text-left">
-          {hideAtlasBranding ? (
-            tenant?.name?.trim() ? (
-              <p className="uppercase tracking-[0.2em] text-primary font-semibold">{tenant.name.trim()}</p>
-            ) : null
-          ) : (
-            <p className="uppercase tracking-[0.2em] text-primary font-semibold">{brandName}</p>
-          )}
+          <p className="uppercase tracking-[0.2em] text-primary font-semibold">{brandName}</p>
           <h1 className="text-3xl md:text-4xl font-bold text-text-primary">Gallery</h1>
           <p className="text-lg text-text-muted">
             Explore our homes through curated photography. Filter by suite type or select a specific room to see

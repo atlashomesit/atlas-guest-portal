@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { MdOutlineDone } from 'react-icons/md';
 import OptimizedImage from '../../ui/OptimizedImage';
-import { getTenantContext } from '../../../tenant/tenantContext';
+import { getTenantBrandName } from '../../../tenant/displayBrand';
 
 const getFeatureData = (brandName: string) => ({
     images: [
@@ -41,9 +41,7 @@ const getFeatureData = (brandName: string) => ({
 });
 
 const Homepage_WhyChoose = () => {
-    const tenant = getTenantContext();
-    // RA-006 §3.6: brand-neutral fallback so unresolved tenant context doesn't leak Atlas.
-    const brandName = tenant?.name ?? "Our Homestays";
+    const brandName = getTenantBrandName();
     const featureData = getFeatureData(brandName);
 
     const [activeFeature, setActiveFeature] = useState(0);

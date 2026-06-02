@@ -1,7 +1,8 @@
 export const SUPPORT_DRAWER_COPY = {
   header: {
     title: "Need a hand?",
-    subtitle: "Chat with Atlas or jump to WhatsApp/callback without losing your place.",
+    /** Resolved at render via `getSupportDrawerHeaderSubtitle(brandName)`. */
+    subtitle: "Chat with us or jump to WhatsApp/callback without losing your place.",
     // Warmer variants for future experiments:
     // - "We’re right here if you need us—ping us and we’ll reply in minutes."
     // - "Questions? Our team is online and ready to help."
@@ -74,3 +75,7 @@ export const SUPPORT_DRAWER_COPY = {
     },
   },
 } as const;
+
+export function getSupportDrawerHeaderSubtitle(brandName: string): string {
+  return `Chat with ${brandName} or jump to WhatsApp/callback without losing your place.`;
+}

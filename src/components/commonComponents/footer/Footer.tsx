@@ -39,9 +39,7 @@ const Footer = () => {
     const showLogo = Boolean(logoSrc);
     // RA-006 §3.5: footer brand always prefers the tenant's own name. Atlas-specific
     // copy is reached only on the Atlas marketplace root where hideAtlasBranding=false.
-    const footerBrand = hideAtlasBranding
-        ? (tenant?.name?.trim() || "Our homestays")
-        : (tenant?.name?.trim() || "Our Homestays");
+    const footerBrand = brandName;
     const footerTagline = hideAtlasBranding
         ? (tenant?.tagline?.trim() || "Comfortable stays with responsive support.")
         : (tenant?.tagline?.trim() || "Thoughtfully curated stays in Hyderabad");

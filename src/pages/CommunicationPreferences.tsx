@@ -3,12 +3,15 @@ import { useParams, useSearchParams } from "react-router-dom";
 import { Link } from "react-router-dom";
 import { buildApiUrl } from "@/api/client";
 import { getContactEmail, getWhatsAppLink } from "@/config/contact";
+import SEO from "@/components/SEO";
+import { getTenantBrandName } from "@/tenant/displayBrand";
 import { messageFromApiResponse } from "@/utils/serverErrorFromResponse";
 
 /**
  * Landing page after one-click unsubscribe from marketing email (API redirects here).
  */
 export default function CommunicationPreferences() {
+  const brandName = getTenantBrandName();
   const { guestToken } = useParams();
   const [params] = useSearchParams();
   const unsubscribed = params.get("unsubscribed");
@@ -78,6 +81,8 @@ export default function CommunicationPreferences() {
 
   if (unsubscribed === "1") {
     return (
+      <>
+      <SEO title={`Preferences updated | ${brandName}`} description={`Marketing preferences for ${brandName} guests.`} />
       <div className="max-w-xl mx-auto px-4 py-12">
         <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-5">
           <h1 className="text-xl font-bold text-text-primary mb-3">Preferences updated</h1>
@@ -87,11 +92,14 @@ export default function CommunicationPreferences() {
           </p>
         </div>
       </div>
+      </>
     );
   }
 
   if (guestToken) {
     return (
+      <>
+      <SEO title={`Communication preferences | ${brandName}`} description={`Manage email and WhatsApp preferences for ${brandName}.`} />
       <div className="max-w-xl mx-auto px-4 py-12">
         <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-5">
           <h1 className="text-xl font-bold text-text-primary mb-4">Communication preferences</h1>
@@ -143,10 +151,13 @@ export default function CommunicationPreferences() {
           )}
         </div>
       </div>
+      </>
     );
   }
 
   return (
+    <>
+    <SEO title={`Communication preferences | ${brandName}`} description={`Manage how ${brandName} contacts you about bookings and offers.`} />
     <div className="max-w-xl mx-auto px-4 py-12">
       <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-5 space-y-4">
         <h1 className="text-xl font-bold text-text-primary">Communication preferences</h1>
@@ -180,5 +191,6 @@ export default function CommunicationPreferences() {
         </p>
       </div>
     </div>
+    </>
   );
 }

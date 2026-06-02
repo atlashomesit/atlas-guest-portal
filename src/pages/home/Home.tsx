@@ -248,19 +248,19 @@ const Home = () => {
         <>
             <SEO
                 title={
-                    hideAtlasBranding && tenant?.name?.trim()
-                        ? `${tenant.name.trim()} | Book your stay`
+                    hideAtlasBranding
+                        ? `${schemaBrandName} | Book your stay`
                         : `${schemaBrandName} | Find your perfect stay`
                 }
                 description={
-                    hideAtlasBranding && tenant?.name?.trim()
-                        ? `Book your stay with ${tenant.name.trim()}. Questions? Call ${CONTACT.business.phone} or email ${contactEmail}.`
+                    hideAtlasBranding
+                        ? `Book your stay with ${schemaBrandName}. Questions? Call ${CONTACT.business.phone} or email ${contactEmail}.`
                         : `Book serviced apartments with ${schemaBrandName}. Flexible stays, business-ready amenities, and attentive support.`
                 }
                 image={primaryOgImage}
                 url={canonicalUrl}
                 twitterCard="summary_large_image"
-                twitterSite="@atlashomestays"
+                twitterSite={hideAtlasBranding ? undefined : "@atlashomestays"}
                 jsonLd={homepageJsonLd}
             />
             <section className="relative font-roboto select-none">

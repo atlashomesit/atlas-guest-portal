@@ -42,10 +42,9 @@ function darkenRgb(rgb: string, amount = 20): string {
 }
 
 export function applyTenantBranding(tenant: TenantInfo): void {
-  // 1. Document title — guard against whitespace-only name (WCAG: title must be non-empty)
-  if (tenant.name?.trim()) {
-    document.title = tenant.name.trim();
-  }
+  // 1. Document title — prefer guest-facing brandName over internal slug/name (CPO-001)
+  const docTitle = (tenant.brandName?.trim() || tenant.name?.trim() || MARKETPLACE_BRAND_BASELINE);
+  document.title = docTitle;
 
   // 2. Primary color — apply to CSS RGB variables used by Tailwind and CSS custom props
   const brandHex = tenant.primaryColor?.trim();

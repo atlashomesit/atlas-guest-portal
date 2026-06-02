@@ -7,12 +7,10 @@ import {
   whyChooseHighlights,
   whyChooseStatsBadges,
 } from "../../config/homepageUxFlags";
-import { getTenantContext } from "../../tenant/tenantContext";
+import { getTenantBrandName } from "../../tenant/displayBrand";
 
 const WhyChooseSection = () => {
-  const tenant = getTenantContext();
-  // RA-006 §3.6: brand-neutral fallback for unresolved tenant context.
-  const brandName = tenant?.name ?? "Our Homestays";
+  const brandName = getTenantBrandName();
 
   const useExperimentalLayout =
     enableWhyChooseAccordion ||

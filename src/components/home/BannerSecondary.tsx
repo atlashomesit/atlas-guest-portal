@@ -6,6 +6,7 @@ import {
   secondaryBannerDefaults,
 } from "../../config/homepageUxFlags";
 import { getTenantContext } from "../../tenant/tenantContext";
+import { getTenantBrandName } from "../../tenant/displayBrand";
 
 const parallaxImage = "";
 
@@ -13,14 +14,14 @@ const BannerSecondary = () => {
   const tenant = getTenantContext();
   // RA-006 §3.6: when tenant resolution fails, fall back to a brand-neutral string
   // instead of "Atlas Homes" so white-label tenants don't leak Atlas during cold loads.
-  const brandName = tenant?.name ?? "Our Homestays";
+  const brandName = getTenantBrandName();
 
   const buildTitleAndDescription = () => {
     const rawTitle = secondaryBannerDefaults.title.replace(/__BRAND__/g, brandName);
     const rawDescription = secondaryBannerDefaults.description.replace(/__BRAND__/g, brandName);
     // Defaults may no longer include the literal "Atlas Homes"; still surface `brandName`
     // on cold load so tests and RA-006 §3.6 see a non–Atlas-branded heading.
-    if (!tenant?.name && !rawTitle.includes(brandName)) {
+    if (!tenant?.brandName?.trim() && !tenant?.name?.trim() && !rawTitle.includes(brandName)) {
       const rest = secondaryBannerDefaults.description.trim();
       const descBody = rest.length > 0 ? rest[0].toLowerCase() + rest.slice(1) : rest;
       return {

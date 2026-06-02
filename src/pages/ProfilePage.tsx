@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import SEO from "../components/SEO";
+import { getTenantBrandName } from "../tenant/displayBrand";
 import StateMessage from "../components/StateMessage";
 import { buildApiUrl, getApiHeaders } from "../api/client";
 import { toast } from "react-toastify";
@@ -128,7 +129,7 @@ export default function ProfilePage() {
 
   return (
     <>
-      <SEO title="My Profile" description="Update your contact information." />
+      <SEO title={`My Profile | ${getTenantBrandName()}`} description={`Update your contact information for ${getTenantBrandName()} bookings.`} />
       <div className="max-w-lg mx-auto px-4 sm:px-6 py-10 space-y-6">
         <div className="space-y-1">
           <h1 className="text-2xl font-bold text-text-primary">My Profile</h1>

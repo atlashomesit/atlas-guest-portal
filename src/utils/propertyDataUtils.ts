@@ -1,4 +1,5 @@
 import { getTenantContext } from '../tenant/tenantContext';
+import { getTenantBrandName } from '../tenant/displayBrand';
 import { propertyData } from '../data';
 import { getTenantOverrides, getTenantPublicListingIdAllowlist } from '../tenant/tenantOverrides';
 
@@ -9,7 +10,7 @@ import { getTenantOverrides, getTenantPublicListingIdAllowlist } from '../tenant
  */
 export function getTenantPropertyData() {
   const tenant = getTenantContext();
-  const tenantName = tenant?.name ?? 'Our Platform';
+  const tenantName = getTenantBrandName();
   const overrides = getTenantOverrides(tenant?.slug);
 
   let filtered = propertyData;
@@ -22,7 +23,7 @@ export function getTenantPropertyData() {
     });
   }
 
-  if (!tenant?.name) {
+  if (!tenant?.slug) {
     return filtered;
   }
 
