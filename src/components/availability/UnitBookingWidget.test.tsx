@@ -83,10 +83,10 @@ describe('UnitBookingWidget - TASK-2623: .bw-* design header, price labels, trus
     expect(content).not.toContain('>Room fare<');
   });
 
-  it('GST label includes "on accommodation" and "On accommodation only" sublabel', () => {
+  it('GST label includes "on accommodation" once (no duplicate sublabel)', () => {
     content = readFileSync(filePath, 'utf-8');
     expect(content).toContain('on accommodation');
-    expect(content).toContain('On accommodation only');
+    expect(content).not.toContain('On accommodation only');
   });
 
   it('payment-processing label replaces older "Service fee" / "Convenience fee" wording (TASK-2633)', () => {
@@ -149,5 +149,17 @@ describe('UnitBookingWidget - TASK-2630: URL date hydration and picker interacti
   it('includes data-testid="price-line-base" on the base rate row for trip-wire testing', () => {
     content = readFileSync(filePath, 'utf-8');
     expect(content).toContain('price-line-base');
+  });
+});
+
+describe('UnitBookingWidget - TASK-2870: accommodation GST uses 18% slab above ₹7,500', () => {
+  const filePath = resolve(__dirname, './UnitBookingWidget.tsx');
+
+  it('uses shared guestPriceEstimate GST helpers (not retired 12% slab)', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    expect(content).toContain('accommodationGstSlabPercent');
+    expect(content).toContain('accommodationGstLineAmount');
+    expect(content).not.toMatch(/<= 7500 \? 5 : 12/);
+    expect(content).not.toContain('else 12%');
   });
 });

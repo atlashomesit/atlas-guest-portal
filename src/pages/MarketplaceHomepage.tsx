@@ -8,6 +8,7 @@ import OptimizedImage from '@/components/ui/OptimizedImage'; // TASK-1874
 import SkeletonCard from '@/components/apartments/SkeletonCard'; // TASK-1875
 import SEO from '@/components/SEO'; // TASK-1876
 import MultiPinMap, { type MapPin } from '@/components/map/MultiPinMap'; // TL-PROP
+import { accommodationGstSlabPercent } from '@/utils/guestPriceEstimate';
 
 // TL-PROP: shape from GET /marketplace/properties (powers the map view).
 type MarketplacePropertyApi = {
@@ -165,10 +166,9 @@ export default function MarketplaceHomepage() {
 
         {!loading &&
           items.map((item) => {
-            // TASK-1869/1873: GST — 5% for ≤₹7,500/night, 18% above (Sept 2025 reform)
-            const gstRate = item.pricePerNight > 7500 ? 1.18 : 1.05;
-            const gstPct = item.pricePerNight > 7500 ? 18 : 5;
-            const estTotal = Math.round(item.pricePerNight * 2 * gstRate);
+            const gstPct = accommodationGstSlabPercent(item.pricePerNight) ?? 5;
+            const gstMult = gstPct === 18 ? 1.18 : 1.05;
+            const estTotal = Math.round(item.pricePerNight * 2 * gstMult);
             const isFav = favIds.has(item.id);
 
             return (

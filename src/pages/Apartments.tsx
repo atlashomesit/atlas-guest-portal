@@ -19,6 +19,7 @@ import {
   inferUnitType,
   type NightlyPriceBreakdown,
 } from "../utils/pricing";
+import { estimateStayNights } from "../utils/guestPriceEstimate";
 import type { UnitType } from "../config/pricing.config";
 
 type PropertyMetadata = {
@@ -479,6 +480,12 @@ export const Apartments = () => {
     return { displayCheckIn, displayCheckOut };
   }, [checkIn, checkOut]);
 
+  const estimateNights = React.useMemo(() => {
+    const ci = checkIn ? new Date(checkIn) : null;
+    const co = checkOut ? new Date(checkOut) : null;
+    return estimateStayNights(ci, co);
+  }, [checkIn, checkOut]);
+
   const shouldShowEmptyState = !safeListings || safeListings.length === 0;
 
   if (fetchState === "error") {
@@ -610,6 +617,7 @@ export const Apartments = () => {
                   losDiscount2MinNights={listing.losDiscount2MinNights}
                   losDiscount2Percent={listing.losDiscount2Percent}
                   directBookingDiscountPercent={directBookingDiscountPercent}
+                  estimateNights={estimateNights}
                   onClick={() => handleNavigate(listing.property)}
                 />
               ))}

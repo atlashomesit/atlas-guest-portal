@@ -94,16 +94,16 @@ const Home = () => {
     // CPO-007: derive canonical from the actual host (or VITE_PUBLIC_SITE_ORIGIN for SSR) so tenant
     // subdomains emit the right URL in JSON-LD instead of defaulting to the marketplace domain.
     const canonicalUrl = `${getPublicSiteOrigin()}/`;
-    const homepageJsonLd = useMemo(
-        () => [
-        {
+    const homepageJsonLd = useMemo(() => {
+        const organization = {
             "@context": "https://schema.org",
             "@type": "Organization",
             name: schemaBrandName,
             url: canonicalUrl,
             ...(schemaLogo ? { logo: schemaLogo } : {}),
-            description:
-                "Serviced apartments in Hyderabad designed for business travel, family trips, and extended stays.",
+            description: hideAtlasBranding
+                ? `Book your stay with ${schemaBrandName}.`
+                : "Serviced apartments in Hyderabad designed for business travel, family trips, and extended stays.",
             ...(hideAtlasBranding ? {} : { sameAs: ATLAS_SOCIAL_SAME_AS }),
             contactPoint: [
                 {
@@ -114,89 +114,92 @@ const Home = () => {
                     availableLanguage: ["English"],
                 },
             ],
-        },
-        {
-            "@context": "https://schema.org",
-            "@type": ["LodgingBusiness", "Hotel"],
-            name: schemaBrandName,
-            url: canonicalUrl,
-            ...(schemaLogo ? { logo: schemaLogo } : {}),
-            description:
-                "Serviced apartments in KPHB, Hyderabad with Wi-Fi, parking, and responsive support for business and family stays.",
-            slogan: "Best price on our website",
-            telephone: `+91-${CONTACT.business.phone}`,
-            email: contactEmail,
-            address: {
-                "@type": "PostalAddress",
-                streetAddress: "KPHB, Kukatpally",
-                addressLocality: "Hyderabad",
-                addressRegion: "Telangana",
-                addressCountry: "IN",
-            },
-            amenityFeature: [
-                { "@type": "LocationFeatureSpecification", name: "High-speed Wi-Fi", value: true },
-                { "@type": "LocationFeatureSpecification", name: "On-site parking", value: true },
-                { "@type": "LocationFeatureSpecification", name: "Air conditioning", value: true },
-                { "@type": "LocationFeatureSpecification", name: "Work-friendly desks", value: true },
-            ],
-            checkinTime: "14:00",
-            checkoutTime: "11:00",
-            makesOffer: {
-                "@type": "Offer",
-                name: "Best price on our website",
-                priceCurrency: "INR",
-                price: penthouseOfferPrice,
-                availability: "https://schema.org/InStock",
+        };
+
+        // TASK-2900: Atlas-specific address / Penthouse offer must not ship on white-label tenants.
+        const lodgingBusiness = hideAtlasBranding
+            ? null
+            : {
+                "@context": "https://schema.org",
+                "@type": ["LodgingBusiness", "Hotel"],
+                name: schemaBrandName,
                 url: canonicalUrl,
-                itemOffered: {
-                    "@type": "Apartment",
-                    name: `${schemaBrandName} | Penthouse Suite 501`,
-                    description: penthouse?.property_description,
-                    ...(penthouseCover ? { image: penthouseCover } : {}),
-                    address: {
-                        "@type": "PostalAddress",
-                        streetAddress: "KPHB, Kukatpally",
-                        addressLocality: "Hyderabad",
-                        addressRegion: "Telangana",
-                        addressCountry: "IN",
-                    },
-                    occupancy: {
-                        "@type": "QuantitativeValue",
-                        maxValue: 6,
-                        unitCode: "C62",
-                    },
-                    amenityFeature: [
-                        { "@type": "LocationFeatureSpecification", name: "Wi-Fi", value: true },
-                        { "@type": "LocationFeatureSpecification", name: "Air conditioning", value: true },
-                        { "@type": "LocationFeatureSpecification", name: "Full kitchen", value: true },
-                        { "@type": "LocationFeatureSpecification", name: "Workspace", value: true },
-                        { "@type": "LocationFeatureSpecification", name: "Swimming pool access", value: true },
-                    ],
-                    // TASK-2064: fabricated review array removed — violates Google Structured Data Guidelines and ASCI 2025
-                    // TASK-2553: aggregateRating removed — was fed by static data.ts (not real verified reviews)
-                    offers: {
-                        "@type": "Offer",
-                        name: `${schemaBrandName} | Penthouse Suite 501 direct offer`,
-                        priceCurrency: "INR",
-                        price: penthouseOfferPrice,
-                        availability: "https://schema.org/InStock",
-                        validFrom: new Date().toISOString(),
-                        url: canonicalUrl,
-                        availableAtOrFrom: {
-                            "@type": "Place",
-                            address: {
-                                "@type": "PostalAddress",
-                                streetAddress: "KPHB, Kukatpally",
-                                addressLocality: "Hyderabad",
-                                addressRegion: "Telangana",
-                                addressCountry: "IN",
+                ...(schemaLogo ? { logo: schemaLogo } : {}),
+                description:
+                    "Serviced apartments in KPHB, Hyderabad with Wi-Fi, parking, and responsive support for business and family stays.",
+                slogan: "Best price on our website",
+                telephone: `+91-${CONTACT.business.phone}`,
+                email: contactEmail,
+                address: {
+                    "@type": "PostalAddress",
+                    streetAddress: "KPHB, Kukatpally",
+                    addressLocality: "Hyderabad",
+                    addressRegion: "Telangana",
+                    addressCountry: "IN",
+                },
+                amenityFeature: [
+                    { "@type": "LocationFeatureSpecification", name: "High-speed Wi-Fi", value: true },
+                    { "@type": "LocationFeatureSpecification", name: "On-site parking", value: true },
+                    { "@type": "LocationFeatureSpecification", name: "Air conditioning", value: true },
+                    { "@type": "LocationFeatureSpecification", name: "Work-friendly desks", value: true },
+                ],
+                checkinTime: "14:00",
+                checkoutTime: "11:00",
+                makesOffer: {
+                    "@type": "Offer",
+                    name: "Best price on our website",
+                    priceCurrency: "INR",
+                    price: penthouseOfferPrice,
+                    availability: "https://schema.org/InStock",
+                    url: canonicalUrl,
+                    itemOffered: {
+                        "@type": "Apartment",
+                        name: `${schemaBrandName} | Penthouse Suite 501`,
+                        description: penthouse?.property_description,
+                        ...(penthouseCover ? { image: penthouseCover } : {}),
+                        address: {
+                            "@type": "PostalAddress",
+                            streetAddress: "KPHB, Kukatpally",
+                            addressLocality: "Hyderabad",
+                            addressRegion: "Telangana",
+                            addressCountry: "IN",
+                        },
+                        occupancy: {
+                            "@type": "QuantitativeValue",
+                            maxValue: 6,
+                            unitCode: "C62",
+                        },
+                        amenityFeature: [
+                            { "@type": "LocationFeatureSpecification", name: "Wi-Fi", value: true },
+                            { "@type": "LocationFeatureSpecification", name: "Air conditioning", value: true },
+                            { "@type": "LocationFeatureSpecification", name: "Full kitchen", value: true },
+                            { "@type": "LocationFeatureSpecification", name: "Workspace", value: true },
+                            { "@type": "LocationFeatureSpecification", name: "Swimming pool access", value: true },
+                        ],
+                        offers: {
+                            "@type": "Offer",
+                            name: `${schemaBrandName} | Penthouse Suite 501 direct offer`,
+                            priceCurrency: "INR",
+                            price: penthouseOfferPrice,
+                            availability: "https://schema.org/InStock",
+                            validFrom: new Date().toISOString(),
+                            url: canonicalUrl,
+                            availableAtOrFrom: {
+                                "@type": "Place",
+                                address: {
+                                    "@type": "PostalAddress",
+                                    streetAddress: "KPHB, Kukatpally",
+                                    addressLocality: "Hyderabad",
+                                    addressRegion: "Telangana",
+                                    addressCountry: "IN",
+                                },
                             },
                         },
                     },
                 },
-            },
-        },
-        {
+            };
+
+        const faqPage = {
             "@context": "https://schema.org",
             "@type": "FAQPage",
             mainEntity: faqHighlights.map((item) => ({
@@ -204,20 +207,22 @@ const Home = () => {
                 name: item.question,
                 acceptedAnswer: { "@type": "Answer", text: item.answer },
             })),
-        },
-    ],
-        [
-            contactEmail,
-            faqHighlights,
-            penthouse?.property_description,
-            penthouseCover,
-            penthouseOfferPrice,
-            schemaBrandName,
-            schemaLogo,
-            canonicalUrl,
-            hideAtlasBranding,
-        ],
-    );
+        };
+
+        return lodgingBusiness
+            ? [organization, lodgingBusiness, faqPage]
+            : [organization, faqPage];
+    }, [
+        contactEmail,
+        faqHighlights,
+        penthouse?.property_description,
+        penthouseCover,
+        penthouseOfferPrice,
+        schemaBrandName,
+        schemaLogo,
+        canonicalUrl,
+        hideAtlasBranding,
+    ]);
 
     useEffect(() => {
         trackEvent("home_view", { surface: "home", listings: propertyData.length });
@@ -245,12 +250,12 @@ const Home = () => {
                 title={
                     hideAtlasBranding && tenant?.name?.trim()
                         ? `${tenant.name.trim()} | Book your stay`
-                        : "Atlas Homestays | Find your perfect stay"
+                        : `${schemaBrandName} | Find your perfect stay`
                 }
                 description={
                     hideAtlasBranding && tenant?.name?.trim()
                         ? `Book your stay with ${tenant.name.trim()}. Questions? Call ${CONTACT.business.phone} or email ${contactEmail}.`
-                        : "Book serviced apartments with Atlas Homestays. Flexible stays, business-ready amenities, and attentive support."
+                        : `Book serviced apartments with ${schemaBrandName}. Flexible stays, business-ready amenities, and attentive support.`
                 }
                 image={primaryOgImage}
                 url={canonicalUrl}

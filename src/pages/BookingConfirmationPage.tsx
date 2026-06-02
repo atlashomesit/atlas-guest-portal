@@ -11,6 +11,7 @@ import { buildApiUrl, getApiHeaders } from "../api/client";
 import { getRuntimeConfig, hasRuntimeConfig } from "../runtime-config";
 import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 import { messageFromApiResponse } from "../utils/serverErrorFromResponse";
+import { getContactEmail } from "../config/contact";
 
 /** Minimal shape of the non-standard `beforeinstallprompt` event — only `prompt()` is used here. */
 interface BeforeInstallPromptEvent extends Event {
@@ -341,6 +342,7 @@ export default function BookingConfirmationPage() {
   const [cancelRequested, setCancelRequested] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [copyRefFeedback, setCopyRefFeedback] = useState(false);
+  const [copyRefManual, setCopyRefManual] = useState(false);
   const [shareLanguage, setShareLanguage] = useState<"en" | "hi" | "te">("en");
   const [paymentStatus, setPaymentStatus] = useState<"pending" | "success" | "failed">("pending");
   const [paymentFailureReason, setPaymentFailureReason] = useState<string | null>(null);
@@ -686,6 +688,14 @@ export default function BookingConfirmationPage() {
   const hostPhone = booking.propertyPhone?.trim() || "+917032493290";
   const hostPhoneDigits = hostPhone.replace(/[^\d+]/g, "");
   const whatsappDigits = hostPhoneDigits.replace(/^\+/, "");
+  const supportEmail = getContactEmail();
+  const confirmationNotifyPhone = (() => {
+    try {
+      return localStorage.getItem("atlas_guest_phone")?.trim() || "";
+    } catch {
+      return "";
+    }
+  })();
   const whatsappText = encodeURIComponent(`Hi, I have a question about booking #${booking.bookingId}.`);
   const whatsappUrl = `https://wa.me/${whatsappDigits}?text=${whatsappText}`;
   const supportsPush = typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window;
@@ -875,17 +885,40 @@ export default function BookingConfirmationPage() {
               type="button"
               data-testid="booking-reference-copy"
               onClick={async () => {
+                const refText = String(booking.bookingId);
+                setCopyRefManual(false);
                 try {
-                  await navigator.clipboard.writeText(String(booking.bookingId));
+                  await navigator.clipboard.writeText(refText);
                   setCopyRefFeedback(true);
                   window.setTimeout(() => setCopyRefFeedback(false), 2000);
+                  return;
                 } catch {
-                  setCopyRefFeedback(false);
+                  /* fall through to legacy copy */
                 }
+                try {
+                  const ta = document.createElement('textarea');
+                  ta.value = refText;
+                  ta.setAttribute('readonly', '');
+                  ta.style.position = 'fixed';
+                  ta.style.left = '-9999px';
+                  document.body.appendChild(ta);
+                  ta.select();
+                  const ok = document.execCommand('copy');
+                  document.body.removeChild(ta);
+                  if (ok) {
+                    setCopyRefFeedback(true);
+                    window.setTimeout(() => setCopyRefFeedback(false), 2000);
+                    return;
+                  }
+                } catch {
+                  /* ignore */
+                }
+                setCopyRefFeedback(false);
+                setCopyRefManual(true);
               }}
               className="text-sm font-medium text-brand-primary underline underline-offset-2 rounded px-1 py-2 hover:bg-brand-primary/5"
             >
-              {copyRefFeedback ? "Copied!" : "Copy ID"}
+              {copyRefFeedback ? "Copied!" : copyRefManual ? `Select #${booking.bookingId}` : "Copy ID"}
             </button>
             <span className="hidden sm:inline">&middot;</span>
             <span>{booking.listingName !== booking.propertyName ? booking.listingName : booking.propertyName}</span>
@@ -1100,10 +1133,38 @@ export default function BookingConfirmationPage() {
           </div>
         )}
 
-        {/* Check-in info */}
+        {/* Check-in info — TASK-2878: times + map always visible; briefing adds richer near-arrival detail */}
         {!isCancelled && (
-          <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-0">
-            <h2 className="text-sm font-semibold text-text-primary mb-3">Check-in details</h2>
+          <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3">
+            <h2 className="text-sm font-semibold text-text-primary mb-1">Check-in details</h2>
+            {(booking.checkInTime || booking.checkOutTime) && (
+              <div className="text-sm text-text-primary">
+                {booking.checkInTime ? (
+                  <p>
+                    Check-in from <span className="font-semibold">{booking.checkInTime}</span>
+                  </p>
+                ) : null}
+                {booking.checkOutTime ? (
+                  <p className="text-text-secondary mt-0.5">
+                    Check-out by <span className="font-medium text-text-primary">{booking.checkOutTime}</span>
+                  </p>
+                ) : null}
+              </div>
+            )}
+            {booking.propertyAddress ? (
+              <div className="space-y-1">
+                <p className="text-sm text-text-primary whitespace-pre-wrap">{booking.propertyAddress}</p>
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(booking.propertyAddress)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-brand-primary font-medium underline underline-offset-2 w-fit inline-block"
+                  data-testid="confirmation-open-maps"
+                >
+                  Open in Google Maps
+                </a>
+              </div>
+            ) : null}
             <div className="space-y-0">
               {booking.checkinInstructions && (
                 <InfoRow label="Check-in instructions" value={booking.checkinInstructions} />
@@ -1111,7 +1172,7 @@ export default function BookingConfirmationPage() {
               {booking.propertyPhone && (
                 <InfoRow label="Property contact" value={booking.propertyPhone} />
               )}
-              {!booking.checkinInstructions && !booking.propertyPhone && (
+              {!booking.checkinInstructions && !booking.propertyPhone && !booking.propertyAddress && (
                 <p className="text-sm text-text-secondary">Check-in instructions will be sent to you 24 hours before arrival.</p>
               )}
             </div>
@@ -1184,15 +1245,24 @@ export default function BookingConfirmationPage() {
               <div className="py-3">
                 <span className="text-xs text-text-muted uppercase tracking-wider font-medium">{pa.hostLabel}</span>
                 <p className="text-sm text-text-secondary mt-1">{pa.hostDesc}</p>
-                <a
-                  href={whatsappUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex mt-2 items-center justify-center rounded-lg bg-[#25D366] text-white text-sm font-medium px-4 py-2.5 hover:opacity-95 transition-opacity"
-                  data-testid="pre-arrival-whatsapp"
-                >
-                  {pa.chatBtn}
-                </a>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  <a
+                    href={whatsappUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center rounded-lg bg-[#25D366] text-white text-sm font-medium px-4 py-2.5 hover:opacity-95 transition-opacity"
+                    data-testid="pre-arrival-whatsapp"
+                  >
+                    {pa.chatBtn}
+                  </a>
+                  <a
+                    href={`mailto:${encodeURIComponent(supportEmail)}?subject=${encodeURIComponent(`Question before check-in — booking #${booking.bookingId}`)}`}
+                    className="inline-flex items-center justify-center rounded-lg border border-border-subtle bg-bg-surface text-text-primary text-sm font-medium px-4 py-2.5 hover:bg-bg-muted/60 transition-colors"
+                    data-testid="pre-arrival-email-host"
+                  >
+                    Email us
+                  </a>
+                </div>
               </div>
               {booking.wifiVisible && (booking.wifiName || booking.wifiPassword) && (
                 <div className="py-3">
@@ -1287,7 +1357,15 @@ export default function BookingConfirmationPage() {
               {paymentStatus === "success" ? (
                 <>
                   <p>✅ Booking confirmed now.</p>
-                  <p>📱 SMS and WhatsApp confirmation should arrive shortly.</p>
+                  <p>
+                    📱 SMS and WhatsApp confirmation should arrive shortly
+                    {confirmationNotifyPhone ? (
+                      <> at <span className="font-medium text-text-primary">{confirmationNotifyPhone}</span></>
+                    ) : (
+                      <> on the phone number you entered at checkout</>
+                    )}
+                    .
+                  </p>
                 </>
               ) : paymentStatus === "pending" ? (
                 <p>⏳ Finalizing your booking — we're confirming your payment. This usually takes a few moments.</p>
@@ -1336,6 +1414,13 @@ export default function BookingConfirmationPage() {
                   className="text-brand-primary font-medium underline underline-offset-2"
                 >
                   Chat with host on WhatsApp
+                </a>
+                {" "}or{" "}
+                <a
+                  href={`mailto:${encodeURIComponent(supportEmail)}?subject=${encodeURIComponent(`Booking #${booking.bookingId} — question`)}`}
+                  className="text-brand-primary font-medium underline underline-offset-2"
+                >
+                  email us
                 </a>
                 .
               </p>
@@ -1386,7 +1471,7 @@ export default function BookingConfirmationPage() {
             Call or WhatsApp us at{" "}
             <a href={`tel:${hostPhoneDigits}`} className="text-brand-primary font-medium">{hostPhone}</a>
             {" "}or email{" "}
-            <a href="mailto:atlashomeskphb@gmail.com" className="text-brand-primary font-medium">atlashomeskphb@gmail.com</a>.
+            <a href={`mailto:${supportEmail}`} className="text-brand-primary font-medium">{supportEmail}</a>.
           </p>
           <a
             href={whatsappUrl}
@@ -1694,6 +1779,15 @@ export default function BookingConfirmationPage() {
               className="text-sm text-brand-primary underline underline-offset-2 hover:text-brand-primary/80"
             >
               Update contact details
+            </Link>
+          )}
+          {token && (
+            <Link
+              to={`/preferences/${encodeURIComponent(token)}`}
+              className="text-sm text-brand-primary underline underline-offset-2 hover:text-brand-primary/80"
+              data-testid="confirmation-manage-preferences"
+            >
+              Manage email &amp; WhatsApp preferences
             </Link>
           )}
           <Link

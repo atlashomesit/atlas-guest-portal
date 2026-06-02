@@ -95,11 +95,8 @@ export default function ProfilePage() {
       setProfile(updated);
       toast.success("Profile updated.");
     } catch (err: unknown) {
-      const message =
-        err instanceof Error && err.message
-          ? err.message
-          : "Could not update profile. Try again.";
-      toast.error(message);
+      console.error("Profile update failed:", err);
+      toast.error("We couldn't save your profile right now. Please check your details and try again.");
     } finally {
       setSaving(false);
     }

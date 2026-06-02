@@ -146,26 +146,50 @@ interface PpCancellationInfo {
   steps: Array<{ title: string; desc: string }>;
 }
 
-function getPpCancellationInfo(tier: string | null | undefined): PpCancellationInfo {
+function getPpRefundSteps(hasOnlinePayment: boolean): Array<{ title: string; desc: string }> {
+  if (!hasOnlinePayment) {
+    return [
+      { title: 'Cancel from your booking', desc: 'One tap from your booking confirmation. No reason needed.' },
+      { title: 'Refund with your host', desc: 'Your host confirms the refund amount and timing directly with you.' },
+      { title: 'Money returned', desc: 'UPI or bank transfer as arranged with the host — timing varies.' },
+      { title: 'Confirmation', desc: 'Your host or our team confirms when the refund is complete.' },
+    ];
+  }
+  return PP_REFUND_STEPS;
+}
+
+function getPpCancellationInfo(
+  tier: string | null | undefined,
+  opts?: { fallbackText?: string; hasOnlinePayment?: boolean },
+): PpCancellationInfo {
+  const steps = getPpRefundSteps(opts?.hasOnlinePayment !== false);
   if (tier === 'Flexible') return {
     headline: 'Full refund if cancelled 48 hours before check-in',
     description: 'Money returns to the exact UPI or card you paid with. No phone calls needed.',
-    steps: PP_REFUND_STEPS,
+    steps,
   };
   if (tier === 'Moderate') return {
     headline: 'Full refund if cancelled 5 days before check-in',
     description: 'Partial refund for cancellations after the window. Check your booking for exact terms.',
-    steps: PP_REFUND_STEPS,
+    steps,
   };
   if (tier === 'Strict') return {
     headline: '50% refund if cancelled 7 days before check-in',
     description: 'No refund within 7 days of check-in. Check your booking for exact terms.',
-    steps: PP_REFUND_STEPS,
+    steps,
   };
+  const fallback = opts?.fallbackText?.trim();
+  if (fallback) {
+    return {
+      headline: fallback.length > 96 ? `${fallback.slice(0, 93)}…` : fallback,
+      description: fallback,
+      steps,
+    };
+  }
   return {
-    headline: 'Contact us to discuss cancellation',
-    description: 'Reach out via WhatsApp before cancelling to get the best outcome.',
-    steps: PP_REFUND_STEPS,
+    headline: 'Flexible cancellation — full refund 48+ hours before check-in',
+    description: 'Standard direct-booking policy. See your booking confirmation for exact cut-off times.',
+    steps,
   };
 }
 
@@ -1224,7 +1248,12 @@ useEffect(() => {
     const ppBrandName = getTenantBrandName();
     const ppHostDisplayName = ppTenantCtx?.name?.trim() || data.property_name || ppBrandName;
     const ppHostInitial = ppHostDisplayName.charAt(0).toUpperCase();
-    const ppCancellationInfo = getPpCancellationInfo(data.cancellationTier);
+    const ppHasOnlinePayment =
+      typeof _getTenantCtx()?.paymentProvider === 'string' && _getTenantCtx()?.paymentProvider !== 'MANUAL';
+    const ppCancellationInfo = getPpCancellationInfo(data.cancellationTier, {
+      fallbackText: _resolvedCancellationText,
+      hasOnlinePayment: ppHasOnlinePayment,
+    });
     const ppHasLocation =
         (typeof data.latitude === 'number' && Number.isFinite(data.latitude)) ||
         mapSrcTrimmed.length > 0 ||
@@ -1256,6 +1285,16 @@ useEffect(() => {
     // v1.1: scope the "Draft — not yet live" badge to admin viewers (no admin-session detection
     // exists in the guest portal today, so v1 shows it to all viewers of a Draft listing).
     const ppIsDraft = publishStatus === 'Draft';
+    // TASK-2888: allow-list — only Published (or legacy undefined) listings are bookable.
+    const ppIsBookable = publishStatus == null || publishStatus === 'Published';
+    const ppSeoNoIndex = publishStatus != null && publishStatus !== 'Published';
+    const ppHasMapCoordinates =
+      typeof data.latitude === 'number' &&
+      typeof data.longitude === 'number' &&
+      Number.isFinite(data.latitude) &&
+      Number.isFinite(data.longitude);
+    const ppStickyNightly =
+      directBookingNightly > 0 ? directBookingNightly : (nightlyPrice?.finalNightlyPrice ?? 0);
 
     return (
         <>
@@ -1267,7 +1306,7 @@ useEffect(() => {
                 url={pageUrl}
                 type="lodgingBusiness"
                 jsonLd={propertyJsonLd}
-                robots={ppIsDraft ? 'noindex, nofollow' : undefined}
+                robots={ppSeoNoIndex ? 'noindex, nofollow' : undefined}
             />
         )}
 
@@ -1544,25 +1583,32 @@ useEffect(() => {
                       </div>
                     </div>
                     <div className="pp-host-actions">
-                      <a
-                        href={ppIsDraft ? ppWaAskUrl : ppWaBookingUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="pp-btn pp-btn-whatsapp pp-btn-sm"
-                        data-testid="chat-with-host-btn"
-                        aria-label={`Message host about ${data.property_name} on WhatsApp`}
-                        onClick={() => trackEvent('whatsapp_cta_click', { listingId: resolvedListingId })}
-                      >
-                        <PpWhatsAppIcon size={14} /> Message on WhatsApp
-                      </a>
+                      {!ppIsDraft && (
+                        <a
+                          href={ppWaBookingUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="pp-btn pp-btn-whatsapp pp-btn-sm"
+                          data-testid="chat-with-host-btn"
+                          aria-label={`Message host about ${data.property_name} on WhatsApp`}
+                          onClick={() => trackEvent('whatsapp_cta_click', { listingId: resolvedListingId })}
+                        >
+                          <PpWhatsAppIcon size={14} /> Message on WhatsApp
+                        </a>
+                      )}
                       <a
                         href={ppWaAskUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="pp-btn pp-btn-ghost pp-btn-sm"
+                        className={`pp-btn pp-btn-sm${ppIsDraft ? ' pp-btn-whatsapp' : ' pp-btn-ghost'}`}
                         aria-label="Ask host a question on WhatsApp"
+                        data-testid={ppIsDraft ? 'draft-listing-ask-host' : undefined}
                       >
-                        Ask a question
+                        {ppIsDraft ? (
+                          <><PpWhatsAppIcon size={14} /> Ask a question</>
+                        ) : (
+                          'Ask a question'
+                        )}
                       </a>
                     </div>
                   </div>
@@ -1587,17 +1633,21 @@ useEffect(() => {
                       <li>
                         <PpCheckIcon size={16} />
                         <span>
-                          <b>Host identity verified.</b>
-                          <span className="pp-meta">KYC completed · property title cross-checked.</span>
+                          <b>Reviewed before going live.</b>
+                          <span className="pp-meta">
+                            Every {ppBrandName} listing is checked for photos and basic details before publish.
+                          </span>
                         </span>
                       </li>
-                      <li>
-                        <PpCheckIcon size={16} />
-                        <span>
-                          <b>Listed at the exact address shown.</b>
-                          <span className="pp-meta">No swap-on-arrival · GPS pin matches registration.</span>
-                        </span>
-                      </li>
+                      {ppHasMapCoordinates ? (
+                        <li>
+                          <PpCheckIcon size={16} />
+                          <span>
+                            <b>Listed at the address on the map.</b>
+                            <span className="pp-meta">The location pin matches the address shown on this page.</span>
+                          </span>
+                        </li>
+                      ) : null}
                       <li>
                         <PpCheckIcon size={16} />
                         <span>
@@ -1702,18 +1752,16 @@ useEffect(() => {
                 {/* Guest Reviews */}
                 {(() => {
                   const api = listingReviewsFromApi;
-                  const showApi = api && !api.loading && api.totalCount > 0;
-                  const apiLoaded = api != null && !api.loading;
-                  const showStatic = !showApi && !apiLoaded && data && data.property_reviews > 0;
+                  // TASK-2897: API-only reviews — never static marketing snippets or data.ts ratings.
                   if (api?.loading) return (
                     <section className="pp-section" aria-label="Guest reviews">
                       <div className="pp-section-head"><h2>Guest reviews</h2></div>
                       <div style={{ height: 120, borderRadius: 16, background: '#f0e6dc' }} />
                     </section>
                   );
-                  if (!showApi && !showStatic) return null;
-                  const rating = showApi ? api!.averageRating : data.property_rating;
-                  const count = showApi ? api!.totalCount : data.property_reviews;
+                  if (!api || api.totalCount <= 0) return null;
+                  const rating = api.averageRating;
+                  const count = api.totalCount;
                   return (
                     <section className="pp-section" aria-label="Guest reviews" data-testid="reviews-section">
                       <div className="pp-section-head">
@@ -1733,8 +1781,8 @@ useEffect(() => {
                           <div className="pp-v2-rating-big-sub">{count} verified {count === 1 ? 'stay' : 'stays'}</div>
                         </div>
                         {/* Sub-rating bars derived from API reviews if available */}
-                        {showApi && api!.reviews.length > 0 && (() => {
-                          const rs = api!.reviews;
+                        {api.reviews.length > 0 && (() => {
+                          const rs = api.reviews;
                           const avg = (vals: (number | null | undefined)[]) => {
                             const valid = vals.filter((v): v is number => v != null && v >= 1);
                             return valid.length > 0 ? (valid.reduce((a, b) => a + b, 0) / valid.length) : null;
@@ -1773,17 +1821,9 @@ useEffect(() => {
                             </div>
                           );
                         })()}
-                        {!showApi && (
-                          <div style={{ fontSize: 14, color: '#475569', lineHeight: 1.6 }}>
-                            <p style={{ margin: '0 0 4px', fontWeight: 600, color: '#1a1a2e' }}>Overall rating</p>
-                            <p style={{ margin: 0 }}>
-                              {count} verified {count === 1 ? 'review' : 'reviews'} · all through this platform.
-                            </p>
-                          </div>
-                        )}
                       </div>
 
-                      {showApi && api!.reviews.length > 0 ? (
+                      {api.reviews.length > 0 ? (
                         <>
                           {/* v2: 3-col card layout with quote marks */}
                           <div className="pp-v2-review-grid" data-testid="reviews-grid">
@@ -1835,7 +1875,7 @@ useEffect(() => {
                               </article>
                             ))}
                           </div>
-                          {api!.reviews.length > 6 && (
+                          {api.reviews.length > 6 && (
                             <button
                               type="button"
                               onClick={() => setShowAllReviews((s) => !s)}
@@ -1845,24 +1885,15 @@ useEffect(() => {
                             >
                               {showAllReviews
                                 ? 'Show fewer reviews'
-                                : `View all ${api!.totalCount} reviews`}
+                                : `View all ${api.totalCount} reviews`}
                               <PpChevronDown size={14} />
                             </button>
                           )}
                         </>
-                      ) : showApi ? (
-                        <p style={{ fontSize: 14, color: '#475569', fontStyle: 'italic' }}>Ratings only — written reviews coming soon.</p>
                       ) : (
-                        data.property_review_snippets && data.property_review_snippets.length > 0 && (
-                          <div className="pp-v2-review-grid">
-                            {data.property_review_snippets.slice(0, 3).map((snippet, idx) => (
-                              <article key={idx} className="pp-v2-review-card">
-                                <span className="pp-v2-review-quote" aria-hidden="true">&ldquo;</span>
-                                <p className="pp-v2-review-body">{snippet}</p>
-                              </article>
-                            ))}
-                          </div>
-                        )
+                        <p style={{ fontSize: 14, color: '#475569', fontStyle: 'italic' }}>
+                          Ratings only — written reviews coming soon.
+                        </p>
                       )}
                     </section>
                   );
@@ -1986,12 +2017,12 @@ useEffect(() => {
 
               {/* ===== RIGHT COLUMN — sticky booking ===== */}
               <aside className="pp-booking-col" aria-label="Booking">
-                {data.photoCount != null && data.photoCount > 0 && (
+                {galleryUrls.length > 0 && (
                   <p style={{ fontSize: 13, color: '#64748b', marginBottom: 8 }} aria-label="Photo count">
-                    {data.photoCount} photo{data.photoCount !== 1 ? 's' : ''}
+                    {galleryUrls.length} photo{galleryUrls.length !== 1 ? 's' : ''}
                   </p>
                 )}
-                {ppIsDraft ? (
+                {!ppIsBookable ? (
                   <div
                     className="pp-draft-notice"
                     data-testid="draft-booking-notice"
@@ -2079,17 +2110,11 @@ useEffect(() => {
                   data-testid="host-profile-card"
                 >
                   <div className="pp-host-avatar" aria-hidden="true" style={{ width: 44, height: 44, fontSize: 18 }}>
-                    {(() => {
-                      const tenantName = _getTenantCtx()?.name ?? '';
-                      const words = tenantName.trim().split(/\s+/).filter(Boolean);
-                      if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
-                      if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
-                      return '?';
-                    })()}
+                    {ppHostInitial}
                   </div>
                   <div>
                     <div className="pp-host-name" style={{ fontSize: 15 }}>
-                      Managed by {_getTenantCtx()?.name ?? 'Our Team'}
+                      Hosted by {ppHostDisplayName}
                     </div>
                     <div className="pp-host-sub">
                       24/7 WhatsApp support{responseTimeBadge ? ` · ${responseTimeBadge}` : ' · WhatsApp-first support.'}
@@ -2102,20 +2127,39 @@ useEffect(() => {
                   </div>
                 </div>
 
-                {/* WhatsApp CTA (sidebar) */}
+                {/* WhatsApp CTA (sidebar) — TASK-2873: draft listings are question-only, not book-via-WhatsApp */}
                 <div style={{ marginTop: 12 }}>
-                  <a
-                    href={ppIsDraft ? ppWaAskUrl : ppWaBookingUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="pp-btn pp-btn-whatsapp pp-btn-block"
-                    data-testid="chat-with-host-btn"
-                    aria-label={`Message host about ${data.property_name} on WhatsApp`}
-                    onClick={() => trackEvent('whatsapp_cta_click', { listingId: resolvedListingId })}
-                  >
-                    <PpWhatsAppIcon size={16} />
-                    Chat with host
-                  </a>
+                  {ppIsDraft ? (
+                    <>
+                      <p className="pp-host-sub" style={{ marginBottom: 8 }}>
+                        This home is not open for booking yet. You can still ask a question.
+                      </p>
+                      <a
+                        href={ppWaAskUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="pp-btn pp-btn-whatsapp pp-btn-block"
+                        data-testid="draft-listing-ask-host-sidebar"
+                        aria-label={`Ask about ${data.property_name} on WhatsApp`}
+                      >
+                        <PpWhatsAppIcon size={16} />
+                        Ask a question
+                      </a>
+                    </>
+                  ) : (
+                    <a
+                      href={ppWaBookingUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="pp-btn pp-btn-whatsapp pp-btn-block"
+                      data-testid="chat-with-host-btn"
+                      aria-label={`Message host about ${data.property_name} on WhatsApp`}
+                      onClick={() => trackEvent('whatsapp_cta_click', { listingId: resolvedListingId })}
+                    >
+                      <PpWhatsAppIcon size={16} />
+                      Chat with host
+                    </a>
+                  )}
                 </div>
 
                 {/* Availability Calendar */}
@@ -2187,7 +2231,7 @@ useEffect(() => {
           ) : (
             <div className="pp-m-sticky" aria-label="Book this property" data-testid="mobile-reserve-bar">
               <div className="pp-m-sticky-price">
-                <b>{formatCurrency(nightlyPrice?.finalNightlyPrice ?? directBookingNightly, { maximumFractionDigits: 0 })}</b>
+                <b>{formatCurrency(ppStickyNightly, { maximumFractionDigits: 0 })}</b>
                 <span>/ night</span>
               </div>
               <button

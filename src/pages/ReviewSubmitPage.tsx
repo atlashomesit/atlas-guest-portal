@@ -284,20 +284,29 @@ export default function ReviewSubmitPage() {
               ? `Your feedback about ${eligibility.propertyName} means a lot. We hope to welcome you back soon!`
               : "You have already submitted a review for this stay. Thank you!"}
           </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-2 flex-wrap">
+          <div className="flex flex-col items-center justify-center gap-3 mt-4">
             <Link
               to={buildHomeUnitPath(getPropertySlug({ property_name: eligibility.propertyName }), eligibility.listingId)}
-              data-testid="review-success-view-property"
-              className="inline-block text-sm font-medium text-brand-primary underline underline-offset-2"
+              data-testid="review-success-book-again"
+              className="inline-flex items-center justify-center rounded-xl bg-brand-primary px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-primary/90 transition-colors"
             >
-              View {eligibility.propertyName}
+              Book {eligibility.propertyName} again
             </Link>
-            <span className="hidden sm:inline text-text-muted text-sm" aria-hidden>
-              ·
-            </span>
-            <Link to="/" className="inline-block text-sm text-brand-primary underline underline-offset-2">
-              Return to homepage
-            </Link>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 flex-wrap">
+              <Link
+                to={buildHomeUnitPath(getPropertySlug({ property_name: eligibility.propertyName }), eligibility.listingId)}
+                data-testid="review-success-view-property"
+                className="inline-block text-sm font-medium text-brand-primary underline underline-offset-2"
+              >
+                View property
+              </Link>
+              <span className="hidden sm:inline text-text-muted text-sm" aria-hidden>
+                ·
+              </span>
+              <Link to="/" className="inline-block text-sm text-brand-primary underline underline-offset-2">
+                Return to homepage
+              </Link>
+            </div>
           </div>
         </div>
       </div>

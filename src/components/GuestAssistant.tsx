@@ -47,11 +47,8 @@ export default function GuestAssistant({ listingId }: GuestAssistantProps) {
       })
       .then((data: unknown) => setFaqs(Array.isArray(data) ? (data as FaqEntry[]) : []))
       .catch((err: unknown) => {
-        setFetchErrorMessage(
-          err instanceof Error && err.message
-            ? err.message
-            : "Couldn't load FAQs. Please try again later.",
-        );
+        console.error("Listing FAQ load failed:", err);
+        setFetchErrorMessage("We couldn't load answers right now. Please try again in a moment.");
         setFaqs([]);
       })
       .finally(() => setLoading(false));

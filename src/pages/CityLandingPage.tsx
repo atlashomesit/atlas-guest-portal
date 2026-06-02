@@ -8,7 +8,7 @@ import { filterGuestImageUrls, sanitizeGuestImageUrl } from "@/utils/guestImageU
 import { buildHomeUnitPath, getPropertySlug } from "@/utils/navigation";
 import { listingMatchesCityKeywords } from "@/utils/cityListingFilter";
 import { getEffectiveDiscountPercent } from "@/utils/pricing";
-import { getTenantBrandName } from "@/tenant/displayBrand";
+import { withTenantBrandInCopy } from "@/tenant/displayBrand";
 import { getTenantContext } from "@/tenant/tenantContext";
 import { getTenantOverrides, getTenantPublicListingIdAllowlist } from "@/tenant/tenantOverrides";
 
@@ -81,8 +81,20 @@ function toListingCardModel(listing: PublicListing) {
 
 const CityLandingPage = ({ citySlug }: CityLandingPageProps) => {
   const navigate = useNavigate();
-  const brandName = getTenantBrandName();
   const content = CITY_CONTENT[citySlug];
+  const pageCopy = useMemo(
+    () => ({
+      metaTitle: withTenantBrandInCopy(content.metaTitle),
+      metaDescription: withTenantBrandInCopy(content.metaDescription),
+      introParagraphs: content.introParagraphs.map((p) => withTenantBrandInCopy(p)),
+      seasonParagraphs: content.seasonParagraphs.map((p) => withTenantBrandInCopy(p)),
+      faq: content.faq.map((item) => ({
+        question: withTenantBrandInCopy(item.question),
+        answer: withTenantBrandInCopy(item.answer),
+      })),
+    }),
+    [content],
+  );
   const [listings, setListings] = useState<PublicListing[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -93,13 +105,13 @@ const CityLandingPage = ({ citySlug }: CityLandingPageProps) => {
     () => ({
       "@context": "https://schema.org",
       "@type": "FAQPage",
-      mainEntity: content.faq.map((item) => ({
+      mainEntity: pageCopy.faq.map((item) => ({
         "@type": "Question",
         name: item.question,
         acceptedAnswer: { "@type": "Answer", text: item.answer },
       })),
     }),
-    [content.faq],
+    [pageCopy.faq],
   );
 
   const load = useCallback(
@@ -117,7 +129,8 @@ const CityLandingPage = ({ citySlug }: CityLandingPageProps) => {
         setListings(rows);
       } catch (e) {
         setListings([]);
-        setLoadError(e instanceof Error ? e.message : "Could not load listings.");
+        console.error("City landing listings load failed:", e);
+        setLoadError("We couldn't load homestays for this destination right now. Please try search or refresh.");
       } finally {
         setLoading(false);
       }
@@ -141,8 +154,8 @@ const CityLandingPage = ({ citySlug }: CityLandingPageProps) => {
   return (
     <div className="mx-auto max-w-5xl px-4 sm:px-6 py-10 text-text-primary">
       <SEO
-        title={`${content.metaTitle} | ${brandName}`}
-        description={content.metaDescription}
+        title={pageCopy.metaTitle}
+        description={pageCopy.metaDescription}
         url={pagePath}
         jsonLd={faqJsonLd}
       />
@@ -161,7 +174,7 @@ const CityLandingPage = ({ citySlug }: CityLandingPageProps) => {
 
       <article className="prose prose-neutral max-w-none dark:prose-invert">
         <div className="space-y-4 text-base leading-relaxed text-text-primary not-prose">
-          {content.introParagraphs.map((p, i) => (
+          {pageCopy.introParagraphs.map((p, i) => (
             <p key={`intro-${i}`}>{p}</p>
           ))}
         </div>
@@ -178,7 +191,7 @@ const CityLandingPage = ({ citySlug }: CityLandingPageProps) => {
 
         <h2 className="text-2xl font-bold text-text-primary mt-12 mb-4 not-prose">{content.seasonTitle}</h2>
         <div className="space-y-3 text-base leading-relaxed text-text-primary not-prose">
-          {content.seasonParagraphs.map((p, i) => (
+          {pageCopy.seasonParagraphs.map((p, i) => (
             <p key={`season-${i}`}>{p}</p>
           ))}
         </div>
@@ -247,7 +260,7 @@ const CityLandingPage = ({ citySlug }: CityLandingPageProps) => {
 
         <h2 className="text-2xl font-bold text-text-primary mt-14 mb-4 not-prose">Frequently asked questions</h2>
         <dl className="space-y-6 not-prose">
-          {content.faq.map((item) => (
+          {pageCopy.faq.map((item) => (
             <div key={item.question} className="rounded-2xl border border-border-subtle bg-bg-surface p-5">
               <dt className="font-semibold text-text-primary">{item.question}</dt>
               <dd className="mt-2 text-sm text-text-muted leading-relaxed">{item.answer}</dd>

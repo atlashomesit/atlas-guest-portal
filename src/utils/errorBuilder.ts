@@ -5,7 +5,7 @@
  * @see docs/UNIFIED_ERROR_LOADING_PATTERNS.md
  */
 
-import { UserError, RecoveryAction, ApiErrorResponse, ErrorCategory } from "@/types/errors";
+import { UserError, RecoveryAction, ApiErrorResponse } from "@/types/errors";
 
 /* ============================================================================
    VALIDATION ERRORS
@@ -266,10 +266,13 @@ export function buildServerError(status: number = 500, contactEmail?: string): U
   }
 
   return {
-    code: "SERVER_ERROR",
+    code: status === 503 ? "SERVICE_UNAVAILABLE" : "SERVER_ERROR",
     category: "unknown",
-    message: "Our servers encountered an error.",
-    details: "Try again shortly or contact support if the problem persists.",
+    message: status === 503 ? "Our service is temporarily unavailable." : "Our servers encountered an error.",
+    details:
+      status >= 500
+        ? `Server responded with ${status}. Try again shortly or contact support if the problem persists.`
+        : "Try again shortly or contact support if the problem persists.",
     recoveryActions: actions,
   };
 }
@@ -425,7 +428,7 @@ export function buildErrorFromApiResponse(response: ApiErrorResponse): UserError
   const { status, title, detail, errors, message, error } = response;
 
   // Extract the most relevant error message
-  let mainMessage = title || message || error || "Request failed";
+  const mainMessage = title || message || error || "Request failed";
   let details = detail || "";
 
   // Handle validation errors (field errors)
