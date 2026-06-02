@@ -1283,8 +1283,17 @@ export default function BookingConfirmationPage() {
           <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5">
             <h2 className="text-sm font-semibold text-text-primary mb-3">What happens next</h2>
             <div className="space-y-2.5 text-sm text-text-secondary">
-              <p>✅ Booking confirmed now.</p>
-              <p>📱 SMS and WhatsApp confirmation should arrive shortly.</p>
+              {/* TASK-2876: gate the "confirmed" affirmation on payment capture; show "Finalizing" while the poll runs so the page doesn't contradict the amber "Checking payment" banner. */}
+              {paymentStatus === "success" ? (
+                <>
+                  <p>✅ Booking confirmed now.</p>
+                  <p>📱 SMS and WhatsApp confirmation should arrive shortly.</p>
+                </>
+              ) : paymentStatus === "pending" ? (
+                <p>⏳ Finalizing your booking — we're confirming your payment. This usually takes a few moments.</p>
+              ) : (
+                <p>⚠️ Your payment hasn't completed yet. Please complete payment above to confirm your booking.</p>
+              )}
               <p data-testid="confirmation-t-minus-1">
                 {/* TASK-546 + TASK-2071: Explicit T-1 WhatsApp reminder date, language-aware */}
                 {(() => {
