@@ -50,3 +50,23 @@ export function getGuestDataProcessingEntityName(): string {
   }
   return getTenantBrandNameLong();
 }
+
+/** Placeholder in static SEO/city/blog templates — resolved at render (CPO-001). */
+export const TENANT_BRAND_PLACEHOLDER = "{{TENANT_BRAND}}";
+
+/** Legacy marketplace name still present in static SEO/city copy (CPO-001 follow-up). */
+// eslint-disable-next-line atlas-brand/no-atlas-string-leak -- intentional legacy token for runtime substitution
+const LEGACY_MARKETPLACE_BRAND_IN_COPY = "Atlas Homestays";
+
+/** Replace hardcoded legacy brand strings in static templates with the resolved tenant brand. */
+export function withTenantBrandInCopy(text: string): string {
+  const brand = getTenantBrandName();
+  let out = text;
+  if (out.includes(TENANT_BRAND_PLACEHOLDER)) {
+    out = out.replaceAll(TENANT_BRAND_PLACEHOLDER, brand);
+  }
+  if (out.includes(LEGACY_MARKETPLACE_BRAND_IN_COPY)) {
+    out = out.replaceAll(LEGACY_MARKETPLACE_BRAND_IN_COPY, brand);
+  }
+  return out;
+}

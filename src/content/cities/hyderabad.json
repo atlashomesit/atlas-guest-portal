@@ -2,8 +2,8 @@
   "slug": "hyderabad",
   "cityName": "Hyderabad",
   "h1": "Homestays in Hyderabad — HITECity work trips and Old City weekends",
-  "metaTitle": "Hyderabad homestays | HITECity & Jubilee Hills | Atlas Homestays",
-  "metaDescription": "Find Hyderabad homestays near HITECity, Gachibowli, Banjara Hills, and Secunderabad. Business-friendly stays and weekend heritage walks—book direct on Atlas Homestays.",
+  "metaTitle": "Hyderabad homestays | HITECity & Jubilee Hills | {{TENANT_BRAND}}",
+  "metaDescription": "Find Hyderabad homestays near HITECity, Gachibowli, Banjara Hills, and Secunderabad. Business-friendly stays and weekend heritage walks—book direct on {{TENANT_BRAND}}.",
   "listingKeywords": [
     "hyderabad",
     "telangana",
@@ -24,7 +24,7 @@
   "introParagraphs": [
     "Hyderabad pairs pearl-and-biryani heritage with one of India’s busiest tech corridors. Homestays give relocating consultants, startup teams, and weekend explorers a residential feel—kitchenettes for late work snacks, quieter desks than lobby cafes, and hosts who understand airport timing on the ORR.",
     "Neighbourhood choice matters: Gachibowli and Financial District listings shorten commutes to major IT parks, while Jubilee Hills and Banjara Hills suit guests who want dining clusters and boutique shopping between meetings. Old City stays reward early starts at Charminar before heat and crowds peak.",
-    "Atlas Homestays focuses on transparent nightly pricing and structured booking confirmations. Cards below filter live catalogue rows whose addresses reference Hyderabad or common suburbs—verify pin codes and landmarks on the listing page before you pay.",
+    "{{TENANT_BRAND}} focuses on transparent nightly pricing and structured booking confirmations. Cards below filter live catalogue rows whose addresses reference Hyderabad or common suburbs—verify pin codes and landmarks on the listing page before you pay.",
     "Food spans midnight Irani chai, Telugu thalis, and modern chef tables. Ask hosts about parking if you self-drive—many lanes are narrow—and about inverter backup if summer AC uptime matters for your work calls.",
     "Family travellers often layer Golconda Fort, Salar Jung Museum, and Ramoji Film City across multiple days. Homestays with living rooms help kids decompress after long sightseeing blocks; confirm sofa-bed availability when travelling as a group.",
     "Medical travel is common in Hyderabad; if that is your reason to visit, pick homestays near your hospital cluster but confirm quiet hours for recovery stays. Hosts frequently allow flexible check-in when you share arrival estimates in advance."

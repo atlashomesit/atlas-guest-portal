@@ -23,7 +23,9 @@ const legalizeText = (
   source
     .replaceAll(MARKETPLACE_BRAND_BASELINE, pack.legalName)
     .replace(/privacy@atlashomestays\.com/g, pack.contactEmail)
-    .replace(/atlashomestays\.com/g, pack.shareDomain);
+    .replace(/privacy@atlastays\.com/g, pack.contactEmail)
+    .replace(/atlashomestays\.com/g, pack.shareDomain)
+    .replace(/atlastays\.com/g, pack.shareDomain);
 
 const PrivacyPage = () => {
   const [search, setSearch] = useState("");

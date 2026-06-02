@@ -27,6 +27,9 @@ import {
 } from "../api/availabilitySummaryClient";
 import RecentlyViewedStrip from "../components/RecentlyViewedStrip";
 import { fallbackCoordsForListing, hasMapCoords } from "../utils/mapCoords";
+import { amenityCodeMatchesCategory, resolveAmenityLabel } from "../utils/amenityCodes";
+import { estimateStayNights, formatEstTotalInclGst } from "../utils/guestPriceEstimate";
+import { formatDisplayNumber, getTelLink } from "../config/contact";
 
 const SearchResultsMap = lazy(() => import("../components/search/SearchResultsMap"));
 
@@ -291,16 +294,21 @@ const SearchPage = () => {
   }, [overrides]);
 
   const onlyApiListings = overrides.onlyApiListings === true;
+  const estimateNights = useMemo(() => estimateStayNights(checkIn, checkOut), [checkIn, checkOut]);
   const listings = useMemo(() => {
     if (onlyApiListings) {
       return apiListings !== null ? apiListings : [];
     }
-    // Show fallback listings after timeout even if API still loading
-    if (loadingTimeoutReached && apiListings === null) {
-      return buildStaticListings(tenantAllowedIds);
+    if (apiListings !== null) {
+      return apiListings;
     }
-    return apiListings ?? buildStaticListings(tenantAllowedIds);
-  }, [apiListings, tenantAllowedIds, onlyApiListings, loadingTimeoutReached]);
+    if (isLoading) {
+      return [];
+    }
+    return buildStaticListings(tenantAllowedIds);
+  }, [apiListings, tenantAllowedIds, onlyApiListings, isLoading]);
+  const showingSampleListings =
+    !onlyApiListings && apiListings === null && !isLoading && listings.length > 0;
 
   useEffect(() => {
     if (!availableNow) {
@@ -330,7 +338,7 @@ const SearchPage = () => {
           signal: controller.signal,
           headers: { Accept: "application/json", ...getApiHeaders() },
         });
-        if (!res.ok) return false;
+        if (!res.ok) return true;
         const j = (await res.json()) as {
           availability?: { date?: string; Date?: string; status?: string; Status?: string; inventory?: number; Inventory?: number }[];
           Availability?: { date?: string; Date?: string; status?: string; Status?: string; inventory?: number; Inventory?: number }[];
@@ -343,7 +351,7 @@ const SearchPage = () => {
         if (st === "blocked" || st === "hold") return false;
         return inv > 0 || st === "available" || st === "turnover";
       } catch {
-        return false;
+        return true;
       }
     };
 
@@ -452,18 +460,8 @@ const SearchPage = () => {
   }, [checkIn, checkOut, hasInvalidDates]);
 
   const hasAmenity = (unit: NormalizedListing, amenity: string): boolean => {
-    const amenityIcons = (unit.amenities || []).map(a => (a.amenities_icon || "").toLowerCase());
-    // TASK-1711: expanded amenity map — Pet-friendly + Balcony added to reach 8 total filter chips.
-    const amenityMap: Record<string, string[]> = {
-      ac: ["ac", "air conditioning", "air-conditioner"],
-      parking: ["parking", "garage"],
-      pool: ["pool", "swimming"],
-      wifi: ["wifi", "internet"],
-      "pet-friendly": ["pet", "dog", "cat"],
-      balcony: ["balcony", "terrace", "patio", "deck"],
-    };
-    const targets = amenityMap[amenity.toLowerCase()] || [];
-    return targets.some(target => amenityIcons.some(icon => icon.includes(target)));
+    const codes = (unit.amenities || []).map((a) => a.amenities_icon || "");
+    return codes.some((code) => amenityCodeMatchesCategory(code, amenity));
   };
 
   const filteredUnits = useMemo(() => {
@@ -506,7 +504,8 @@ const SearchPage = () => {
         if (!hasAllSelectedAmenities) return false;
       }
       if (availableNow) {
-        if (tonightProbeLoading || tonightAvailableIds === null) return false;
+        if (tonightProbeLoading) return true;
+        if (tonightAvailableIds === null) return true;
         if (!tonightAvailableIds.has(unit.numericId)) return false;
       }
       return true;
@@ -710,7 +709,11 @@ const SearchPage = () => {
 
   const visibleUnits = sortedUnits.slice(0, visibleCount);
   const hasMore = visibleCount < sortedUnits.length;
-  const showEmptyState = !isLoading && !hasInvalidDates && sortedUnits.length === 0;
+  const dateAvailCheckFailed =
+    explicitDateSearch && !dateAvailLoading && dateAvailableIds === null && !hasInvalidDates;
+  const showTonightProbeBanner = availableNow && tonightProbeLoading;
+  const showEmptyState =
+    !isLoading && !hasInvalidDates && sortedUnits.length === 0 && !showTonightProbeBanner;
   /** TASK-1648: skeleton while public availability resolves for selected dates (list view). */
   const showDateAvailabilitySkeleton =
     explicitDateSearch && !hasInvalidDates && dateAvailLoading && !isLoading && !mapView;
@@ -754,13 +757,17 @@ const SearchPage = () => {
           {/* TASK-1864: dynamic h1 — only say "homes for your dates" when dates are actually set */}
           <h1 className="text-3xl font-bold text-text-primary sm:text-4xl">
             {checkIn && checkOut
-              ? `${filteredUnits.length} ${filteredUnits.length === 1 ? "home" : "homes"} for your dates`
+              ? dateAvailCheckFailed
+                ? `${filteredUnits.length} ${filteredUnits.length === 1 ? "home" : "homes"} — availability not confirmed`
+                : `${filteredUnits.length} ${filteredUnits.length === 1 ? "home" : "homes"} for your dates`
               : getTenantBrandName()}
           </h1>
           <p className="max-w-3xl text-base text-text-body">
-            {checkIn && checkOut && !hasInvalidDates
-              ? "Homes below are filtered to those available for your dates when our live check succeeds. You can still refine with price, guests, and amenities."
-              : "Browse all homes. Filter by price, guests and amenities below."}
+            {dateAvailCheckFailed
+              ? "We couldn't confirm live availability for these dates. Contact the host before you book, or try different dates."
+              : checkIn && checkOut && !hasInvalidDates
+                ? "Homes below are filtered to those available for your dates when our live check succeeds. You can still refine with price, guests, and amenities."
+                : "Browse all homes. Filter by price, guests and amenities below."}
           </p>
         </header>
 
@@ -1018,10 +1025,49 @@ const SearchPage = () => {
         )}
 
         {/* TASK-1867: only show banner on a real fetch error, not when API returns 0 listings */}
+        {showingSampleListings && (
+          <div
+            className="flex items-center gap-3 rounded-xl border border-border-subtle bg-bg-muted/60 px-4 py-3 text-sm text-text-secondary"
+            data-testid="search-sample-listings-banner"
+          >
+            Showing sample homes while we refresh live prices and availability…
+          </div>
+        )}
+
+        {dateAvailCheckFailed && (
+          <div
+            className="flex items-center gap-3 rounded-xl border border-support-warning/40 bg-support-warning/10 px-4 py-3 text-support-warning"
+            data-testid="search-date-availability-failed"
+          >
+            <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
+            <span>
+              We couldn&apos;t verify availability for your dates. Results may include homes that are
+              already booked — please confirm with the host before paying.
+            </span>
+          </div>
+        )}
+
+        {showTonightProbeBanner && (
+          <div
+            className="flex items-center gap-3 rounded-xl border border-border-subtle bg-bg-surface px-4 py-3 text-text-secondary"
+            data-testid="search-tonight-probe-loading"
+            aria-live="polite"
+          >
+            <div className="h-5 w-5 shrink-0 rounded-full border-2 border-border-subtle border-t-cta-primary animate-spin" aria-hidden />
+            <span>Checking tonight&apos;s availability…</span>
+          </div>
+        )}
+
         {!isLoading && apiError && listings.length > 0 && (
           <div className="flex items-center gap-3 rounded-xl border border-support-warning/40 bg-support-warning/10 px-4 py-3 text-support-warning">
             <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
-            <span>Live availability check failed. Showing cached results — call +91 7032 493 290 to confirm before booking.</span>
+            <span>
+              Live listing refresh failed. Showing cached results — call{" "}
+              <a href={getTelLink()} className="font-semibold underline underline-offset-2">
+                {formatDisplayNumber()}
+              </a>{" "}
+              to confirm before booking.
+            </span>
           </div>
         )}
 
@@ -1037,14 +1083,21 @@ const SearchPage = () => {
               className="rounded-2xl border border-border-subtle bg-bg-surface px-4 py-8 text-center shadow-sm sm:px-8"
               data-testid="search-empty-state"
             >
-              {/* RA-006: SVG depicts marketplace brand — only show on the marketplace root. */} {/* TODO(CPO-001-followup): swap SVG/wordmark per tenant pack */}
               {!hideAtlasBranding && (
                 <div className="mx-auto mb-6 flex max-w-xs justify-center" aria-hidden>
-                  <img
-                    src="/images/atlas-homestays-static-map.svg"
-                    alt=""
-                    className="h-28 w-auto max-w-full object-contain opacity-90"
-                  />
+                  {tenant?.logoUrl ? (
+                    <img
+                      src={tenant.logoUrl}
+                      alt=""
+                      className="h-20 w-auto max-w-full object-contain opacity-90"
+                    />
+                  ) : (
+                    <img
+                      src="/images/atlas-homestays-static-map.svg"
+                      alt=""
+                      className="h-28 w-auto max-w-full object-contain opacity-90"
+                    />
+                  )}
                 </div>
               )}
               <h2 className="text-xl font-bold text-text-primary sm:text-2xl">{`No ${unitNoun.marketingPlural} match your filters`}</h2>
@@ -1269,7 +1322,7 @@ const SearchPage = () => {
                         {unit.hasVerifiedPhotos && unit.isGstRegistered ? (
                           <span
                             className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700 border border-emerald-200 cursor-help"
-                            title="Identity verified, GST registered, 50+ stays. We've checked the documents."
+                            title="Verified photos and GST registration on file. Listing details reviewed before publish."
                           >
                             ✅ Atlas Trusted Host
                           </span>
@@ -1324,8 +1377,6 @@ const SearchPage = () => {
                       {(() => {
                         const dailyBreakdown = getDailyListingPricing(unit.numericId);
                         const displayedPrice = (dailyBreakdown?.actualPrice ?? 0) > 0 ? dailyBreakdown!.actualPrice : unit.pricePerNight;
-                        const gstMult = displayedPrice > 7500 ? 1.18 : 1.05;
-                        const gstPct = displayedPrice > 7500 ? 18 : 5;
                         return (
                           <>
                             <p className="text-2xl font-bold text-text-primary" data-testid="guest-listing-nightly-price">{formatDisplayCurrency(displayedPrice)}</p>
@@ -1334,9 +1385,7 @@ const SearchPage = () => {
                             )}
                             <p className="text-sm text-text-muted">per night</p>
                             <p className="text-xs text-text-muted">
-                              {/* TASK-1869 / TASK-1451: Sept 2025 GST reform — 5% for ≤₹7,500/night, 18% above */}
-                              {/* TASK-2557: corrected >₹7,500 slab from 12% to 18% */}
-                              {`Est. total: ${formatDisplayCurrency(Math.round(displayedPrice * gstMult))} (incl. ${gstPct}% GST)`}
+                              {formatEstTotalInclGst(displayedPrice, estimateNights, formatDisplayCurrency)}
                             </p>
                           </>
                         );
@@ -1372,11 +1421,15 @@ const SearchPage = () => {
                       />
                     </div>
                     <div className="flex flex-col gap-1 text-right text-xs text-text-muted">
-                      {unit.amenities.map((amenity, index) => (
-                        <span key={`${unit.id}-amenity-${index}`} className="font-semibold text-text-secondary">
-                          {amenity.amenities_icon}
-                        </span>
-                      ))}
+                      {unit.amenities.slice(0, 4).map((amenity, index) => {
+                        const code = amenity.amenities_icon?.trim();
+                        if (!code) return null;
+                        return (
+                          <span key={`${unit.id}-amenity-${index}`} className="font-semibold text-text-secondary">
+                            {resolveAmenityLabel(code)}
+                          </span>
+                        );
+                      })}
                     </div>
                     <Link
                       to={`${unit.canonicalPath}${querySuffix}`}

@@ -2,8 +2,8 @@
   "slug": "manali",
   "cityName": "Manali",
   "h1": "Homestays in Manali — river valleys, apple orchards, and mountain hosts",
-  "metaTitle": "Manali homestays | Old Manali & Solang side | Atlas Homestays",
-  "metaDescription": "Browse Manali homestays near Old Manali, Vashisht, and Solang Valley access points. Mountain hosts, transparent rates, and direct booking on Atlas Homestays.",
+  "metaTitle": "Manali homestays | Old Manali & Solang side | {{TENANT_BRAND}}",
+  "metaDescription": "Browse Manali homestays near Old Manali, Vashisht, and Solang Valley access points. Mountain hosts, transparent rates, and direct booking on {{TENANT_BRAND}}.",
   "listingKeywords": [
     "manali",
     "old manali",
@@ -23,7 +23,7 @@
     "Travellers come for snow views, paragliding slots, café culture in Old Manali, and temple dips near Vashisht hot springs. Respect altitude: hydrate, pace hikes, and avoid alcohol overload on night one if you flew in from sea level the same day.",
     "Winter brings snow uncertainty—chains, heating, and backup generators matter. Summer is peak family travel; book riverside listings early if you want white-noise sleep over rushing water. Monsoon beautifies waterfalls but raises landslide risk on certain highways—listen to host detours.",
     "Food spans siddu, trout where responsibly sourced, and traveller-friendly cafés. Ask hosts about ethical adventure operators and leave-no-trace habits on trails; carry back all snack wrappers because alpine ecosystems recover slowly.",
-    "Atlas Homestays shows live inventory filtered for Manali and Kullu valley keywords. Compare cards, open listings for accurate bed counts, and read minimum-night rules before peak long weekends.",
+    "{{TENANT_BRAND}} shows live inventory filtered for Manali and Kullu valley keywords. Compare cards, open listings for accurate bed counts, and read minimum-night rules before peak long weekends.",
     "If you combine work and mountains, verify WiFi notes and desk space—some homestays optimise for leisure travellers only. Early-morning departures for Atal Tunnel day plans run smoother when hosts pre-book taxis."
   ],
   "areasTitle": "Top areas in Manali for homestay guests",

@@ -13,8 +13,8 @@ export const propertyData = [
         id: 501,
         listingId: 7,
         unitType: "penthouse",
-        property_name: "Atlas Penthouse 501",
-        property_description: `Perched high above Hyderabad’s energetic skyline, Atlas Penthouse 501 delivers a five-star
+        property_name: "Penthouse Suite 501",
+        property_description: `Perched high above Hyderabad’s energetic skyline, Penthouse Suite 501 delivers a five-star
 retreat for guests who want a private sanctuary near the city’s tech corridor. Spanning more than 1,600 sq. ft. with
 panoramic glass walls, this duplex penthouse blends luxury finishes with thoughtfully curated conveniences so you can host,
 work, and unwind without compromise.

@@ -35,11 +35,11 @@ const BlogPostPage = () => {
           datePublished: "2026-04-28",
           author: {
             "@type": "Organization",
-            name: "Atlas Stays",
+            name: brandName,
           },
           publisher: {
             "@type": "Organization",
-            name: "Atlas Stays",
+            name: brandName,
           },
         };
         return (

@@ -9,7 +9,7 @@ export type TermsSection = {
 };
 
 export const termsMetadata = {
-  title: "Terms of Service | Atlas Guest Portal",
+  /** Title is localized in `Terms.tsx` via `getTenantBrandName()`. */
   lastUpdated: "Last updated: January 10, 2025",
 };
 

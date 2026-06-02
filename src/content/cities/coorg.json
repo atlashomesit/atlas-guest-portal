@@ -2,8 +2,8 @@
   "slug": "coorg",
   "cityName": "Coorg (Kodagu)",
   "h1": "Homestays in Coorg — coffee estates, mist, and Kodava hospitality",
-  "metaTitle": "Coorg homestays | Estate stays & Kodagu rooms | Atlas Homestays",
-  "metaDescription": "Discover Coorg homestays near Madikeri, Virajpet, and coffee estates. Cool-climate escapes, trekking access, and direct host booking on Atlas Homestays.",
+  "metaTitle": "Coorg homestays | Estate stays & Kodagu rooms | {{TENANT_BRAND}}",
+  "metaDescription": "Discover Coorg homestays near Madikeri, Virajpet, and coffee estates. Cool-climate escapes, trekking access, and direct host booking on {{TENANT_BRAND}}.",
   "listingKeywords": [
     "coorg",
     "kodagu",
@@ -23,7 +23,7 @@
     "Travellers pick Coorg for slow mornings: cardamom-scented air, optional cook-to-order Kodava meals, and drives to viewpoints like Raja’s Seat. A homestay anchors you inside village rhythms—roosters, temple bells, and forest sounds—so pack layers; evenings cool down even in summer.",
     "Adventure pairs well with rest here. Popular day plans include Abbey Falls after checking crowd timings, Dubare elephant camp ethics research before you go, and Talacauvery when roads are clear. Always hire local drivers familiar with ghat sections during heavy rain.",
     "Food is proudly local: kadumbuttu, pandi curry (where offered), and vegetarian Kodava spreads. Hosts may arrange estate tours—stay on marked paths, avoid litter in streams, and tip hospitality staff through the host’s preferred method so community norms stay intact.",
-    "Atlas Homestays surfaces live listings whose addresses mention Coorg or Kodagu towns. Compare nightly rates on cards below, then open a listing for detailed house rules, check-in times, and cancellation tiers before you pay.",
+    "{{TENANT_BRAND}} surfaces live listings whose addresses mention Coorg or Kodagu towns. Compare nightly rates on cards below, then open a listing for detailed house rules, check-in times, and cancellation tiers before you pay.",
     "If you are planning a long weekend from Bengaluru or Mysuru, mid-week gaps frequently open in plantation properties. Book direct to align on road conditions during monsoon and to confirm 4x4 access if your homestay sits on a steep estate lane."
   ],
   "areasTitle": "Top areas in Coorg for homestay guests",

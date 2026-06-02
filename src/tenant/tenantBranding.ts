@@ -5,6 +5,9 @@
  */
 
 import type { TenantInfo } from './tenantContext';
+import { MARKETPLACE_BRAND_BASELINE } from './displayBrand';
+
+let manifestObjectUrl: string | null = null;
 
 /** Rejects non-hex brand strings from the API so CSS variables are never injected with arbitrary values. */
 function isSafeBrandHex(value: string): boolean {
@@ -77,4 +80,44 @@ export function applyTenantBranding(tenant: TenantInfo): void {
     }
     link.href = tenant.faviconUrl;
   }
+
+  applyTenantWebManifest(tenant);
+}
+
+/** Per-tenant PWA manifest name (CPO-001 / module #14). */
+function applyTenantWebManifest(tenant: TenantInfo): void {
+  if (typeof document === 'undefined' || typeof fetch === 'undefined') return;
+
+  const displayName =
+    tenant.brandName?.trim() || tenant.name?.trim() || MARKETPLACE_BRAND_BASELINE;
+  const shortName = displayName.length > 12 ? `${displayName.slice(0, 12)}…` : displayName;
+
+  void fetch('/manifest.webmanifest')
+    .then((res) => (res.ok ? res.json() : null))
+    .then((base: Record<string, unknown> | null) => {
+      if (!base || typeof base !== 'object') return;
+      const merged = {
+        ...base,
+        name: displayName,
+        short_name: shortName,
+        description: `Direct booking with ${displayName} — verified homestays and serviced apartments.`,
+      };
+      if (manifestObjectUrl) {
+        URL.revokeObjectURL(manifestObjectUrl);
+        manifestObjectUrl = null;
+      }
+      manifestObjectUrl = URL.createObjectURL(
+        new Blob([JSON.stringify(merged)], { type: 'application/manifest+json' }),
+      );
+      let link = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
+      if (!link) {
+        link = document.createElement('link');
+        link.rel = 'manifest';
+        document.head.appendChild(link);
+      }
+      link.href = manifestObjectUrl;
+    })
+    .catch(() => {
+      /* offline / missing manifest — keep static file */
+    });
 }
