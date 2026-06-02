@@ -171,7 +171,6 @@ function getPpCancellationInfo(tier: string | null | undefined): PpCancellationI
 
 const PP_REVIEW_BG_COLORS = ['#1a1a2e', '#ffb347', '#c2410c', '#94755b', '#e9f5ef'];
 const PP_REVIEW_TEXT_COLORS = ['#fffaf5', '#1a1a2e', '#fffaf5', '#fffaf5', '#157046'];
-const PP_CELL_LABELS = ['Living', 'Kitchen', 'Bedroom', 'Balcony'] as const;
 
 /** Shown while listing data is resolving (incl. API fallback). Matches loaded page layout for perceived performance. */
 function PropertyDetailsSkeleton() {
@@ -1408,23 +1407,19 @@ useEffect(() => {
               </div>
 
               {/* Thumbnail cells */}
+              {/* TASK-2889: render only cells that have a real photo — no fabricated
+                  "Living/Kitchen/Bedroom/Balcony" placeholder tiles for sparse listings. */}
               {([1, 2, 3, 4] as const).map((i) => {
                 const photo = galleryUrls[i];
+                if (!photo) return null;
                 return (
                   <div
                     key={i}
-                    className={`pp-cell pp-cell-${i + 1}${photo ? ' pp-cell--photo' : ''}`}
-                    style={photo ? { backgroundImage: `url(${photo})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
+                    className={`pp-cell pp-cell-${i + 1} pp-cell--photo`}
+                    style={{ backgroundImage: `url(${photo})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
                     role="img"
-                    aria-label={photo ? `${data.property_name} — photo ${i + 1}` : `${PP_CELL_LABELS[i - 1]} area`}
-                  >
-                    {!photo && (
-                      <>
-                        <div className="pp-cell-id-thumb" aria-hidden="true">{['i','ii','iii','iv'][i - 1]}</div>
-                        <span className="pp-cell-label">{PP_CELL_LABELS[i - 1]}</span>
-                      </>
-                    )}
-                  </div>
+                    aria-label={`${data.property_name} — photo ${i + 1}`}
+                  />
                 );
               })}
 
