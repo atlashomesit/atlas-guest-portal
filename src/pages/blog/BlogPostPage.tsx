@@ -3,16 +3,24 @@ import { useParams, Link } from "react-router-dom";
 import SEO from "../../components/SEO";
 import { getLocalizedBlogPosts } from "../../data/blogPosts";
 import { getTenantBrandName } from "../../tenant/displayBrand";
+import { getTenantContext } from "../../tenant/tenantContext";
+import { getTenantOverrides, getUnitNoun } from "../../tenant/tenantOverrides";
 
 const BlogPostPage = () => {
   const { slug } = useParams();
   const brandName = getTenantBrandName();
+  const unitNoun = getUnitNoun(getTenantOverrides(getTenantContext()?.slug));
+  const listingsLabel = `Our ${unitNoun.capitalPlural}`;
   const posts = useMemo(() => getLocalizedBlogPosts(brandName), [brandName]);
   const post = posts.find((p) => p.slug === slug);
 
   if (!post) {
     return (
       <div className="px-4 md:px-10 lg:px-20 py-28">
+        <SEO
+          title={`Post not found | ${brandName}`}
+          description={`This blog post is not available on ${brandName}.`}
+        />
         <h1 className="text-3xl font-bold text-text-primary">Post not found</h1>
         <Link to="/blog" className="text-primary font-semibold mt-4 inline-block">
           Back to Blog
@@ -74,10 +82,10 @@ const BlogPostPage = () => {
         <p className="text-text-muted leading-relaxed text-lg">{post.content}</p>
         <div className="bg-bg-muted border border-border-subtle rounded-xl p-4">
           <p className="text-sm text-text-muted">
-            For booking offers and property policies, explore our Apartments, Offers, and Policies pages.
+            For booking offers and property policies, explore {brandName}&apos;s listings, Offers, and Policies pages.
           </p>
           <div className="flex gap-3 mt-3 flex-wrap">
-            <Link to="/#our-homes" className="btn-chip">Our Homes</Link>
+            <Link to="/#our-homes" className="btn-chip">{listingsLabel}</Link>
             <Link to="/offers" className="btn-chip">Offers</Link>
             <Link to="/policies" className="btn-chip">Policies</Link>
           </div>

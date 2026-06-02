@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import SEO from "../components/SEO";
-import { getTenantBrandName, getTenantContactEmail } from "../tenant/displayBrand";
+import { getTenantBrandName, getTenantBrandNameLong, getTenantContactEmail } from "../tenant/displayBrand";
 
 /**
  * TASK-016: DPDP 2023 privacy policy page.
@@ -13,6 +13,7 @@ import { getTenantBrandName, getTenantContactEmail } from "../tenant/displayBran
 
 export default function PrivacyPolicyPage() {
   const brandName = getTenantBrandName();
+  const legalEntityName = getTenantBrandNameLong();
   const privacyEmail = getTenantContactEmail("privacy");
   const lastUpdated = "22 April 2026";
 
@@ -100,11 +101,11 @@ export default function PrivacyPolicyPage() {
 
         <h2 className="mt-6 text-lg font-semibold">8. Data Fiduciary &amp; Contact</h2>
         <p>
-          Atlas Tech Solutions is the Data Fiduciary under DPDP 2023. For privacy questions, complaints, or
+          {legalEntityName} is the Data Fiduciary under DPDP 2023. For privacy questions, complaints, or
           to exercise your rights, contact:
         </p>
         <address className="not-italic">
-          Atlas Tech Solutions<br />
+          {legalEntityName}<br />
           <a href={`mailto:${privacyEmail}`} className="text-brand-primary underline">
             {privacyEmail}
           </a>
@@ -121,7 +122,7 @@ export default function PrivacyPolicyPage() {
 
         <p className="pt-6 text-xs text-text-muted">
           This privacy policy is a template subject to legal review. The production version may differ
-          in specific language; the obligations stated here are binding on Atlas regardless.
+          in specific language; the obligations stated here are binding on {legalEntityName} regardless.
         </p>
       </section>
 

@@ -1334,8 +1334,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               Payment processing{convenienceFeePctLabel > 0 ? ` (${convenienceFeePctLabel}%)` : ''}
               <HelpCircle
                 className="h-3 w-3 cursor-help text-text-muted"
-                aria-label="Razorpay payment gateway fee — passed through, not an Atlas markup."
-                title="Razorpay payment gateway fee — passed through, not an Atlas markup."
+                aria-label="Razorpay payment gateway fee — passed through, not a platform markup."
+                title="Razorpay payment gateway fee — passed through, not a platform markup."
               />
             </span>
             <span className="lv-num">{displayPrice(breakdownConvenienceFee)}</span>

@@ -1683,9 +1683,12 @@ useEffect(() => {
                   )}
                   {/* Check-in / Check-out times */}
                   {(resolvedCheckInTime || resolvedCheckOutTime) && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginTop: 16 }}>
+                    <div
+                      style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginTop: 16 }}
+                      data-testid="property-check-in-schedule"
+                    >
                       {resolvedCheckInTime && (
-                        <span style={{ fontSize: 14, color: '#475569' }}>
+                        <span style={{ fontSize: 14, color: '#475569' }} data-testid="property-check-in-time">
                           <strong style={{ color: '#1a1a2e' }}>Check-in:</strong> {resolvedCheckInTime}
                         </span>
                       )}
@@ -1939,10 +1942,12 @@ useEffect(() => {
                       </span>
                     </div>
                     {/* Check-in card */}
-                    <div className="pp-v2-knowcard">
+                    <div className="pp-v2-knowcard" data-testid="property-check-in-card">
                       <div className="pp-v2-knowicon"><PpV2ClockInIcon /></div>
                       <small>Check-in</small>
-                      <strong>{resolvedCheckInTime ?? 'Confirmed after booking'}</strong>
+                      <strong data-testid={resolvedCheckInTime ? 'property-check-in-time' : 'property-check-in-pending'}>
+                        {resolvedCheckInTime ?? 'Confirmed after booking'}
+                      </strong>
                       {resolvedCheckInTime && <span>Early check-in subject to availability.</span>}
                     </div>
                     {/* Check-out card */}

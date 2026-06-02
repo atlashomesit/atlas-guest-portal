@@ -1,3 +1,5 @@
+import { getTenantBrandName } from "../tenant/displayBrand";
+
 /**
  * TASK-1705: Owner-share trust badge.
  *
@@ -27,6 +29,7 @@ const formatINR = (n: number) =>
   }).format(n);
 
 export default function OwnerShareBadge({ nightlyPrice, className = "" }: OwnerShareBadgeProps) {
+  const brandName = getTenantBrandName();
   const hostAmount =
     nightlyPrice != null && nightlyPrice > 0
       ? Math.round(nightlyPrice * PLATFORM_SHARE)
@@ -37,7 +40,7 @@ export default function OwnerShareBadge({ nightlyPrice, className = "" }: OwnerS
     : "0% commission — book direct";
 
   const tooltip =
-    "Booking direct via Atlas means your host keeps significantly more. " +
+    `Booking direct via ${brandName} means your host keeps significantly more. ` +
     "OTA platforms (marketplaces) typically charge 15–20% commission. " +
     "Direct bookings have 0% platform commission — only a small payment-processing fee.";
 

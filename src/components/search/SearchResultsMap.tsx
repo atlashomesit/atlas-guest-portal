@@ -6,6 +6,7 @@ import L from "leaflet";
 import type { LatLngExpression } from "leaflet";
 
 import { HYDERABAD_CENTER, hasMapCoords, fallbackCoordsForListing } from "../../utils/mapCoords";
+import { getTenantBrandName } from "../../tenant/displayBrand";
 import { getTenantContext } from "../../tenant/tenantContext";
 import { getTenantOverrides, getUnitNoun } from "../../tenant/tenantOverrides";
 
@@ -79,13 +80,14 @@ export default function SearchResultsMap({ units, formatPrice, querySuffix }: Se
   const withApiCoords = useMemo(() => capped.filter(usedApiCoords).length, [capped]);
   const center: LatLngExpression = [HYDERABAD_CENTER.lat, HYDERABAD_CENTER.lng];
   const unitNoun = getUnitNoun(getTenantOverrides(getTenantContext()?.slug));
+  const brandName = getTenantBrandName();
 
   return (
     <div className="flex flex-col gap-2" data-testid="search-results-map">
       {withApiCoords < capped.length ? (
         <p className="text-xs text-text-muted">
           {withApiCoords === 0
-            ? `Showing ${capped.length} homes with approximate map pins (set property coordinates in Atlas for exact locations).`
+            ? `Showing ${capped.length} ${unitNoun.plural} with approximate map pins (set property coordinates in ${brandName} admin for exact locations).`
             : `${withApiCoords} of ${capped.length} with exact coordinates; others use approximate pins.`}
         </p>
       ) : null}

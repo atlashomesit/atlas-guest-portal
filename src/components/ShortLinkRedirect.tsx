@@ -1,9 +1,11 @@
 import { useEffect, useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
+import SEO from "./SEO";
 import { shortLinkMap } from "../config/shortLinks";
 import { getTenantBrandName } from "../tenant/displayBrand";
 
 const ShortLinkRedirect = () => {
+    const brandName = getTenantBrandName();
     const { shortCode } = useParams<{ shortCode: string }>();
 
     const normalizedCode = shortCode?.toLowerCase();
@@ -47,10 +49,11 @@ const ShortLinkRedirect = () => {
     if (!normalizedCode || !targetUrl) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-bg-muted px-6">
+                <SEO title={`Link not found | ${brandName}`} robots="noindex, nofollow" />
                 <div className="max-w-md w-full bg-bg-surface shadow-level2 rounded-lg p-8 text-center">
                     <h1 className="text-2xl font-semibold text-text-primary mb-4">Link not found</h1>
                     <p className="text-text-muted mb-6">
-                        We couldn't find the short link you're looking for. Please return to the homepage and try again.
+                        We couldn&apos;t find that short link on {brandName}. Please return to the homepage and try again.
                     </p>
                     <Link
                         to="/"
@@ -71,7 +74,8 @@ const ShortLinkRedirect = () => {
                 <div className="flex justify-center">
                     <div className="h-12 w-12 rounded-full border-4 border-border-subtle border-t-primary animate-spin" aria-hidden="true" />
                 </div>
-                <h1 className="text-2xl font-semibold text-text-primary">Taking you to {getTenantBrandName()} {label}…</h1>
+                <SEO title={`Redirecting | ${brandName}`} robots="noindex, nofollow" />
+                <h1 className="text-2xl font-semibold text-text-primary">Taking you to {brandName} {label}…</h1>
                 <p className="text-text-muted break-words">{targetUrl}</p>
                 <button
                     type="button"
