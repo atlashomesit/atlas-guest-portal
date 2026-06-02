@@ -1355,7 +1355,8 @@ useEffect(() => {
                   className="pp-btn pp-btn-ghost pp-btn-sm"
                   onClick={() => {
                     const url = window.location.href;
-                    const priceText = directBookingNightly > 0 ? ` from ₹${directBookingNightly.toLocaleString('en-IN')}/night` : '';
+                    // TASK-2873: do not advertise a price for a Draft (unpublished) listing.
+                    const priceText = !ppIsDraft && directBookingNightly > 0 ? ` from ₹${directBookingNightly.toLocaleString('en-IN')}/night` : '';
                     const text = `Check out ${data.property_name}${priceText} on ${ppBrandName}`;
                     const share = async () => {
                       if (typeof navigator.share === 'function') {
@@ -1549,7 +1550,7 @@ useEffect(() => {
                     </div>
                     <div className="pp-host-actions">
                       <a
-                        href={ppWaBookingUrl}
+                        href={ppIsDraft ? ppWaAskUrl : ppWaBookingUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="pp-btn pp-btn-whatsapp pp-btn-sm"
@@ -2109,7 +2110,7 @@ useEffect(() => {
                 {/* WhatsApp CTA (sidebar) */}
                 <div style={{ marginTop: 12 }}>
                   <a
-                    href={ppWaBookingUrl}
+                    href={ppIsDraft ? ppWaAskUrl : ppWaBookingUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="pp-btn pp-btn-whatsapp pp-btn-block"
