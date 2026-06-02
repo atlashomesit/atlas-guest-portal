@@ -1915,15 +1915,15 @@ useEffect(() => {
                     <div className="pp-v2-knowcard">
                       <div className="pp-v2-knowicon"><PpV2ClockInIcon /></div>
                       <small>Check-in</small>
-                      <strong>{resolvedCheckInTime ?? '2:00 PM'}</strong>
-                      <span>Self-check-in via lockbox. Early check-in subject to availability.</span>
+                      <strong>{resolvedCheckInTime ?? 'Confirmed after booking'}</strong>
+                      {resolvedCheckInTime && <span>Early check-in subject to availability.</span>}
                     </div>
                     {/* Check-out card */}
                     <div className="pp-v2-knowcard">
                       <div className="pp-v2-knowicon"><PpV2ClockOutIcon /></div>
                       <small>Check-out</small>
-                      <strong>{resolvedCheckOutTime ?? '11:00 AM'}</strong>
-                      <span>Drop keys in the lockbox. Luggage can stay till evening on request.</span>
+                      <strong>{resolvedCheckOutTime ?? 'Confirmed after booking'}</strong>
+                      {resolvedCheckOutTime && <span>Late check-out subject to availability.</span>}
                     </div>
                   </div>
                 </section>
