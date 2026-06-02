@@ -42,12 +42,63 @@ exports[`Homepage UX wrappers (default path) > shows the established Why Choose 
 </DocumentFragment>
 `;
 
-exports[`Homepage UX wrappers (default path) > uses the live testimonials carousel instead of placeholders 1`] = `
+exports[`Homepage UX wrappers (default path) > uses verified guest reviews instead of placeholders 1`] = `
 <DocumentFragment>
-  <div
-    data-testid="testimonials-default"
+  <section
+    aria-labelledby="testimonials-heading"
+    class="py-section-gap md:py-section-gap-md lg:py-section-gap-lg text-white bg-[#071624] isolate relative"
+    style="background-color: rgb(7, 22, 36); background-image: linear-gradient(180deg, rgb(7, 22, 36) 0%, rgb(16, 36, 58) 100%);"
   >
-    Testimonials carousel baseline
-  </div>
+    <div
+      class="mx-auto max-w-luxury px-[5%]"
+    >
+      <div
+        class="text-center max-w-prose mx-auto mb-12"
+      >
+        <p
+          class="text-amber-300 font-semibold tracking-[0.08em] uppercase text-xs md:text-sm mb-2"
+        >
+          Guest reviews
+        </p>
+        <h2
+          class="font-display text-[var(--text-h2)] font-semibold text-white tracking-tight"
+          id="testimonials-heading"
+          style="font-family: var(--font-family-display);"
+        >
+          What verified guests say
+        </h2>
+      </div>
+      <div
+        class="grid gap-6 md:grid-cols-3 overflow-x-auto md:overflow-visible"
+      >
+        <div
+          class="rounded-2xl border border-white/20 bg-[#10243a] p-6 md:p-8 transition-all duration-[180ms] hover:-translate-y-1.5 hover:scale-[1.02] min-w-[280px]"
+        >
+          <p
+            class="font-display text-xl md:text-2xl font-normal italic text-white leading-relaxed"
+            style="font-family: var(--font-family-display);"
+          >
+            “Spotless rooms and warm hosts.”
+          </p>
+          <p
+            aria-label="5 out of 5 stars"
+            class="mt-4 text-amber-300"
+          >
+            ★★★★★
+          </p>
+          <p
+            class="mt-4 font-semibold text-white"
+          >
+            Ananya
+          </p>
+          <p
+            class="text-xs uppercase tracking-[0.08em] text-white/60"
+          >
+            Verified stay
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
 </DocumentFragment>
 `;

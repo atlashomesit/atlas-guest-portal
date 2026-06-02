@@ -1,5 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import AboutPage from "@/pages/AboutPage";
+import { MARKETPLACE_BRAND_BASELINE } from "@/tenant/displayBrand";
 
 describe("AboutPage", () => {
   it("renders mission, team, standards, and trust content", () => {
@@ -21,8 +22,8 @@ describe("AboutPage", () => {
     render(<AboutPage />);
 
     const descriptionMeta = document.head.querySelector("meta[name='description']");
-    expect(descriptionMeta?.getAttribute("content")).toContain("Atlas Homestays");
-    expect(document.title).toContain("About Atlas Homestays");
+    expect(descriptionMeta?.getAttribute("content")).toContain(MARKETPLACE_BRAND_BASELINE);
+    expect(document.title).toContain(`About ${MARKETPLACE_BRAND_BASELINE}`);
   });
 
   it("matches the snapshot", () => {

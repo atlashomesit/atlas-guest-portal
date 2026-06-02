@@ -171,7 +171,6 @@ function getPpCancellationInfo(tier: string | null | undefined): PpCancellationI
 
 const PP_REVIEW_BG_COLORS = ['#1a1a2e', '#ffb347', '#c2410c', '#94755b', '#e9f5ef'];
 const PP_REVIEW_TEXT_COLORS = ['#fffaf5', '#1a1a2e', '#fffaf5', '#fffaf5', '#157046'];
-const PP_CELL_LABELS = ['Living', 'Kitchen', 'Bedroom', 'Balcony'] as const;
 
 /** Shown while listing data is resolving (incl. API fallback). Matches loaded page layout for perceived performance. */
 function PropertyDetailsSkeleton() {
@@ -1355,7 +1354,8 @@ useEffect(() => {
                   className="pp-btn pp-btn-ghost pp-btn-sm"
                   onClick={() => {
                     const url = window.location.href;
-                    const priceText = directBookingNightly > 0 ? ` from ₹${directBookingNightly.toLocaleString('en-IN')}/night` : '';
+                    // TASK-2873: do not advertise a price for a Draft (unpublished) listing.
+                    const priceText = !ppIsDraft && directBookingNightly > 0 ? ` from ₹${directBookingNightly.toLocaleString('en-IN')}/night` : '';
                     const text = `Check out ${data.property_name}${priceText} on ${ppBrandName}`;
                     const share = async () => {
                       if (typeof navigator.share === 'function') {
@@ -1407,23 +1407,19 @@ useEffect(() => {
               </div>
 
               {/* Thumbnail cells */}
+              {/* TASK-2889: render only cells that have a real photo — no fabricated
+                  "Living/Kitchen/Bedroom/Balcony" placeholder tiles for sparse listings. */}
               {([1, 2, 3, 4] as const).map((i) => {
                 const photo = galleryUrls[i];
+                if (!photo) return null;
                 return (
                   <div
                     key={i}
-                    className={`pp-cell pp-cell-${i + 1}${photo ? ' pp-cell--photo' : ''}`}
-                    style={photo ? { backgroundImage: `url(${photo})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
+                    className={`pp-cell pp-cell-${i + 1} pp-cell--photo`}
+                    style={{ backgroundImage: `url(${photo})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
                     role="img"
-                    aria-label={photo ? `${data.property_name} — photo ${i + 1}` : `${PP_CELL_LABELS[i - 1]} area`}
-                  >
-                    {!photo && (
-                      <>
-                        <div className="pp-cell-id-thumb" aria-hidden="true">{['i','ii','iii','iv'][i - 1]}</div>
-                        <span className="pp-cell-label">{PP_CELL_LABELS[i - 1]}</span>
-                      </>
-                    )}
-                  </div>
+                    aria-label={`${data.property_name} — photo ${i + 1}`}
+                  />
                 );
               })}
 
@@ -1549,7 +1545,7 @@ useEffect(() => {
                     </div>
                     <div className="pp-host-actions">
                       <a
-                        href={ppWaBookingUrl}
+                        href={ppIsDraft ? ppWaAskUrl : ppWaBookingUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="pp-btn pp-btn-whatsapp pp-btn-sm"
@@ -1915,15 +1911,15 @@ useEffect(() => {
                     <div className="pp-v2-knowcard">
                       <div className="pp-v2-knowicon"><PpV2ClockInIcon /></div>
                       <small>Check-in</small>
-                      <strong>{resolvedCheckInTime ?? '2:00 PM'}</strong>
-                      <span>Self-check-in via lockbox. Early check-in subject to availability.</span>
+                      <strong>{resolvedCheckInTime ?? 'Confirmed after booking'}</strong>
+                      {resolvedCheckInTime && <span>Early check-in subject to availability.</span>}
                     </div>
                     {/* Check-out card */}
                     <div className="pp-v2-knowcard">
                       <div className="pp-v2-knowicon"><PpV2ClockOutIcon /></div>
                       <small>Check-out</small>
-                      <strong>{resolvedCheckOutTime ?? '11:00 AM'}</strong>
-                      <span>Drop keys in the lockbox. Luggage can stay till evening on request.</span>
+                      <strong>{resolvedCheckOutTime ?? 'Confirmed after booking'}</strong>
+                      {resolvedCheckOutTime && <span>Late check-out subject to availability.</span>}
                     </div>
                   </div>
                 </section>
@@ -2109,7 +2105,7 @@ useEffect(() => {
                 {/* WhatsApp CTA (sidebar) */}
                 <div style={{ marginTop: 12 }}>
                   <a
-                    href={ppWaBookingUrl}
+                    href={ppIsDraft ? ppWaAskUrl : ppWaBookingUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="pp-btn pp-btn-whatsapp pp-btn-block"
