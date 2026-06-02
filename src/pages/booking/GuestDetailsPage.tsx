@@ -326,10 +326,11 @@ const GuestDetailsPage: React.FC = () => {
 
   const displayPrice = (n: number) => formatCurrency(n, { maximumFractionDigits: 0 });
 
-  // GST: 5% or 12% on accommodation (ADDITIVE per CPO-canonical formula 2026-05-21)
+  // GST: 5% (≤₹7,500/night) or 18% (above) on accommodation — ADDITIVE per CPO-canonical
+  // formula 2026-05-21; 18% upper slab per the 22 Sep 2025 reform (TASK-2870).
   // baseAmount from API is pre-GST (price_per_night × nights)
   const perNight = nights > 0 ? Math.round(baseAmount / nights) : 0;
-  const gstSlabPercent = perNight > 0 ? (perNight <= 7500 ? 5 : 12) : null;
+  const gstSlabPercent = perNight > 0 ? (perNight <= 7500 ? 5 : 18) : null;
   const gstLineAmount =
     gstSlabPercent != null && baseAmount > 0
       ? Math.max(1, Math.round(baseAmount * gstSlabPercent / 100))
