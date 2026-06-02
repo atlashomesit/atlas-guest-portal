@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint'
 import noAtlasStringLeak from './eslint-rules/no-atlas-string-leak.js'
 
 export default tseslint.config(
-  { ignores: ['dist', 'be-src', '**/be-src/**'] },
+  { ignores: ['dist', 'be-src', '**/be-src/**', '.wrangler/**'] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ['**/*.{ts,tsx}'],

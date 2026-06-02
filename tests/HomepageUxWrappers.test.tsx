@@ -10,8 +10,29 @@ vi.mock("../src/components/homepage_components/homepage_whychoose/Homepage_WhyCh
   default: () => <div data-testid="why-choose-default">Why Choose baseline</div>,
 }));
 
-vi.mock("../src/components/homepage_components/homepage_testimonial/Homepage_Testimonial", () => ({
-  default: () => <div data-testid="testimonials-default">Testimonials carousel baseline</div>,
+vi.mock("../src/hooks/useTenantListings", () => ({
+  useTenantListings: () => ({
+    properties: [{ id: 1, listingId: 101 }],
+    listings: [],
+    state: "success" as const,
+    errorMessage: undefined,
+    refetch: vi.fn(),
+  }),
+}));
+
+vi.mock("../src/hooks/useVerifiedReviews", () => ({
+  useVerifiedReviews: () => ({
+    reviews: [
+      {
+        id: 1,
+        firstName: "Ananya",
+        rating: 5,
+        text: "Spotless rooms and warm hosts.",
+        createdAt: "2026-05-01T00:00:00Z",
+      },
+    ],
+    loading: false,
+  }),
 }));
 
 vi.mock("../src/components/commonComponents/parallax/Parallax", () => ({
@@ -70,10 +91,11 @@ describe("Homepage UX wrappers (default path)", () => {
     expect(asFragment()).toMatchSnapshot();
   });
 
-  it("uses the live testimonials carousel instead of placeholders", () => {
+  it("uses verified guest reviews instead of placeholders", () => {
     const { asFragment } = render(withBooking(<TestimonialsSection />));
 
-    expect(screen.getByTestId("testimonials-default")).toBeInTheDocument();
+    expect(screen.getByText("What verified guests say")).toBeInTheDocument();
+    expect(screen.getByText("Verified stay")).toBeInTheDocument();
     expect(screen.queryByText(/Source pending verification/i)).not.toBeInTheDocument();
     expect(asFragment()).toMatchSnapshot();
   });

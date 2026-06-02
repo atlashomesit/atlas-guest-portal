@@ -1,6 +1,7 @@
 import { CheckCircle2, HeartHandshake, ShieldCheck, Sparkles, Users, MapPin, Clock4, BedDouble, Medal } from "lucide-react";
 import SEO from "../components/SEO";
-import { getTenantContext } from "../tenant/tenantContext";
+import { getPublicSiteOrigin } from "../config/siteOrigin";
+import { getTenantBrandName } from "../tenant/displayBrand";
 
 const stayIllustration = `data:image/svg+xml;utf8,${encodeURIComponent(`
   <svg width="640" height="360" viewBox="0 0 640 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
@@ -130,9 +131,9 @@ const missionHighlights = [
 ];
 
 const AboutPage = () => {
-  const brandName = getTenantContext()?.name?.trim() || "Atlas Homestays";
-  const aboutUrl =
-    typeof window !== "undefined" ? `${window.location.origin}/about` : "https://www.atlashomestays.com/about";
+  const brandName = getTenantBrandName();
+  const origin = getPublicSiteOrigin();
+  const aboutUrl = origin ? `${origin}/about` : "/about";
 
   return (
   <div className="bg-bg-muted text-text-primary min-h-screen">
