@@ -756,7 +756,7 @@ const SearchPage = () => {
         <header className="space-y-2">
           <p className="text-sm font-semibold uppercase tracking-wide text-text-muted">Search results</p>
           {/* TASK-1864: dynamic h1 — only say "homes for your dates" when dates are actually set */}
-          <h1 className="text-3xl font-bold text-text-primary sm:text-4xl">
+          <h1 className="text-3xl font-bold text-text-primary sm:text-4xl" data-testid="search-results-h1">
             {checkIn && checkOut
               ? dateAvailCheckFailed
                 ? `${filteredUnits.length} ${filteredUnits.length === 1 ? "home" : "homes"} — availability not confirmed`

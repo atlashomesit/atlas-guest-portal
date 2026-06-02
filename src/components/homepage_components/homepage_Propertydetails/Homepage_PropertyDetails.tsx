@@ -1424,7 +1424,7 @@ useEffect(() => {
             </div>
 
             {/* ---- Gallery mosaic ---- */}
-            <div className="pp-gallery" role="region" aria-label="Property photos">
+            <div className="pp-gallery" role="region" aria-label="Property photos" data-testid="property-photo-gallery">
               {/* Hero cell */}
               <div
                 className={`pp-cell pp-cell-hero${galleryUrls[0] ? ' pp-cell--photo' : ''}`}

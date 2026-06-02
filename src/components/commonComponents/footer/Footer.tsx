@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom';
 import { helpNav, moreNav, primaryNav } from '../../../config/navigation';
 import { LOGO_URL } from '../../../config/branding';
 import { getTenantContext } from '../../../tenant/tenantContext';
+import { getTenantBrandName } from '../../../tenant/displayBrand';
 import { getTenantOverrides, shouldHideAtlasBranding } from '../../../tenant/tenantOverrides';
 import { CompactThemeSwitcher } from '../../ui/CompactThemeSwitcher';
 import { formatDisplayNumber, getContactEmail, getTelLink, getWhatsAppLink, getContactPhone, getWhatsAppPhone } from '../../../config/contact';
@@ -22,16 +23,16 @@ const iconMap = {
     IoIosArrowForward
 };
 
-const socialLabelByIcon: Record<string, string> = {
-    FaFacebook: `Visit ${getTenantContext()?.name ?? 'us'} on Facebook`,
-    FaInstagram: `Visit ${getTenantContext()?.name ?? 'us'} on Instagram`,
-    FaTwitter: `Visit ${getTenantContext()?.name ?? 'us'} on X`,
-    FaYoutube: `Visit ${getTenantContext()?.name ?? 'us'} on YouTube`,
-    ImGithub: `Visit ${getTenantContext()?.name ?? 'us'} on GitHub`,
-};
-
 const Footer = () => {
     const tenant = getTenantContext();
+    const brandName = getTenantBrandName();
+    const socialLabelByIcon: Record<string, string> = {
+        FaFacebook: `Visit ${brandName} on Facebook`,
+        FaInstagram: `Visit ${brandName} on Instagram`,
+        FaTwitter: `Visit ${brandName} on X`,
+        FaYoutube: `Visit ${brandName} on YouTube`,
+        ImGithub: `Visit ${brandName} on GitHub`,
+    };
     const overrides = getTenantOverrides(tenant?.slug);
     const hideAtlasBranding = shouldHideAtlasBranding(tenant, overrides);
     const logoSrc = overrides.hideLogo ? "" : (tenant?.logoUrl ?? LOGO_URL);

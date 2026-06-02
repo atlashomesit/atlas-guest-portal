@@ -1,8 +1,14 @@
 import { MemoryRouter } from 'react-router-dom';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
 import Policies from './Policies';
 import Footer from '../components/commonComponents/footer/Footer';
 import { policySections } from '../content/legal/policies';
+
+vi.mock('../tenant/displayBrand', () => ({
+  getTenantBrandName: () => 'Atlastays',
+  MARKETPLACE_BRAND_BASELINE: 'Atlastays',
+}));
 
 describe('Policies page', () => {
   const renderPage = () => render(
@@ -13,7 +19,7 @@ describe('Policies page', () => {
 
   it('renders the page title for policies', () => {
     renderPage();
-    expect(screen.getByRole('heading', { name: /Guest Policies \| Atlas Guest Portal/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Guest Policies \| Atlastays/i })).toBeInTheDocument();
   });
 
   it('shows all sections in the section nav', () => {

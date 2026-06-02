@@ -13,7 +13,7 @@ export type PolicySection = {
 };
 
 export const policyMetadata = {
-  title: "Guest Policies | Atlas Guest Portal",
+  /** Title is localized in `Policies.tsx` via `getTenantBrandName()`. */
   effectiveDate: "Effective from January 10, 2025",
 };
 

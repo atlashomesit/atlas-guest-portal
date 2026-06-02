@@ -326,6 +326,7 @@ export default function BookingConfirmationPage() {
     token ?? undefined,
   );
   const qrEncodeToken = qrToken ?? token;
+  const brandName = getTenantBrandName();
 
   const [booking, setBooking] = useState<BookingSummary | null>(null);
   const [addOns, setAddOns] = useState<ListingAddOnPublic[]>([]);
@@ -727,7 +728,7 @@ export default function BookingConfirmationPage() {
     const checkin = formatIcsDate(cinIso, cinTime);
     const checkout = formatIcsDate(coutIso, coutTime);
     const uid = `atlas-booking-${booking.bookingId}@atlashomestays.com`; // eslint-disable-line atlas-brand/no-atlas-string-leak -- iCal UID domain, not user-visible
-    const tenantName = getTenantContext()?.name ?? 'Our Platform';
+    const tenantName = brandName;
     const ics = [
       "BEGIN:VCALENDAR",
       "VERSION:2.0",
@@ -1369,7 +1370,7 @@ export default function BookingConfirmationPage() {
               {/* TASK-2876: gate the "confirmed" affirmation on payment capture; show "Finalizing" while the poll runs so the page doesn't contradict the amber "Checking payment" banner. */}
               {paymentStatus === "success" ? (
                 <>
-                  <p>✅ Booking confirmed now.</p>
+                  <p data-testid="booking-confirmed-affirmation">✅ Booking confirmed now.</p>
                   <p>
                     📱 SMS and WhatsApp confirmation should arrive shortly
                     {confirmationNotifyPhone ? (
@@ -1381,7 +1382,7 @@ export default function BookingConfirmationPage() {
                   </p>
                 </>
               ) : paymentStatus === "pending" ? (
-                <p>⏳ Finalizing your booking — we're confirming your payment. This usually takes a few moments.</p>
+                <p data-testid="booking-finalizing-payment">⏳ Finalizing your booking — we're confirming your payment. This usually takes a few moments.</p>
               ) : (
                 <p>⚠️ Your payment hasn't completed yet. Please complete payment above to confirm your booking.</p>
               )}
@@ -1739,7 +1740,7 @@ export default function BookingConfirmationPage() {
           <div className="rounded-2xl border border-green-200 bg-green-50/40 p-5 space-y-3">
             <h2 className="text-sm font-semibold text-text-primary">Give friends ₹500 off</h2>
             <p className="text-sm text-text-secondary">
-              Share your code and your friends get ₹500 off their first {getTenantContext()?.name ?? 'our platform'} booking.
+              Share your code and your friends get ₹500 off their first {brandName} booking.
             </p>
             <div className="flex items-center gap-2 bg-white border border-green-200 rounded-lg px-3 py-2 w-fit">
               <span className="text-base font-mono font-bold text-text-primary tracking-widest" data-testid="referral-code">
@@ -1762,10 +1763,10 @@ export default function BookingConfirmationPage() {
             <a
               href={`https://wa.me/?text=${encodeURIComponent(
                 shareLanguage === "hi"
-                  ? `मैंने ${booking.propertyName} में अपना प्रवास बेहद पसंद किया! 🏠✨ ${getTenantContext()?.name ?? 'Our platform'} पर बुक करें और कोड ${booking.guestReferralCode} से ₹500 की छूट पाएं: ${window.location.origin}/search`
+                  ? `मैंने ${booking.propertyName} में अपना प्रवास बेहद पसंद किया! 🏠✨ ${brandName} पर बुक करें और कोड ${booking.guestReferralCode} से ₹500 की छूट पाएं: ${window.location.origin}/search`
                   : shareLanguage === "te"
-                  ? `${booking.propertyName}లో నా స్టే చాలా బాగుంది! 🏠✨ ${getTenantContext()?.name ?? 'Our platform'} లో బుక్ చేసుకోండి మరియు ${booking.guestReferralCode} కోడ్ ఉపయోగించి ₹500 డిస్కౌంట్ పొందండి: ${window.location.origin}/search`
-                  : `I loved my stay at ${booking.propertyName}! 🏠✨ Book via ${getTenantContext()?.name ?? 'our platform'} and use code ${booking.guestReferralCode} for ₹500 off your first booking: ${window.location.origin}/search`
+                  ? `${booking.propertyName}లో నా స్టే చాలా బాగుంది! 🏠✨ ${brandName} లో బుక్ చేసుకోండి మరియు ${booking.guestReferralCode} కోడ్ ఉపయోగించి ₹500 డిస్కౌంట్ పొందండి: ${window.location.origin}/search`
+                  : `I loved my stay at ${booking.propertyName}! 🏠✨ Book via ${brandName} and use code ${booking.guestReferralCode} for ₹500 off your first booking: ${window.location.origin}/search`
               )}`}
               target="_blank"
               rel="noopener noreferrer"
@@ -1808,7 +1809,7 @@ export default function BookingConfirmationPage() {
             data-testid="confirmation-cta"
             className="text-sm text-text-muted underline underline-offset-2 hover:text-text-primary"
           >
-            ← Back to {getTenantContext()?.name ?? 'Home'}
+            ← Back to {brandName}
           </Link>
         </div>
       </div>

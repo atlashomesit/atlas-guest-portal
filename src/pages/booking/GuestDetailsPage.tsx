@@ -248,6 +248,7 @@ const GuestDetailsPage: React.FC = () => {
   const navigate = useNavigate();
   const { propertySlug, unitSlug } = useParams<{ propertySlug: string; unitSlug: string }>();
   const { booking, updateBooking } = useBooking();
+  const brandName = getTenantBrandName();
   const [holdHydrationDone, setHoldHydrationDone] = useState(false);
 
   // TASK-2882: rehydrate hold from sessionStorage after hard reload before showing "pick dates" modal.
@@ -743,7 +744,7 @@ const GuestDetailsPage: React.FC = () => {
                 key: keyId,
                 amount: Number(amount),
                 currency: 'INR',
-                name: getTenantContext()?.displayMerchantName ?? getTenantContext()?.name ?? 'Our Property',
+                name: getTenantContext()?.displayMerchantName ?? brandName,
                 description: `Booking confirmation`,
                 order_id: orderId,
                 prefill: {
@@ -976,7 +977,6 @@ const GuestDetailsPage: React.FC = () => {
   }
 
   const tenantCtx = getTenantContext();
-  const brandName = getTenantBrandName();
   const brandInitial = brandName.charAt(0).toUpperCase();
   const whatsappNumber = tenantCtx?.whatsappBookingPhone ?? '';
   const consentEntityName = getGuestDataProcessingEntityName();
@@ -1627,7 +1627,7 @@ const GuestDetailsPage: React.FC = () => {
               </div>
             )}
             {convenienceFeeAmount > 0 && (
-              <div className="gd-price-row" title="Razorpay payment gateway fee — passed through, not an Atlas markup.">
+              <div className="gd-price-row" title="Razorpay payment gateway fee — passed through, not a platform markup.">
                 <span>Payment processing</span>
                 <span className="num">{displayPrice(convenienceFeeAmount)}</span>
               </div>
