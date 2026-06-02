@@ -719,6 +719,10 @@ const SearchPage = () => {
   /** TASK-1648: skeleton while public availability resolves for selected dates (list view). */
   const showDateAvailabilitySkeleton =
     explicitDateSearch && !hasInvalidDates && dateAvailLoading && !isLoading && !mapView;
+  /** TASK-2893: dates were searched but the live availability check returned nothing (fail-open),
+   * so we're showing all homes unfiltered — don't claim they're "available for your dates". */
+  const dateAvailUnconfirmed =
+    explicitDateSearch && !hasInvalidDates && !dateAvailLoading && dateAvailableIds === null;
   const queryString = searchParams.toString();
   const querySuffix = queryString ? `?${queryString}` : "";
   const approximatePinHint = useMemo(
@@ -759,17 +763,15 @@ const SearchPage = () => {
           {/* TASK-1864: dynamic h1 — only say "homes for your dates" when dates are actually set */}
           <h1 className="text-3xl font-bold text-text-primary sm:text-4xl" data-testid="search-results-h1">
             {checkIn && checkOut
-              ? dateAvailCheckFailed
-                ? `${filteredUnits.length} ${filteredUnits.length === 1 ? "home" : "homes"} — availability not confirmed`
-                : `${filteredUnits.length} ${filteredUnits.length === 1 ? "home" : "homes"} for your dates`
+              ? `${filteredUnits.length} ${filteredUnits.length === 1 ? "home" : "homes"}${dateAvailUnconfirmed ? "" : " for your dates"}`
               : getTenantBrandName()}
           </h1>
           <p className="max-w-3xl text-base text-text-body">
-            {dateAvailCheckFailed
-              ? "We couldn't confirm live availability for these dates. Contact the host before you book, or try different dates."
-              : checkIn && checkOut && !hasInvalidDates
-                ? "Homes below are filtered to those available for your dates when our live check succeeds. You can still refine with price, guests, and amenities."
-                : "Browse all homes. Filter by price, guests and amenities below."}
+            {checkIn && checkOut && !hasInvalidDates
+              ? (dateAvailUnconfirmed
+                  ? "We couldn't confirm live availability for these dates, so we're showing all homes — please reconfirm with the host before booking. Refine with price, guests, and amenities below."
+                  : "Homes below are filtered to those available for your dates when our live check succeeds. You can still refine with price, guests, and amenities.")
+              : "Browse all homes. Filter by price, guests and amenities below."}
           </p>
         </header>
 
