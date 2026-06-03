@@ -275,7 +275,6 @@ interface Property {
     property_policy_details: PropertyDetail[];
     property_rating: number;
     property_reviews: number;
-    property_review_snippets: string[];
     property_price: number;
     timezoneId?: string;
     photoCount?: number;
@@ -864,7 +863,6 @@ const PropertyDetails = () => {
                         property_policy_details: Array.isArray((apiListing as Record<string, unknown>).property_policy_details) ? (apiListing as Record<string, unknown>).property_policy_details as PropertyDetail[] : [],
                         property_rating: Number((apiListing as Record<string, unknown>).property_rating) || 0,
                         property_reviews: Number((apiListing as Record<string, unknown>).property_reviews) || 0,
-                        property_review_snippets: Array.isArray((apiListing as Record<string, unknown>).property_review_snippets) ? (apiListing as Record<string, unknown>).property_review_snippets as string[] : [],
                         property_price: Number((apiListing as Record<string, unknown>).property_price) || 0,
                         timezoneId: (apiListing as Record<string, unknown>).timezoneId as string | undefined,
                         photoCount: photoCount || (coverUrl ? 1 : 0),
