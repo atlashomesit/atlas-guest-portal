@@ -31,6 +31,7 @@ import { track } from '@/lib/events'; // TASK-1480
 import {
   ILLUSTRATIVE_OTA_GUEST_FEE_PERCENT,
 } from '@/utils/directBookingPromo';
+import { accommodationGstLineAmount, accommodationGstSlabPercent } from '@/utils/guestPriceEstimate';
 
 declare global {
   interface Window {
@@ -816,8 +817,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
   // ---------- Fee calculations ----------
 
-  // TASK-1645: Indian accommodation GST slab on effective nightly rate (5% ≤₹7,500/night, 12% above).
-  // Room fare in breakdown is GST-inclusive; we show extracted GST for transparency.
+  // TASK-1645 / TASK-2870: Indian accommodation GST slab (5% ≤₹7,500/night, 18% above).
+  // Room fare in breakdown is GST-exclusive base; GST is additive for transparency.
 
   // When API has loaded: use API price (or calendar sum). When API has not loaded: use 0.
   const hasSelectedRange = Boolean(dateRange.startDate && dateRange.endDate);
@@ -837,14 +838,16 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         ? effectiveDailyPricing.actualPrice
         : 0;
 
-  /** TASK-1645: slab from average nightly room tariff for the selected stay (≤₹7,500 → 5%, else 12%). */
+  /** TASK-2870: slab from average nightly room tariff for the selected stay. */
   const gstSlabPercent =
-    hasSelectedRange && perNightForDisplay > 0 ? (perNightForDisplay <= 7500 ? 5 : 12) : null;
+    hasSelectedRange && perNightForDisplay > 0
+      ? accommodationGstSlabPercent(perNightForDisplay)
+      : null;
 
   /** GST component of room fare (ADDITIVE — CPO formula per 2026-05-21). */
   const gstLineAmount =
     gstSlabPercent != null && breakdownPrice > 0
-      ? Math.max(1, Math.round(breakdownPrice * gstSlabPercent / 100))
+      ? accommodationGstLineAmount(breakdownPrice, perNightForDisplay)
       : 0;
 
   // Razorpay charges its 3% fee on the FULL amount it processes (base + GST), not just base.
@@ -853,7 +856,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   const breakdownConvenienceFee = Math.round((breakdownPrice + gstLineAmount) * convenienceFeePercent);
 
   // TASK-2631: Total = Base + GST + Service Fee (CPO-canonical formula).
-  // GST is additive (5% or 12% of base, not inclusive extraction).
+  // GST is additive (5% or 18% of base, not inclusive extraction).
   const breakdownFinalTotal = Math.max(1, breakdownPrice + gstLineAmount + breakdownConvenienceFee);
 
   const finalTotal =
@@ -874,7 +877,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
   // v2: "Why book direct" block removed from widget JSX. Calculation kept (prefixed _) for future
   // OTA comparison card on the listing page. TASK-2576 context: data was used to show OTA fee delta.
-  const _illustrativeOtaGuestFeeComparison = useMemo(() => {
+  const illustrativeOtaGuestFeeComparison = useMemo(() => {
     if (!hasSelectedRange || breakdownPrice <= 0) return null;
     const illustrativeGuestFee = Math.round((breakdownPrice * ILLUSTRATIVE_OTA_GUEST_FEE_PERCENT) / 100);
     return {
@@ -924,6 +927,16 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     const numericListingId = listingId != null ? Number(listingId) : NaN;
     if (!Number.isFinite(numericListingId)) {
       setFormError('Property could not be loaded. Please refresh the page and try again.');
+      return;
+    }
+
+    // TASK-2879: never create a hold without route slugs — /reserve cannot carry holdId forward.
+    const targetSlug = (propertySlug ?? '').trim();
+    const targetUnit = (unitSlug ?? '').trim();
+    if (!targetSlug || !targetUnit) {
+      setFormError(
+        'Checkout is temporarily unavailable for this listing. Please refresh the page or contact the host.',
+      );
       return;
     }
 
@@ -984,14 +997,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         guests,
       });
 
-      const targetSlug = propertySlug ?? '';
-      const targetUnit = unitSlug ?? '';
-      if (targetSlug && targetUnit) {
-        navigate(`/book/${targetSlug}/${targetUnit}/details`);
-      } else {
-        // Fallback: navigate to reserve page (should not happen in normal flow)
-        navigate('/reserve');
-      }
+      navigate(`/book/${targetSlug}/${targetUnit}/details`);
     } catch (error: unknown) {
       console.error('[UnitBookingWidget] Reserve error:', error);
       const data = (error as { response?: { data?: { code?: string; Code?: string } } })?.response?.data;
@@ -1226,6 +1232,16 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           open for booking.
           <span className="mx-1 inline-block rounded bg-[#fff3e0] px-1.5 py-0.5 text-[#92400e]">Turnover</span>
           cleaning window (still bookable).
+          <span
+            className="mx-1 inline-block rounded px-1.5 py-0.5 text-[#64748b]"
+            style={{
+              background:
+                'repeating-linear-gradient(-45deg, #f1f5f9, #f1f5f9 3px, #e2e8f0 3px, #e2e8f0 6px)',
+            }}
+          >
+            Unavailable
+          </span>
+          booked, blocked, or on hold.
         </p>
 
         {/* v2 guests card */}
@@ -1249,7 +1265,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               <div className="bw-guest-row">
                 <div>
                   <div className="bw-guest-label">Guests</div>
-                  <div className="bw-guest-sub">Ages 2+</div>
+                  <div className="bw-guest-sub">
+                    Ages 2+ · Maximum {effectiveMaxGuests} guest{effectiveMaxGuests === 1 ? '' : 's'}
+                  </div>
                 </div>
                 <div className="bw-counter">
                   <button
@@ -1287,7 +1305,6 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             <div className="lv-price-row" data-testid="bw-bd-gst-row">
               <span>
                 GST ({gstSlabPercent}%) <small style={{ color: '#475569', fontWeight: 400 }}>on accommodation</small>
-                <br /><small style={{ color: '#475569', fontWeight: 400, fontSize: 11 }}>On accommodation only</small>
               </span>
               <span className="lv-num">{displayPrice(gstLineAmount)}</span>
             </div>
@@ -1317,8 +1334,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               Payment processing{convenienceFeePctLabel > 0 ? ` (${convenienceFeePctLabel}%)` : ''}
               <HelpCircle
                 className="h-3 w-3 cursor-help text-text-muted"
-                aria-label="Razorpay payment gateway fee — passed through, not an Atlas markup."
-                title="Razorpay payment gateway fee — passed through, not an Atlas markup."
+                aria-label="Razorpay payment gateway fee — passed through, not a platform markup."
+                title="Razorpay payment gateway fee — passed through, not a platform markup."
               />
             </span>
             <span className="lv-num">{displayPrice(breakdownConvenienceFee)}</span>
@@ -1396,6 +1413,16 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       <p className="bw-charge-note" data-testid="bw-charge-note" style={{ textAlign: 'center', fontSize: 12, color: '#64748b', marginTop: 8 }}>
         You won&apos;t be charged yet
       </p>
+
+      {illustrativeOtaGuestFeeComparison && illustrativeOtaGuestFeeComparison.illustrativeGuestFee > 0 && (
+        <p
+          className="bw-direct-savings"
+          data-testid="bw-direct-savings-line"
+          style={{ textAlign: 'center', fontSize: 12, color: '#157046', marginTop: 6, lineHeight: 1.45 }}
+        >
+          Save ~{displayPrice(illustrativeOtaGuestFeeComparison.illustrativeGuestFee)} vs typical booking sites — no guest service fee on direct bookings.
+        </p>
+      )}
 
       {/* TASK-2623: Trust strip — free cancellation (v2 style) */}
       <div className="lv-booking-cancel bw-trust" data-testid="bw-trust-strip">

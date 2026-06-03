@@ -171,6 +171,10 @@ export default function MyBookingsPage() {
           <div className="space-y-3">
             {filteredBookings.map((b) => {
               const statusClass = STATUS_COLORS[b.status] ?? "bg-gray-100 text-gray-700";
+              const inStay = b.status === "CheckedIn";
+              const statusLabel = inStay
+                ? `In progress · check out ${b.checkoutDate}`
+                : b.status;
               return (
                 <Link
                   key={b.id}
@@ -182,8 +186,11 @@ export default function MyBookingsPage() {
                       <p className="text-base font-semibold text-text-primary">{b.listingName}</p>
                       <p className="text-sm text-text-muted">{b.propertyName}</p>
                     </div>
-                    <span className={`text-sm font-medium px-2 py-1 rounded-full shrink-0 ${statusClass}`}>
-                      {b.status}
+                    <span
+                      className={`text-sm font-medium px-2 py-1 rounded-full shrink-0 ${statusClass}`}
+                      data-testid={inStay ? "my-bookings-in-stay-badge" : undefined}
+                    >
+                      {statusLabel}
                     </span>
                   </div>
                   <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-text-secondary">
@@ -191,6 +198,11 @@ export default function MyBookingsPage() {
                     <span className="font-mono text-sm text-text-muted">#{b.bookingRef}</span>
                     <span className="ml-auto font-medium text-text-primary">₹{Number(b.totalAmount).toLocaleString("en-IN")}</span>
                   </div>
+                  {inStay && (
+                    <p className="mt-2 text-xs text-text-muted" data-testid="my-bookings-in-stay-hint">
+                      View check-in details, address, and host contact on your confirmation page.
+                    </p>
+                  )}
                 </Link>
               );
             })}
@@ -199,12 +211,19 @@ export default function MyBookingsPage() {
 
         {/* TASK-2567: only show link when there's a booking to use as context (avoids ?bookingId= empty param) */}
         {guestId && token && bookings.length > 0 && (
-          <div className="text-center pt-2">
+          <div className="text-center pt-2 flex flex-col items-center gap-2">
             <Link
               to={`/profile?bookingId=${bookings[0].id}&t=${encodeURIComponent(token)}`}
               className="text-sm text-text-muted underline underline-offset-2 hover:text-text-primary"
             >
               Update contact details
+            </Link>
+            <Link
+              to={`/preferences/${encodeURIComponent(token)}`}
+              className="text-sm text-text-muted underline underline-offset-2 hover:text-text-primary"
+              data-testid="my-bookings-manage-preferences"
+            >
+              Manage email &amp; WhatsApp preferences
             </Link>
           </div>
         )}

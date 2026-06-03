@@ -22,10 +22,10 @@ exports[`Homepage UX wrappers (default path) > renders the default secondary ban
       <h2
         data-testid="parallax-title"
       >
-        Our Homestays – Where Every Stay Feels Like Home
+        Atlastays – Where Every Stay Feels Like Home
       </h2>
       <p>
-        At Our Homestays, every detail is designed for your comfort. Relax in beautifully appointed spaces, enjoy modern amenities, and make every moment unforgettable.
+        At Atlastays, every detail is designed for your comfort. Relax in beautifully appointed spaces, enjoy modern amenities, and make every moment unforgettable.
       </p>
     </div>
   </div>
@@ -47,6 +47,7 @@ exports[`Homepage UX wrappers (default path) > uses verified guest reviews inste
   <section
     aria-labelledby="testimonials-heading"
     class="py-section-gap md:py-section-gap-md lg:py-section-gap-lg text-white bg-[#071624] isolate relative"
+    data-testid="homepage-verified-testimonials"
     style="background-color: rgb(7, 22, 36); background-image: linear-gradient(180deg, rgb(7, 22, 36) 0%, rgb(16, 36, 58) 100%);"
   >
     <div

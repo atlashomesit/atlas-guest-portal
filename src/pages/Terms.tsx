@@ -42,15 +42,17 @@ const Terms = () => {
 
   const printPage = () => window.print();
 
+  const pageTitle = `Terms of Service | ${brandName}`;
+
   return (
     <LegalLayout
       current="terms"
-      title={termsMetadata.title}
+      title={pageTitle}
       description="The definitive legal contract governing bookings, payments, conduct, and liabilities."
       lastUpdated={termsMetadata.lastUpdated}
     >
       <SEO
-        title={termsMetadata.title}
+        title={pageTitle}
         description={`Review ${brandName} Terms of Service with booking rules, cancellations, conduct, and liability guidance.`}
         url="/terms"
       />

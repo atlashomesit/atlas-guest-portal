@@ -5,6 +5,9 @@
  */
 
 import type { TenantInfo } from './tenantContext';
+import { MARKETPLACE_BRAND_BASELINE } from './displayBrand';
+
+let manifestObjectUrl: string | null = null;
 
 /** Rejects non-hex brand strings from the API so CSS variables are never injected with arbitrary values. */
 function isSafeBrandHex(value: string): boolean {
@@ -39,10 +42,9 @@ function darkenRgb(rgb: string, amount = 20): string {
 }
 
 export function applyTenantBranding(tenant: TenantInfo): void {
-  // 1. Document title — guard against whitespace-only name (WCAG: title must be non-empty)
-  if (tenant.name?.trim()) {
-    document.title = tenant.name.trim();
-  }
+  // 1. Document title — prefer guest-facing brandName over internal slug/name (CPO-001)
+  const docTitle = (tenant.brandName?.trim() || tenant.name?.trim() || MARKETPLACE_BRAND_BASELINE);
+  document.title = docTitle;
 
   // 2. Primary color — apply to CSS RGB variables used by Tailwind and CSS custom props
   const brandHex = tenant.primaryColor?.trim();
@@ -77,4 +79,58 @@ export function applyTenantBranding(tenant: TenantInfo): void {
     }
     link.href = tenant.faviconUrl;
   }
+
+  applyTenantWebManifest(tenant);
+  applyAppleWebAppTitle(tenant);
+}
+
+function applyAppleWebAppTitle(tenant: TenantInfo): void {
+  const short =
+    tenant.brandName?.trim() || tenant.name?.trim() || MARKETPLACE_BRAND_BASELINE;
+  const appleTitle = short.length > 12 ? short.slice(0, 12) : short;
+  let meta = document.querySelector<HTMLMetaElement>('meta[name="apple-mobile-web-app-title"]');
+  if (!meta) {
+    meta = document.createElement("meta");
+    meta.name = "apple-mobile-web-app-title";
+    document.head.appendChild(meta);
+  }
+  meta.content = appleTitle;
+}
+
+/** Per-tenant PWA manifest name (CPO-001 / module #14). */
+function applyTenantWebManifest(tenant: TenantInfo): void {
+  if (typeof document === 'undefined' || typeof fetch === 'undefined') return;
+
+  const displayName =
+    tenant.brandName?.trim() || tenant.name?.trim() || MARKETPLACE_BRAND_BASELINE;
+  const shortName = displayName.length > 12 ? `${displayName.slice(0, 12)}…` : displayName;
+
+  void fetch('/manifest.webmanifest')
+    .then((res) => (res.ok ? res.json() : null))
+    .then((base: Record<string, unknown> | null) => {
+      if (!base || typeof base !== 'object') return;
+      const merged = {
+        ...base,
+        name: displayName,
+        short_name: shortName,
+        description: `Direct booking with ${displayName} — verified homestays and serviced apartments.`,
+      };
+      if (manifestObjectUrl) {
+        URL.revokeObjectURL(manifestObjectUrl);
+        manifestObjectUrl = null;
+      }
+      manifestObjectUrl = URL.createObjectURL(
+        new Blob([JSON.stringify(merged)], { type: 'application/manifest+json' }),
+      );
+      let link = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
+      if (!link) {
+        link = document.createElement('link');
+        link.rel = 'manifest';
+        document.head.appendChild(link);
+      }
+      link.href = manifestObjectUrl;
+    })
+    .catch(() => {
+      /* offline / missing manifest — keep static file */
+    });
 }

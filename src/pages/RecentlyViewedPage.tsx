@@ -1,14 +1,16 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { FaHeart, FaRegHeart } from "react-icons/fa";
 import SEO from "../components/SEO";
 import { fetchPublicListings } from "../api/listingClient";
-import { clearRecentlyViewed, getRecentlyViewed } from "../utils/guestHistory";
+import { clearRecentlyViewed, getRecentlyViewed, isFavorite, toggleFavorite } from "../utils/guestHistory";
 import { formatCurrency } from "../utils/formatting";
 import { getTenantBrandName } from "../tenant/displayBrand";
 
 export default function RecentlyViewedPage() {
   const brandName = getTenantBrandName();
   const [items, setItems] = useState(() => getRecentlyViewed());
+  const [favEpoch, setFavEpoch] = useState(0);
   const [liveNightlyByListingId, setLiveNightlyByListingId] = useState<Record<number, number>>({});
 
   useEffect(() => {
@@ -84,15 +86,38 @@ export default function RecentlyViewedPage() {
               Number.isFinite(current);
             const delta = hasCompare ? current - stored : null;
 
+            const saved = isFavorite(it.listingId);
             return (
               <div
-                key={`${it.listingId}-${it.viewedAtUtc}`}
+                key={`${it.listingId}-${it.viewedAtUtc}-${favEpoch}`}
                 className="rounded-xl border border-border-subtle bg-bg-surface overflow-hidden shadow-level1 hover:shadow-level2 transition-shadow"
               >
-                <Link to={it.path}>
-                  {it.coverPhotoUrl ? (
-                    <img src={it.coverPhotoUrl} alt={it.name ?? "Home"} className="w-full h-40 object-cover" loading="lazy" />
-                  ) : null}
+                <div className="relative">
+                  <Link to={it.path} className="block">
+                    {it.coverPhotoUrl ? (
+                      <img src={it.coverPhotoUrl} alt={it.name ?? "Home"} className="w-full h-40 object-cover" loading="lazy" />
+                    ) : (
+                      <div className="w-full h-40 bg-bg-muted" aria-hidden />
+                    )}
+                  </Link>
+                  <button
+                    type="button"
+                    data-testid={`recently-viewed-save-${it.listingId}`}
+                    className="absolute top-2 right-2 z-10 rounded-full bg-bg-surface/95 p-2 shadow-level1 border border-border-subtle hover:opacity-95 transition-opacity"
+                    aria-label={saved ? "Remove from saved" : "Save to favorites"}
+                    onClick={() => {
+                      toggleFavorite(it.listingId);
+                      setFavEpoch((e) => e + 1);
+                    }}
+                  >
+                    {saved ? (
+                      <FaHeart className="h-5 w-5 text-red-500" aria-hidden />
+                    ) : (
+                      <FaRegHeart className="h-5 w-5 text-text-muted" aria-hidden />
+                    )}
+                  </button>
+                </div>
+                <Link to={it.path} className="block">
                   <div className="p-4 pb-2">
                     <p className="font-semibold text-text-primary">{it.name ?? `Listing ${it.listingId}`}</p>
                     <p className="text-sm text-text-secondary">{it.location ?? ""}</p>

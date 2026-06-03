@@ -17,6 +17,7 @@ import { getTenantOverrides, shouldHideAtlasBranding } from "../../tenant/tenant
 import { usePropertyListings } from "../../hooks/usePropertyListings";
 import { addRecentlyViewed } from "../../utils/guestHistory";
 import { track } from "../../lib/events";
+import SEO from "../../components/SEO";
 import { buildHomeDetailsLodgingJsonLd } from "./homeDetailsJsonLd";
 
 const UnitBookingWidget = lazy(() => import("../../components/availability/UnitBookingWidget"));
@@ -91,6 +92,7 @@ function AmenityChip({ label }: { label: string }) {
 
 const HomeDetails = () => {
   const { roomNo } = useParams<{ roomNo: string }>();
+  const brandName = getTenantBrandName();
   const { homes: apiHomes, listingsById } = usePropertyListings();
   const tenant = getTenantContext();
   const tenantOverrides = getTenantOverrides(tenant?.slug);
@@ -146,18 +148,17 @@ const HomeDetails = () => {
    *  Restore on unmount to avoid stale title when navigating away (TASK-2433: never restore to blank). */
   useEffect(() => {
     if (!room?.title) return;
-    const brandName = getTenantBrandName();
     const prev = document.title?.trim() ? document.title : "";
     const next = `${room.title} | ${brandName}`.trim();
-    document.title = next || prev || brandName || "Atlas";
+    document.title = next || prev || brandName;
     return () => {
       if (prev) {
         document.title = prev;
       } else {
-        document.title = brandName || "Atlas";
+        document.title = brandName;
       }
     };
-  }, [room?.title]);
+  }, [room?.title, brandName]);
 
   /** TASK-1477: inject LodgingBusiness JSON-LD for SEO (url, ratings, white-label provider). */
   useEffect(() => {
@@ -215,23 +216,36 @@ const HomeDetails = () => {
 
   if (!room) {
     return (
-      <section className="max-w-3xl mx-auto px-4 py-12">
-        <h1 className="text-3xl font-bold text-text-primary">Home not found</h1>
-        <p className="mt-3 text-text-secondary">
-          We could not find that home. Please return to the catalog to see available stays.
-        </p>
-        <Link to="/#our-homes" className="inline-flex mt-6 rounded-full bg-[color:var(--cta-primary)] px-4 py-3 text-white font-semibold">
-          Back to Our Homes
-        </Link>
-      </section>
+      <>
+        <SEO
+          title={`Home not found | ${brandName}`}
+          description={`This stay is not listed on ${brandName}. Browse available homes to find your next booking.`}
+        />
+        <section className="max-w-3xl mx-auto px-4 py-12">
+          <h1 className="text-3xl font-bold text-text-primary">Home not found</h1>
+          <p className="mt-3 text-text-secondary">
+            We could not find that home on {brandName}. Please return to the catalog to see available stays.
+          </p>
+          <Link to="/#our-homes" className="inline-flex mt-6 rounded-full bg-[color:var(--cta-primary)] px-4 py-3 text-white font-semibold">
+            Browse {brandName} homes
+          </Link>
+        </section>
+      </>
     );
   }
 
+  const listingSeoTitle = `${room.title} | ${brandName}`;
+  const listingSeoDescription =
+    room.tagline?.trim() ||
+    `Book ${room.title} on ${brandName}. View photos, amenities, guest reviews, and live availability.`;
+
   return (
+    <>
+    <SEO title={listingSeoTitle} description={listingSeoDescription} />
     <section className="max-w-5xl mx-auto px-4 py-12 flex flex-col gap-6">
       <div>
         {!hideAtlasBranding && (
-          <p className="text-sm uppercase tracking-wide text-text-muted">{getTenantBrandName()}</p>
+          <p className="text-sm uppercase tracking-wide text-text-muted">{brandName}</p>
         )}
         <h1 className="text-4xl font-bold text-text-primary">{room.title}</h1>
         {room.tagline && <p className="mt-2 text-lg text-text-secondary">{room.tagline}</p>}
@@ -395,10 +409,11 @@ const HomeDetails = () => {
           to="/#our-homes"
           className="inline-flex items-center justify-center rounded-full border border-border-subtle px-5 py-3 text-sm font-semibold text-text-primary transition hover:border-[color:var(--cta-primary)] hover:text-[color:var(--cta-primary)]"
         >
-          Back to Our Homes
+          Browse {brandName} homes
         </Link>
       </div>
     </section>
+    </>
   );
 };
 

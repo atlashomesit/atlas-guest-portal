@@ -90,7 +90,11 @@ const mapDtoToProperty = (dto: PublicListing, photosFromEndpoint: string[]): Ten
     listingId: dto.id,
     maxGuests: dto.maxGuests || local?.maxGuests || 2,
     unitType: local?.unitType ?? inferUnitTypeFromName(dto.name ?? dto.propertyName),
-    property_name: dto.name ?? local?.property_name ?? dto.propertyName ?? `Listing ${dto.id}`,
+    property_name:
+      (dto.name?.trim() ? dto.name : null) ??
+      (dto.propertyName?.trim() ? dto.propertyName : null) ??
+      local?.property_name ??
+      `Listing ${dto.id}`,
     property_description:
       local?.property_description ??
       `Comfortable stay for up to ${dto.maxGuests || local?.maxGuests || 2} guests.`,

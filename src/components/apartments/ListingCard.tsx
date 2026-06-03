@@ -5,6 +5,7 @@ import { type NightlyPriceBreakdown } from "../../utils/pricing";
 import OptimizedImage from "../ui/OptimizedImage";
 import OwnerShareBadge from "../OwnerShareBadge"; // TASK-1705
 import { useCurrency } from "../../contexts/CurrencyContext";
+import { formatEstTotalInclGst } from "../../utils/guestPriceEstimate";
 
 type ListingCardProps = {
   id: string;
@@ -32,6 +33,8 @@ type ListingCardProps = {
   losDiscount2MinNights?: number | null;
   /** TASK-1695: LOS auto-discount tier 2 — discount percentage (0-100). */
   losDiscount2Percent?: number | null;
+  /** TASK-2903: nights for est-total line (default 1 when dates unknown). */
+  estimateNights?: number;
   onClick?: () => void;
 };
 
@@ -59,6 +62,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
   losDiscountPercent,
   losDiscount2MinNights,
   losDiscount2Percent,
+  estimateNights = 1,
   onClick,
 }) => {
   const { format: formatCurrency } = useCurrency();
@@ -248,7 +252,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
                 </div>
                 {/* TASK-1645 / TASK-2871: Indian accommodation GST — 5% for ≤₹7,500/night, 18% above (eff. 22 Sep 2025) */}
                 <span className="text-xs text-text-muted">
-                  {(() => { const gstMult = finalPrice > 7500 ? 1.18 : 1.05; const pct = finalPrice > 7500 ? 18 : 5; return `${formatCurrency(Math.round(finalPrice * 2 * gstMult))} est. total incl. ${pct}% GST (2 nights)`; })()}
+                  {formatEstTotalInclGst(finalPrice, estimateNights, formatCurrency)}
                 </span>
                 {showDiscount && savingsAmount > 0 && (
                   <span className="text-xs font-semibold text-cta-primary">

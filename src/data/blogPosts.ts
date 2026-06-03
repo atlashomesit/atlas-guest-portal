@@ -51,8 +51,8 @@ export const blogPosts: BlogPost[] = [
     content:
       "Compare neighborhoods, commute windows, and must-have amenities before choosing your Hyderabad stay.",
     featuredImage: "https://atlashomestorage.blob.core.windows.net/listing-images/103/img_1.jpg",
-    metaTitle: "Homestays in Hyderabad | Atlas Stays Blog",
-    metaDescription: "Explore how to choose the right Hyderabad homestay by area, budget, and trip type.",
+    metaTitle: `Homestays in Hyderabad | ${TENANT_BRAND_PLACEHOLDER} Blog`,
+    metaDescription: `Explore how to choose the right Hyderabad homestay by area, budget, and trip type on ${TENANT_BRAND_PLACEHOLDER}.`,
     canonicalPath: "/blog/homestays-in-hyderabad",
   },
   {
@@ -64,8 +64,8 @@ export const blogPosts: BlogPost[] = [
     content:
       "Use trip length, group size, and privacy needs to pick the best category across marketplace stays.",
     featuredImage: "https://atlashomestorage.blob.core.windows.net/listing-images/104/img_3.jpg",
-    metaTitle: "Rooms vs Homes | Atlas Stays Blog",
-    metaDescription: "A quick guide to choosing between room and home category listings on Atlas Stays.",
+    metaTitle: `Rooms vs Homes | ${TENANT_BRAND_PLACEHOLDER} Blog`,
+    metaDescription: `A quick guide to choosing between room and home category listings on ${TENANT_BRAND_PLACEHOLDER}.`,
     canonicalPath: "/blog/rooms-vs-homes",
   },
 ];

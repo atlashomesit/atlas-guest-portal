@@ -1,4 +1,3 @@
-/* eslint-disable atlas-brand/no-atlas-string-leak -- baseline marketplace notice; tenant substitution in PrivacyPage (RA-006). */
 import { MARKETPLACE_BRAND_BASELINE } from "../../tenant/displayBrand";
 
 // DPDPA 2023 notice content for the marketplace data fiduciary (see MARKETPLACE_BRAND_BASELINE).
@@ -32,7 +31,7 @@ export const privacyMetadata = {
   dataFiduciary: MARKETPLACE_BRAND_BASELINE,
   grievanceOfficer: {
     name: "Sreekar Atla",
-    email: "privacy@atlashomestays.com",
+    email: "privacy@atlastays.com",
     phone: "+91-70324-93290",
   },
 };
@@ -128,7 +127,7 @@ export const privacySections: PrivacySection[] = [
     id: "your-rights",
     title: "Your rights as a Data Principal",
     summary:
-      "The DPDP Act gives you rights over your personal data. You can exercise any of them by writing to our Grievance Officer at privacy@atlashomestays.com.",
+      "The DPDP Act gives you rights over your personal data. You can exercise any of them by writing to our Grievance Officer at privacy@atlastays.com.",
     details: [
       "Right to access (Section 11): ask for a summary of the personal data we hold about you and how we are processing it.",
       "Right to correction (Section 12): ask us to correct inaccurate or outdated data, or to complete incomplete data.",
@@ -136,7 +135,7 @@ export const privacySections: PrivacySection[] = [
       "Right to grievance redressal (Section 13): raise a complaint with our Grievance Officer. We will respond within 90 days.",
       "Right to nominate (Section 14): nominate another person to exercise these rights on your behalf in the event of your death or incapacity.",
       "Right to withdraw consent (Section 6(4)): withdraw consent at any time. Withdrawal will not affect lawfulness of processing before withdrawal, and some processing may continue under a different lawful basis (for example, tax-record retention).",
-      "Withdrawing consent is as easy as giving it — use the 'Cookie & consent settings' link in the footer, or email privacy@atlashomestays.com.",
+      "Withdrawing consent is as easy as giving it — use the 'Cookie & consent settings' link in the footer, or email privacy@atlastays.com.",
     ],
   },
   {

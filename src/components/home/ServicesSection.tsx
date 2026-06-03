@@ -8,6 +8,7 @@ import {
   servicesSummaryCopy,
 } from "../../config/homepageUxFlags";
 import { KeyRound, PercentCircle, Plane, UsersRound } from "lucide-react";
+import { getTenantBrandName } from "../../tenant/displayBrand";
 
 const SERVICE_ICONS = {
   plane: Plane,
@@ -55,6 +56,11 @@ export const SERVICES_CONTENT: {
 };
 
 const ServicesSection = () => {
+  const brandName = getTenantBrandName();
+  const servicesSummary = servicesSummaryCopy.replace(
+    "our exclusive range",
+    `${brandName}'s services`,
+  );
   const useExperimentalLayout =
     enableServicesConcreteCopy ||
     enableServicesIconography ||
@@ -71,7 +77,7 @@ const ServicesSection = () => {
             <span className="text-accent-primary font-medium tracking-wider uppercase text-sm">Elite Experiences</span>
             <h2 className="text-3xl lg:text-4xl font-bold text-text-primary">Discover Our Exclusive Services</h2>
             <div className="w-24 h-1 bg-accent-primary mx-auto rounded"></div>
-            <p className="text-text-muted max-w-2xl mx-auto">{servicesSummaryCopy}</p>
+            <p className="text-text-muted max-w-2xl mx-auto">{servicesSummary}</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 py-16">

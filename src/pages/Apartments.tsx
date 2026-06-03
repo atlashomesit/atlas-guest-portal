@@ -5,6 +5,7 @@ import ErrorBoundary from "../components/ErrorBoundary";
 import ErrorLayout from "../components/ErrorLayout";
 import ListingCard from "../components/apartments/ListingCard";
 import ListingFilters from "../components/apartments/ListingFilters";
+import SEO from "../components/SEO";
 import { LOGO_URL } from "../config/branding";
 import { getTenantBrandName } from "../tenant/displayBrand";
 import { getTenantContext } from "../tenant/tenantContext";
@@ -19,6 +20,7 @@ import {
   inferUnitType,
   type NightlyPriceBreakdown,
 } from "../utils/pricing";
+import { estimateStayNights } from "../utils/guestPriceEstimate";
 import type { UnitType } from "../config/pricing.config";
 
 type PropertyMetadata = {
@@ -239,7 +241,7 @@ export const Apartments = () => {
   const tenant = getTenantContext();
   const brandName = getTenantBrandName();
   const tenantOverrides = getTenantOverrides(tenant?.slug);
-  const hideAtlasBranding = shouldHideAtlasBranding(tenant, tenantOverrides);
+  const _hideAtlasBranding = shouldHideAtlasBranding(tenant, tenantOverrides);
   const directBookingDiscountPercent = React.useMemo(() => getEffectiveDiscountPercent(), []);
 
   const safeListings = React.useMemo(() => sanitizeListings(listingsSource), [listingsSource]);
@@ -479,6 +481,12 @@ export const Apartments = () => {
     return { displayCheckIn, displayCheckOut };
   }, [checkIn, checkOut]);
 
+  const estimateNights = React.useMemo(() => {
+    const ci = checkIn ? new Date(checkIn) : null;
+    const co = checkOut ? new Date(checkOut) : null;
+    return estimateStayNights(ci, co);
+  }, [checkIn, checkOut]);
+
   const shouldShowEmptyState = !safeListings || safeListings.length === 0;
 
   if (fetchState === "error") {
@@ -501,19 +509,17 @@ export const Apartments = () => {
 
   return (
     <div className="bg-bg-muted py-10">
+      <SEO
+        title={`Apartments | ${brandName}`}
+        description={`Browse serviced apartments and penthouses on ${brandName} with transparent pricing and direct booking.`}
+      />
       <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 md:px-8">
         <header className="space-y-2">
-          {hideAtlasBranding ? (
-            tenant?.name?.trim() ? (
-              <p className="text-sm font-semibold uppercase tracking-wide text-primary">{tenant.name.trim()}</p>
-            ) : null
-          ) : (
-            <p className="text-sm font-semibold uppercase tracking-wide text-primary">{brandName}</p>
-          )}
+          <p className="text-sm font-semibold uppercase tracking-wide text-primary">{brandName}</p>
           <h1 className="text-3xl font-bold text-text-primary sm:text-4xl">Hyderabad serviced apartments</h1>
           <p className="max-w-3xl text-base text-text-muted">
             Discover beautifully furnished homes tailored for extended stays, business travel, and weekend getaways.
-            Browse our curated apartments and penthouses, complete with clear pricing and trusted ratings.
+            Browse {brandName}&apos;s curated apartments and penthouses, complete with clear pricing and trusted ratings.
           </p>
         </header>
 
@@ -610,6 +616,7 @@ export const Apartments = () => {
                   losDiscount2MinNights={listing.losDiscount2MinNights}
                   losDiscount2Percent={listing.losDiscount2Percent}
                   directBookingDiscountPercent={directBookingDiscountPercent}
+                  estimateNights={estimateNights}
                   onClick={() => handleNavigate(listing.property)}
                 />
               ))}

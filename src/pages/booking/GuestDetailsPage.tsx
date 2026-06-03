@@ -20,7 +20,7 @@ import React, {
 } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
-import { useBooking } from '@/contexts/BookingContext';
+import { useBooking, type BookingPriceBreakdown } from '@/contexts/BookingContext';
 import { buildApiUrl, getApiHeaders, getOrderRequestHeaders } from '@/api/client';
 import { apiFetch } from '@/lib/http';
 import {
@@ -31,11 +31,13 @@ import {
   toRazorpayContactDigits,
 } from '@/utils/guestPhoneDial';
 import { getTenantContext } from '@/tenant/tenantContext';
-import { getGuestDataProcessingEntityName } from '@/tenant/displayBrand';
+import { getGuestDataProcessingEntityName, getTenantBrandName } from '@/tenant/displayBrand';
 import { formatCurrency } from '@/utils/formatting';
 import { formatDateInTimezone } from '@/utils/dateHelpers';
 import { track } from '@/lib/events';
 import { mapRazorpayFailureCode } from '@/utils/razorpayGuestErrors';
+import { getContactEmail, getWhatsAppLink } from '@/config/contact';
+import { accommodationGstLineAmount, accommodationGstSlabPercent } from '@/utils/guestPriceEstimate';
 
 declare global {
   interface Window {
@@ -51,6 +53,29 @@ interface AddOnService {
   description?: string | null;
   price: number;
   priceType: string;
+}
+
+const ADD_ON_MAX_QTY = 5;
+
+function addOnLineTotal(
+  ao: AddOnService,
+  qty: number,
+  stayNights: number,
+  guestCount: number,
+): number {
+  if (qty <= 0) return 0;
+  const type = (ao.priceType || 'per_stay').toLowerCase().replace(/-/g, '_');
+  const unit = ao.price * qty;
+  if (type.includes('night')) return unit * Math.max(1, stayNights);
+  if (type.includes('guest')) return unit * Math.max(1, guestCount);
+  return unit;
+}
+
+function addOnPriceHint(priceType: string, stayNights: number, guestCount: number): string {
+  const type = (priceType || 'per_stay').toLowerCase();
+  if (type.includes('night')) return `× ${Math.max(1, stayNights)} night${stayNights === 1 ? '' : 's'}`;
+  if (type.includes('guest')) return `× ${Math.max(1, guestCount)} guest${guestCount === 1 ? '' : 's'}`;
+  return 'per stay';
 }
 
 // ── Inline SVG icons (verbatim from bundle icons.jsx) ─────────────────────
@@ -101,6 +126,37 @@ const IconNote = ({ size = 14 }: { size?: number }) => (
 
 const LAST_UPI_VPA_KEY = 'atlas_last_upi_vpa';
 const CHECKOUT_DRAFT_KEY = 'atlas_guest_checkout_draft';
+/** TASK-2882: survive hard reload on GuestDetailsPage with a still-valid server hold. */
+const CHECKOUT_HOLD_KEY = 'atlas_guest_checkout_hold';
+
+type CheckoutHoldCache = {
+  holdId: number;
+  holdExpiresAt: string;
+  holdListingId?: number | null;
+  holdPropertySlug?: string | null;
+  holdUnitSlug?: string | null;
+  holdListingName?: string | null;
+  holdPriceBreakdown?: BookingPriceBreakdown | null;
+  checkIn?: string | null;
+  checkOut?: string | null;
+  guests?: number;
+};
+
+function loadCheckoutHold(): CheckoutHoldCache | null {
+  try {
+    const raw = window.sessionStorage.getItem(CHECKOUT_HOLD_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as CheckoutHoldCache;
+    if (!parsed?.holdId || !parsed?.holdExpiresAt) return null;
+    if (new Date(parsed.holdExpiresAt).getTime() <= Date.now()) {
+      window.sessionStorage.removeItem(CHECKOUT_HOLD_KEY);
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
 
 /** Guest PII typed on this page, persisted to sessionStorage so a reload/Back doesn't lose it. */
 type CheckoutDraft = {
@@ -192,6 +248,30 @@ const GuestDetailsPage: React.FC = () => {
   const navigate = useNavigate();
   const { propertySlug, unitSlug } = useParams<{ propertySlug: string; unitSlug: string }>();
   const { booking, updateBooking } = useBooking();
+  const brandName = getTenantBrandName();
+  const [holdHydrationDone, setHoldHydrationDone] = useState(false);
+
+  // TASK-2882: rehydrate hold from sessionStorage after hard reload before showing "pick dates" modal.
+  useEffect(() => {
+    if (!booking.holdId || !booking.holdExpiresAt) {
+      const cached = loadCheckoutHold();
+      if (cached) {
+        updateBooking({
+          holdId: cached.holdId,
+          holdExpiresAt: cached.holdExpiresAt,
+          holdListingId: cached.holdListingId ?? null,
+          holdPropertySlug: cached.holdPropertySlug ?? null,
+          holdUnitSlug: cached.holdUnitSlug ?? null,
+          holdListingName: cached.holdListingName ?? null,
+          holdPriceBreakdown: cached.holdPriceBreakdown ?? null,
+          checkIn: cached.checkIn ?? null,
+          checkOut: cached.checkOut ?? null,
+          guests: cached.guests ?? booking.guests,
+        });
+      }
+    }
+    setHoldHydrationDone(true);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- mount-only rehydrate
 
   // ── Hold state from context ──────────────────────────────────────────────
   const holdId = booking.holdId;
@@ -266,6 +346,32 @@ const GuestDetailsPage: React.FC = () => {
     } catch { /* ignore */ }
   }, [formData, phoneDialCode]);
 
+  useEffect(() => {
+    if (!holdId || !holdExpiresAt) {
+      try { window.sessionStorage.removeItem(CHECKOUT_HOLD_KEY); } catch { /* ignore */ }
+      return;
+    }
+    const payload: CheckoutHoldCache = {
+      holdId: Number(holdId),
+      holdExpiresAt,
+      holdListingId: holdListingId ?? null,
+      holdPropertySlug: booking.holdPropertySlug ?? propertySlug ?? null,
+      holdUnitSlug: booking.holdUnitSlug ?? unitSlug ?? null,
+      holdListingName: booking.holdListingName ?? null,
+      holdPriceBreakdown: priceBreakdown ?? null,
+      checkIn: booking.checkIn ?? null,
+      checkOut: booking.checkOut ?? null,
+      guests: booking.guests,
+    };
+    try {
+      window.sessionStorage.setItem(CHECKOUT_HOLD_KEY, JSON.stringify(payload));
+    } catch { /* ignore */ }
+  }, [
+    holdId, holdExpiresAt, holdListingId, priceBreakdown, booking.checkIn, booking.checkOut,
+    booking.guests, booking.holdPropertySlug, booking.holdUnitSlug, booking.holdListingName,
+    propertySlug, unitSlug,
+  ]);
+
   // ── Progressive disclosure state ──────────────────────────────────────────
   const [promoOpen, setPromoOpen] = useState(false);
   const [referralOpen, setReferralOpen] = useState(false);
@@ -280,6 +386,8 @@ const GuestDetailsPage: React.FC = () => {
   const [promoValidating, setPromoValidating] = useState(false);
   const [appliedPromoCode, setAppliedPromoCode] = useState<string | null>(null);
   const [promoDiscountAmount, setPromoDiscountAmount] = useState(0);
+  /** TASK-2880: true once `/api/Razorpay/order` returned the authoritative promo discount. */
+  const [serverPromoLocked, setServerPromoLocked] = useState(false);
 
   const [referralCode, setReferralCode] = useState(() => {
     try { return (window.localStorage.getItem('atlas_guest_referral_code') || '').slice(0, 32); } catch { return ''; }
@@ -308,19 +416,21 @@ const GuestDetailsPage: React.FC = () => {
     })();
   }, [holdListingId]);
 
-  const addOnsTotal = useMemo(
-    () =>
-      availableAddOns.reduce((sum, ao) => {
-        const qty = selectedAddOns[ao.addOnServiceId] ?? 0;
-        return sum + (qty > 0 ? ao.price * qty : 0);
-      }, 0),
-    [availableAddOns, selectedAddOns],
-  );
+  const stayGuestCount = booking.guests ?? 1;
 
   // ── Pricing ───────────────────────────────────────────────────────────────
   const baseAmount = priceBreakdown?.baseAmount ?? 0;
   const convenienceFeeAmount = priceBreakdown?.convenienceFeeAmount ?? 0;
   const nights = priceBreakdown?.nights ?? 0;
+
+  const addOnsTotal = useMemo(
+    () =>
+      availableAddOns.reduce((sum, ao) => {
+        const qty = selectedAddOns[ao.addOnServiceId] ?? 0;
+        return sum + addOnLineTotal(ao, qty, nights, stayGuestCount);
+      }, 0),
+    [availableAddOns, selectedAddOns, nights, stayGuestCount],
+  );
   // cleaningFeeAmount not in BookingPriceBreakdown — convenienceFee covers cleaning + service combined
   const cleaningFeeAmount = 0;
 
@@ -330,10 +440,10 @@ const GuestDetailsPage: React.FC = () => {
   // formula 2026-05-21; 18% upper slab per the 22 Sep 2025 reform (TASK-2870).
   // baseAmount from API is pre-GST (price_per_night × nights)
   const perNight = nights > 0 ? Math.round(baseAmount / nights) : 0;
-  const gstSlabPercent = perNight > 0 ? (perNight <= 7500 ? 5 : 18) : null;
+  const gstSlabPercent = accommodationGstSlabPercent(perNight);
   const gstLineAmount =
     gstSlabPercent != null && baseAmount > 0
-      ? Math.max(1, Math.round(baseAmount * gstSlabPercent / 100))
+      ? accommodationGstLineAmount(baseAmount, perNight)
       : 0;
 
   // TASK-2631: Total = Base + GST + Service Fee + Add-ons − Discounts (CPO-canonical formula)
@@ -370,8 +480,23 @@ const GuestDetailsPage: React.FC = () => {
   const [orderErrorIs409, setOrderErrorIs409] = useState(false);
   const [paymentCancelled, setPaymentCancelled] = useState(false);
   const [razorpayOrderId, setRazorpayOrderId] = useState<string | null>(null);
-  const [_razorpayAmount, setRazorpayAmount] = useState<number | null>(null);
+  const [razorpayAmountPaise, setRazorpayAmount] = useState<number | null>(null);
   const pendingBookingTokenRef = useRef<string | null>(null);
+  /** TASK-2875: when server total differs from the client quote, require a second Pay tap before Razorpay opens. */
+  const [serverTotalConfirmRequired, setServerTotalConfirmRequired] = useState(false);
+  const pendingRazorpayLaunchRef = useRef<{
+    keyId: string;
+    orderId: string;
+    bookingId: number;
+    amount: number;
+    bookingToken: string | null;
+  } | null>(null);
+
+  /** TASK-2875: when the server total differs, the Pay CTA shows the authoritative charge (INR). */
+  const chargeInr =
+    serverTotalConfirmRequired && razorpayAmountPaise != null && razorpayAmountPaise > 0
+      ? razorpayAmountPaise / 100
+      : displayTotal;
 
   // ── Form validation ───────────────────────────────────────────────────────
   const validateForm = useCallback(() => {
@@ -394,6 +519,26 @@ const GuestDetailsPage: React.FC = () => {
     else { setConsentError(''); }
 
     setFormErrors(errors);
+    if (!valid) {
+      requestAnimationFrame(() => {
+        if (errors.name) {
+          document.getElementById('gd-name')?.focus();
+          return;
+        }
+        if (errors.email) {
+          document.getElementById('gd-email')?.focus();
+          return;
+        }
+        if (errors.phone) {
+          document.getElementById('gd-phone')?.focus();
+          return;
+        }
+        if (!consentAccepted) {
+          consentRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          consentRowRef.current?.focus();
+        }
+      });
+    }
     return valid;
   }, [formData, phoneDialCode, consentAccepted]);
 
@@ -414,6 +559,7 @@ const GuestDetailsPage: React.FC = () => {
       setPromoMessage(data.message);
       if (data.valid) {
         setAppliedPromoCode(code);
+        setServerPromoLocked(false);
         if (typeof data.discountAmount === 'number' && data.discountAmount > 0) {
           setPromoDiscountAmount(data.discountAmount);
         }
@@ -432,7 +578,7 @@ const GuestDetailsPage: React.FC = () => {
     setTimeout(() => {
       if (/^[A-Z0-9]{1,32}$/.test(code)) {
         setAppliedReferralCode(code);
-        setReferralMessage('Code format looks good — reward will apply if eligible at checkout.');
+        setReferralMessage('Code format accepted — we will check eligibility when you pay; no discount is guaranteed until then.');
       } else {
         setAppliedReferralCode(null);
         setReferralMessage('Referral codes must be letters and numbers only (no spaces or symbols).');
@@ -487,57 +633,95 @@ const GuestDetailsPage: React.FC = () => {
       };
 
       try {
-        const idempotencyKey = crypto.randomUUID();
         const numericListingId = holdListingId ? Number(holdListingId) : 0;
-        track('start_checkout', numericListingId);
+        let keyId: string;
+        let orderId: string;
+        let bookingId: number;
+        let amount: number;
+        let bookingToken: string | null = null;
 
-        console.log('[GuestDetailsPage] Creating Razorpay order for booking...');
-        const response = await axios.post(buildApiUrl('/api/Razorpay/order'), payload, {
-          headers: getOrderRequestHeaders(idempotencyKey),
-          timeout: 20000,
-        });
-        const responseData = response.data;
-        console.log('[GuestDetailsPage] Razorpay order created successfully:', { orderId: responseData?.orderId, amount: responseData?.amount, keyId: responseData?.keyId });
+        const pendingLaunch = pendingRazorpayLaunchRef.current;
+        if (pendingLaunch) {
+          pendingRazorpayLaunchRef.current = null;
+          setServerTotalConfirmRequired(false);
+          ({ keyId, orderId, bookingId, amount, bookingToken } = pendingLaunch);
+          pendingBookingTokenRef.current = bookingToken;
+          setRazorpayOrderId(orderId);
+          setRazorpayAmount(amount);
+        } else {
+          const idempotencyKey = crypto.randomUUID();
+          track('start_checkout', numericListingId);
 
-        const {
-          keyId,
-          orderId,
-          bookingId,
-          bookingToken,
-          amount,
-          appliedReferralCode: serverReferralCode,
-          referralDiscountAmount: serverReferralDiscount,
-          appliedPromoCode: serverPromoCode,
-          promoDiscountAmount: serverPromoDiscount,
-        } = responseData ?? {};
+          console.log('[GuestDetailsPage] Creating Razorpay order for booking...');
+          const response = await axios.post(buildApiUrl('/api/Razorpay/order'), payload, {
+            headers: getOrderRequestHeaders(idempotencyKey),
+            timeout: 20000,
+          });
+          const responseData = response.data;
+          console.log('[GuestDetailsPage] Razorpay order created successfully:', { orderId: responseData?.orderId, amount: responseData?.amount, keyId: responseData?.keyId });
 
-        // Validate all required fields with explicit type checks
-        if (!keyId || typeof keyId !== 'string') {
-          throw new Error('Checkout error: missing payment key. Please try again.');
-        }
-        if (!orderId || typeof orderId !== 'string') {
-          throw new Error('Checkout error: missing order ID from backend. Please try again.');
-        }
-        if (!bookingId || (typeof bookingId !== 'number' && typeof bookingId !== 'string')) {
-          throw new Error('Checkout error: missing booking ID. Please try again.');
-        }
-        if (!amount || typeof amount !== 'number' || amount <= 0) {
-          console.error('[GuestDetailsPage] Invalid amount:', amount);
-          throw new Error('Checkout error: invalid payment amount. Please try again.');
-        }
+          const {
+            keyId: respKeyId,
+            orderId: respOrderId,
+            bookingId: respBookingId,
+            bookingToken: respBookingToken,
+            amount: respAmount,
+            appliedReferralCode: serverReferralCode,
+            referralDiscountAmount: serverReferralDiscount,
+            appliedPromoCode: serverPromoCode,
+            promoDiscountAmount: serverPromoDiscount,
+          } = responseData ?? {};
 
-        if (typeof serverReferralCode === 'string' && serverReferralCode.trim()) {
-          setAppliedReferralCode(serverReferralCode.trim());
-          setReferralDiscountAmount(Number(serverReferralDiscount) > 0 ? Number(serverReferralDiscount) : 0);
-        }
-        if (typeof serverPromoCode === 'string' && serverPromoCode.trim()) {
-          setAppliedPromoCode(serverPromoCode.trim());
-          setPromoDiscountAmount(Number(serverPromoDiscount) > 0 ? Number(serverPromoDiscount) : 0);
-        }
+          if (!respKeyId || typeof respKeyId !== 'string') {
+            throw new Error('Checkout error: missing payment key. Please try again.');
+          }
+          if (!respOrderId || typeof respOrderId !== 'string') {
+            throw new Error('Checkout error: missing order ID from backend. Please try again.');
+          }
+          if (!respBookingId || (typeof respBookingId !== 'number' && typeof respBookingId !== 'string')) {
+            throw new Error('Checkout error: missing booking ID. Please try again.');
+          }
+          if (!respAmount || typeof respAmount !== 'number' || respAmount <= 0) {
+            console.error('[GuestDetailsPage] Invalid amount:', respAmount);
+            throw new Error('Checkout error: invalid payment amount. Please try again.');
+          }
 
-        setRazorpayOrderId(orderId);
-        setRazorpayAmount(Number(amount));
-        pendingBookingTokenRef.current = typeof bookingToken === 'string' ? bookingToken.trim() : null;
+          if (typeof serverReferralCode === 'string' && serverReferralCode.trim()) {
+            setAppliedReferralCode(serverReferralCode.trim());
+            setReferralDiscountAmount(Number(serverReferralDiscount) > 0 ? Number(serverReferralDiscount) : 0);
+          }
+          if (typeof serverPromoCode === 'string' && serverPromoCode.trim()) {
+            setAppliedPromoCode(serverPromoCode.trim());
+            setPromoDiscountAmount(Number(serverPromoDiscount) > 0 ? Number(serverPromoDiscount) : 0);
+            setServerPromoLocked(true);
+          } else if (Number(serverPromoDiscount) > 0) {
+            setServerPromoLocked(true);
+          }
+
+          keyId = respKeyId;
+          orderId = respOrderId;
+          bookingId = Number(respBookingId);
+          amount = Number(respAmount);
+          bookingToken = typeof respBookingToken === 'string' ? respBookingToken.trim() : null;
+
+          setRazorpayOrderId(orderId);
+          setRazorpayAmount(amount);
+          pendingBookingTokenRef.current = bookingToken;
+
+          const clientQuotePaise = Math.round(displayTotal * 100);
+          if (Math.abs(amount - clientQuotePaise) > 100) {
+            pendingRazorpayLaunchRef.current = {
+              keyId,
+              orderId,
+              bookingId,
+              amount,
+              bookingToken,
+            };
+            setServerTotalConfirmRequired(true);
+            setIsSubmitting(false);
+            return;
+          }
+        }
 
         loadRazorpayScript(
           () => {
@@ -560,7 +744,7 @@ const GuestDetailsPage: React.FC = () => {
                 key: keyId,
                 amount: Number(amount),
                 currency: 'INR',
-                name: getTenantContext()?.displayMerchantName ?? getTenantContext()?.name ?? 'Our Property',
+                name: getTenantContext()?.displayMerchantName ?? brandName,
                 description: `Booking confirmation`,
                 order_id: orderId,
                 prefill: {
@@ -591,29 +775,43 @@ const GuestDetailsPage: React.FC = () => {
                 handler: async (res: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => {
                   paymentCompleted = true;
                   try {
-                    const verifyRes = await axios.post(
-                      buildApiUrl('/api/Razorpay/verify'),
-                      {
-                        bookingId: Number(bookingId),
-                        razorpayOrderId: res.razorpay_order_id,
-                        razorpayPaymentId: res.razorpay_payment_id,
-                        razorpaySignature: res.razorpay_signature,
-                        guestInfo: {
-                          name: formData.name.trim(),
-                          email: formData.email.trim(),
-                          phone: e164Phone,
-                        },
+                    const verifyBody = {
+                      bookingId: Number(bookingId),
+                      razorpayOrderId: res.razorpay_order_id,
+                      razorpayPaymentId: res.razorpay_payment_id,
+                      razorpaySignature: res.razorpay_signature,
+                      guestInfo: {
+                        name: formData.name.trim(),
+                        email: formData.email.trim(),
+                        phone: e164Phone,
                       },
-                      { headers: { ...getApiHeaders(), 'Content-Type': 'application/json' }, timeout: 15000 },
-                    );
-                    if (verifyRes.data?.success) {
+                    };
+                    let verifyRes: { data?: { success?: boolean; message?: string; lastUpiVpa?: string } } | null = null;
+                    for (let attempt = 0; attempt < 2; attempt++) {
+                      try {
+                        verifyRes = await axios.post(
+                          buildApiUrl('/api/Razorpay/verify'),
+                          verifyBody,
+                          { headers: { ...getApiHeaders(), 'Content-Type': 'application/json' }, timeout: 15000 },
+                        );
+                        if (verifyRes.data?.success) break;
+                      } catch (verifyErr) {
+                        if (attempt === 1) throw verifyErr;
+                        await new Promise((r) => setTimeout(r, 800));
+                      }
+                    }
+                    if (verifyRes?.data?.success) {
                       const vpa = typeof verifyRes.data.lastUpiVpa === 'string' ? verifyRes.data.lastUpiVpa.trim() : '';
                       if (vpa) { try { localStorage.setItem(LAST_UPI_VPA_KEY, vpa); } catch { /* ignore */ } }
                       try {
                         localStorage.setItem('atlas_guest_email', formData.email.trim());
                         if (formData.name.trim()) localStorage.setItem('atlas_guest_name', formData.name.trim());
+                        if (e164Phone) localStorage.setItem('atlas_guest_phone', e164Phone);
                       } catch { /* ignore */ }
-                      try { sessionStorage.removeItem(CHECKOUT_DRAFT_KEY); } catch { /* ignore */ }
+                      try {
+                        sessionStorage.removeItem(CHECKOUT_DRAFT_KEY);
+                        sessionStorage.removeItem(CHECKOUT_HOLD_KEY);
+                      } catch { /* ignore */ }
                       updateBooking({
                         holdId: null, holdExpiresAt: null, holdPropertySlug: null,
                         holdUnitSlug: null, holdPriceBreakdown: null, holdListingId: null,
@@ -631,7 +829,15 @@ const GuestDetailsPage: React.FC = () => {
                     }
                   } catch (err) {
                     console.error('[GuestDetailsPage] verify error:', err);
-                    setOrderError(`Payment verification failed. Please contact support with your payment ID if you were charged.`);
+                    const paymentId = res.razorpay_payment_id;
+                    const waText = encodeURIComponent(
+                      `Hi, my payment succeeded but booking verification failed. Payment ID: ${paymentId}. Booking ID: ${bookingId}.`,
+                    );
+                    setOrderError(
+                      `Payment received but we could not confirm your booking yet. Payment ID: ${paymentId} · Booking #${bookingId}. ` +
+                        `We will retry automatically — if your stay is not confirmed in 10 minutes, contact us on WhatsApp (${getWhatsAppLink()}?text=${waText}) ` +
+                        `or email ${getContactEmail()}. No need to pay again.`,
+                    );
                   } finally {
                     setIsSubmitting(false);
                   }
@@ -652,7 +858,8 @@ const GuestDetailsPage: React.FC = () => {
                 const code = String(fr?.error?.code ?? '');
                 const desc = String(fr?.error?.description ?? '');
                 console.log('[GuestDetailsPage] Payment failed:', { code, desc });
-                setOrderError(mapRazorpayFailureCode(code, desc));
+                setOrderError(`No money was taken. ${mapRazorpayFailureCode(code, desc)}`);
+                setPaymentCancelled(false);
                 setIsSubmitting(false);
               });
               rzp.on('close', handleClose);
@@ -709,8 +916,8 @@ const GuestDetailsPage: React.FC = () => {
     [
       isSubmitting, holdExpired, validateForm, holdId, phoneDialCode, formData,
       availableAddOns, selectedAddOns, referralCode, promoCode, whatsappOptIn,
-      holdListingId, updateBooking, navigate, booking.checkIn, booking.checkOut,
-      checkInDisplay, checkOutDisplay,
+      holdListingId, updateBooking, navigate, booking.checkIn, booking.checkOut, displayTotal,
+      checkInDisplay, checkOutDisplay, brandName,
     ],
   );
 
@@ -730,6 +937,7 @@ const GuestDetailsPage: React.FC = () => {
   }, []);
 
   const handleBackToProperty = useCallback(() => {
+    try { window.sessionStorage.removeItem(CHECKOUT_HOLD_KEY); } catch { /* ignore */ }
     updateBooking({
       holdId: null, holdExpiresAt: null, holdPropertySlug: null,
       holdUnitSlug: null, holdPriceBreakdown: null, holdListingId: null, holdListingName: null,
@@ -738,9 +946,15 @@ const GuestDetailsPage: React.FC = () => {
   }, [updateBooking, navigate, propertySlug, unitSlug]);
 
   // ── Render ────────────────────────────────────────────────────────────────
-  // No active hold (direct navigation or hard reload wiped the session-only hold).
-  // Show a friendly "pick your dates again" card instead of silently bouncing the
-  // guest out — their typed details are already saved to sessionStorage.
+  if (!holdHydrationDone) {
+    return (
+      <div className="gd-page" aria-busy="true" aria-label="Loading your reservation">
+        <style>{gdStyles}</style>
+      </div>
+    );
+  }
+
+  // No active hold after rehydrate attempt — show pick-dates card (PII still in sessionStorage).
   if (!holdId || !holdExpiresAt) {
     return (
       <div className="gd-page">
@@ -749,8 +963,8 @@ const GuestDetailsPage: React.FC = () => {
             <div className="gd-modal-icon"><IconClock size={22} /></div>
             <h3 id="gd-nohold-title">Let's pick your dates again</h3>
             <p>
-              Your 15-minute hold isn't active anymore — reservations are released when the
-              page reloads. Any details you entered are saved and will be waiting for you.
+              Your 15-minute hold has expired or was cleared. Pick your dates again to start a
+              fresh hold — any details you entered are saved and will be waiting for you.
             </p>
             <button type="button" className="gd-modal-cta" onClick={handleBackToProperty}>
               Choose dates
@@ -763,7 +977,6 @@ const GuestDetailsPage: React.FC = () => {
   }
 
   const tenantCtx = getTenantContext();
-  const brandName = tenantCtx?.name ?? 'Atlas';
   const brandInitial = brandName.charAt(0).toUpperCase();
   const whatsappNumber = tenantCtx?.whatsappBookingPhone ?? '';
   const consentEntityName = getGuestDataProcessingEntityName();
@@ -995,7 +1208,7 @@ const GuestDetailsPage: React.FC = () => {
                       <span style={{ color: 'var(--gd-coral)' }}><IconTag size={14}/></span>
                       Promo code
                       {appliedPromoCode && promoDiscountAmount > 0 && (
-                        <span className="gd-pill">−{displayPrice(promoDiscountAmount)} applied</span>
+                        <span className="gd-pill">Est. −{displayPrice(promoDiscountAmount)}</span>
                       )}
                     </span>
                     <span className="gd-disc-side">
@@ -1111,29 +1324,48 @@ const GuestDetailsPage: React.FC = () => {
                       <div className="gd-disclosure-panel gd-disclosure-panel-pad-top">
                         {availableAddOns.map((ao) => {
                           const qty = selectedAddOns[ao.addOnServiceId] ?? 0;
+                          const lineTotal = addOnLineTotal(ao, qty || 1, nights, stayGuestCount);
                           return (
                             <div key={ao.addOnServiceId} className="gd-addon">
-                              <span
-                                className={`gd-check${qty > 0 ? ' checked' : ''}`}
-                                onClick={() => setSelectedAddOns((p) => ({
-                                  ...p,
-                                  [ao.addOnServiceId]: qty > 0 ? 0 : 1,
-                                }))}
-                                role="checkbox"
-                                aria-checked={qty > 0}
-                                tabIndex={0}
-                                onKeyDown={(e) => e.key === ' ' && setSelectedAddOns((p) => ({
-                                  ...p,
-                                  [ao.addOnServiceId]: qty > 0 ? 0 : 1,
-                                }))}
-                              >
-                                <IconCheck size={14}/>
-                              </span>
                               <div>
                                 <div className="gd-addon-name">{ao.name}</div>
                                 {ao.description && <div className="gd-addon-desc">{ao.description}</div>}
+                                <div className="gd-addon-desc">
+                                  {displayPrice(ao.price)} {addOnPriceHint(ao.priceType, nights, stayGuestCount)}
+                                </div>
                               </div>
-                              <div className="gd-addon-price">{displayPrice(ao.price)}</div>
+                              <div className="gd-addon-price" style={{ textAlign: 'right' }}>
+                                {qty > 0 ? displayPrice(lineTotal) : displayPrice(ao.price)}
+                                <div className="gd-addon-qty" style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end', marginTop: 6 }}>
+                                  <button
+                                    type="button"
+                                    className="gd-resume-btn"
+                                    style={{ minWidth: 28, padding: '2px 8px' }}
+                                    aria-label={`Decrease ${ao.name}`}
+                                    disabled={qty <= 0}
+                                    onClick={() => setSelectedAddOns((p) => ({
+                                      ...p,
+                                      [ao.addOnServiceId]: Math.max(0, (p[ao.addOnServiceId] ?? 0) - 1),
+                                    }))}
+                                  >
+                                    −
+                                  </button>
+                                  <span aria-live="polite">{qty}</span>
+                                  <button
+                                    type="button"
+                                    className="gd-resume-btn"
+                                    style={{ minWidth: 28, padding: '2px 8px' }}
+                                    aria-label={`Increase ${ao.name}`}
+                                    disabled={qty >= ADD_ON_MAX_QTY}
+                                    onClick={() => setSelectedAddOns((p) => ({
+                                      ...p,
+                                      [ao.addOnServiceId]: Math.min(ADD_ON_MAX_QTY, (p[ao.addOnServiceId] ?? 0) + 1),
+                                    }))}
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                              </div>
                             </div>
                           );
                         })}
@@ -1233,12 +1465,36 @@ const GuestDetailsPage: React.FC = () => {
             </div>
 
             {/* Error banners */}
+            {serverTotalConfirmRequired && razorpayAmountPaise != null && (
+              <div
+                className="gd-alert gd-alert-warn"
+                role="status"
+                data-testid="guest-checkout-total-updated"
+              >
+                <b>Total updated.</b> Final price from our server is{' '}
+                <b>{displayPrice(razorpayAmountPaise / 100)}</b> (your estimate was{' '}
+                {displayPrice(displayTotal)}). Tap <b>Pay</b> again to confirm and open payment.
+              </div>
+            )}
             {orderError && !orderErrorIs409 && (
-              <div className="gd-banner" role="alert">
+              <div className="gd-banner" role="alert" data-testid="guest-checkout-order-error">
                 <IconAlert size={16}/>
                 <div>
-                  <b>{orderError.startsWith('Couldn') ? 'Payment cancelled — no money taken.' : 'Something went wrong.'}</b><br/>
+                  <b>
+                    {orderError.startsWith('Couldn')
+                      ? 'Payment cancelled — no money taken.'
+                      : orderError.startsWith('No money was taken')
+                        ? 'Payment failed — no money taken.'
+                        : 'Something went wrong.'}
+                  </b><br/>
                   <span>{orderError}</span>
+                  {orderError.startsWith('No money was taken') && razorpayOrderId && (
+                    <div style={{ marginTop: 10 }}>
+                      <button type="button" className="gd-resume-btn" onClick={handleResume}>
+                        Try payment again
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -1349,7 +1605,10 @@ const GuestDetailsPage: React.FC = () => {
             )}
             {promoDiscountAmount > 0 && (
               <div className="gd-price-row save">
-                <span>Promo{appliedPromoCode ? ` · ${appliedPromoCode}` : ''}</span>
+                <span>
+                  Promo{appliedPromoCode ? ` · ${appliedPromoCode}` : ''}
+                  {serverPromoLocked ? '' : ' (estimated)'}
+                </span>
                 <span className="num">−{displayPrice(promoDiscountAmount)}</span>
               </div>
             )}
@@ -1362,14 +1621,13 @@ const GuestDetailsPage: React.FC = () => {
             {gstSlabPercent != null && gstLineAmount > 0 && (
               <div className="gd-price-row gst">
                 <div className="desc">
-                  <span>GST {gstSlabPercent}%</span>
-                  <small>On accommodation only</small>
+                  <span>GST {gstSlabPercent}% on accommodation</span>
                 </div>
                 <span className="num">{displayPrice(gstLineAmount)}</span>
               </div>
             )}
             {convenienceFeeAmount > 0 && (
-              <div className="gd-price-row" title="Razorpay payment gateway fee — passed through, not an Atlas markup.">
+              <div className="gd-price-row" title="Razorpay payment gateway fee — passed through, not a platform markup.">
                 <span>Payment processing</span>
                 <span className="num">{displayPrice(convenienceFeeAmount)}</span>
               </div>
@@ -1394,7 +1652,7 @@ const GuestDetailsPage: React.FC = () => {
           >
             {isSubmitting
               ? <><IconSpinner size={16}/> Securing your booking…</>
-              : <><IconLock size={14}/> Pay <span className="num">{displayPrice(displayTotal)}</span> to confirm</>
+              : <><IconLock size={14}/> Pay <span className="num">{displayPrice(chargeInr)}</span> to confirm</>
             }
           </button>
 
@@ -1404,7 +1662,7 @@ const GuestDetailsPage: React.FC = () => {
           )}
           {consentAccepted && (
             <div className="gd-pay-microcopy">
-              You'll be charged <b>{displayPrice(displayTotal)}</b> now to confirm.
+              You'll be charged <b>{displayPrice(chargeInr)}</b> now to confirm.
               {freeCancelDisplay && ` Free cancellation until ${freeCancelDisplay}.`}
             </div>
           )}
@@ -1444,7 +1702,7 @@ const GuestDetailsPage: React.FC = () => {
         >
           {isSubmitting
             ? <><IconSpinner size={14}/> Securing…</>
-            : <><IconLock size={14}/> Pay <span className="num">{displayPrice(displayTotal)}</span></>
+            : <><IconLock size={14}/> Pay <span className="num">{displayPrice(chargeInr)}</span></>
           }
         </button>
       </div>

@@ -11,7 +11,8 @@ import {
 } from "react";
 import { FiX } from "react-icons/fi";
 
-import { SUPPORT_DRAWER_COPY } from "../../config/supportDrawerCopy";
+import { SUPPORT_DRAWER_COPY, getSupportDrawerHeaderSubtitle } from "../../config/supportDrawerCopy";
+import { getTenantBrandName } from "../../tenant/displayBrand";
 import { useSupportDrawerFlags } from "./SupportDrawerFlagsContext";
 
 type SupportDrawerView = "home" | "callback" | "faq" | "chat";
@@ -135,7 +136,7 @@ const SupportDrawer = ({
         <div className="flex items-start justify-between gap-[var(--drawer-section-gap,0.75rem)] bg-[color-mix(in_srgb,var(--bg-surface)_96%,#f2efe8_18%)] px-[var(--drawer-card-padding-inline,1rem)] py-[var(--drawer-card-padding-block,0.75rem)]">
           <div className="flex flex-col gap-0.5">
             <p className="text-sm font-semibold text-text-primary">{SUPPORT_DRAWER_COPY.header.title}</p>
-            <p className="text-xs text-text-muted">{SUPPORT_DRAWER_COPY.header.subtitle}</p>
+            <p className="text-xs text-text-muted">{getSupportDrawerHeaderSubtitle(getTenantBrandName())}</p>
           </div>
           <div className="flex flex-col items-end gap-1">
             <button

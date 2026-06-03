@@ -3,11 +3,14 @@ import { toast } from 'react-toastify';
 import { useBooking } from '../contexts/BookingContext';
 import { Button } from '../components/ui/Button';
 import Subheading from '../components/commonComponents/subheading/Subheading';
+import SEO from '../components/SEO';
+import { getTenantBrandName } from '../tenant/displayBrand';
 import { formatHumanDate } from '../utils/formatting';
 
 const Reserve = () => {
   const { booking } = useBooking();
   const navigate = useNavigate();
+  const brandName = getTenantBrandName();
 
   const hasSelection = Boolean(booking.listingDetailPath?.trim() && booking.checkIn && booking.checkOut);
 
@@ -16,7 +19,7 @@ const Reserve = () => {
   const goToPayment = () => {
     const base = booking.listingDetailPath?.trim();
     if (!base) {
-      toast.error('Open a property from search or Our Homes first, then return here to pay.');
+      toast.error(`Open a property from search or ${brandName} listings first, then return here to pay.`);
       return;
     }
 
@@ -29,6 +32,8 @@ const Reserve = () => {
   };
 
   return (
+    <>
+    <SEO title={`Reserve | ${brandName}`} description={`Review your stay details and continue to secure payment with ${brandName}.`} />
     <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-8">
       <div className="pt-6">
         <Subheading />
@@ -89,6 +94,7 @@ const Reserve = () => {
         </p>
       </div>
     </section>
+    </>
   );
 };
 

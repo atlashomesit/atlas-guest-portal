@@ -1,7 +1,9 @@
 import { footerMiniCtaCopy } from "../../config/homepageUxFlags";
 import { getWhatsAppLink } from "../../config/contact";
+import { getTenantBrandName } from "../../tenant/displayBrand";
 
 const FooterCtaStrip = () => {
+  const brandName = getTenantBrandName();
   const whatsappLink = getWhatsAppLink();
 
   return (
@@ -12,7 +14,7 @@ const FooterCtaStrip = () => {
           href={whatsappLink}
           className="rounded-full inline-flex items-center justify-center px-8 py-3.5 text-sm font-semibold text-white transition-all duration-250 hover:scale-[1.03]"
           style={{ background: 'var(--gradient-cta)' }}        >
-          {footerMiniCtaCopy.buttonLabel}
+          {footerMiniCtaCopy.buttonLabel.replace("our team", brandName)}
         </a>
       </div>
     </div>

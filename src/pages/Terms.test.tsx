@@ -2,6 +2,11 @@ import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import Terms from "./Terms";
 
+vi.mock("../tenant/displayBrand", () => ({
+  getTenantBrandName: () => "Atlastays",
+  MARKETPLACE_BRAND_BASELINE: "Atlastays",
+}));
+
 vi.mock("react-router-dom", async () => {
   const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
   return {
@@ -18,7 +23,7 @@ describe("Terms", () => {
       <Terms />
     );
 
-    expect(screen.getByRole("heading", { name: /Terms of Service \| Atlas Guest Portal/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Terms of Service \| Atlastays/i })).toBeInTheDocument();
     expect(screen.getByText(/Print-friendly view/i)).toBeInTheDocument();
     expect(screen.getAllByRole("heading", { level: 2 }).length).toBeGreaterThan(1);
     expect(screen.getByText(/Payment data sharing/i)).toBeInTheDocument();

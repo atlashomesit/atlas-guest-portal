@@ -1,0 +1,312 @@
+/**
+ * Custom animations for unified error and loading patterns.
+ * @see docs/UNIFIED_ERROR_LOADING_PATTERNS.md
+ */
+
+/* ============================================================================
+   SKELETON PULSE ANIMATION (Loading placeholders)
+   ============================================================================ */
+
+@keyframes skeleton-pulse {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.animate-skeleton-pulse {
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+/* ============================================================================
+   STAGGERED SKELETON ANIMATION (Cascading items)
+   ============================================================================ */
+
+/* Stagger offsets for cascading effect (100ms per item) */
+.skeleton-stagger-1 {
+  animation-delay: 0ms;
+}
+
+.skeleton-stagger-2 {
+  animation-delay: 100ms;
+}
+
+.skeleton-stagger-3 {
+  animation-delay: 200ms;
+}
+
+.skeleton-stagger-4 {
+  animation-delay: 300ms;
+}
+
+.skeleton-stagger-5 {
+  animation-delay: 400ms;
+}
+
+.skeleton-stagger-6 {
+  animation-delay: 500ms;
+}
+
+/* Alternative: nth-child selectors for automatic staggering */
+.skeleton-grid > :nth-child(1) {
+  animation-delay: 0ms;
+}
+
+.skeleton-grid > :nth-child(2) {
+  animation-delay: 100ms;
+}
+
+.skeleton-grid > :nth-child(3) {
+  animation-delay: 200ms;
+}
+
+.skeleton-grid > :nth-child(4) {
+  animation-delay: 300ms;
+}
+
+.skeleton-grid > :nth-child(5) {
+  animation-delay: 400ms;
+}
+
+.skeleton-grid > :nth-child(6) {
+  animation-delay: 500ms;
+}
+
+.skeleton-list > :nth-child(1) {
+  animation-delay: 0ms;
+}
+
+.skeleton-list > :nth-child(2) {
+  animation-delay: 100ms;
+}
+
+.skeleton-list > :nth-child(3) {
+  animation-delay: 200ms;
+}
+
+.skeleton-list > :nth-child(4) {
+  animation-delay: 300ms;
+}
+
+.skeleton-list > :nth-child(5) {
+  animation-delay: 400ms;
+}
+
+.skeleton-list > :nth-child(6) {
+  animation-delay: 500ms;
+}
+
+/* ============================================================================
+   ERROR STATE ANIMATIONS (Subtle entrance)
+   ============================================================================ */
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slide-up {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out;
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out;
+}
+
+/* ============================================================================
+   SPINNER ANIMATION (Continuous rotation)
+   ============================================================================ */
+
+/* Tailwind's built-in animate-spin is sufficient:
+   @keyframes spin {
+     to {
+       transform: rotate(360deg);
+     }
+   }
+   Duration: 1s, Timing: linear, Iteration: infinite
+*/
+
+/* Optional: Custom spinner animation with color change effect */
+@keyframes spinner-color-pulse {
+  0% {
+    border-color: currentColor;
+    border-top-color: transparent;
+  }
+  50% {
+    border-top-color: currentColor;
+  }
+  100% {
+    border-color: currentColor;
+    border-top-color: transparent;
+  }
+}
+
+.animate-spinner-color {
+  animation: spinner-color-pulse 1.5s linear infinite;
+}
+
+/* ============================================================================
+   LOADING BAR / PROGRESS ANIMATION
+   ============================================================================ */
+
+@keyframes progress-bar {
+  0% {
+    width: 0%;
+  }
+  10% {
+    width: 10%;
+  }
+  50% {
+    width: 50%;
+  }
+  90% {
+    width: 90%;
+  }
+  100% {
+    width: 100%;
+  }
+}
+
+.animate-progress {
+  animation: progress-bar 2s ease-in-out forwards;
+}
+
+/* ============================================================================
+   PULSE ANIMATION (Alternative to skeleton)
+   ============================================================================ */
+
+/* Tailwind's built-in animate-pulse is already defined.
+   This is for reference/customization:
+   @keyframes pulse {
+     0%, 100% {
+       opacity: 1;
+     }
+     50% {
+       opacity: 0.5;
+     }
+   }
+   Duration: 2s, Timing: ease-in-out, Iteration: infinite
+*/
+
+/* ============================================================================
+   BOUNCE / ATTENTION ANIMATIONS
+   ============================================================================ */
+
+@keyframes bounce-in {
+  0% {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-bounce-in {
+  animation: bounce-in 0.3s ease-out;
+}
+
+/* ============================================================================
+   SHAKE ANIMATION (Error state emphasis)
+   ============================================================================ */
+
+@keyframes shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  10%, 30%, 50%, 70%, 90% {
+    transform: translateX(-4px);
+  }
+  20%, 40%, 60%, 80% {
+    transform: translateX(4px);
+  }
+}
+
+.animate-shake {
+  animation: shake 0.5s ease-in-out;
+}
+
+/* ============================================================================
+   UTILITY CLASSES FOR COMMON PATTERNS
+   ============================================================================ */
+
+/* Fade in on mount (for error/loading state entrance) */
+.fade-in-ease {
+  animation: fade-in 0.2s ease-out;
+}
+
+/* Pulse indefinitely (for loading states) */
+.pulse-indefinite {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* Skeleton with stagger (apply to parent grid/list) */
+.skeleton-parent .skeleton-item:nth-child(1) {
+  animation-delay: 0ms;
+}
+
+.skeleton-parent .skeleton-item:nth-child(2) {
+  animation-delay: 100ms;
+}
+
+.skeleton-parent .skeleton-item:nth-child(3) {
+  animation-delay: 200ms;
+}
+
+.skeleton-parent .skeleton-item:nth-child(4) {
+  animation-delay: 300ms;
+}
+
+.skeleton-parent .skeleton-item:nth-child(5) {
+  animation-delay: 400ms;
+}
+
+.skeleton-parent .skeleton-item:nth-child(6) {
+  animation-delay: 500ms;
+}
+
+/* ============================================================================
+   ACCESSIBILITY: Respect prefers-reduced-motion
+   ============================================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-skeleton-pulse,
+  .animate-fade-in,
+  .animate-slide-up,
+  .animate-spinner-color,
+  .animate-progress,
+  .animate-bounce-in,
+  .animate-shake,
+  .fade-in-ease,
+  .pulse-indefinite {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  /* For spinners and skeletons, show static state when motion is reduced */
+  [role="status"] {
+    opacity: 1;
+  }
+}

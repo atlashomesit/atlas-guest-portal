@@ -42,11 +42,8 @@ export default function FavoritesPage() {
       .catch((err: unknown) => {
         if (!cancelled) {
           setAll([]);
-          const message =
-            err instanceof Error && err.message
-              ? err.message
-              : "We couldn't load saved homes right now. Please try again.";
-          setError(message);
+          console.error("Favorites listings load failed:", err);
+          setError("We couldn't load saved homes right now. Please try again.");
         }
       })
       .finally(() => {
@@ -77,7 +74,7 @@ export default function FavoritesPage() {
     setReminderState("busy");
     try {
       const ids = getFavoriteIds();
-      await Promise.all(
+      const responses = await Promise.all(
         ids.map((listingId) =>
           fetch(buildApiUrl("/api/saved-listings"), {
             method: "POST",
@@ -86,6 +83,11 @@ export default function FavoritesPage() {
           })
         )
       );
+      const failedCount = responses.filter((res) => !res.ok).length;
+      if (failedCount > 0) {
+        setReminderState("error");
+        return;
+      }
       localStorage.setItem("atlas_guest_email", email);
       setHasStoredEmail(true);
       setReminderState("done");
@@ -140,6 +142,13 @@ export default function FavoritesPage() {
               {shareState === "copied" ? "✓ Link copied!" : "Share wishlist"}
             </button>
           )}
+          <Link
+            to="/my-bookings"
+            className="text-sm text-text-muted underline underline-offset-2 hover:text-text-primary"
+            data-testid="favorites-manage-preferences-hint"
+          >
+            Manage preferences
+          </Link>
           <Link to="/" className="text-sm text-brand-primary underline underline-offset-2">
             Back to home
           </Link>
@@ -202,7 +211,9 @@ export default function FavoritesPage() {
               </button>
             </form>
             {reminderState === "error" && (
-              <p className="text-xs text-red-600 mt-2">Couldn't save your email. Please try again.</p>
+              <p className="text-xs text-red-600 mt-2" role="alert">
+                We couldn&apos;t save your reminder for every saved home. Please try again in a moment.
+              </p>
             )}
           </div>
         )}

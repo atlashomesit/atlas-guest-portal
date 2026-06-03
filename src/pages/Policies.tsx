@@ -56,12 +56,12 @@ const Policies = () => {
   return (
     <LegalLayout
       current="policies"
-      title={policyMetadata.title}
+      title={`Guest Policies | ${brandName}`}
       description="Practical rules for bookings, arrivals, conduct, and how we keep stays predictable."
       lastUpdated={policyMetadata.effectiveDate}
     >
       <SEO
-        title={policyMetadata.title}
+        title={`Guest Policies | ${brandName}`}
         description={`${brandName} guest policies covering booking rules, cancellations, conduct, and amenity usage.`}
         url="/policies"
       />
@@ -148,7 +148,7 @@ const Policies = () => {
                 href={whatsappLink}
                 target="_blank"
                 rel="noopener noreferrer"
-                aria-label="Contact Atlas support on WhatsApp"
+                aria-label={`Contact ${brandName} support on WhatsApp`}
                 className="inline-flex items-center gap-2 px-4 py-3 bg-bg-surface text-primary font-semibold rounded-xl shadow-level1 hover:shadow-level2"
               >
                 Message on WhatsApp

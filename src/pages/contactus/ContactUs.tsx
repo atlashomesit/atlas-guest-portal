@@ -12,7 +12,7 @@ import ErrorBoundary from "../../components/ErrorBoundary";
 import { toast } from "react-toastify";
 import { logUserAction, reportError } from "../../lib/monitoring";
 import { messageFromApiResponse } from "../../utils/serverErrorFromResponse";
-import { getTenantContext } from "../../tenant/tenantContext";
+import { getTenantBrandName } from "../../tenant/displayBrand";
 
 type StatusMessage = {
     type: "info" | "success" | "error";
@@ -21,7 +21,7 @@ type StatusMessage = {
 
 const ContactUs = () => {
     const contactEmail = getContactEmail();
-    const tenantLabel = getTenantContext()?.name?.trim() || "us";
+    const tenantLabel = getTenantBrandName();
 
     const [formData, setFormData] = useState({
         name: "",

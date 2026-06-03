@@ -100,6 +100,7 @@ const TestimonialsSection = () => {
       className="py-section-gap md:py-section-gap-md lg:py-section-gap-lg text-white bg-[#071624] isolate relative"
       style={testimonialsBandStyle}
       aria-labelledby="testimonials-heading"
+      data-testid="homepage-verified-testimonials"
     >
       <div className="mx-auto max-w-luxury px-[5%]">
         <div className="text-center max-w-prose mx-auto mb-12">

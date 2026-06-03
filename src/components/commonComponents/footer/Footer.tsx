@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom';
 import { helpNav, moreNav, primaryNav } from '../../../config/navigation';
 import { LOGO_URL } from '../../../config/branding';
 import { getTenantContext } from '../../../tenant/tenantContext';
+import { getTenantBrandName } from '../../../tenant/displayBrand';
 import { getTenantOverrides, shouldHideAtlasBranding } from '../../../tenant/tenantOverrides';
 import { CompactThemeSwitcher } from '../../ui/CompactThemeSwitcher';
 import { formatDisplayNumber, getContactEmail, getTelLink, getWhatsAppLink, getContactPhone, getWhatsAppPhone } from '../../../config/contact';
@@ -22,25 +23,23 @@ const iconMap = {
     IoIosArrowForward
 };
 
-const socialLabelByIcon: Record<string, string> = {
-    FaFacebook: `Visit ${getTenantContext()?.name ?? 'us'} on Facebook`,
-    FaInstagram: `Visit ${getTenantContext()?.name ?? 'us'} on Instagram`,
-    FaTwitter: `Visit ${getTenantContext()?.name ?? 'us'} on X`,
-    FaYoutube: `Visit ${getTenantContext()?.name ?? 'us'} on YouTube`,
-    ImGithub: `Visit ${getTenantContext()?.name ?? 'us'} on GitHub`,
-};
-
 const Footer = () => {
     const tenant = getTenantContext();
+    const brandName = getTenantBrandName();
+    const socialLabelByIcon: Record<string, string> = {
+        FaFacebook: `Visit ${brandName} on Facebook`,
+        FaInstagram: `Visit ${brandName} on Instagram`,
+        FaTwitter: `Visit ${brandName} on X`,
+        FaYoutube: `Visit ${brandName} on YouTube`,
+        ImGithub: `Visit ${brandName} on GitHub`,
+    };
     const overrides = getTenantOverrides(tenant?.slug);
     const hideAtlasBranding = shouldHideAtlasBranding(tenant, overrides);
     const logoSrc = overrides.hideLogo ? "" : (tenant?.logoUrl ?? LOGO_URL);
     const showLogo = Boolean(logoSrc);
     // RA-006 §3.5: footer brand always prefers the tenant's own name. Atlas-specific
     // copy is reached only on the Atlas marketplace root where hideAtlasBranding=false.
-    const footerBrand = hideAtlasBranding
-        ? (tenant?.name?.trim() || "Our homestays")
-        : (tenant?.name?.trim() || "Our Homestays");
+    const footerBrand = brandName;
     const footerTagline = hideAtlasBranding
         ? (tenant?.tagline?.trim() || "Comfortable stays with responsive support.")
         : (tenant?.tagline?.trim() || "Thoughtfully curated stays in Hyderabad");

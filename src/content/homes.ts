@@ -51,7 +51,7 @@ const buildHome = (roomNo: string, config: HomeConfig = {}): Home => {
   return {
     roomNo,
     listingId,
-    title: `Atlas ${isPenthouse ? 'Penthouse' : 'Homes'} ${roomNo}`,
+    title: `${isPenthouse ? 'Penthouse' : 'Suite'} ${roomNo}`,
     slug,
     href,
     maxGuests,

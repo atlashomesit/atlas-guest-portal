@@ -1,12 +1,17 @@
 import React from "react";
 import { useParams, useSearchParams } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { buildApiUrl } from "@/api/client";
+import { getContactEmail, getWhatsAppLink } from "@/config/contact";
+import SEO from "@/components/SEO";
+import { getTenantBrandName } from "@/tenant/displayBrand";
 import { messageFromApiResponse } from "@/utils/serverErrorFromResponse";
 
 /**
  * Landing page after one-click unsubscribe from marketing email (API redirects here).
  */
 export default function CommunicationPreferences() {
+  const brandName = getTenantBrandName();
   const { guestToken } = useParams();
   const [params] = useSearchParams();
   const unsubscribed = params.get("unsubscribed");
@@ -44,11 +49,8 @@ export default function CommunicationPreferences() {
       })
       .catch((e: unknown) => {
         if (cancelled) return;
-        setError(
-          e instanceof Error && e.message
-            ? e.message
-            : "Could not load preferences. Use the link from your email.",
-        );
+        console.error("Communication preferences load failed:", e);
+        setError("We couldn't load your preferences. Please use the link from your booking email or SMS.");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -70,7 +72,8 @@ export default function CommunicationPreferences() {
       if (!res.ok) throw new Error(await messageFromApiResponse(res));
       setSaved(true);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Could not save preferences.");
+      console.error("Communication preferences save failed:", e);
+      setError("We couldn't save your preferences right now. Please try again in a moment.");
     } finally {
       setLoading(false);
     }
@@ -78,6 +81,8 @@ export default function CommunicationPreferences() {
 
   if (unsubscribed === "1") {
     return (
+      <>
+      <SEO title={`Preferences updated | ${brandName}`} description={`Marketing preferences for ${brandName} guests.`} />
       <div className="max-w-xl mx-auto px-4 py-12">
         <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-5">
           <h1 className="text-xl font-bold text-text-primary mb-3">Preferences updated</h1>
@@ -87,11 +92,14 @@ export default function CommunicationPreferences() {
           </p>
         </div>
       </div>
+      </>
     );
   }
 
   if (guestToken) {
     return (
+      <>
+      <SEO title={`Communication preferences | ${brandName}`} description={`Manage email and WhatsApp preferences for ${brandName}.`} />
       <div className="max-w-xl mx-auto px-4 py-12">
         <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-5">
           <h1 className="text-xl font-bold text-text-primary mb-4">Communication preferences</h1>
@@ -143,15 +151,46 @@ export default function CommunicationPreferences() {
           )}
         </div>
       </div>
+      </>
     );
   }
 
   return (
+    <>
+    <SEO title={`Communication preferences | ${brandName}`} description={`Manage how ${brandName} contacts you about bookings and offers.`} />
     <div className="max-w-xl mx-auto px-4 py-12">
-      <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-5">
-        <h1 className="text-xl font-bold text-text-primary mb-3">Communication preferences</h1>
-        <p className="text-text-muted text-sm">Use the link from your email to update marketing preferences.</p>
+      <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-5 space-y-4">
+        <h1 className="text-xl font-bold text-text-primary">Communication preferences</h1>
+        <p className="text-text-secondary text-sm leading-relaxed">
+          Open the secure link from your booking confirmation email or SMS — it contains your personal
+          preferences token. You can also reach it from{' '}
+          <Link to="/my-bookings" className="text-brand-primary underline underline-offset-2">
+            My bookings
+          </Link>
+          ,{' '}
+          <Link to="/favorites" className="text-brand-primary underline underline-offset-2">
+            Saved homes
+          </Link>
+          , or your booking confirmation after you follow a booking link.
+        </p>
+        <p className="text-text-secondary text-sm leading-relaxed">
+          Need help opting out? WhatsApp us at{' '}
+          <a
+            href={getWhatsAppLink()}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-brand-primary underline underline-offset-2"
+          >
+            {getWhatsAppLink().replace('https://wa.me/', '+91-')}
+          </a>{' '}
+          or email{' '}
+          <a href={`mailto:${getContactEmail()}`} className="text-brand-primary underline underline-offset-2">
+            {getContactEmail()}
+          </a>
+          .
+        </p>
       </div>
     </div>
+    </>
   );
 }

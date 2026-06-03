@@ -5,12 +5,13 @@ interface CommonBannerProps {
 }
 
 const CommonBanner: React.FC<CommonBannerProps> = ({ image, PageName }) => {
+    const bannerAlt = image ? `${PageName} banner` : `${PageName}`;
 
     return (
         <section className=''>
             <div className='relative w-full h-auto'>
                 {image
-                    ? <img className='w-full h-auto object-cover' src={image} alt="Banner" loading="eager" decoding="async" fetchPriority="high" />
+                    ? <img className='w-full h-auto object-cover' src={image} alt={bannerAlt} loading="eager" decoding="async" fetchPriority="high" />
                     : <div className='w-full bg-slate-100' />
                 }
             </div>

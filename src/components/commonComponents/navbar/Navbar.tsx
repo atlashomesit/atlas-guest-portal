@@ -5,6 +5,7 @@ import './navbar.css';
 import { primaryNav, ctaNav } from '../../../config/navigation';
 import { LOGO_URL } from '../../../config/branding';
 import { getTenantContext } from '../../../tenant/tenantContext';
+import { getTenantBrandName } from '../../../tenant/displayBrand';
 import { getTenantOverrides, shouldHideAtlasBranding } from '../../../tenant/tenantOverrides';
 import { formatDisplayNumber, getTelLink } from '../../../config/contact';
 import { trackEvent } from '../../../utils/analytics';
@@ -14,12 +15,10 @@ import { useBooking } from '../../../contexts/BookingContext';
 const Navbar = () => {
   const tenant = getTenantContext();
   const overrides = getTenantOverrides(tenant?.slug);
-  const hideAtlasBranding = shouldHideAtlasBranding(tenant, overrides);
+  const _hideAtlasBranding = shouldHideAtlasBranding(tenant, overrides);
   const logoSrc = tenant?.logoUrl ?? LOGO_URL;
   // RA-006 §3.5: prefer tenant name everywhere; only fall back to "Home" on the Atlas root.
-  const brandName = hideAtlasBranding
-    ? (tenant?.name?.trim() ?? '')
-    : (tenant?.name ?? 'Home');
+  const brandName = getTenantBrandName();
   const showLogo = !overrides.hideLogo;
   const showListProperty = !overrides.hideListProperty;
 
