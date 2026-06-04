@@ -235,6 +235,27 @@ const Navbar = () => {
         {/* RIGHT - Desktop Actions: Saved | Book Now only (utility bar has phone/login/currency) */}
         <div className="hidden lg:flex items-center gap-6">
           <NavLink
+            to="/amenities"
+            className={navLinkClass}
+            data-testid="navbar-amenities-link"
+          >
+            Amenities
+          </NavLink>
+          <NavLink
+            to="/my-bookings"
+            className={navLinkClass}
+            data-testid="navbar-my-bookings-link"
+          >
+            My bookings
+          </NavLink>
+          <NavLink
+            to="/profile"
+            className={navLinkClass}
+            data-testid="navbar-profile-link"
+          >
+            Account
+          </NavLink>
+          <NavLink
             to="/favorites"
             className={navLinkClass}
             data-testid="navbar-saved-link"
@@ -300,6 +321,30 @@ const Navbar = () => {
 
           {/* MOBILE ACTIONS */}
           <div className="mt-2 flex flex-col gap-3">
+            <NavLink
+              to="/amenities"
+              onClick={closeMobile}
+              className="block py-2 font-semibold"
+              data-testid="navbar-amenities-link-mobile"
+            >
+              Amenities
+            </NavLink>
+            <NavLink
+              to="/my-bookings"
+              onClick={closeMobile}
+              className="block py-2 font-semibold"
+              data-testid="navbar-my-bookings-link-mobile"
+            >
+              My bookings
+            </NavLink>
+            <NavLink
+              to="/profile"
+              onClick={closeMobile}
+              className="block py-2 font-semibold"
+              data-testid="navbar-profile-link-mobile"
+            >
+              Account
+            </NavLink>
             <NavLink
               to="/favorites"
               onClick={closeMobile}
