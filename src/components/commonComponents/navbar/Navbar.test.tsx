@@ -52,12 +52,15 @@ describe("Navbar CTA", () => {
     expect(helpLink).toHaveAttribute("href", "/contact");
   });
 
-  it("renders simplified center nav: Stays, Hyderabad, Trips, Help — no duplicates of utility bar", () => {
+  it("renders simplified center nav: Stays, Hyderabad, Trips menu, Help — no duplicates of utility bar", () => {
     renderNavbar();
 
     expect(screen.getByRole("link", { name: /^Stays$/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /^Hyderabad$/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /^Trips$/i })).toBeInTheDocument();
+    expect(screen.getByTestId("navbar-trips-menu")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("navbar-trips-menu"));
+    expect(screen.getByRole("menuitem", { name: /my bookings/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /profile/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /^Help$/i })).toBeInTheDocument();
 
     // Utility-bar items must NOT appear in the main navbar right section
