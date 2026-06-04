@@ -114,6 +114,19 @@ export default function ProfilePage() {
     );
   }
 
+  if (!bookingId || !token) {
+    return (
+      <StateMessage
+        data-testid="profile-missing-token-state"
+        icon="👤"
+        title="Open your booking profile"
+        message="Your profile is linked to a booking. Open it from your booking confirmation email or My Bookings."
+        primaryAction={{ label: "My bookings", to: "/my-bookings" }}
+        secondaryActions={[{ label: "Return to homepage", to: "/" }]}
+      />
+    );
+  }
+
   if (error || !profile) {
     return (
       <StateMessage
@@ -122,7 +135,10 @@ export default function ProfilePage() {
         title="Profile not found"
         message={error ?? "We couldn’t load your profile right now. Please try again in a moment."}
         primaryAction={{ label: "Try again", onClick: () => window.location.reload() }}
-        secondaryActions={[{ label: "Return to homepage", to: "/" }]}
+        secondaryActions={[
+          { label: "My bookings", to: "/my-bookings" },
+          { label: "Return to homepage", to: "/" },
+        ]}
       />
     );
   }

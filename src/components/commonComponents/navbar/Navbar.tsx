@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, NavLink, useNavigate, useLocation, matchPath } from 'react-router-dom';
 import './navbar.css';
 
-import { primaryNav, ctaNav } from '../../../config/navigation';
+import { primaryNav, ctaNav, tripsMenuNav } from '../../../config/navigation';
 import { LOGO_URL } from '../../../config/branding';
 import { getTenantContext } from '../../../tenant/tenantContext';
 import { getTenantBrandName } from '../../../tenant/displayBrand';
@@ -23,6 +23,7 @@ const Navbar = () => {
   const showListProperty = !overrides.hideListProperty;
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [tripsMenuOpen, setTripsMenuOpen] = useState(false);
   const [ctaStatus, setCtaStatus] = useState<'idle' | 'navigating' | 'scrolling'>('idle');
   const [savedCount, setSavedCount] = useState(0);
 
@@ -119,7 +120,7 @@ const Navbar = () => {
     setIsMenuOpen(false);
   }, [location.pathname, location.search, location.hash]);
 
-  const visibleNavItems = primaryNav.filter((item) => !item.hidden);
+  const visibleNavItems = primaryNav.filter((item) => !item.hidden && item.label !== 'Trips');
 
   useEffect(() => {
     setCtaStatus('idle');
@@ -197,6 +198,37 @@ const Navbar = () => {
                 {item.label}
               </NavLink>
             ))}
+            <div className="relative">
+              <button
+                type="button"
+                className="nav-link"
+                aria-expanded={tripsMenuOpen}
+                aria-haspopup="true"
+                data-testid="navbar-trips-menu"
+                onClick={() => setTripsMenuOpen((o) => !o)}
+                onBlur={() => window.setTimeout(() => setTripsMenuOpen(false), 150)}
+              >
+                Trips ▾
+              </button>
+              {tripsMenuOpen && (
+                <div
+                  className="absolute left-0 top-full z-50 mt-2 min-w-[11rem] rounded-lg border border-border-subtle bg-bg-surface py-2 shadow-lg"
+                  role="menu"
+                >
+                  {tripsMenuNav.map((item) => (
+                    <Link
+                      key={item.to}
+                      to={item.to}
+                      role="menuitem"
+                      className="block px-4 py-2 text-sm text-text-primary hover:bg-brand-primary/10"
+                      onClick={() => setTripsMenuOpen(false)}
+                    >
+                      {item.label}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -250,6 +282,17 @@ const Navbar = () => {
               onClick={closeMobile}
               to={item.to}
               className="block py-2"
+            >
+              {item.label}
+            </NavLink>
+          ))}
+          <p className="py-2 text-xs font-semibold uppercase tracking-wide text-text-muted">Trips</p>
+          {tripsMenuNav.map((item) => (
+            <NavLink
+              key={item.to}
+              onClick={closeMobile}
+              to={item.to}
+              className="block py-2 pl-2"
             >
               {item.label}
             </NavLink>
