@@ -289,6 +289,8 @@ interface Property {
     amenityCodes?: string[];
     /** TASK-355: host/on-site contact phone for WhatsApp CTA */
     hostPhone?: string | null;
+    /** TASK-2907: property owner / host display name from listing API */
+    hostName?: string | null;
     /** Street-level address from API (TASK-1896); may be null if host chose not to expose pre-booking */
     propertyAddress?: string | null;
     /** Legacy / alternate JSON key for same */
@@ -884,6 +886,10 @@ const PropertyDetails = () => {
                             const raw = (apiListing as Record<string, unknown>).hostPhone ?? (apiListing as Record<string, unknown>).contactPhone;
                             return typeof raw === 'string' && raw.trim() ? raw.trim() : null;
                         })(),
+                        hostName: (() => {
+                            const raw = (apiListing as Record<string, unknown>).hostName ?? (apiListing as Record<string, unknown>).HostName;
+                            return typeof raw === 'string' && raw.trim() ? raw.trim() : null;
+                        })(),
                         amenityCodes: (() => {
                             const raw = (apiListing as Record<string, unknown>).amenityCodes;
                             if (Array.isArray(raw)) return raw.filter((c): c is string => typeof c === 'string');
@@ -1244,7 +1250,11 @@ useEffect(() => {
     const ppTenantOverrides = getTenantOverrides(ppTenantCtx?.slug ?? '');
     const ppHideAtlasBranding = shouldHideAtlasBranding(ppTenantCtx, ppTenantOverrides);
     const ppBrandName = getTenantBrandName();
-    const ppHostDisplayName = ppTenantCtx?.name?.trim() || data.property_name || ppBrandName;
+    const ppHostDisplayName =
+      data.hostName?.trim() ||
+      ppTenantCtx?.name?.trim() ||
+      data.property_name ||
+      ppBrandName;
     const ppHostInitial = ppHostDisplayName.charAt(0).toUpperCase();
     const ppHasOnlinePayment =
       typeof _getTenantCtx()?.paymentProvider === 'string' && _getTenantCtx()?.paymentProvider !== 'MANUAL';
@@ -2105,30 +2115,6 @@ useEffect(() => {
                     </div>
                   );
                 })()}
-
-                {/* Host profile card */}
-                <div
-                  className="pp-host"
-                  style={{ marginTop: 12 }}
-                  data-testid="host-profile-card"
-                >
-                  <div className="pp-host-avatar" aria-hidden="true" style={{ width: 44, height: 44, fontSize: 18 }}>
-                    {ppHostInitial}
-                  </div>
-                  <div>
-                    <div className="pp-host-name" style={{ fontSize: 15 }}>
-                      Hosted by {ppHostDisplayName}
-                    </div>
-                    <div className="pp-host-sub">
-                      24/7 WhatsApp support{responseTimeBadge ? ` · ${responseTimeBadge}` : ' · WhatsApp-first support.'}
-                    </div>
-                    {reviewReplyRateBadge && (
-                      <p style={{ fontSize: 12, color: '#157046', fontWeight: 600, marginTop: 2 }}>
-                        ✓ {reviewReplyRateBadge} within 48h
-                      </p>
-                    )}
-                  </div>
-                </div>
 
                 {/* WhatsApp CTA (sidebar) — TASK-2873: draft listings are question-only, not book-via-WhatsApp */}
                 <div style={{ marginTop: 12 }}>
