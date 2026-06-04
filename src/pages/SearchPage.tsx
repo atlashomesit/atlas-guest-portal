@@ -303,6 +303,7 @@ const SearchPage = () => {
     if (apiListings !== null) {
       return apiListings;
     }
+    // TASK-2904: never swap static homes in while the live API request is in flight
     if (isLoading) {
       return [];
     }
@@ -1168,7 +1169,17 @@ const SearchPage = () => {
           </div>
         )}
 
-        {isLoading && !loadingTimeoutReached && (
+        {isLoading && loadingTimeoutReached && (
+          <div
+            className="mb-4 flex items-center gap-3 rounded-xl border border-border-subtle bg-bg-muted/60 px-4 py-3 text-sm text-text-secondary"
+            data-testid="search-still-loading-banner"
+            role="status"
+          >
+            Still loading live homes and prices — sample results will not appear until the refresh finishes or fails.
+          </div>
+        )}
+
+        {isLoading && (
           <section
             className="grid gap-6 sm:grid-cols-2"
             data-testid="search-skeleton"
