@@ -1158,36 +1158,37 @@ useEffect(() => {
         nightlyPrice?.finalNightlyPrice,
     ]);
 
-    if (!data && !notFound) {
+    if (!data) {
+        if (notFound) {
+            return (
+                <div className="min-h-screen flex items-center justify-center">
+                    <div className="text-center max-w-xl px-4">
+                        <h1 className="text-2xl font-semibold text-text-primary mb-4">Home Not Found</h1>
+                        <div className="text-text-muted">
+                            Please check the link and try again, or head back to our homes catalog to continue browsing.
+                        </div>
+                        <div className="mt-6 flex flex-wrap gap-3 justify-center">
+                            <Button onClick={() => window.history.back()} className="w-full sm:w-auto">
+                                Go Back
+                            </Button>
+                            <Link
+                                to="/"
+                                className="inline-flex items-center justify-center rounded-full border border-border-subtle px-5 py-3 text-sm font-semibold text-text-primary transition hover:border-[color:var(--cta-primary)] hover:text-[color:var(--cta-primary)]"
+                            >
+                                Return to homepage
+                            </Link>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
         return <PropertyDetailsSkeleton />;
     }
 
-    if (!data && notFound) {
-        return (
-            <div className="min-h-screen flex items-center justify-center">
-                <div className="text-center max-w-xl px-4">
-                    <h1 className="text-2xl font-semibold text-text-primary mb-4">Home Not Found</h1>
-                    <div className="text-text-muted">
-                        Please check the link and try again, or head back to our homes catalog to continue browsing.
-                    </div>
-                    <div className="mt-6 flex flex-wrap gap-3 justify-center">
-                        <Button onClick={() => window.history.back()} className="w-full sm:w-auto">
-                            Go Back
-                        </Button>
-                        <Link
-                            to="/"
-                            className="inline-flex items-center justify-center rounded-full border border-border-subtle px-5 py-3 text-sm font-semibold text-text-primary transition hover:border-[color:var(--cta-primary)] hover:text-[color:var(--cta-primary)]"
-                        >
-                            Return to homepage
-                        </Link>
-                    </div>
-                </div>
-            </div>
-        );
-    }
+    const property = data;
 
     const resolvedCheckInTime =
-      data?.checkInTime?.trim() || data?.unitPolicy?.checkInTime?.trim() || null;
+      property.checkInTime?.trim() || property.unitPolicy?.checkInTime?.trim() || null;
     const resolvedCheckOutTime =
       data?.checkOutTime?.trim() || data?.unitPolicy?.checkOutTime?.trim() || null;
     const cancellationPolicyText = (() => {
