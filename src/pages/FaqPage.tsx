@@ -9,7 +9,7 @@ import { termsSections } from "../content/legal/terms";
 import { useScrollToHash } from "../hooks/useScrollToHash";
 import { CONTACT } from "../config/contact";
 import { buildWaLink, defaultPrefill } from "../utils/whatsapp";
-import FaqHighlights from "../components/faq/FaqHighlights";
+import FaqHighlights from "../components/Faq/FaqHighlights";
 import { getFaqHighlights } from "../content/faqHighlights";
 import { getTenantBrandName } from "../tenant/displayBrand";
 

@@ -7,7 +7,6 @@ import { fetchPublicListings, type PublicListing } from "@/api/listingClient";
 import { filterGuestImageUrls, sanitizeGuestImageUrl } from "@/utils/guestImageUrl";
 import { buildHomeUnitPath, getPropertySlug } from "@/utils/navigation";
 import { listingMatchesCityKeywords } from "@/utils/cityListingFilter";
-import { getEffectiveDiscountPercent } from "@/utils/pricing";
 import { withTenantBrandInCopy } from "@/tenant/displayBrand";
 import { getTenantContext } from "@/tenant/tenantContext";
 import { getTenantOverrides, getTenantPublicListingIdAllowlist } from "@/tenant/tenantOverrides";
@@ -99,7 +98,6 @@ const CityLandingPage = ({ citySlug }: CityLandingPageProps) => {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const directBookingDiscountPercent = useMemo(() => getEffectiveDiscountPercent(), []);
 
   const faqJsonLd = useMemo(
     () => ({
@@ -251,7 +249,7 @@ const CityLandingPage = ({ citySlug }: CityLandingPageProps) => {
                 losDiscountPercent={c.losDiscountPercent ?? null}
                 losDiscount2MinNights={c.losDiscount2MinNights ?? null}
                 losDiscount2Percent={c.losDiscount2Percent ?? null}
-                directBookingDiscountPercent={directBookingDiscountPercent}
+                estimateNights={1}
                 onClick={() => navigate(buildHomeUnitPath(c.propertySlug, c.listingId))}
               />
             ))}

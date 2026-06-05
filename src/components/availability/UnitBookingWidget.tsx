@@ -1,7 +1,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { addDays, format, startOfMonth } from 'date-fns';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { NETWORK_ERROR_MESSAGE } from './unitBookingPaymentOrderErrors';
 import { toast } from 'react-toastify';
@@ -116,20 +116,6 @@ function getBookingErrorMessage(error: unknown, context: 'order' | 'verify'): st
     : 'Payment verification failed. Please contact support with your payment ID.';
 }
 
-/** TASK-255: Best-effort removal of PaymentPending row after Razorpay dismiss/failure (token = order response bookingToken). */
-async function _abandonPaymentPendingCheckout(bookingId: number, bookingToken: string | null | undefined) {
-  const token = typeof bookingToken === 'string' ? bookingToken.trim() : '';
-  if (!token) return;
-  try {
-    const url = buildApiUrl(
-      `/api/guest/bookings/${bookingId}/abandon-checkout?t=${encodeURIComponent(token)}`
-    );
-    await apiFetch(url, { method: 'POST' });
-  } catch {
-    /* non-blocking */
-  }
-}
-
 /** Day-level status derived from public availability calendar API. */
 type ListingCalendarDayStatus = 'Blocked' | 'Available' | 'Hold' | 'Turnover';
 
@@ -151,7 +137,6 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   }
 
   const navigate = useNavigate();
-  const _location = useLocation();
   const { booking, updateBooking } = useBooking();
   const { getUrlsForListingId } = useListingPhotosFromApi();
   const isBookingDisabled = !hasRuntimeConfig();
@@ -212,22 +197,6 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     const endDate = addDays(startDate, 60);
     return { startDate, endDate };
   }, [today]);
-
-  const _resolveNightlyRates = (
-    response: AvailabilityResponse,
-    normalizedTarget: string,
-  ): AvailabilityNightlyRate[] => {
-    if (response.nightlyRates) {
-      return response.nightlyRates;
-    }
-
-    const listing = response.listings?.find((entry) => {
-      const candidate = entry.propertyId ?? entry.listingId ?? entry.id;
-      return normalizeListingId(candidate) === normalizedTarget;
-    });
-
-    return listing?.nightlyRates ?? [];
-  };
 
   useEffect(() => {
     if (!isBookingDisabled || !openCalendar) return;
@@ -600,29 +569,6 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   return true; // otherwise normal
 };
 
-const _isCheckOutAllowed = (date: Date) => {
-  const iso = toISODate(getIstStartOfDay(date));
-  
-  // Check status from dateStatusMap (from GET API response)
-  const status = dateStatusMap.get(iso);
-  if (status === 'Blocked' || status === 'Hold') {
-    // allow check-out if previous day is selected as startDate
-    return dateRange.startDate
-      ? getIstStartOfDay(date).getTime() === addDays(dateRange.startDate, 1).getTime()
-      : false;
-  }
-  
-  // Also check blockedSet for backward compatibility
-  if (blockedSet.has(iso)) {
-    // allow check-out if previous day is selected as startDate
-    return dateRange.startDate
-      ? getIstStartOfDay(date).getTime() === addDays(dateRange.startDate, 1).getTime()
-      : false;
-  }
-  return true;
-};
-
-
   const disabledDay = useCallback((date: Date) => {
   const normalized = getIstStartOfDay(date);
   
@@ -852,7 +798,6 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
   // Razorpay charges its 3% fee on the FULL amount it processes (base + GST), not just base.
   // Sreekar canonical clarification 2026-05-21 (memory: project_guest_booking_pricing_formula).
-  const _convenienceFee = Math.round(priceDetails.total * convenienceFeePercent);
   const breakdownConvenienceFee = Math.round((breakdownPrice + gstLineAmount) * convenienceFeePercent);
 
   // TASK-2631: Total = Base + GST + Service Fee (CPO-canonical formula).
@@ -1023,37 +968,6 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     listingId, guests, propertySlug, unitSlug, listingName, breakdownPrice, breakdownConvenienceFee,
     breakdownFinalTotal, finalTotal, updateBooking, navigate,
   ]);
-
-  // Helper function to find next available date starting from a given date
-  // Returns dates that are not blocked/hold
-  const _findNextAvailableDate = useCallback((startDate: Date): Date | null => {
-    // Find next available date (up to 60 days ahead)
-    for (let i = 0; i <= 60; i++) {
-      const checkDate = addDays(startDate, i);
-      const checkISO = toISODate(checkDate);
-      const checkStatus = dateStatusMap.get(checkISO);
-      
-      // Skip if status is 'Blocked' or 'Hold' or date is in blockedSet
-      if (checkStatus === 'Blocked' || checkStatus === 'Hold' || blockedSet.has(checkISO)) {
-        continue;
-      }
-      
-      // Consider date available if:
-      // 1. Status is explicitly 'Available', OR
-      // 2. Status is undefined but date is not in blockedSet (API might not return all available dates)
-      const isAvailable =
-        checkStatus === 'Available' ||
-        checkStatus === 'Turnover' ||
-        (checkStatus === undefined && !blockedSet.has(checkISO));
-      
-      if (isAvailable) {
-        // Checkout date can be blocked/hold - that's allowed (you're leaving, not staying)
-        // Only check-in date needs to be available
-        return checkDate;
-      }
-    }
-    return null; // No available date found
-  }, [dateStatusMap, blockedSet]);
 
   if (providerBlocked) {
     return (
@@ -1335,7 +1249,6 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               <HelpCircle
                 className="h-3 w-3 cursor-help text-text-muted"
                 aria-label="Razorpay payment gateway fee — passed through, not a platform markup."
-                title="Razorpay payment gateway fee — passed through, not a platform markup."
               />
             </span>
             <span className="lv-num">{displayPrice(breakdownConvenienceFee)}</span>

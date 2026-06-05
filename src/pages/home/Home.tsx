@@ -21,7 +21,7 @@ import {
 } from "../../config/homepageUxFlags";
 import { useBooking } from "../../contexts/BookingContext";
 import { useLocation } from "react-router-dom";
-import FaqHighlights from "../../components/faq/FaqHighlights";
+import FaqHighlights from "../../components/Faq/FaqHighlights";
 import pricingConfig from "../../config/pricing.config";
 import { getEffectiveDiscountPercent } from "../../utils/pricing";
 import { getPublicSiteOrigin } from "../../config/siteOrigin";

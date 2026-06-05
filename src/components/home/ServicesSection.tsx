@@ -52,7 +52,10 @@ export const SERVICES_CONTENT: {
       thumbnail: "",
     },
   ],
-  concreteCopy: servicesConcreteCopy,
+  concreteCopy: servicesConcreteCopy.map((item) => ({
+    ...item,
+    icon: item.icon as keyof typeof SERVICE_ICONS,
+  })),
 };
 
 const ServicesSection = () => {

@@ -22,7 +22,6 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { useBooking, type BookingPriceBreakdown } from '@/contexts/BookingContext';
 import { buildApiUrl, getApiHeaders, getOrderRequestHeaders } from '@/api/client';
-import { apiFetch } from '@/lib/http';
 import {
   clampNationalDigits,
   getGuestDialOption,
@@ -841,7 +840,11 @@ const GuestDetailsPage: React.FC = () => {
               }
 
               console.log('[GuestDetailsPage] Creating Razorpay instance with order:', { orderId, amount, keyId });
-              const rzp = new window.Razorpay(options);
+              type RazorpayCheckout = {
+                open: () => void;
+                on: (event: string, handler: (r: unknown) => void) => void;
+              };
+              const rzp = new window.Razorpay(options) as RazorpayCheckout;
               console.log('[GuestDetailsPage] Razorpay instance created successfully');
 
               rzp.on('payment.failed', (failRes: unknown) => {

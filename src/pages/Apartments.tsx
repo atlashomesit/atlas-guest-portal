@@ -16,7 +16,6 @@ import { trackEvent } from "../utils/analytics";
 import { buildHomeUnitPath, getPropertySlug, navigateToHomeUnit } from "../utils/navigation";
 import {
   calculateNightlyPrice,
-  getEffectiveDiscountPercent,
   inferUnitType,
   type NightlyPriceBreakdown,
 } from "../utils/pricing";
@@ -51,6 +50,8 @@ type PropertyRecord = {
   property_amenities?: { amenities_icon?: string }[];
   property_policy_details?: { type?: string; value?: string }[];
   property_description?: string;
+  /** TASK-1360: most recent checkout within 30 days (from public listings API). */
+  lastBookedAt?: string | null;
 };
 
 type CombinedListing = {
@@ -240,8 +241,6 @@ export const Apartments = () => {
 
   const tenant = getTenantContext();
   const brandName = getTenantBrandName();
-  const tenantOverrides = getTenantOverrides(tenant?.slug);
-  const directBookingDiscountPercent = React.useMemo(() => getEffectiveDiscountPercent(), []);
 
   const safeListings = React.useMemo(() => sanitizeListings(listingsSource), [listingsSource]);
   const safeProperties = React.useMemo(() => sanitizeProperties(propertiesSource), [propertiesSource]);
@@ -614,7 +613,6 @@ export const Apartments = () => {
                   losDiscountPercent={listing.losDiscountPercent}
                   losDiscount2MinNights={listing.losDiscount2MinNights}
                   losDiscount2Percent={listing.losDiscount2Percent}
-                  directBookingDiscountPercent={directBookingDiscountPercent}
                   estimateNights={estimateNights}
                   onClick={() => handleNavigate(listing.property)}
                 />

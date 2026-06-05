@@ -7,15 +7,27 @@ import { useNavigate } from "react-router-dom";
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Navigation, Pagination, Scrollbar, A11y, Autoplay } from 'swiper/modules';
 import PropertyModal from "../propertymodal/PropertyModal";
-import { useState } from "react";
+import { useState, type ComponentProps } from "react";
 import Subheading from "../../commonComponents/subheading/Subheading";
 import Homepage_form from "../hotelBooking_form/BookingCard";
 import { filterGuestImageUrls } from "../../../utils/guestImageUrl";
 
+type LocationProperty = {
+    id?: number;
+    property_name?: string;
+    property_img?: string[];
+    property_subtitle?: string;
+    property_location?: string;
+    property_description?: string;
+    property_amenities?: { amenities_icon?: string }[];
+    property_address?: { value?: string }[];
+    additional_cost_note?: string;
+};
+
 const Homepage_LocationDetails = () => {
     const location = useLocation();
     const navigate = useNavigate();
-    const [selectedProperty, setSelectedProperty] = useState(null);
+    const [selectedProperty, setSelectedProperty] = useState<LocationProperty | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
 
     const locationViseData = location.state?.property?.properties;
@@ -52,7 +64,7 @@ const Homepage_LocationDetails = () => {
 };
 
 
-    const handleModal = (property: { id?: number; property_name?: string }) => () => {
+    const handleModal = (property: LocationProperty) => () => {
         setSelectedProperty(property);
         setIsModalOpen(true);
     };
@@ -223,7 +235,7 @@ const Homepage_LocationDetails = () => {
                                             imgs.map((image: string, index: number) => (
                                             <SwiperSlide key={index}>
                                                 <div
-                                                    onClick={() => handleNavigate(data.property_name)}
+                                                    onClick={() => handleNavigate(String(data.property_name ?? ""))}
                                                     className="h-full w-full cursor-pointer"
                                                 >
                                                     <img
@@ -318,7 +330,11 @@ const Homepage_LocationDetails = () => {
 
                 {/* Modal */}
                 {isModalOpen && (
-                    <PropertyModal property={selectedProperty} onClose={closeModal} handleNavigate={handleNavigate} />
+                    <PropertyModal
+                        property={selectedProperty as ComponentProps<typeof PropertyModal>["property"]}
+                        onClose={closeModal}
+                        handleNavigate={(property) => handleNavigate(property.property_name)}
+                    />
                 )}
             </section>
         </section>
