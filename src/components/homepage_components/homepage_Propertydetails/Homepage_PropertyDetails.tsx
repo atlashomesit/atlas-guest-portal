@@ -1588,6 +1588,7 @@ useEffect(() => {
                       <div className="pp-host-sub">
                         Owner-operated · Responds on WhatsApp · Direct booking
                         {responseTimeBadge ? ` · ${responseTimeBadge}` : ''}
+                        {reviewReplyRateBadge ? ` · ${reviewReplyRateBadge}` : ''}
                       </div>
                     </div>
                     <div className="pp-host-actions">
