@@ -126,7 +126,19 @@ describe("Hero date picker", () => {
     const calendar = openCalendar();
 
     expect(calendar.getAttribute("data-months")).toBe("1");
-    expect(document.body).toMatchSnapshot("date-picker-mobile");
+    // React useId() values (e.g. :rg:, :rh:) are render-order dependent: their base counter
+    // shifts with unrelated render changes, which made this snapshot chronically flaky
+    // (re-recorded repeatedly per git history). Normalise each distinct id to a stable
+    // :ridN: token by first-seen order so the snapshot captures structure, not React internals.
+    const idMap = new Map<string, string>();
+    const stableHtml = document.body.innerHTML.replace(/:r[0-9a-z]+:/gi, (id) => {
+      const existing = idMap.get(id);
+      if (existing) return existing;
+      const token = `:rid${idMap.size}:`;
+      idMap.set(id, token);
+      return token;
+    });
+    expect(stableHtml).toMatchSnapshot("date-picker-mobile");
 
     view.unmount();
     viewportSpy.mockRestore();
