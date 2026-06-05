@@ -5,7 +5,7 @@ import { useTenantListings } from "../hooks/useTenantListings";
 import { filterGuestImageUrls, sanitizeGuestImageUrl } from "../utils/guestImageUrl";
 import { getTenantBrandName } from "../tenant/displayBrand";
 import { getTenantContext } from "../tenant/tenantContext";
-import { getTenantOverrides, shouldHideAtlasBranding } from "../tenant/tenantOverrides";
+import { getTenantOverrides } from "../tenant/tenantOverrides";
 
 interface GalleryItem {
   propertyId: number;
@@ -28,7 +28,6 @@ const GalleryPage = () => {
   const tenant = getTenantContext();
   const brandName = getTenantBrandName();
   const tenantOverrides = getTenantOverrides(tenant?.slug);
-  const _hideAtlasBranding = shouldHideAtlasBranding(tenant, tenantOverrides);
   const [activeSegment, setActiveSegment] = useState<string>("all");
   const [propertyFilter, setPropertyFilter] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState<string>("");

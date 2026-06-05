@@ -22,35 +22,46 @@ type PropertyLike = {
   property_metadata?: Record<string, unknown>;
 };
 
+const metaString = (
+  bag: Record<string, unknown> | undefined,
+  key: string,
+): string | undefined => {
+  const value = bag?.[key];
+  return typeof value === "string" ? value : undefined;
+};
+
 const pickPropertySlugSource = (property: PropertyLike): string =>
-  (property.property_slug as string | undefined) ??
-  (property.slug as string | undefined) ??
-  (property.property_metadata as Record<string, unknown> | undefined)?.property_slug as string | undefined ??
-  (property.metadata as Record<string, unknown> | undefined)?.property_slug as string | undefined ??
-  (property.property_metadata as Record<string, unknown> | undefined)?.slug as string | undefined ??
-  (property.metadata as Record<string, unknown> | undefined)?.slug as string | undefined ??
+  property.property_slug ??
+  property.slug ??
+  metaString(property.property_metadata, "property_slug") ??
+  metaString(property.metadata, "property_slug") ??
+  metaString(property.property_metadata, "slug") ??
+  metaString(property.metadata, "slug") ??
   property.property_name ??
-  (property.property_metadata as Record<string, unknown> | undefined)?.property_name as string | undefined ??
-  (property.metadata as Record<string, unknown> | undefined)?.property_name as string | undefined ??
+  metaString(property.property_metadata, "property_name") ??
+  metaString(property.metadata, "property_name") ??
   property.name ??
-  (property.property_metadata as Record<string, unknown> | undefined)?.name as string | undefined ??
-  (property.metadata as Record<string, unknown> | undefined)?.name as string | undefined ??
+  metaString(property.property_metadata, "name") ??
+  metaString(property.metadata, "name") ??
   property.title ??
   "";
 
-const pickUnitSlugSource = (property: PropertyLike): string | number =>
-  property.unit_slug ??
-  property.unitSlug ??
-  property.id ??
-  property.slug ??
-  property.property_name ??
-  property.name ??
-  property.title ??
-  (property.property_metadata as Record<string, unknown> | undefined)?.unit_slug ??
-  (property.metadata as Record<string, unknown> | undefined)?.unit_slug ??
-  (property.property_metadata as Record<string, unknown> | undefined)?.slug ??
-  (property.metadata as Record<string, unknown> | undefined)?.slug ??
-  "unit";
+const pickUnitSlugSource = (property: PropertyLike): string => {
+  const raw =
+    property.unit_slug ??
+    property.unitSlug ??
+    (property.id != null ? String(property.id) : undefined) ??
+    property.slug ??
+    property.property_name ??
+    property.name ??
+    property.title ??
+    metaString(property.property_metadata, "unit_slug") ??
+    metaString(property.metadata, "unit_slug") ??
+    metaString(property.property_metadata, "slug") ??
+    metaString(property.metadata, "slug") ??
+    "unit";
+  return String(raw);
+};
 
 export const getPropertySlug = (property: PropertyLike): string => {
   const source = pickPropertySlugSource(property) || "atlas homes";

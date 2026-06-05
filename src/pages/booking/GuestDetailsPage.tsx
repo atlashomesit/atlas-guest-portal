@@ -191,14 +191,6 @@ function remainingPct(expiresAt: string, ttlMs = 15 * 60 * 1000): number {
   return Math.max(0, Math.min(1, ms / ttlMs));
 }
 
-async function _abandonHold(holdId: number, prepToken: string | null) {
-  if (!prepToken) return;
-  try {
-    const url = buildApiUrl(`/api/guest/bookings/${holdId}/abandon-checkout?t=${encodeURIComponent(prepToken)}`);
-    await apiFetch(url, { method: 'POST' });
-  } catch { /* non-blocking */ }
-}
-
 function loadRazorpayScript(onSuccess: () => void, onError: (msg: string) => void) {
   if (window.Razorpay) { onSuccess(); return; }
 

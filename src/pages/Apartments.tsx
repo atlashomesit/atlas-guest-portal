@@ -9,7 +9,7 @@ import SEO from "../components/SEO";
 import { LOGO_URL } from "../config/branding";
 import { getTenantBrandName } from "../tenant/displayBrand";
 import { getTenantContext } from "../tenant/tenantContext";
-import { getTenantOverrides, shouldHideAtlasBranding } from "../tenant/tenantOverrides";
+import { getTenantOverrides } from "../tenant/tenantOverrides";
 import type { Listing } from "../data/listings";
 import { useTenantListings } from "../hooks/useTenantListings";
 import { trackEvent } from "../utils/analytics";
@@ -241,7 +241,6 @@ export const Apartments = () => {
   const tenant = getTenantContext();
   const brandName = getTenantBrandName();
   const tenantOverrides = getTenantOverrides(tenant?.slug);
-  const _hideAtlasBranding = shouldHideAtlasBranding(tenant, tenantOverrides);
   const directBookingDiscountPercent = React.useMemo(() => getEffectiveDiscountPercent(), []);
 
   const safeListings = React.useMemo(() => sanitizeListings(listingsSource), [listingsSource]);

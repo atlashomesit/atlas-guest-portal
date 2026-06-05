@@ -72,11 +72,6 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
   const calendarContentId = React.useId();
   const calendarLabelId = React.useId();
   const dateErrorId = React.useId();
-  /* eslint-disable @typescript-eslint/no-unused-vars -- reserved for GuestTypeSelector a11y */
-  const guestsLabelId = React.useId();
-  const guestsHelperId = React.useId();
-  const guestsErrorId = React.useId();
-  /* eslint-enable @typescript-eslint/no-unused-vars */
   const { booking, updateBooking } = useBooking();
   const monthsToShow = React.useMemo(
     () => (typeof window !== 'undefined' && window.innerWidth < 768 ? 1 : 2),

@@ -6,7 +6,7 @@ import { primaryNav, ctaNav, tripsMenuNav } from '../../../config/navigation';
 import { LOGO_URL } from '../../../config/branding';
 import { getTenantContext } from '../../../tenant/tenantContext';
 import { getTenantBrandName } from '../../../tenant/displayBrand';
-import { getTenantOverrides, shouldHideAtlasBranding } from '../../../tenant/tenantOverrides';
+import { getTenantOverrides } from '../../../tenant/tenantOverrides';
 import { formatDisplayNumber, getTelLink } from '../../../config/contact';
 import { trackEvent } from '../../../utils/analytics';
 import { getFavoriteIds } from '../../../utils/guestHistory';
@@ -15,7 +15,6 @@ import { useBooking } from '../../../contexts/BookingContext';
 const Navbar = () => {
   const tenant = getTenantContext();
   const overrides = getTenantOverrides(tenant?.slug);
-  const _hideAtlasBranding = shouldHideAtlasBranding(tenant, overrides);
   const logoSrc = tenant?.logoUrl ?? LOGO_URL;
   // RA-006 §3.5: prefer tenant name everywhere; only fall back to "Home" on the Atlas root.
   const brandName = getTenantBrandName();
@@ -61,7 +60,11 @@ const Navbar = () => {
       matchPath('/homes/:roomNo', location.pathname) ??
       matchPath('/property_details/:id', location.pathname) ??
       matchPath('/properties/:id', location.pathname);
-    const propertyIdFromRoute = propertyMatch?.params.unitSlug ?? propertyMatch?.params.roomNo ?? propertyMatch?.params.id ?? null;
+    const routeParams = propertyMatch?.params as
+      | { unitSlug?: string; roomNo?: string; id?: string }
+      | undefined;
+    const propertyIdFromRoute =
+      routeParams?.unitSlug ?? routeParams?.roomNo ?? routeParams?.id ?? null;
     const isPropertyDetailsRoute = Boolean(propertyMatch);
     const bookingTarget = isPropertyDetailsRoute ? 'booking-form' : 'search';
     const bookingSurface = isPropertyDetailsRoute ? 'property_details' : 'navbar';

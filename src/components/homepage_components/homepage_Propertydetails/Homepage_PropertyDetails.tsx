@@ -703,15 +703,6 @@ const PropertyDetails = () => {
         return () => ac.abort();
     }, [resolvedListingId]);
 
-    /** TASK-2068: hero quote only from live API reviews (never static marketing snippets). */
-    const _heroReviewQuote = useMemo(() => {
-        const api = listingReviewsFromApi;
-        if (!api || api.loading || api.reviews.length === 0) return null;
-        const r = api.reviews[0];
-        const text = String(r.body || r.title || '').trim();
-        return text ? text.slice(0, 280) : null;
-    }, [listingReviewsFromApi]);
-
     useEffect(() => {
         setNotFound(false);
         setData(null);
