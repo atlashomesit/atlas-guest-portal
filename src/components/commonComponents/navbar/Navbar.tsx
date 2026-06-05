@@ -73,6 +73,12 @@ const Navbar = () => {
       checkIn: booking.checkIn ?? undefined,
       checkOut: booking.checkOut ?? undefined,
       guests: booking.guests,
+      // TASK-3938: forward the guest-count breakdown so SearchAvailabilityWidget preserves it
+      // instead of re-deriving a 60/40 adults/children split from the total.
+      adults: booking.adults ?? undefined,
+      children: booking.children ?? undefined,
+      infants: booking.infants ?? undefined,
+      pets: booking.pets ?? undefined,
     };
 
     const destination = isPropertyDetailsRoute ? `${location.pathname}#${bookingTarget}` : ctaNav.to;

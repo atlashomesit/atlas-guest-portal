@@ -136,6 +136,12 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
             checkIn?: string | null;
             checkOut?: string | null;
             guests?: number | null;
+            // TASK-3938: guest-count breakdown forwarded by callers (e.g. Navbar Book-Now CTA)
+            // so the widget preserves it instead of re-deriving a split from the total.
+            adults?: number | null;
+            children?: number | null;
+            infants?: number | null;
+            pets?: number | null;
           };
         }
       | null;
