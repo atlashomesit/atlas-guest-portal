@@ -1,30 +1,6 @@
 /** Same script id as LocationPage / MultiPinMap — one SDK load per tab. */
 export const MAP_SCRIPT_ID = "atlas-homestays-google-maps-script";
 
-declare global {
-  interface Window {
-    google?: {
-      maps?: {
-        Map: new (
-          el: HTMLElement,
-          opts: {
-            center: { lat: number; lng: number };
-            zoom: number;
-            mapTypeControl?: boolean;
-            streetViewControl?: boolean;
-            fullscreenControl?: boolean;
-          },
-        ) => unknown;
-        Marker: new (opts: {
-          position: { lat: number; lng: number };
-          map: unknown;
-          title?: string;
-        }) => unknown;
-      };
-    };
-  }
-}
-
 export async function loadGoogleMapsJs(apiKey: string): Promise<void> {
   if (window.google?.maps?.Map && window.google.maps.Marker) return;
   const existing = document.getElementById(MAP_SCRIPT_ID) as HTMLScriptElement | null;

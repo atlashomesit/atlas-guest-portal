@@ -262,7 +262,7 @@ function PropertyDetailsSkeleton() {
 }
 
 interface Property {
-    id: number;
+    id: number | string;
     listingId?: number | string;
     property_name: string;
     property_img: string[];
@@ -302,6 +302,41 @@ interface Property {
     /** TL-GUEST: from GET /listings/{id} or /listings/public — drives same Google Maps JS path as Location page. */
     latitude?: number | null;
     longitude?: number | null;
+}
+
+function coerceProperty(item: Partial<Property> & { id?: number | string }): Property {
+    return {
+        id: item.id ?? 0,
+        listingId: item.listingId,
+        property_name: item.property_name ?? "",
+        property_img: item.property_img ?? [],
+        property_location: item.property_location ?? "",
+        property_neighborhoods: item.property_neighborhoods ?? [],
+        property_amenities: item.property_amenities ?? [],
+        property_description: item.property_description ?? "",
+        property_nearplaces: item.property_nearplaces ?? [],
+        property_mapSrc: item.property_mapSrc ?? "",
+        property_policy_details: item.property_policy_details ?? [],
+        property_rating: item.property_rating ?? 0,
+        property_reviews: item.property_reviews ?? 0,
+        property_price: item.property_price ?? 0,
+        timezoneId: item.timezoneId,
+        photoCount: item.photoCount,
+        maxGuests: item.maxGuests,
+        maxCapacity: item.maxCapacity,
+        checkInTime: item.checkInTime,
+        checkOutTime: item.checkOutTime,
+        unitPolicy: item.unitPolicy,
+        amenityCodes: item.amenityCodes,
+        hostPhone: item.hostPhone,
+        hostName: item.hostName,
+        propertyAddress: item.propertyAddress,
+        property_address: item.property_address,
+        virtualTourUrl: item.virtualTourUrl,
+        cancellationTier: item.cancellationTier,
+        latitude: item.latitude,
+        longitude: item.longitude,
+    };
 }
 
 /** TASK-1664: row shape from `GET /api/listings/{id}/reviews` (camelCase JSON). */
@@ -726,7 +761,7 @@ const PropertyDetails = () => {
 
         // 1) Match by listingId (PK from DB/API) — IDs 1–7 etc.
         const foundByListingId = listingIdParam && Number.isFinite(listingId) && listingId > 0
-            ? apiProperties.find((item: Property) => Number(item.listingId) === listingId)
+            ? apiProperties.find((item) => Number(item.listingId) === listingId)
             : null;
 
         if (import.meta.env.DEV && listingIdParam) {
@@ -735,7 +770,7 @@ const PropertyDetails = () => {
         }
 
         // 2) Match by unit slug / property name (legacy URLs)
-        const foundByUnitSlug = foundByListingId ?? apiProperties.find((item: Property) => {
+        const foundByUnitSlug = foundByListingId ?? apiProperties.find((item) => {
             const idSlug = normalizeSlug(item.id);
             const nameSlug = normalizeSlug(item.property_name);
             const unitMatches = normalizedUnitSlug && (idSlug === normalizedUnitSlug || nameSlug === normalizedUnitSlug);
@@ -750,7 +785,7 @@ const PropertyDetails = () => {
         });
 
         if (foundByUnitSlug) {
-            setData({
+            setData(coerceProperty({
                 ...foundByUnitSlug,
                 property_neighborhoods: Array.isArray(foundByUnitSlug.property_neighborhoods)
                     ? foundByUnitSlug.property_neighborhoods
@@ -759,16 +794,16 @@ const PropertyDetails = () => {
                 maxGuests:
                     resolveStaticMaxGuests(foundByUnitSlug as unknown as Record<string, unknown>) ??
                     foundByUnitSlug.maxGuests,
-            });
+            }));
             return;
         }
 
         // If not found by slug, try to find by ID (e.g. unitSlug "7" matches item.id 501)
         const propertyId = normalizedUnitSlug || undefined;
         if (propertyId) {
-            const foundById = apiProperties.find((item: Property) => String(item.id) === String(propertyId));
+            const foundById = apiProperties.find((item) => String(item.id) === String(propertyId));
             if (foundById) {
-                setData({
+                setData(coerceProperty({
                     ...foundById,
                     property_neighborhoods: Array.isArray(foundById.property_neighborhoods)
                         ? foundById.property_neighborhoods
@@ -776,7 +811,7 @@ const PropertyDetails = () => {
                     property_img: foundById.property_img || [],
                     maxGuests:
                         resolveStaticMaxGuests(foundById as unknown as Record<string, unknown>) ?? foundById.maxGuests,
-                });
+                }));
                 return;
             }
         }

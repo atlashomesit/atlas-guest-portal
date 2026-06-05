@@ -38,12 +38,6 @@ import { mapRazorpayFailureCode } from '@/utils/razorpayGuestErrors';
 import { getContactEmail, getWhatsAppLink } from '@/config/contact';
 import { accommodationGstLineAmount, accommodationGstSlabPercent } from '@/utils/guestPriceEstimate';
 
-declare global {
-  interface Window {
-    Razorpay: new (...args: unknown[]) => { open: () => void; on: (event: string, handler: (r: unknown) => void) => void };
-  }
-}
-
 // ── Types ────────────────────────────────────────────────────────────────────
 
 interface AddOnService {
@@ -785,7 +779,7 @@ const GuestDetailsPage: React.FC = () => {
                           verifyBody,
                           { headers: { ...getApiHeaders(), 'Content-Type': 'application/json' }, timeout: 15000 },
                         );
-                        if (verifyRes.data?.success) break;
+                        if (verifyRes?.data?.success) break;
                       } catch (verifyErr) {
                         if (attempt === 1) throw verifyErr;
                         await new Promise((r) => setTimeout(r, 800));
@@ -816,7 +810,7 @@ const GuestDetailsPage: React.FC = () => {
                         { replace: true },
                       );
                     } else {
-                      throw new Error(verifyRes.data?.message || 'Payment verification failed.');
+                      throw new Error(verifyRes?.data?.message || 'Payment verification failed.');
                     }
                   } catch (err) {
                     console.error('[GuestDetailsPage] verify error:', err);

@@ -105,9 +105,7 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
         alt={alt}
         className={`${isLoaded ? "opacity-100" : "opacity-0"} ${className ?? ""}`}
         decoding={decoding}
-        {...(fetchPriority != null && fetchPriority !== ""
-          ? { fetchpriority: fetchPriority }
-          : {})}
+        {...(fetchPriority != null ? { fetchpriority: fetchPriority } : {})}
         loading={loading}
         onError={(event) => {
           setLoadFailed(true);

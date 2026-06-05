@@ -201,7 +201,7 @@ function normalizePublicListing(payload: Record<string, unknown>): PublicListing
         ? null
         : Number(payload.wifiSpeedMbps),
     hasCoworkingDesk: Boolean(payload.hasCoworkingDesk),
-    minStay: Number.isFinite(minStay) && minStay > 0 ? minStay : null,
+    minStay: minStay != null && Number.isFinite(minStay) && minStay > 0 ? minStay : null,
     losDiscountMinNights:
       payload.losDiscountMinNights != null ? Number(payload.losDiscountMinNights) : null,
     losDiscountPercent:

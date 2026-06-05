@@ -82,15 +82,15 @@ const SupportDrawer = ({
     return { bottom: bottomSpacing, top: "5px" };
   }, [bottomSpacing, resolvedLayoutVariant]);
 
-  const spacingTokens = useMemo<CSSProperties>(
+  const spacingTokens = useMemo(
     () =>
-      enableDrawerStructureTokens
+      (enableDrawerStructureTokens
         ? {
             "--drawer-card-padding-block": SUPPORT_DRAWER_SPACING.cardPaddingBlock,
             "--drawer-card-padding-inline": SUPPORT_DRAWER_SPACING.cardPaddingInline,
             "--drawer-section-gap": SUPPORT_DRAWER_SPACING.sectionGap,
           }
-        : {},
+        : {}) as CSSProperties,
     [enableDrawerStructureTokens],
   );
 

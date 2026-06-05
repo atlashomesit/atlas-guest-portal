@@ -80,7 +80,7 @@ const PropertyModal: React.FC<PropertyModalProps> = ({ property, onClose, handle
                             <ul className="list-disc list-inside grid grid-cols-12 gap-4">
                                 {property.property_amenities.map((amenity: { amenities_icon?: string; amenities_type?: string }, index: number) => (
                                     <div className="flex items-center gap-3" key={index}>
-                                        <span className="text-sm md:text-base" key={index}>{renderIcon(amenity.amenities_icon   )}</span>
+                                        <span className="text-sm md:text-base" key={index}>{renderIcon(amenity.amenities_icon ?? "")}</span>
                                         <span className="text-sm md:text-base">{amenity.amenities_type}</span>
                                     </div>
                                 ))}

@@ -215,7 +215,7 @@ const Homepage_LocationDetails = () => {
 
                     {/* our location wise properties = Right side  */}
                     <div className="flex-[3.5] w-full h-fit grid grid-cols-1 place-items-center gap-6">
-                        {locationViseData.map((data: { id?: number; property_name?: string; property_img?: string[]; property_subtitle?: string; property_location?: string; property_description?: string; property_amenities?: Array<{ amenities_icon?: string; amenities_count?: number; amenities_availablity?: string; amenities_type?: string }>; property_address?: Array<{ value?: string }> }) => {
+                        {locationViseData.map((data: LocationProperty) => {
                             const imgs = filterGuestImageUrls(data?.property_img ?? []);
                             return (
                             <div
@@ -292,7 +292,7 @@ const Homepage_LocationDetails = () => {
                                         <div className="flex flex-wrap gap-3 mt-2 text-sm text-text-muted">
                                             {data?.property_amenities?.slice(0, 4).map((amenity: { amenities_icon?: string; amenities_count?: number; amenities_availablity?: string; amenities_type?: string }, index: number) => (
                                                 <div key={index} className="flex items-center gap-1">
-                                                    <span>{renderIcon(amenity.amenities_icon)}</span>
+                                                    <span>{renderIcon(amenity.amenities_icon ?? "")}</span>
                                                     <span>
                                                         {amenity.amenities_count || amenity.amenities_availablity || amenity.amenities_type}
                                                     </span>

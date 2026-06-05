@@ -1,7 +1,6 @@
 import { createElement, type InputHTMLAttributes, type PropsWithChildren, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
 import "./ui.css";
 
-type ElementTag = "input" | "textarea" | "select";
 type InputState = "default" | "error" | "success" | "warning";
 
 interface SharedProps {

@@ -196,6 +196,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
 
   const handleNavigate = React.useCallback(
     (model: ListingModel | null) => {
+      if (!model) return;
       const navigation = getListingNavigation(model);
       if (!navigation) return;
       const nextSearch = searchString ? `?${searchString}` : "";

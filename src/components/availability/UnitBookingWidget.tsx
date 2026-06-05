@@ -11,10 +11,8 @@ import { AtlasBookingCalendar } from './AtlasBookingCalendar';
 import { useBooking } from '@/contexts/BookingContext';
 import { hasRuntimeConfig } from '@/runtime-config';
 import ErrorBanner from '@/components/ErrorBanner';
-import { type AvailabilityNightlyRate, type AvailabilityResponse } from '@/api/availabilityClient';
 import { buildApiUrl, getApiHeaders, getOrderRequestHeaders } from '@/api/client';
 import { dedupedAvailabilityCalendarFetch } from '@/api/availabilityCalendarClient';
-import { apiFetch } from '@/lib/http';
 import { getIstStartOfDay } from '@/utils/date';
 import { calculateNights, formatDateInTimezone } from '@/utils/dateHelpers';
 import { doesRangeIntersectBlocked, toISODate } from '@/utils/dateRange';
@@ -35,7 +33,10 @@ import { accommodationGstLineAmount, accommodationGstSlabPercent } from '@/utils
 
 declare global {
   interface Window {
-    Razorpay: new (...args: unknown[]) => { open: (options: unknown) => void };
+    Razorpay: new (...args: unknown[]) => {
+      open: (options?: unknown) => void;
+      on: (event: string, handler: (r: unknown) => void) => void;
+    };
   }
 }
 
@@ -62,11 +63,6 @@ interface UnitBookingWidgetProps {
 }
 
 const PENDING_PAYMENT_KEY = 'atlas_pending_razorpay_order';
-
-const normalizeListingId = (value: string | number | null | undefined) =>
-  String(value ?? '')
-    .trim()
-    .toLowerCase();
 
 /** Detect network/connection failures (timeout, offline, ECONNREFUSED, etc.). */
 function isNetworkError(error: unknown): boolean {
@@ -186,7 +182,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [formError, setFormError] = useState<string | null>(null);
   const [dateError, setDateError] = useState<string | null>(null);
   const [minStayNights] = useState(1);
-  const minAdvanceDays = 0;
+  const minAdvanceDays: number = 0;
   const effectiveMaxGuests = maxGuests;
   /** RA-006: payment provider not configured for this tenant. */
   const [providerBlocked, setProviderBlocked] = useState(false);

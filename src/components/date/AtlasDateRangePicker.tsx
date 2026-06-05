@@ -1,6 +1,6 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { addDays, startOfDay } from 'date-fns';
-import { DateRange, type RangeKeyDict } from 'react-date-range';
+import { DateRange } from 'react-date-range';
 
 import { DateRangePickerPopover } from '../homepage_components/hotelBooking_form/DateRangePickerPopover';
 import { getIstStartOfDay } from '@/utils/date';
@@ -201,10 +201,10 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
     return disabledDay ? disabledDay(date) : false;
   };
 
-  const handleRangeChange = (ranges: RangeKeyDict) => {
+  const handleRangeChange = (ranges: { selection?: { startDate?: Date | null; endDate?: Date | null } }) => {
     const selection = ranges.selection ?? { startDate: null, endDate: null };
-    const startDate = normalizeDate(selection.startDate);
-    const endDate = normalizeDate(selection.endDate);
+    const startDate = normalizeDate(selection.startDate ?? null);
+    const endDate = normalizeDate(selection.endDate ?? null);
 
     // Reject clicks on disabled dates - ensure visual disabled state matches functional behavior
     if (startDate && composedDisabledDay(startDate)) {

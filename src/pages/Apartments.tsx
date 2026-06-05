@@ -239,7 +239,6 @@ export const Apartments = () => {
     refetch: fetchData,
   } = useTenantListings();
 
-  const tenant = getTenantContext();
   const brandName = getTenantBrandName();
 
   const safeListings = React.useMemo(() => sanitizeListings(listingsSource), [listingsSource]);
@@ -369,7 +368,7 @@ export const Apartments = () => {
           console.error(`Error processing listing ${listing.id}:`, error);
           return null;
         }
-      }).filter((item): item is CombinedListing => item !== null && item.price > 0);
+      }).filter((item) => item !== null && item.price > 0) as CombinedListing[];
 
       return merged;
     } catch (error) {
@@ -433,11 +432,12 @@ export const Apartments = () => {
     };
 
     const nextCheckIn = isValidDate(parsedCheckIn) ? parsedCheckIn : null;
+    const validCheckOut = isValidDate(parsedCheckOut) ? parsedCheckOut : null;
     const nextCheckOut =
-      isValidDate(parsedCheckOut) && nextCheckIn && new Date(parsedCheckOut) > new Date(nextCheckIn)
-        ? parsedCheckOut
-        : isValidDate(parsedCheckOut) && !nextCheckIn
-          ? parsedCheckOut
+      nextCheckIn && validCheckOut && new Date(validCheckOut) > new Date(nextCheckIn)
+        ? validCheckOut
+        : !nextCheckIn && validCheckOut
+          ? validCheckOut
           : null;
 
     if (guestsParam && guestsParam > 0) {
@@ -497,7 +497,7 @@ export const Apartments = () => {
               fetchErrorMessage?.trim() ||
               "We're having trouble loading apartments right now. Please try again."
             }
-            primaryAction={{ label: "Try again", onClick: fetchData, disabled: fetchState === "loading" }}
+            primaryAction={{ label: "Try again", onClick: fetchData }}
             secondaryAction={{ label: "Back to home", href: "/" }}
           />
         </div>
