@@ -31,7 +31,7 @@ const TENANT_SLUG = (() => {
   }
 })();
 
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const SHELL_CACHE = `atlas-guest-shell-${TENANT_SLUG}-${CACHE_VERSION}`;
 const SHELL_URLS = ['/', '/index.html', '/manifest.webmanifest'];
 
@@ -117,6 +117,11 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return;
   // Never cache API responses.
   if (isApiRequest(url)) return;
+  // Never cache `/.well-known/` resources (runtime config). atlas-runtime-config.json
+  // carries the live apiBaseUrl + environment and MUST be read fresh, exactly like an
+  // API response. A cache-first copy here serves a stale/poisoned config after a deploy
+  // or env change → the app dies with "Failed to fetch /.well-known/atlas-runtime-config.json".
+  if (url.pathname.startsWith('/.well-known/')) return;
 
   // TASK-2748 — never intercept Vite's immutable, content-hashed build output.
   // `/assets/*` is already `Cache-Control: immutable, max-age=31536000` at the
