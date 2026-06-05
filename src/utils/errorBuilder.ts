@@ -444,7 +444,7 @@ export function buildErrorFromApiResponse(response: ApiErrorResponse): UserError
   }
 
   // Route by status code
-  return buildErrorFromHttpStatus(status, { status, detail: details || mainMessage });
+  return buildErrorFromHttpStatus(status, { status, statusText: "", detail: details || mainMessage });
 }
 
 /* ============================================================================

@@ -11,31 +11,6 @@ import { getTenantContext } from "../tenant/tenantContext";
 import MultiPinMap, { type MapPin } from "../components/map/MultiPinMap";
 import { usePropertyListings } from "../hooks/usePropertyListings";
 
-type GoogleMapsMapOptions = {
-  center: { lat: number; lng: number };
-  zoom: number;
-  mapTypeControl?: boolean;
-  streetViewControl?: boolean;
-  fullscreenControl?: boolean;
-};
-
-type GoogleMapsMarkerOptions = {
-  position: { lat: number; lng: number };
-  map: unknown;
-  title?: string;
-};
-
-declare global {
-  interface Window {
-    google?: {
-      maps?: {
-        Map: new (element: HTMLElement, options: GoogleMapsMapOptions) => unknown;
-        Marker: new (options: GoogleMapsMarkerOptions) => unknown;
-      };
-    };
-  }
-}
-
 const MAP_SCRIPT_ID = "atlas-homestays-google-maps-script";
 const FALLBACK_STATIC_MAP_URL = "/images/atlas-homestays-static-map.svg";
 
@@ -70,8 +45,10 @@ const LocationPage = () => {
       const lat = typeof l.latitude === "number" ? l.latitude : null;
       const lng = typeof l.longitude === "number" ? l.longitude : null;
       if (lat == null || lng == null) continue;
-      if (seen.has(l.propertyId)) continue;
-      seen.set(l.propertyId, {
+      const propertyId = l.propertyId;
+      if (propertyId == null) continue;
+      if (seen.has(propertyId)) continue;
+      seen.set(propertyId, {
         id: `property-${l.propertyId}`,
         lat,
         lng,

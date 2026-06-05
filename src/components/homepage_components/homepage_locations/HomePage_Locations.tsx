@@ -196,6 +196,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
 
   const handleNavigate = React.useCallback(
     (model: ListingModel | null) => {
+      if (!model) return;
       const navigation = getListingNavigation(model);
       if (!navigation) return;
       const nextSearch = searchString ? `?${searchString}` : "";
@@ -222,15 +223,6 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
     },
     [checkIn, checkOut, getListingNavigation, guests, navigate, searchString],
   );
-
-  const _handleSlideChange = (id: string, direction: "next" | "prev", imagesLength: number) => {
-    setActiveImageIndex((prev) => {
-      const current = prev[id] ?? 0;
-      const nextIndex = direction === "next" ? current + 1 : current - 1;
-      const normalized = (nextIndex + imagesLength) % imagesLength;
-      return { ...prev, [id]: normalized };
-    });
-  };
 
   const renderPrice = (model: ListingModel) => {
     if (!model.price) return null;

@@ -5,7 +5,7 @@
  * after applying configured LOS (Length-of-Stay) auto-discount tiers.
  * Only renders when at least one discount tier is configured.
  */
-import React, { useState } from "react";
+import { useState } from "react";
 
 interface LongStayCalculatorProps {
   /** Base nightly price in INR. */

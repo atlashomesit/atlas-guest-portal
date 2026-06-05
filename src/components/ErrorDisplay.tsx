@@ -1,5 +1,3 @@
-import React from "react";
-
 export type RecoveryAction = {
   actionType: "RETRY_PAYMENT" | "SEARCH_AGAIN" | "CONTACT_SUPPORT" | "CHECK_EMAIL";
   actionLabel: string;

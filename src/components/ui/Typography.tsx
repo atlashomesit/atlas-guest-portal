@@ -1,4 +1,4 @@
-import type { HTMLAttributes, PropsWithChildren } from "react";
+import { createElement, type HTMLAttributes, type PropsWithChildren } from "react";
 import "./ui.css";
 
 type TypographyVariant = "h1" | "h2" | "h3" | "subtitle" | "body" | "muted";
@@ -26,12 +26,8 @@ export function Typography<T extends TagName = "p">({ as, variant = "body", clas
     body: "p",
     muted: "span",
   };
-  const Component = (as || variantTagMap[variant]) as keyof JSX.IntrinsicElements;
+  const tag = (as || variantTagMap[variant]) as TagName;
   const classes = ["rb-typography", `rb-typography--${variant}`, className].filter(Boolean).join(" ");
 
-  return (
-    <Component className={classes} {...rest}>
-      {children}
-    </Component>
-  );
+  return createElement(tag, { className: classes, ...rest }, children);
 }

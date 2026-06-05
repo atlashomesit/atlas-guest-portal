@@ -8,7 +8,8 @@ import {
   ShieldCheck, Sparkles, Users, CheckCircle2,
 } from "lucide-react";
 
-import { getTenantFilteredHomes, defaultHomeHighlights } from "../../content/homes";
+import { getTenantFilteredHomes, defaultHomeHighlights, type Home } from "../../content/homes";
+import EmbeddedListingMap from "../../components/map/EmbeddedListingMap";
 import { useBooking } from "../../contexts/BookingContext";
 import { CONTACT } from "../../config/contact";
 import { getTenantContext } from "../../tenant/tenantContext";
@@ -98,22 +99,23 @@ const HomeDetails = () => {
   const tenantOverrides = getTenantOverrides(tenant?.slug);
   const hideAtlasBranding = shouldHideAtlasBranding(tenant, tenantOverrides);
 
-  const room = useMemo(() => {
-    // First try to find in API data (by listing ID)
+  const room = useMemo((): Home | undefined => {
+    const staticHome = getTenantFilteredHomes().find((item) => item.roomNo === roomNo);
     const apiRoom = apiHomes.find((item) => item.roomNo === roomNo);
     if (apiRoom) {
       return {
-        roomNo,
+        roomNo: roomNo ?? apiRoom.roomNo,
+        listingId: Number(apiRoom.roomNo),
         title: apiRoom.title,
         href: apiRoom.href,
-        slug: apiRoom.title.toLowerCase().replace(/_/g, '-'),
-        images: [] as string[],
-        maxGuests: 2,
-        listingId: Number(apiRoom.roomNo),
+        slug: apiRoom.title.toLowerCase().replace(/_/g, "-"),
+        images: staticHome?.images ?? [],
+        maxGuests: staticHome?.maxGuests ?? 2,
+        tagline: staticHome?.tagline,
+        highlights: staticHome?.highlights,
       };
     }
-    // Fallback to tenant-filtered homes
-    return getTenantFilteredHomes().find((item) => item.roomNo === roomNo);
+    return staticHome;
   }, [apiHomes, roomNo]);
 
   const { updateBooking } = useBooking();
@@ -360,7 +362,7 @@ const HomeDetails = () => {
           listingId={room.listingId}
           listingName={room.title}
           maxGuests={room.maxGuests}
-          hostPhone={room.hostPhone ?? null}
+          hostPhone={listingsById[room.roomNo]?.hostPhone ?? null}
         />
       </Suspense>
 

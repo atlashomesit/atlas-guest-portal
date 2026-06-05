@@ -713,6 +713,7 @@ export default function BookingConfirmationPage() {
 
   // TASK-333: Generate and download ICS calendar event for check-in
   function downloadCalendar() {
+    if (!booking) return;
     const formatIcsDate = (dateStr: string, timeStr: string) => {
       // dateStr is YYYY-MM-DD, timeStr is HH:MM (24h IST)
       const [y, m, d] = dateStr.split("-");

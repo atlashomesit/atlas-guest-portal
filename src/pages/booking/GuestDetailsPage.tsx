@@ -22,7 +22,6 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { useBooking, type BookingPriceBreakdown } from '@/contexts/BookingContext';
 import { buildApiUrl, getApiHeaders, getOrderRequestHeaders } from '@/api/client';
-import { apiFetch } from '@/lib/http';
 import {
   clampNationalDigits,
   getGuestDialOption,
@@ -38,12 +37,6 @@ import { track } from '@/lib/events';
 import { mapRazorpayFailureCode } from '@/utils/razorpayGuestErrors';
 import { getContactEmail, getWhatsAppLink } from '@/config/contact';
 import { accommodationGstLineAmount, accommodationGstSlabPercent } from '@/utils/guestPriceEstimate';
-
-declare global {
-  interface Window {
-    Razorpay: new (...args: unknown[]) => { open: () => void; on: (event: string, handler: (r: unknown) => void) => void };
-  }
-}
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -189,14 +182,6 @@ function formatCountdown(expiresAt: string): string {
 function remainingPct(expiresAt: string, ttlMs = 15 * 60 * 1000): number {
   const ms = new Date(expiresAt).getTime() - Date.now();
   return Math.max(0, Math.min(1, ms / ttlMs));
-}
-
-async function _abandonHold(holdId: number, prepToken: string | null) {
-  if (!prepToken) return;
-  try {
-    const url = buildApiUrl(`/api/guest/bookings/${holdId}/abandon-checkout?t=${encodeURIComponent(prepToken)}`);
-    await apiFetch(url, { method: 'POST' });
-  } catch { /* non-blocking */ }
 }
 
 function loadRazorpayScript(onSuccess: () => void, onError: (msg: string) => void) {
@@ -794,7 +779,7 @@ const GuestDetailsPage: React.FC = () => {
                           verifyBody,
                           { headers: { ...getApiHeaders(), 'Content-Type': 'application/json' }, timeout: 15000 },
                         );
-                        if (verifyRes.data?.success) break;
+                        if (verifyRes?.data?.success) break;
                       } catch (verifyErr) {
                         if (attempt === 1) throw verifyErr;
                         await new Promise((r) => setTimeout(r, 800));
@@ -825,7 +810,7 @@ const GuestDetailsPage: React.FC = () => {
                         { replace: true },
                       );
                     } else {
-                      throw new Error(verifyRes.data?.message || 'Payment verification failed.');
+                      throw new Error(verifyRes?.data?.message || 'Payment verification failed.');
                     }
                   } catch (err) {
                     console.error('[GuestDetailsPage] verify error:', err);
@@ -849,7 +834,11 @@ const GuestDetailsPage: React.FC = () => {
               }
 
               console.log('[GuestDetailsPage] Creating Razorpay instance with order:', { orderId, amount, keyId });
-              const rzp = new window.Razorpay(options);
+              type RazorpayCheckout = {
+                open: () => void;
+                on: (event: string, handler: (r: unknown) => void) => void;
+              };
+              const rzp = new window.Razorpay(options) as RazorpayCheckout;
               console.log('[GuestDetailsPage] Razorpay instance created successfully');
 
               rzp.on('payment.failed', (failRes: unknown) => {

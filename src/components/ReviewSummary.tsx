@@ -7,7 +7,7 @@
  * Returns null when the listing has fewer than 3 reviews (API returns 204).
  * Behind Reviews:UseLlmSummary=false flag on the API for future LLM upgrade.
  */
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { buildApiUrl, getApiHeaders } from "@/api/client";
 
 interface ReviewSummaryData {

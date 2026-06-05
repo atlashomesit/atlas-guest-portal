@@ -9,14 +9,13 @@ import SEO from "../components/SEO";
 import { LOGO_URL } from "../config/branding";
 import { getTenantBrandName } from "../tenant/displayBrand";
 import { getTenantContext } from "../tenant/tenantContext";
-import { getTenantOverrides, shouldHideAtlasBranding } from "../tenant/tenantOverrides";
+import { getTenantOverrides } from "../tenant/tenantOverrides";
 import type { Listing } from "../data/listings";
 import { useTenantListings } from "../hooks/useTenantListings";
 import { trackEvent } from "../utils/analytics";
 import { buildHomeUnitPath, getPropertySlug, navigateToHomeUnit } from "../utils/navigation";
 import {
   calculateNightlyPrice,
-  getEffectiveDiscountPercent,
   inferUnitType,
   type NightlyPriceBreakdown,
 } from "../utils/pricing";
@@ -51,6 +50,8 @@ type PropertyRecord = {
   property_amenities?: { amenities_icon?: string }[];
   property_policy_details?: { type?: string; value?: string }[];
   property_description?: string;
+  /** TASK-1360: most recent checkout within 30 days (from public listings API). */
+  lastBookedAt?: string | null;
 };
 
 type CombinedListing = {
@@ -238,11 +239,7 @@ export const Apartments = () => {
     refetch: fetchData,
   } = useTenantListings();
 
-  const tenant = getTenantContext();
   const brandName = getTenantBrandName();
-  const tenantOverrides = getTenantOverrides(tenant?.slug);
-  const _hideAtlasBranding = shouldHideAtlasBranding(tenant, tenantOverrides);
-  const directBookingDiscountPercent = React.useMemo(() => getEffectiveDiscountPercent(), []);
 
   const safeListings = React.useMemo(() => sanitizeListings(listingsSource), [listingsSource]);
   const safeProperties = React.useMemo(() => sanitizeProperties(propertiesSource), [propertiesSource]);
@@ -371,7 +368,7 @@ export const Apartments = () => {
           console.error(`Error processing listing ${listing.id}:`, error);
           return null;
         }
-      }).filter((item): item is CombinedListing => item !== null && item.price > 0);
+      }).filter((item) => item !== null && item.price > 0) as CombinedListing[];
 
       return merged;
     } catch (error) {
@@ -435,11 +432,12 @@ export const Apartments = () => {
     };
 
     const nextCheckIn = isValidDate(parsedCheckIn) ? parsedCheckIn : null;
+    const validCheckOut = isValidDate(parsedCheckOut) ? parsedCheckOut : null;
     const nextCheckOut =
-      isValidDate(parsedCheckOut) && nextCheckIn && new Date(parsedCheckOut) > new Date(nextCheckIn)
-        ? parsedCheckOut
-        : isValidDate(parsedCheckOut) && !nextCheckIn
-          ? parsedCheckOut
+      nextCheckIn && validCheckOut && new Date(validCheckOut) > new Date(nextCheckIn)
+        ? validCheckOut
+        : !nextCheckIn && validCheckOut
+          ? validCheckOut
           : null;
 
     if (guestsParam && guestsParam > 0) {
@@ -499,7 +497,7 @@ export const Apartments = () => {
               fetchErrorMessage?.trim() ||
               "We're having trouble loading apartments right now. Please try again."
             }
-            primaryAction={{ label: "Try again", onClick: fetchData, disabled: fetchState === "loading" }}
+            primaryAction={{ label: "Try again", onClick: fetchData }}
             secondaryAction={{ label: "Back to home", href: "/" }}
           />
         </div>
@@ -615,7 +613,6 @@ export const Apartments = () => {
                   losDiscountPercent={listing.losDiscountPercent}
                   losDiscount2MinNights={listing.losDiscount2MinNights}
                   losDiscount2Percent={listing.losDiscount2Percent}
-                  directBookingDiscountPercent={directBookingDiscountPercent}
                   estimateNights={estimateNights}
                   onClick={() => handleNavigate(listing.property)}
                 />

@@ -262,7 +262,7 @@ function PropertyDetailsSkeleton() {
 }
 
 interface Property {
-    id: number;
+    id: number | string;
     listingId?: number | string;
     property_name: string;
     property_img: string[];
@@ -289,6 +289,8 @@ interface Property {
     amenityCodes?: string[];
     /** TASK-355: host/on-site contact phone for WhatsApp CTA */
     hostPhone?: string | null;
+    /** TASK-2907: property owner / host display name from listing API */
+    hostName?: string | null;
     /** Street-level address from API (TASK-1896); may be null if host chose not to expose pre-booking */
     propertyAddress?: string | null;
     /** Legacy / alternate JSON key for same */
@@ -300,6 +302,41 @@ interface Property {
     /** TL-GUEST: from GET /listings/{id} or /listings/public — drives same Google Maps JS path as Location page. */
     latitude?: number | null;
     longitude?: number | null;
+}
+
+function coerceProperty(item: Partial<Property> & { id?: number | string }): Property {
+    return {
+        id: item.id ?? 0,
+        listingId: item.listingId,
+        property_name: item.property_name ?? "",
+        property_img: item.property_img ?? [],
+        property_location: item.property_location ?? "",
+        property_neighborhoods: item.property_neighborhoods ?? [],
+        property_amenities: item.property_amenities ?? [],
+        property_description: item.property_description ?? "",
+        property_nearplaces: item.property_nearplaces ?? [],
+        property_mapSrc: item.property_mapSrc ?? "",
+        property_policy_details: item.property_policy_details ?? [],
+        property_rating: item.property_rating ?? 0,
+        property_reviews: item.property_reviews ?? 0,
+        property_price: item.property_price ?? 0,
+        timezoneId: item.timezoneId,
+        photoCount: item.photoCount,
+        maxGuests: item.maxGuests,
+        maxCapacity: item.maxCapacity,
+        checkInTime: item.checkInTime,
+        checkOutTime: item.checkOutTime,
+        unitPolicy: item.unitPolicy,
+        amenityCodes: item.amenityCodes,
+        hostPhone: item.hostPhone,
+        hostName: item.hostName,
+        propertyAddress: item.propertyAddress,
+        property_address: item.property_address,
+        virtualTourUrl: item.virtualTourUrl,
+        cancellationTier: item.cancellationTier,
+        latitude: item.latitude,
+        longitude: item.longitude,
+    };
 }
 
 /** TASK-1664: row shape from `GET /api/listings/{id}/reviews` (camelCase JSON). */
@@ -701,15 +738,6 @@ const PropertyDetails = () => {
         return () => ac.abort();
     }, [resolvedListingId]);
 
-    /** TASK-2068: hero quote only from live API reviews (never static marketing snippets). */
-    const _heroReviewQuote = useMemo(() => {
-        const api = listingReviewsFromApi;
-        if (!api || api.loading || api.reviews.length === 0) return null;
-        const r = api.reviews[0];
-        const text = String(r.body || r.title || '').trim();
-        return text ? text.slice(0, 280) : null;
-    }, [listingReviewsFromApi]);
-
     useEffect(() => {
         setNotFound(false);
         setData(null);
@@ -733,7 +761,7 @@ const PropertyDetails = () => {
 
         // 1) Match by listingId (PK from DB/API) — IDs 1–7 etc.
         const foundByListingId = listingIdParam && Number.isFinite(listingId) && listingId > 0
-            ? apiProperties.find((item: Property) => Number(item.listingId) === listingId)
+            ? apiProperties.find((item) => Number(item.listingId) === listingId)
             : null;
 
         if (import.meta.env.DEV && listingIdParam) {
@@ -742,7 +770,7 @@ const PropertyDetails = () => {
         }
 
         // 2) Match by unit slug / property name (legacy URLs)
-        const foundByUnitSlug = foundByListingId ?? apiProperties.find((item: Property) => {
+        const foundByUnitSlug = foundByListingId ?? apiProperties.find((item) => {
             const idSlug = normalizeSlug(item.id);
             const nameSlug = normalizeSlug(item.property_name);
             const unitMatches = normalizedUnitSlug && (idSlug === normalizedUnitSlug || nameSlug === normalizedUnitSlug);
@@ -757,7 +785,7 @@ const PropertyDetails = () => {
         });
 
         if (foundByUnitSlug) {
-            setData({
+            setData(coerceProperty({
                 ...foundByUnitSlug,
                 property_neighborhoods: Array.isArray(foundByUnitSlug.property_neighborhoods)
                     ? foundByUnitSlug.property_neighborhoods
@@ -766,16 +794,16 @@ const PropertyDetails = () => {
                 maxGuests:
                     resolveStaticMaxGuests(foundByUnitSlug as unknown as Record<string, unknown>) ??
                     foundByUnitSlug.maxGuests,
-            });
+            }));
             return;
         }
 
         // If not found by slug, try to find by ID (e.g. unitSlug "7" matches item.id 501)
         const propertyId = normalizedUnitSlug || undefined;
         if (propertyId) {
-            const foundById = apiProperties.find((item: Property) => String(item.id) === String(propertyId));
+            const foundById = apiProperties.find((item) => String(item.id) === String(propertyId));
             if (foundById) {
-                setData({
+                setData(coerceProperty({
                     ...foundById,
                     property_neighborhoods: Array.isArray(foundById.property_neighborhoods)
                         ? foundById.property_neighborhoods
@@ -783,7 +811,7 @@ const PropertyDetails = () => {
                     property_img: foundById.property_img || [],
                     maxGuests:
                         resolveStaticMaxGuests(foundById as unknown as Record<string, unknown>) ?? foundById.maxGuests,
-                });
+                }));
                 return;
             }
         }
@@ -882,6 +910,10 @@ const PropertyDetails = () => {
                         })(),
                         hostPhone: (() => {
                             const raw = (apiListing as Record<string, unknown>).hostPhone ?? (apiListing as Record<string, unknown>).contactPhone;
+                            return typeof raw === 'string' && raw.trim() ? raw.trim() : null;
+                        })(),
+                        hostName: (() => {
+                            const raw = (apiListing as Record<string, unknown>).hostName ?? (apiListing as Record<string, unknown>).HostName;
                             return typeof raw === 'string' && raw.trim() ? raw.trim() : null;
                         })(),
                         amenityCodes: (() => {
@@ -1161,36 +1193,37 @@ useEffect(() => {
         nightlyPrice?.finalNightlyPrice,
     ]);
 
-    if (!data && !notFound) {
+    if (!data) {
+        if (notFound) {
+            return (
+                <div className="min-h-screen flex items-center justify-center">
+                    <div className="text-center max-w-xl px-4">
+                        <h1 className="text-2xl font-semibold text-text-primary mb-4">Home Not Found</h1>
+                        <div className="text-text-muted">
+                            Please check the link and try again, or head back to our homes catalog to continue browsing.
+                        </div>
+                        <div className="mt-6 flex flex-wrap gap-3 justify-center">
+                            <Button onClick={() => window.history.back()} className="w-full sm:w-auto">
+                                Go Back
+                            </Button>
+                            <Link
+                                to="/"
+                                className="inline-flex items-center justify-center rounded-full border border-border-subtle px-5 py-3 text-sm font-semibold text-text-primary transition hover:border-[color:var(--cta-primary)] hover:text-[color:var(--cta-primary)]"
+                            >
+                                Return to homepage
+                            </Link>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
         return <PropertyDetailsSkeleton />;
     }
 
-    if (!data && notFound) {
-        return (
-            <div className="min-h-screen flex items-center justify-center">
-                <div className="text-center max-w-xl px-4">
-                    <h1 className="text-2xl font-semibold text-text-primary mb-4">Home Not Found</h1>
-                    <div className="text-text-muted">
-                        Please check the link and try again, or head back to our homes catalog to continue browsing.
-                    </div>
-                    <div className="mt-6 flex flex-wrap gap-3 justify-center">
-                        <Button onClick={() => window.history.back()} className="w-full sm:w-auto">
-                            Go Back
-                        </Button>
-                        <Link
-                            to="/"
-                            className="inline-flex items-center justify-center rounded-full border border-border-subtle px-5 py-3 text-sm font-semibold text-text-primary transition hover:border-[color:var(--cta-primary)] hover:text-[color:var(--cta-primary)]"
-                        >
-                            Return to homepage
-                        </Link>
-                    </div>
-                </div>
-            </div>
-        );
-    }
+    const property = data;
 
     const resolvedCheckInTime =
-      data?.checkInTime?.trim() || data?.unitPolicy?.checkInTime?.trim() || null;
+      property.checkInTime?.trim() || property.unitPolicy?.checkInTime?.trim() || null;
     const resolvedCheckOutTime =
       data?.checkOutTime?.trim() || data?.unitPolicy?.checkOutTime?.trim() || null;
     const cancellationPolicyText = (() => {
@@ -1244,7 +1277,11 @@ useEffect(() => {
     const ppTenantOverrides = getTenantOverrides(ppTenantCtx?.slug ?? '');
     const ppHideAtlasBranding = shouldHideAtlasBranding(ppTenantCtx, ppTenantOverrides);
     const ppBrandName = getTenantBrandName();
-    const ppHostDisplayName = ppTenantCtx?.name?.trim() || data.property_name || ppBrandName;
+    const ppHostDisplayName =
+      data.hostName?.trim() ||
+      ppTenantCtx?.name?.trim() ||
+      data.property_name ||
+      ppBrandName;
     const ppHostInitial = ppHostDisplayName.charAt(0).toUpperCase();
     const ppHasOnlinePayment =
       typeof _getTenantCtx()?.paymentProvider === 'string' && _getTenantCtx()?.paymentProvider !== 'MANUAL';
@@ -1578,6 +1615,7 @@ useEffect(() => {
                       <div className="pp-host-sub">
                         Owner-operated · Responds on WhatsApp · Direct booking
                         {responseTimeBadge ? ` · ${responseTimeBadge}` : ''}
+                        {reviewReplyRateBadge ? ` · ${reviewReplyRateBadge}` : ''}
                       </div>
                     </div>
                     <div className="pp-host-actions">
@@ -2105,30 +2143,6 @@ useEffect(() => {
                     </div>
                   );
                 })()}
-
-                {/* Host profile card */}
-                <div
-                  className="pp-host"
-                  style={{ marginTop: 12 }}
-                  data-testid="host-profile-card"
-                >
-                  <div className="pp-host-avatar" aria-hidden="true" style={{ width: 44, height: 44, fontSize: 18 }}>
-                    {ppHostInitial}
-                  </div>
-                  <div>
-                    <div className="pp-host-name" style={{ fontSize: 15 }}>
-                      Hosted by {ppHostDisplayName}
-                    </div>
-                    <div className="pp-host-sub">
-                      24/7 WhatsApp support{responseTimeBadge ? ` · ${responseTimeBadge}` : ' · WhatsApp-first support.'}
-                    </div>
-                    {reviewReplyRateBadge && (
-                      <p style={{ fontSize: 12, color: '#157046', fontWeight: 600, marginTop: 2 }}>
-                        ✓ {reviewReplyRateBadge} within 48h
-                      </p>
-                    )}
-                  </div>
-                </div>
 
                 {/* WhatsApp CTA (sidebar) — TASK-2873: draft listings are question-only, not book-via-WhatsApp */}
                 <div style={{ marginTop: 12 }}>

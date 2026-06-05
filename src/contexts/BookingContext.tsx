@@ -16,6 +16,11 @@ type BookingState = {
   checkIn: string | null;
   checkOut: string | null;
   guests: number;
+  /** Guest mix for search/availability widgets (TASK-3938). */
+  adults?: number;
+  children?: number;
+  infants?: number;
+  pets?: number;
   /** Canonical `/homes/{propertySlug}/{listingId}` for returning from /reserve to pay (TASK-258). */
   listingDetailPath: string | null;
   /** While Razorpay checkout is open for a hold booking; used by AvailabilityCalendar (payment-in-progress UX). */

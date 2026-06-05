@@ -122,13 +122,13 @@ const SupportWidgetContent = () => {
 
   const handleOpen = () => {
     setIsOpen(true);
-    trackEvent("chat_opened", { surface: "support_widget", entryPoint: "floating_pill" }, analyticsMetadata);
+    trackEvent("chat_opened", { surface: "support_widget", entryPoint: "floating_pill" }, { route: analyticsMetadata.route, listingId: analyticsMetadata.listingId ?? undefined });
   };
 
   const handleClose = () => {
     setIsOpen(false);
     rememberDismissal();
-    trackEvent("chat_minimized", { surface: "support_widget" }, analyticsMetadata);
+    trackEvent("chat_minimized", { surface: "support_widget" }, { route: analyticsMetadata.route, listingId: analyticsMetadata.listingId ?? undefined });
   };
 
   const handlePhoneChange = (value: string) => {
@@ -154,7 +154,7 @@ const SupportWidgetContent = () => {
         source: "support_widget",
       });
       setCallbackStatus("sent");
-      trackEvent("chat_callback_submitted", { surface: "support_widget" }, analyticsMetadata);
+      trackEvent("chat_callback_submitted", { surface: "support_widget" }, { route: analyticsMetadata.route, listingId: analyticsMetadata.listingId ?? undefined });
       setTimeout(() => setIsOpen(false), 1200);
     } catch (error) {
       console.error("[support-widget] callback request failed", error);
@@ -188,14 +188,14 @@ const SupportWidgetContent = () => {
     };
 
     const handleFaqClick = () => {
-      trackEvent("support_faq", { surface: "support_widget" }, analyticsMetadata);
+      trackEvent("support_faq", { surface: "support_widget" }, { route: analyticsMetadata.route, listingId: analyticsMetadata.listingId ?? undefined });
       if (enableRevealCallbackOnClickOnly) {
         goToFaq();
       }
     };
 
     const handleWhatsappClick = () => {
-      trackEvent("support_whatsapp", { surface: "support_widget" }, analyticsMetadata);
+      trackEvent("support_whatsapp", { surface: "support_widget" }, { route: analyticsMetadata.route, listingId: analyticsMetadata.listingId ?? undefined });
       if (enableRevealCallbackOnClickOnly) {
         goToChat();
       }
@@ -207,7 +207,7 @@ const SupportWidgetContent = () => {
           contactPhone={CONTACT.business.phone}
           enableCtaHierarchy={enableSupportCtaHierarchy}
           enableRecommendedWhatsAppPrimary={enableRecommendedWhatsAppPrimary}
-          onCallClick={() => trackEvent("support_call", { surface: "support_widget" }, analyticsMetadata)}
+          onCallClick={() => trackEvent("support_call", { surface: "support_widget" }, { route: analyticsMetadata.route, listingId: analyticsMetadata.listingId ?? undefined })}
           onFaqClick={handleFaqClick}
           onCallbackClick={enableRevealCallbackOnClickOnly ? handleCallbackCardClick : undefined}
           onWhatsappClick={handleWhatsappClick}

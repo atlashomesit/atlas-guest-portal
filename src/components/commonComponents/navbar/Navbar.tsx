@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react';
 import { Link, NavLink, useNavigate, useLocation, matchPath } from 'react-router-dom';
 import './navbar.css';
 
-import { primaryNav, ctaNav } from '../../../config/navigation';
+import { primaryNav, ctaNav, tripsMenuNav } from '../../../config/navigation';
 import { LOGO_URL } from '../../../config/branding';
 import { getTenantContext } from '../../../tenant/tenantContext';
 import { getTenantBrandName } from '../../../tenant/displayBrand';
-import { getTenantOverrides, shouldHideAtlasBranding } from '../../../tenant/tenantOverrides';
+import { getTenantOverrides } from '../../../tenant/tenantOverrides';
 import { formatDisplayNumber, getTelLink } from '../../../config/contact';
 import { trackEvent } from '../../../utils/analytics';
 import { getFavoriteIds } from '../../../utils/guestHistory';
@@ -15,7 +15,6 @@ import { useBooking } from '../../../contexts/BookingContext';
 const Navbar = () => {
   const tenant = getTenantContext();
   const overrides = getTenantOverrides(tenant?.slug);
-  const _hideAtlasBranding = shouldHideAtlasBranding(tenant, overrides);
   const logoSrc = tenant?.logoUrl ?? LOGO_URL;
   // RA-006 §3.5: prefer tenant name everywhere; only fall back to "Home" on the Atlas root.
   const brandName = getTenantBrandName();
@@ -23,6 +22,7 @@ const Navbar = () => {
   const showListProperty = !overrides.hideListProperty;
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [tripsMenuOpen, setTripsMenuOpen] = useState(false);
   const [ctaStatus, setCtaStatus] = useState<'idle' | 'navigating' | 'scrolling'>('idle');
   const [savedCount, setSavedCount] = useState(0);
 
@@ -60,7 +60,11 @@ const Navbar = () => {
       matchPath('/homes/:roomNo', location.pathname) ??
       matchPath('/property_details/:id', location.pathname) ??
       matchPath('/properties/:id', location.pathname);
-    const propertyIdFromRoute = propertyMatch?.params.unitSlug ?? propertyMatch?.params.roomNo ?? propertyMatch?.params.id ?? null;
+    const routeParams = propertyMatch?.params as
+      | { unitSlug?: string; roomNo?: string; id?: string }
+      | undefined;
+    const propertyIdFromRoute =
+      routeParams?.unitSlug ?? routeParams?.roomNo ?? routeParams?.id ?? null;
     const isPropertyDetailsRoute = Boolean(propertyMatch);
     const bookingTarget = isPropertyDetailsRoute ? 'booking-form' : 'search';
     const bookingSurface = isPropertyDetailsRoute ? 'property_details' : 'navbar';
@@ -72,6 +76,12 @@ const Navbar = () => {
       checkIn: booking.checkIn ?? undefined,
       checkOut: booking.checkOut ?? undefined,
       guests: booking.guests,
+      // TASK-3938: forward the guest-count breakdown so SearchAvailabilityWidget preserves it
+      // instead of re-deriving a 60/40 adults/children split from the total.
+      adults: booking.adults ?? undefined,
+      children: booking.children ?? undefined,
+      infants: booking.infants ?? undefined,
+      pets: booking.pets ?? undefined,
     };
 
     const destination = isPropertyDetailsRoute ? `${location.pathname}#${bookingTarget}` : ctaNav.to;
@@ -119,7 +129,7 @@ const Navbar = () => {
     setIsMenuOpen(false);
   }, [location.pathname, location.search, location.hash]);
 
-  const visibleNavItems = primaryNav.filter((item) => !item.hidden);
+  const visibleNavItems = primaryNav.filter((item) => !item.hidden && item.label !== 'Trips');
 
   useEffect(() => {
     setCtaStatus('idle');
@@ -197,11 +207,63 @@ const Navbar = () => {
                 {item.label}
               </NavLink>
             ))}
+            <div className="relative">
+              <button
+                type="button"
+                className="nav-link"
+                aria-expanded={tripsMenuOpen}
+                aria-haspopup="true"
+                data-testid="navbar-trips-menu"
+                onClick={() => setTripsMenuOpen((o) => !o)}
+                onBlur={() => window.setTimeout(() => setTripsMenuOpen(false), 150)}
+              >
+                Trips ▾
+              </button>
+              {tripsMenuOpen && (
+                <div
+                  className="absolute left-0 top-full z-50 mt-2 min-w-[11rem] rounded-lg border border-border-subtle bg-bg-surface py-2 shadow-lg"
+                  role="menu"
+                >
+                  {tripsMenuNav.map((item) => (
+                    <Link
+                      key={item.to}
+                      to={item.to}
+                      role="menuitem"
+                      className="block px-4 py-2 text-sm text-text-primary hover:bg-brand-primary/10"
+                      onClick={() => setTripsMenuOpen(false)}
+                    >
+                      {item.label}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
         {/* RIGHT - Desktop Actions: Saved | Book Now only (utility bar has phone/login/currency) */}
         <div className="hidden lg:flex items-center gap-6">
+          <NavLink
+            to="/amenities"
+            className={navLinkClass}
+            data-testid="navbar-amenities-link"
+          >
+            Amenities
+          </NavLink>
+          <NavLink
+            to="/my-bookings"
+            className={navLinkClass}
+            data-testid="navbar-my-bookings-link"
+          >
+            My bookings
+          </NavLink>
+          <NavLink
+            to="/profile"
+            className={navLinkClass}
+            data-testid="navbar-profile-link"
+          >
+            Account
+          </NavLink>
           <NavLink
             to="/favorites"
             className={navLinkClass}
@@ -254,9 +316,44 @@ const Navbar = () => {
               {item.label}
             </NavLink>
           ))}
+          <p className="py-2 text-xs font-semibold uppercase tracking-wide text-text-muted">Trips</p>
+          {tripsMenuNav.map((item) => (
+            <NavLink
+              key={item.to}
+              onClick={closeMobile}
+              to={item.to}
+              className="block py-2 pl-2"
+            >
+              {item.label}
+            </NavLink>
+          ))}
 
           {/* MOBILE ACTIONS */}
           <div className="mt-2 flex flex-col gap-3">
+            <NavLink
+              to="/amenities"
+              onClick={closeMobile}
+              className="block py-2 font-semibold"
+              data-testid="navbar-amenities-link-mobile"
+            >
+              Amenities
+            </NavLink>
+            <NavLink
+              to="/my-bookings"
+              onClick={closeMobile}
+              className="block py-2 font-semibold"
+              data-testid="navbar-my-bookings-link-mobile"
+            >
+              My bookings
+            </NavLink>
+            <NavLink
+              to="/profile"
+              onClick={closeMobile}
+              className="block py-2 font-semibold"
+              data-testid="navbar-profile-link-mobile"
+            >
+              Account
+            </NavLink>
             <NavLink
               to="/favorites"
               onClick={closeMobile}

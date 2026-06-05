@@ -99,7 +99,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
       ? priceDisplayConfig.discount.primaryBadgeLabel
       : specialPricingLabel;
 
-  const AMENITY_MAP = useMemo(
+  const AMENITY_MAP: Record<string, string[]> = useMemo(
     () => ({
       "501": ["Wi-Fi", "Air conditioning", "Private bath"],
       "201": ["Wi-Fi", "Air conditioning"],
@@ -112,7 +112,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
     [],
   );
 
-  const amenities = AMENITY_MAP[id] ?? [];
+  const amenities = AMENITY_MAP[String(id)] ?? [];
 
   const quickFacts = [
     {
@@ -268,7 +268,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
 
               {amenities.length > 0 && (
                 <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-text-primary">
-                  {amenities.slice(0, 3).map((amenity) => (
+                  {amenities.slice(0, 3).map((amenity: string) => (
                     <span key={amenity} className="inline-flex items-center gap-1">
                       {amenity.toLowerCase().includes("wi-fi") ? (
                         <Wifi className="h-4 w-4" aria-hidden />

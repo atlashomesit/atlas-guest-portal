@@ -1,11 +1,9 @@
-import type { InputHTMLAttributes, PropsWithChildren, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
+import { createElement, type InputHTMLAttributes, type PropsWithChildren, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
 import "./ui.css";
 
-type ElementTag = "input" | "textarea" | "select";
 type InputState = "default" | "error" | "success" | "warning";
 
 interface SharedProps {
-  as?: ElementTag;
   fullWidth?: boolean;
   className?: string;
   state?: InputState;
@@ -13,13 +11,10 @@ interface SharedProps {
   helper?: string;
 }
 
-type NativeProps<T extends ElementTag> = T extends "textarea"
-  ? TextareaHTMLAttributes<HTMLTextAreaElement>
-  : T extends "select"
-    ? SelectHTMLAttributes<HTMLSelectElement>
-    : InputHTMLAttributes<HTMLInputElement>;
-
-type InputProps<T extends ElementTag = "input"> = SharedProps & PropsWithChildren & NativeProps<T>;
+type InputProps =
+  | (SharedProps & PropsWithChildren & InputHTMLAttributes<HTMLInputElement> & { as?: "input" })
+  | (SharedProps & PropsWithChildren & TextareaHTMLAttributes<HTMLTextAreaElement> & { as: "textarea" })
+  | (SharedProps & PropsWithChildren & SelectHTMLAttributes<HTMLSelectElement> & { as: "select" });
 
 function buildClassName(className?: string, fullWidth?: boolean, state?: InputState) {
   return [
@@ -30,8 +25,8 @@ function buildClassName(className?: string, fullWidth?: boolean, state?: InputSt
   ].filter(Boolean).join(" ");
 }
 
-export function Input<T extends ElementTag = "input">({
-  as,
+export function Input({
+  as = "input",
   fullWidth = true,
   className,
   children,
@@ -40,20 +35,22 @@ export function Input<T extends ElementTag = "input">({
   helper,
   "aria-invalid": ariaInvalid,
   ...rest
-}: InputProps<T>) {
-  const Component = (as || "input") as keyof JSX.IntrinsicElements;
+}: InputProps) {
+  const tag = as;
   const isError = state === "error" || !!error;
 
   return (
     <div>
-      <Component
-        className={buildClassName(className, fullWidth, state)}
-        aria-invalid={isError || ariaInvalid}
-        aria-describedby={error ? "input-error" : helper ? "input-helper" : undefined}
-        {...(rest as NativeProps<T>)}
-      >
-        {children}
-      </Component>
+      {createElement(
+        tag,
+        {
+          className: buildClassName(className, fullWidth, state),
+          "aria-invalid": isError || ariaInvalid,
+          "aria-describedby": error ? "input-error" : helper ? "input-helper" : undefined,
+          ...rest,
+        },
+        children,
+      )}
       {error && (
         <p id="input-error" className="rb-input__error">
           {error}
