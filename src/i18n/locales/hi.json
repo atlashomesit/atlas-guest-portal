@@ -1,0 +1,22 @@
+{
+  "searchPage": {
+    "hero": "अपने सपनों का होमस्टे खोजें",
+    "checkIn": "चेक-इन",
+    "checkOut": "चेक-आउट",
+    "guests": "अतिथि"
+  },
+  "listingDetail": {
+    "perNight": "प्रति रात",
+    "nearbyAttractions": "पास की आकर्षक जगहें और देखने लायक स्थान",
+    "distance": "दूर"
+  },
+  "bookingWidget": {
+    "book": "अभी बुक करें",
+    "reserve": "बुकिंग करें",
+    "total": "कुल"
+  },
+  "common": {
+    "loading": "लोड हो रहा है...",
+    "error": "कुछ गलत हुआ"
+  }
+}

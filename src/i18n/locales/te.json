@@ -1,0 +1,22 @@
+{
+  "searchPage": {
+    "hero": "మీ ఖాయం హోమ్‌స్టేను కనుగొనండి",
+    "checkIn": "చెక్-ఇన్",
+    "checkOut": "చెక్-అవుట్",
+    "guests": "అతిథులు"
+  },
+  "listingDetail": {
+    "perNight": "రాత్రికి",
+    "nearbyAttractions": "సమీపంలోని ఆకర్షణ & చేయవలసిన విషయాలు",
+    "distance": "దూరంలో"
+  },
+  "bookingWidget": {
+    "book": "ఇప్పుడే బుక్ చేయండి",
+    "reserve": "రిజర్వ్ చేయండి",
+    "total": "మొత్తం"
+  },
+  "common": {
+    "loading": "లోడ్ చేస్తోంది...",
+    "error": "ఏదో తప్పు జరిగింది"
+  }
+}

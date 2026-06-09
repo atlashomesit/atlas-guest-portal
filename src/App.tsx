@@ -1,4 +1,4 @@
-import React, { Suspense, useEffect } from "react"
+import React, { Suspense, useEffect, useState } from "react"
 import { BrowserRouter as Router, Routes, Route, useLocation, matchPath, Navigate, useParams } from "react-router-dom"
 import './App.css'
 import Navbar from "./components/commonComponents/navbar/Navbar"
@@ -83,6 +83,18 @@ function PropertyDetailsLazyFallback() {
 
 function AppWrapper() {
   const location = useLocation();
+  const [, setLanguageVersion] = useState(0);
+
+  // TASK-4018: Listen for language changes across the app
+  useEffect(() => {
+    const handleLanguageChange = () => {
+      setLanguageVersion((v) => v + 1);
+    };
+    window.addEventListener('i18n-language-changed', handleLanguageChange);
+    return () => {
+      window.removeEventListener('i18n-language-changed', handleLanguageChange);
+    };
+  }, []);
 
   const hideNavbarRoutes = ['/property_LocationDetails/:id'];
 
