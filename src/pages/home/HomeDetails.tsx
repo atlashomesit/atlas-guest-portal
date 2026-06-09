@@ -1,6 +1,7 @@
 import { Link, useParams } from "react-router-dom";
 import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/http";
+import { useLocale } from "@/contexts/LocaleContext";
 import type { LucideIcon } from "lucide-react";
 import {
   Wifi, Snowflake, Tv, Car, UtensilsCrossed, WashingMachine,
@@ -93,6 +94,7 @@ function AmenityChip({ label }: { label: string }) {
 
 const HomeDetails = () => {
   const { roomNo } = useParams<{ roomNo: string }>();
+  const { locale } = useLocale();
   const brandName = getTenantBrandName();
   const { homes: apiHomes, listingsById } = usePropertyListings();
   const tenant = getTenantContext();
@@ -132,11 +134,13 @@ const HomeDetails = () => {
   useEffect(() => {
     const listingId = Number(roomNo);
     if (!Number.isFinite(listingId) || listingId <= 0) return;
-    apiFetch(`/api/listings/${listingId}/reviews`)
+    // TASK-4031: append locale query param when fetching listing details if a non-English locale is selected
+    const url = `/api/listings/${listingId}/reviews${locale && locale !== 'en' ? `?locale=${encodeURIComponent(locale)}` : ''}`;
+    apiFetch(url)
       .then((res) => res.json() as Promise<ListingReviewsResponse>)
       .then(setReviewsData)
       .catch(() => { /* reviews are non-critical */ });
-  }, [roomNo]);
+  }, [roomNo, locale]);
 
   /** TASK-1480: track listing view event on mount. */
   useEffect(() => {

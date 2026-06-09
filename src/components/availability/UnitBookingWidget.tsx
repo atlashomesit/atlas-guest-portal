@@ -1375,9 +1375,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       {/* Payment trust logos before Razorpay checkout */}
       <div className="lv-pay-rail" data-testid="bw-payment-trust-logos">
         <span className="lv-pay-label">Pay with</span>
-        <img src="/icons/upi.svg" alt="UPI" className="lv-pay-icon lv-pay-icon-upi" />
-        <img src="/icons/visa.svg" alt="Visa" className="lv-pay-icon" />
-        <img src="/icons/rupay.svg" alt="RuPay" className="lv-pay-icon" />
+        <img src="/icons/upi.svg" alt="UPI" className="lv-pay-icon lv-pay-icon-upi" loading="lazy" decoding="async" width={32} height={20} />
+        <img src="/icons/visa.svg" alt="Visa" className="lv-pay-icon" loading="lazy" decoding="async" width={32} height={20} />
+        <img src="/icons/rupay.svg" alt="RuPay" className="lv-pay-icon" loading="lazy" decoding="async" width={32} height={20} />
         <span className="lv-pay-secure">Secured by Razorpay</span>
       </div>
     </form>
