@@ -204,7 +204,7 @@ function App() {
     <CurrencyProvider>
       <BookingProvider>
         <ListingPhotosProvider>
-          <Router future={{ v7_relativeSplatPath: true }}>
+          <Router>
             <AppWrapper />
           </Router>
         </ListingPhotosProvider>
