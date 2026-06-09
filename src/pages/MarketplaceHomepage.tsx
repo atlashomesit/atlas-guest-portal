@@ -8,7 +8,7 @@ import OptimizedImage from '@/components/ui/OptimizedImage'; // TASK-1874
 import SkeletonCard from '@/components/apartments/SkeletonCard'; // TASK-1875
 import SEO from '@/components/SEO'; // TASK-1876
 import MultiPinMap, { type MapPin } from '@/components/map/MultiPinMap'; // TL-PROP
-import { accommodationGstSlabPercent } from '@/utils/guestPriceEstimate';
+import { formatEstTotalInclGst } from '@/utils/guestPriceEstimate';
 
 // TL-PROP: shape from GET /marketplace/properties (powers the map view).
 type MarketplacePropertyApi = {
@@ -166,9 +166,6 @@ export default function MarketplaceHomepage() {
 
         {!loading &&
           items.map((item) => {
-            const gstPct = accommodationGstSlabPercent(item.pricePerNight) ?? 5;
-            const gstMult = gstPct === 18 ? 1.18 : 1.05;
-            const estTotal = Math.round(item.pricePerNight * 2 * gstMult);
             const isFav = favIds.has(item.id);
 
             return (
@@ -233,9 +230,9 @@ export default function MarketplaceHomepage() {
                     <span className="ml-1 text-sm font-normal text-text-muted">/ night</span>
                   </p>
 
-                  {/* TASK-1873: GST-inclusive estimate */}
+                  {/* TASK-1873/TASK-2903: GST-inclusive estimate — use shared utility for consistency */}
                   <p className="text-xs text-text-muted">
-                    Est. total: {formatCurrency(estTotal, { maximumFractionDigits: 0 })} (incl. {gstPct}% GST, 2 nights)
+                    {formatEstTotalInclGst(item.pricePerNight, 2, (amount) => formatCurrency(amount, { maximumFractionDigits: 0 }))}
                   </p>
 
                   <Link

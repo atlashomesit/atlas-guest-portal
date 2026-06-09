@@ -1243,6 +1243,17 @@ const SearchPage = () => {
           </div>
         )}
 
+        {showingSampleListings && (
+          <div
+            className="mb-4 flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+            data-testid="search-static-fallback-banner"
+            role="status"
+          >
+            <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
+            <span>Showing sample homes — loading live prices and availability…</span>
+          </div>
+        )}
+
         {showDateAvailabilitySkeleton && (
           <section
             className="grid gap-6 sm:grid-cols-2"
