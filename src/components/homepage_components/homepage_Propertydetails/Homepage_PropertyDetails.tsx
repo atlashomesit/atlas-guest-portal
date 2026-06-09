@@ -2022,7 +2022,7 @@ useEffect(() => {
                               to={path}
                               style={{ display: 'block', borderRadius: 16, border: '1px solid #f0e6dc', overflow: 'hidden', textDecoration: 'none', background: '#fff' }}
                             >
-                              {img && <img src={img} alt={name} style={{ width: '100%', height: 140, objectFit: 'cover' }} loading="lazy" />}
+                              {img && <img src={img} alt={name} style={{ width: '100%', height: 140, objectFit: 'cover' }} loading="lazy" decoding="async" width={300} height={140} />}
                               <div style={{ padding: '12px 14px' }}>
                                 <p style={{ fontWeight: 600, color: '#1a1a2e', fontSize: 14, margin: '0 0 4px' }}>{name}</p>
                                 <p style={{ fontSize: 12.5, color: '#64748b', margin: 0 }}>{String(it.propertyAddress ?? '').slice(0, 60)}</p>

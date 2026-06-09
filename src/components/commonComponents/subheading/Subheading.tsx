@@ -14,7 +14,7 @@ const Subheading = () => {
             <div className="w-full h-fit flex justify-start mt-12 px-4 bg-transparent">
                 {showLogo && (
                     <Link to={'/'}>
-                        <img className="w-40 h-20 object-contain bg-transparent" src={LOGO_URL} alt={brandName} />
+                        <img className="w-40 h-20 object-contain bg-transparent" src={LOGO_URL} alt={brandName} loading="eager" decoding="async" width={160} height={80} />
                     </Link>
                 )}
             </div>

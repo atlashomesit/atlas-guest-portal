@@ -1090,12 +1090,20 @@ const SearchPage = () => {
                       src={tenant.logoUrl}
                       alt=""
                       className="h-20 w-auto max-w-full object-contain opacity-90"
+                      loading="lazy"
+                      decoding="async"
+                      width={300}
+                      height={80}
                     />
                   ) : (
                     <img
                       src="/images/atlas-homestays-static-map.svg"
                       alt=""
                       className="h-28 w-auto max-w-full object-contain opacity-90"
+                      loading="lazy"
+                      decoding="async"
+                      width={300}
+                      height={112}
                     />
                   )}
                 </div>

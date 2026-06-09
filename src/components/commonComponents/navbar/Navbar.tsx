@@ -171,6 +171,10 @@ const Navbar = () => {
                 src={logoSrc}
                 alt={brandName || "Site logo"}
                 className="navbar-logo"
+                loading="eager"
+                decoding="async"
+                width={48}
+                height={48}
               />
             )}
             {brandName ? <span className="navbar-logo-text">{brandName}</span> : null}
