@@ -12,7 +12,7 @@
 
 import { useEffect } from 'react';
 import { getTenantContext } from '@/tenant/tenantContext';
-import { getTenantBrandName, getTenantContactEmail } from '@/tenant/displayBrand';
+import { getTenantBrandName } from '@/tenant/displayBrand';
 import { getContactPhone, getContactEmail } from '@/config/contact';
 import { getAvailableLanguages } from '@/i18n/i18n';
 
@@ -48,7 +48,6 @@ export const TenantJsonLd: React.FC = () => {
     }
 
     const brandName = getTenantBrandName();
-    const contactEmail = getTenantContactEmail('support');
     const businessPhone = getContactPhone('business');
     const canonicalEmail = getContactEmail();
 
