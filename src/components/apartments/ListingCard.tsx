@@ -35,6 +35,8 @@ type ListingCardProps = {
   losDiscount2Percent?: number | null;
   /** TASK-2903: nights for est-total line (default 1 when dates unknown). */
   estimateNights?: number;
+  /** TASK-4011: last-minute discount percentage (0-100) when available. */
+  lastMinuteDiscountPercent?: number | null;
   onClick?: () => void;
 };
 
@@ -63,6 +65,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
   losDiscount2MinNights,
   losDiscount2Percent,
   estimateNights = 1,
+  lastMinuteDiscountPercent,
   onClick,
 }) => {
   const { format: formatCurrency } = useCurrency();
@@ -204,6 +207,13 @@ const ListingCard: React.FC<ListingCardProps> = ({
         {lastBookedLabel && (
           <span className="inline-flex items-center gap-1 self-start rounded-full bg-green-50 border border-green-200 px-2.5 py-0.5 text-xs font-medium text-green-700">
             🔥 {lastBookedLabel}
+          </span>
+        )}
+
+        {/* TASK-4011: Last-minute discount badge */}
+        {(lastMinuteDiscountPercent ?? 0) > 0 && (
+          <span className="inline-flex items-center gap-1 self-start rounded-full bg-red-50 border border-red-200 px-2.5 py-0.5 text-xs font-medium text-red-700">
+            ⚡ Last-minute — save {Math.round(lastMinuteDiscountPercent!)}%
           </span>
         )}
 

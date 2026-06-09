@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import { toast } from 'react-toastify';
 import { useBooking } from '../contexts/BookingContext';
 import { Button } from '../components/ui/Button';
@@ -13,6 +14,14 @@ const Reserve = () => {
   const brandName = getTenantBrandName();
 
   const hasSelection = Boolean(booking.listingDetailPath?.trim() && booking.checkIn && booking.checkOut);
+
+  // TASK-4019: Guard against empty context — redirect to search with toast if no booking details
+  useEffect(() => {
+    if (!hasSelection) {
+      toast.warn(`Open a property from ${brandName} listings first, then return here to pay.`);
+      navigate('/search', { replace: true });
+    }
+  }, [hasSelection, navigate, brandName]);
 
   // Build a URL back to the property detail page with dates pre-filled so the
   // UnitBookingWidget can complete the Razorpay checkout without leaving the page.
