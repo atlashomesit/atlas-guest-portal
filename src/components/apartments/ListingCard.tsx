@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { Bath, BedDouble, Car, PawPrint, Snowflake, Users, Wifi } from "lucide-react";
 import { priceDisplayConfig } from "../../config/priceDisplay.config";
 import { type NightlyPriceBreakdown } from "../../utils/pricing";
@@ -17,6 +17,8 @@ type ListingCardProps = {
   pricingBreakdown?: NightlyPriceBreakdown | null;
   rating: number;
   reviews: number;
+  /** TASK-4012: review count for rating chip */
+  reviewCount?: number | null;
   propertyType: string;
   guests: number;
   bedrooms?: number | null;
@@ -53,6 +55,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
   pricingBreakdown,
   rating,
   reviews,
+  reviewCount,
   propertyType,
   guests,
   bedrooms,
@@ -69,6 +72,8 @@ const ListingCard: React.FC<ListingCardProps> = ({
   onClick,
 }) => {
   const { format: formatCurrency } = useCurrency();
+  /** TASK-4013: Toggle between per-night and total price display */
+  const [showTotal, setShowTotal] = useState(false);
   // TASK-1360: Compute "Last booked X days ago" label
   const lastBookedLabel = useMemo(() => {
     if (!lastBookedAt) return null;
@@ -190,13 +195,20 @@ const ListingCard: React.FC<ListingCardProps> = ({
               </div>
             )}
           </div>
-          <div className="flex flex-shrink-0 items-center gap-1 text-sm font-semibold text-text-primary">
-            {hasVerifiedReviews ? (
-              <>
+          {/* TASK-4012: Rating chip on listing cards */}
+          <div className="flex flex-shrink-0 items-center">
+            {hasVerifiedReviews && (reviewCount ?? 0) > 0 ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-yellow-50 border border-yellow-200 px-2.5 py-1 text-sm font-semibold text-yellow-800">
+                <span aria-hidden>★</span>
+                <span>{rating.toFixed(1)}</span>
+                <span className="text-xs font-normal">({(reviewCount ?? 0).toLocaleString()})</span>
+              </span>
+            ) : hasVerifiedReviews ? (
+              <span className="inline-flex items-center gap-1 text-sm font-semibold text-text-primary">
                 <span aria-hidden>★</span>
                 <span>{rating.toFixed(2)}</span>
                 <span className="text-text-muted">({reviews.toLocaleString()})</span>
-              </>
+              </span>
             ) : (
               <span className="text-xs font-semibold text-text-muted">New listing</span>
             )}
@@ -256,14 +268,42 @@ const ListingCard: React.FC<ListingCardProps> = ({
                     </span>
                   )}
                   <div className="text-2xl font-bold leading-tight text-cta-primary">
-                    {formatCurrency(finalPrice)}
-                    <span className="ml-1 text-sm font-semibold text-text-muted">/ night</span>
+                    {showTotal ? (
+                      <>
+                        {formatCurrency(Math.round(finalPrice * estimateNights * (finalPrice <= 7500 ? 1.05 : 1.18)))}
+                        <span className="ml-1 text-sm font-semibold text-text-muted">total</span>
+                      </>
+                    ) : (
+                      <>
+                        {formatCurrency(finalPrice)}
+                        <span className="ml-1 text-sm font-semibold text-text-muted">/ night</span>
+                      </>
+                    )}
                   </div>
                 </div>
-                {/* TASK-1645 / TASK-2871: Indian accommodation GST — 5% for ≤₹7,500/night, 18% above (eff. 22 Sep 2025) */}
-                <span className="text-xs text-text-muted">
-                  {formatEstTotalInclGst(finalPrice, estimateNights, formatCurrency)}
-                </span>
+                {/* TASK-4013: Toggle link for total with taxes; TASK-1645 / TASK-2871: Indian accommodation GST — 5% for ≤₹7,500/night, 18% above (eff. 22 Sep 2025) */}
+                {showTotal ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowTotal(false)}
+                    className="text-xs text-cta-primary hover:underline font-semibold self-start"
+                  >
+                    Hide total
+                  </button>
+                ) : (
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs text-text-muted">
+                      {formatEstTotalInclGst(finalPrice, estimateNights, formatCurrency)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowTotal(true)}
+                      className="text-xs text-cta-primary hover:underline font-semibold self-start"
+                    >
+                      See total with taxes ↓
+                    </button>
+                  </div>
+                )}
                 {showDiscount && savingsAmount > 0 && (
                   <span className="text-xs font-semibold text-cta-primary">
                     {priceDisplayConfig.discount.savingsPrefix} {formatCurrency(savingsAmount)}

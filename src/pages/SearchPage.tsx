@@ -1366,13 +1366,13 @@ const SearchPage = () => {
                           </span>
                         ) : null}
                       </div>
-                      {/* TASK-1660: match ListingCard — no catalog star average without verified review count */}
+                      {/* TASK-4012: rating snippet + TASK-1660: match ListingCard — no catalog star average without verified review count */}
                       {(unit.reviewCount ?? 0) > 0 && unit.rating != null && unit.rating > 0 && (
-                        <p className="mt-0.5 text-sm text-accent-primary font-medium">
-                          {"★".repeat(Math.round(unit.rating))}
-                          <span className="text-text-muted ml-1">{unit.rating.toFixed(1)}</span>
-                          <span className="text-text-muted ml-1 text-xs">({unit.reviewCount})</span>
-                        </p>
+                        <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-yellow-50 border border-yellow-200 px-2.5 py-1 text-sm font-semibold text-yellow-800">
+                          <span aria-hidden>★</span>
+                          <span>{unit.rating.toFixed(1)}</span>
+                          <span className="text-xs font-normal">({(unit.reviewCount ?? 0).toLocaleString()})</span>
+                        </span>
                       )}
                       {/* TASK-1716: keyword-bucketed sentiment summary */}
                       <ReviewSummary listingId={unit.numericId} />

@@ -2052,6 +2052,49 @@ useEffect(() => {
                   </section>
                 )}
 
+                {/* TASK-4014: Nearby attractions section — static placeholder for now */}
+                <section className="pp-section" aria-label="Nearby attractions and things to do">
+                  <div className="pp-section-head">
+                    <h2>Nearby attractions & things to do</h2>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 16 }}>
+                    {(() => {
+                      // TODO: Replace with real API data from GET /api/listings/{id}/nearby when available
+                      const SAMPLE_ATTRACTIONS = [
+                        { name: 'Local Market', distance: '0.5 km', type: 'Shopping', icon: '🛍️' },
+                        { name: 'Waterfall Trail', distance: '2 km', type: 'Nature', icon: '🏞️' },
+                        { name: 'Town Square', distance: '1 km', type: 'Landmark', icon: '📍' },
+                      ];
+                      return SAMPLE_ATTRACTIONS.map((attraction, idx) => (
+                        <div
+                          key={`attraction-${idx}`}
+                          style={{
+                            borderRadius: 12,
+                            border: '1px solid #f0e6dc',
+                            padding: 12,
+                            textAlign: 'center',
+                            background: '#fff',
+                            transition: 'box-shadow 0.2s',
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)')}
+                          onMouseLeave={(e) => (e.currentTarget.style.boxShadow = 'none')}
+                        >
+                          <div style={{ fontSize: 28, marginBottom: 8 }} aria-hidden="true">{attraction.icon}</div>
+                          <p style={{ fontWeight: 600, color: '#1a1a2e', fontSize: 13, margin: '0 0 4px', minHeight: '2em' }}>
+                            {attraction.name}
+                          </p>
+                          <p style={{ fontSize: 11, color: '#64748b', margin: '0 0 6px' }}>
+                            {attraction.distance}
+                          </p>
+                          <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: '#f0e6dc', color: '#94755b' }}>
+                            {attraction.type}
+                          </span>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                </section>
+
 
               </div>
               {/* ===== END LEFT COLUMN ===== */}
@@ -2087,20 +2130,41 @@ useEffect(() => {
                     </div>
                   </div>
                 ) : (
-                  <Suspense fallback={<SkeletonCard />}>
-                    <UnitBookingWidget
-                      listingId={resolvedListingId ?? undefined}
-                      propertyId={listingPropertyId ?? undefined}
-                      listingName={getListingDisplayName(data.id ?? data.listingId, data.property_name) || 'This property'}
-                      timezoneId={data.timezoneId}
-                      coverPhotoUrl={primaryImage}
-                      maxGuests={data.maxGuests}
-                      propertySlug={propertySlugParam}
-                      unitSlug={unitSlugParam}
-                      reviewRating={ppHasApiReviews ? ppApiReviews!.averageRating : undefined}
-                      reviewCount={ppHasApiReviews ? ppApiReviews!.totalCount : undefined}
-                    />
-                  </Suspense>
+                  <>
+                    <Suspense fallback={<SkeletonCard />}>
+                      <UnitBookingWidget
+                        listingId={resolvedListingId ?? undefined}
+                        propertyId={listingPropertyId ?? undefined}
+                        listingName={getListingDisplayName(data.id ?? data.listingId, data.property_name) || 'This property'}
+                        timezoneId={data.timezoneId}
+                        coverPhotoUrl={primaryImage}
+                        maxGuests={data.maxGuests}
+                        propertySlug={propertySlugParam}
+                        unitSlug={unitSlugParam}
+                        reviewRating={ppHasApiReviews ? ppApiReviews!.averageRating : undefined}
+                        reviewCount={ppHasApiReviews ? ppApiReviews!.totalCount : undefined}
+                      />
+                    </Suspense>
+
+                    {/* TASK-4015: Save vs OTA delta */}
+                    {data.property_price && data.property_price > 0 && (
+                      <div style={{
+                        marginTop: 16,
+                        padding: '12px 14px',
+                        borderRadius: 8,
+                        background: '#dcfce7',
+                        border: '1px solid #86efac',
+                      }} data-testid="save-vs-ota-delta">
+                        <div style={{ fontSize: 14, fontWeight: 600, color: '#166534', display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span>💰</span>
+                          <span>Save ~₹{Math.round(data.property_price * 2 * 0.15).toLocaleString('en-IN')} by booking directly</span>
+                        </div>
+                        <div style={{ fontSize: 12, color: '#15803d', marginTop: 4 }}>
+                          vs OTA platforms that charge 15–18%
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
 
                 {/* Trust band — consolidates legitimacy, cancellation & payment
