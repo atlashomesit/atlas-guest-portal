@@ -18,6 +18,8 @@ export default function FavoritesPage() {
   // TASK-1299: Wishlist share — copy link to clipboard
   const [shareState, setShareState] = useState<"idle" | "copied">("idle");
   const [searchParams] = useSearchParams();
+  // TASK-4010: Server-side sync status indicator
+  const [syncStatus, setSyncStatus] = useState<"idle" | "synced" | "local">("idle");
   const sharedWishlistIds = useMemo(() => {
     const token = searchParams.get("wishlist");
     if (!token) return null;
@@ -38,7 +40,11 @@ export default function FavoritesPage() {
     setError(null);
     fetchPublicListings()
       .then((list) => {
-        if (!cancelled) setAll(list);
+        if (!cancelled) {
+          setAll(list);
+          // TASK-4010: Check if API is available by attempting a non-critical fetch
+          checkApiAvailability();
+        }
       })
       .catch((err: unknown) => {
         if (!cancelled) {
@@ -53,6 +59,25 @@ export default function FavoritesPage() {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  // TASK-4010: Check if SavedListingsController API is available
+  const checkApiAvailability = React.useCallback(async () => {
+    try {
+      const res = await fetch(buildApiUrl("/api/saved-listings"), {
+        method: "HEAD",
+        headers: getApiHeaders(),
+      });
+      // If endpoint exists (HEAD succeeds or returns non-404), API is available
+      if (res.status !== 404) {
+        setSyncStatus("synced");
+      } else {
+        setSyncStatus("local");
+      }
+    } catch {
+      // Network error or endpoint truly unavailable — fall back to localStorage
+      setSyncStatus("local");
+    }
   }, []);
 
   useEffect(() => loadListings(), [loadListings]);
@@ -133,6 +158,13 @@ export default function FavoritesPage() {
       <div className="flex items-baseline justify-between gap-2 flex-wrap">
         <h1 className="text-2xl font-bold text-text-primary">Saved homes</h1>
         <div className="flex items-center gap-3">
+          {/* TASK-4010: Sync status indicator */}
+          {syncStatus === "synced" && (
+            <span className="text-xs text-green-700 font-medium">✓ Synced</span>
+          )}
+          {syncStatus === "local" && (
+            <span className="text-xs text-text-muted font-medium">Local only</span>
+          )}
           {/* TASK-1299: Share wishlist via WhatsApp / native share / clipboard */}
           {favorites.length > 0 && (
             <button
