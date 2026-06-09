@@ -506,16 +506,23 @@ const GuestDetailsPage: React.FC = () => {
     setFormErrors(errors);
     if (!valid) {
       requestAnimationFrame(() => {
+        // Focus and scroll to first failing field (WCAG 3.3 error identification)
         if (errors.name) {
-          document.getElementById('gd-name')?.focus();
+          const el = document.getElementById('gd-name');
+          el?.focus();
+          el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
           return;
         }
         if (errors.email) {
-          document.getElementById('gd-email')?.focus();
+          const el = document.getElementById('gd-email');
+          el?.focus();
+          el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
           return;
         }
         if (errors.phone) {
-          document.getElementById('gd-phone')?.focus();
+          const el = document.getElementById('gd-phone');
+          el?.focus();
+          el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
           return;
         }
         if (!consentAccepted) {
@@ -848,6 +855,9 @@ const GuestDetailsPage: React.FC = () => {
                 const desc = String(fr?.error?.description ?? '');
                 console.log('[GuestDetailsPage] Payment failed:', { code, desc });
                 setOrderError(`No money was taken. ${mapRazorpayFailureCode(code, desc)}`);
+                // TASK-2906: Store the order ID and amount so the "Resume payment" button can retry
+                setRazorpayOrderId(orderId);
+                setRazorpayAmount(amount);
                 setPaymentCancelled(false);
                 setIsSubmitting(false);
               });
@@ -1487,7 +1497,7 @@ const GuestDetailsPage: React.FC = () => {
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px 16px', alignItems: 'center' }}>
                         {razorpayOrderId && (
                           <button type="button" className="gd-resume-btn" onClick={handleResume}>
-                            Try payment again
+                            Resume payment
                           </button>
                         )}
                         <a href={paymentFailureWhatsAppUrl} target="_blank" rel="noopener noreferrer">
