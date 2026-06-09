@@ -1,5 +1,6 @@
 /**
  * RA-006/TASK-2335: Runtime JSON-LD injection for tenant-aware schema.org metadata.
+ * TASK-4058: Enhanced with ContactPoint (via contact.ts), hreflang alternates (via i18n).
  *
  * Renders Organization and FAQPage JSON-LD blocks using the tenant context
  * (brand name, logo, contact email). This component appends the JSON-LD scripts
@@ -12,6 +13,8 @@
 import { useEffect } from 'react';
 import { getTenantContext } from '@/tenant/tenantContext';
 import { getTenantBrandName, getTenantContactEmail } from '@/tenant/displayBrand';
+import { getContactPhone, getContactEmail } from '@/config/contact';
+import { getAvailableLanguages } from '@/i18n/i18n';
 
 /**
  * Appends a JSON-LD script tag to <head>.
@@ -46,15 +49,23 @@ export const TenantJsonLd: React.FC = () => {
 
     const brandName = getTenantBrandName();
     const contactEmail = getTenantContactEmail('support');
+    const businessPhone = getContactPhone('business');
+    const canonicalEmail = getContactEmail();
 
     // ── Organization JSON-LD ─────────────────────────────────────────────────────
     // Logo field is omitted if logoUrl is not set (better than a default Atlas logo).
+    // ContactPoint sourced from contact.ts helpers to ensure canonical values.
     const organizationJsonLd: Record<string, unknown> = {
       '@context': 'https://schema.org',
       '@type': 'Organization',
       name: brandName,
-      telephone: tenantInfo.legalContactPack?.contactPhone || undefined,
-      email: contactEmail,
+      email: canonicalEmail,
+      contactPoint: {
+        '@type': 'ContactPoint',
+        contactType: 'Customer Service',
+        telephone: `+91${businessPhone}`,
+        email: canonicalEmail,
+      },
     };
     if (typeof window !== 'undefined') {
       organizationJsonLd.url = `${window.location.origin}/`;
@@ -137,6 +148,41 @@ export const TenantJsonLd: React.FC = () => {
     };
 
     appendJsonLdScript('faqpage', faqPageJsonLd);
+
+    // ── hreflang alternate links (TASK-4058) ──────────────────────────────────────
+    // Inject hreflang links for all supported locales + x-default.
+    // This aids Google's multi-language detection and alternate version crawling.
+    const currentUrl = typeof window !== 'undefined' ? window.location.href : '';
+    if (currentUrl) {
+      const supportedLangs = getAvailableLanguages(); // ['en', 'hi', 'te']
+
+      // Remove existing hreflang links (we'll recreate them)
+      document.querySelectorAll('link[rel="alternate"][hreflang]').forEach((el) => {
+        el.remove();
+      });
+
+      // Add hreflang for each language using search params (no locale path segments)
+      // Preserve existing query params and append/update lang param
+      const url = new URL(currentUrl);
+      supportedLangs.forEach((lang) => {
+        const langUrl = new URL(url);
+        langUrl.searchParams.set('lang', lang);
+        const link = document.createElement('link');
+        link.rel = 'alternate';
+        link.hreflang = lang;
+        link.href = langUrl.toString();
+        document.head.appendChild(link);
+      });
+
+      // Add x-default hreflang pointing to the canonical (en) version without lang param
+      const defaultUrl = new URL(url);
+      defaultUrl.searchParams.delete('lang');
+      const defaultLink = document.createElement('link');
+      defaultLink.rel = 'alternate';
+      defaultLink.hreflang = 'x-default';
+      defaultLink.href = defaultUrl.toString();
+      document.head.appendChild(defaultLink);
+    }
   }, []);
 
   return null;
