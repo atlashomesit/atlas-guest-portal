@@ -11,6 +11,7 @@ import { formatDisplayNumber, getTelLink } from '../../../config/contact';
 import { trackEvent } from '../../../utils/analytics';
 import { getFavoriteIds } from '../../../utils/guestHistory';
 import { useBooking } from '../../../contexts/BookingContext';
+import { useTranslation } from '../../../hooks/useTranslation';
 
 const Navbar = () => {
   const tenant = getTenantContext();
@@ -23,12 +24,14 @@ const Navbar = () => {
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [tripsMenuOpen, setTripsMenuOpen] = useState(false);
+  const [langMenuOpen, setLangMenuOpen] = useState(false);
   const [ctaStatus, setCtaStatus] = useState<'idle' | 'navigating' | 'scrolling'>('idle');
   const [savedCount, setSavedCount] = useState(0);
 
   const navigate = useNavigate();
   const location = useLocation();
   const { booking } = useBooking();
+  const { language, changeLanguage, availableLanguages, getLanguageName } = useTranslation();
 
   const telLink = getTelLink();
 
@@ -156,7 +159,44 @@ const Navbar = () => {
             <span className="util-bar-sep" aria-hidden="true" />
             <span className="util-bar-locale">INR ₹</span>
             <span className="util-bar-sep" aria-hidden="true" />
-            <span className="util-bar-locale">EN</span>
+            {/* TASK-4018: Language switcher */}
+            <div className="relative">
+              <button
+                type="button"
+                className="util-bar-locale lang-switcher"
+                onClick={() => setLangMenuOpen(!langMenuOpen)}
+                onBlur={() => window.setTimeout(() => setLangMenuOpen(false), 150)}
+                aria-label="Change language"
+                aria-expanded={langMenuOpen}
+              >
+                {language.toUpperCase()}
+              </button>
+              {langMenuOpen && (
+                <div
+                  className="absolute right-0 top-full z-50 mt-1 min-w-[8rem] rounded-lg border border-border-subtle bg-bg-surface shadow-lg"
+                  role="menu"
+                >
+                  {availableLanguages.map((lang) => (
+                    <button
+                      key={lang}
+                      type="button"
+                      role="menuitem"
+                      className={`block w-full text-left px-4 py-2 text-sm ${
+                        language === lang
+                          ? 'bg-brand-primary/10 font-semibold text-brand-primary'
+                          : 'text-text-primary hover:bg-bg-muted'
+                      }`}
+                      onClick={() => {
+                        changeLanguage(lang);
+                        setLangMenuOpen(false);
+                      }}
+                    >
+                      {getLanguageName(lang)}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

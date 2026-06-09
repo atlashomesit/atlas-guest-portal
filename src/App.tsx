@@ -1,4 +1,4 @@
-import React, { Suspense, useEffect } from "react"
+import React, { Suspense, useEffect, useState } from "react"
 import { BrowserRouter as Router, Routes, Route, useLocation, matchPath, Navigate, useParams } from "react-router-dom"
 import './App.css'
 import Navbar from "./components/commonComponents/navbar/Navbar"
@@ -9,7 +9,7 @@ import { ToastContainer } from "react-toastify"
 import { BookingProvider } from "./contexts/BookingContext"
 import { ListingPhotosProvider } from "./contexts/ListingPhotosContext"
 import { CurrencyProvider } from "./contexts/CurrencyContext"
-import { LocaleProvider } from "./contexts/LocaleContext"
+import { GuestAuthProvider } from "./contexts/GuestAuthContext"
 import { trackEvent } from "./utils/analytics"
 import { isMarketplaceMode } from "./tenant/tenantResolver"
 import { CITY_LANDING_SLUGS } from "./content/cities/cityLandingSlugs"
@@ -51,6 +51,8 @@ const PageNotFound = React.lazy(() => import("./pages/pagenotfound/PageNotFound"
 const CityLandingPage = React.lazy(() => import("./pages/CityLandingPage"))
 // TASK-2612: Two-step booking flow — guest details step after Reserve
 const GuestDetailsPage = React.lazy(() => import("./pages/booking/GuestDetailsPage"))
+// TASK-4017: Guest OTP login
+const GuestLoginPage = React.lazy(() => import("./pages/GuestLoginPage"))
 
 function LazyFallback() {
   return (
@@ -84,6 +86,18 @@ function PropertyDetailsLazyFallback() {
 
 function AppWrapper() {
   const location = useLocation();
+  const [, setLanguageVersion] = useState(0);
+
+  // TASK-4018: Listen for language changes across the app
+  useEffect(() => {
+    const handleLanguageChange = () => {
+      setLanguageVersion((v) => v + 1);
+    };
+    window.addEventListener('i18n-language-changed', handleLanguageChange);
+    return () => {
+      window.removeEventListener('i18n-language-changed', handleLanguageChange);
+    };
+  }, []);
 
   const hideNavbarRoutes = ['/property_LocationDetails/:id'];
 
@@ -179,6 +193,7 @@ function AppWrapper() {
           <Route path="/preferences/:guestToken" element={withBoundary(<Suspense fallback={<LazyFallback />}><CommunicationPreferences /></Suspense>, "communication-preferences-token-route")} />
           <Route path="/profile" element={withBoundary(<Suspense fallback={<LazyFallback />}><ProfilePage /></Suspense>, "profile-route")} />
           <Route path="/my-bookings" element={withBoundary(<Suspense fallback={<LazyFallback />}><MyBookingsPage /></Suspense>, "my-bookings-route")} />
+          <Route path="/login" element={withBoundary(<Suspense fallback={<LazyFallback />}><GuestLoginPage /></Suspense>, "guest-login-route")} />
           <Route path="/favorites" element={withBoundary(<Suspense fallback={<LazyFallback />}><FavoritesPage /></Suspense>, "favorites-route")} />
           <Route path="/saved" element={withBoundary(<Navigate to="/favorites" replace />, "saved-alias-route")} />
           <Route path="/recent" element={withBoundary(<Suspense fallback={<LazyFallback />}><RecentlyViewedPage /></Suspense>, "recent-route")} />
@@ -202,7 +217,7 @@ function AppWrapper() {
 
 function App() {
   return (
-    <LocaleProvider>
+    <GuestAuthProvider>
       <CurrencyProvider>
         <BookingProvider>
           <ListingPhotosProvider>
@@ -212,7 +227,7 @@ function App() {
           </ListingPhotosProvider>
         </BookingProvider>
       </CurrencyProvider>
-    </LocaleProvider>
+    </GuestAuthProvider>
   );
 }
 

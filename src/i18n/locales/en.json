@@ -1,0 +1,22 @@
+{
+  "searchPage": {
+    "hero": "Find your perfect homestay",
+    "checkIn": "Check-in",
+    "checkOut": "Check-out",
+    "guests": "Guests"
+  },
+  "listingDetail": {
+    "perNight": "per night",
+    "nearbyAttractions": "Nearby attractions & things to do",
+    "distance": "distance away"
+  },
+  "bookingWidget": {
+    "book": "Book now",
+    "reserve": "Reserve",
+    "total": "Total"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Something went wrong"
+  }
+}
