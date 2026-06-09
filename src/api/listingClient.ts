@@ -290,7 +290,7 @@ export function invalidatePublicListingsCache(): void {
   cachePromise = null;
 }
 
-export const fetchPublicListings = async (signal?: AbortSignal): Promise<PublicListing[]> => {
+export const fetchPublicListings = async (signal?: AbortSignal, options?: { locale?: string }): Promise<PublicListing[]> => {
   // Return cached result if still within the freshness window
   if (cachedListings != null && Date.now() - cachedListingsAt < PUBLIC_LISTINGS_TTL_MS) {
     return cachedListings;
@@ -304,7 +304,12 @@ export const fetchPublicListings = async (signal?: AbortSignal): Promise<PublicL
   // Create new fetch promise
   cachePromise = (async () => {
     try {
-      const response = await fetch(buildApiUrl(PUBLIC_LISTINGS_ENDPOINT), {
+      const params = new URLSearchParams();
+      if (options?.locale) {
+        params.append('locale', options.locale);
+      }
+      const url = buildApiUrl(PUBLIC_LISTINGS_ENDPOINT + (params.toString() ? '?' + params.toString() : ''));
+      const response = await fetch(url, {
         signal,
         headers: getApiHeaders(),
       });
@@ -465,11 +470,21 @@ export async function fetchListingPhotos(
   return normalizeListingPhotoResponse(payload);
 }
 
+/**
+ * TASK-4031: Fetch a listing with optional locale-specific translations.
+ * Pass locale code (e.g. "hi" for Hindi, "te" for Telugu) to get translated content.
+ */
 export const fetchListingById = async (
   listingId: string | number,
   signal?: AbortSignal,
+  options?: { locale?: string },
 ): Promise<ListingDetail> => {
-  const response = await fetch(buildApiUrl(`${LISTING_ENDPOINT}/${listingId}`), {
+  const params = new URLSearchParams();
+  if (options?.locale) {
+    params.append('locale', options.locale);
+  }
+  const url = buildApiUrl(`${LISTING_ENDPOINT}/${listingId}${params.toString() ? '?' + params.toString() : ''}`);
+  const response = await fetch(url, {
     signal,
     headers: getApiHeaders(),
   });

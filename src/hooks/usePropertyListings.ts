@@ -3,6 +3,7 @@ import { fetchPublicListings, type PublicListing } from '../api/listingClient';
 import { getTenantContext } from '../tenant/tenantContext';
 import { getTenantOverrides, getTenantPublicListingIdAllowlist } from '../tenant/tenantOverrides';
 import { buildHomeUnitPath, getPropertySlug } from '../utils/navigation';
+import { getCurrentLanguage } from '../i18n/i18n';
 
 export type HomeLink = {
   roomNo: string;
@@ -47,7 +48,8 @@ export function usePropertyListings(): PropertyListingsState {
       setIsLoading(true);
       setUsedFallback(false);
       try {
-        const listings = await fetchPublicListings();
+        const currentLang = getCurrentLanguage();
+        const listings = await fetchPublicListings(undefined, { locale: currentLang });
         const overrides = getTenantOverrides(tenant?.slug);
         const tenantAllowedIds = getTenantPublicListingIdAllowlist(overrides);
 
