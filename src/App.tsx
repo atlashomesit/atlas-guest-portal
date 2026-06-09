@@ -9,6 +9,7 @@ import { ToastContainer } from "react-toastify"
 import { BookingProvider } from "./contexts/BookingContext"
 import { ListingPhotosProvider } from "./contexts/ListingPhotosContext"
 import { CurrencyProvider } from "./contexts/CurrencyContext"
+import { LocaleProvider } from "./contexts/LocaleContext"
 import { trackEvent } from "./utils/analytics"
 import { isMarketplaceMode } from "./tenant/tenantResolver"
 import { CITY_LANDING_SLUGS } from "./content/cities/cityLandingSlugs"
@@ -201,15 +202,17 @@ function AppWrapper() {
 
 function App() {
   return (
-    <CurrencyProvider>
-      <BookingProvider>
-        <ListingPhotosProvider>
-          <Router>
-            <AppWrapper />
-          </Router>
-        </ListingPhotosProvider>
-      </BookingProvider>
-    </CurrencyProvider>
+    <LocaleProvider>
+      <CurrencyProvider>
+        <BookingProvider>
+          <ListingPhotosProvider>
+            <Router>
+              <AppWrapper />
+            </Router>
+          </ListingPhotosProvider>
+        </BookingProvider>
+      </CurrencyProvider>
+    </LocaleProvider>
   );
 }
 
