@@ -9,6 +9,7 @@ import { ToastContainer } from "react-toastify"
 import { BookingProvider } from "./contexts/BookingContext"
 import { ListingPhotosProvider } from "./contexts/ListingPhotosContext"
 import { CurrencyProvider } from "./contexts/CurrencyContext"
+import { GuestAuthProvider } from "./contexts/GuestAuthContext"
 import { trackEvent } from "./utils/analytics"
 import { isMarketplaceMode } from "./tenant/tenantResolver"
 import { CITY_LANDING_SLUGS } from "./content/cities/cityLandingSlugs"
@@ -50,6 +51,8 @@ const PageNotFound = React.lazy(() => import("./pages/pagenotfound/PageNotFound"
 const CityLandingPage = React.lazy(() => import("./pages/CityLandingPage"))
 // TASK-2612: Two-step booking flow — guest details step after Reserve
 const GuestDetailsPage = React.lazy(() => import("./pages/booking/GuestDetailsPage"))
+// TASK-4017: Guest OTP login
+const GuestLoginPage = React.lazy(() => import("./pages/GuestLoginPage"))
 
 function LazyFallback() {
   return (
@@ -190,6 +193,7 @@ function AppWrapper() {
           <Route path="/preferences/:guestToken" element={withBoundary(<Suspense fallback={<LazyFallback />}><CommunicationPreferences /></Suspense>, "communication-preferences-token-route")} />
           <Route path="/profile" element={withBoundary(<Suspense fallback={<LazyFallback />}><ProfilePage /></Suspense>, "profile-route")} />
           <Route path="/my-bookings" element={withBoundary(<Suspense fallback={<LazyFallback />}><MyBookingsPage /></Suspense>, "my-bookings-route")} />
+          <Route path="/login" element={withBoundary(<Suspense fallback={<LazyFallback />}><GuestLoginPage /></Suspense>, "guest-login-route")} />
           <Route path="/favorites" element={withBoundary(<Suspense fallback={<LazyFallback />}><FavoritesPage /></Suspense>, "favorites-route")} />
           <Route path="/saved" element={withBoundary(<Navigate to="/favorites" replace />, "saved-alias-route")} />
           <Route path="/recent" element={withBoundary(<Suspense fallback={<LazyFallback />}><RecentlyViewedPage /></Suspense>, "recent-route")} />
@@ -213,15 +217,17 @@ function AppWrapper() {
 
 function App() {
   return (
-    <CurrencyProvider>
-      <BookingProvider>
-        <ListingPhotosProvider>
-          <Router>
-            <AppWrapper />
-          </Router>
-        </ListingPhotosProvider>
-      </BookingProvider>
-    </CurrencyProvider>
+    <GuestAuthProvider>
+      <CurrencyProvider>
+        <BookingProvider>
+          <ListingPhotosProvider>
+            <Router>
+              <AppWrapper />
+            </Router>
+          </ListingPhotosProvider>
+        </BookingProvider>
+      </CurrencyProvider>
+    </GuestAuthProvider>
   );
 }
 
