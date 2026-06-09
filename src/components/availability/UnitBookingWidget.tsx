@@ -21,6 +21,7 @@ import { HelpCircle } from 'lucide-react';
 import { calculateNightlyPrice, inferUnitType } from '@/utils/pricing';
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
 import { fetchCalendarPricing, fetchPricingBreakdown } from '@/api/pricingClient';
+import { fetchPublicListings } from '@/api/listingClient';
 import { useListingPhotosFromApi } from '@/contexts/ListingPhotosContext';
 import OptimizedImage from '@/components/ui/OptimizedImage';
 import FomoBar from '@/components/FomoBar';
@@ -60,6 +61,8 @@ interface UnitBookingWidgetProps {
   reviewRating?: number;
   /** TASK-2623: Total review count from the listing API. 0 or undefined = hide rating row. */
   reviewCount?: number;
+  /** TASK-956: minimum nights required — shown before the calendar opens. */
+  minStayNights?: number;
 }
 
 const PENDING_PAYMENT_KEY = 'atlas_pending_razorpay_order';
@@ -127,6 +130,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   unitSlug,
   reviewRating,
   reviewCount,
+  minStayNights: minStayNightsProp,
 }) => {
   if (import.meta.env.DEV) {
     console.assert(Boolean(propertyId), '[UnitBookingWidget] propertyId is required for unit mode');
@@ -147,8 +151,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   }, [listingId, getUrlsForListingId]);
 
   const displayCoverUrl = (coverPhotoUrl?.trim() || coverFromPublicListings || '').trim() || undefined;
-  // hostPhone retained in props for future WhatsApp support on GuestDetailsPage
-  void hostPhone;
+  void hostPhone; // passed through for listing pages; payment-failure support lives on GuestDetailsPage
 
   const today = useMemo(() => getIstStartOfDay(), []);
   const maxBookingDate = useMemo(() => addDays(today, 365), [today]);
@@ -181,8 +184,30 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [dateError, setDateError] = useState<string | null>(null);
-  const [minStayNights] = useState(1);
+  const [resolvedMinStay, setResolvedMinStay] = useState(1);
   const minAdvanceDays: number = 0;
+
+  useEffect(() => {
+    if (minStayNightsProp != null && Number.isFinite(minStayNightsProp) && minStayNightsProp > 0) {
+      setResolvedMinStay(Math.max(1, Math.floor(minStayNightsProp)));
+      return;
+    }
+    const id = listingId != null ? Number(listingId) : NaN;
+    if (!Number.isFinite(id) || id <= 0) {
+      setResolvedMinStay(1);
+      return;
+    }
+    const ctrl = new AbortController();
+    fetchPublicListings(ctrl.signal)
+      .then((listings) => {
+        const match = listings.find((l) => l.id === id);
+        setResolvedMinStay(Math.max(1, match?.minStay ?? 1));
+      })
+      .catch(() => setResolvedMinStay(1));
+    return () => ctrl.abort();
+  }, [listingId, minStayNightsProp]);
+
+  const minStayNights = resolvedMinStay;
   const effectiveMaxGuests = maxGuests;
   /** RA-006: payment provider not configured for this tenant. */
   const [providerBlocked, setProviderBlocked] = useState(false);
@@ -1052,7 +1077,13 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       {/* v2 block (2) + (3): Date range card + Guests card */}
       <div className="lv-booking-form">
         {minStayNights > 1 && (
-          <p className="text-xs font-medium text-text-muted" style={{ marginBottom: 6 }}>Minimum stay: {minStayNights} nights</p>
+          <p
+            className="inline-flex items-center rounded-full bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-900 border border-amber-200"
+            style={{ marginBottom: 8 }}
+            data-testid="min-stay-badge"
+          >
+            Minimum {minStayNights} night{minStayNights !== 1 ? 's' : ''}
+          </p>
         )}
         {/* v2 date card */}
         <div
@@ -1341,13 +1372,13 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         <span>Free cancellation until 48 hours before check-in</span>
       </div>
 
-      {/* Pay-with rail (v2) */}
-      <div className="lv-pay-rail">
+      {/* Payment trust logos before Razorpay checkout */}
+      <div className="lv-pay-rail" data-testid="bw-payment-trust-logos">
         <span className="lv-pay-label">Pay with</span>
-        <span className="lv-pay-text">UPI</span>
-        <span className="lv-pay-text">VISA</span>
-        <span className="lv-pay-text">RUPAY</span>
-        <span className="lv-pay-text">RAZORPAY</span>
+        <img src="/icons/upi.svg" alt="UPI" className="lv-pay-icon lv-pay-icon-upi" />
+        <img src="/icons/visa.svg" alt="Visa" className="lv-pay-icon" />
+        <img src="/icons/rupay.svg" alt="RuPay" className="lv-pay-icon" />
+        <span className="lv-pay-secure">Secured by Razorpay</span>
       </div>
     </form>
     </>

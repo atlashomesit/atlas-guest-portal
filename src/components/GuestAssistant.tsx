@@ -175,7 +175,7 @@ export default function GuestAssistant({ listingId }: GuestAssistantProps) {
               </div>
               <button
                 type="button"
-                className="flex-shrink-0 rounded-full p-1.5 text-text-muted hover:bg-bg-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-cta-primary"
+                className="flex-shrink-0 inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-text-muted hover:bg-bg-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-cta-primary"
                 onClick={() => setIsOpen(false)}
                 aria-label="Close FAQ panel"
               >
@@ -230,7 +230,7 @@ export default function GuestAssistant({ listingId }: GuestAssistantProps) {
                         <button
                           type="button"
                           onClick={() => void handleAskAi()}
-                          className="rounded-lg bg-cta-primary px-4 py-2 text-xs font-semibold text-white hover:opacity-90 transition"
+                          className="inline-flex min-h-11 items-center rounded-lg bg-cta-primary px-4 py-3 text-sm font-semibold text-white hover:opacity-90 transition"
                         >
                           Ask AI →
                         </button>

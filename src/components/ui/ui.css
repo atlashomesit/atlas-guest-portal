@@ -129,6 +129,7 @@
 
 .rb-input {
   width: 100%;
+  min-height: 48px;
   padding: var(--space-4) var(--space-4);
   border-radius: var(--radius-md);
   border: 1px solid var(--border-subtle);
@@ -137,6 +138,7 @@
   font-family: var(--font-family-base);
   font-size: var(--font-size-md);
   transition: border-color 150ms ease, box-shadow 150ms ease;
+  box-sizing: border-box;
 }
 
 .rb-input::placeholder {

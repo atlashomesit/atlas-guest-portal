@@ -14,6 +14,8 @@ type ListingFiltersProps = {
   onPropertyTypeChange: (value: string) => void;
   onPetFriendlyChange: (value: boolean) => void;
   onSortChange: (value: string) => void;
+  onReset?: () => void;
+  onApply?: () => void;
 };
 
 const ListingFilters: React.FC<ListingFiltersProps> = ({
@@ -30,6 +32,8 @@ const ListingFilters: React.FC<ListingFiltersProps> = ({
   onPropertyTypeChange,
   onPetFriendlyChange,
   onSortChange,
+  onReset,
+  onApply,
 }) => (
   <div className="flex flex-col gap-4 rounded-2xl bg-bg-surface p-4 border border-border-subtle sm:flex-row sm:items-end sm:justify-between">
     <div className="grid flex-1 grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -106,6 +110,29 @@ const ListingFilters: React.FC<ListingFiltersProps> = ({
           <option value="rating">Rating</option>
         </select>
       </label>
+
+      {(onReset || onApply) && (
+        <div className="flex flex-wrap gap-2">
+          {onReset ? (
+            <button
+              type="button"
+              onClick={onReset}
+              className="min-h-11 flex-1 rounded-lg border border-border-subtle bg-bg-surface px-4 py-3 text-sm font-semibold text-text-primary hover:bg-bg-muted focus:outline-none focus:ring-2 focus:ring-cta-primary"
+            >
+              Reset
+            </button>
+          ) : null}
+          {onApply ? (
+            <button
+              type="button"
+              onClick={onApply}
+              className="min-h-11 flex-1 rounded-lg bg-cta-primary px-4 py-3 text-sm font-semibold text-[var(--text-contrast)] hover:bg-cta-secondary focus:outline-none focus:ring-2 focus:ring-cta-primary"
+            >
+              Apply
+            </button>
+          ) : null}
+        </div>
+      )}
     </div>
   </div>
 );

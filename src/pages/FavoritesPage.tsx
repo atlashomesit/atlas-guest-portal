@@ -7,6 +7,7 @@ import { getFavoriteIds, getRecentlyViewed, toggleFavorite } from "../utils/gues
 import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 import { buildApiUrl, getApiHeaders } from "../api/client";
 import { getTenantBrandName } from "../tenant/displayBrand";
+import { LoadingState } from "../components/LoadingState";
 
 export default function FavoritesPage() {
   const brandName = getTenantBrandName();
@@ -156,14 +157,14 @@ export default function FavoritesPage() {
       </div>
 
       {loading ? (
-        <p className="text-sm text-text-secondary">Loading…</p>
+        <LoadingState kind="skeleton-grid" count={6} message="Loading saved homes…" />
       ) : error ? (
         <div className="rounded-2xl border border-border-subtle bg-bg-surface p-6 space-y-3">
           <p className="text-text-secondary">{error}</p>
           <button
             type="button"
             onClick={() => loadListings()}
-            className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-2.5 hover:opacity-95 transition-opacity"
+            className="inline-flex min-h-[48px] items-center justify-center rounded-lg bg-brand-primary text-white text-base font-medium px-5 py-3 hover:opacity-95 transition-opacity"
           >
             Retry
           </button>
@@ -200,12 +201,12 @@ export default function FavoritesPage() {
                 placeholder="your@email.com"
                 value={reminderEmail}
                 onChange={(e) => setReminderEmail(e.target.value)}
-                className="flex-1 min-w-0 rounded-lg border border-border-subtle px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                className="flex-1 min-w-0 rounded-lg border border-border-subtle px-3 py-3 text-base focus:outline-none focus:ring-2 focus:ring-brand-primary"
               />
               <button
                 type="submit"
                 disabled={reminderState === "busy"}
-                className="rounded-lg bg-brand-primary px-4 py-2 text-sm font-semibold text-white hover:opacity-90 transition disabled:opacity-50"
+                className="rounded-lg bg-brand-primary px-4 py-3 text-sm font-semibold text-white hover:opacity-90 transition disabled:opacity-50 min-h-11"
               >
                 {reminderState === "busy" ? "Saving…" : "Remind me"}
               </button>
@@ -266,9 +267,9 @@ export default function FavoritesPage() {
                   </p>
                   <Link
                     to={path}
-                    className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-3 hover:opacity-95 transition-opacity"
-                  >
-                    Book now
+              className="inline-flex min-h-11 items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-3 hover:opacity-95 transition-opacity"
+            >
+              Book now
                   </Link>
                 </div>
               </div>

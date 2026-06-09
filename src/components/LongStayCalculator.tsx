@@ -79,7 +79,7 @@ export default function LongStayCalculator({
             <button
               key={nights}
               onClick={() => setSelected(nights)}
-              className={`flex-1 rounded-lg border px-1 py-1.5 text-center text-xs transition-colors ${
+              className={`flex-1 min-h-11 rounded-lg border px-1 py-2.5 text-center text-xs transition-colors ${
                 selected === nights
                   ? "border-cta-primary bg-cta-primary text-white"
                   : "border-border-subtle bg-bg-surface text-text-secondary hover:border-cta-primary"
@@ -106,7 +106,7 @@ export default function LongStayCalculator({
           )}
         </span>
         {discountPct > 0 && (
-          <span className="text-[11px] font-medium text-emerald-600">
+          <span className="text-xs font-medium text-emerald-600">
             Save {discountPct}%
           </span>
         )}

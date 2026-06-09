@@ -12,7 +12,7 @@ import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 import { getTenantContext } from "../tenant/tenantContext";
 import { getTenantBrandName } from "../tenant/displayBrand";
 import { getTenantOverrides, getTenantPublicListingIdAllowlist, getUnitNoun, shouldHideAtlasBranding } from "../tenant/tenantOverrides";
-import SkeletonCard from "../components/apartments/SkeletonCard";
+import { LoadingState } from "../components/LoadingState";
 import OptimizedImage from "../components/ui/OptimizedImage";
 import OwnerShareBadge from "../components/OwnerShareBadge"; // TASK-1705
 import DirectDiscountBanner from "../components/DirectDiscountBanner"; // TASK-1708
@@ -897,7 +897,7 @@ const SearchPage = () => {
               <button
                 type="button"
                 onClick={clearFilters}
-                className="min-h-11 rounded-lg border border-border-subtle px-4 py-3 text-sm font-medium text-text-muted hover:bg-bg-muted focus:outline-none"
+                className="min-h-[48px] rounded-lg border border-border-subtle px-4 py-3 text-base font-medium text-text-muted hover:bg-bg-muted focus:outline-none"
               >
                 Clear filters
               </button>
@@ -907,7 +907,7 @@ const SearchPage = () => {
 
         {/* Amenity filters — TASK-1711: 6 basic chips + 2 nomad chips = 8 total */}
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-medium text-text-muted uppercase tracking-wide">Amenities:</span>
+          <span className="text-base font-medium text-text-muted uppercase tracking-wide">Amenities:</span>
           {["AC", "Parking", "Pool", "WiFi", "Pet-friendly", "Balcony"].map((amenity) => (
             <button
               key={amenity}
@@ -925,7 +925,7 @@ const SearchPage = () => {
 
         {/* TASK-1738: Digital nomad filter chips */}
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-medium text-text-muted uppercase tracking-wide">Digital nomad:</span>
+          <span className="text-base font-medium text-text-muted uppercase tracking-wide">Digital nomad:</span>
           {(
             [
               { param: "nomadWifi", active: nomadWifi, icon: Wifi, text: "WiFi 50+ Mbps" },
@@ -1018,11 +1018,7 @@ const SearchPage = () => {
                 </div>
               </div>
             </div>
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={`avail-sk-${i}`}>
-                <SkeletonCard />
-              </div>
-            ))}
+            <LoadingState kind="skeleton-card" count={4} />
           </section>
         )}
 
@@ -1181,17 +1177,11 @@ const SearchPage = () => {
 
         {isLoading && (
           <section
-            className="grid gap-6 sm:grid-cols-2"
             data-testid="search-skeleton"
             aria-busy="true"
             aria-label="Loading search results"
           >
-            {/* TASK-2566: 8 skeletons to fill wider grid layouts */}
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i}>
-                <SkeletonCard />
-              </div>
-            ))}
+            <LoadingState kind="skeleton-card" count={8} />
           </section>
         )}
 
@@ -1267,11 +1257,7 @@ const SearchPage = () => {
                 </div>
               </div>
             </div>
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={`avail-skel-${i}`}>
-                <SkeletonCard />
-              </div>
-            ))}
+            <LoadingState kind="skeleton-card" count={4} />
           </section>
         )}
 

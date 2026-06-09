@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Users, ChevronDown, Minus, Plus, Info } from 'lucide-react';
 
 export interface GuestCounts {
@@ -28,6 +28,50 @@ interface GuestTypeRowProps {
   info?: string;
 }
 
+const InfoTip: React.FC<{ text: string }> = ({ text }) => {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [open]);
+
+  return (
+    <div ref={rootRef} className="group/info relative">
+      <button
+        type="button"
+        aria-label="More info"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        onFocus={() => setOpen(true)}
+        onBlur={(e) => {
+          if (!rootRef.current?.contains(e.relatedTarget as Node)) {
+            setOpen(false);
+          }
+        }}
+        className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-[var(--text-muted)] hover:bg-[var(--bg-muted)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cta-primary)]"
+      >
+        <Info className="h-4 w-4" aria-hidden />
+      </button>
+      <div
+        role="tooltip"
+        className={`absolute left-0 bottom-full mb-2 w-48 p-2.5 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg shadow-[var(--shadow-level-2)] text-[13px] leading-relaxed text-[var(--text-muted)] z-50 ${
+          open ? 'block' : 'hidden group-hover/info:block'
+        }`}
+      >
+        {text}
+      </div>
+    </div>
+  );
+};
+
 const GuestTypeRow: React.FC<GuestTypeRowProps> = ({
   label,
   sublabel,
@@ -46,16 +90,9 @@ const GuestTypeRow: React.FC<GuestTypeRowProps> = ({
       <div className="flex-1">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-[var(--text-primary)]">{label}</span>
-          {info && (
-            <div className="group relative">
-              <Info className="h-3.5 w-3.5 text-[var(--text-muted)] cursor-help" />
-              <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-48 p-2 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg shadow-[var(--shadow-level-2)] text-xs text-[var(--text-muted)] z-50">
-                {info}
-              </div>
-            </div>
-          )}
+          {info && <InfoTip text={info} />}
         </div>
-        {sublabel && <span className="text-xs text-[var(--text-muted)]">{sublabel}</span>}
+        {sublabel && <span className="text-[13px] text-[var(--text-muted)]">{sublabel}</span>}
       </div>
       <div className="flex items-center gap-3">
         <button
@@ -156,7 +193,7 @@ export const GuestTypeSelector: React.FC<GuestTypeSelectorProps> = ({
         aria-expanded={isOpen}
         aria-label="Select guests"
       >
-        <span className="flex items-center gap-2.5 text-[10px] font-bold uppercase tracking-[0.10em] text-[var(--text-muted)] whitespace-nowrap">
+        <span className="flex items-center gap-2.5 text-xs font-bold uppercase tracking-[0.10em] text-[var(--text-muted)] whitespace-nowrap">
           <Users className="h-[18px] w-[18px] shrink-0 text-[var(--text-muted)]" aria-hidden="true" />
           <span className="truncate">Guests</span>
         </span>
@@ -165,7 +202,7 @@ export const GuestTypeSelector: React.FC<GuestTypeSelectorProps> = ({
           <ChevronDown className={`h-[18px] w-[18px] shrink-0 text-[var(--text-muted)] transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} aria-hidden />
         </span>
         {isAtCapacity && (
-          <p className="mt-3 text-[12px] leading-relaxed text-[var(--support-error)] font-medium">
+          <p className="mt-3 text-[13px] leading-relaxed text-[var(--support-error)] font-medium">
             Maximum {maxCapacity} guests
           </p>
         )}
@@ -214,7 +251,7 @@ export const GuestTypeSelector: React.FC<GuestTypeSelectorProps> = ({
           
           {isAtCapacity && (
             <div className="mt-3 pt-3 border-t border-[var(--border-subtle)]">
-              <p className="text-xs text-[var(--support-error)] font-medium">
+              <p className="text-[13px] text-[var(--support-error)] font-medium">
                 Maximum capacity reached ({maxCapacity} guests)
               </p>
             </div>

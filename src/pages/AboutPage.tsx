@@ -186,7 +186,7 @@ const AboutPage = () => {
 
       <section className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr] items-center" data-testid="hospitality-section">
         <div className="space-y-4">
-          <p className="text-sm uppercase tracking-[0.18em] text-primary font-semibold">Hospitality standards</p>
+          <p className="text-base uppercase tracking-[0.18em] text-primary font-semibold">Hospitality standards</p>
           <h2 className="text-2xl md:text-3xl font-bold">Standards that travel with you</h2>
           <p className="text-base text-text-muted max-w-3xl leading-relaxed">
             Every Starguest House home is audited on the same quality framework. We match hotel-grade consistency with the warmth of local hosts so travelers never have to choose between comfort and character.
@@ -214,7 +214,7 @@ const AboutPage = () => {
       <section className="bg-bg-surface border border-border-subtle rounded-3xl p-8 shadow-level1" data-testid="team-section">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <p className="text-sm uppercase tracking-[0.18em] text-primary font-semibold">Meet the team</p>
+            <p className="text-base uppercase tracking-[0.18em] text-primary font-semibold">Meet the team</p>
             <h2 className="text-2xl md:text-3xl font-bold">People who craft every Starguest House stay</h2>
             <p className="text-base text-text-muted max-w-2xl mt-2 leading-relaxed">
               Our distributed team blends hospitality know-how with operational rigor, ensuring each apartment is cared for like a boutique property.
@@ -249,7 +249,7 @@ const AboutPage = () => {
       <section className="bg-bg-surface border border-border-subtle rounded-3xl p-8 shadow-level1" data-testid="trust-section">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <p className="text-sm uppercase tracking-[0.18em] text-primary font-semibold">Trust badges</p>
+            <p className="text-base uppercase tracking-[0.18em] text-primary font-semibold">Trust badges</p>
             <h2 className="text-2xl md:text-3xl font-bold">Confidence built into every booking</h2>
             <p className="text-base text-text-muted max-w-3xl mt-2 leading-relaxed">
               We publish the promises that guide our team, so guests know exactly how we operate before they arrive.

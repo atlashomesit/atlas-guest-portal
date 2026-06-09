@@ -94,7 +94,7 @@ function SelfCheckInCard({ bookingId, token }: { bookingId: number; token: strin
           type="time"
           value={arrival}
           onChange={(e) => setArrival(e.target.value)}
-          className="mt-1 block w-full rounded-lg border border-border-subtle px-3 py-2 text-sm"
+          className="mt-1 block w-full rounded-lg border border-border-subtle px-3 py-3 text-base"
           data-testid="self-checkin-arrival"
         />
       </label>
@@ -105,7 +105,7 @@ function SelfCheckInCard({ bookingId, token }: { bookingId: number; token: strin
           min={1}
           value={guests}
           onChange={(e) => setGuests(e.target.value)}
-          className="mt-1 block w-full rounded-lg border border-border-subtle px-3 py-2 text-sm"
+          className="mt-1 block w-full rounded-lg border border-border-subtle px-3 py-3 text-base"
           data-testid="self-checkin-guests"
         />
       </label>
@@ -116,7 +116,7 @@ function SelfCheckInCard({ bookingId, token }: { bookingId: number; token: strin
           value={idUrl}
           onChange={(e) => setIdUrl(e.target.value)}
           placeholder="https://…"
-          className="mt-1 block w-full rounded-lg border border-border-subtle px-3 py-2 text-sm"
+          className="mt-1 block w-full rounded-lg border border-border-subtle px-3 py-3 text-base"
           data-testid="self-checkin-id"
         />
       </label>
@@ -124,7 +124,7 @@ function SelfCheckInCard({ bookingId, token }: { bookingId: number; token: strin
         type="button"
         disabled={submitting}
         onClick={() => void submit()}
-        className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-2.5 hover:bg-brand-primary/90 transition-colors disabled:opacity-70"
+        className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-3 hover:bg-brand-primary/90 transition-colors disabled:opacity-70"
         data-testid="self-checkin-submit"
       >
         {submitting ? "Submitting…" : "Submit check-in"}
@@ -924,7 +924,7 @@ export default function BookingConfirmationPage() {
                 setCopyRefFeedback(false);
                 setCopyRefManual(true);
               }}
-              className="text-sm font-medium text-brand-primary underline underline-offset-2 rounded px-1 py-2 hover:bg-brand-primary/5"
+              className="text-sm font-medium text-brand-primary underline underline-offset-2 rounded px-1 py-3 hover:bg-brand-primary/5"
             >
               {copyRefFeedback ? "Copied!" : copyRefManual ? `Select #${booking.bookingId}` : "Copy ID"}
             </button>
@@ -962,7 +962,7 @@ export default function BookingConfirmationPage() {
               Payment failed: {paymentFailureReason ?? "Your payment could not be completed."}
             </p>
             {paymentFailedAt && (
-              <p className="text-xs text-red-700/80">
+              <p className="text-sm text-red-700/80">
                 Failed at: {new Date(paymentFailedAt).toLocaleString("en-IN", {
                   day: "2-digit",
                   month: "short",
@@ -977,7 +977,7 @@ export default function BookingConfirmationPage() {
                 <button
                   type="button"
                   onClick={() => window.open(paymentRetryUrl, "_blank", "noopener,noreferrer")}
-                  className="inline-flex items-center justify-center rounded-lg bg-red-600 text-white text-sm font-medium px-4 py-2.5 hover:bg-red-700 transition-colors"
+                  className="inline-flex items-center justify-center rounded-lg bg-red-600 text-white text-sm font-medium px-4 py-3 hover:bg-red-700 transition-colors"
                   data-testid="retry-payment-btn-manual"
                 >
                   Retry Payment
@@ -987,7 +987,7 @@ export default function BookingConfirmationPage() {
                 type="button"
                 onClick={() => { void runManualPaymentStatusCheck(); }}
                 disabled={paymentCheckManual}
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-300 text-red-800 text-sm font-medium px-4 py-2.5 hover:bg-red-100 transition-colors disabled:opacity-70"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-300 text-red-800 text-sm font-medium px-4 py-3 hover:bg-red-100 transition-colors disabled:opacity-70"
                 data-testid="check-payment-status-btn"
               >
                 {paymentCheckManual ? (
@@ -999,7 +999,7 @@ export default function BookingConfirmationPage() {
                   "Check payment status"
                 )}
               </button>
-              <span className="text-xs text-red-700/80" data-testid="payment-last-checked">
+              <span className="text-sm text-red-700/80" data-testid="payment-last-checked">
                 Last checked: {formatRelativeLastCheck(lastPaymentCheckAt)}
               </span>
               <a
@@ -1043,6 +1043,18 @@ export default function BookingConfirmationPage() {
               {booking.currency}&nbsp;{booking.totalAmount.toLocaleString("en-IN")}
             </span>
           </div>
+          {canRequestModification && (
+            <div className="pt-4 border-t border-border-subtle">
+              <button
+                type="button"
+                onClick={() => document.getElementById("booking-change-request")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                className="inline-flex min-h-11 items-center text-sm font-medium text-brand-primary underline underline-offset-2 rounded px-1 py-3 hover:bg-brand-primary/5"
+                data-testid="modify-dates-link"
+              >
+                Need different dates?
+              </button>
+            </div>
+          )}
         </div>
 
         {/* TASK-1476: QR check-in code — guests can scan on arrival to confirm identity */}
@@ -1264,14 +1276,14 @@ export default function BookingConfirmationPage() {
                     href={whatsappUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center justify-center rounded-lg bg-[#25D366] text-white text-sm font-medium px-4 py-2.5 hover:opacity-95 transition-opacity"
+                    className="inline-flex items-center justify-center rounded-lg bg-[#25D366] text-white text-sm font-medium px-4 py-3 hover:opacity-95 transition-opacity"
                     data-testid="pre-arrival-whatsapp"
                   >
                     {pa.chatBtn}
                   </a>
                   <a
                     href={`mailto:${encodeURIComponent(supportEmail)}?subject=${encodeURIComponent(`Question before check-in — booking #${booking.bookingId}`)}`}
-                    className="inline-flex items-center justify-center rounded-lg border border-border-subtle bg-bg-surface text-text-primary text-sm font-medium px-4 py-2.5 hover:bg-bg-muted/60 transition-colors"
+                    className="inline-flex items-center justify-center rounded-lg border border-border-subtle bg-bg-surface text-text-primary text-sm font-medium px-4 py-3 hover:bg-bg-muted/60 transition-colors"
                     data-testid="pre-arrival-email-host"
                   >
                     Email us
@@ -1307,7 +1319,7 @@ export default function BookingConfirmationPage() {
             {booking.listingId != null && booking.listingId > 0 && (
               <Link
                 to={buildHomeUnitPath(getPropertySlug({ property_name: booking.propertyName }), booking.listingId)}
-                className="inline-flex items-center justify-center rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-2 hover:bg-brand-primary/5 transition-colors"
+                className="inline-flex items-center justify-center rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-3 hover:bg-brand-primary/5 transition-colors"
                 data-testid="pre-arrival-view-listing"
               >
                 {pa.viewListing}
@@ -1467,7 +1479,7 @@ export default function BookingConfirmationPage() {
                       href={addOnWhatsapp}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="shrink-0 inline-flex items-center gap-1 rounded-lg bg-brand-primary text-white text-xs font-semibold px-3 py-1.5 hover:opacity-90 transition-opacity"
+                      className="shrink-0 inline-flex min-h-11 items-center gap-1 rounded-lg bg-brand-primary text-white text-sm font-semibold px-4 py-3 hover:opacity-90 transition-opacity"
                     >
                       Add ₹{addOn.price}{priceLabel}
                     </a>
@@ -1559,7 +1571,7 @@ export default function BookingConfirmationPage() {
                 return (
                   <li key={r.id} className="rounded-lg border border-border-subtle p-3 space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${badgeClass}`} data-testid={`mod-status-${r.id}`}>
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-sm font-medium border ${badgeClass}`} data-testid={`mod-status-${r.id}`}>
                         {r.status}
                       </span>
                       <span className="text-xs text-text-muted">{fmtDate(r.createdAtUtc)}</span>
@@ -1583,7 +1595,7 @@ export default function BookingConfirmationPage() {
         )}
 
         {canRequestModification && (
-          <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3">
+          <div id="booking-change-request" className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3">
             <h2 className="text-sm font-semibold text-text-primary">Request booking changes</h2>
             {hasPendingModRequest
               ? <p className="text-sm text-yellow-700 bg-yellow-50 rounded-lg px-3 py-2 border border-yellow-200">You have a pending change request. Our team will review it shortly.</p>
@@ -1629,7 +1641,7 @@ export default function BookingConfirmationPage() {
               </label>
               <label className="text-sm text-text-secondary sm:col-span-2">
                 Note (optional)
-                <textarea value={modNote} onChange={(e) => setModNote(e.target.value)} rows={3} className="mt-1 w-full rounded-md border border-border-subtle px-3 py-2.5 text-base" />
+                <textarea value={modNote} onChange={(e) => setModNote(e.target.value)} rows={3} className="mt-1 w-full rounded-md border border-border-subtle px-3 py-3 text-base" />
               </label>
             </div>
             <button
@@ -1684,9 +1696,13 @@ export default function BookingConfirmationPage() {
                     type="button"
                     onClick={submitCancellationRequest}
                     disabled={cancelSubmitting}
-                    className="inline-flex items-center justify-center rounded-lg bg-red-600 text-white text-base font-medium px-4 py-3 disabled:opacity-50 hover:bg-red-700 transition-colors"
+                    aria-busy={cancelSubmitting}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 text-white text-base font-medium px-4 py-3 disabled:opacity-50 hover:bg-red-700 transition-colors"
                     data-testid="confirm-cancellation-btn"
                   >
+                    {cancelSubmitting && (
+                      <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" aria-hidden />
+                    )}
                     {cancelSubmitting ? "Submitting…" : "Confirm request"}
                   </button>
                   <button
@@ -1700,18 +1716,22 @@ export default function BookingConfirmationPage() {
               </div>
             )}
             {cancelMessage && (
-              <p className={`text-sm font-medium ${cancelMessage.includes("submitted") ? "text-green-700" : "text-red-700"}`}>
+              <p
+                role="status"
+                aria-live="polite"
+                className={`text-base font-medium ${cancelMessage.includes("submitted") ? "text-green-700" : "text-red-700"}`}
+              >
                 {cancelMessage}
               </p>
             )}
           </div>
         )}
         {cancelRequested && (
-          <div className="rounded-2xl border border-green-200 bg-green-50/60 p-4 text-sm text-green-800 space-y-2">
+          <div className="rounded-2xl border border-green-200 bg-green-50/60 p-4 text-base text-green-800 space-y-2" role="status" aria-live="polite">
             <p>✅ Cancellation request received. We&apos;ll contact you within 24 hours.</p>
             <Link
               to="/policies#cancellation-refunds"
-              className="inline-block text-brand-primary font-medium underline underline-offset-2 text-sm"
+              className="inline-block text-brand-primary font-medium underline underline-offset-2 text-base py-1"
               data-testid="cancellation-refund-policy-link"
             >
               Read refund policy
@@ -1771,7 +1791,7 @@ export default function BookingConfirmationPage() {
               target="_blank"
               rel="noopener noreferrer"
               data-testid="referral-share-whatsapp"
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#25D366] text-white text-sm font-medium px-4 py-3 hover:opacity-95 transition-opacity"
+              className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-lg bg-[#25D366] text-white text-base font-medium px-5 py-3 hover:opacity-95 transition-opacity"
             >
               Share on WhatsApp
             </a>

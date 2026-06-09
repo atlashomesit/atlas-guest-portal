@@ -288,7 +288,7 @@ export default function ReviewSubmitPage() {
             <Link
               to={buildHomeUnitPath(getPropertySlug({ property_name: eligibility.propertyName }), eligibility.listingId)}
               data-testid="review-success-book-again"
-              className="inline-flex items-center justify-center rounded-xl bg-brand-primary px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-primary/90 transition-colors"
+              className="inline-flex min-h-11 items-center justify-center rounded-xl bg-brand-primary px-5 py-3 text-sm font-semibold text-white hover:bg-brand-primary/90 transition-colors"
             >
               Book {eligibility.propertyName} again
             </Link>
@@ -431,7 +431,7 @@ export default function ReviewSubmitPage() {
                   return (
                     <div key={`${u}-${idx}`} className="relative w-20 h-20 rounded-lg overflow-hidden border border-border-subtle bg-bg-muted shrink-0">
                       {safe ? (
-                        <img src={safe} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
+                        <img src={safe} alt="Review photo" className="w-full h-full object-cover" loading="lazy" decoding="async" />
                       ) : null}
                       <button
                         type="button"

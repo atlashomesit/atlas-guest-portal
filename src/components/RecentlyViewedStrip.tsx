@@ -58,7 +58,7 @@ export default function RecentlyViewedStrip() {
                 {it.coverPhotoUrl ? (
                   <OptimizedImage
                     src={it.coverPhotoUrl}
-                    alt=""
+                    alt={it.name ?? `Listing ${it.listingId}`}
                     className="h-full w-full object-cover"
                     wrapperClassName="h-full"
                     sizes="140px"

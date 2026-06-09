@@ -400,6 +400,19 @@ export const Apartments = () => {
     return result;
   }, [guests, listings, maxPrice, minPrice, petFriendlyOnly, propertyType, sortBy]);
 
+  const resetFilters = React.useCallback(() => {
+    setMinPrice(priceBounds.min);
+    setMaxPrice(priceBounds.max);
+    setGuests(2);
+    setPropertyType("all");
+    setPetFriendlyOnly(false);
+    setSortBy("featured");
+  }, [priceBounds.max, priceBounds.min]);
+
+  const applyFilters = React.useCallback(() => {
+    document.getElementById("apartments-listings-grid")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
+
   const handleNavigate = (property: PropertyRecord) => {
     const listingId = property.listingId ?? property.id;
     const id = typeof listingId === "number" ? listingId : Number(listingId);
@@ -587,9 +600,11 @@ export const Apartments = () => {
               onPropertyTypeChange={setPropertyType}
               onPetFriendlyChange={setPetFriendlyOnly}
               onSortChange={setSortBy}
+              onReset={resetFilters}
+              onApply={applyFilters}
             />
 
-            <section className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <section id="apartments-listings-grid" className="grid grid-cols-1 gap-6 md:grid-cols-2">
               {filteredListings.map((listing) => (
                 <ListingCard
                   key={listing.id}

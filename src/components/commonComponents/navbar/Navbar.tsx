@@ -169,8 +169,7 @@ const Navbar = () => {
             {showLogo && (
               <img
                 src={logoSrc}
-                alt=""
-                aria-hidden="true"
+                alt={brandName || "Site logo"}
                 className="navbar-logo"
               />
             )}
