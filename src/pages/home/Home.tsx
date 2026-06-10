@@ -145,58 +145,60 @@ const Home = () => {
                 ],
                 checkinTime: "14:00",
                 checkoutTime: "11:00",
-                makesOffer: {
-                    "@type": "Offer",
-                    name: "Best price on our website",
-                    priceCurrency: "INR",
-                    price: penthouseOfferPrice,
-                    availability: "https://schema.org/InStock",
-                    url: canonicalUrl,
-                    itemOffered: {
-                        "@type": "Apartment",
-                        name: `${schemaBrandName} | Penthouse Suite 501`,
-                        description: penthouse?.property_description,
-                        ...(penthouseCover ? { image: penthouseCover } : {}),
-                        address: {
-                            "@type": "PostalAddress",
-                            streetAddress: "KPHB, Kukatpally",
-                            addressLocality: "Hyderabad",
-                            addressRegion: "Telangana",
-                            addressCountry: "IN",
-                        },
-                        occupancy: {
-                            "@type": "QuantitativeValue",
-                            maxValue: 6,
-                            unitCode: "C62",
-                        },
-                        amenityFeature: [
-                            { "@type": "LocationFeatureSpecification", name: "Wi-Fi", value: true },
-                            { "@type": "LocationFeatureSpecification", name: "Air conditioning", value: true },
-                            { "@type": "LocationFeatureSpecification", name: "Full kitchen", value: true },
-                            { "@type": "LocationFeatureSpecification", name: "Workspace", value: true },
-                            { "@type": "LocationFeatureSpecification", name: "Swimming pool access", value: true },
-                        ],
-                        offers: {
-                            "@type": "Offer",
-                            name: `${schemaBrandName} | Penthouse Suite 501 direct offer`,
-                            priceCurrency: "INR",
-                            price: penthouseOfferPrice,
-                            availability: "https://schema.org/InStock",
-                            validFrom: new Date().toISOString(),
-                            url: canonicalUrl,
-                            availableAtOrFrom: {
-                                "@type": "Place",
-                                address: {
-                                    "@type": "PostalAddress",
-                                    streetAddress: "KPHB, Kukatpally",
-                                    addressLocality: "Hyderabad",
-                                    addressRegion: "Telangana",
-                                    addressCountry: "IN",
+                ...(penthouse ? {
+                    makesOffer: {
+                        "@type": "Offer",
+                        name: "Best price on our website",
+                        priceCurrency: "INR",
+                        price: penthouseOfferPrice,
+                        availability: "https://schema.org/InStock",
+                        url: canonicalUrl,
+                        itemOffered: {
+                            "@type": "Apartment",
+                            name: `${schemaBrandName} | Penthouse Suite 501`,
+                            description: penthouse.property_description,
+                            ...(penthouseCover ? { image: penthouseCover } : {}),
+                            address: {
+                                "@type": "PostalAddress",
+                                streetAddress: penthouse.property_address ?? "KPHB, Kukatpally",
+                                addressLocality: "Hyderabad",
+                                addressRegion: "Telangana",
+                                addressCountry: "IN",
+                            },
+                            occupancy: {
+                                "@type": "QuantitativeValue",
+                                maxValue: 6,
+                                unitCode: "C62",
+                            },
+                            amenityFeature: [
+                                { "@type": "LocationFeatureSpecification", name: "Wi-Fi", value: true },
+                                { "@type": "LocationFeatureSpecification", name: "Air conditioning", value: true },
+                                { "@type": "LocationFeatureSpecification", name: "Full kitchen", value: true },
+                                { "@type": "LocationFeatureSpecification", name: "Workspace", value: true },
+                                { "@type": "LocationFeatureSpecification", name: "Swimming pool access", value: true },
+                            ],
+                            offers: {
+                                "@type": "Offer",
+                                name: `${schemaBrandName} | Penthouse Suite 501 direct offer`,
+                                priceCurrency: "INR",
+                                price: penthouseOfferPrice,
+                                availability: "https://schema.org/InStock",
+                                validFrom: new Date().toISOString(),
+                                url: canonicalUrl,
+                                availableAtOrFrom: {
+                                    "@type": "Place",
+                                    address: {
+                                        "@type": "PostalAddress",
+                                        streetAddress: penthouse.property_address ?? "KPHB, Kukatpally",
+                                        addressLocality: "Hyderabad",
+                                        addressRegion: "Telangana",
+                                        addressCountry: "IN",
+                                    },
                                 },
                             },
                         },
                     },
-                },
+                } : {}),
             };
 
         const faqPage = {
@@ -215,7 +217,7 @@ const Home = () => {
     }, [
         contactEmail,
         faqHighlights,
-        penthouse?.property_description,
+        penthouse,
         penthouseCover,
         penthouseOfferPrice,
         schemaBrandName,
