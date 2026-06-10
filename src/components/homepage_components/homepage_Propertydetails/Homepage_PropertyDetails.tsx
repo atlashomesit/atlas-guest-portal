@@ -165,7 +165,9 @@ function getPpCancellationInfo(
   const steps = getPpRefundSteps(opts?.hasOnlinePayment !== false);
   if (tier === 'Flexible') return {
     headline: 'Full refund if cancelled 48 hours before check-in',
-    description: 'Money returns to the exact UPI or card you paid with. No phone calls needed.',
+    description: opts?.hasOnlinePayment !== false
+      ? 'Money returns to the exact UPI or card you paid with. No phone calls needed.'
+      : 'Your host arranges the refund directly with you.',
     steps,
   };
   if (tier === 'Moderate') return {
@@ -1613,7 +1615,7 @@ useEffect(() => {
                         </span>
                       </div>
                       <div className="pp-host-sub">
-                        Owner-operated · Responds on WhatsApp · Direct booking
+                        Hosted directly · Responds on WhatsApp · Direct booking
                         {responseTimeBadge ? ` · ${responseTimeBadge}` : ''}
                         {reviewReplyRateBadge ? ` · ${reviewReplyRateBadge}` : ''}
                       </div>

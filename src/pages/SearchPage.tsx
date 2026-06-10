@@ -347,7 +347,7 @@ const SearchPage = () => {
         };
         const days = j.availability ?? j.Availability ?? [];
         const row = days.find((d) => (d.date ?? d.Date) === today);
-        if (!row) return false;
+        if (!row) return true;  // TASK-4107: missing today-row = inconclusive → fail-open
         const st = String(row.status ?? row.Status ?? "").toLowerCase();
         const inv = Number(row.inventory ?? row.Inventory ?? 0);
         if (st === "blocked" || st === "hold") return false;
