@@ -387,6 +387,12 @@ const GuestDetailsPage: React.FC = () => {
   const [selectedAddOns, setSelectedAddOns] = useState<Record<number, number>>({});
 
   useEffect(() => {
+    if (serverTotalConfirmRequired) {
+      serverTotalWarnRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [serverTotalConfirmRequired]);
+
+  useEffect(() => {
     const id = holdListingId != null ? Number(holdListingId) : NaN;
     if (!Number.isFinite(id) || id <= 0) return;
     void (async () => {
@@ -476,6 +482,7 @@ const GuestDetailsPage: React.FC = () => {
     amount: number;
     bookingToken: string | null;
   } | null>(null);
+  const serverTotalWarnRef = useRef<HTMLDivElement>(null);
 
   /** TASK-2875: when the server total differs, the Pay CTA shows the authoritative charge (INR). */
   const chargeInr =
@@ -1470,6 +1477,7 @@ const GuestDetailsPage: React.FC = () => {
             {/* Error banners */}
             {serverTotalConfirmRequired && razorpayAmountPaise != null && (
               <div
+                ref={serverTotalWarnRef}
                 className="gd-alert gd-alert-warn"
                 role="status"
                 data-testid="guest-checkout-total-updated"
@@ -1715,7 +1723,9 @@ const GuestDetailsPage: React.FC = () => {
         >
           {isSubmitting
             ? <><IconSpinner size={14}/> Securing…</>
-            : <><IconLock size={14}/> Pay <span className="num">{displayPrice(chargeInr)}</span></>
+            : serverTotalConfirmRequired
+              ? <><IconLock size={14}/> Confirm <span className="num">{displayPrice(chargeInr)}</span></>
+              : <><IconLock size={14}/> Pay <span className="num">{displayPrice(chargeInr)}</span></>
           }
         </button>
       </div>
