@@ -194,7 +194,7 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
               {heading}
             </p>
             <span
-              className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-[var(--border-subtle)] text-[11px] font-semibold text-[var(--text-muted)] p-2.5 -m-2.5"
+              className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-muted)]"
               title="Click a date for check-in, then a later date for check-out."
               aria-label={instructionAriaLabel ?? 'Click a date for check-in, then a later date for check-out.'}
             >
@@ -211,7 +211,7 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
               type="button"
               onClick={onClose}
               aria-label="Close date picker"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-lg font-semibold text-[var(--text-primary)] shadow-sm"
+              className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-lg font-semibold text-[var(--text-primary)] shadow-sm"
             >
               ×
             </button>

@@ -451,6 +451,21 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
   };
 
 
+  const clearDates = () => {
+    markHeroInteraction();
+    setDateRange(defaultRange);
+    setDateError(null);
+    setError(null);
+    setStatusMessage('');
+    setIsCalendarOpen(false);
+    setActiveField(null);
+    setShownDate(defaultRange.startDate ?? today);
+  };
+
+  const hasCustomDates =
+    dateRange.startDate?.getTime() !== defaultRange.startDate?.getTime() ||
+    dateRange.endDate?.getTime() !== defaultRange.endDate?.getTime();
+
   const checkInLabel = dateRange.startDate ? format(dateRange.startDate, 'dd MMM yyyy') : 'Check-in';
   const checkOutLabel = dateRange.endDate ? format(dateRange.endDate, 'dd MMM yyyy') : 'Check-out';
   const isSubmitDisabled =
@@ -483,7 +498,7 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
     dateError ? ' border-[var(--support-error)] shadow-[0_0_0_1px_var(--support-error)] error-shake' : ''
   }`;
   const labelClass =
-    'flex items-center gap-2.5 text-[11px] font-bold uppercase tracking-[0.10em] text-[var(--text-muted)] whitespace-nowrap';
+    'flex items-center gap-2.5 text-xs font-bold uppercase tracking-[0.10em] text-[var(--text-muted)] whitespace-nowrap';
   return (
     <form onSubmit={handleSubmit} className={formContainerClass} data-testid="search-input" id="search-form">
       <div className="sr-only" role="status" aria-live="polite">
@@ -585,7 +600,7 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
       data-testid={`hero-date-${format(day, 'yyyy-MM-dd')}`}
       className={`relative z-10 flex items-center justify-center text-sm font-medium transition ${
         isRangeStart || isRangeEnd
-          ? 'bg-[var(--cta-primary)] text-white rounded-xl px-3 py-2 shadow-sm'
+          ? 'bg-[var(--cta-primary)] text-white rounded-xl px-3 py-3 shadow-sm'
           : isDisabled
           ? 'text-[var(--border-strong)] cursor-not-allowed opacity-50'
           : 'text-[var(--brand)]'
@@ -649,6 +664,19 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
         <p className="text-left text-sm font-semibold text-text-primary" aria-live="polite">
           {statusMessage}
         </p>
+      )}
+
+      {hasCustomDates && (
+        <div className="flex justify-start">
+          <button
+            type="button"
+            onClick={clearDates}
+            className="min-h-11 rounded-xl border border-border-subtle bg-bg-surface px-4 py-3 text-sm font-semibold text-text-primary hover:bg-bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary"
+            data-testid="hero-search-clear-dates"
+          >
+            Clear
+          </button>
+        </div>
       )}
 
     </form>

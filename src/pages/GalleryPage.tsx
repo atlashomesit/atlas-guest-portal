@@ -110,7 +110,7 @@ const GalleryPage = () => {
                 <button
                   key={segment.id}
                   onClick={() => setActiveSegment(segment.id)}
-                  className={`rounded-full border px-4 py-4 text-base font-semibold transition shadow-sm ${
+                  className={`rounded-full border px-4 py-3 min-h-12 text-base font-semibold transition shadow-sm ${
                     activeSegment === segment.id
                       ? "bg-primary text-[var(--text-contrast)] border-primary"
                       : "bg-bg-muted text-text-primary border-border-subtle hover:border-primary"
@@ -124,9 +124,9 @@ const GalleryPage = () => {
 
             <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
               <label className="w-full md:w-56">
-                <span className="text-sm text-text-muted">Filter by property</span>
+                <span className="text-base text-text-muted">Filter by property</span>
                 <select
-                  className="mt-1 min-h-[44px] w-full rounded-lg border border-border-subtle bg-bg-muted px-3 py-2 text-base text-text-primary focus:border-primary focus:outline-none"
+                  className="mt-1 min-h-12 w-full rounded-lg border border-border-subtle bg-bg-muted px-3 py-2 text-base text-text-primary focus:border-primary focus:outline-none"
                   value={propertyFilter}
                   onChange={(event) => setPropertyFilter(event.target.value)}
                 >
@@ -147,11 +147,11 @@ const GalleryPage = () => {
               </label>
 
               <label className="w-full md:w-64">
-                <span className="text-sm text-text-muted">Search</span>
+                <span className="text-base text-text-muted">Search</span>
                 <input
                   type="search"
                   placeholder="Search by location or name"
-                  className="mt-1 min-h-[44px] w-full rounded-lg border border-border-subtle bg-bg-muted px-3 py-2 text-base text-text-primary focus:border-primary focus:outline-none"
+                  className="mt-1 min-h-12 w-full rounded-lg border border-border-subtle bg-bg-muted px-3 py-2 text-base text-text-primary focus:border-primary focus:outline-none"
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
                 />

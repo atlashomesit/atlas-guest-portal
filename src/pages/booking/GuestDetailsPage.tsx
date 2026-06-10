@@ -35,7 +35,7 @@ import { formatCurrency } from '@/utils/formatting';
 import { formatDateInTimezone } from '@/utils/dateHelpers';
 import { track } from '@/lib/events';
 import { mapRazorpayFailureCode } from '@/utils/razorpayGuestErrors';
-import { getContactEmail, getWhatsAppLink } from '@/config/contact';
+import { formatDisplayNumber, getContactEmail, getTelLink, getWhatsAppLink } from '@/config/contact';
 import { accommodationGstLineAmount, accommodationGstSlabPercent } from '@/utils/guestPriceEstimate';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -506,16 +506,23 @@ const GuestDetailsPage: React.FC = () => {
     setFormErrors(errors);
     if (!valid) {
       requestAnimationFrame(() => {
+        // Focus and scroll to first failing field (WCAG 3.3 error identification)
         if (errors.name) {
-          document.getElementById('gd-name')?.focus();
+          const el = document.getElementById('gd-name');
+          el?.focus();
+          el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
           return;
         }
         if (errors.email) {
-          document.getElementById('gd-email')?.focus();
+          const el = document.getElementById('gd-email');
+          el?.focus();
+          el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
           return;
         }
         if (errors.phone) {
-          document.getElementById('gd-phone')?.focus();
+          const el = document.getElementById('gd-phone');
+          el?.focus();
+          el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
           return;
         }
         if (!consentAccepted) {
@@ -563,7 +570,7 @@ const GuestDetailsPage: React.FC = () => {
     setTimeout(() => {
       if (/^[A-Z0-9]{1,32}$/.test(code)) {
         setAppliedReferralCode(code);
-        setReferralMessage('Code format accepted — we will check eligibility when you pay; no discount is guaranteed until then.');
+        setReferralMessage('Referral code saved — we\'ll apply any eligible reward automatically at checkout.');
       } else {
         setAppliedReferralCode(null);
         setReferralMessage('Referral codes must be letters and numbers only (no spaces or symbols).');
@@ -848,6 +855,9 @@ const GuestDetailsPage: React.FC = () => {
                 const desc = String(fr?.error?.description ?? '');
                 console.log('[GuestDetailsPage] Payment failed:', { code, desc });
                 setOrderError(`No money was taken. ${mapRazorpayFailureCode(code, desc)}`);
+                // TASK-2906: Store the order ID and amount so the "Resume payment" button can retry
+                setRazorpayOrderId(orderId);
+                setRazorpayAmount(amount);
                 setPaymentCancelled(false);
                 setIsSubmitting(false);
               });
@@ -969,6 +979,12 @@ const GuestDetailsPage: React.FC = () => {
   const brandInitial = brandName.charAt(0).toUpperCase();
   const whatsappNumber = tenantCtx?.whatsappBookingPhone ?? '';
   const consentEntityName = getGuestDataProcessingEntityName();
+  const paymentFailureWhatsAppUrl = `${getWhatsAppLink()}?text=${encodeURIComponent(
+    'Hi, my payment just failed while booking. Can you help?',
+  )}`;
+  const paymentFailureTelLink = getTelLink();
+  const paymentFailureEmail = getContactEmail();
+  const paymentFailureMailto = `mailto:${paymentFailureEmail}?subject=${encodeURIComponent('Payment failed — need help')}`;
 
   const payDisabled = isSubmitting || holdExpired || !consentAccepted;
 
@@ -1281,7 +1297,7 @@ const GuestDetailsPage: React.FC = () => {
                       </div>
                       {referralValidating && <div className="gd-input-help">Validating…</div>}
                       {!referralValidating && referralMessage && (
-                        <div className={`gd-input-help${appliedReferralCode ? ' success' : ' error'}`}>
+                        <div className={`gd-input-help${appliedReferralCode ? '' : ' error'}`}>
                           {referralMessage}
                         </div>
                       )}
@@ -1325,11 +1341,10 @@ const GuestDetailsPage: React.FC = () => {
                               </div>
                               <div className="gd-addon-price" style={{ textAlign: 'right' }}>
                                 {qty > 0 ? displayPrice(lineTotal) : displayPrice(ao.price)}
-                                <div className="gd-addon-qty" style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end', marginTop: 6 }}>
+                                <div className="gd-addon-qty">
                                   <button
                                     type="button"
-                                    className="gd-resume-btn"
-                                    style={{ minWidth: 28, padding: '2px 8px' }}
+                                    className="gd-addon-qty-btn"
                                     aria-label={`Decrease ${ao.name}`}
                                     disabled={qty <= 0}
                                     onClick={() => setSelectedAddOns((p) => ({
@@ -1339,11 +1354,10 @@ const GuestDetailsPage: React.FC = () => {
                                   >
                                     −
                                   </button>
-                                  <span aria-live="polite">{qty}</span>
+                                  <span className="gd-addon-qty-val" aria-live="polite">{qty}</span>
                                   <button
                                     type="button"
-                                    className="gd-resume-btn"
-                                    style={{ minWidth: 28, padding: '2px 8px' }}
+                                    className="gd-addon-qty-btn"
                                     aria-label={`Increase ${ao.name}`}
                                     disabled={qty >= ADD_ON_MAX_QTY}
                                     onClick={() => setSelectedAddOns((p) => ({
@@ -1477,11 +1491,21 @@ const GuestDetailsPage: React.FC = () => {
                         : 'Something went wrong.'}
                   </b><br/>
                   <span>{orderError}</span>
-                  {orderError.startsWith('No money was taken') && razorpayOrderId && (
-                    <div style={{ marginTop: 10 }}>
-                      <button type="button" className="gd-resume-btn" onClick={handleResume}>
-                        Try payment again
-                      </button>
+                  {orderError.startsWith('No money was taken') && (
+                    <div style={{ marginTop: 12 }} data-testid="payment-failed-support">
+                      <p style={{ margin: '0 0 8px', fontSize: 14 }}>Need help finishing your booking?</p>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px 16px', alignItems: 'center' }}>
+                        {razorpayOrderId && (
+                          <button type="button" className="gd-resume-btn" onClick={handleResume}>
+                            Resume payment
+                          </button>
+                        )}
+                        <a href={paymentFailureWhatsAppUrl} target="_blank" rel="noopener noreferrer">
+                          <IconWhatsApp size={14} /> WhatsApp us
+                        </a>
+                        <a href={paymentFailureTelLink}>Call {formatDisplayNumber()}</a>
+                        <a href={paymentFailureMailto}>Email {paymentFailureEmail}</a>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -2278,6 +2302,42 @@ const gdStyles = `
 .gd-addon-name { font-size: 14px; font-weight: 600; color: var(--gd-ink); line-height: 1.3; }
 .gd-addon-desc { font-size: 12px; color: var(--gd-faint); line-height: 1.4; margin-top: 2px; }
 .gd-addon-price { font-size: 14px; color: var(--gd-ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+/* TASK-1775: add-on +/- tap targets ≥48px (moved from UnitBookingWidget) */
+.gd-addon-qty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+.gd-addon-qty-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  min-height: 48px;
+  padding: 0;
+  border: 1px solid var(--gd-line, #e8e0d8);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--gd-ink);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+}
+.gd-addon-qty-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.gd-addon-qty-val {
+  min-width: 1.5rem;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
 
 /* Custom checkbox */
 .gd-check {

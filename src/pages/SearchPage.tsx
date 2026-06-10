@@ -12,7 +12,7 @@ import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 import { getTenantContext } from "../tenant/tenantContext";
 import { getTenantBrandName } from "../tenant/displayBrand";
 import { getTenantOverrides, getTenantPublicListingIdAllowlist, getUnitNoun, shouldHideAtlasBranding } from "../tenant/tenantOverrides";
-import SkeletonCard from "../components/apartments/SkeletonCard";
+import { LoadingState } from "../components/LoadingState";
 import OptimizedImage from "../components/ui/OptimizedImage";
 import OwnerShareBadge from "../components/OwnerShareBadge"; // TASK-1705
 import DirectDiscountBanner from "../components/DirectDiscountBanner"; // TASK-1708
@@ -347,7 +347,7 @@ const SearchPage = () => {
         };
         const days = j.availability ?? j.Availability ?? [];
         const row = days.find((d) => (d.date ?? d.Date) === today);
-        if (!row) return false;
+        if (!row) return true;  // TASK-4107: missing today-row = inconclusive → fail-open
         const st = String(row.status ?? row.Status ?? "").toLowerCase();
         const inv = Number(row.inventory ?? row.Inventory ?? 0);
         if (st === "blocked" || st === "hold") return false;
@@ -719,6 +719,10 @@ const SearchPage = () => {
   /** TASK-1648: skeleton while public availability resolves for selected dates (list view). */
   const showDateAvailabilitySkeleton =
     explicitDateSearch && !hasInvalidDates && dateAvailLoading && !isLoading && !mapView;
+  /** TASK-2893: dates were searched but the live availability check returned nothing (fail-open),
+   * so we're showing all homes unfiltered — don't claim they're "available for your dates". */
+  const dateAvailUnconfirmed =
+    explicitDateSearch && !hasInvalidDates && !dateAvailLoading && dateAvailableIds === null;
   const queryString = searchParams.toString();
   const querySuffix = queryString ? `?${queryString}` : "";
   const approximatePinHint = useMemo(
@@ -759,17 +763,15 @@ const SearchPage = () => {
           {/* TASK-1864: dynamic h1 — only say "homes for your dates" when dates are actually set */}
           <h1 className="text-3xl font-bold text-text-primary sm:text-4xl" data-testid="search-results-h1">
             {checkIn && checkOut
-              ? dateAvailCheckFailed
-                ? `${filteredUnits.length} ${filteredUnits.length === 1 ? "home" : "homes"} — availability not confirmed`
-                : `${filteredUnits.length} ${filteredUnits.length === 1 ? "home" : "homes"} for your dates`
+              ? `${filteredUnits.length} ${filteredUnits.length === 1 ? "home" : "homes"}${dateAvailUnconfirmed ? "" : " for your dates"}`
               : getTenantBrandName()}
           </h1>
           <p className="max-w-3xl text-base text-text-body">
-            {dateAvailCheckFailed
-              ? "We couldn't confirm live availability for these dates. Contact the host before you book, or try different dates."
-              : checkIn && checkOut && !hasInvalidDates
-                ? "Homes below are filtered to those available for your dates when our live check succeeds. You can still refine with price, guests, and amenities."
-                : "Browse all homes. Filter by price, guests and amenities below."}
+            {checkIn && checkOut && !hasInvalidDates
+              ? (dateAvailUnconfirmed
+                  ? "We couldn't confirm live availability for these dates, so we're showing all homes — please reconfirm with the host before booking. Refine with price, guests, and amenities below."
+                  : "Homes below are filtered to those available for your dates when our live check succeeds. You can still refine with price, guests, and amenities.")
+              : "Browse all homes. Filter by price, guests and amenities below."}
           </p>
         </header>
 
@@ -897,7 +899,7 @@ const SearchPage = () => {
               <button
                 type="button"
                 onClick={clearFilters}
-                className="min-h-11 rounded-lg border border-border-subtle px-4 py-3 text-sm font-medium text-text-muted hover:bg-bg-muted focus:outline-none"
+                className="min-h-[48px] rounded-lg border border-border-subtle px-4 py-3 text-base font-medium text-text-muted hover:bg-bg-muted focus:outline-none"
               >
                 Clear filters
               </button>
@@ -907,7 +909,7 @@ const SearchPage = () => {
 
         {/* Amenity filters — TASK-1711: 6 basic chips + 2 nomad chips = 8 total */}
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-medium text-text-muted uppercase tracking-wide">Amenities:</span>
+          <span className="text-base font-medium text-text-muted uppercase tracking-wide">Amenities:</span>
           {["AC", "Parking", "Pool", "WiFi", "Pet-friendly", "Balcony"].map((amenity) => (
             <button
               key={amenity}
@@ -925,7 +927,7 @@ const SearchPage = () => {
 
         {/* TASK-1738: Digital nomad filter chips */}
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-medium text-text-muted uppercase tracking-wide">Digital nomad:</span>
+          <span className="text-base font-medium text-text-muted uppercase tracking-wide">Digital nomad:</span>
           {(
             [
               { param: "nomadWifi", active: nomadWifi, icon: Wifi, text: "WiFi 50+ Mbps" },
@@ -1018,11 +1020,7 @@ const SearchPage = () => {
                 </div>
               </div>
             </div>
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={`avail-sk-${i}`}>
-                <SkeletonCard />
-              </div>
-            ))}
+            <LoadingState kind="skeleton-card" count={4} />
           </section>
         )}
 
@@ -1092,12 +1090,20 @@ const SearchPage = () => {
                       src={tenant.logoUrl}
                       alt=""
                       className="h-20 w-auto max-w-full object-contain opacity-90"
+                      loading="lazy"
+                      decoding="async"
+                      width={300}
+                      height={80}
                     />
                   ) : (
                     <img
                       src="/images/atlas-homestays-static-map.svg"
                       alt=""
                       className="h-28 w-auto max-w-full object-contain opacity-90"
+                      loading="lazy"
+                      decoding="async"
+                      width={300}
+                      height={112}
                     />
                   )}
                 </div>
@@ -1181,17 +1187,11 @@ const SearchPage = () => {
 
         {isLoading && (
           <section
-            className="grid gap-6 sm:grid-cols-2"
             data-testid="search-skeleton"
             aria-busy="true"
             aria-label="Loading search results"
           >
-            {/* TASK-2566: 8 skeletons to fill wider grid layouts */}
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i}>
-                <SkeletonCard />
-              </div>
-            ))}
+            <LoadingState kind="skeleton-card" count={8} />
           </section>
         )}
 
@@ -1251,6 +1251,17 @@ const SearchPage = () => {
           </div>
         )}
 
+        {showingSampleListings && (
+          <div
+            className="mb-4 flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+            data-testid="search-static-fallback-banner"
+            role="status"
+          >
+            <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
+            <span>Showing sample homes — loading live prices and availability…</span>
+          </div>
+        )}
+
         {showDateAvailabilitySkeleton && (
           <section
             className="grid gap-6 sm:grid-cols-2"
@@ -1267,11 +1278,7 @@ const SearchPage = () => {
                 </div>
               </div>
             </div>
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={`avail-skel-${i}`}>
-                <SkeletonCard />
-              </div>
-            ))}
+            <LoadingState kind="skeleton-card" count={4} />
           </section>
         )}
 
@@ -1367,13 +1374,13 @@ const SearchPage = () => {
                           </span>
                         ) : null}
                       </div>
-                      {/* TASK-1660: match ListingCard — no catalog star average without verified review count */}
+                      {/* TASK-4012: rating snippet + TASK-1660: match ListingCard — no catalog star average without verified review count */}
                       {(unit.reviewCount ?? 0) > 0 && unit.rating != null && unit.rating > 0 && (
-                        <p className="mt-0.5 text-sm text-accent-primary font-medium">
-                          {"★".repeat(Math.round(unit.rating))}
-                          <span className="text-text-muted ml-1">{unit.rating.toFixed(1)}</span>
-                          <span className="text-text-muted ml-1 text-xs">({unit.reviewCount})</span>
-                        </p>
+                        <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-yellow-50 border border-yellow-200 px-2.5 py-1 text-sm font-semibold text-yellow-800">
+                          <span aria-hidden>★</span>
+                          <span>{unit.rating.toFixed(1)}</span>
+                          <span className="text-xs font-normal">({(unit.reviewCount ?? 0).toLocaleString()})</span>
+                        </span>
                       )}
                       {/* TASK-1716: keyword-bucketed sentiment summary */}
                       <ReviewSummary listingId={unit.numericId} />

@@ -5,9 +5,28 @@ import fs from "fs";
 
 const RUNTIME_CONFIG_PATH = path.resolve(__dirname, "public/.well-known/atlas-runtime-config.json");
 const MANIFEST_PATH = path.resolve(__dirname, "public/manifest.webmanifest");
-const BACKEND_TARGET = "http://localhost:5120";
+// Dev-server backend target for the vite proxy + dev runtime-config plugin.
+// Resolved, in order: (1) VITE_API_PROXY_TARGET env (explicit override), then
+// (2) the apiBaseUrl already written into atlas-runtime-config.json — non-default
+// dev stacks set this (e.g. the WSL release-gate sandbox rewrites it to :5320),
+// then (3) the :5120 default for normal local dev. This keeps Windows/local dev
+// unchanged (committed config = :5120) while letting an alternate stack redirect
+// the proxy without editing this file. Dev-only: neither the proxy nor
+// devRuntimeConfigPlugin runs in a production build.
+function resolveBackendTarget(): string {
+  const override = (process.env.VITE_API_PROXY_TARGET || "").trim();
+  if (override) return override;
+  try {
+    const cfg = JSON.parse(fs.readFileSync(RUNTIME_CONFIG_PATH, "utf-8")) as { apiBaseUrl?: string };
+    if (cfg.apiBaseUrl && cfg.apiBaseUrl.trim()) return cfg.apiBaseUrl.trim();
+  } catch {
+    /* file missing/unreadable → fall through to default */
+  }
+  return "http://localhost:5120";
+}
+const BACKEND_TARGET = resolveBackendTarget();
 
-/** In dev, serve runtime config with apiBaseUrl = 5120 (API only). */
+/** In dev, serve runtime config with apiBaseUrl = BACKEND_TARGET (API only). */
 function devRuntimeConfigPlugin() {
   return {
     name: "dev-runtime-config",

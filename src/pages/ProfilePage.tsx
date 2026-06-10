@@ -12,9 +12,11 @@ interface GuestProfile {
   name: string;
   email?: string | null;
   phone?: string | null;
+  photoUrl?: string | null;
 }
 
 const PHONE_RE = /^[6-9]\d{9}$/;
+const MAX_AVATAR_BYTES = 512_000;
 
 function initialsFromName(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -39,6 +41,73 @@ export default function ProfilePage() {
   const [phone, setPhone] = useState("");
   const [phoneError, setPhoneError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarError, setAvatarError] = useState("");
+  const [avatarUploading, setAvatarUploading] = useState(false);
+
+  const profileQuery = bookingId && token
+    ? `?t=${encodeURIComponent(token)}`
+    : "";
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    setAvatarError("");
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !bookingId || !token) return;
+    if (!file.type.startsWith("image/")) {
+      setAvatarError("Please choose a JPG, PNG, or WebP image.");
+      return;
+    }
+    if (file.size > MAX_AVATAR_BYTES) {
+      setAvatarError("Photo must be under 512 KB.");
+      return;
+    }
+
+    setAvatarUploading(true);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const url = buildApiUrl(`/api/public/bookings/${bookingId}/guest-profile/photo${profileQuery}`);
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { Accept: "application/json", ...getApiHeaders() },
+        body: form,
+      });
+      if (!res.ok) throw new Error(await messageFromApiResponse(res));
+      const data = await res.json() as { photoUrl?: string; url?: string };
+      const nextUrl = data.photoUrl ?? data.url ?? null;
+      setAvatarUrl(nextUrl);
+      setProfile((prev) => (prev ? { ...prev, photoUrl: nextUrl } : prev));
+      toast.success("Profile photo updated.");
+    } catch (err: unknown) {
+      console.error("Profile photo upload failed:", err);
+      setAvatarError("We couldn't upload your photo. Please try a smaller JPG or PNG.");
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
+  const handleAvatarRemove = async () => {
+    if (!bookingId || !token) return;
+    setAvatarError("");
+    setAvatarUploading(true);
+    try {
+      const url = buildApiUrl(`/api/public/bookings/${bookingId}/guest-profile/photo${profileQuery}`);
+      const res = await fetch(url, {
+        method: "DELETE",
+        headers: { Accept: "application/json", ...getApiHeaders() },
+      });
+      if (!res.ok) throw new Error(await messageFromApiResponse(res));
+      setAvatarUrl(null);
+      setProfile((prev) => (prev ? { ...prev, photoUrl: null } : prev));
+      toast.success("Profile photo removed.");
+    } catch (err: unknown) {
+      console.error("Profile photo remove failed:", err);
+      setAvatarError("We couldn't remove your photo right now. Please try again.");
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
 
   useEffect(() => {
     if (!bookingId || !token) {
@@ -46,7 +115,7 @@ export default function ProfilePage() {
       setLoading(false);
       return;
     }
-    const url = buildApiUrl(`/api/public/bookings/${bookingId}/guest-profile?t=${encodeURIComponent(token)}`);
+    const url = buildApiUrl(`/api/public/bookings/${bookingId}/guest-profile${profileQuery}`);
     fetch(url, { headers: { Accept: "application/json", ...getApiHeaders() } })
       .then(async (res) => {
         if (res.status === 404) throw new Error("Profile link not found. Please use the link from your booking confirmation.");
@@ -58,13 +127,14 @@ export default function ProfilePage() {
         setName(p.name ?? "");
         setEmail(p.email ?? "");
         setPhone(p.phone ?? "");
+        setAvatarUrl(p.photoUrl ?? null);
       })
       .catch((err: Error) => {
         console.error(err);
         setError("We couldn't load your profile — please try again.");
       })
       .finally(() => setLoading(false));
-  }, [bookingId, token]);
+  }, [bookingId, token, profileQuery]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,7 +148,7 @@ export default function ProfilePage() {
 
     setSaving(true);
     try {
-      const url = buildApiUrl(`/api/public/bookings/${bookingId}/guest-profile?t=${encodeURIComponent(token ?? "")}`);
+      const url = buildApiUrl(`/api/public/bookings/${bookingId}/guest-profile${profileQuery}`);
       const res = await fetch(url, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Accept: "application/json", ...getApiHeaders() },
@@ -94,6 +164,7 @@ export default function ProfilePage() {
       if (!res.ok) throw new Error(await messageFromApiResponse(res));
       const updated = await res.json() as GuestProfile;
       setProfile(updated);
+      setAvatarUrl(updated.photoUrl ?? null);
       toast.success("Profile updated.");
     } catch (err: unknown) {
       console.error("Profile update failed:", err);
@@ -152,15 +223,48 @@ export default function ProfilePage() {
           <p className="text-sm text-text-secondary">Update your contact details below.</p>
         </div>
 
-        <div className="flex flex-col items-center gap-2 py-1">
+        <div className="flex flex-col items-center gap-3 py-1" id="profile-photo" data-testid="profile-photo-section">
           <div
-            className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-brand-primary/15 text-xl font-semibold tracking-tight text-brand-primary"
-            title="From your name"
-            aria-label={`Profile initials: ${initialsFromName((name || profile?.name || "").trim() || "Guest")}`}
+            className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full bg-brand-primary/15 text-xl font-semibold tracking-tight text-brand-primary"
+            title={avatarUrl ? "Your profile photo" : "From your name"}
+            aria-label={
+              avatarUrl
+                ? "Your profile photo"
+                : `Profile initials: ${initialsFromName((name || profile?.name || "").trim() || "Guest")}`
+            }
           >
-            {initialsFromName((name || profile?.name || "").trim() || "Guest")}
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+            ) : (
+              initialsFromName((name || profile?.name || "").trim() || "Guest")
+            )}
           </div>
-          <p className="text-center text-xs text-text-muted">Avatar from your name; photo upload coming later.</p>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <label className={`inline-flex min-h-11 cursor-pointer items-center justify-center rounded-full border border-border-subtle bg-bg-surface px-4 py-2.5 text-sm font-semibold text-text-primary hover:bg-bg-muted transition-colors ${avatarUploading ? "pointer-events-none opacity-60" : ""}`}>
+              {avatarUploading ? "Uploading…" : avatarUrl ? "Change photo" : "Upload photo"}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="sr-only"
+                disabled={avatarUploading}
+                onChange={handleAvatarChange}
+              />
+            </label>
+            {avatarUrl ? (
+              <button
+                type="button"
+                onClick={handleAvatarRemove}
+                disabled={avatarUploading}
+                className="inline-flex min-h-11 items-center justify-center rounded-full px-4 py-2.5 text-sm font-semibold text-text-muted hover:text-text-primary disabled:opacity-60"
+              >
+                Remove
+              </button>
+            ) : null}
+          </div>
+          <p className="text-center text-xs text-text-muted max-w-xs">
+            Optional — JPG or PNG up to 512 KB. Saved to your guest profile across bookings.
+          </p>
+          {avatarError ? <p className="text-xs text-red-600" role="alert">{avatarError}</p> : null}
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">

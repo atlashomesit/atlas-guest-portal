@@ -206,7 +206,7 @@ exports[`AboutPage > matches the snapshot 1`] = `
         class="space-y-4"
       >
         <p
-          class="text-sm uppercase tracking-[0.18em] text-primary font-semibold"
+          class="text-base uppercase tracking-[0.18em] text-primary font-semibold"
         >
           Hospitality standards
         </p>
@@ -432,7 +432,7 @@ exports[`AboutPage > matches the snapshot 1`] = `
       >
         <div>
           <p
-            class="text-sm uppercase tracking-[0.18em] text-primary font-semibold"
+            class="text-base uppercase tracking-[0.18em] text-primary font-semibold"
           >
             Meet the team
           </p>
@@ -588,7 +588,7 @@ exports[`AboutPage > matches the snapshot 1`] = `
       >
         <div>
           <p
-            class="text-sm uppercase tracking-[0.18em] text-primary font-semibold"
+            class="text-base uppercase tracking-[0.18em] text-primary font-semibold"
           >
             Trust badges
           </p>

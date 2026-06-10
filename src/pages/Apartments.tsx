@@ -80,6 +80,8 @@ type CombinedListing = {
   /** TASK-1695: LOS auto-discount tier 2. */
   losDiscount2MinNights?: number | null;
   losDiscount2Percent?: number | null;
+  /** TASK-4011: Last-minute discount percentage. */
+  lastMinuteDiscountPercent?: number | null;
 };
 
 const derivePropertyType = (name?: string): string => {
@@ -400,6 +402,19 @@ export const Apartments = () => {
     return result;
   }, [guests, listings, maxPrice, minPrice, petFriendlyOnly, propertyType, sortBy]);
 
+  const resetFilters = React.useCallback(() => {
+    setMinPrice(priceBounds.min);
+    setMaxPrice(priceBounds.max);
+    setGuests(2);
+    setPropertyType("all");
+    setPetFriendlyOnly(false);
+    setSortBy("featured");
+  }, [priceBounds.max, priceBounds.min]);
+
+  const applyFilters = React.useCallback(() => {
+    document.getElementById("apartments-listings-grid")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
+
   const handleNavigate = (property: PropertyRecord) => {
     const listingId = property.listingId ?? property.id;
     const id = typeof listingId === "number" ? listingId : Number(listingId);
@@ -587,9 +602,11 @@ export const Apartments = () => {
               onPropertyTypeChange={setPropertyType}
               onPetFriendlyChange={setPetFriendlyOnly}
               onSortChange={setSortBy}
+              onReset={resetFilters}
+              onApply={applyFilters}
             />
 
-            <section className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <section id="apartments-listings-grid" className="grid grid-cols-1 gap-6 md:grid-cols-2">
               {filteredListings.map((listing) => (
                 <ListingCard
                   key={listing.id}
@@ -613,6 +630,7 @@ export const Apartments = () => {
                   losDiscountPercent={listing.losDiscountPercent}
                   losDiscount2MinNights={listing.losDiscount2MinNights}
                   losDiscount2Percent={listing.losDiscount2Percent}
+                  lastMinuteDiscountPercent={listing.lastMinuteDiscountPercent}
                   estimateNights={estimateNights}
                   onClick={() => handleNavigate(listing.property)}
                 />

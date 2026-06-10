@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import SEO from "../components/SEO";
 import StateMessage from "../components/StateMessage";
+import { LoadingState } from "../components/LoadingState";
 import { buildApiUrl, getApiHeaders } from "../api/client";
 import { messageFromApiResponse } from "../utils/serverErrorFromResponse";
 import { getContactEmail } from "../config/contact";
@@ -92,11 +93,8 @@ export default function MyBookingsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-[60vh] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-3 border-border-subtle border-t-brand-primary rounded-full animate-spin" />
-          <p className="text-sm text-text-secondary">Loading&hellip;</p>
-        </div>
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10">
+        <LoadingState kind="skeleton-list" count={4} message="Loading bookings…" />
       </div>
     );
   }
@@ -187,7 +185,7 @@ export default function MyBookingsPage() {
                       <p className="text-sm text-text-muted">{b.propertyName}</p>
                     </div>
                     <span
-                      className={`text-sm font-medium px-2 py-1 rounded-full shrink-0 ${statusClass}`}
+                      className={`text-base font-medium px-2 py-1 rounded-full shrink-0 ${statusClass}`}
                       data-testid={inStay ? "my-bookings-in-stay-badge" : undefined}
                     >
                       {statusLabel}
@@ -195,11 +193,11 @@ export default function MyBookingsPage() {
                   </div>
                   <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-text-secondary">
                     <span>{b.checkinDate} → {b.checkoutDate}</span>
-                    <span className="font-mono text-sm text-text-muted">#{b.bookingRef}</span>
+                    <span className="font-mono text-base text-text-muted">#{b.bookingRef}</span>
                     <span className="ml-auto font-medium text-text-primary">₹{Number(b.totalAmount).toLocaleString("en-IN")}</span>
                   </div>
                   {inStay && (
-                    <p className="mt-2 text-xs text-text-muted" data-testid="my-bookings-in-stay-hint">
+                    <p className="mt-2 text-sm text-text-muted" data-testid="my-bookings-in-stay-hint">
                       View check-in details, address, and host contact on your confirmation page.
                     </p>
                   )}

@@ -133,6 +133,13 @@ const ContactUs = () => {
                                 >
                                     Call {formatDisplayNumber()}
                                 </a>
+                                <a
+                                    href={`mailto:${contactEmail}`}
+                                    aria-label={`Email ${tenantLabel} at ${contactEmail}`}
+                                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-cta-primary text-cta-primary bg-bg-surface px-6 py-3 font-semibold shadow-md hover:shadow-lg transition-all duration-250 hover:scale-105"
+                                >
+                                    Email us
+                                </a>
                             </div>
                             <Typography variant="muted">
                                 Prefer email? Reach us at{" "}
@@ -197,7 +204,7 @@ const ContactUs = () => {
                         )}
                         <form onSubmit={handleSubmit} className="space-y-5">
                             <div className="space-y-2">
-                                <label htmlFor="name" className="block text-sm font-semibold text-text-primary">Name</label>
+                                <label htmlFor="name" className="block text-base font-semibold text-text-primary">Name</label>
                                 <Input
                                     id="name"
                                     type="text"
@@ -209,7 +216,7 @@ const ContactUs = () => {
                                 />
                             </div>
                             <div className="space-y-2">
-                                <label htmlFor="email" className="block text-sm font-semibold text-text-primary">Email</label>
+                                <label htmlFor="email" className="block text-base font-semibold text-text-primary">Email</label>
                                 <Input
                                     id="email"
                                     type="email"
@@ -221,7 +228,7 @@ const ContactUs = () => {
                                 />
                             </div>
                             <div className="space-y-2">
-                                <label htmlFor="contactnumber" className="block text-sm font-semibold text-text-primary">Phone</label>
+                                <label htmlFor="contactnumber" className="block text-base font-semibold text-text-primary">Phone</label>
                                 <Input
                                     id="contactnumber"
                                     type="tel"
@@ -233,7 +240,7 @@ const ContactUs = () => {
                                 />
                             </div>
                             <div className="space-y-2">
-                                <label htmlFor="destination" className="block text-sm font-semibold text-text-primary">Destination</label>
+                                <label htmlFor="destination" className="block text-base font-semibold text-text-primary">Destination</label>
                                 <Input
                                     as="select"
                                     id="destination"
@@ -249,7 +256,7 @@ const ContactUs = () => {
                                 </Input>
                             </div>
                             <div className="space-y-2">
-                                <label htmlFor="description" className="block text-sm font-semibold text-text-primary">Message</label>
+                                <label htmlFor="description" className="block text-base font-semibold text-text-primary">Message</label>
                                 <Input
                                     as="textarea"
                                     id="description"

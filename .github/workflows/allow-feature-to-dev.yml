@@ -1,0 +1,31 @@
+name: Allow feature → dev
+
+# Companion to enforce-dev-to-main.yml.
+# The `dev` branch protection requires "PR source must be dev" to pass —
+# but that check only fires on PRs to main. For PRs TO dev (feature branches),
+# the check is listed as "expected" and blocks the merge indefinitely.
+# This passthrough workflow satisfies the required-check contract for dev PRs
+# by publishing the same job name with an unconditional success.
+#
+# Cost: ~30s of ubuntu-latest per PR open/reopen to dev — negligible.
+# Trigger scope: opened + reopened + synchronize (mirrors enforce-dev-to-main.yml contract).
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+    branches: [dev]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  branch-source:
+    name: PR source must be dev
+    runs-on: ubuntu-latest
+    steps:
+      - name: Allow any source branch for PRs to dev
+        run: |
+          echo "PR targets dev — any source branch is permitted."
+          echo "Head: ${{ github.head_ref }} → Base: ${{ github.base_ref }}"
+

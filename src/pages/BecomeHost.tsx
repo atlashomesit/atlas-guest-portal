@@ -579,7 +579,7 @@ const BecomeHost = () => {
             </strong>
           </p>
           <label
-            className="block text-sm font-medium mb-2"
+            className="block text-base font-medium mb-2"
             style={{ color: "#475569" }}
           >
             Number of rooms: <strong>{estimatorRooms}</strong>
@@ -595,8 +595,8 @@ const BecomeHost = () => {
             className="w-full accent-blue-600"
           />
           <div
-            className="flex justify-between text-sm mt-1 mb-4"
-            style={{ color: "#94a3b8" }}
+            className="flex justify-between text-base mt-1 mb-4"
+            style={{ color: "#64748b" }}
           >
             <span>1 room</span>
             <span>10 rooms</span>
@@ -609,7 +609,7 @@ const BecomeHost = () => {
             aria-live="polite"
             aria-atomic="true"
           >
-            <p className="text-sm" style={{ color: "#475569" }}>
+            <p className="text-base" style={{ color: "#475569" }}>
               Estimated monthly earnings
             </p>
             <p
@@ -618,7 +618,7 @@ const BecomeHost = () => {
             >
               ₹{formatINR(estimatorRooms * 15000)} – ₹{formatINR(estimatorRooms * 40000)}
             </p>
-            <p className="text-sm mt-2" style={{ color: "#94a3b8" }}>
+            <p className="text-base mt-2" style={{ color: "#64748b" }}>
               Based on average occupancy for properties using {pmsLabel}
             </p>
           </div>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { buildApiUrl, getApiHeaders } from "../api/client";
 import SEO from "../components/SEO";
@@ -27,6 +27,7 @@ type Step = "auth" | "summary" | "id-upload" | "house-rules" | "done";
 export default function SelfCheckIn() {
   const brandName = getTenantBrandName();
   const { bookingRef: urlRef } = useParams<{ bookingRef: string }>();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [bookingRef, setBookingRef] = useState(urlRef ?? "");
   const [lastName, setLastName] = useState("");
@@ -38,6 +39,9 @@ export default function SelfCheckIn() {
   const [govtIdNumber, setGovtIdNumber] = useState("");
   const [rulesAccepted, setRulesAccepted] = useState(false);
   const [alreadySigned, setAlreadySigned] = useState(false);
+  // TASK-4009: Government ID file upload
+  const [idFile, setIdFile] = useState<File | null>(null);
+  const [idFilePreview, setIdFilePreview] = useState<string | null>(null);
 
   const stepIndex: Record<Step, number> = {
     auth: 0, summary: 1, "id-upload": 2, "house-rules": 3, done: 4,
@@ -68,18 +72,71 @@ export default function SelfCheckIn() {
     }
   };
 
+  // TASK-4009: Handle file selection and preview
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Client-side validation: image or PDF only
+    if (!/\.(jpg|jpeg|png|pdf)$/i.test(file.name)) {
+      setError("Please upload a JPG, PNG, or PDF file.");
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      setError("File must be under 10 MB.");
+      return;
+    }
+
+    setIdFile(file);
+    setError("");
+
+    // Show preview for images
+    if (file.type.startsWith("image/")) {
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        setIdFilePreview(evt.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setIdFilePreview(null); // PDFs don't preview inline
+    }
+  };
+
   const handleComplete = async () => {
     if (!details) return;
     setBusy(true);
     setError("");
     try {
+      // TASK-4009: Upload ID document if provided
+      let idDocumentUrl: string | null = null;
+      if (idFile) {
+        const formData = new FormData();
+        formData.append("file", idFile);
+        const uploadRes = await fetch(
+          buildApiUrl(`/api/guests/kyc-documents`),
+          {
+            method: "POST",
+            headers: getApiHeaders(),
+            body: formData,
+          }
+        );
+        if (!uploadRes.ok) {
+          console.warn("ID upload failed, continuing without it");
+          // Non-critical — don't fail the whole checkin
+        } else {
+          const uploadData = (await uploadRes.json()) as { url?: string };
+          idDocumentUrl = uploadData.url || null;
+        }
+      }
+
       const url = buildApiUrl(`/api/public/checkin/${encodeURIComponent(bookingRef.trim())}/complete`);
       const res = await fetch(url, {
         method: "POST",
         headers: { ...getApiHeaders(), "Content-Type": "application/json" },
         body: JSON.stringify({
           lastName: lastName.trim(),
-          idDocumentUrl: null,
+          idDocumentUrl,
           houseRulesAccepted: rulesAccepted,
           govtIdType: govtIdType || null,
           govtIdNumber: govtIdNumber.trim() || null,
@@ -201,7 +258,7 @@ export default function SelfCheckIn() {
           <div className="rounded-2xl border border-border-subtle bg-bg-surface p-6 shadow-level1">
             <h2 className="text-xl font-bold text-text-primary mb-1">Government ID</h2>
             <p className="text-text-secondary text-sm mb-5">
-              Your ID number helps the host verify your stay. Only the last 4 digits are stored.
+              Your ID helps the host verify your stay for compliance. Only required information is stored.
               <span className="block mt-1 text-text-muted">(Optional — you can skip this step)</span>
             </p>
 
@@ -226,6 +283,40 @@ export default function SelfCheckIn() {
               value={govtIdNumber}
               onChange={e => setGovtIdNumber(e.target.value)}
             />
+
+            {/* TASK-4009: ID document file upload */}
+            <label className="block text-sm font-medium text-text-primary mb-2">ID photo (optional)</label>
+            <p className="text-xs text-text-muted mb-3">JPG, PNG, or PDF — max 10 MB</p>
+
+            <div className="rounded-lg border-2 border-dashed border-border-subtle p-4 mb-4 text-center cursor-pointer hover:border-brand-primary transition"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*,.pdf"
+                onChange={handleFileSelect}
+                className="hidden"
+                aria-label="Upload government ID"
+              />
+              {idFilePreview ? (
+                <div className="space-y-2">
+                  <img src={idFilePreview} alt="ID preview" className="max-h-32 mx-auto rounded" />
+                  <p className="text-xs text-text-primary font-medium">{idFile?.name}</p>
+                </div>
+              ) : idFile ? (
+                <p className="text-sm text-text-primary font-medium">📄 {idFile.name}</p>
+              ) : (
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-text-primary">📷 Click to upload or drag & drop</p>
+                  <p className="text-xs text-text-muted">JPG, PNG, or PDF</p>
+                </div>
+              )}
+            </div>
+
+            {error && (
+              <p className="rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 mb-4">{error}</p>
+            )}
 
             <div className="flex gap-3">
               <button
