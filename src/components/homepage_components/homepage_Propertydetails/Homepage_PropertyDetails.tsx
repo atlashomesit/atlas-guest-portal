@@ -2316,6 +2316,7 @@ useEffect(() => {
               <div className="pp-m-sticky-price">
                 <b>{formatCurrency(ppStickyNightly, { maximumFractionDigits: 0 })}</b>
                 <span>/ night</span>
+                <span className="pp-m-sticky-taxes">+ taxes &amp; fees</span>
               </div>
               <button
                 type="button"

@@ -493,7 +493,7 @@ const SearchPage = () => {
         if ((unit.wifiSpeedMbps ?? 0) < 50) return false;
       }
       if (nomadWorkspace) {
-        const hasWorkspace = hasAmenity(unit, "Workspace") || hasAmenity(unit, "Desk") || unit.hasCoworkingDesk;
+        const hasWorkspace = hasAmenity(unit, "workspace") || unit.hasCoworkingDesk;
         if (!hasWorkspace) return false;
       }
       if (monthlyStay) {
@@ -873,19 +873,28 @@ const SearchPage = () => {
             />
             <span className="text-text-primary">Long stay (7+ nights)</span>
           </label>
-          {(!checkIn || !checkOut) && (
           <label className="flex items-center gap-2 rounded-lg border border-border-subtle bg-bg-muted px-3 py-2 text-sm">
             <input
               type="checkbox"
               id="filter-available-tonight"
               checked={availableNow}
-              onChange={(e) => updateParam("availableNow", e.target.checked ? "true" : "")}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                updateParam("availableNow", checked ? "true" : "");
+                if (checked && (checkIn || checkOut)) {
+                  const now = new Date();
+                  const todayStr = now.toISOString().slice(0, 10);
+                  const tom = new Date(now.getTime() + 86400000);
+                  const tomStr = tom.toISOString().slice(0, 10);
+                  updateParam("checkIn", todayStr);
+                  updateParam("checkOut", tomStr);
+                }
+              }}
               className="cursor-pointer"
               data-testid="search-filter-available-tonight"
             />
             <span className="text-text-primary">Available tonight</span>
           </label>
-          )}
           <div className="ml-auto flex items-end gap-3">
             {!isLoading && listings.length > 0 && (
               <span className="text-sm text-text-muted">
@@ -1443,9 +1452,11 @@ const SearchPage = () => {
                       {unit.amenities.slice(0, 4).map((amenity, index) => {
                         const code = amenity.amenities_icon?.trim();
                         if (!code) return null;
+                        const label = resolveAmenityLabel(code);
+                        if (!label) return null;
                         return (
                           <span key={`${unit.id}-amenity-${index}`} className="font-semibold text-text-secondary">
-                            {resolveAmenityLabel(code)}
+                            {label}
                           </span>
                         );
                       })}

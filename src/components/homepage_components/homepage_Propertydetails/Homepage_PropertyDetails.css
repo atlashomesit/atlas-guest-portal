@@ -569,6 +569,7 @@
     font-weight: 700; color: #1a1a2e; line-height: 1.1;
   }
   .pp-m-sticky-price span { display: block; font-size: 11.5px; color: #475569; margin-top: 2px; }
+  .pp-m-sticky-taxes { font-size: 10px !important; color: #94a3b8 !important; margin-top: 1px !important; }
   .pp-m-sticky-cta { height: 44px; padding: 0 22px; border-radius: 12px; border: none; }
 }
 
