@@ -759,16 +759,16 @@ const GuestDetailsPage: React.FC = () => {
                   method: 'upi',
                   ...(lastUpiVpa ? { vpa: lastUpiVpa } : {}),
                 },
-                upi: { flow: 'collect', ...(lastUpiVpa ? { vpa: lastUpiVpa } : {}) },
+                ...(lastUpiVpa ? { upi: { vpa: lastUpiVpa } } : {}),
                 config: {
                   display: {
                     blocks: {
-                      upi_collect: {
-                        name: 'Pay using UPI ID',
-                        instruments: [{ method: 'upi', flows: ['collect'] }],
+                      upi_block: {
+                        name: 'Pay using UPI',
+                        instruments: [{ method: 'upi' }],
                       },
                     },
-                    sequence: ['block.upi_collect', 'block.card', 'block.netbanking', 'block.wallet'],
+                    sequence: ['block.upi_block', 'block.card', 'block.netbanking', 'block.wallet'],
                     preferences: { show_default_blocks: true },
                   },
                 },

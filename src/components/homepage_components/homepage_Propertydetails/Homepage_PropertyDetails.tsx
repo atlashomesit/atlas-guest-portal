@@ -1851,17 +1851,20 @@ useEffect(() => {
                             );
                           }
                           return (
-                            <div className="pp-v2-rating-bars">
-                              {bars.map(b => (
-                                <div key={b.label} className="pp-v2-rating-bar-row">
-                                  <span>{b.label}</span>
-                                  <div className="pp-v2-rating-bar">
-                                    <span style={{ width: `${Math.round((b.v! / 5) * 100)}%` }} />
+                            <>
+                              <div className="pp-v2-rating-bars">
+                                {bars.map(b => (
+                                  <div key={b.label} className="pp-v2-rating-bar-row">
+                                    <span>{b.label}</span>
+                                    <div className="pp-v2-rating-bar">
+                                      <span style={{ width: `${Math.round((b.v! / 5) * 100)}%` }} />
+                                    </div>
+                                    <span className="pp-v2-rating-bar-val">{b.v!.toFixed(1)}</span>
                                   </div>
-                                  <span className="pp-v2-rating-bar-val">{b.v!.toFixed(1)}</span>
-                                </div>
-                              ))}
-                            </div>
+                                ))}
+                              </div>
+                              <p style={{ fontSize: 12, color: '#64748b', marginTop: 6 }}>Based on {rs.length} recent review{rs.length !== 1 ? 's' : ''}</p>
+                            </>
                           );
                         })()}
                       </div>
