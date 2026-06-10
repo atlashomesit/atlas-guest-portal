@@ -89,18 +89,13 @@ const Reserve = () => {
           >
             Back to previous page
           </Button>
-          {/* Option A: navigate back to property page with dates pre-filled so
-              UnitBookingWidget handles the full Razorpay payment flow inline. */}
           <Button
             onClick={goToPayment}
             disabled={!hasSelection}
           >
-            Go to payment
+            Continue to booking
           </Button>
         </div>
-        <p className="text-sm text-text-muted">
-          You will be taken to the property page to complete your secure payment via Razorpay.
-        </p>
       </div>
     </section>
     </>

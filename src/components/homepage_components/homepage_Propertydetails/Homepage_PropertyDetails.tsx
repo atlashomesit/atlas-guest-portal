@@ -1332,6 +1332,8 @@ useEffect(() => {
       Number.isFinite(data.longitude);
     const ppStickyNightly =
       directBookingNightly > 0 ? directBookingNightly : (nightlyPrice?.finalNightlyPrice ?? 0);
+    const directBookingNightlyIsSynthetic =
+      !(dailyPricingRow?.finalAmount != null && Number(dailyPricingRow.finalAmount) > 0);
 
     return (
         <>
@@ -2314,7 +2316,7 @@ useEffect(() => {
           ) : (
             <div className="pp-m-sticky" aria-label="Book this property" data-testid="mobile-reserve-bar">
               <div className="pp-m-sticky-price">
-                <b>{formatCurrency(ppStickyNightly, { maximumFractionDigits: 0 })}</b>
+                <b>{directBookingNightlyIsSynthetic ? 'from ' : ''}{formatCurrency(ppStickyNightly, { maximumFractionDigits: 0 })}</b>
                 <span>/ night</span>
               </div>
               <button

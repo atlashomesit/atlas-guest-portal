@@ -1231,6 +1231,18 @@ export default function BookingConfirmationPage() {
           </div>
         )}
 
+        {/* TASK-4086: nearby landmarks — non-sensitive context shown immediately, not gated on 72h window */}
+        {!isCancelled && Array.isArray(booking.nearbyLandmarks) && booking.nearbyLandmarks.length > 0 && (
+          <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5">
+            <h2 className="text-sm font-semibold text-text-primary mb-3">📍 {pa.landmarksLabel}</h2>
+            <ul className="list-disc pl-5 text-sm text-text-primary space-y-1">
+              {booking.nearbyLandmarks.map((line, i) => (
+                <li key={`${i}-${line}`}>{line}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {/* TASK-1888: pre-arrival briefing (confirmed stays within 72h) */}
         {!isCancelled && booking.preArrivalBriefingVisible && (
           <section
@@ -1306,16 +1318,6 @@ export default function BookingConfirmationPage() {
                       <span className="block text-text-secondary text-xs mt-0.5">Password: see WiFi card above.</span>
                     ) : null}
                   </p>
-                </div>
-              )}
-              {Array.isArray(booking.nearbyLandmarks) && booking.nearbyLandmarks.length > 0 && (
-                <div className="py-3">
-                  <span className="text-xs text-text-muted uppercase tracking-wider font-medium">{pa.landmarksLabel}</span>
-                  <ul className="mt-2 list-disc pl-5 text-sm text-text-primary space-y-1">
-                    {booking.nearbyLandmarks.map((line, i) => (
-                      <li key={`${i}-${line}`}>{line}</li>
-                    ))}
-                  </ul>
                 </div>
               )}
             </div>
