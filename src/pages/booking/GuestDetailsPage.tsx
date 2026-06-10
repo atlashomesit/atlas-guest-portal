@@ -570,7 +570,7 @@ const GuestDetailsPage: React.FC = () => {
     setTimeout(() => {
       if (/^[A-Z0-9]{1,32}$/.test(code)) {
         setAppliedReferralCode(code);
-        setReferralMessage('Code format accepted — we will check eligibility when you pay; no discount is guaranteed until then.');
+        setReferralMessage('Referral code saved — we\'ll apply any eligible reward automatically at checkout.');
       } else {
         setAppliedReferralCode(null);
         setReferralMessage('Referral codes must be letters and numbers only (no spaces or symbols).');
@@ -1297,7 +1297,7 @@ const GuestDetailsPage: React.FC = () => {
                       </div>
                       {referralValidating && <div className="gd-input-help">Validating…</div>}
                       {!referralValidating && referralMessage && (
-                        <div className={`gd-input-help${appliedReferralCode ? ' success' : ' error'}`}>
+                        <div className={`gd-input-help${appliedReferralCode ? '' : ' error'}`}>
                           {referralMessage}
                         </div>
                       )}

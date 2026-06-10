@@ -696,13 +696,7 @@ export default function BookingConfirmationPage() {
   const hostPhoneDigits = hostPhone.replace(/[^\d+]/g, "");
   const whatsappDigits = hostPhoneDigits.replace(/^\+/, "");
   const supportEmail = getContactEmail();
-  const confirmationNotifyPhone = (() => {
-    try {
-      return localStorage.getItem("atlas_guest_phone")?.trim() || "";
-    } catch {
-      return "";
-    }
-  })();
+  const confirmationNotifyPhone = "";
   const whatsappText = encodeURIComponent(`Hi, I have a question about booking #${booking.bookingId}.`);
   const whatsappUrl = `https://wa.me/${whatsappDigits}?text=${whatsappText}`;
   const supportsPush = typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window;
@@ -948,9 +942,18 @@ export default function BookingConfirmationPage() {
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-1" data-testid="payment-polling-status">
             <p className="text-sm text-amber-800 font-medium">Checking payment... attempt {paymentPollAttempt}/150</p>
             {paymentPollExhausted && (
-              <p className="text-sm text-amber-800">
-                Still processing? Check your email for confirmation or contact support.
-              </p>
+              <>
+                <p className="text-sm text-amber-800">
+                  Payment is taking longer than usual — check your email for a confirmation, or tap below to refresh.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => { void runManualPaymentStatusCheck(); }}
+                  className="mt-1 text-sm font-medium text-amber-900 underline underline-offset-2"
+                >
+                  Check status again
+                </button>
+              </>
             )}
           </div>
         )}
@@ -1394,7 +1397,11 @@ export default function BookingConfirmationPage() {
                   </p>
                 </>
               ) : paymentStatus === "pending" ? (
-                <p data-testid="booking-finalizing-payment">⏳ Finalizing your booking — we're confirming your payment. This usually takes a few moments.</p>
+                <p data-testid="booking-finalizing-payment">
+                  {paymentPollExhausted
+                    ? "⏳ Payment is taking longer than usual — tap \"Check status again\" above or check your email for a confirmation."
+                    : "⏳ Finalizing your booking — we're confirming your payment. This usually takes a few moments."}
+                </p>
               ) : (
                 <p>⚠️ Your payment hasn't completed yet. Please complete payment above to confirm your booking.</p>
               )}
