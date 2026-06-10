@@ -176,7 +176,7 @@ export default function FavoritesPage() {
             </button>
           )}
           <Link
-            to="/my-bookings"
+            to="/communication-preferences"
             className="text-sm text-text-muted underline underline-offset-2 hover:text-text-primary"
             data-testid="favorites-manage-preferences-hint"
           >

@@ -170,8 +170,11 @@ export default function MyBookingsPage() {
             {filteredBookings.map((b) => {
               const statusClass = STATUS_COLORS[b.status] ?? "bg-gray-100 text-gray-700";
               const inStay = b.status === "CheckedIn";
+              const checkoutFormatted = parseBookingDate(b.checkoutDate).toLocaleDateString("en-IN", {
+                day: "2-digit", month: "short", year: "numeric",
+              });
               const statusLabel = inStay
-                ? `In progress · check out ${b.checkoutDate}`
+                ? `In progress · check out ${checkoutFormatted}`
                 : b.status;
               return (
                 <Link

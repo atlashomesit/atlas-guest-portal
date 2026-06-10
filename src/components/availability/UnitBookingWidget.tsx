@@ -65,8 +65,6 @@ interface UnitBookingWidgetProps {
   minStayNights?: number;
 }
 
-const PENDING_PAYMENT_KEY = 'atlas_pending_razorpay_order';
-
 /** Detect network/connection failures (timeout, offline, ECONNREFUSED, etc.). */
 function isNetworkError(error: unknown): boolean {
   const err = error as { code?: string; message?: string; response?: { status?: number } };
@@ -244,15 +242,6 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     hasHydratedFromContextRef.current = false;
   }, [listingId]);
 
-
-  // On mount: clear any stale pending payment (e.g. user refreshed during Razorpay modal)
-  useEffect(() => {
-    const pending = localStorage.getItem(PENDING_PAYMENT_KEY);
-    if (pending) {
-      localStorage.removeItem(PENDING_PAYMENT_KEY);
-      toast.info('Your previous payment session was interrupted. You can try booking again.');
-    }
-  }, []);
 
   useEffect(() => {
     try {
@@ -1026,11 +1015,13 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             <div className="lv-booking-total">
               <span className="lv-booking-from-prefix">From </span>
               <b data-testid="bw-per-night-price">
-                {effectiveDailyPricing != null
-                  ? formatCurrency(effectiveDailyPricing.actualPrice, { maximumFractionDigits: 0 })
-                  : perNightForDisplay > 0
-                    ? formatCurrency(perNightForDisplay, { maximumFractionDigits: 0 })
-                    : '—'}
+                {hasSelectedRange && perNightForDisplay > 0
+                  ? formatCurrency(perNightForDisplay, { maximumFractionDigits: 0 })
+                  : effectiveDailyPricing != null
+                    ? formatCurrency(effectiveDailyPricing.actualPrice, { maximumFractionDigits: 0 })
+                    : perNightForDisplay > 0
+                      ? formatCurrency(perNightForDisplay, { maximumFractionDigits: 0 })
+                      : '—'}
               </b>
               <span> / night</span>
             </div>
@@ -1245,7 +1236,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           {gstSlabPercent != null && breakdownPrice > 0 && gstLineAmount > 0 && (
             <div className="lv-price-row" data-testid="bw-bd-gst-row">
               <span>
-                GST ({gstSlabPercent}%) <small style={{ color: '#475569', fontWeight: 400 }}>on accommodation</small>
+                GST ({gstSlabPercent}%)
               </span>
               <span className="lv-num">{displayPrice(gstLineAmount)}</span>
             </div>

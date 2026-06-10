@@ -1634,7 +1634,7 @@ const GuestDetailsPage: React.FC = () => {
             {gstSlabPercent != null && gstLineAmount > 0 && (
               <div className="gd-price-row gst">
                 <div className="desc">
-                  <span>GST {gstSlabPercent}% on accommodation</span>
+                  <span>GST {gstSlabPercent}%</span>
                 </div>
                 <span className="num">{displayPrice(gstLineAmount)}</span>
               </div>
