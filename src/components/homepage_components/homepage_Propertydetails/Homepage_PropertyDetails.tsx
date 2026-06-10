@@ -279,7 +279,7 @@ interface Property {
     property_reviews: number;
     property_price: number;
     timezoneId?: string;
-    photoCount?: number;
+    // photoCount from API is intentionally not used for display; all counts derive from galleryUrls.length
     maxGuests?: number;
     maxCapacity?: number;
     /** G3-002: from API listing when available */
@@ -323,7 +323,6 @@ function coerceProperty(item: Partial<Property> & { id?: number | string }): Pro
         property_reviews: item.property_reviews ?? 0,
         property_price: item.property_price ?? 0,
         timezoneId: item.timezoneId,
-        photoCount: item.photoCount,
         maxGuests: item.maxGuests,
         maxCapacity: item.maxCapacity,
         checkInTime: item.checkInTime,
@@ -866,7 +865,6 @@ const PropertyDetails = () => {
                             ? [...new Set((photoUrlsRaw as string[]).filter(Boolean))]
                             : [],
                     );
-                    const photoCount = Number((apiListing as Record<string, unknown>).photoCount) || 0;
                     const pub = apiListing as unknown as Partial<PublicListing>;
                     // TASK-2739-v1: capture publishStatus on the API-fallback render path too.
                     {
@@ -895,7 +893,6 @@ const PropertyDetails = () => {
                         property_reviews: Number((apiListing as Record<string, unknown>).property_reviews) || 0,
                         property_price: Number((apiListing as Record<string, unknown>).property_price) || 0,
                         timezoneId: (apiListing as Record<string, unknown>).timezoneId as string | undefined,
-                        photoCount: photoCount || (coverUrl ? 1 : 0),
                         maxGuests: parseMaxGuestsFromPayload(apiListing as Record<string, unknown>),
                         checkInTime: pub.checkInTime?.trim() || undefined,
                         checkOutTime: pub.checkOutTime?.trim() || undefined,
@@ -1279,11 +1276,10 @@ useEffect(() => {
     const ppTenantOverrides = getTenantOverrides(ppTenantCtx?.slug ?? '');
     const ppHideAtlasBranding = shouldHideAtlasBranding(ppTenantCtx, ppTenantOverrides);
     const ppBrandName = getTenantBrandName();
-    const ppHostDisplayName =
-      data.hostName?.trim() ||
-      ppTenantCtx?.name?.trim() ||
-      data.property_name ||
-      ppBrandName;
+    const ppHasRealHost = !!data.hostName?.trim();
+    const ppHostDisplayName = ppHasRealHost
+      ? data.hostName!.trim()
+      : `Listed by ${ppBrandName}`;
     const ppHostInitial = ppHostDisplayName.charAt(0).toUpperCase();
     const ppHasOnlinePayment =
       typeof _getTenantCtx()?.paymentProvider === 'string' && _getTenantCtx()?.paymentProvider !== 'MANUAL';
@@ -1610,9 +1606,11 @@ useEffect(() => {
                     <div>
                       <div className="pp-host-name">
                         {ppHostDisplayName}
-                        <span className="pp-verified-badge">
-                          <PpCheckIcon size={10} /> Verified
-                        </span>
+                        {ppHasRealHost && (
+                          <span className="pp-verified-badge">
+                            <PpCheckIcon size={10} /> Verified
+                          </span>
+                        )}
                       </div>
                       <div className="pp-host-sub">
                         Hosted directly · Responds on WhatsApp · Direct booking
@@ -1664,17 +1662,15 @@ useEffect(() => {
                       <li>
                         <PpCheckIcon size={16} />
                         <span>
-                          <b>Property photos are genuine.</b>
-                          <span className="pp-meta">Our team reviewed listing photos before publishing.</span>
+                          <b>Photos and basic details reviewed.</b>
+                          <span className="pp-meta">Listings are reviewed for photos and basic details before going live.</span>
                         </span>
                       </li>
                       <li>
                         <PpCheckIcon size={16} />
                         <span>
-                          <b>Reviewed before going live.</b>
-                          <span className="pp-meta">
-                            Every {ppBrandName} listing is checked for photos and basic details before publish.
-                          </span>
+                          <b>Direct booking — no middlemen.</b>
+                          <span className="pp-meta">You pay the host directly via Razorpay.</span>
                         </span>
                       </li>
                       {ppHasMapCoordinates ? (
@@ -1686,13 +1682,6 @@ useEffect(() => {
                           </span>
                         </li>
                       ) : null}
-                      <li>
-                        <PpCheckIcon size={16} />
-                        <span>
-                          <b>Direct booking — no middlemen.</b>
-                          <span className="pp-meta">You pay the host directly via Razorpay.</span>
-                        </span>
-                      </li>
                     </ul>
                   </div>
                 </section>
