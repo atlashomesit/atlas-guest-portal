@@ -160,7 +160,7 @@ const Home = () => {
                             ...(penthouseCover ? { image: penthouseCover } : {}),
                             address: {
                                 "@type": "PostalAddress",
-                                streetAddress: penthouse.property_address ?? "KPHB, Kukatpally",
+                                streetAddress: penthouse.property_location ?? "KPHB, Kukatpally",
                                 addressLocality: "Hyderabad",
                                 addressRegion: "Telangana",
                                 addressCountry: "IN",
@@ -189,7 +189,7 @@ const Home = () => {
                                     "@type": "Place",
                                     address: {
                                         "@type": "PostalAddress",
-                                        streetAddress: penthouse.property_address ?? "KPHB, Kukatpally",
+                                        streetAddress: penthouse.property_location ?? "KPHB, Kukatpally",
                                         addressLocality: "Hyderabad",
                                         addressRegion: "Telangana",
                                         addressCountry: "IN",
