@@ -2088,7 +2088,8 @@ useEffect(() => {
                           <p style={{ fontSize: 11, color: '#64748b', margin: '0 0 6px' }}>
                             {attraction.distance}
                           </p>
-                          <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: '#f0e6dc', color: '#94755b' }}>
+                          {/* WCAG AA: #6b5138 on #f0e6dc ≈ 5.9:1 (was #94755b at 3.44:1 — axe color-contrast failure) */}
+                          <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: '#f0e6dc', color: '#6b5138' }}>
                             {attraction.type}
                           </span>
                         </div>
