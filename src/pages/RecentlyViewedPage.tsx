@@ -166,7 +166,7 @@ export default function RecentlyViewedPage() {
                       to={it.path}
                       className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-2 hover:opacity-95 transition-opacity"
                     >
-                      Book now
+                      {delta != null && delta < 0 ? 'Book at new lower price' : 'Book now'}
                     </Link>
                   </div>
                 </div>

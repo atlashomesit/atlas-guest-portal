@@ -100,7 +100,7 @@ export default function FavoritesPage() {
     setReminderState("busy");
     try {
       const ids = getFavoriteIds();
-      const responses = await Promise.all(
+      const results = await Promise.allSettled(
         ids.map((listingId) =>
           fetch(buildApiUrl("/api/saved-listings"), {
             method: "POST",
@@ -109,8 +109,10 @@ export default function FavoritesPage() {
           })
         )
       );
-      const failedCount = responses.filter((res) => !res.ok).length;
-      if (failedCount > 0) {
+      const anySuccess = results.some(
+        (r) => r.status === "fulfilled" && r.value.ok
+      );
+      if (!anySuccess) {
         setReminderState("error");
         return;
       }

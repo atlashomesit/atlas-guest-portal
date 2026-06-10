@@ -292,6 +292,17 @@ export default function ReviewSubmitPage() {
             >
               Book {eligibility.propertyName} again
             </Link>
+            {submitted && (
+              <a
+                href={`https://wa.me/?text=${encodeURIComponent(`I just stayed at ${eligibility.propertyName} and loved it! Book directly here (no OTA fees): ${typeof window !== 'undefined' ? window.location.origin : ''}${buildHomeUnitPath(getPropertySlug({ property_name: eligibility.propertyName }), eligibility.listingId)}`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                data-testid="review-success-wa-share"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-brand-primary px-5 py-3 text-sm font-semibold text-brand-primary hover:bg-brand-primary/5 transition-colors"
+              >
+                Share {eligibility.propertyName} with friends
+              </a>
+            )}
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 flex-wrap">
               <Link
                 to={buildHomeUnitPath(getPropertySlug({ property_name: eligibility.propertyName }), eligibility.listingId)}

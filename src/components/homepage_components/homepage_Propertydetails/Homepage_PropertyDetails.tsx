@@ -2172,43 +2172,37 @@ useEffect(() => {
                 {/* Trust band — consolidates legitimacy, cancellation & payment
                     (DESIGN-003). Absorbs the former standalone verified pill.
                     Each row degrades gracefully on missing data. */}
-                {(() => {
-                  const pp = _getTenantCtx()?.paymentProvider;
-                  const hasOnline = typeof pp === 'string' && pp !== 'MANUAL';
-                  return (
-                    <div className="pp-trust" data-testid="property-trust-band" aria-label="Booking trust details">
-                      <div className="pp-trust-row">
-                        <ShieldCheck className="pp-trust-ic" size={18} aria-hidden="true" />
-                        <div>
-                          <div className="pp-trust-t">
-                            {hasOnline ? `Verified home · Instant book` : `Verified home · Host-confirmed booking`}
-                          </div>
-                          <div className="pp-trust-s">
-                            Listing details and photos reviewed by {ppBrandName} before going live.
-                          </div>
-                        </div>
+                <div className="pp-trust" data-testid="property-trust-band" aria-label="Booking trust details">
+                  <div className="pp-trust-row">
+                    <ShieldCheck className="pp-trust-ic" size={18} aria-hidden="true" />
+                    <div>
+                      <div className="pp-trust-t">
+                        {ppHasOnlinePayment ? `Verified home · Instant book` : `Verified home · Host-confirmed booking`}
                       </div>
-                      <div className="pp-trust-row">
-                        <CalendarClock className="pp-trust-ic" size={18} aria-hidden="true" />
-                        <div>
-                          <div className="pp-trust-t">{ppCancellationInfo.headline}</div>
-                          <div className="pp-trust-s">{ppCancellationInfo.description}</div>
-                        </div>
-                      </div>
-                      <div className="pp-trust-row">
-                        <CreditCard className="pp-trust-ic" size={18} aria-hidden="true" />
-                        <div>
-                          <div className="pp-trust-t">Direct booking · no OTA fees</div>
-                          <div className="pp-trust-s">
-                            {hasOnline
-                              ? 'You pay the host directly. Secure payment via Razorpay (UPI, cards, netbanking).'
-                              : 'You pay the host directly — no middle-man fees. The host confirms your dates.'}
-                          </div>
-                        </div>
+                      <div className="pp-trust-s">
+                        Listing details and photos reviewed by {ppBrandName} before going live.
                       </div>
                     </div>
-                  );
-                })()}
+                  </div>
+                  <div className="pp-trust-row">
+                    <CalendarClock className="pp-trust-ic" size={18} aria-hidden="true" />
+                    <div>
+                      <div className="pp-trust-t">{ppCancellationInfo.headline}</div>
+                      <div className="pp-trust-s">{ppCancellationInfo.description}</div>
+                    </div>
+                  </div>
+                  <div className="pp-trust-row">
+                    <CreditCard className="pp-trust-ic" size={18} aria-hidden="true" />
+                    <div>
+                      <div className="pp-trust-t">Direct booking · no OTA fees</div>
+                      <div className="pp-trust-s">
+                        {ppHasOnlinePayment
+                          ? 'You pay the host directly. Secure payment via Razorpay (UPI, cards, netbanking).'
+                          : 'You pay the host directly — no middle-man fees. The host confirms your dates.'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
                 {/* WhatsApp CTA (sidebar) — TASK-2873: draft listings are question-only, not book-via-WhatsApp */}
                 <div style={{ marginTop: 12 }}>

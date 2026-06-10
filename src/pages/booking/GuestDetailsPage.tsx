@@ -686,6 +686,10 @@ const GuestDetailsPage: React.FC = () => {
             setAppliedPromoCode(serverPromoCode.trim());
             setPromoDiscountAmount(Number(serverPromoDiscount) > 0 ? Number(serverPromoDiscount) : 0);
             setServerPromoLocked(true);
+            if (!(Number(serverPromoDiscount) > 0)) {
+              setPromoMessage(`Promo ${serverPromoCode.trim()} could not be applied`);
+              setPromoOpen(true);
+            }
           } else if (Number(serverPromoDiscount) > 0) {
             setServerPromoLocked(true);
           }
