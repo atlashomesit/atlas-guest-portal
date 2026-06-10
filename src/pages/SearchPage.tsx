@@ -555,7 +555,7 @@ const SearchPage = () => {
       setAvailabilityFetchDone(explicitDateSearch || hasInvalidDates);
       return;
     }
-    const ids = sortedUnits.map((u) => u.numericId).filter((id) => id > 0).slice(0, 48);
+    const ids = sortedUnits.map((u) => u.numericId).filter((id) => id > 0);
     if (ids.length === 0) {
       setAvailabilityById({});
       setAvailabilityFetchDone(true);
