@@ -1306,7 +1306,18 @@ const SearchPage = () => {
                 </div>
                 {/* TASK-1460: reserve chip row so layout does not jump when summary loads */}
                 <div className="min-h-7 px-5 pt-3" data-testid="search-listing-availability-slot">
-                  {!explicitDateSearch ? (() => {
+                  {explicitDateSearch ? (
+                    dateAvailLoading ? (
+                      <span className="inline-block h-5 w-16 rounded-full bg-bg-muted" aria-hidden />
+                    ) : dateAvailableIds !== null ? (
+                      <span
+                        className="inline-flex max-w-full items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-emerald-100 text-emerald-800"
+                        data-testid="search-listing-availability-chip"
+                      >
+                        Available
+                      </span>
+                    ) : null
+                  ) : (() => {
                     const chip = availabilityChip(availabilityById[unit.numericId]);
                     return chip ? (
                       <span
@@ -1318,7 +1329,7 @@ const SearchPage = () => {
                     ) : !availabilityFetchDone ? (
                       <span className="inline-block h-5 w-16 rounded-full bg-bg-muted" aria-hidden />
                     ) : null;
-                  })() : null}
+                  })()}
                 </div>
                 <div className="flex flex-1 flex-col gap-3 p-5">
                   <div className="flex items-start justify-between gap-3">
