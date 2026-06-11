@@ -747,13 +747,17 @@ const SearchPage = () => {
       }),
     [sortedUnits],
   );
-  /** TASK-1451 / TASK-2572: cheapest 3 listings as "you might also like" — avoids re-offering the filtered-out listings. */
+  /** TASK-1451 / TASK-2572 / TASK-4092: cheapest 3 available listings — excludes date-unavailable homes. */
   const emptyStateSuggestions = useMemo(() => {
     if (listings.length === 0) return [];
-    return [...listings]
+    const dateFiltered = dateAvailableIds !== null
+      ? listings.filter((l) => dateAvailableIds.has(l.numericId))
+      : listings;
+    const pool = dateFiltered.length > 0 ? dateFiltered : listings;
+    return [...pool]
       .sort((a, b) => a.pricePerNight - b.pricePerNight)
       .slice(0, 3);
-  }, [listings]);
+  }, [listings, dateAvailableIds]);
 
   return (
     <div className="min-h-screen bg-bg-muted py-10">

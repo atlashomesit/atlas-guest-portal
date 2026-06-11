@@ -1103,7 +1103,7 @@ export default function BookingConfirmationPage() {
           <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3">
             <h2 className="text-sm font-semibold text-text-primary">GST invoice</h2>
             <p className="text-sm text-text-secondary">
-              GST invoice will be available within 1 hour. Refresh this page to access it.
+              Your GST invoice is being generated — we'll send it to your email within 1 hour.
             </p>
             <p className="text-xs text-text-muted">
               Accommodation is billed under SAC&nbsp;9963 (hotel and similar accommodation services) as applicable for Indian GST.
@@ -1334,8 +1334,8 @@ export default function BookingConfirmationPage() {
           </section>
         )}
 
-        {/* TASK-1254: Self check-in card — visible within 48h of check-in (same window as WiFi) */}
-        {!isCancelled && booking.wifiVisible && booking.bookingRef &&
+        {/* TASK-1254: Self check-in card — available any time after confirmation */}
+        {!isCancelled && booking.bookingRef &&
           (booking.status === 'Confirmed' || booking.status === 'CheckedIn') && (
           <Link
             to={`/check-in/${encodeURIComponent(booking.bookingRef)}`}

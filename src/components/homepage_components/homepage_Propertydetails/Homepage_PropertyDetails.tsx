@@ -183,7 +183,7 @@ function getPpCancellationInfo(
   const fallback = opts?.fallbackText?.trim();
   if (fallback) {
     return {
-      headline: fallback.length > 96 ? `${fallback.slice(0, 93)}…` : fallback,
+      headline: 'Cancellation policy',
       description: fallback,
       steps,
     };
@@ -1468,13 +1468,10 @@ useEffect(() => {
                 aria-label={galleryUrls[0] ? `${data.property_name} — main photo` : `${data.property_name} — photo coming soon`}
               >
                 {!galleryUrls[0] && (
-                  <>
-                    <div className="pp-cell-id-hero" aria-hidden="true">{data.id}</div>
-                    <div className="pp-cell-overlay">
-                      <span className="pp-dot" aria-hidden="true" />
-                      <span>Photos coming soon · home is real</span>
-                    </div>
-                  </>
+                  <div className="pp-cell-overlay">
+                    <span className="pp-dot" aria-hidden="true" />
+                    <span>Photos coming soon</span>
+                  </div>
                 )}
               </div>
 
