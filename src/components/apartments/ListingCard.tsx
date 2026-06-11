@@ -5,7 +5,8 @@ import { type NightlyPriceBreakdown } from "../../utils/pricing";
 import OptimizedImage from "../ui/OptimizedImage";
 import OwnerShareBadge from "../OwnerShareBadge"; // TASK-1705
 import { useCurrency } from "../../contexts/CurrencyContext";
-import { formatEstTotalInclGst } from "../../utils/guestPriceEstimate";
+import { useBooking } from "../../contexts/BookingContext";
+import { estimateStayNights, formatEstTotalInclGst } from "../../utils/guestPriceEstimate";
 
 type ListingCardProps = {
   id: string;
@@ -67,11 +68,18 @@ const ListingCard: React.FC<ListingCardProps> = ({
   losDiscountPercent,
   losDiscount2MinNights,
   losDiscount2Percent,
-  estimateNights = 1,
+  estimateNights: estimateNightsProp,
   lastMinuteDiscountPercent,
   onClick,
 }) => {
   const { format: formatCurrency } = useCurrency();
+  const { booking } = useBooking();
+  const estimateNights = useMemo(() => {
+    if (estimateNightsProp != null) return estimateNightsProp;
+    const ci = booking.checkIn ? new Date(booking.checkIn) : null;
+    const co = booking.checkOut ? new Date(booking.checkOut) : null;
+    return estimateStayNights(ci, co);
+  }, [estimateNightsProp, booking.checkIn, booking.checkOut]);
   /** TASK-4013: Toggle between per-night and total price display */
   const [showTotal, setShowTotal] = useState(false);
   // TASK-1360: Compute "Last booked X days ago" label
