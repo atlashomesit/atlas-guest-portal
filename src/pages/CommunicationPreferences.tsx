@@ -1,7 +1,7 @@
 import React from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { Link } from "react-router-dom";
-import { buildApiUrl } from "@/api/client";
+import { buildApiUrl, getApiHeaders } from "@/api/client";
 import { getContactEmail, getWhatsAppLink } from "@/config/contact";
 import SEO from "@/components/SEO";
 import { getTenantBrandName } from "@/tenant/displayBrand";
@@ -32,7 +32,7 @@ export default function CommunicationPreferences() {
     setLoading(true);
     setError(null);
     fetch(buildApiUrl(`/api/public/communication-preferences/preferences/${encodeURIComponent(guestToken)}`), {
-      headers: { Accept: "application/json" },
+      headers: { Accept: "application/json", ...getApiHeaders() },
     })
       .then(async (res) => {
         if (!res.ok) throw new Error(await messageFromApiResponse(res));
@@ -66,7 +66,7 @@ export default function CommunicationPreferences() {
     try {
       const res = await fetch(buildApiUrl(`/api/public/communication-preferences/preferences/${encodeURIComponent(guestToken)}`), {
         method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        headers: { "Content-Type": "application/json", Accept: "application/json", ...getApiHeaders() },
         body: JSON.stringify(form),
       });
       if (!res.ok) throw new Error(await messageFromApiResponse(res));
