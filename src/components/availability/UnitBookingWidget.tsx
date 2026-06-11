@@ -4,7 +4,6 @@ import { addDays, format, startOfMonth } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { NETWORK_ERROR_MESSAGE } from './unitBookingPaymentOrderErrors';
-import { toast } from 'react-toastify';
 import { Button } from '@/components/ui/Button';
 import { type AtlasDateRangePickerValue } from '@/components/date/AtlasDateRangePicker';
 import { AtlasBookingCalendar } from './AtlasBookingCalendar';

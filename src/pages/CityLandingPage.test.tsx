@@ -3,6 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 import { CurrencyProvider } from "@/contexts/CurrencyContext";
+import { BookingProvider } from "@/contexts/BookingContext";
 import type { PublicListing } from "@/api/listingClient";
 
 vi.mock("@/api/listingClient", () => ({
@@ -37,7 +38,9 @@ describe("CityLandingPage", () => {
     render(
       <MemoryRouter>
         <CurrencyProvider>
-          <CityLandingPage citySlug="goa" />
+          <BookingProvider>
+            <CityLandingPage citySlug="goa" />
+          </BookingProvider>
         </CurrencyProvider>
       </MemoryRouter>,
     );

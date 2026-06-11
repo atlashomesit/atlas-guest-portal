@@ -83,10 +83,12 @@ describe('UnitBookingWidget - TASK-2623: .bw-* design header, price labels, trus
     expect(content).not.toContain('>Room fare<');
   });
 
-  it('GST label includes "on accommodation" once (no duplicate sublabel)', () => {
+  it('GST row is standardized to "GST (N%)" with no redundant "on accommodation" sublabel (TASK-4097)', () => {
     content = readFileSync(filePath, 'utf-8');
-    expect(content).toContain('on accommodation');
-    expect(content).not.toContain('On accommodation only');
+    // TASK-4097 (PR #242, commit 54200ec3) deliberately dropped the redundant
+    // "on accommodation" sublabel and standardized the GST row to "GST (N%)".
+    expect(content).toContain('GST ({gstSlabPercent}%)');
+    expect(content).not.toContain('on accommodation');
   });
 
   it('payment-processing label replaces older "Service fee" / "Convenience fee" wording (TASK-2633)', () => {
