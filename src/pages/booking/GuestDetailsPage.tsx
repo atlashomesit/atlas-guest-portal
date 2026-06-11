@@ -387,12 +387,6 @@ const GuestDetailsPage: React.FC = () => {
   const [selectedAddOns, setSelectedAddOns] = useState<Record<number, number>>({});
 
   useEffect(() => {
-    if (serverTotalConfirmRequired) {
-      serverTotalWarnRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
-  }, [serverTotalConfirmRequired]);
-
-  useEffect(() => {
     const id = holdListingId != null ? Number(holdListingId) : NaN;
     if (!Number.isFinite(id) || id <= 0) return;
     void (async () => {
@@ -483,6 +477,14 @@ const GuestDetailsPage: React.FC = () => {
     bookingToken: string | null;
   } | null>(null);
   const serverTotalWarnRef = useRef<HTMLDivElement>(null);
+
+  // TASK-2875: scroll the server-total warning into view once a second-tap confirm becomes required.
+  // Declared here (after serverTotalConfirmRequired/serverTotalWarnRef) to avoid a used-before-declaration / TDZ error.
+  useEffect(() => {
+    if (serverTotalConfirmRequired) {
+      serverTotalWarnRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [serverTotalConfirmRequired]);
 
   /** TASK-2875: when the server total differs, the Pay CTA shows the authoritative charge (INR). */
   const chargeInr =
