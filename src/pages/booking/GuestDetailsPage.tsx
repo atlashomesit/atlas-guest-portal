@@ -847,6 +847,31 @@ const GuestDetailsPage: React.FC = () => {
                         `We will retry automatically — if your stay is not confirmed in 10 minutes, contact us on WhatsApp (${getWhatsAppLink()}?text=${waText}) ` +
                         `or email ${getContactEmail()}. No need to pay again.`,
                     );
+                    // Poll booking-summary endpoint; navigate automatically when server confirms
+                    const pollToken = pendingBookingTokenRef.current;
+                    let pollTries = 0;
+                    const pollStatus = async () => {
+                      pollTries++;
+                      try {
+                        const r = await fetch(
+                          buildApiUrl(`/api/guest/bookings/${bookingId}/summary?t=${encodeURIComponent(pollToken ?? '')}`),
+                          { headers: { Accept: 'application/json', ...getApiHeaders() } },
+                        );
+                        if (r.ok) {
+                          const d: { status?: string } = await r.json();
+                          const s = d?.status;
+                          if (s === 'Confirmed' || s === 'CheckedIn' || s === 'PaymentReceived') {
+                            navigate(
+                              pollToken ? `/booking/${bookingId}?t=${encodeURIComponent(pollToken)}` : `/booking/${bookingId}`,
+                              { replace: true },
+                            );
+                            return;
+                          }
+                        }
+                      } catch { /* ignore, keep polling */ }
+                      if (pollTries < 4) setTimeout(pollStatus, 30000);
+                    };
+                    setTimeout(pollStatus, 15000);
                   } finally {
                     setIsSubmitting(false);
                   }
