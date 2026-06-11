@@ -723,6 +723,9 @@ const SearchPage = () => {
    * so we're showing all homes unfiltered — don't claim they're "available for your dates". */
   const dateAvailUnconfirmed =
     explicitDateSearch && !hasInvalidDates && !dateAvailLoading && dateAvailableIds === null;
+  /** TASK-4070: only true once the availability fetch resolved with real data. */
+  const dateAvailConfirmed =
+    explicitDateSearch && !hasInvalidDates && !dateAvailLoading && dateAvailableIds !== null;
   const queryString = searchParams.toString();
   const querySuffix = queryString ? `?${queryString}` : "";
   const approximatePinHint = useMemo(
@@ -767,7 +770,7 @@ const SearchPage = () => {
           {/* TASK-1864: dynamic h1 — only say "homes for your dates" when dates are actually set */}
           <h1 className="text-3xl font-bold text-text-primary sm:text-4xl" data-testid="search-results-h1">
             {checkIn && checkOut
-              ? `${filteredUnits.length} ${filteredUnits.length === 1 ? "home" : "homes"}${dateAvailUnconfirmed ? "" : " for your dates"}`
+              ? `${filteredUnits.length} ${filteredUnits.length === 1 ? "home" : "homes"}${dateAvailConfirmed ? " for your dates" : dateAvailLoading ? " — checking availability" : ""}`
               : getTenantBrandName()}
           </h1>
           <p className="max-w-3xl text-base text-text-body">

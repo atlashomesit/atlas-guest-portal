@@ -699,6 +699,12 @@ const GuestDetailsPage: React.FC = () => {
             }
           } else if (Number(serverPromoDiscount) > 0) {
             setServerPromoLocked(true);
+          } else if (appliedPromoCode && promoDiscountAmount > 0) {
+            setPromoDiscountAmount(0);
+            setAppliedPromoCode(null);
+            setServerPromoLocked(true);
+            setPromoMessage(`Promo ${appliedPromoCode} could not be applied`);
+            setPromoOpen(true);
           }
 
           keyId = respKeyId;
