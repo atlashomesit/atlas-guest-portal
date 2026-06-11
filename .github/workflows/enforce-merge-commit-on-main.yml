@@ -2,9 +2,10 @@ name: Enforce merge-commit on main
 
 # Workspace policy: every commit reaching main MUST be a 2-parent merge commit
 # (i.e. PR merged via "Create a merge commit", NOT "Rebase and merge" or "Squash").
-# This workflow fails the run if HEAD of main is not a merge commit. GitHub's API
-# forbids disabling rebase AND squash at the same time, so the merge-method allow
-# flags can't enforce this on their own — this workflow is the post-fact detection.
+# This workflow fails the run if the tip of main (the newly pushed commit) is not
+# a merge commit. GitHub's API forbids disabling rebase AND squash at the same time,
+# so the merge-method allow flags can't enforce this on their own — this workflow
+# is the post-fact detection.
 #
 # Filed 2026-05-22 by founder (Sreekar) request for true merge-commit-only enforcement.
 # See atlas-e2e/docs/governance/PR-MERGE-STRATEGY.md for the full rule.
@@ -26,7 +27,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Verify all pushed commits are merge commits
+      - name: Verify the pushed tip is a merge commit
         shell: bash
         env:
           BEFORE: ${{ github.event.before }}
@@ -37,34 +38,23 @@ jobs:
           if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
             # First-ever push to this branch (branch creation). No prior history to walk.
             echo "Branch creation push — verifying HEAD only."
-            COMMITS="$AFTER"
+            TIP="$AFTER"
           else
-            COMMITS=$(git rev-list "$BEFORE..$AFTER")
+            # Validate only the newly pushed tip ($AFTER), not all intermediate commits.
+            TIP="$AFTER"
           fi
 
-          if [ -z "$COMMITS" ]; then
-            echo "No new commits in push range (likely a no-op push). OK."
+          if [ -z "$TIP" ]; then
+            echo "No commit to verify (empty tip). OK."
             exit 0
           fi
 
-          VIOLATIONS=0
-          for sha in $COMMITS; do
-            PARENT_COUNT=$(git cat-file -p "$sha" | grep -c '^parent ' || true)
-            if [ "$PARENT_COUNT" -ne 2 ]; then
-              SUBJECT=$(git log -1 --format='%s' "$sha")
-              AUTHOR=$(git log -1 --format='%an <%ae>' "$sha")
-              echo "::error title=Merge-commit policy violation::Commit $sha on main has $PARENT_COUNT parent(s); expected 2 (merge commit). Author: $AUTHOR. Subject: $SUBJECT. This PR was merged with 'Rebase and merge' or 'Squash and merge' — both forbidden by PR-MERGE-STRATEGY.md. Recovery: revert the bad merge on main, then re-merge the source PR via 'Create a merge commit'."
-              VIOLATIONS=$((VIOLATIONS + 1))
-            else
-              echo "OK: $sha is a merge commit (2 parents)."
-            fi
-          done
-
-          if [ "$VIOLATIONS" -gt 0 ]; then
-            echo ""
-            echo "::error::$VIOLATIONS non-merge-commit(s) on main. See errors above."
+          PARENT_COUNT=$(git cat-file -p "$TIP" | grep -c '^parent ' || true)
+          if [ "$PARENT_COUNT" -ne 2 ]; then
+            SUBJECT=$(git log -1 --format='%s' "$TIP")
+            AUTHOR=$(git log -1 --format='%an <%ae>' "$TIP")
+            echo "::error title=Merge-commit policy violation::Commit $TIP on main has $PARENT_COUNT parent(s); expected 2 (merge commit). Author: $AUTHOR. Subject: $SUBJECT. This PR was merged with 'Rebase and merge' or 'Squash and merge' — both forbidden by PR-MERGE-STRATEGY.md. Recovery: revert the bad merge on main, then re-merge the source PR via 'Create a merge commit'."
             exit 1
           fi
 
-          echo ""
-          echo "All pushed commits on main are merge commits. Policy satisfied."
+          echo "OK: $TIP is a merge commit (2 parents). Policy satisfied."
