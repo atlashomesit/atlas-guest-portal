@@ -1206,6 +1206,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             <div>
               <small style={{ display: 'block', fontSize: '9.5px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#475569', marginBottom: 4 }}>Guests</small>
               <span className="lv-guest-val">{guests} {guests === 1 ? 'adult' : 'adults'}</span>
+              {guests >= effectiveMaxGuests && (
+                <small style={{ display: 'block', fontSize: '10px', color: '#64748b', marginTop: 2 }}>
+                  Maximum {effectiveMaxGuests} guest{effectiveMaxGuests === 1 ? '' : 's'} for this home
+                </small>
+              )}
             </div>
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ color: '#475569', flexShrink: 0 }}><polyline points="6 9 12 15 18 9" /></svg>
           </button>
@@ -1368,7 +1373,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           data-testid="bw-direct-savings-line"
           style={{ textAlign: 'center', fontSize: 12, color: '#157046', marginTop: 6, lineHeight: 1.45 }}
         >
-          Save ~{displayPrice(illustrativeOtaGuestFeeComparison.illustrativeGuestFee)} vs typical booking sites — no guest service fee on direct bookings.
+          Save ~{displayPrice(illustrativeOtaGuestFeeComparison.illustrativeGuestFee)} vs typical booking sites (illustrative) — no guest service fee on direct bookings.
         </p>
       )}
 

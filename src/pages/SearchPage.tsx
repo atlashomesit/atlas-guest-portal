@@ -29,7 +29,7 @@ import RecentlyViewedStrip from "../components/RecentlyViewedStrip";
 import { fallbackCoordsForListing, hasMapCoords } from "../utils/mapCoords";
 import { amenityCodeMatchesCategory, resolveAmenityLabel } from "../utils/amenityCodes";
 import { estimateStayNights, formatEstTotalInclGst } from "../utils/guestPriceEstimate";
-import { formatDisplayNumber, getTelLink } from "../config/contact";
+import { CONTACT } from "../config/contact";
 
 const SearchResultsMap = lazy(() => import("../components/search/SearchResultsMap"));
 
@@ -1072,8 +1072,8 @@ const SearchPage = () => {
             <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
             <span>
               Live listing refresh failed. Showing cached results — call{" "}
-              <a href={getTelLink()} className="font-semibold underline underline-offset-2">
-                {formatDisplayNumber()}
+              <a href={`tel:+91${CONTACT.business.phone}`} className="font-semibold underline underline-offset-2">
+                +91-{CONTACT.business.phone}
               </a>{" "}
               to confirm before booking.
             </span>
