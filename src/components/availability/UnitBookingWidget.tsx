@@ -936,7 +936,15 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         timeout: 15000,
       });
 
-      const { holdId, holdExpiresAt } = response.data ?? {};
+      // TASK-4111: read server-authoritative breakdown so GuestDetailsPage renders
+      // the correct quote on first paint. Fall back to client sums when absent.
+      const {
+        holdId,
+        holdExpiresAt,
+        baseAmount: serverBaseAmount,
+        convenienceFeeAmount: serverConvFee,
+        finalAmount: serverFinalAmount,
+      } = response.data ?? {};
       if (!holdId || !holdExpiresAt) {
         throw new Error('Hold could not be created. Please try again.');
       }
@@ -950,10 +958,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         holdListingId: numericListingId,
         holdListingName: listingName ?? null,
         holdPriceBreakdown: {
-          baseAmount: breakdownPrice,
+          baseAmount: typeof serverBaseAmount === 'number' && serverBaseAmount > 0 ? serverBaseAmount : breakdownPrice,
           discountAmount: 0,
-          convenienceFeeAmount: breakdownConvenienceFee,
-          finalAmount: finalTotal > 0 ? finalTotal : breakdownFinalTotal,
+          convenienceFeeAmount: typeof serverConvFee === 'number' ? serverConvFee : breakdownConvenienceFee,
+          finalAmount: typeof serverFinalAmount === 'number' && serverFinalAmount > 0 ? serverFinalAmount : (finalTotal > 0 ? finalTotal : breakdownFinalTotal),
           nights: stayNights,
           currency: 'INR',
         },
