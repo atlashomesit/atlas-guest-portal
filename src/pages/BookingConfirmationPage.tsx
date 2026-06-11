@@ -1479,7 +1479,7 @@ export default function BookingConfirmationPage() {
                   : addOn.priceType === 'per_guest' ? '/guest'
                   : '';
                 const addOnText = encodeURIComponent(
-                  `Hi, I just booked #${booking!.bookingId} and I'd like to add: ${addOn.name} (${booking!.currency} ${addOn.price}${priceLabel}). Please confirm.`
+                  `Hi, I just booked #${booking!.bookingId} and I'd like to add: ${addOn.name} (${booking!.currency} ${addOn.price}${priceLabel}). Please confirm.`
                 );
                 const addOnWhatsapp = `https://wa.me/${whatsappUrl.split('/')[3].split('?')[0]}?text=${addOnText}`;
                 return (
