@@ -7,7 +7,7 @@
  * E2E; this unit test guards the data layer.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 
 // ── Minimal replay of the tenantContext parsing logic ─────────────────────────
 // We test the parsing rules directly so we don't need to mock fetch.
