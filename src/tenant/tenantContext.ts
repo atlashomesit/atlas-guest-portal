@@ -86,6 +86,13 @@ export interface TenantLegalContactPack {
   gstin?: string;
   /** When true, the guest portal renders a small powered-by footer credit for the marketplace operator. */
   showAtlasFooterCredit: boolean;
+  /**
+   * TASK-4161: True when the tenant was resolved via a custom domain (or branded subdomain)
+   * rather than the Atlas default domain set. The guest portal uses this to conditionally render
+   * Consumer Protection E-Commerce Rules 2020 disclosures: merchant-of-record name, grievance
+   * contact, booking-engine credit, and Razorpay on-behalf-of line.
+   */
+  isCustomDomain: boolean;
 }
 
 let tenantInfo: TenantInfo | null = null;
@@ -221,6 +228,7 @@ export async function resolveFromDomain(apiBaseUrl: string, domain: string): Pro
             pincode: typeof data.legalContactPack.pincode === 'string' ? data.legalContactPack.pincode : undefined,
             gstin: typeof data.legalContactPack.gstin === 'string' ? data.legalContactPack.gstin : undefined,
             showAtlasFooterCredit: Boolean(data.legalContactPack.showAtlasFooterCredit),
+            isCustomDomain: Boolean(data.legalContactPack.isCustomDomain),
           }
         : undefined,
     };

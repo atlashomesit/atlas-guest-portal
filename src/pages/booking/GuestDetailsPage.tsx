@@ -1700,6 +1700,18 @@ const GuestDetailsPage: React.FC = () => {
             </div>
           </div>
 
+          {/* TASK-4161: Consumer Protection (E-Commerce) Rules 2020 — Razorpay on-behalf-of
+              disclosure for white-label / custom-domain tenants only. */}
+          {tenantCtx?.legalContactPack?.isCustomDomain && (
+            <p
+              data-testid="razorpay-mor-disclosure"
+              style={{ fontSize: 11, color: '#64748b', textAlign: 'center', marginBottom: 8, lineHeight: 1.5 }}
+            >
+              Payments are processed by Razorpay on behalf of{' '}
+              <strong>{tenantCtx.legalContactPack.legalName ?? brandName}</strong>.
+            </p>
+          )}
+
           {/* Pay CTA */}
           <button
             type="submit"
