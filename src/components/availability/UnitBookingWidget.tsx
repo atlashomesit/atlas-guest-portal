@@ -4,7 +4,6 @@ import { addDays, format, startOfMonth } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { NETWORK_ERROR_MESSAGE } from './unitBookingPaymentOrderErrors';
-import { toast } from 'react-toastify';
 import { Button } from '@/components/ui/Button';
 import { type AtlasDateRangePickerValue } from '@/components/date/AtlasDateRangePicker';
 import { AtlasBookingCalendar } from './AtlasBookingCalendar';
@@ -64,8 +63,6 @@ interface UnitBookingWidgetProps {
   /** TASK-956: minimum nights required — shown before the calendar opens. */
   minStayNights?: number;
 }
-
-const PENDING_PAYMENT_KEY = 'atlas_pending_razorpay_order';
 
 /** Detect network/connection failures (timeout, offline, ECONNREFUSED, etc.). */
 function isNetworkError(error: unknown): boolean {
@@ -244,15 +241,6 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     hasHydratedFromContextRef.current = false;
   }, [listingId]);
 
-
-  // On mount: clear any stale pending payment (e.g. user refreshed during Razorpay modal)
-  useEffect(() => {
-    const pending = localStorage.getItem(PENDING_PAYMENT_KEY);
-    if (pending) {
-      localStorage.removeItem(PENDING_PAYMENT_KEY);
-      toast.info('Your previous payment session was interrupted. You can try booking again.');
-    }
-  }, []);
 
   useEffect(() => {
     try {
@@ -936,7 +924,15 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         timeout: 15000,
       });
 
-      const { holdId, holdExpiresAt } = response.data ?? {};
+      // TASK-4111: read server-authoritative breakdown so GuestDetailsPage renders
+      // the correct quote on first paint. Fall back to client sums when absent.
+      const {
+        holdId,
+        holdExpiresAt,
+        baseAmount: serverBaseAmount,
+        convenienceFeeAmount: serverConvFee,
+        finalAmount: serverFinalAmount,
+      } = response.data ?? {};
       if (!holdId || !holdExpiresAt) {
         throw new Error('Hold could not be created. Please try again.');
       }
@@ -950,10 +946,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         holdListingId: numericListingId,
         holdListingName: listingName ?? null,
         holdPriceBreakdown: {
-          baseAmount: breakdownPrice,
+          baseAmount: typeof serverBaseAmount === 'number' && serverBaseAmount > 0 ? serverBaseAmount : breakdownPrice,
           discountAmount: 0,
-          convenienceFeeAmount: breakdownConvenienceFee,
-          finalAmount: finalTotal > 0 ? finalTotal : breakdownFinalTotal,
+          convenienceFeeAmount: typeof serverConvFee === 'number' ? serverConvFee : breakdownConvenienceFee,
+          finalAmount: typeof serverFinalAmount === 'number' && serverFinalAmount > 0 ? serverFinalAmount : (finalTotal > 0 ? finalTotal : breakdownFinalTotal),
           nights: stayNights,
           currency: 'INR',
         },
@@ -1026,11 +1022,13 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             <div className="lv-booking-total">
               <span className="lv-booking-from-prefix">From </span>
               <b data-testid="bw-per-night-price">
-                {effectiveDailyPricing != null
-                  ? formatCurrency(effectiveDailyPricing.actualPrice, { maximumFractionDigits: 0 })
-                  : perNightForDisplay > 0
-                    ? formatCurrency(perNightForDisplay, { maximumFractionDigits: 0 })
-                    : '—'}
+                {hasSelectedRange && perNightForDisplay > 0
+                  ? formatCurrency(perNightForDisplay, { maximumFractionDigits: 0 })
+                  : effectiveDailyPricing != null
+                    ? formatCurrency(effectiveDailyPricing.actualPrice, { maximumFractionDigits: 0 })
+                    : perNightForDisplay > 0
+                      ? formatCurrency(perNightForDisplay, { maximumFractionDigits: 0 })
+                      : '—'}
               </b>
               <span> / night</span>
             </div>
@@ -1198,6 +1196,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             <div>
               <small style={{ display: 'block', fontSize: '9.5px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#475569', marginBottom: 4 }}>Guests</small>
               <span className="lv-guest-val">{guests} {guests === 1 ? 'adult' : 'adults'}</span>
+              {guests >= effectiveMaxGuests && (
+                <small style={{ display: 'block', fontSize: '10px', color: '#64748b', marginTop: 2 }}>
+                  Maximum {effectiveMaxGuests} guest{effectiveMaxGuests === 1 ? '' : 's'} for this home
+                </small>
+              )}
             </div>
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ color: '#475569', flexShrink: 0 }}><polyline points="6 9 12 15 18 9" /></svg>
           </button>
@@ -1245,7 +1248,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           {gstSlabPercent != null && breakdownPrice > 0 && gstLineAmount > 0 && (
             <div className="lv-price-row" data-testid="bw-bd-gst-row">
               <span>
-                GST ({gstSlabPercent}%) <small style={{ color: '#475569', fontWeight: 400 }}>on accommodation</small>
+                GST ({gstSlabPercent}%)
               </span>
               <span className="lv-num">{displayPrice(gstLineAmount)}</span>
             </div>
@@ -1360,7 +1363,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           data-testid="bw-direct-savings-line"
           style={{ textAlign: 'center', fontSize: 12, color: '#157046', marginTop: 6, lineHeight: 1.45 }}
         >
-          Save ~{displayPrice(illustrativeOtaGuestFeeComparison.illustrativeGuestFee)} vs typical booking sites — no guest service fee on direct bookings.
+          Save ~{displayPrice(illustrativeOtaGuestFeeComparison.illustrativeGuestFee)} vs typical booking sites (illustrative) — no guest service fee on direct bookings.
         </p>
       )}
 

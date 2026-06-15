@@ -652,6 +652,14 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
           >
             {isSubmitting ? 'Checking...' : 'Check availability'}
           </button>
+          <button
+            type="button"
+            data-testid="hero-browse-all"
+            onClick={() => navigate('/search')}
+            className="mt-1.5 text-sm text-center text-[color:var(--text-muted)] underline underline-offset-2 hover:text-[color:var(--text-primary)] transition-colors w-full"
+          >
+            Browse all homes
+          </button>
         </div>
       </div>
 

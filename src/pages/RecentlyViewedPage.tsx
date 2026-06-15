@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { toast } from "react-toastify";
 import { Link } from "react-router-dom";
 import { FaHeart, FaRegHeart } from "react-icons/fa";
 import SEO from "../components/SEO";
@@ -123,6 +124,7 @@ export default function RecentlyViewedPage() {
                       onClick={() => {
                         toggleFavorite(it.listingId);
                         setFavEpoch((e) => e + 1);
+                        toast(saved ? "Removed from saved" : "Saved!", { position: "bottom-center" });
                       }}
                     >
                       {saved ? (
@@ -139,7 +141,9 @@ export default function RecentlyViewedPage() {
                       {stored != null && stored > 0 ? (
                         <p className="text-sm text-text-primary mt-1">
                           <span className="font-semibold">₹{stored.toLocaleString("en-IN")}</span>
-                          <span className="text-text-secondary"> / night</span>
+                          <span className="text-text-secondary">
+                            {!livePricesLoading && delta === null ? " / night (viewed price)" : " / night"}
+                          </span>
                         </p>
                       ) : null}
                       {livePricesLoading && stored != null && stored > 0 ? (
@@ -166,7 +170,7 @@ export default function RecentlyViewedPage() {
                       to={it.path}
                       className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-2 hover:opacity-95 transition-opacity"
                     >
-                      Book now
+                      {delta != null && delta < 0 ? 'Book at new lower price' : 'Book now'}
                     </Link>
                   </div>
                 </div>

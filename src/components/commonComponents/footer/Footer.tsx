@@ -205,6 +205,44 @@ const Footer = () => {
                 </div>
             </div>
 
+            {/* TASK-4161: Consumer Protection (E-Commerce) Rules 2020 disclosure — custom-domain
+                white-label tenants only. Must show: merchant-of-record legal name, grievance
+                contact, booking-engine credit, and Razorpay payment processor credit. */}
+            {tenant?.legalContactPack?.isCustomDomain && (
+                <div
+                    data-testid="mor-disclosure"
+                    className='mt-8 pt-6 border-t border-white/10 text-xs text-[var(--footer-link)] text-center space-y-1'
+                >
+                    <p>
+                        Bookings on this site are fulfilled by{' '}
+                        <strong>{tenant.legalContactPack.legalName ?? footerBrand}</strong>.
+                        {(tenant.legalContactPack.contactEmail || tenant.legalContactPack.contactPhone) && (
+                            <span>
+                                {' '}Grievance contact:{' '}
+                                {tenant.legalContactPack.contactEmail && (
+                                    <a
+                                        href={`mailto:${encodeURIComponent(tenant.legalContactPack.contactEmail)}`}
+                                        className='hover:text-[var(--footer-link-hover)] transition-colors'
+                                    >
+                                        {tenant.legalContactPack.contactEmail}
+                                    </a>
+                                )}
+                                {tenant.legalContactPack.contactEmail && tenant.legalContactPack.contactPhone && ' · '}
+                                {tenant.legalContactPack.contactPhone && (
+                                    <a
+                                        href={`tel:${tenant.legalContactPack.contactPhone}`}
+                                        className='hover:text-[var(--footer-link-hover)] transition-colors'
+                                    >
+                                        {tenant.legalContactPack.contactPhone}
+                                    </a>
+                                )}
+                            </span>
+                        )}
+                    </p>
+                    <p>Booking engine by <strong>Atlas PMS</strong> · Payments secured by <strong>Razorpay</strong></p>
+                </div>
+            )}
+
         </footer>    );
 };
 

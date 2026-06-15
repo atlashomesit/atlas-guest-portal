@@ -10,7 +10,7 @@ import { buildApiUrl, getApiHeaders } from "../api/client";
 import { getRuntimeConfig, hasRuntimeConfig } from "../runtime-config";
 import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 import { messageFromApiResponse } from "../utils/serverErrorFromResponse";
-import { getContactEmail } from "../config/contact";
+import { getContactEmail, getContactPhone } from "../config/contact";
 import { useGuestBookingQrToken } from "../hooks/useGuestBookingQrToken";
 
 /** Minimal shape of the non-standard `beforeinstallprompt` event — only `prompt()` is used here. */
@@ -215,8 +215,8 @@ const PRE_ARRIVAL_STRINGS: Record<string, {
     checkinLabel: "Check-in & check-out times", addressLabel: "Address", hostLabel: "Host WhatsApp",
     hostDesc: "Questions before you arrive? Message the property team.", chatBtn: "Chat on WhatsApp",
     wifiLabel: "WiFi", landmarksLabel: "Nearby landmarks", viewListing: "View full listing & photos",
-    t1Hint: (d) => `🏠 WhatsApp reminder with check-in instructions will be sent on ${d}.`,
-    t1Fallback: "🏠 WhatsApp reminder with check-in instructions will be sent the day before your stay.",
+    t1Hint: (d) => `🏠 We'll remind you on ${d} with check-in details (typically via WhatsApp or email).`,
+    t1Fallback: "🏠 We'll remind you the day before your stay with check-in details.",
     t1PreviewSummary: "Preview the day-before WhatsApp message",
     t1PreviewDisclaimer: "The exact wording may vary; your host may personalize the message before it is sent.",
   },
@@ -225,8 +225,8 @@ const PRE_ARRIVAL_STRINGS: Record<string, {
     checkinLabel: "चेक-इन और चेक-आउट का समय", addressLabel: "पता", hostLabel: "होस्ट WhatsApp",
     hostDesc: "आगमन से पहले प्रश्न हैं? संपत्ति टीम को संदेश करें।", chatBtn: "WhatsApp पर चैट करें",
     wifiLabel: "WiFi", landmarksLabel: "नज़दीकी स्थान", viewListing: "पूरी लिस्टिंग और फ़ोटो देखें",
-    t1Hint: (d) => `🏠 WhatsApp रिमाइंडर चेक-इन निर्देशों के साथ ${d} को भेजा जाएगा।`,
-    t1Fallback: "🏠 आपके प्रवास के एक दिन पहले WhatsApp रिमाइंडर भेजा जाएगा।",
+    t1Hint: (d) => `🏠 हम आपको ${d} को चेक-इन विवरण के साथ याद दिलाएंगे (सामान्यतः WhatsApp या ईमेल द्वारा)।`,
+    t1Fallback: "🏠 हम आपके प्रवास के एक दिन पहले चेक-इन विवरण के साथ याद दिलाएंगे।",
     t1PreviewSummary: "एक दिन पहले भेजे जाने वाले WhatsApp संदेश का पूर्वावलोकन",
     t1PreviewDisclaimer: "वास्तविक शब्द भिन्न हो सकते हैं; आपका होस्ट भेजने से पहले संदेश को अनुकूलित कर सकता है।",
   },
@@ -235,8 +235,8 @@ const PRE_ARRIVAL_STRINGS: Record<string, {
     checkinLabel: "చెక్-ఇన్ మరియు చెక్-అవుట్ సమయాలు", addressLabel: "చిరునామా", hostLabel: "హోస్ట్ WhatsApp",
     hostDesc: "రాకముందు ప్రశ్నలు ఉన్నాయా? ఆస్తి బృందాన్ని సందేశించండి।", chatBtn: "WhatsApp లో చాట్ చేయండి",
     wifiLabel: "WiFi", landmarksLabel: "సమీప ప్రదేశాలు", viewListing: "పూర్తి లిస్టింగ్ & ఫోటోలు చూడండి",
-    t1Hint: (d) => `🏠 చెక్-ఇన్ సూచనలతో WhatsApp రిమైండర్ ${d}న పంపబడుతుంది।`,
-    t1Fallback: "🏠 మీ వసతికి ముందు రోజు WhatsApp రిమైండర్ పంపబడుతుంది।",
+    t1Hint: (d) => `🏠 మేము ${d}న చెక్-ఇన్ వివరాలతో మీకు గుర్తు చేస్తాము (సాధారణంగా WhatsApp లేదా ఇమెయిల్ ద్వారా).`,
+    t1Fallback: "🏠 మేము మీ వసతికి ముందు రోజు చెక్-ఇన్ వివరాలతో గుర్తు చేస్తాము.",
     t1PreviewSummary: "ముందురోజు WhatsApp సందేశాన్ని చూడండి",
     t1PreviewDisclaimer: "నిజమైన పదాలు మారవచ్చు; పంపే ముందు మీ హోస్ట్ సందేశాన్ని సవరించవచ్చు.",
   },
@@ -692,7 +692,8 @@ export default function BookingConfirmationPage() {
   // TASK-2071: pick language strings from guest profile preference
   const langCode = (booking.preferredLanguage ?? "en").toLowerCase();
   const pa = PRE_ARRIVAL_STRINGS[langCode] ?? PRE_ARRIVAL_STRINGS.en;
-  const hostPhone = booking.propertyPhone?.trim() || "+917032493290";
+  const hasRealHostPhone = !!booking.propertyPhone?.trim();
+  const hostPhone = hasRealHostPhone ? booking.propertyPhone!.trim() : `+91${getContactPhone()}`;
   const hostPhoneDigits = hostPhone.replace(/[^\d+]/g, "");
   const whatsappDigits = hostPhoneDigits.replace(/^\+/, "");
   const supportEmail = getContactEmail();
@@ -1102,7 +1103,7 @@ export default function BookingConfirmationPage() {
           <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3">
             <h2 className="text-sm font-semibold text-text-primary">GST invoice</h2>
             <p className="text-sm text-text-secondary">
-              GST invoice will be available within 1 hour. Refresh this page to access it.
+              Your GST invoice is being generated — we'll send it to your email within 1 hour.
             </p>
             <p className="text-xs text-text-muted">
               Accommodation is billed under SAC&nbsp;9963 (hotel and similar accommodation services) as applicable for Indian GST.
@@ -1231,6 +1232,18 @@ export default function BookingConfirmationPage() {
           </div>
         )}
 
+        {/* TASK-4086: nearby landmarks — non-sensitive context shown immediately, not gated on 72h window */}
+        {!isCancelled && Array.isArray(booking.nearbyLandmarks) && booking.nearbyLandmarks.length > 0 && (
+          <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5">
+            <h2 className="text-sm font-semibold text-text-primary mb-3">📍 {pa.landmarksLabel}</h2>
+            <ul className="list-disc pl-5 text-sm text-text-primary space-y-1">
+              {booking.nearbyLandmarks.map((line, i) => (
+                <li key={`${i}-${line}`}>{line}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {/* TASK-1888: pre-arrival briefing (confirmed stays within 72h) */}
         {!isCancelled && booking.preArrivalBriefingVisible && (
           <section
@@ -1272,7 +1285,9 @@ export default function BookingConfirmationPage() {
                 </div>
               ) : null}
               <div className="py-3">
-                <span className="text-xs text-text-muted uppercase tracking-wider font-medium">{pa.hostLabel}</span>
+                <span className="text-xs text-text-muted uppercase tracking-wider font-medium">
+                  {hasRealHostPhone ? pa.hostLabel : 'Support'}
+                </span>
                 <p className="text-sm text-text-secondary mt-1">{pa.hostDesc}</p>
                 <div className="flex flex-wrap gap-2 mt-2">
                   <a
@@ -1282,7 +1297,7 @@ export default function BookingConfirmationPage() {
                     className="inline-flex items-center justify-center rounded-lg bg-[#25D366] text-white text-sm font-medium px-4 py-3 hover:opacity-95 transition-opacity"
                     data-testid="pre-arrival-whatsapp"
                   >
-                    {pa.chatBtn}
+                    {hasRealHostPhone ? pa.chatBtn : `Chat with ${brandName} support`}
                   </a>
                   <a
                     href={`mailto:${encodeURIComponent(supportEmail)}?subject=${encodeURIComponent(`Question before check-in — booking #${booking.bookingId}`)}`}
@@ -1308,16 +1323,6 @@ export default function BookingConfirmationPage() {
                   </p>
                 </div>
               )}
-              {Array.isArray(booking.nearbyLandmarks) && booking.nearbyLandmarks.length > 0 && (
-                <div className="py-3">
-                  <span className="text-xs text-text-muted uppercase tracking-wider font-medium">{pa.landmarksLabel}</span>
-                  <ul className="mt-2 list-disc pl-5 text-sm text-text-primary space-y-1">
-                    {booking.nearbyLandmarks.map((line, i) => (
-                      <li key={`${i}-${line}`}>{line}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
             </div>
             {booking.listingId != null && booking.listingId > 0 && (
               <Link
@@ -1331,8 +1336,8 @@ export default function BookingConfirmationPage() {
           </section>
         )}
 
-        {/* TASK-1254: Self check-in card — visible within 48h of check-in (same window as WiFi) */}
-        {!isCancelled && booking.wifiVisible && booking.bookingRef &&
+        {/* TASK-1254: Self check-in card — available any time after confirmation */}
+        {!isCancelled && booking.bookingRef &&
           (booking.status === 'Confirmed' || booking.status === 'CheckedIn') && (
           <Link
             to={`/check-in/${encodeURIComponent(booking.bookingRef)}`}
@@ -1446,7 +1451,7 @@ export default function BookingConfirmationPage() {
                   rel="noopener noreferrer"
                   className="text-brand-primary font-medium underline underline-offset-2"
                 >
-                  Chat with host on WhatsApp
+                  {hasRealHostPhone ? 'Chat with host on WhatsApp' : `Chat with ${brandName} support`}
                 </a>
                 {" "}or{" "}
                 <a
@@ -1466,14 +1471,15 @@ export default function BookingConfirmationPage() {
         {/* TASK-1376: Add-on upsell — only when listing has active add-ons and booking is not cancelled */}
         {!isCancelled && addOns.length > 0 && (
           <div className="rounded-2xl border border-brand-primary/30 bg-brand-primary/5 p-5">
-            <h2 className="text-sm font-semibold text-text-primary mb-3">Make your stay even better</h2>
+            <h2 className="text-sm font-semibold text-text-primary mb-1">Make your stay even better</h2>
+            <p className="text-xs text-text-secondary mb-3">Our team will confirm via WhatsApp after you send a request.</p>
             <div className="space-y-3">
               {addOns.slice(0, 3).map((addOn) => {
                 const priceLabel = addOn.priceType === 'per_night' ? '/night'
                   : addOn.priceType === 'per_guest' ? '/guest'
                   : '';
                 const addOnText = encodeURIComponent(
-                  `Hi, I just booked #${booking!.bookingId} and I'd like to add: ${addOn.name} (₹${addOn.price}${priceLabel}). Please confirm.`
+                  `Hi, I just booked #${booking!.bookingId} and I'd like to add: ${addOn.name} (${booking!.currency} ${addOn.price}${priceLabel}). Please confirm.`
                 );
                 const addOnWhatsapp = `https://wa.me/${whatsappUrl.split('/')[3].split('?')[0]}?text=${addOnText}`;
                 return (
@@ -1488,7 +1494,7 @@ export default function BookingConfirmationPage() {
                       rel="noopener noreferrer"
                       className="shrink-0 inline-flex min-h-11 items-center gap-1 rounded-lg bg-brand-primary text-white text-sm font-semibold px-4 py-3 hover:opacity-90 transition-opacity"
                     >
-                      Add ₹{addOn.price}{priceLabel}
+                      Request · {booking!.currency}&nbsp;{addOn.price}{priceLabel}
                     </a>
                   </div>
                 );
@@ -1512,7 +1518,7 @@ export default function BookingConfirmationPage() {
             rel="noopener noreferrer"
             className="inline-flex items-center justify-center rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-3 hover:bg-brand-primary/5 transition-colors"
           >
-            Chat with host on WhatsApp
+            {hasRealHostPhone ? 'Chat with host on WhatsApp' : `Chat with ${brandName} support`}
           </a>
         </div>
 

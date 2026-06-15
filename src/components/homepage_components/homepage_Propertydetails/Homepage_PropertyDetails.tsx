@@ -183,7 +183,7 @@ function getPpCancellationInfo(
   const fallback = opts?.fallbackText?.trim();
   if (fallback) {
     return {
-      headline: fallback.length > 96 ? `${fallback.slice(0, 93)}…` : fallback,
+      headline: 'Cancellation policy',
       description: fallback,
       steps,
     };
@@ -279,7 +279,7 @@ interface Property {
     property_reviews: number;
     property_price: number;
     timezoneId?: string;
-    photoCount?: number;
+    // photoCount from API is intentionally not used for display; all counts derive from galleryUrls.length
     maxGuests?: number;
     maxCapacity?: number;
     /** G3-002: from API listing when available */
@@ -323,7 +323,6 @@ function coerceProperty(item: Partial<Property> & { id?: number | string }): Pro
         property_reviews: item.property_reviews ?? 0,
         property_price: item.property_price ?? 0,
         timezoneId: item.timezoneId,
-        photoCount: item.photoCount,
         maxGuests: item.maxGuests,
         maxCapacity: item.maxCapacity,
         checkInTime: item.checkInTime,
@@ -866,7 +865,6 @@ const PropertyDetails = () => {
                             ? [...new Set((photoUrlsRaw as string[]).filter(Boolean))]
                             : [],
                     );
-                    const photoCount = Number((apiListing as Record<string, unknown>).photoCount) || 0;
                     const pub = apiListing as unknown as Partial<PublicListing>;
                     // TASK-2739-v1: capture publishStatus on the API-fallback render path too.
                     {
@@ -895,7 +893,6 @@ const PropertyDetails = () => {
                         property_reviews: Number((apiListing as Record<string, unknown>).property_reviews) || 0,
                         property_price: Number((apiListing as Record<string, unknown>).property_price) || 0,
                         timezoneId: (apiListing as Record<string, unknown>).timezoneId as string | undefined,
-                        photoCount: photoCount || (coverUrl ? 1 : 0),
                         maxGuests: parseMaxGuestsFromPayload(apiListing as Record<string, unknown>),
                         checkInTime: pub.checkInTime?.trim() || undefined,
                         checkOutTime: pub.checkOutTime?.trim() || undefined,
@@ -1279,11 +1276,10 @@ useEffect(() => {
     const ppTenantOverrides = getTenantOverrides(ppTenantCtx?.slug ?? '');
     const ppHideAtlasBranding = shouldHideAtlasBranding(ppTenantCtx, ppTenantOverrides);
     const ppBrandName = getTenantBrandName();
-    const ppHostDisplayName =
-      data.hostName?.trim() ||
-      ppTenantCtx?.name?.trim() ||
-      data.property_name ||
-      ppBrandName;
+    const ppHasRealHost = !!data.hostName?.trim();
+    const ppHostDisplayName = ppHasRealHost
+      ? data.hostName!.trim()
+      : `Listed by ${ppBrandName}`;
     const ppHostInitial = ppHostDisplayName.charAt(0).toUpperCase();
     const ppHasOnlinePayment =
       typeof _getTenantCtx()?.paymentProvider === 'string' && _getTenantCtx()?.paymentProvider !== 'MANUAL';
@@ -1332,6 +1328,8 @@ useEffect(() => {
       Number.isFinite(data.longitude);
     const ppStickyNightly =
       directBookingNightly > 0 ? directBookingNightly : (nightlyPrice?.finalNightlyPrice ?? 0);
+    const directBookingNightlyIsSynthetic =
+      !(dailyPricingRow?.finalAmount != null && Number(dailyPricingRow.finalAmount) > 0);
 
     return (
         <>
@@ -1472,13 +1470,10 @@ useEffect(() => {
                 aria-label={galleryUrls[0] ? `${data.property_name} — main photo` : `${data.property_name} — photo coming soon`}
               >
                 {!galleryUrls[0] && (
-                  <>
-                    <div className="pp-cell-id-hero" aria-hidden="true">{data.id}</div>
-                    <div className="pp-cell-overlay">
-                      <span className="pp-dot" aria-hidden="true" />
-                      <span>Photos coming soon · home is real</span>
-                    </div>
-                  </>
+                  <div className="pp-cell-overlay">
+                    <span className="pp-dot" aria-hidden="true" />
+                    <span>Photos coming soon</span>
+                  </div>
                 )}
               </div>
 
@@ -1610,9 +1605,11 @@ useEffect(() => {
                     <div>
                       <div className="pp-host-name">
                         {ppHostDisplayName}
-                        <span className="pp-verified-badge">
-                          <PpCheckIcon size={10} /> Verified
-                        </span>
+                        {ppHasRealHost && (
+                          <span className="pp-verified-badge">
+                            <PpCheckIcon size={10} /> Verified
+                          </span>
+                        )}
                       </div>
                       <div className="pp-host-sub">
                         Hosted directly · Responds on WhatsApp · Direct booking
@@ -1664,17 +1661,15 @@ useEffect(() => {
                       <li>
                         <PpCheckIcon size={16} />
                         <span>
-                          <b>Property photos are genuine.</b>
-                          <span className="pp-meta">Our team reviewed listing photos before publishing.</span>
+                          <b>Photos and basic details reviewed.</b>
+                          <span className="pp-meta">Listings are reviewed for photos and basic details before going live.</span>
                         </span>
                       </li>
                       <li>
                         <PpCheckIcon size={16} />
                         <span>
-                          <b>Reviewed before going live.</b>
-                          <span className="pp-meta">
-                            Every {ppBrandName} listing is checked for photos and basic details before publish.
-                          </span>
+                          <b>Direct booking — no middlemen.</b>
+                          <span className="pp-meta">You pay the host directly via Razorpay.</span>
                         </span>
                       </li>
                       {ppHasMapCoordinates ? (
@@ -1686,13 +1681,6 @@ useEffect(() => {
                           </span>
                         </li>
                       ) : null}
-                      <li>
-                        <PpCheckIcon size={16} />
-                        <span>
-                          <b>Direct booking — no middlemen.</b>
-                          <span className="pp-meta">You pay the host directly via Razorpay.</span>
-                        </span>
-                      </li>
                     </ul>
                   </div>
                 </section>
@@ -1849,17 +1837,20 @@ useEffect(() => {
                             );
                           }
                           return (
-                            <div className="pp-v2-rating-bars">
-                              {bars.map(b => (
-                                <div key={b.label} className="pp-v2-rating-bar-row">
-                                  <span>{b.label}</span>
-                                  <div className="pp-v2-rating-bar">
-                                    <span style={{ width: `${Math.round((b.v! / 5) * 100)}%` }} />
+                            <>
+                              <div className="pp-v2-rating-bars">
+                                {bars.map(b => (
+                                  <div key={b.label} className="pp-v2-rating-bar-row">
+                                    <span>{b.label}</span>
+                                    <div className="pp-v2-rating-bar">
+                                      <span style={{ width: `${Math.round((b.v! / 5) * 100)}%` }} />
+                                    </div>
+                                    <span className="pp-v2-rating-bar-val">{b.v!.toFixed(1)}</span>
                                   </div>
-                                  <span className="pp-v2-rating-bar-val">{b.v!.toFixed(1)}</span>
-                                </div>
-                              ))}
-                            </div>
+                                ))}
+                              </div>
+                              <p style={{ fontSize: 12, color: '#64748b', marginTop: 6 }}>Based on {rs.length} recent review{rs.length !== 1 ? 's' : ''}</p>
+                            </>
                           );
                         })()}
                       </div>
@@ -2173,43 +2164,37 @@ useEffect(() => {
                 {/* Trust band — consolidates legitimacy, cancellation & payment
                     (DESIGN-003). Absorbs the former standalone verified pill.
                     Each row degrades gracefully on missing data. */}
-                {(() => {
-                  const pp = _getTenantCtx()?.paymentProvider;
-                  const hasOnline = typeof pp === 'string' && pp !== 'MANUAL';
-                  return (
-                    <div className="pp-trust" data-testid="property-trust-band" aria-label="Booking trust details">
-                      <div className="pp-trust-row">
-                        <ShieldCheck className="pp-trust-ic" size={18} aria-hidden="true" />
-                        <div>
-                          <div className="pp-trust-t">
-                            {hasOnline ? `Verified home · Instant book` : `Verified home · Host-confirmed booking`}
-                          </div>
-                          <div className="pp-trust-s">
-                            Listing details and photos reviewed by {ppBrandName} before going live.
-                          </div>
-                        </div>
+                <div className="pp-trust" data-testid="property-trust-band" aria-label="Booking trust details">
+                  <div className="pp-trust-row">
+                    <ShieldCheck className="pp-trust-ic" size={18} aria-hidden="true" />
+                    <div>
+                      <div className="pp-trust-t">
+                        {ppHasOnlinePayment ? `Verified home · Instant book` : `Verified home · Host-confirmed booking`}
                       </div>
-                      <div className="pp-trust-row">
-                        <CalendarClock className="pp-trust-ic" size={18} aria-hidden="true" />
-                        <div>
-                          <div className="pp-trust-t">{ppCancellationInfo.headline}</div>
-                          <div className="pp-trust-s">{ppCancellationInfo.description}</div>
-                        </div>
-                      </div>
-                      <div className="pp-trust-row">
-                        <CreditCard className="pp-trust-ic" size={18} aria-hidden="true" />
-                        <div>
-                          <div className="pp-trust-t">Direct booking · no OTA fees</div>
-                          <div className="pp-trust-s">
-                            {hasOnline
-                              ? 'You pay the host directly. Secure payment via Razorpay (UPI, cards, netbanking).'
-                              : 'You pay the host directly — no middle-man fees. The host confirms your dates.'}
-                          </div>
-                        </div>
+                      <div className="pp-trust-s">
+                        Listing details and photos reviewed by {ppBrandName} before going live.
                       </div>
                     </div>
-                  );
-                })()}
+                  </div>
+                  <div className="pp-trust-row">
+                    <CalendarClock className="pp-trust-ic" size={18} aria-hidden="true" />
+                    <div>
+                      <div className="pp-trust-t">{ppCancellationInfo.headline}</div>
+                      <div className="pp-trust-s">{ppCancellationInfo.description}</div>
+                    </div>
+                  </div>
+                  <div className="pp-trust-row">
+                    <CreditCard className="pp-trust-ic" size={18} aria-hidden="true" />
+                    <div>
+                      <div className="pp-trust-t">Direct booking · no OTA fees</div>
+                      <div className="pp-trust-s">
+                        {ppHasOnlinePayment
+                          ? 'You pay the host directly. Secure payment via Razorpay (UPI, cards, netbanking).'
+                          : 'You pay the host directly — no middle-man fees. The host confirms your dates.'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
                 {/* WhatsApp CTA (sidebar) — TASK-2873: draft listings are question-only, not book-via-WhatsApp */}
                 <div style={{ marginTop: 12 }}>
@@ -2315,8 +2300,9 @@ useEffect(() => {
           ) : (
             <div className="pp-m-sticky" aria-label="Book this property" data-testid="mobile-reserve-bar">
               <div className="pp-m-sticky-price">
-                <b>{formatCurrency(ppStickyNightly, { maximumFractionDigits: 0 })}</b>
+                <b>{directBookingNightlyIsSynthetic ? 'from ' : ''}{formatCurrency(ppStickyNightly, { maximumFractionDigits: 0 })}</b>
                 <span>/ night</span>
+                <span className="pp-m-sticky-taxes">+ taxes &amp; fees</span>
               </div>
               <button
                 type="button"

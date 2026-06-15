@@ -29,7 +29,7 @@ import RecentlyViewedStrip from "../components/RecentlyViewedStrip";
 import { fallbackCoordsForListing, hasMapCoords } from "../utils/mapCoords";
 import { amenityCodeMatchesCategory, resolveAmenityLabel } from "../utils/amenityCodes";
 import { estimateStayNights, formatEstTotalInclGst } from "../utils/guestPriceEstimate";
-import { formatDisplayNumber, getTelLink } from "../config/contact";
+import { CONTACT } from "../config/contact";
 
 const SearchResultsMap = lazy(() => import("../components/search/SearchResultsMap"));
 
@@ -493,7 +493,7 @@ const SearchPage = () => {
         if ((unit.wifiSpeedMbps ?? 0) < 50) return false;
       }
       if (nomadWorkspace) {
-        const hasWorkspace = hasAmenity(unit, "Workspace") || hasAmenity(unit, "Desk") || unit.hasCoworkingDesk;
+        const hasWorkspace = hasAmenity(unit, "workspace") || unit.hasCoworkingDesk;
         if (!hasWorkspace) return false;
       }
       if (monthlyStay) {
@@ -555,7 +555,7 @@ const SearchPage = () => {
       setAvailabilityFetchDone(explicitDateSearch || hasInvalidDates);
       return;
     }
-    const ids = sortedUnits.map((u) => u.numericId).filter((id) => id > 0).slice(0, 48);
+    const ids = sortedUnits.map((u) => u.numericId).filter((id) => id > 0);
     if (ids.length === 0) {
       setAvailabilityById({});
       setAvailabilityFetchDone(true);
@@ -723,6 +723,9 @@ const SearchPage = () => {
    * so we're showing all homes unfiltered — don't claim they're "available for your dates". */
   const dateAvailUnconfirmed =
     explicitDateSearch && !hasInvalidDates && !dateAvailLoading && dateAvailableIds === null;
+  /** TASK-4070: only true once the availability fetch resolved with real data. */
+  const dateAvailConfirmed =
+    explicitDateSearch && !hasInvalidDates && !dateAvailLoading && dateAvailableIds !== null;
   const queryString = searchParams.toString();
   const querySuffix = queryString ? `?${queryString}` : "";
   const approximatePinHint = useMemo(
@@ -747,13 +750,17 @@ const SearchPage = () => {
       }),
     [sortedUnits],
   );
-  /** TASK-1451 / TASK-2572: cheapest 3 listings as "you might also like" — avoids re-offering the filtered-out listings. */
+  /** TASK-1451 / TASK-2572 / TASK-4092: cheapest 3 available listings — excludes date-unavailable homes. */
   const emptyStateSuggestions = useMemo(() => {
     if (listings.length === 0) return [];
-    return [...listings]
+    const dateFiltered = dateAvailableIds !== null
+      ? listings.filter((l) => dateAvailableIds.has(l.numericId))
+      : listings;
+    const pool = dateFiltered.length > 0 ? dateFiltered : listings;
+    return [...pool]
       .sort((a, b) => a.pricePerNight - b.pricePerNight)
       .slice(0, 3);
-  }, [listings]);
+  }, [listings, dateAvailableIds]);
 
   return (
     <div className="min-h-screen bg-bg-muted py-10">
@@ -763,7 +770,7 @@ const SearchPage = () => {
           {/* TASK-1864: dynamic h1 — only say "homes for your dates" when dates are actually set */}
           <h1 className="text-3xl font-bold text-text-primary sm:text-4xl" data-testid="search-results-h1">
             {checkIn && checkOut
-              ? `${filteredUnits.length} ${filteredUnits.length === 1 ? "home" : "homes"}${dateAvailUnconfirmed ? "" : " for your dates"}`
+              ? `${filteredUnits.length} ${filteredUnits.length === 1 ? "home" : "homes"}${dateAvailConfirmed ? " for your dates" : dateAvailLoading ? " — checking availability" : ""}`
               : getTenantBrandName()}
           </h1>
           <p className="max-w-3xl text-base text-text-body">
@@ -873,19 +880,28 @@ const SearchPage = () => {
             />
             <span className="text-text-primary">Long stay (7+ nights)</span>
           </label>
-          {(!checkIn || !checkOut) && (
           <label className="flex items-center gap-2 rounded-lg border border-border-subtle bg-bg-muted px-3 py-2 text-sm">
             <input
               type="checkbox"
               id="filter-available-tonight"
               checked={availableNow}
-              onChange={(e) => updateParam("availableNow", e.target.checked ? "true" : "")}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                updateParam("availableNow", checked ? "true" : "");
+                if (checked && (checkIn || checkOut)) {
+                  const now = new Date();
+                  const todayStr = now.toISOString().slice(0, 10);
+                  const tom = new Date(now.getTime() + 86400000);
+                  const tomStr = tom.toISOString().slice(0, 10);
+                  updateParam("checkIn", todayStr);
+                  updateParam("checkOut", tomStr);
+                }
+              }}
               className="cursor-pointer"
               data-testid="search-filter-available-tonight"
             />
             <span className="text-text-primary">Available tonight</span>
           </label>
-          )}
           <div className="ml-auto flex items-end gap-3">
             {!isLoading && listings.length > 0 && (
               <span className="text-sm text-text-muted">
@@ -1063,8 +1079,8 @@ const SearchPage = () => {
             <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
             <span>
               Live listing refresh failed. Showing cached results — call{" "}
-              <a href={getTelLink()} className="font-semibold underline underline-offset-2">
-                {formatDisplayNumber()}
+              <a href={`tel:+91${CONTACT.business.phone}`} className="font-semibold underline underline-offset-2">
+                +91-{CONTACT.business.phone}
               </a>{" "}
               to confirm before booking.
             </span>
@@ -1306,7 +1322,18 @@ const SearchPage = () => {
                 </div>
                 {/* TASK-1460: reserve chip row so layout does not jump when summary loads */}
                 <div className="min-h-7 px-5 pt-3" data-testid="search-listing-availability-slot">
-                  {!explicitDateSearch ? (() => {
+                  {explicitDateSearch ? (
+                    dateAvailLoading ? (
+                      <span className="inline-block h-5 w-16 rounded-full bg-bg-muted" aria-hidden />
+                    ) : dateAvailableIds !== null ? (
+                      <span
+                        className="inline-flex max-w-full items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-emerald-100 text-emerald-800"
+                        data-testid="search-listing-availability-chip"
+                      >
+                        Available
+                      </span>
+                    ) : null
+                  ) : (() => {
                     const chip = availabilityChip(availabilityById[unit.numericId]);
                     return chip ? (
                       <span
@@ -1318,7 +1345,7 @@ const SearchPage = () => {
                     ) : !availabilityFetchDone ? (
                       <span className="inline-block h-5 w-16 rounded-full bg-bg-muted" aria-hidden />
                     ) : null;
-                  })() : null}
+                  })()}
                 </div>
                 <div className="flex flex-1 flex-col gap-3 p-5">
                   <div className="flex items-start justify-between gap-3">
@@ -1443,9 +1470,11 @@ const SearchPage = () => {
                       {unit.amenities.slice(0, 4).map((amenity, index) => {
                         const code = amenity.amenities_icon?.trim();
                         if (!code) return null;
+                        const label = resolveAmenityLabel(code);
+                        if (!label) return null;
                         return (
                           <span key={`${unit.id}-amenity-${index}`} className="font-semibold text-text-secondary">
-                            {resolveAmenityLabel(code)}
+                            {label}
                           </span>
                         );
                       })}

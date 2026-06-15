@@ -476,6 +476,15 @@ const GuestDetailsPage: React.FC = () => {
     amount: number;
     bookingToken: string | null;
   } | null>(null);
+  const serverTotalWarnRef = useRef<HTMLDivElement>(null);
+
+  // TASK-2875: scroll the server-total warning into view once a second-tap confirm becomes required.
+  // Declared here (after serverTotalConfirmRequired/serverTotalWarnRef) to avoid a used-before-declaration / TDZ error.
+  useEffect(() => {
+    if (serverTotalConfirmRequired) {
+      serverTotalWarnRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [serverTotalConfirmRequired]);
 
   /** TASK-2875: when the server total differs, the Pay CTA shows the authoritative charge (INR). */
   const chargeInr =
@@ -686,8 +695,18 @@ const GuestDetailsPage: React.FC = () => {
             setAppliedPromoCode(serverPromoCode.trim());
             setPromoDiscountAmount(Number(serverPromoDiscount) > 0 ? Number(serverPromoDiscount) : 0);
             setServerPromoLocked(true);
+            if (!(Number(serverPromoDiscount) > 0)) {
+              setPromoMessage(`Promo ${serverPromoCode.trim()} could not be applied`);
+              setPromoOpen(true);
+            }
           } else if (Number(serverPromoDiscount) > 0) {
             setServerPromoLocked(true);
+          } else if (appliedPromoCode && promoDiscountAmount > 0) {
+            setPromoDiscountAmount(0);
+            setAppliedPromoCode(null);
+            setServerPromoLocked(true);
+            setPromoMessage(`Promo ${appliedPromoCode} could not be applied`);
+            setPromoOpen(true);
           }
 
           keyId = respKeyId;
@@ -749,16 +768,16 @@ const GuestDetailsPage: React.FC = () => {
                   method: 'upi',
                   ...(lastUpiVpa ? { vpa: lastUpiVpa } : {}),
                 },
-                upi: { flow: 'collect', ...(lastUpiVpa ? { vpa: lastUpiVpa } : {}) },
+                ...(lastUpiVpa ? { upi: { vpa: lastUpiVpa } } : {}),
                 config: {
                   display: {
                     blocks: {
-                      upi_collect: {
-                        name: 'Pay using UPI ID',
-                        instruments: [{ method: 'upi', flows: ['collect'] }],
+                      upi_block: {
+                        name: 'Pay using UPI',
+                        instruments: [{ method: 'upi' }],
                       },
                     },
-                    sequence: ['block.upi_collect', 'block.card', 'block.netbanking', 'block.wallet'],
+                    sequence: ['block.upi_block', 'block.card', 'block.netbanking', 'block.wallet'],
                     preferences: { show_default_blocks: true },
                   },
                 },
@@ -830,6 +849,31 @@ const GuestDetailsPage: React.FC = () => {
                         `We will retry automatically — if your stay is not confirmed in 10 minutes, contact us on WhatsApp (${getWhatsAppLink()}?text=${waText}) ` +
                         `or email ${getContactEmail()}. No need to pay again.`,
                     );
+                    // Poll booking-summary endpoint; navigate automatically when server confirms
+                    const pollToken = pendingBookingTokenRef.current;
+                    let pollTries = 0;
+                    const pollStatus = async () => {
+                      pollTries++;
+                      try {
+                        const r = await fetch(
+                          buildApiUrl(`/api/guest/bookings/${bookingId}/summary?t=${encodeURIComponent(pollToken ?? '')}`),
+                          { headers: { Accept: 'application/json', ...getApiHeaders() } },
+                        );
+                        if (r.ok) {
+                          const d: { status?: string } = await r.json();
+                          const s = d?.status;
+                          if (s === 'Confirmed' || s === 'CheckedIn' || s === 'PaymentReceived') {
+                            navigate(
+                              pollToken ? `/booking/${bookingId}?t=${encodeURIComponent(pollToken)}` : `/booking/${bookingId}`,
+                              { replace: true },
+                            );
+                            return;
+                          }
+                        }
+                      } catch { /* ignore, keep polling */ }
+                      if (pollTries < 4) setTimeout(pollStatus, 30000);
+                    };
+                    setTimeout(pollStatus, 15000);
                   } finally {
                     setIsSubmitting(false);
                   }
@@ -1470,6 +1514,7 @@ const GuestDetailsPage: React.FC = () => {
             {/* Error banners */}
             {serverTotalConfirmRequired && razorpayAmountPaise != null && (
               <div
+                ref={serverTotalWarnRef}
                 className="gd-alert gd-alert-warn"
                 role="status"
                 data-testid="guest-checkout-total-updated"
@@ -1634,7 +1679,7 @@ const GuestDetailsPage: React.FC = () => {
             {gstSlabPercent != null && gstLineAmount > 0 && (
               <div className="gd-price-row gst">
                 <div className="desc">
-                  <span>GST {gstSlabPercent}% on accommodation</span>
+                  <span>GST {gstSlabPercent}%</span>
                 </div>
                 <span className="num">{displayPrice(gstLineAmount)}</span>
               </div>
@@ -1654,6 +1699,18 @@ const GuestDetailsPage: React.FC = () => {
               <small className="num-sub">Includes GST · INR</small>
             </div>
           </div>
+
+          {/* TASK-4161: Consumer Protection (E-Commerce) Rules 2020 — Razorpay on-behalf-of
+              disclosure for white-label / custom-domain tenants only. */}
+          {tenantCtx?.legalContactPack?.isCustomDomain && (
+            <p
+              data-testid="razorpay-mor-disclosure"
+              style={{ fontSize: 11, color: '#64748b', textAlign: 'center', marginBottom: 8, lineHeight: 1.5 }}
+            >
+              Payments are processed by Razorpay on behalf of{' '}
+              <strong>{tenantCtx.legalContactPack.legalName ?? brandName}</strong>.
+            </p>
+          )}
 
           {/* Pay CTA */}
           <button
@@ -1715,7 +1772,9 @@ const GuestDetailsPage: React.FC = () => {
         >
           {isSubmitting
             ? <><IconSpinner size={14}/> Securing…</>
-            : <><IconLock size={14}/> Pay <span className="num">{displayPrice(chargeInr)}</span></>
+            : serverTotalConfirmRequired
+              ? <><IconLock size={14}/> Confirm <span className="num">{displayPrice(chargeInr)}</span></>
+              : <><IconLock size={14}/> Pay <span className="num">{displayPrice(chargeInr)}</span></>
           }
         </button>
       </div>
