@@ -5,7 +5,16 @@ import type { TenantInfo } from "../tenant/tenantContext";
 vi.mock("../tenant/tenantContext", () => ({ getTenantContext: vi.fn() }));
 vi.mock("../tenant/tenantOverrides", () => ({ getTenantOverrides: vi.fn() }));
 
-import { getContactPhone, getWhatsAppPhone } from "./contact";
+import {
+  getContactPhone,
+  getWhatsAppPhone,
+  getContactEmail,
+  getTelLink,
+  getWhatsAppLink,
+  formatDisplayNumber,
+  hasHostContact,
+  isWhiteLabelTenant,
+} from "./contact";
 import { getTenantContext } from "../tenant/tenantContext";
 import { getTenantOverrides } from "../tenant/tenantOverrides";
 
@@ -73,8 +82,109 @@ describe("contact resolution — per-tenant number from the API", () => {
   it("rejects an un-normalisable API number and falls back to the default", () => {
     ovr.mockReturnValue({});
     ctx.mockReturnValue(
+      tenant({ slug: "atlas" }),
+    );
+    // Un-normalisable phone on a non-custom-domain → Atlas default
+    ctx.mockReturnValue(
       tenant({ legalContactPack: { contactPhone: "12345", showAtlasFooterCredit: false } }),
     );
     expect(getContactPhone("business")).toBe(ATLAS_DEFAULT);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// White-label tenant (isCustomDomain=true) — Atlas defaults MUST NOT leak
+// TASK: cross-tenant contact data leak guard
+// ---------------------------------------------------------------------------
+describe("white-label tenant (isCustomDomain true) — no Atlas defaults must leak", () => {
+  it("getContactPhone returns '' when no phone is configured (NOT the Atlas number)", () => {
+    ovr.mockReturnValue({});
+    ctx.mockReturnValue(
+      tenant({ slug: "nightnest", legalContactPack: { isCustomDomain: true, showAtlasFooterCredit: false } }),
+    );
+    const phone = getContactPhone("business");
+    expect(phone).toBe("");
+    expect(phone).not.toBe(ATLAS_DEFAULT);
+  });
+
+  it("getWhatsAppPhone returns '' when no phone is configured (NOT the Atlas number)", () => {
+    ovr.mockReturnValue({});
+    ctx.mockReturnValue(
+      tenant({ slug: "nightnest", legalContactPack: { isCustomDomain: true, showAtlasFooterCredit: false } }),
+    );
+    const phone = getWhatsAppPhone("business");
+    expect(phone).toBe("");
+    expect(phone).not.toBe(ATLAS_DEFAULT);
+  });
+
+  it("getContactEmail returns '' when no email is configured (NOT the Atlas email)", () => {
+    ovr.mockReturnValue({});
+    ctx.mockReturnValue(
+      tenant({ slug: "nightnest", legalContactPack: { isCustomDomain: true, showAtlasFooterCredit: false } }),
+    );
+    const email = getContactEmail();
+    expect(email).toBe("");
+    expect(email).not.toContain("atlas");
+  });
+
+  it("getTelLink returns '' (no recipient-less tel: link)", () => {
+    ovr.mockReturnValue({});
+    ctx.mockReturnValue(
+      tenant({ slug: "nightnest", legalContactPack: { isCustomDomain: true, showAtlasFooterCredit: false } }),
+    );
+    expect(getTelLink()).toBe("");
+  });
+
+  it("getWhatsAppLink returns '' (no recipient-less wa.me link)", () => {
+    ovr.mockReturnValue({});
+    ctx.mockReturnValue(
+      tenant({ slug: "nightnest", legalContactPack: { isCustomDomain: true, showAtlasFooterCredit: false } }),
+    );
+    expect(getWhatsAppLink()).toBe("");
+  });
+
+  it("formatDisplayNumber returns ''", () => {
+    ovr.mockReturnValue({});
+    ctx.mockReturnValue(
+      tenant({ slug: "nightnest", legalContactPack: { isCustomDomain: true, showAtlasFooterCredit: false } }),
+    );
+    expect(formatDisplayNumber()).toBe("");
+  });
+
+  it("hasHostContact returns false", () => {
+    ovr.mockReturnValue({});
+    ctx.mockReturnValue(
+      tenant({ slug: "nightnest", legalContactPack: { isCustomDomain: true, showAtlasFooterCredit: false } }),
+    );
+    expect(hasHostContact()).toBe(false);
+  });
+
+  it("isWhiteLabelTenant returns true", () => {
+    ovr.mockReturnValue({});
+    ctx.mockReturnValue(
+      tenant({ slug: "nightnest", legalContactPack: { isCustomDomain: true, showAtlasFooterCredit: false } }),
+    );
+    expect(isWhiteLabelTenant()).toBe(true);
+  });
+
+  it("when the tenant DOES have a contactPhone, that number wins (no leak, no omission)", () => {
+    ovr.mockReturnValue({});
+    ctx.mockReturnValue(
+      tenant({
+        slug: "nightnest",
+        legalContactPack: { isCustomDomain: true, showAtlasFooterCredit: false, contactPhone: "9876543210" },
+      }),
+    );
+    expect(getContactPhone("business")).toBe("9876543210");
+    expect(hasHostContact()).toBe(true);
+  });
+
+  it("Atlas marketplace domain (isCustomDomain false) still gets Atlas defaults", () => {
+    ovr.mockReturnValue({});
+    ctx.mockReturnValue(
+      tenant({ slug: "atlastays", legalContactPack: { isCustomDomain: false, showAtlasFooterCredit: true } }),
+    );
+    expect(getContactPhone("business")).toBe(ATLAS_DEFAULT);
+    expect(isWhiteLabelTenant()).toBe(false);
   });
 });
