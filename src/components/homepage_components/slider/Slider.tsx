@@ -139,7 +139,16 @@ const Slider = () => {
             aria-label={heroPhotoAriaLabel}
           />
         ) : (
-          <div className="ahv2-hero-photo ahv2-hero-photo--fallback" aria-hidden="true" />
+          <div className="ahv2-hero-photo ahv2-hero-photo--fallback" aria-hidden="true">
+            <span className="ahv2-hero-fallback-mark">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M3 10.5 12 3l9 7.5" />
+                <path d="M5 9.5V21h14V9.5" />
+                <path d="M9.5 21v-6h5v6" />
+              </svg>
+            </span>
+            <span className="ahv2-hero-fallback-name">{brandName}</span>
+          </div>
         )}
         <div
           data-testid="hero-overlay"

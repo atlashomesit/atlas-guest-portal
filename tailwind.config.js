@@ -39,6 +39,13 @@ export default {
           primaryHover: withOpacity('--cta-primary-hover-rgb'),
           secondary: withOpacity('--cta-secondary-rgb'),
         },
+        // brand-primary is themed per-tenant via tenantBranding.ts (--brand-primary).
+        // Without this mapping, bg/text/border-brand-primary utilities used across the
+        // booking, check-in, review, favorites and 404 flows resolve to nothing
+        // (transparent) — leaving white-on-transparent invisible CTAs.
+        brand: {
+          primary: 'var(--brand-primary)',
+        },
         border: {
           subtle: 'var(--border-subtle)',
           strong: 'var(--border-strong)',
