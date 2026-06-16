@@ -1,4 +1,5 @@
 import { getTenantBrandNameLong } from "../tenant/displayBrand";
+import { formatDisplayNumber, isWhiteLabelTenant } from "../config/contact";
 
 export type TermsSection = {
   id: string;
@@ -91,10 +92,16 @@ export const termsSections: TermsSection[] = [
     id: "contacts",
     number: "9",
     title: "Contacts",
-    paragraphs: [
-      "Property Manager: +91-7032493290.",
-      "Owner (escalation): +91-9177773290.",
-    ],
+    // RA-006: phone resolved at render time via getContactPhone(); omit the line on a
+    // white-label tenant when no tenant number is configured (formatDisplayNumber returns "").
+    get paragraphs(): string[] {
+      const mgr = formatDisplayNumber("business");
+      const rows: string[] = [];
+      if (mgr) rows.push(`Property Manager: ${mgr}.`);
+      // Owner escalation line is Atlas-only; never show it on a white-label tenant.
+      if (!isWhiteLabelTenant()) rows.push("Owner (escalation): contact us via the main number.");
+      return rows;
+    },
   },
 ];
 

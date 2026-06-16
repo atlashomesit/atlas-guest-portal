@@ -4,10 +4,10 @@ import { getTenantContext } from "./tenantContext";
 /** Canonical marketplace name when no tenant is resolved (apex / atlas tenant). */
 export const MARKETPLACE_BRAND_BASELINE = "Atlastays";
 
-/** Marketplace support inbox when the tenant has not supplied `legalContactPack.contactEmail`. */
+// eslint-disable-next-line atlas-brand/no-atlas-string-leak -- marketplace-only fallback; getTenantContactEmail() guards against leaking this to white-label tenants
 const MARKETPLACE_SUPPORT_EMAIL = "support@atlastays.com";
 
-/** Marketplace privacy inbox when the tenant has not supplied a contact email. */
+// eslint-disable-next-line atlas-brand/no-atlas-string-leak -- marketplace-only fallback; getTenantContactEmail() guards against leaking this to white-label tenants
 const MARKETPLACE_PRIVACY_EMAIL = "privacy@atlastays.com";
 
 /** @deprecated Prefer MARKETPLACE_BRAND_BASELINE — kept for call sites using DEFAULT_TENANT_BRAND_NAME. */
@@ -16,10 +16,16 @@ export const DEFAULT_TENANT_BRAND_NAME = MARKETPLACE_BRAND_BASELINE;
 /**
  * Guest-visible contact email: tenant `legalContactPack.contactEmail` when set (white-label),
  * otherwise the marketplace default for support vs privacy flows.
+ * RA-006: returns "" on a white-label tenant with no configured email so callers
+ * can hide the contact row rather than showing an Atlas platform address.
  */
 export function getTenantContactEmail(kind: "support" | "privacy" = "support"): string {
-  const fromPack = getTenantContext()?.legalContactPack?.contactEmail?.trim();
+  const ctx = getTenantContext();
+  const fromPack = ctx?.legalContactPack?.contactEmail?.trim();
   if (fromPack) return fromPack;
+  // Never fall back to the Atlas marketplace email on a white-label custom domain.
+  const isWhiteLabel = Boolean(ctx?.legalContactPack?.isCustomDomain);
+  if (isWhiteLabel) return "";
   return kind === "privacy" ? MARKETPLACE_PRIVACY_EMAIL : MARKETPLACE_SUPPORT_EMAIL;
 }
 

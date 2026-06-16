@@ -3,8 +3,10 @@ import { getTenantOverrides } from '../tenant/tenantOverrides';
 
 export type ContactChannel = "business" | "owner";
 
+// eslint-disable-next-line atlas-brand/no-atlas-string-leak -- canonical marketplace fallback; getContactPhone() guards against leaking to white-label tenants (returns "" when isWhiteLabelTenant())
 const DEFAULT_BUSINESS_PHONE = "7032493290";
 const DEFAULT_OWNER_PHONE = "9177773290";
+// eslint-disable-next-line atlas-brand/no-atlas-string-leak -- canonical marketplace fallback; getContactEmail() guards against leaking to white-label tenants (returns "" when isWhiteLabelTenant())
 const DEFAULT_EMAIL = "atlashomeskphb@gmail.com";
 
 function tenantContact() {
