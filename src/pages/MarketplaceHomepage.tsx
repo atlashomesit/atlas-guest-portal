@@ -14,6 +14,7 @@ import { formatEstTotalInclGst } from '@/utils/guestPriceEstimate';
 type MarketplacePropertyApi = {
   propertyId: number;
   listingId: number;
+  tenantSlug?: string;
   propertyName: string;
   propertyAddress?: string | null;
   listingName: string;
@@ -63,10 +64,13 @@ export default function MarketplaceHomepage() {
     const p = new URLSearchParams();
     if (category !== 'all') p.set('category', category);
     if (query.trim()) p.set('city', query.trim());
+    if (checkIn) p.set('checkIn', checkIn);
+    if (checkOut) p.set('checkOut', checkOut);
+    if (guests > 1) p.set('guests', String(guests));
     p.set('page', '1');
     p.set('pageSize', '20');
     return `/marketplace/listings?${p.toString()}`;
-  }, [category, query]);
+  }, [category, query, checkIn, checkOut, guests]);
 
   useEffect(() => {
     let cancelled = false;
@@ -105,7 +109,9 @@ export default function MarketplaceHomepage() {
             lng: Number(row.longitude),
             title: row.propertyName || row.listingName || `Property ${row.propertyId}`,
             subtitle: row.propertyAddress ?? undefined,
-            href: `/${row.listingId}`,
+            href: row.tenantSlug
+              ? `/property_details/${row.listingId}?tenant=${encodeURIComponent(row.tenantSlug)}`
+              : `/property_details/${row.listingId}`,
           });
         }
         setMapPins(Array.from(seen.values()));
@@ -310,7 +316,7 @@ export default function MarketplaceHomepage() {
 
                   <Link
                     className="mt-auto inline-flex min-h-[40px] items-center justify-center rounded-xl bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 transition-colors"
-                    to={`/${item.slug}`}
+                    to={`/property_details/${item.id}?tenant=${encodeURIComponent(item.tenantSlug)}`}
                   >
                     View home
                   </Link>

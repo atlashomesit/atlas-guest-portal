@@ -31,11 +31,31 @@ function parseDiscount(raw: string | undefined): number {
 }
 
 export const onRequestGet = (context: { env: Env; request: Request }) => {
-  const { env } = context;
+  const { env, request } = context;
 
   const apiBaseUrl = (env.ATLAS_API_BASE_URL ?? "").trim();
-  const tenantKey = (env.ATLAS_TENANT_KEY ?? "").trim();
   const environment = (env.ATLAS_ENVIRONMENT ?? "").trim();
+
+  // Extract tenant slug dynamically from request hostname
+  const url = new URL(request.url);
+  const host = url.hostname.toLowerCase();
+  let tenantKey = "";
+
+  if (host.includes("nightnesthospitalityservices")) {
+    tenantKey = "Nightnest";
+  } else if (host === "atlastays.com" || host === "www.atlastays.com") {
+    tenantKey = "marketplace";
+  } else if (host.includes("atlashomestays") || host.includes("localhost")) {
+    tenantKey = "atlas";
+  } else {
+    // For any other domain, try to extract as subdomain
+    const parts = host.split(".");
+    if (parts.length > 2) {
+      tenantKey = parts[0]; // Use subdomain as fallback
+    } else {
+      tenantKey = env.ATLAS_TENANT_KEY?.trim() || "atlas"; // Final fallback to env var
+    }
+  }
 
   if (!apiBaseUrl) {
     return new Response(
