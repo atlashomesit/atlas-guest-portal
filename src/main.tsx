@@ -94,7 +94,8 @@ const bootstrapApp = async () => {
     if (!domainResolved) {
       // 2. Fall back to runtime config tenantKey (legacy / explicit override)
       const tenantSlug = getTenantSlug({ fallbackSlug: config.tenantKey });
-      if (tenantSlug) {
+      // Skip validateTenant for "marketplace" — it's not a real tenant, just a flag
+      if (tenantSlug && tenantSlug !== 'marketplace') {
         try {
           await validateTenant(tenantSlug);
         } catch (e) {
@@ -104,6 +105,8 @@ const bootstrapApp = async () => {
             throw e;
           }
         }
+      } else if (tenantSlug === 'marketplace') {
+        setMarketplaceMode(true);
       } else if (!import.meta.env.DEV) {
         throw new Error('Tenant could not be resolved. Check /.well-known/atlas-runtime-config.json (tenantKey) or ensure the domain is registered in the Atlas tenant table.');
       }
