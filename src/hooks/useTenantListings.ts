@@ -128,7 +128,8 @@ const mapDtosToData = (
     .filter((dto) => dto.id > 0)
     .map((dto) => mapDtoToProperty(dto, photosByListingId.get(dto.id) ?? []));
 
-  if (tenantAllowedIds.size > 0) {
+  // Marketplace tenant shows all listings; other tenants apply the allowlist filter
+  if (tenantAllowedIds.size > 0 && tenant?.slug !== 'marketplace') {
     properties = properties.filter((p) => {
       const lid = p.listingId != null ? Number(p.listingId) : NaN;
       return Number.isFinite(lid) && tenantAllowedIds.has(lid);
