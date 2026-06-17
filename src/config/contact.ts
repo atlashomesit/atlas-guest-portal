@@ -3,13 +3,25 @@ import { getTenantOverrides } from '../tenant/tenantOverrides';
 
 export type ContactChannel = "business" | "owner";
 
+// eslint-disable-next-line atlas-brand/no-atlas-string-leak -- canonical marketplace fallback; getContactPhone() guards against leaking to white-label tenants (returns "" when isWhiteLabelTenant())
 const DEFAULT_BUSINESS_PHONE = "7032493290";
 const DEFAULT_OWNER_PHONE = "9177773290";
+// eslint-disable-next-line atlas-brand/no-atlas-string-leak -- canonical marketplace fallback; getContactEmail() guards against leaking to white-label tenants (returns "" when isWhiteLabelTenant())
 const DEFAULT_EMAIL = "atlashomeskphb@gmail.com";
 
 function tenantContact() {
   const slug = getTenantContext()?.slug;
   return getTenantOverrides(slug).contact;
+}
+
+/**
+ * True for a white-label tenant resolved via its own custom domain / branded subdomain.
+ * For these tenants the Atlas marketplace phone/email MUST NEVER appear as the host contact —
+ * that is a cross-tenant leak. The DEFAULT_* platform values below are only valid on the
+ * Atlas default/marketplace domain (isCustomDomain falsey).
+ */
+export function isWhiteLabelTenant(): boolean {
+  return Boolean(getTenantContext()?.legalContactPack?.isCustomDomain);
 }
 
 /**
@@ -29,15 +41,17 @@ function toNationalDigits(raw?: string | null): string | null {
 export function getContactPhone(channel: ContactChannel = "business"): string {
   const overrides = tenantContact();
   if (channel === "owner") {
-    return overrides?.ownerPhone ?? DEFAULT_OWNER_PHONE;
+    // For white-label tenants, never fall back to the Atlas owner number.
+    return overrides?.ownerPhone ?? (isWhiteLabelTenant() ? "" : DEFAULT_OWNER_PHONE);
   }
   // Precedence: explicit override → the tenant's own number from the API →
-  // Atlas default. The API value (host's admin-profile phone) MUST win over the
-  // default, otherwise every tenant without a hardcoded override would show the
+  // Atlas default (marketplace only — never on a white-label custom domain).
+  // The API value (host's admin-profile phone) MUST win over the default,
+  // otherwise every tenant without a hardcoded override would show the
   // Atlas marketplace number to its own guests.
   if (overrides?.businessPhone) return overrides.businessPhone;
   const fromApi = toNationalDigits(getTenantContext()?.legalContactPack?.contactPhone);
-  return fromApi ?? DEFAULT_BUSINESS_PHONE;
+  return fromApi ?? (isWhiteLabelTenant() ? "" : DEFAULT_BUSINESS_PHONE);
 }
 
 export function getWhatsAppPhone(channel: ContactChannel = "business"): string {
@@ -47,6 +61,7 @@ export function getWhatsAppPhone(channel: ContactChannel = "business"): string {
     const fromApi = toNationalDigits(getTenantContext()?.whatsappBookingPhone);
     if (fromApi) return fromApi;
   }
+  // Falls through to getContactPhone which itself applies the white-label guard.
   return getContactPhone(channel);
 }
 
@@ -55,7 +70,18 @@ export function getContactEmail(): string {
   if (override) return override;
   const fromApi = getTenantContext()?.legalContactPack?.contactEmail?.trim();
   if (fromApi) return fromApi;
-  return DEFAULT_EMAIL;
+  // Never leak the Atlas platform email to a white-label tenant's guests.
+  return isWhiteLabelTenant() ? "" : DEFAULT_EMAIL;
+}
+
+/**
+ * Returns true when the resolved contact phone for the given channel is non-empty.
+ * Use this to conditionally render phone/WhatsApp CTAs — returning false means
+ * no number is available (white-label tenant with no configured phone, or empty
+ * override) and the CTA should be hidden rather than pointing to a blank wa.me link.
+ */
+export function hasHostContact(channel: ContactChannel = "business"): boolean {
+  return getContactPhone(channel).length > 0;
 }
 
 /**
@@ -83,13 +109,16 @@ export const CONTACT = {
 export const DEFAULT_CONTACT_CHANNEL: ContactChannel = "business";
 
 export function getTelLink(channel: ContactChannel = DEFAULT_CONTACT_CHANNEL) {
-  return `tel:+91${getContactPhone(channel)}`;
+  const p = getContactPhone(channel);
+  return p ? `tel:+91${p}` : "";
 }
 
 export function getWhatsAppLink(channel: ContactChannel = DEFAULT_CONTACT_CHANNEL) {
-  return `https://wa.me/${getWhatsAppPhone(channel)}`;
+  const p = getWhatsAppPhone(channel);
+  return p ? `https://wa.me/${p}` : "";
 }
 
 export function formatDisplayNumber(channel: ContactChannel = DEFAULT_CONTACT_CHANNEL) {
-  return `+91-${getContactPhone(channel)}`;
+  const p = getContactPhone(channel);
+  return p ? `+91-${p}` : "";
 }

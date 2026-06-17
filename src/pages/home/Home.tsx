@@ -1,4 +1,3 @@
-/* eslint-disable atlas-brand/no-atlas-string-leak -- TODO Task 16: replace with per-tenant content */
 import Slider from "../../components/homepage_components/slider/Slider";
 import HomePage_Locations from "../../components/homepage_components/homepage_locations/HomePage_Locations";
 import { useEffect, useMemo } from "react";
@@ -63,8 +62,11 @@ const WHY_DIRECT_ITEMS = [
 // Atlas social handles only published as sameAs when running under the Atlas brand.
 const ATLAS_SOCIAL_SAME_AS = [
     "https://www.facebook.com/profile.php?id=100040632723189",
+    // eslint-disable-next-line atlas-brand/no-atlas-string-leak -- Atlas platform social; guarded by hideAtlasBranding above
     "https://www.instagram.com/atlashomeskphb/",
+    // eslint-disable-next-line atlas-brand/no-atlas-string-leak -- Atlas platform social; guarded by hideAtlasBranding above
     "https://x.com/atlashomeskphb",
+    // eslint-disable-next-line atlas-brand/no-atlas-string-leak -- Atlas platform social; guarded by hideAtlasBranding above
     "https://www.youtube.com/@atlashomestays",
 ];
 
@@ -262,6 +264,7 @@ const Home = () => {
                 image={primaryOgImage}
                 url={canonicalUrl}
                 twitterCard="summary_large_image"
+                // eslint-disable-next-line atlas-brand/no-atlas-string-leak -- Atlas marketplace Twitter handle; guarded by hideAtlasBranding (undefined on white-label tenants)
                 twitterSite={hideAtlasBranding ? undefined : "@atlashomestays"}
                 jsonLd={homepageJsonLd}
             />

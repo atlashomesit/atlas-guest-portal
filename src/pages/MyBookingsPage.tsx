@@ -5,7 +5,7 @@ import StateMessage from "../components/StateMessage";
 import { LoadingState } from "../components/LoadingState";
 import { buildApiUrl, getApiHeaders } from "../api/client";
 import { messageFromApiResponse } from "../utils/serverErrorFromResponse";
-import { getContactEmail } from "../config/contact";
+import { getContactEmail, getTelLink, hasHostContact } from "../config/contact";
 import { getTenantBrandName } from "../tenant/displayBrand";
 
 interface BookingItem {
@@ -159,7 +159,7 @@ export default function MyBookingsPage() {
             title="No bookings yet"
             message="Once you book a home it’ll show up here. Bookings are linked to the email or phone used at checkout — if you used a different contact, open the link from that confirmation email or WhatsApp message."
             primaryAction={{ label: "Browse our homes", to: "/" }}
-            secondaryActions={[{ label: "Call us to find a booking", href: "tel:+917032493290" }]}
+            secondaryActions={hasHostContact() ? [{ label: "Call us to find a booking", href: getTelLink() }] : []}
           />
         ) : filteredBookings.length === 0 ? (
           <div className="rounded-xl border border-border-subtle bg-bg-muted/40 px-4 py-6 text-center text-sm text-text-secondary">

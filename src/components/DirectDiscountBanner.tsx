@@ -75,9 +75,9 @@ export default function DirectDiscountBanner() {
           title="Click to copy"
         >
           {PROMO_CODE}
-          <span className="ml-1 text-xs font-normal text-emerald-500">{copied ? "Copied!" : "Copy"}</span>
+          <span className="ml-1 text-xs font-normal text-emerald-700">{copied ? "Copied!" : "Copy"}</span>
         </button>
-        <span className="text-xs text-emerald-600">at checkout — auto-applied when you tap "Book now"</span>
+        <span className="text-xs text-emerald-800">at checkout — auto-applied when you tap "Book now"</span>
       </div>
       <button
         type="button"

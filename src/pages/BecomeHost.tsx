@@ -123,7 +123,7 @@ const styles = {
     justifyContent: "center",
     fontWeight: 700,
     fontSize: 14,
-    color: active || completed ? "#fff" : "#94a3b8",
+    color: active || completed ? "#fff" : "var(--text-muted, #475569)",
     background: active
       ? "var(--cta-primary, #2563eb)"
       : completed
@@ -142,7 +142,7 @@ const styles = {
   stepLabel: (active: boolean): React.CSSProperties => ({
     fontSize: 12,
     fontWeight: active ? 600 : 400,
-    color: active ? "var(--text-primary, #1e293b)" : "#94a3b8",
+    color: active ? "var(--text-primary, #1e293b)" : "var(--text-muted, #475569)",
     textAlign: "center",
     marginTop: 4,
   }),
@@ -203,7 +203,7 @@ const styles = {
   } as React.CSSProperties,
   hint: {
     fontSize: 14,
-    color: "#94a3b8",
+    color: "var(--text-muted, #475569)",
     marginTop: 4,
   } as React.CSSProperties,
 };
@@ -657,7 +657,7 @@ const BecomeHost = () => {
                   </th>
                   <th
                     className="p-3 text-center font-semibold"
-                    style={{ color: "#94a3b8" }}
+                    style={{ color: "var(--text-muted, #475569)" }}
                   >
                     Self-managed
                   </th>
@@ -688,7 +688,7 @@ const BecomeHost = () => {
                     </td>
                     <td
                       className="p-3 text-center"
-                      style={{ color: "#94a3b8" }}
+                      style={{ color: "var(--text-muted, #475569)" }}
                     >
                       {row.self}
                     </td>
@@ -740,7 +740,7 @@ const BecomeHost = () => {
                 >
                   {t.name}
                 </p>
-                <p className="text-xs" style={{ color: "#94a3b8" }}>
+                <p className="text-xs" style={{ color: "var(--text-muted, #475569)" }}>
                   {t.detail}
                 </p>
               </div>
@@ -975,7 +975,7 @@ const BecomeHost = () => {
             <>
               <Typography variant="h3">
                 Import from Airbnb{" "}
-                <span style={{ fontSize: 13, fontWeight: 400, color: "#94a3b8" }}>
+                <span style={{ fontSize: 13, fontWeight: 400, color: "var(--text-muted, #475569)" }}>
                   (optional)
                 </span>
               </Typography>

@@ -1,7 +1,6 @@
-/* eslint-disable atlas-brand/no-atlas-string-leak -- TODO Task 16: replace with per-tenant content */
 // NOTE: this file is imported by Node scripts during build; keep ESM imports explicit for Windows.
 import { LOGO_URL } from "./config/branding.ts";
-import { CONTACT } from "./config/contact.ts";
+import { CONTACT, getContactEmail } from "./config/contact.ts";
 
 const logo = LOGO_URL;
 
@@ -505,7 +504,8 @@ export const navbarData = {
         {
             id: 1,
             icon: 'IoIosMail',
-            data: 'atlashomeskphb@gmail.com'
+            // RA-006: resolved at access time via getContactEmail(); never a hardcoded platform address.
+            get data() { return getContactEmail(); },
         },
         {
             id: 2,
@@ -626,8 +626,11 @@ export const iconMap: IconMapping = {
 export const footerData: FooterDataInterface = {
     socialLinks: [
         { icon: 'FaFacebook', link: 'https://www.facebook.com/profile.php?id=100040632723189' },
+        // eslint-disable-next-line atlas-brand/no-atlas-string-leak -- Atlas platform social; Footer.tsx gates this behind !hideAtlasBranding (never shown on white-label tenants)
         { icon: 'FaInstagram', link: 'https://www.instagram.com/atlashomeskphb/' },
+        // eslint-disable-next-line atlas-brand/no-atlas-string-leak -- Atlas platform social; Footer.tsx gates this behind !hideAtlasBranding (never shown on white-label tenants)
         { icon: 'FaTwitter', link: 'https://x.com/atlashomeskphb' },
+        // eslint-disable-next-line atlas-brand/no-atlas-string-leak -- Atlas platform social; Footer.tsx gates this behind !hideAtlasBranding (never shown on white-label tenants)
         { icon: 'FaYoutube', link: 'https://www.youtube.com/@atlashomestays' },
     ],
     contactInfo: [],

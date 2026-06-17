@@ -1,6 +1,7 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { addDays, startOfDay } from 'date-fns';
 import { DateRange } from 'react-date-range';
+import { formatDisplayNumber } from '@/config/contact';
 
 import { DateRangePickerPopover } from '../homepage_components/hotelBooking_form/DateRangePickerPopover';
 import { getIstStartOfDay } from '@/utils/date';
@@ -164,7 +165,8 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
       return { valid: false, error: 'Minimum stay is 1 night. Check-out must be at least 1 day after check-in' };
     }
     if (diffDays > 30) {
-      return { valid: false, error: 'Maximum stay is 30 nights. For longer stays, please contact us at +91-7032493290' };
+      const contactNum = formatDisplayNumber();
+      return { valid: false, error: `Maximum stay is 30 nights. For longer stays, please contact us${contactNum ? ` at ${contactNum}` : ''}.` };
     }
     return { valid: true, error: null };
   };
