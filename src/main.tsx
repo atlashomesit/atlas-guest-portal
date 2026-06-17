@@ -12,7 +12,7 @@ import { initAnalytics } from './utils/analytics'
 import { ThemeProvider } from './theme/ThemeProvider'
 import { loadRuntimeConfig, setRuntimeConfig, getApiBaseUrl } from './runtime-config'
 import { getApiHeaders } from './api/client'
-import { getTenantSlug, isMarketplaceMode, setMarketplaceMode } from './tenant/tenantResolver'
+import { getTenantSlug, isAtlastaysMarketplaceSurface, isMarketplaceMode, setMarketplaceMode } from './tenant/tenantResolver'
 import { validateTenant, resolveFromDomain, getTenantContext, SubdomainNotActivatedError } from './tenant/tenantContext'
 import SubdomainNotActivatedScreen from './components/SubdomainNotActivatedScreen'
 import { applyTenantBranding } from './tenant/tenantBranding'
@@ -105,7 +105,7 @@ const bootstrapApp = async () => {
             throw e;
           }
         }
-      } else if (tenantSlug === 'marketplace') {
+      } else if (tenantSlug === 'marketplace' && isAtlastaysMarketplaceSurface()) {
         setMarketplaceMode(true);
       } else if (!import.meta.env.DEV) {
         throw new Error('Tenant could not be resolved. Check /.well-known/atlas-runtime-config.json (tenantKey) or ensure the domain is registered in the Atlas tenant table.');
@@ -115,7 +115,7 @@ const bootstrapApp = async () => {
     // 3. Apply brand config to DOM (title, primaryColor CSS vars, favicon)
     const forceMarketplaceFromConfig = (config.tenantKey || '').trim().toLowerCase() === 'marketplace-root';
     const resolved = getTenantContext();
-    if (resolved?.isMarketplaceRoot || forceMarketplaceFromConfig) {
+    if ((resolved?.isMarketplaceRoot || forceMarketplaceFromConfig) && isAtlastaysMarketplaceSurface()) {
       setMarketplaceMode(true);
     } else if (resolved) {
       applyTenantBranding(resolved);
@@ -126,7 +126,7 @@ const bootstrapApp = async () => {
     // body text stays tiny (Suspense fallback) and a11y/homepage tests flake. Prefetch
     // the correct root chunk during the intentional boot delay so first paint is ready.
     if (typeof window !== 'undefined') {
-      if (isMarketplaceMode()) {
+      if (isMarketplaceMode() && isAtlastaysMarketplaceSurface()) {
         void import('./pages/MarketplaceHomepage');
       } else {
         void import('./pages/home/Home');

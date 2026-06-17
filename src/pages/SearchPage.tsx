@@ -21,6 +21,8 @@ import LongStayCalculator from "../components/LongStayCalculator"; // TASK-1739
 import { filterGuestImageUrls, sanitizeGuestImageUrl } from "../utils/guestImageUrl";
 import { compareAtlasHomesBuildingOrder } from "../utils/atlasHomesBuildingOrder";
 import { buildApiUrl, getApiHeaders } from "../api/client";
+import { isAtlastaysMarketplaceSurface, isMarketplaceMode } from "../tenant/tenantResolver";
+import AirbnbSearchBar from "../components/marketplace/airbnbSearch/AirbnbSearchBar";
 import {
   fetchAvailabilitySummary,
   type ListingAvailabilitySummary,
@@ -157,6 +159,36 @@ function apiToNormalized(listings: PublicListing[]): NormalizedListing[] {
     .filter((l) => l.numericId > 0);
 }
 
+type MarketplaceApiItem = {
+  id: number;
+  tenantSlug: string;
+  title: string;
+  city?: string;
+  pricePerNight: number;
+  maxGuests: number;
+  coverImageUrl?: string;
+  rating?: number | null;
+  reviewCount?: number | null;
+};
+
+function marketplaceToNormalized(items: MarketplaceApiItem[]): NormalizedListing[] {
+  return items.map((item) => ({
+    id: `mp-${item.id}`,
+    numericId: item.id,
+    title: item.title,
+    location: item.city ?? "",
+    pricePerNight: item.pricePerNight,
+    maxGuests: item.maxGuests,
+    imageUrl: sanitizeGuestImageUrl(item.coverImageUrl) ?? "",
+    amenities: [],
+    canonicalPath: `/property_details/${item.id}?tenant=${encodeURIComponent(item.tenantSlug)}`,
+    rating: item.rating ?? undefined,
+    reviewCount: item.reviewCount ?? null,
+    latitude: null,
+    longitude: null,
+  }));
+}
+
 /** TASK-1460: compact label + colors for listing card availability chip. */
 function availabilityChip(
   sum: ListingAvailabilitySummary | undefined,
@@ -184,12 +216,47 @@ function availabilityChip(
 const SearchPage = () => {
   const { format: formatDisplayCurrency, formatINR, isConverted } = useCurrency();
   const [searchParams, setSearchParams] = useSearchParams();
+  const isMarketplaceSearch = isMarketplaceMode() && isAtlastaysMarketplaceSurface();
   const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
   const [isLoading, setIsLoading] = useState(true);
   const [apiListings, setApiListings] = useState<NormalizedListing[] | null>(null);
   // TASK-1867: track real API errors separately; null apiListings on 0-listing response is not an error
   const [apiError, setApiError] = useState(false);
   const [loadingTimeoutReached, setLoadingTimeoutReached] = useState(false);
+
+  const checkInParam = searchParams.get("checkIn");
+  const checkOutParam = searchParams.get("checkOut");
+  const guestsParam = searchParams.get("guests");
+  const adultsParam = searchParams.get("adults");
+  const childrenParam = searchParams.get("children");
+  const destinationParam = searchParams.get("destination") ?? searchParams.get("city");
+
+  const loadFromMarketplace = useCallback(async (signal: AbortSignal) => {
+    setApiError(false);
+    try {
+      const p = new URLSearchParams();
+      if (destinationParam?.trim()) p.set("city", destinationParam.trim());
+      if (checkInParam) p.set("checkIn", checkInParam);
+      if (checkOutParam) p.set("checkOut", checkOutParam);
+      const guestTotal =
+        (Number(adultsParam) || 0) + (Number(childrenParam) || 0) || Number(guestsParam) || 0;
+      if (guestTotal > 0) p.set("guests", String(guestTotal));
+      p.set("page", "1");
+      p.set("pageSize", "100");
+      const res = await fetch(buildApiUrl(`/marketplace/listings?${p.toString()}`), {
+        signal,
+        headers: { Accept: "application/json" },
+      });
+      if (!res.ok) throw new Error("marketplace listings failed");
+      const data = (await res.json()) as { items?: MarketplaceApiItem[] };
+      setApiListings(marketplaceToNormalized(data.items ?? []));
+    } catch {
+      if (!signal.aborted) {
+        setApiError(true);
+        setApiListings([]);
+      }
+    }
+  }, [adultsParam, checkInParam, checkOutParam, childrenParam, destinationParam, guestsParam]);
 
   const loadFromApi = useCallback(async (signal: AbortSignal) => {
     setApiError(false);
@@ -217,7 +284,8 @@ const SearchPage = () => {
     setIsLoading(true);
     setLoadingTimeoutReached(false);
 
-    loadFromApi(controller.signal).finally(() => setIsLoading(false));
+    const loader = isMarketplaceSearch ? loadFromMarketplace : loadFromApi;
+    loader(controller.signal).finally(() => setIsLoading(false));
 
     // Show cached/fallback results after 2s if API still loading
     const fallbackTimer = setTimeout(() => setLoadingTimeoutReached(true), 2000);
@@ -226,11 +294,8 @@ const SearchPage = () => {
       controller.abort();
       clearTimeout(fallbackTimer);
     };
-  }, [loadFromApi]);
+  }, [isMarketplaceSearch, loadFromApi, loadFromMarketplace]);
 
-  const checkInParam = searchParams.get("checkIn");
-  const checkOutParam = searchParams.get("checkOut");
-  const guestsParam = searchParams.get("guests");
   const minPriceParam = searchParams.get("minPrice");
   const maxPriceParam = searchParams.get("maxPrice");
   const remoteWorkParam = searchParams.get("remoteWork");
@@ -245,7 +310,13 @@ const SearchPage = () => {
 
   const checkIn = useMemo(() => parseDate(checkInParam), [checkInParam]);
   const checkOut = useMemo(() => parseDate(checkOutParam), [checkOutParam]);
-  const guests = useMemo(() => Number(guestsParam) || null, [guestsParam]);
+  const guests = useMemo(() => {
+    if (adultsParam || childrenParam) {
+      const total = (Number(adultsParam) || 0) + (Number(childrenParam) || 0);
+      return total > 0 ? total : null;
+    }
+    return Number(guestsParam) || null;
+  }, [adultsParam, childrenParam, guestsParam]);
   const minPrice = useMemo(() => Number(minPriceParam) || null, [minPriceParam]);
   const maxPrice = useMemo(() => Number(maxPriceParam) || null, [maxPriceParam]);
   const remoteWork = useMemo(() => remoteWorkParam === "true", [remoteWorkParam]);
@@ -297,6 +368,9 @@ const SearchPage = () => {
   const onlyApiListings = overrides.onlyApiListings === true;
   const estimateNights = useMemo(() => estimateStayNights(checkIn, checkOut), [checkIn, checkOut]);
   const listings = useMemo(() => {
+    if (isMarketplaceSearch) {
+      return apiListings !== null ? apiListings : [];
+    }
     if (onlyApiListings) {
       return apiListings !== null ? apiListings : [];
     }
@@ -308,7 +382,7 @@ const SearchPage = () => {
       return [];
     }
     return buildStaticListings(tenantAllowedIds);
-  }, [apiListings, tenantAllowedIds, onlyApiListings, isLoading]);
+  }, [apiListings, isMarketplaceSearch, tenantAllowedIds, onlyApiListings, isLoading]);
   const showingSampleListings =
     !onlyApiListings && apiListings === null && !isLoading && listings.length > 0;
 
@@ -470,6 +544,11 @@ const SearchPage = () => {
     if (hasInvalidDates) return [];
 
     return listings.filter((unit) => {
+      if (isMarketplaceSearch && destinationParam?.trim()) {
+        const dest = destinationParam.trim().toLowerCase();
+        const haystack = `${unit.location} ${unit.title}`.toLowerCase();
+        if (!haystack.includes(dest)) return false;
+      }
       if (guests && guests > unit.maxGuests) return false;
       if (minPrice && unit.pricePerNight > 0 && unit.pricePerNight < minPrice) return false;
       if (maxPrice && unit.pricePerNight > maxPrice) return false;
@@ -518,8 +597,10 @@ const SearchPage = () => {
     checkOut,
     dateAvailableIds,
     dateAvailLoading,
+    destinationParam,
     guests,
     hasInvalidDates,
+    isMarketplaceSearch,
     listings,
     longStay,
     maxPrice,
@@ -765,11 +846,19 @@ const SearchPage = () => {
   return (
     <div className="min-h-screen bg-bg-muted py-10">
       <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 md:px-8">
+        {isMarketplaceSearch ? (
+          <div className="sticky top-[var(--nav-height)] z-30 -mx-4 bg-bg-muted px-4 py-3 md:static md:mx-0 md:bg-transparent md:p-0">
+            <AirbnbSearchBar />
+          </div>
+        ) : null}
+
         <header className="space-y-2">
           <p className="text-sm font-semibold uppercase tracking-wide text-text-muted">Search results</p>
           {/* TASK-1864: dynamic h1 — only say "homes for your dates" when dates are actually set */}
           <h1 className="text-3xl font-bold text-text-primary sm:text-4xl" data-testid="search-results-h1">
-            {checkIn && checkOut
+            {isMarketplaceSearch && destinationParam
+              ? `Stays in ${destinationParam}`
+              : checkIn && checkOut
               ? `${filteredUnits.length} ${filteredUnits.length === 1 ? "home" : "homes"}${dateAvailConfirmed ? " for your dates" : dateAvailLoading ? " — checking availability" : ""}`
               : getTenantBrandName()}
           </h1>

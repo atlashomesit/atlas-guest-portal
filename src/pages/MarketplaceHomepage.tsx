@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { FaHeart, FaRegHeart } from 'react-icons/fa';
 import { buildApiUrl } from '@/api/client';
 import { formatCurrency } from '@/utils/formatting'; // TASK-1872
@@ -9,6 +9,7 @@ import SkeletonCard from '@/components/apartments/SkeletonCard'; // TASK-1875
 import SEO from '@/components/SEO'; // TASK-1876
 import MultiPinMap, { type MapPin } from '@/components/map/MultiPinMap'; // TL-PROP
 import { formatEstTotalInclGst } from '@/utils/guestPriceEstimate';
+import AirbnbSearchBar from '@/components/marketplace/airbnbSearch/AirbnbSearchBar';
 
 // TL-PROP: shape from GET /marketplace/properties (powers the map view).
 type MarketplacePropertyApi = {
@@ -41,7 +42,6 @@ type MarketplaceItem = {
 type ApiResponse = { items: MarketplaceItem[]; total: number; page: number; pageSize: number };
 
 export default function MarketplaceHomepage() {
-  const navigate = useNavigate();
   const [category, setCategory] = useState<'all' | 'homes' | 'rooms'>('all');
   const [query, setQuery] = useState('');
   const [items, setItems] = useState<MarketplaceItem[]>([]);
@@ -55,22 +55,15 @@ export default function MarketplaceHomepage() {
   // TL-PROP: map view of all marketplace properties. Toggle to show/hide.
   const [showMap, setShowMap] = useState(false);
   const [mapPins, setMapPins] = useState<MapPin[]>([]);
-  // TASK-4016: date picker + guest stepper for homepage hero
-  const [checkIn, setCheckIn] = useState('');
-  const [checkOut, setCheckOut] = useState('');
-  const [guests, setGuests] = useState(1);
 
   const apiPath = useMemo(() => {
     const p = new URLSearchParams();
     if (category !== 'all') p.set('category', category);
     if (query.trim()) p.set('city', query.trim());
-    if (checkIn) p.set('checkIn', checkIn);
-    if (checkOut) p.set('checkOut', checkOut);
-    if (guests > 1) p.set('guests', String(guests));
     p.set('page', '1');
     p.set('pageSize', '20');
     return `/marketplace/listings?${p.toString()}`;
-  }, [category, query, checkIn, checkOut, guests]);
+  }, [category, query]);
 
   useEffect(() => {
     let cancelled = false;
@@ -134,72 +127,8 @@ export default function MarketplaceHomepage() {
       <h1 className="text-3xl font-bold text-text-primary">Atlastays Marketplace</h1>
       <p className="mt-2 text-text-body">Discover homes and rooms across verified hosts.</p>
 
-      {/* TASK-4016: Hero date picker + guest stepper */}
-      <div className="mt-8 rounded-2xl border border-border bg-bg-surface p-6 shadow-sm">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5 items-end">
-          <div>
-            <label className="block text-sm font-medium text-text-primary mb-2">Check-in</label>
-            <input
-              type="date"
-              value={checkIn}
-              onChange={(e) => setCheckIn(e.target.value)}
-              className="w-full min-h-[44px] rounded-lg border border-border-subtle px-3 py-2"
-              data-testid="homepage-checkin"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-text-primary mb-2">Check-out</label>
-            <input
-              type="date"
-              value={checkOut}
-              onChange={(e) => setCheckOut(e.target.value)}
-              className="w-full min-h-[44px] rounded-lg border border-border-subtle px-3 py-2"
-              data-testid="homepage-checkout"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-text-primary mb-2">Guests</label>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setGuests(Math.max(1, guests - 1))}
-                className="min-h-[44px] min-w-[44px] rounded-lg border border-border-subtle hover:bg-bg-muted"
-              >
-                −
-              </button>
-              <input
-                type="number"
-                min={1}
-                max={10}
-                value={guests}
-                onChange={(e) => setGuests(Math.max(1, Math.min(10, Number(e.target.value))))}
-                className="w-full text-center border-0 bg-transparent text-lg font-semibold"
-                data-testid="homepage-guests"
-              />
-              <button
-                type="button"
-                onClick={() => setGuests(Math.min(10, guests + 1))}
-                className="min-h-[44px] min-w-[44px] rounded-lg border border-border-subtle hover:bg-bg-muted"
-              >
-                +
-              </button>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              const params = new URLSearchParams();
-              if (checkIn) params.set('checkIn', checkIn);
-              if (checkOut) params.set('checkOut', checkOut);
-              if (guests > 1) params.set('guests', String(guests));
-              navigate(`/search?${params.toString()}`);
-            }}
-            className="min-h-[44px] rounded-lg bg-black text-white font-semibold hover:bg-gray-800 transition-colors lg:col-span-1"
-            data-testid="homepage-search-btn"
-          >
-            Search
-          </button>
-        </div>
+      <div className="mt-8">
+        <AirbnbSearchBar />
       </div>
 
       <div className="mt-6 flex flex-wrap items-center gap-3">

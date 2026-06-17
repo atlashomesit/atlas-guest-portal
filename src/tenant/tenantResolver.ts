@@ -33,6 +33,20 @@ export function isMarketplaceHostname(hostname?: string): boolean {
   return MARKETPLACE_HOSTS.has(host);
 }
 
+/**
+ * Marketplace aggregate UI (homepage, Airbnb search bar) is shown only on Atlastays apex
+ * domains — not on tenant white-label / custom domains. Local dev hosts are allowed for testing.
+ */
+export function isAtlastaysMarketplaceSurface(hostname?: string): boolean {
+  if (isMarketplaceHostname(hostname)) return true;
+  return import.meta.env.DEV && isLocalDev();
+}
+
+/** @deprecated Use isAtlastaysMarketplaceSurface — kept for callers that only checked hostname. */
+export function isMarketplaceHostnameOnly(hostname?: string): boolean {
+  return isMarketplaceHostname(hostname);
+}
+
 function getHostname(): string {
   if (typeof window === 'undefined') return '';
   return (window.location?.hostname ?? '').toLowerCase();
