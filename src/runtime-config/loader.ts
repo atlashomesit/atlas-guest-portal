@@ -1,3 +1,4 @@
+import { Capacitor } from "@capacitor/core";
 import type { AtlasRuntimeConfig } from "./types";
 
 const PREFERRED_URL = "/.well-known/atlas-runtime-config.json";
@@ -78,7 +79,37 @@ function isLocalhostUrl(url: string): boolean {
   }
 }
 
+/**
+ * Native (Capacitor) builds can't fetch /.well-known/atlas-runtime-config.json: the file is served
+ * from the app bundle (capacitor://localhost) but Capacitor's default aapt ignore (the `.*` rule in
+ * android/app/build.gradle) strips dot-prefixed dirs, and there is no server in the WebView to serve
+ * it. So on native we read the config baked at build time into VITE_NATIVE_RUNTIME_CONFIG (injected by
+ * build-signed-apks.ps1). Web / Cloudflare Pages behaviour is unchanged.
+ */
+function loadNativeConfig(): AtlasRuntimeConfig {
+  const raw = (import.meta.env.VITE_NATIVE_RUNTIME_CONFIG as string | undefined) ?? "";
+  if (!raw.trim()) {
+    throw new Error("Native runtime config missing: VITE_NATIVE_RUNTIME_CONFIG was not set at build time.");
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error("Native runtime config invalid: VITE_NATIVE_RUNTIME_CONFIG is not valid JSON.");
+  }
+  const result = validateConfig(parsed);
+  if (!result.ok) {
+    throw new Error(`Native runtime config invalid: ${result.reason}`);
+  }
+  return result.config;
+}
+
 export async function loadRuntimeConfig(): Promise<AtlasRuntimeConfig> {
+  // Capacitor native app: no server and no bundled .well-known — use the build-time baked config.
+  if (Capacitor.isNativePlatform()) {
+    return loadNativeConfig();
+  }
+
   const tryUrl = async (url: string): Promise<Response> => {
     const base = typeof window !== "undefined" ? window.location.origin : "";
     return fetch(`${base}${url}`, { cache: "no-store" });

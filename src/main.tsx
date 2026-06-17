@@ -19,6 +19,7 @@ import { applyTenantBranding } from './tenant/tenantBranding'
 import { ConfigLoadingScreen } from './runtime-config/ConfigLoadingScreen'
 import { ConfigErrorScreen } from './runtime-config/ConfigErrorScreen'
 import TenantJsonLd from './components/TenantJsonLd'
+import { Capacitor } from '@capacitor/core'
 
 // Suppress chrome extension module loading errors in console (non-critical, expected in dev).
 // ErrorEvent.message is typed `string` but is nullish for some cross-origin / platform error
@@ -73,39 +74,47 @@ const bootstrapApp = async () => {
       }
     }
 
-    // 1. Try domain-based tenant resolution (white-label + default Atlas domains)
-    //    Calls /tenants/from-domain?domain=<hostname> — no auth needed.
-    //    Sets the resolved slug so all subsequent API calls use X-Tenant-Slug from context.
-    const domain = typeof window !== 'undefined' ? window.location.hostname : '';
-    let domainResolved = null;
-    try {
-      domainResolved = domain ? await resolveFromDomain(apiBaseUrl, domain) : null;
-    } catch (e) {
-      // TASK-2642: the subdomain belongs to a tenant without the WEBSITE add-on. Render the
-      // brand-neutral "not activated" page and STOP — do not fall back to validateTenant(),
-      // which would leak Atlas branding onto a stranger's branded subdomain.
-      if (e instanceof SubdomainNotActivatedError) {
-        root.render(<SubdomainNotActivatedScreen />);
-        return;
-      }
-      throw e;
-    }
-
-    if (!domainResolved) {
-      // 2. Fall back to runtime config tenantKey (legacy / explicit override)
-      const tenantSlug = getTenantSlug({ fallbackSlug: config.tenantKey });
-      if (tenantSlug) {
-        try {
-          await validateTenant(tenantSlug);
-        } catch (e) {
-          if (import.meta.env.DEV) {
-            console.warn('[Atlas] Tenant validation failed (dev — continuing):', e);
-          } else {
-            throw e;
-          }
+    // Native (Capacitor) app: the packaged Atlas Stays app IS the multi-tenant marketplace — there is
+    // no meaningful hostname to resolve in the WebView (window.location.hostname === 'localhost'). Force
+    // marketplace mode and skip domain/tenant resolution; this mirrors atlastays.com's marketplace-root
+    // path (no X-Tenant-Slug → marketplace listings). Web/Pages behaviour below is unchanged.
+    if (Capacitor.isNativePlatform()) {
+      setMarketplaceMode(true);
+    } else {
+      // 1. Try domain-based tenant resolution (white-label + default Atlas domains)
+      //    Calls /tenants/from-domain?domain=<hostname> — no auth needed.
+      //    Sets the resolved slug so all subsequent API calls use X-Tenant-Slug from context.
+      const domain = typeof window !== 'undefined' ? window.location.hostname : '';
+      let domainResolved = null;
+      try {
+        domainResolved = domain ? await resolveFromDomain(apiBaseUrl, domain) : null;
+      } catch (e) {
+        // TASK-2642: the subdomain belongs to a tenant without the WEBSITE add-on. Render the
+        // brand-neutral "not activated" page and STOP — do not fall back to validateTenant(),
+        // which would leak Atlas branding onto a stranger's branded subdomain.
+        if (e instanceof SubdomainNotActivatedError) {
+          root.render(<SubdomainNotActivatedScreen />);
+          return;
         }
-      } else if (!import.meta.env.DEV) {
-        throw new Error('Tenant could not be resolved. Check /.well-known/atlas-runtime-config.json (tenantKey) or ensure the domain is registered in the Atlas tenant table.');
+        throw e;
+      }
+
+      if (!domainResolved) {
+        // 2. Fall back to runtime config tenantKey (legacy / explicit override)
+        const tenantSlug = getTenantSlug({ fallbackSlug: config.tenantKey });
+        if (tenantSlug) {
+          try {
+            await validateTenant(tenantSlug);
+          } catch (e) {
+            if (import.meta.env.DEV) {
+              console.warn('[Atlas] Tenant validation failed (dev — continuing):', e);
+            } else {
+              throw e;
+            }
+          }
+        } else if (!import.meta.env.DEV) {
+          throw new Error('Tenant could not be resolved. Check /.well-known/atlas-runtime-config.json (tenantKey) or ensure the domain is registered in the Atlas tenant table.');
+        }
       }
     }
 
