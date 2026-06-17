@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import SEO from "../components/SEO";
 import { getTenantBrandName, getTenantBrandNameLong, getTenantContactEmail } from "../tenant/displayBrand";
+import { formatDisplayNumber, getTelLink, isWhiteLabelTenant } from "../config/contact";
 
 /**
  * TASK-016: DPDP 2023 privacy policy page.
@@ -109,8 +110,16 @@ export default function PrivacyPolicyPage() {
           <a href={`mailto:${privacyEmail}`} className="text-brand-primary underline">
             {privacyEmail}
           </a>
-          <br />
-          Phone: <a href="tel:+917416261981" className="text-brand-primary underline">+91 74162 61981</a>
+          {/* RA-006: use resolved tenant contact phone; hide entirely on white-label when no number is configured. */}
+          {!isWhiteLabelTenant() || formatDisplayNumber() ? (
+            <>
+              <br />
+              Phone:{" "}
+              <a href={getTelLink()} className="text-brand-primary underline">
+                {formatDisplayNumber()}
+              </a>
+            </>
+          ) : null}
         </address>
 
         <h2 className="mt-6 text-lg font-semibold">9. Changes to this Policy</h2>

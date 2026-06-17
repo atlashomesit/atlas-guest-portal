@@ -10,7 +10,7 @@ import { buildApiUrl, getApiHeaders } from "../api/client";
 import { getRuntimeConfig, hasRuntimeConfig } from "../runtime-config";
 import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 import { messageFromApiResponse } from "../utils/serverErrorFromResponse";
-import { getContactEmail, getContactPhone } from "../config/contact";
+import { getContactEmail, getContactPhone, hasHostContact } from "../config/contact";
 import { useGuestBookingQrToken } from "../hooks/useGuestBookingQrToken";
 
 /** Minimal shape of the non-standard `beforeinstallprompt` event — only `prompt()` is used here. */
@@ -693,13 +693,23 @@ export default function BookingConfirmationPage() {
   const langCode = (booking.preferredLanguage ?? "en").toLowerCase();
   const pa = PRE_ARRIVAL_STRINGS[langCode] ?? PRE_ARRIVAL_STRINGS.en;
   const hasRealHostPhone = !!booking.propertyPhone?.trim();
-  const hostPhone = hasRealHostPhone ? booking.propertyPhone!.trim() : `+91${getContactPhone()}`;
+  // getContactPhone() now returns "" for white-label tenants with no configured number —
+  // never build a tel: or wa.me link with an empty number (cross-tenant leak guard).
+  const resolvedFallbackPhone = getContactPhone();
+  const hostPhone = hasRealHostPhone
+    ? booking.propertyPhone!.trim()
+    : resolvedFallbackPhone
+      ? `+91${resolvedFallbackPhone}`
+      : "";
   const hostPhoneDigits = hostPhone.replace(/[^\d+]/g, "");
   const whatsappDigits = hostPhoneDigits.replace(/^\+/, "");
+  // True when there is a real number to contact (either the property's own phone or the
+  // tenant's configured fallback). False for white-label tenants with no number set.
+  const hasWhatsAppContact = (hasRealHostPhone || hasHostContact()) && whatsappDigits.length > 0;
   const supportEmail = getContactEmail();
   const confirmationNotifyPhone = "";
   const whatsappText = encodeURIComponent(`Hi, I have a question about booking #${booking.bookingId}.`);
-  const whatsappUrl = `https://wa.me/${whatsappDigits}?text=${whatsappText}`;
+  const whatsappUrl = hasWhatsAppContact ? `https://wa.me/${whatsappDigits}?text=${whatsappText}` : "";
   const supportsPush = typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window;
   const canRequestModification = !isCancelled && !!token;
   const hasPendingModRequest = modRequests.some((r) => r.status === "Pending");
@@ -1006,14 +1016,16 @@ export default function BookingConfirmationPage() {
               <span className="text-sm text-red-700/80" data-testid="payment-last-checked">
                 Last checked: {formatRelativeLastCheck(lastPaymentCheckAt)}
               </span>
-              <a
-                href={whatsappUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm font-medium text-red-800 underline underline-offset-2"
-              >
-                Contact Support
-              </a>
+              {hasWhatsAppContact && (
+                <a
+                  href={whatsappUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm font-medium text-red-800 underline underline-offset-2"
+                >
+                  Contact Support
+                </a>
+              )}
             </div>
           </div>
         )}
@@ -1290,22 +1302,26 @@ export default function BookingConfirmationPage() {
                 </span>
                 <p className="text-sm text-text-secondary mt-1">{pa.hostDesc}</p>
                 <div className="flex flex-wrap gap-2 mt-2">
-                  <a
-                    href={whatsappUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center justify-center rounded-lg bg-[#25D366] text-white text-sm font-medium px-4 py-3 hover:opacity-95 transition-opacity"
-                    data-testid="pre-arrival-whatsapp"
-                  >
-                    {hasRealHostPhone ? pa.chatBtn : `Chat with ${brandName} support`}
-                  </a>
-                  <a
-                    href={`mailto:${encodeURIComponent(supportEmail)}?subject=${encodeURIComponent(`Question before check-in — booking #${booking.bookingId}`)}`}
-                    className="inline-flex items-center justify-center rounded-lg border border-border-subtle bg-bg-surface text-text-primary text-sm font-medium px-4 py-3 hover:bg-bg-muted/60 transition-colors"
-                    data-testid="pre-arrival-email-host"
-                  >
-                    Email us
-                  </a>
+                  {hasWhatsAppContact && (
+                    <a
+                      href={whatsappUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center justify-center rounded-lg bg-[#25D366] text-white text-sm font-medium px-4 py-3 hover:opacity-95 transition-opacity"
+                      data-testid="pre-arrival-whatsapp"
+                    >
+                      {hasRealHostPhone ? pa.chatBtn : `Chat with ${brandName} support`}
+                    </a>
+                  )}
+                  {supportEmail && (
+                    <a
+                      href={`mailto:${encodeURIComponent(supportEmail)}?subject=${encodeURIComponent(`Question before check-in — booking #${booking.bookingId}`)}`}
+                      className="inline-flex items-center justify-center rounded-lg border border-border-subtle bg-bg-surface text-text-primary text-sm font-medium px-4 py-3 hover:bg-bg-muted/60 transition-colors"
+                      data-testid="pre-arrival-email-host"
+                    >
+                      Email us
+                    </a>
+                  )}
                 </div>
               </div>
               {booking.wifiVisible && (booking.wifiName || booking.wifiPassword) && (
@@ -1444,23 +1460,42 @@ export default function BookingConfirmationPage() {
                 </pre>
               </details>
               <p>
-                💬 Need details sooner?{" "}
-                <a
-                  href={whatsappUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-brand-primary font-medium underline underline-offset-2"
-                >
-                  {hasRealHostPhone ? 'Chat with host on WhatsApp' : `Chat with ${brandName} support`}
-                </a>
-                {" "}or{" "}
-                <a
-                  href={`mailto:${encodeURIComponent(supportEmail)}?subject=${encodeURIComponent(`Booking #${booking.bookingId} — question`)}`}
-                  className="text-brand-primary font-medium underline underline-offset-2"
-                >
-                  email us
-                </a>
-                .
+                {hasWhatsAppContact ? (
+                  <>
+                    💬 Need details sooner?{" "}
+                    <a
+                      href={whatsappUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-brand-primary font-medium underline underline-offset-2"
+                    >
+                      {hasRealHostPhone ? 'Chat with host on WhatsApp' : `Chat with ${brandName} support`}
+                    </a>
+                    {supportEmail && (
+                      <>
+                        {" "}or{" "}
+                        <a
+                          href={`mailto:${encodeURIComponent(supportEmail)}?subject=${encodeURIComponent(`Booking #${booking.bookingId} — question`)}`}
+                          className="text-brand-primary font-medium underline underline-offset-2"
+                        >
+                          email us
+                        </a>
+                      </>
+                    )}
+                    .
+                  </>
+                ) : supportEmail ? (
+                  <>
+                    💬 Need details sooner?{" "}
+                    <a
+                      href={`mailto:${encodeURIComponent(supportEmail)}?subject=${encodeURIComponent(`Booking #${booking.bookingId} — question`)}`}
+                      className="text-brand-primary font-medium underline underline-offset-2"
+                    >
+                      Email us
+                    </a>
+                    .
+                  </>
+                ) : null}
               </p>
               {/* TASK-1387: build review expectation at confirmation time */}
               <p>⭐ After your stay, we'll ask you to share a quick review — it helps future guests and your host.</p>
@@ -1503,24 +1538,37 @@ export default function BookingConfirmationPage() {
           </div>
         )}
 
-        {/* Need help */}
-        <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-2">
-          <h2 className="text-sm font-semibold text-text-primary">Need help?</h2>
-          <p className="text-sm text-text-secondary">
-            Call or WhatsApp us at{" "}
-            <a href={`tel:${hostPhoneDigits}`} className="text-brand-primary font-medium">{hostPhone}</a>
-            {" "}or email{" "}
-            <a href={`mailto:${supportEmail}`} className="text-brand-primary font-medium">{supportEmail}</a>.
-          </p>
-          <a
-            href={whatsappUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center justify-center rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-3 hover:bg-brand-primary/5 transition-colors"
-          >
-            {hasRealHostPhone ? 'Chat with host on WhatsApp' : `Chat with ${brandName} support`}
-          </a>
-        </div>
+        {/* Need help — only render contact rows when at least one channel is available */}
+        {(hasWhatsAppContact || !!supportEmail) && (
+          <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-2">
+            <h2 className="text-sm font-semibold text-text-primary">Need help?</h2>
+            <p className="text-sm text-text-secondary">
+              {hasWhatsAppContact && (
+                <>
+                  Call or WhatsApp us at{" "}
+                  <a href={`tel:${hostPhoneDigits}`} className="text-brand-primary font-medium">{hostPhone}</a>
+                  {supportEmail && <>{" "}or email{" "}<a href={`mailto:${supportEmail}`} className="text-brand-primary font-medium">{supportEmail}</a></>}.
+                </>
+              )}
+              {!hasWhatsAppContact && supportEmail && (
+                <>
+                  Email us at{" "}
+                  <a href={`mailto:${supportEmail}`} className="text-brand-primary font-medium">{supportEmail}</a>.
+                </>
+              )}
+            </p>
+            {hasWhatsAppContact && (
+              <a
+                href={whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-3 hover:bg-brand-primary/5 transition-colors"
+              >
+                {hasRealHostPhone ? 'Chat with host on WhatsApp' : `Chat with ${brandName} support`}
+              </a>
+            )}
+          </div>
+        )}
 
         {/* Add to Calendar (TASK-333) */}
         {!isCancelled && (

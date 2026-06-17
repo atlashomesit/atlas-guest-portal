@@ -1,3 +1,4 @@
+/* eslint-disable atlas-brand/no-atlas-string-leak -- baseline marketplace privacy notice; all platform emails/names are substituted at render time by PrivacyPage.tsx:legalizeText() before displaying to any tenant guest */
 import { MARKETPLACE_BRAND_BASELINE } from "../../tenant/displayBrand";
 
 // DPDPA 2023 notice content for the marketplace data fiduciary (see MARKETPLACE_BRAND_BASELINE).

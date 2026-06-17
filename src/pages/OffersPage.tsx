@@ -108,7 +108,7 @@ export default function OffersPage() {
             aria-label="Copy DIRECT5 promo code"
           >
             DIRECT5
-            <span className="text-xs font-normal text-emerald-500">{copied === "DIRECT5" ? "Copied!" : "Copy"}</span>
+            <span className="text-xs font-normal text-emerald-700">{copied === "DIRECT5" ? "Copied!" : "Copy"}</span>
           </button>
         </div>
 

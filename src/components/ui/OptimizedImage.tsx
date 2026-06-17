@@ -83,10 +83,25 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
   if (showPlaceholder) {
     return (
       <div
-        className={`relative block overflow-hidden ${PLACEHOLDER_CLASS} ${wrapperClassName ?? ""} ${className ?? ""}`.trim()}
+        className={`relative flex items-center justify-center overflow-hidden ${PLACEHOLDER_CLASS} ${wrapperClassName ?? ""} ${className ?? ""}`.trim()}
         role={alt ? "img" : undefined}
         aria-label={alt || undefined}
-      />
+      >
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+          className="h-10 w-10 text-[color:color-mix(in_srgb,var(--text-muted)_42%,transparent)]"
+        >
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <circle cx="8.5" cy="8.5" r="1.6" />
+          <path d="m21 15-4.5-4.5L5 21.5" />
+        </svg>
+      </div>
     );
   }
 

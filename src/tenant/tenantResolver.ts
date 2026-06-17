@@ -20,6 +20,19 @@ export function isMarketplaceMode(): boolean {
   return _marketplaceMode;
 }
 
+/** Hostnames that render the multi-tenant marketplace homepage (atlastays.com apex). */
+const MARKETPLACE_HOSTS = new Set([
+  'atlastays.com',
+  'www.atlastays.com',
+  'dev.atlastays.com',
+]);
+
+/** True when the hostname is the marketplace apex (used as boot fallback before API deploy). */
+export function isMarketplaceHostname(hostname?: string): boolean {
+  const host = (hostname ?? getHostname()).toLowerCase();
+  return MARKETPLACE_HOSTS.has(host);
+}
+
 function getHostname(): string {
   if (typeof window === 'undefined') return '';
   return (window.location?.hostname ?? '').toLowerCase();

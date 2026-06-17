@@ -4,6 +4,7 @@ import { getListingDisplayName } from '@/lib/listingDisplayName';
 import { getTenantContext as _getTenantCtx } from '@/tenant/tenantContext';
 import { getTenantOverrides, shouldHideAtlasBranding } from '@/tenant/tenantOverrides';
 import { getTenantBrandName } from '@/tenant/displayBrand';
+import { getWhatsAppPhone } from '@/config/contact';
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { FaBed, FaShower, FaSwimmingPool, FaCar, FaWifi, FaTv, FaDumbbell } from "react-icons/fa";
 import { TbAirConditioning } from "react-icons/tb";
@@ -1292,9 +1293,10 @@ useEffect(() => {
         mapSrcTrimmed.length > 0 ||
         useMultiPin ||
         (mapLocation != null && typeof mapLocation.lat === 'number' && Number.isFinite(mapLocation.lat));
-    const ppHostPhone = (data.hostPhone?.replace(/\D/g, '') || '').trim() || '7032493290';
-    const ppWaBookingUrl = `https://wa.me/${ppHostPhone}?text=${encodeURIComponent(`Hi, I'm interested in booking ${data.property_name}`)}`;
-    const ppWaAskUrl = `https://wa.me/${ppHostPhone}?text=${encodeURIComponent(`Hi, I have a question about ${data.property_name}`)}`;
+    const ppHostPhone = (data.hostPhone?.replace(/\D/g, '') || '').trim() || getWhatsAppPhone('business');
+    const ppHasHostPhone = ppHostPhone.length > 0;
+    const ppWaBookingUrl = ppHasHostPhone ? `https://wa.me/${ppHostPhone}?text=${encodeURIComponent(`Hi, I'm interested in booking ${data.property_name}`)}` : '';
+    const ppWaAskUrl = ppHasHostPhone ? `https://wa.me/${ppHostPhone}?text=${encodeURIComponent(`Hi, I have a question about ${data.property_name}`)}` : '';
     const ppShowRegRow = (ppTenantOverrides.gstin != null) ||
         (ppTenantOverrides.tourismRegNumbers != null && ppTenantOverrides.tourismRegNumbers.length > 0);
 
@@ -1618,7 +1620,7 @@ useEffect(() => {
                       </div>
                     </div>
                     <div className="pp-host-actions">
-                      {!ppIsDraft && (
+                      {!ppIsDraft && ppHasHostPhone && (
                         <a
                           href={ppWaBookingUrl}
                           target="_blank"
@@ -1631,20 +1633,22 @@ useEffect(() => {
                           <PpWhatsAppIcon size={14} /> Message on WhatsApp
                         </a>
                       )}
-                      <a
-                        href={ppWaAskUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={`pp-btn pp-btn-sm${ppIsDraft ? ' pp-btn-whatsapp' : ' pp-btn-ghost'}`}
-                        aria-label="Ask host a question on WhatsApp"
-                        data-testid={ppIsDraft ? 'draft-listing-ask-host' : undefined}
-                      >
-                        {ppIsDraft ? (
-                          <><PpWhatsAppIcon size={14} /> Ask a question</>
-                        ) : (
-                          'Ask a question'
-                        )}
-                      </a>
+                      {ppHasHostPhone && (
+                        <a
+                          href={ppWaAskUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`pp-btn pp-btn-sm${ppIsDraft ? ' pp-btn-whatsapp' : ' pp-btn-ghost'}`}
+                          aria-label="Ask host a question on WhatsApp"
+                          data-testid={ppIsDraft ? 'draft-listing-ask-host' : undefined}
+                        >
+                          {ppIsDraft ? (
+                            <><PpWhatsAppIcon size={14} /> Ask a question</>
+                          ) : (
+                            'Ask a question'
+                          )}
+                        </a>
+                      )}
                     </div>
                   </div>
 
@@ -2196,40 +2200,44 @@ useEffect(() => {
                   </div>
                 </div>
 
-                {/* WhatsApp CTA (sidebar) — TASK-2873: draft listings are question-only, not book-via-WhatsApp */}
-                <div style={{ marginTop: 12 }}>
-                  {ppIsDraft ? (
-                    <>
-                      <p className="pp-host-sub" style={{ marginBottom: 8 }}>
-                        This home is not open for booking yet. You can still ask a question.
-                      </p>
+                {/* WhatsApp CTA (sidebar) — TASK-2873: draft listings are question-only, not book-via-WhatsApp.
+                    Guard: only render when ppHasHostPhone — never show a recipient-less wa.me link on a
+                    white-label tenant with no configured number (cross-tenant data leak). */}
+                {ppHasHostPhone && (
+                  <div style={{ marginTop: 12 }}>
+                    {ppIsDraft ? (
+                      <>
+                        <p className="pp-host-sub" style={{ marginBottom: 8 }}>
+                          This home is not open for booking yet. You can still ask a question.
+                        </p>
+                        <a
+                          href={ppWaAskUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="pp-btn pp-btn-whatsapp pp-btn-block"
+                          data-testid="draft-listing-ask-host-sidebar"
+                          aria-label={`Ask about ${data.property_name} on WhatsApp`}
+                        >
+                          <PpWhatsAppIcon size={16} />
+                          Ask a question
+                        </a>
+                      </>
+                    ) : (
                       <a
-                        href={ppWaAskUrl}
+                        href={ppWaBookingUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="pp-btn pp-btn-whatsapp pp-btn-block"
-                        data-testid="draft-listing-ask-host-sidebar"
-                        aria-label={`Ask about ${data.property_name} on WhatsApp`}
+                        data-testid="chat-with-host-btn"
+                        aria-label={`Message host about ${data.property_name} on WhatsApp`}
+                        onClick={() => trackEvent('whatsapp_cta_click', { listingId: resolvedListingId })}
                       >
                         <PpWhatsAppIcon size={16} />
-                        Ask a question
+                        Chat with host
                       </a>
-                    </>
-                  ) : (
-                    <a
-                      href={ppWaBookingUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="pp-btn pp-btn-whatsapp pp-btn-block"
-                      data-testid="chat-with-host-btn"
-                      aria-label={`Message host about ${data.property_name} on WhatsApp`}
-                      onClick={() => trackEvent('whatsapp_cta_click', { listingId: resolvedListingId })}
-                    >
-                      <PpWhatsAppIcon size={16} />
-                      Chat with host
-                    </a>
-                  )}
-                </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Availability Calendar */}
                 {resolvedListingId && (
