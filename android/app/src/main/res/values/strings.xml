@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Atlas Stays</string>
+    <string name="title_activity_main">Atlas Stays</string>
+    <string name="package_name">com.atlastays.app</string>
+    <string name="custom_url_scheme">com.atlastays.app</string>
+</resources>
