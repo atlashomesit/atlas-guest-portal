@@ -1,0 +1,10 @@
+name = "atlas-guest-portal"
+type = "javascript"
+account_id = "268fbc55e5364fe69a2bd0e9a4764f68"
+workers_dev = true
+
+[env.production]
+vars = { ATLAS_API_BASE_URL = "https://api.atlaspms.in" }
+
+[env.preview]
+vars = { ATLAS_API_BASE_URL = "https://api.atlaspms.in" }
