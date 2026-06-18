@@ -10,6 +10,8 @@ import SEO from '@/components/SEO'; // TASK-1876
 import MultiPinMap, { type MapPin } from '@/components/map/MultiPinMap'; // TL-PROP
 import { formatEstTotalInclGst } from '@/utils/guestPriceEstimate';
 import AirbnbSearchBar from '@/components/marketplace/airbnbSearch/AirbnbSearchBar';
+import { buildHomeUnitPath, getPropertySlug } from '@/utils/navigation';
+import { sanitizeGuestImageUrl } from '@/utils/guestImageUrl';
 
 // TL-PROP: shape from GET /marketplace/properties (powers the map view).
 type MarketplacePropertyApi = {
@@ -38,6 +40,11 @@ type MarketplaceItem = {
   rating?: number | null;
   reviewCount?: number | null;
 };
+
+function marketplaceListingPath(item: Pick<MarketplaceItem, 'id' | 'title' | 'tenantSlug'>): string {
+  const propertySlug = getPropertySlug({ property_name: item.title });
+  return `${buildHomeUnitPath(propertySlug, item.id)}?tenant=${encodeURIComponent(item.tenantSlug)}`;
+}
 
 type ApiResponse = { items: MarketplaceItem[]; total: number; page: number; pageSize: number };
 
@@ -103,8 +110,12 @@ export default function MarketplaceHomepage() {
             title: row.propertyName || row.listingName || `Property ${row.propertyId}`,
             subtitle: row.propertyAddress ?? undefined,
             href: row.tenantSlug
-              ? `/property_details/${row.listingId}?tenant=${encodeURIComponent(row.tenantSlug)}`
-              : `/property_details/${row.listingId}`,
+              ? marketplaceListingPath({
+                  id: row.listingId,
+                  title: row.listingName || row.propertyName || `Listing ${row.listingId}`,
+                  tenantSlug: row.tenantSlug,
+                })
+              : buildHomeUnitPath(getPropertySlug({ property_name: row.listingName }), row.listingId),
           });
         }
         setMapPins(Array.from(seen.values()));
@@ -185,7 +196,7 @@ export default function MarketplaceHomepage() {
                 {/* TASK-1874: OptimizedImage replaces raw <img> */}
                 <div className="h-40 w-full bg-bg-muted">
                   <OptimizedImage
-                    src={item.coverImageUrl ?? ''}
+                    src={sanitizeGuestImageUrl(item.coverImageUrl) ?? ''}
                     alt={item.title || 'Listing photo'}
                     className="h-full w-full object-cover"
                     wrapperClassName="h-full"
@@ -245,7 +256,7 @@ export default function MarketplaceHomepage() {
 
                   <Link
                     className="mt-auto inline-flex min-h-[40px] items-center justify-center rounded-xl bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 transition-colors"
-                    to={`/property_details/${item.id}?tenant=${encodeURIComponent(item.tenantSlug)}`}
+                    to={marketplaceListingPath(item)}
                   >
                     View home
                   </Link>

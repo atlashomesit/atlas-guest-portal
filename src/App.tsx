@@ -117,6 +117,7 @@ function AppWrapper() {
 
   const LegacyPropertyRedirect = () => {
     const { id } = useParams();
+    const location = useLocation();
 
     if (!id) {
       return <Navigate to="/" replace />;
@@ -127,12 +128,12 @@ function AppWrapper() {
     if (!trailingNumericId) {
       // TASK-1220: malformed legacy slugs (no numeric listing id) should still land on a
       // concrete not-found page instead of hanging behind the property-details resolver.
-      return <Navigate to={`/homes/${normalizedId}`} replace />;
+      return <Navigate to={`/homes/${normalizedId}${location.search}`} replace />;
     }
     const idParts = normalizedId.split('-').filter(Boolean);
     const canonicalPropertySlug = idParts.length >= 2 ? idParts.slice(0, 2).join('-') : 'atlas-homes';
 
-    return <Navigate to={`/homes/${canonicalPropertySlug}/${normalizedId}`} replace />;
+    return <Navigate to={`/homes/${canonicalPropertySlug}/${trailingNumericId}${location.search}`} replace />;
   };
 
   return (
