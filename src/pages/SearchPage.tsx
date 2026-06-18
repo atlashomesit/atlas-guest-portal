@@ -23,6 +23,7 @@ import { compareAtlasHomesBuildingOrder } from "../utils/atlasHomesBuildingOrder
 import { buildApiUrl, getApiHeaders } from "../api/client";
 import { isAtlastaysMarketplaceSurface, isMarketplaceMode } from "../tenant/tenantResolver";
 import AirbnbSearchBar from "../components/marketplace/airbnbSearch/AirbnbSearchBar";
+import { enrichMarketplaceCoverItems } from "../utils/marketplaceListingCover";
 import {
   fetchAvailabilitySummary,
   type ListingAvailabilitySummary,
@@ -253,7 +254,8 @@ const SearchPage = () => {
       });
       if (!res.ok) throw new Error("marketplace listings failed");
       const data = (await res.json()) as { items?: MarketplaceApiItem[] };
-      setApiListings(marketplaceToNormalized(data.items ?? []));
+      const enriched = await enrichMarketplaceCoverItems(data.items ?? []);
+      setApiListings(marketplaceToNormalized(enriched));
     } catch {
       if (!signal.aborted) {
         setApiError(true);
