@@ -1,5 +1,5 @@
 import { getApiBaseUrl, hasRuntimeConfig, getRuntimeConfig } from '@/runtime-config';
-import { getTenantSlug } from '@/tenant/tenantResolver';
+import { getTenantSlug, isMarketplaceMode } from '@/tenant/tenantResolver';
 
 const resolveApiBaseUrl = (): string | null => {
   const baseUrl = getApiBaseUrl();
@@ -21,6 +21,13 @@ export const getApiHeaders = (): Record<string, string> => {
     if (urlTenant) {
       return { 'X-Tenant-Slug': urlTenant };
     }
+  }
+
+  // Marketplace apex: never send the sentinel slug "marketplace" as X-Tenant-Slug — it triggers
+  // cross-tenant /listings/public mode and hits /tenants/marketplace/* instead of real tenant APIs.
+  // Detail pages pass ?tenant=<slug> which is handled above.
+  if (isMarketplaceMode()) {
+    return {};
   }
 
   // Priority matches tenantResolver: domain-resolved slug first, runtime config tenantKey only as

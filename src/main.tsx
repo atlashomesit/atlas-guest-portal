@@ -13,7 +13,7 @@ import { ThemeProvider } from './theme/ThemeProvider'
 import { loadRuntimeConfig, setRuntimeConfig, getApiBaseUrl } from './runtime-config'
 import { getApiHeaders } from './api/client'
 import { getTenantSlug, isAtlastaysMarketplaceSurface, isMarketplaceMode, setMarketplaceMode } from './tenant/tenantResolver'
-import { validateTenant, resolveFromDomain, getTenantContext, SubdomainNotActivatedError } from './tenant/tenantContext'
+import { validateTenant, resolveFromDomain, getTenantContext, SubdomainNotActivatedError, type TenantInfo } from './tenant/tenantContext'
 import SubdomainNotActivatedScreen from './components/SubdomainNotActivatedScreen'
 import { applyTenantBranding } from './tenant/tenantBranding'
 import { ConfigLoadingScreen } from './runtime-config/ConfigLoadingScreen'
@@ -42,6 +42,22 @@ window.addEventListener("unhandledrejection", (event) => {
 
 const rootEl = document.getElementById('root')!
 const root = createRoot(rootEl)
+
+/** Enable multi-tenant marketplace UI on atlastays.com apex (homepage + /search). */
+function activateMarketplaceSurface(
+  tenantKey: string | undefined,
+  domainResolved: TenantInfo | null,
+): void {
+  if (!isAtlastaysMarketplaceSurface()) return
+  const key = (tenantKey ?? '').trim().toLowerCase()
+  if (
+    domainResolved?.isMarketplaceRoot === true ||
+    key === 'marketplace' ||
+    key === 'marketplace-root'
+  ) {
+    setMarketplaceMode(true)
+  }
+}
 
 const bootstrapApp = async () => {
   applyTheme(DEFAULT_THEME)
@@ -105,18 +121,17 @@ const bootstrapApp = async () => {
             throw e;
           }
         }
-      } else if (tenantSlug === 'marketplace' && isAtlastaysMarketplaceSurface()) {
-        setMarketplaceMode(true);
-      } else if (!import.meta.env.DEV) {
+      } else if (!import.meta.env.DEV && tenantSlug !== 'marketplace' && !isAtlastaysMarketplaceSurface()) {
         throw new Error('Tenant could not be resolved. Check /.well-known/atlas-runtime-config.json (tenantKey) or ensure the domain is registered in the Atlas tenant table.');
       }
     }
 
+    activateMarketplaceSurface(config.tenantKey, domainResolved);
+
     // 3. Apply brand config to DOM (title, primaryColor CSS vars, favicon)
-    const forceMarketplaceFromConfig = (config.tenantKey || '').trim().toLowerCase() === 'marketplace-root';
     const resolved = getTenantContext();
-    if ((resolved?.isMarketplaceRoot || forceMarketplaceFromConfig) && isAtlastaysMarketplaceSurface()) {
-      setMarketplaceMode(true);
+    if (isMarketplaceMode() && isAtlastaysMarketplaceSurface()) {
+      // Marketplace apex uses Atlas Stays branding from static assets — not a single host tenant.
     } else if (resolved) {
       applyTenantBranding(resolved);
     }
