@@ -172,7 +172,10 @@ type MarketplaceApiItem = {
 };
 
 function marketplaceToNormalized(items: MarketplaceApiItem[]): NormalizedListing[] {
-  return items.map((item) => ({
+  return items.map((item) => {
+    const propertySlug = getPropertySlug({ property_name: item.title });
+    const canonicalPath = `${buildHomeUnitPath(propertySlug, item.id)}?tenant=${encodeURIComponent(item.tenantSlug)}`;
+    return {
     id: `mp-${item.id}`,
     numericId: item.id,
     title: item.title,
@@ -181,12 +184,13 @@ function marketplaceToNormalized(items: MarketplaceApiItem[]): NormalizedListing
     maxGuests: item.maxGuests,
     imageUrl: sanitizeGuestImageUrl(item.coverImageUrl) ?? "",
     amenities: [],
-    canonicalPath: `/property_details/${item.id}?tenant=${encodeURIComponent(item.tenantSlug)}`,
+    canonicalPath,
     rating: item.rating ?? undefined,
     reviewCount: item.reviewCount ?? null,
     latitude: null,
     longitude: null,
-  }));
+  };
+  });
 }
 
 /** TASK-1460: compact label + colors for listing card availability chip. */
