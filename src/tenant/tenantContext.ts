@@ -7,7 +7,7 @@
  */
 
 import { getApiHeaders, buildApiUrl } from '@/api/client';
-import { setDomainResolvedSlug, setMarketplaceMode } from '@/tenant/tenantResolver';
+import { setDomainResolvedSlug, setMarketplaceMode, isAtlastaysMarketplaceSurface } from '@/tenant/tenantResolver';
 
 export interface TenantInfo {
   id?: number;
@@ -168,7 +168,7 @@ export async function resolveFromDomain(apiBaseUrl: string, domain: string): Pro
     }
 
     if (slug) setDomainResolvedSlug(slug);
-    if (isMarketplaceRoot) setMarketplaceMode(true);
+    if (isMarketplaceRoot && isAtlastaysMarketplaceSurface(domain)) setMarketplaceMode(true);
 
     const brandShort = String(data.brandName ?? "").trim();
     const brandLong =

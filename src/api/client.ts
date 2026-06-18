@@ -1,5 +1,5 @@
 import { getApiBaseUrl, hasRuntimeConfig, getRuntimeConfig } from '@/runtime-config';
-import { getTenantSlug } from '@/tenant/tenantResolver';
+import { getTenantSlug, isMarketplaceMode } from '@/tenant/tenantResolver';
 
 const resolveApiBaseUrl = (): string | null => {
   const baseUrl = getApiBaseUrl();
@@ -15,6 +15,21 @@ const resolveApiBaseUrl = (): string | null => {
 
 /** Headers to attach to Atlas API requests when contract requires tenant (e.g. X-Tenant-Slug). */
 export const getApiHeaders = (): Record<string, string> => {
+  // Marketplace detail pages pass ?tenant=<slug> so cross-host listings resolve the correct host tenant.
+  if (typeof window !== 'undefined') {
+    const urlTenant = new URLSearchParams(window.location.search).get('tenant')?.trim();
+    if (urlTenant) {
+      return { 'X-Tenant-Slug': urlTenant };
+    }
+  }
+
+  // Marketplace apex: never send the sentinel slug "marketplace" as X-Tenant-Slug — it triggers
+  // cross-tenant /listings/public mode and hits /tenants/marketplace/* instead of real tenant APIs.
+  // Detail pages pass ?tenant=<slug> which is handled above.
+  if (isMarketplaceMode()) {
+    return {};
+  }
+
   // Priority matches tenantResolver: domain-resolved slug first, runtime config tenantKey only as
   // fallback. This lets a single deploy serve multiple tenants by hostname while still allowing
   // dev/staging to force a slug via ATLAS_TENANT_KEY when the hostname can't be resolved.

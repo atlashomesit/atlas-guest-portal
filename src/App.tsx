@@ -11,7 +11,7 @@ import { ListingPhotosProvider } from "./contexts/ListingPhotosContext"
 import { CurrencyProvider } from "./contexts/CurrencyContext"
 import { GuestAuthProvider } from "./contexts/GuestAuthContext"
 import { trackEvent } from "./utils/analytics"
-import { isMarketplaceMode } from "./tenant/tenantResolver"
+import { isAtlastaysMarketplaceSurface, isMarketplaceMode } from "./tenant/tenantResolver"
 import { CITY_LANDING_SLUGS } from "./content/cities/cityLandingSlugs"
 
 const Home = React.lazy(() => import("./pages/home/Home"))
@@ -148,7 +148,7 @@ function AppWrapper() {
         <Routes key={location.pathname}>
           <Route
             path="/"
-            element={withBoundary(<Suspense fallback={<LazyFallback />}>{isMarketplaceMode() ? <MarketplaceHomepage /> : <Home />}</Suspense>, isMarketplaceMode() ? "marketplace-home-route" : "home-route")}
+            element={withBoundary(<Suspense fallback={<LazyFallback />}>{isMarketplaceMode() && isAtlastaysMarketplaceSurface() ? <MarketplaceHomepage /> : <Home />}</Suspense>, isMarketplaceMode() && isAtlastaysMarketplaceSurface() ? "marketplace-home-route" : "home-route")}
           />
           <Route path="/contact" element={withBoundary(<Suspense fallback={<LazyFallback />}><ContactUs /></Suspense>, "contact-route")} />
           <Route path="/apartments" element={withBoundary(<Navigate to="/#our-homes" replace />, "apartments-redirect")} />
