@@ -12,6 +12,7 @@ import { formatEstTotalInclGst } from '@/utils/guestPriceEstimate';
 import AirbnbSearchBar from '@/components/marketplace/airbnbSearch/AirbnbSearchBar';
 import { buildHomeUnitPath, getPropertySlug } from '@/utils/navigation';
 import { sanitizeGuestImageUrl } from '@/utils/guestImageUrl';
+import { enrichMarketplaceCoverItems } from '@/utils/marketplaceListingCover';
 
 // TL-PROP: shape from GET /marketplace/properties (powers the map view).
 type MarketplacePropertyApi = {
@@ -77,8 +78,9 @@ export default function MarketplaceHomepage() {
     setLoading(true);
     fetch(buildApiUrl(apiPath))
       .then(async (r) => (r.ok ? ((await r.json()) as ApiResponse) : { items: [] as MarketplaceItem[] }))
-      .then((data) => {
-        if (!cancelled) setItems(data.items ?? []);
+      .then(async (data) => {
+        const enriched = await enrichMarketplaceCoverItems(data.items ?? []);
+        if (!cancelled) setItems(enriched);
       })
       .catch(() => {
         if (!cancelled) setItems([]);
