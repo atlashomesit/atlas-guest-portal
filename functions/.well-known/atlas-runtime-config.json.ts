@@ -39,7 +39,7 @@ export const onRequestGet = (context: { env: Env; request: Request }) => {
   // Extract tenant slug dynamically from request hostname
   const url = new URL(request.url);
   const host = url.hostname.toLowerCase();
-  let tenantKey = "";
+  let tenantKey: string;
 
   if (host.includes("nightnesthospitalityservices")) {
     tenantKey = "Nightnest";

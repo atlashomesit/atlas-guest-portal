@@ -8,6 +8,7 @@ vi.mock('@/runtime-config', () => ({
 }));
 vi.mock('@/tenant/tenantResolver', () => ({
   getTenantSlug: () => 'atlas',
+  isMarketplaceMode: () => false,
 }));
 
 import { CORS_ALLOWED_REQUEST_HEADERS, getOrderRequestHeaders } from '@/api/client';

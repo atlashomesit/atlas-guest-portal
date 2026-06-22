@@ -1,8 +1,16 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
+import {
+  hydrateGuestAuthState,
+  getCachedGuestAuthState,
+  persistGuestAuthState,
+  clearGuestAuthState,
+} from '@/storage/guestAuthStorage';
 
 /**
  * TASK-4017: Guest authentication context
  * Manages OTP-based guest login and JWT storage
+ * TASK-4198: JWT persisted via Preferences on native Android
  */
 
 export interface GuestAuthState {
@@ -19,8 +27,6 @@ type GuestAuthContextValue = {
   isLoading: boolean;
 };
 
-const STORAGE_KEY = 'atlas_guest_auth';
-
 const defaultState: GuestAuthState = {
   isAuthenticated: false,
   token: null,
@@ -32,22 +38,25 @@ const defaultState: GuestAuthState = {
 export const GuestAuthContext = createContext<GuestAuthContextValue | undefined>(undefined);
 
 export const GuestAuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [auth, setAuth] = useState<GuestAuthState>(defaultState);
-  const [isLoading, setIsLoading] = useState(true);
+  const [auth, setAuth] = useState<GuestAuthState>(() => getCachedGuestAuthState() ?? defaultState);
+  const [isLoading, setIsLoading] = useState(Capacitor.isNativePlatform());
 
-  // Load auth from localStorage on mount
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored) as GuestAuthState;
-        setAuth(parsed);
+    if (!Capacitor.isNativePlatform()) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const stored = await hydrateGuestAuthState();
+        if (!cancelled && stored) setAuth(stored);
+      } catch (error) {
+        console.error('Failed to load guest auth from storage:', error);
+      } finally {
+        if (!cancelled) setIsLoading(false);
       }
-    } catch (error) {
-      console.error('Failed to load guest auth from storage:', error);
-    } finally {
-      setIsLoading(false);
-    }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const login = useCallback((token: string, email: string, guestId?: number) => {
@@ -58,20 +67,16 @@ export const GuestAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       guestId: guestId ?? null,
     };
     setAuth(newAuth);
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newAuth));
-    } catch (error) {
+    void persistGuestAuthState(newAuth).catch((error) => {
       console.error('Failed to save guest auth to storage:', error);
-    }
+    });
   }, []);
 
   const logout = useCallback(() => {
     setAuth(defaultState);
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch (error) {
+    void clearGuestAuthState().catch((error) => {
       console.error('Failed to clear guest auth from storage:', error);
-    }
+    });
   }, []);
 
   const value: GuestAuthContextValue = {

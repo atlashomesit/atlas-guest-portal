@@ -9,7 +9,9 @@ import { ToastContainer } from "react-toastify"
 import { BookingProvider } from "./contexts/BookingContext"
 import { ListingPhotosProvider } from "./contexts/ListingPhotosContext"
 import { CurrencyProvider } from "./contexts/CurrencyContext"
-import { GuestAuthProvider } from "./contexts/GuestAuthContext"
+import { GuestAuthProvider, useGuestAuth } from "./contexts/GuestAuthContext"
+import { usePushNotifications } from "./hooks/usePushNotifications"
+import NativeShellBridge from "./native/NativeShellBridge"
 import { trackEvent } from "./utils/analytics"
 import { isAtlastaysMarketplaceSurface, isMarketplaceMode } from "./tenant/tenantResolver"
 import { CITY_LANDING_SLUGS } from "./content/cities/cityLandingSlugs"
@@ -84,6 +86,12 @@ function PropertyDetailsLazyFallback() {
   )
 }
 
+function GuestNativeHooks() {
+  const { auth, isLoading } = useGuestAuth();
+  usePushNotifications(auth.isAuthenticated, auth.token);
+  return <NativeShellBridge authLoading={isLoading} />;
+}
+
 function AppWrapper() {
   const location = useLocation();
   const [, setLanguageVersion] = useState(0);
@@ -138,6 +146,7 @@ function AppWrapper() {
 
   return (
     <>
+      <GuestNativeHooks />
       <a href="#main-content" className="skip-to-main">
         Skip to main content
       </a>

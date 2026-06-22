@@ -40,7 +40,8 @@
   "overrides": {
     "@jridgewell/sourcemap-codec": "1.5.5",
     "dom-accessibility-api": "^0.6.3",
-    "minimatch": ">=10.2.1"
+    "minimatch": ">=10.2.1",
+    "undici": "^7.28.0"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.0",
