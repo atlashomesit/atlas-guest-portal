@@ -2,10 +2,10 @@
   Cache-Control: public, max-age=31536000, immutable
 
 /sw.js
-  Cache-Control: no-cache, must-revalidate
+  Cache-Control: no-store, no-cache, must-revalidate
 
 /sw-register.js
-  Cache-Control: no-cache, must-revalidate
+  Cache-Control: no-store, no-cache, must-revalidate
 
 /manifest.webmanifest
   Cache-Control: no-cache, must-revalidate

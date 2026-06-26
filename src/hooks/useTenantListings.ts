@@ -116,6 +116,40 @@ const mapDtoToProperty = (dto: PublicListing, photosFromEndpoint: string[]): Ten
   };
 };
 
+/**
+ * Guarantees a unique `id` across the property list. `id` is the React key (and the propertyLookup
+ * key) on the home grid, but mapDtoToProperty derives it from a friendly propertyNumber
+ * (name-extraction / local lookup) which is NOT unique across cross-tenant / marketplace data — two
+ * distinct listings can resolve to the same number. That produced duplicate React keys + a
+ * duplicate-content card and, in the gate, a "two children with the same key" console error that
+ * cascaded across guest specs. Drops any exact-duplicate listing (same listingId), then falls back
+ * to the unique listingId (dto.id) for a property whose propertyNumber collides with one already
+ * used. No real listing is lost. Exported for unit testing.
+ */
+export const ensureUniquePropertyIds = (
+  properties: TenantPropertyRecord[],
+): TenantPropertyRecord[] => {
+  const seenListingIds = new Set<number>();
+  const seenIds = new Set<number | string>();
+  return properties
+    .filter((p) => {
+      const lid = p.listingId != null ? Number(p.listingId) : NaN;
+      if (!Number.isFinite(lid)) return true;
+      if (seenListingIds.has(lid)) return false;
+      seenListingIds.add(lid);
+      return true;
+    })
+    .map((p) => {
+      if (p.id != null && !seenIds.has(p.id)) {
+        seenIds.add(p.id);
+        return p;
+      }
+      const uniqueId = p.listingId ?? p.id;
+      seenIds.add(uniqueId);
+      return { ...p, id: uniqueId };
+    });
+};
+
 const mapDtosToData = (
   dtos: PublicListing[],
   photosByListingId: Map<number, string[]>,
@@ -135,6 +169,10 @@ const mapDtosToData = (
       return Number.isFinite(lid) && tenantAllowedIds.has(lid);
     });
   }
+
+  // Guarantee a unique `id` per property (it is the React key + the propertyLookup key on the home
+  // grid) — see ensureUniquePropertyIds.
+  properties = ensureUniquePropertyIds(properties);
 
   const listings: Listing[] = properties.map((p) => ({
     id: p.id,
