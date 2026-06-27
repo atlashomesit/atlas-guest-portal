@@ -800,18 +800,19 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       : null;
 
   /** GST component of room fare (ADDITIVE — CPO formula per 2026-05-21). */
+  const losApplied = losDiscountAmount > 0 && priceDetails.nights >= 7 ? losDiscountAmount : 0;
+  const taxableBase = Math.max(0, breakdownPrice - losApplied);
   const gstLineAmount =
-    gstSlabPercent != null && breakdownPrice > 0
-      ? accommodationGstLineAmount(breakdownPrice, perNightForDisplay)
+    gstSlabPercent != null && taxableBase > 0
+      ? accommodationGstLineAmount(taxableBase, perNightForDisplay)
       : 0;
 
   // Razorpay charges its 3% fee on the FULL amount it processes (base + GST), not just base.
   // Sreekar canonical clarification 2026-05-21 (memory: project_guest_booking_pricing_formula).
-  const breakdownConvenienceFee = Math.round((breakdownPrice + gstLineAmount) * convenienceFeePercent);
+  const breakdownConvenienceFee = Math.round((taxableBase + gstLineAmount) * convenienceFeePercent);
 
-  // TASK-2631: Total = Base + GST + Service Fee (CPO-canonical formula).
-  // GST is additive (5% or 18% of base, not inclusive extraction).
-  const breakdownFinalTotal = Math.max(1, breakdownPrice + gstLineAmount + breakdownConvenienceFee);
+  // TASK-2631: Total = Base − LOS + GST + Service Fee (CPO-canonical formula).
+  const breakdownFinalTotal = Math.max(1, taxableBase + gstLineAmount + breakdownConvenienceFee);
 
   const finalTotal =
     hasSelectedRange && selectedRangeTotalFromCalendar != null

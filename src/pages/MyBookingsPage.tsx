@@ -7,6 +7,7 @@ import { buildApiUrl, getApiHeaders } from "../api/client";
 import { messageFromApiResponse } from "../utils/serverErrorFromResponse";
 import { getContactEmail, getTelLink, hasHostContact } from "../config/contact";
 import { getTenantBrandName } from "../tenant/displayBrand";
+import { useGuestAuth } from "../contexts/GuestAuthContext";
 
 interface BookingItem {
   id: number;
@@ -48,6 +49,7 @@ export default function MyBookingsPage() {
   const [searchParams] = useSearchParams();
   const guestId = searchParams.get("guestId");
   const token = searchParams.get("t");
+  const { auth, isLoading: authLoading } = useGuestAuth();
 
   const [bookings, setBookings] = useState<BookingItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -55,27 +57,65 @@ export default function MyBookingsPage() {
   const [tab, setTab] = useState<BookingsTab>("upcoming");
 
   useEffect(() => {
-    if (!guestId || !token) {
-      setError("Booking history link is missing guest details. Please use the link from your booking confirmation.");
-      setLoading(false);
-      return;
-    }
-    const url = buildApiUrl(
-      `/api/guest/bookings?guestId=${encodeURIComponent(guestId)}&t=${encodeURIComponent(token)}`
-    );
-    fetch(url, { headers: { Accept: "application/json", ...getApiHeaders() } })
-      .then(async (res) => {
-        if (res.status === 404) throw new Error("No bookings found. Please use the link from your booking confirmation.");
-        if (!res.ok) throw new Error(await messageFromApiResponse(res));
-        return res.json() as Promise<BookingItem[]>;
-      })
-      .then((data) => setBookings(Array.isArray(data) ? data : []))
-      .catch((err: Error) => {
+    if (authLoading) return;
+
+    let cancelled = false;
+
+    const loadFromMagicLink = async () => {
+      const url = buildApiUrl(
+        `/api/guest/bookings?guestId=${encodeURIComponent(guestId!)}&t=${encodeURIComponent(token!)}`
+      );
+      const res = await fetch(url, { headers: { Accept: "application/json", ...getApiHeaders() } });
+      if (res.status === 404) throw new Error("No bookings found. Please use the link from your booking confirmation.");
+      if (!res.ok) throw new Error(await messageFromApiResponse(res));
+      return res.json() as Promise<BookingItem[]>;
+    };
+
+    const loadFromJwt = async () => {
+      const url = buildApiUrl("/api/guest/auth/bookings");
+      const res = await fetch(url, {
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${auth.token}`,
+          ...getApiHeaders(),
+        },
+      });
+      if (res.status === 401) throw new Error("Your session expired. Please log in again.");
+      if (res.status === 404) throw new Error("No bookings found for your account.");
+      if (!res.ok) throw new Error(await messageFromApiResponse(res));
+      return res.json() as Promise<BookingItem[]>;
+    };
+
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const hasMagicLink = Boolean(guestId && token);
+        const hasJwt = auth.isAuthenticated && auth.token;
+
+        if (!hasMagicLink && !hasJwt) {
+          setError("Sign in to view your trips, or use the link from your booking confirmation email.");
+          setBookings([]);
+          return;
+        }
+
+        const data = hasMagicLink ? await loadFromMagicLink() : await loadFromJwt();
+        if (!cancelled) setBookings(Array.isArray(data) ? data : []);
+      } catch (err: unknown) {
         console.error(err);
-        setError("We couldn't load your bookings — please try again.");
-      })
-      .finally(() => setLoading(false));
-  }, [guestId, token]);
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "We couldn't load your bookings — please try again.");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [guestId, token, auth.isAuthenticated, auth.token, authLoading]);
 
   const filteredBookings = useMemo(() => {
     const today = startOfTodayUtc();
@@ -91,7 +131,7 @@ export default function MyBookingsPage() {
     });
   }, [bookings, tab]);
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10">
         <LoadingState kind="skeleton-list" count={4} message="Loading bookings…" />
@@ -107,9 +147,8 @@ export default function MyBookingsPage() {
         title="Bookings not found"
         message={error}
         primaryAction={{
-          label: "Try again",
-          onClick: () => window.location.reload(),
-          "data-testid": "my-bookings-retry",
+          label: auth.isAuthenticated ? "Browse homes" : "Log in",
+          ...(auth.isAuthenticated ? { to: "/" } : { to: "/login" }),
         }}
         secondaryActions={[
           {
@@ -157,7 +196,7 @@ export default function MyBookingsPage() {
             data-testid="my-bookings-empty-state"
             icon="🧳"
             title="No bookings yet"
-            message="Once you book a home it’ll show up here. Bookings are linked to the email or phone used at checkout — if you used a different contact, open the link from that confirmation email or WhatsApp message."
+            message="Once you book a home it'll show up here. Bookings are linked to the email or phone used at checkout — if you used a different contact, open the link from that confirmation email or WhatsApp message."
             primaryAction={{ label: "Browse our homes", to: "/" }}
             secondaryActions={hasHostContact() ? [{ label: "Call us to find a booking", href: getTelLink() }] : []}
           />
@@ -210,17 +249,18 @@ export default function MyBookingsPage() {
           </div>
         )}
 
-        {/* TASK-2567: only show link when there's a booking to use as context (avoids ?bookingId= empty param) */}
-        {guestId && token && bookings.length > 0 && (
+        {bookings.length > 0 && bookings[0].token && (
           <div className="text-center pt-2 flex flex-col items-center gap-2">
+            {(guestId && token) && (
+              <Link
+                to={`/profile?bookingId=${bookings[0].id}&t=${encodeURIComponent(token)}`}
+                className="text-sm text-text-muted underline underline-offset-2 hover:text-text-primary"
+              >
+                Update contact details
+              </Link>
+            )}
             <Link
-              to={`/profile?bookingId=${bookings[0].id}&t=${encodeURIComponent(token)}`}
-              className="text-sm text-text-muted underline underline-offset-2 hover:text-text-primary"
-            >
-              Update contact details
-            </Link>
-            <Link
-              to={`/preferences/${encodeURIComponent(token)}`}
+              to={`/preferences/${encodeURIComponent(bookings[0].token)}`}
               className="text-sm text-text-muted underline underline-offset-2 hover:text-text-primary"
               data-testid="my-bookings-manage-preferences"
             >
