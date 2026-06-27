@@ -106,6 +106,10 @@ export async function fetchPricingBreakdown(
     let convenienceFeePercent = 0;
 
     for (const d of days) {
+      const dayDate = String(d.date ?? d.Date ?? '').slice(0, 10);
+      if (dayDate && params.checkOut) {
+        if (dayDate < params.checkIn || dayDate >= params.checkOut) continue;
+      }
       const base = Number(d.baseAmount ?? d.BaseAmount ?? 0);
       const discount = Number(d.discountAmount ?? d.DiscountAmount ?? 0);
       const los = Number(d.losDiscountAmount ?? d.LosDiscountAmount ?? 0);

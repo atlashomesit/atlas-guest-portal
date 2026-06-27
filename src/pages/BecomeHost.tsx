@@ -235,6 +235,7 @@ const BecomeHost = () => {
 
   const [step, setStep] = useState(0);
   const [submitStatus, setSubmitStatus] = useState<SubmitStatus>("idle");
+  const [adminPortalUrl, setAdminPortalUrl] = useState<string | null>(null);
   const [showResumeBanner, setShowResumeBanner] = useState(false);
   // TASK-2609: partner referral code from ?ref= (optional; redeemed server-side at /onboarding/start)
   const [referralCode, setReferralCode] = useState(() => {
@@ -440,21 +441,16 @@ const BecomeHost = () => {
       if (data?.listingId) {
         localStorage.setItem('onboarding_listing_id', String(data.listingId));
       }
-      if (data?.token) {
-        // Keep admin portal auth keys in sync for setup auto-login.
-        localStorage.setItem('atlas_admin_token', String(data.token));
-        localStorage.setItem('auth_token', String(data.token));
-      }
-      if (data?.tenantSlug) {
-        localStorage.setItem('auth_tenant_slug', String(data.tenantSlug));
-      }
-      if (data?.tenantId) {
-        localStorage.setItem('auth_tenant_id', String(data.tenantId));
-      }
-      if (typeof data?.userId === 'number') {
-        localStorage.setItem('onboarding_user_id', String(data.userId));
-      }
-      localStorage.setItem('onboarding_user_email', contact.email.trim());
+
+      const adminBase = (import.meta.env.VITE_ADMIN_PORTAL_URL as string | undefined)?.trim() || "https://app.atlaspms.in";
+      const setupParams = new URLSearchParams({ auto_login: "1" });
+      if (data?.token) setupParams.set("setup_token", String(data.token));
+      if (data?.tenantSlug) setupParams.set("tenant_slug", String(data.tenantSlug));
+      if (data?.tenantId) setupParams.set("tenant_id", String(data.tenantId));
+      if (data?.propertyId) setupParams.set("property_id", String(data.propertyId));
+      if (data?.listingId) setupParams.set("listing_id", String(data.listingId));
+      setupParams.set("email", contact.email.trim());
+      setAdminPortalUrl(`${adminBase}/onboarding/setup?${setupParams.toString()}`);
 
       setSubmitStatus("success");
       localStorage.removeItem(DRAFT_KEY);
@@ -487,7 +483,7 @@ const BecomeHost = () => {
                 to set up pricing, upload photos, and go live.
               </Typography>
               <a
-                href={`${(import.meta.env.VITE_ADMIN_PORTAL_URL as string | undefined)?.trim() || "https://app.atlaspms.in"}/onboarding/setup?auto_login=1`}
+                href={adminPortalUrl ?? `${(import.meta.env.VITE_ADMIN_PORTAL_URL as string | undefined)?.trim() || "https://app.atlaspms.in"}/onboarding/setup?auto_login=1`}
                 style={styles.adminLink}
               >
                 Open Admin Portal
