@@ -23,7 +23,13 @@ interface PaymentStatusPollBody {
 const PAYMENT_STATUS_POLL_MS = 30_000;
 
 function formatYmd(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  // Use LOCAL date parts (not toISOString, which is UTC). The grid cells below build keys from
+  // local year/month/day, so a UTC slice shifts the from/to range by a day in IST (UTC+5:30) and
+  // can make blocked/booked days fall outside the fetched window and render as "available".
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 function addMonths(d: Date, n: number): Date {
