@@ -91,7 +91,7 @@ export default function MyBookingsPage() {
       setError(null);
       try {
         const hasMagicLink = Boolean(guestId && token);
-        const hasJwt = auth.isAuthenticated && auth.token;
+        const hasJwt = Boolean(auth.isAuthenticated && auth.token);
 
         if (!hasMagicLink && !hasJwt) {
           setError("Sign in to view your trips, or use the link from your booking confirmation email.");
@@ -99,7 +99,9 @@ export default function MyBookingsPage() {
           return;
         }
 
-        const data = hasMagicLink ? await loadFromMagicLink() : await loadFromJwt();
+        // Prefer the authenticated JWT session when present; a stale/bookmarked ?guestId=&t= magic link
+        // should not override (or break) a logged-in guest's view of their own trips.
+        const data = hasJwt ? await loadFromJwt() : await loadFromMagicLink();
         if (!cancelled) setBookings(Array.isArray(data) ? data : []);
       } catch (err: unknown) {
         console.error(err);
