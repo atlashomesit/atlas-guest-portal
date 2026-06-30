@@ -167,6 +167,14 @@ export function getUnitNoun(overrides: TenantOverrides): {
 
 const TENANT_OVERRIDES: Record<string, TenantOverrides> = {
   atlas: {
+    // TASK-4300 (founder decision 2026-06-30): canonical guest-facing support WhatsApp =
+    // +91-7032493290 (Atlastays platform line). The tenant API returns the Atlas Homes admin
+    // number (9502244053) for whatsappBookingPhone, which is NOT the guest support line — pin
+    // the override so every wa.me link + displayed number resolves to 7032493290.
+    contact: {
+      // eslint-disable-next-line atlas-brand/no-atlas-string-leak -- canonical Atlas marketplace WhatsApp; scoped to the `atlas` marketplace slug only, never a white-label tenant
+      whatsappPhone: '7032493290',
+    },
     mapLocation: {
       lat: 17.4948,
       lng: 78.3996,

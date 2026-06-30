@@ -95,8 +95,8 @@ const trustBadges = [
     icon: HeartHandshake,
   },
   {
-    title: "Recognized hosts",
-    description: "Consistently rated 4.8★+ across partner platforms and recurring corporate stays.",
+    title: "Owner-run hosts",
+    description: "Every home is run by its owner and held to a consistent quality, safety, and cleanliness standard.",
     icon: Medal,
   },
   {
@@ -189,7 +189,7 @@ const AboutPage = () => {
           <p className="text-base uppercase tracking-[0.18em] text-primary font-semibold">Hospitality standards</p>
           <h2 className="text-2xl md:text-3xl font-bold">Standards that travel with you</h2>
           <p className="text-base text-text-muted max-w-3xl leading-relaxed">
-            Every Starguest House home is audited on the same quality framework. We match hotel-grade consistency with the warmth of local hosts so travelers never have to choose between comfort and character.
+            Every Atlas home is audited on the same quality framework. We match hotel-grade consistency with the warmth of local hosts so travelers never have to choose between comfort and character.
           </p>
           <div className="grid gap-4 sm:grid-cols-2">
             {hospitalityStandards.map(({ title, description, icon: Icon }) => (
@@ -215,7 +215,7 @@ const AboutPage = () => {
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <p className="text-base uppercase tracking-[0.18em] text-primary font-semibold">Meet the team</p>
-            <h2 className="text-2xl md:text-3xl font-bold">People who craft every Starguest House stay</h2>
+            <h2 className="text-2xl md:text-3xl font-bold">People who craft every Atlas stay</h2>
             <p className="text-base text-text-muted max-w-2xl mt-2 leading-relaxed">
               Our distributed team blends hospitality know-how with operational rigor, ensuring each apartment is cared for like a boutique property.
             </p>

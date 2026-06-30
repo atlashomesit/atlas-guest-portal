@@ -23,7 +23,9 @@ describe("Terms", () => {
       <Terms />
     );
 
-    expect(screen.getByRole("heading", { name: /Terms of Service \| Atlastays/i })).toBeInTheDocument();
+    // TASK-4304: visible H1 is the human heading only ("Terms of Service"); the " | <brand>"
+    // suffix lives in the document <title> (SEO), not the on-page heading.
+    expect(screen.getByRole("heading", { name: /^Terms of Service$/i })).toBeInTheDocument();
     expect(screen.getByText(/Print-friendly view/i)).toBeInTheDocument();
     expect(screen.getAllByRole("heading", { level: 2 }).length).toBeGreaterThan(1);
     expect(screen.getByText(/Payment data sharing/i)).toBeInTheDocument();

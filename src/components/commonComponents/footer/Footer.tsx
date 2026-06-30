@@ -65,7 +65,7 @@ const Footer = () => {
         key: "email",
         icon: <IoIosMail className="shrink-0 text-xl" aria-hidden />,
         content: (
-            <a href={`mailto:${encodeURIComponent(email)}`} className="break-all text-left hover:text-[var(--footer-link-hover)]">
+            <a href={`mailto:${email}`} className="break-all text-left hover:text-[var(--footer-link-hover)]">
                 {email}
             </a>
         ),

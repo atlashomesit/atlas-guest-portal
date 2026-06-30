@@ -232,7 +232,7 @@ export default function MarketplaceHomepage() {
                     </span>
                   )}
 
-                  <p className="text-sm text-text-body">Sleeps up to {item.maxGuests} guests</p>
+                  <p className="text-sm text-text-body">Sleeps up to {item.maxGuests} guest{item.maxGuests === 1 ? '' : 's'}</p>
 
                   {/* TASK-1873: rating row */}
                   {item.rating != null && item.rating > 0 && (

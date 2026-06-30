@@ -47,7 +47,7 @@ const Terms = () => {
   return (
     <LegalLayout
       current="terms"
-      title={pageTitle}
+      title="Terms of Service"
       description="The definitive legal contract governing bookings, payments, conduct, and liabilities."
       lastUpdated={termsMetadata.lastUpdated}
     >

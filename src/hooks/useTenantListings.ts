@@ -97,7 +97,8 @@ const mapDtoToProperty = (dto: PublicListing, photosFromEndpoint: string[]): Ten
       `Listing ${dto.id}`,
     property_description:
       local?.property_description ??
-      `Comfortable stay for up to ${dto.maxGuests || local?.maxGuests || 2} guests.`,
+      // TASK-4313: singular "1 guest" when capacity is 1.
+      `Comfortable stay for up to ${dto.maxGuests || local?.maxGuests || 2} guest${(dto.maxGuests || local?.maxGuests || 2) === 1 ? '' : 's'}.`,
     property_location: local?.property_location ?? dto.propertyAddress ?? "Hyderabad",
     property_neighborhoods: local?.property_neighborhoods ?? [],
     property_reviews: dto.reviewCount ?? local?.property_reviews ?? 0,
