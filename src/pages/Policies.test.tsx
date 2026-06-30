@@ -19,7 +19,9 @@ describe('Policies page', () => {
 
   it('renders the page title for policies', () => {
     renderPage();
-    expect(screen.getByRole('heading', { name: /Guest Policies \| Atlastays/i })).toBeInTheDocument();
+    // TASK-4304: visible H1 is the human heading only ("Guest Policies"); the " | <brand>"
+    // suffix lives in the document <title> (SEO), not the on-page heading.
+    expect(screen.getByRole('heading', { name: /^Guest Policies$/i })).toBeInTheDocument();
   });
 
   it('shows all sections in the section nav', () => {
