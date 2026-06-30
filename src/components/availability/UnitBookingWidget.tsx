@@ -1006,7 +1006,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
       {/* v2 block (1): Price headline */}
       <div className="lv-booking-headline" data-testid="bw-header">
-        {hasSelectedRange && finalTotal > 0 ? (
+        {hasSelectedRange && !invalidIstStayRange && finalTotal > 0 ? (
           <>
             <div className="lv-booking-total">
               <b data-testid="bw-per-night-price">{displayPrice(Math.max(1, finalTotal))}</b>
@@ -1235,10 +1235,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             </div>
           )}
         </div>
-        {/* v2 block (4): Price breakdown — hidden until both dates are selected (TASK-4276).
-            Showing a partial breakdown (base price without GST) when only one date is
-            set would display a price lower than the final total, misleading the guest. */}
-        {hasSelectedRange && (
+        {/* v2 block (4): Price breakdown — hidden until both dates are selected (TASK-4276)
+            AND the range is valid (checkout > checkin) (TASK-4284).
+            Showing a breakdown for a reversed or same-day range would display either a
+            missing-GST or ₹1 total, misleading the guest. */}
+        {hasSelectedRange && !invalidIstStayRange && (
         <div className="lv-price-rows">
           <div className="lv-price-row" data-testid="bw-bd-subtotal-row price-line-base">
             <span>
