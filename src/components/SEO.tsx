@@ -1,5 +1,10 @@
 import { useEffect } from "react";
 
+// Default OG/Twitter preview image shipped in index.html. Used as the fallback when a route
+// renders <SEO> without an `image`, so SPA navigation never leaves the previous route's image
+// (or canonical/og:url) behind — those tags are reset to their index.html defaults instead.
+const DEFAULT_OG_IMAGE = "/og-image.svg";
+
 interface SEOProps {
   title: string;
   description?: string;
@@ -60,23 +65,22 @@ const SEO = ({
       ogDescription.content = description;
     }
 
-    if (url) {
-      const ogUrl = ensureMeta("og:url", "property");
-      ogUrl.content = url;
+    // Always reset canonical + og:url (to the route's url, or "" which self-references the
+    // current page like index.html's default) so a prior route's URL never persists after
+    // client-side navigation to a page that does not pass `url`.
+    const ogUrl = ensureMeta("og:url", "property");
+    ogUrl.content = url ?? "";
 
-      let canonical = document.querySelector("link[rel='canonical']") as HTMLLinkElement | null;
-      if (!canonical) {
-        canonical = document.createElement("link");
-        canonical.rel = "canonical";
-        document.head.appendChild(canonical);
-      }
-      canonical.href = url;
+    let canonical = document.querySelector("link[rel='canonical']") as HTMLLinkElement | null;
+    if (!canonical) {
+      canonical = document.createElement("link");
+      canonical.rel = "canonical";
+      document.head.appendChild(canonical);
     }
+    canonical.href = url ?? "";
 
-    if (image) {
-      const ogImage = ensureMeta("og:image", "property");
-      ogImage.content = image;
-    }
+    const ogImage = ensureMeta("og:image", "property");
+    ogImage.content = image ?? DEFAULT_OG_IMAGE;
 
     const ogType = ensureMeta("og:type", "property");
     ogType.content = type;
@@ -93,10 +97,8 @@ const SEO = ({
       twitterDescription.content = description;
     }
 
-    if (image) {
-      const twitterImage = ensureMeta("twitter:image");
-      twitterImage.content = image;
-    }
+    const twitterImage = ensureMeta("twitter:image");
+    twitterImage.content = image ?? DEFAULT_OG_IMAGE;
 
     if (twitterSite) {
       const twitterSiteMeta = ensureMeta("twitter:site");
