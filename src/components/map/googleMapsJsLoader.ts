@@ -9,9 +9,21 @@ export const MAP_SCRIPT_ID = "atlas-homestays-google-maps-script";
  */
 export const MAPS_AUTH_FAILURE_EVENT = "atlas:mapsAuthFailure";
 
+/** Window augmented with the Maps auth-failure flags this module sets. */
+type AtlasMapsWindow = Window & {
+  __atlasMapsAuthFailed?: boolean;
+  __atlasMapsAuthGuardInstalled?: boolean;
+  gm_authFailure?: () => void;
+};
+
+/** Typed accessor for the augmented window (avoids per-call casts). */
+function mapsWindow(): AtlasMapsWindow {
+  return window as AtlasMapsWindow;
+}
+
 /** True once `gm_authFailure` has fired at least once in this tab. */
 export function isMapsAuthFailed(): boolean {
-  return Boolean((window as Record<string, unknown>).__atlasMapsAuthFailed);
+  return Boolean(mapsWindow().__atlasMapsAuthFailed);
 }
 
 /**
@@ -23,11 +35,12 @@ export function isMapsAuthFailed(): boolean {
  * `atlas:mapsAuthFailure` so React components can react.
  */
 function installAuthFailureGuard(): void {
-  if ((window as Record<string, unknown>).__atlasMapsAuthGuardInstalled) return;
-  (window as Record<string, unknown>).__atlasMapsAuthGuardInstalled = true;
-  (window as Record<string, unknown>).gm_authFailure = () => {
-    if (!(window as Record<string, unknown>).__atlasMapsAuthFailed) {
-      (window as Record<string, unknown>).__atlasMapsAuthFailed = true;
+  const w = mapsWindow();
+  if (w.__atlasMapsAuthGuardInstalled) return;
+  w.__atlasMapsAuthGuardInstalled = true;
+  w.gm_authFailure = () => {
+    if (!w.__atlasMapsAuthFailed) {
+      w.__atlasMapsAuthFailed = true;
       window.dispatchEvent(new CustomEvent(MAPS_AUTH_FAILURE_EVENT));
     }
   };
