@@ -14,12 +14,14 @@ describe("contact config", () => {
   it("uses business details by default", () => {
     expect(DEFAULT_CONTACT_CHANNEL).toBe("business");
     expect(getTelLink()).toBe(`tel:+91${CONTACT.business.phone}`);
-    expect(getWhatsAppLink()).toBe(`https://wa.me/${CONTACT.business.whatsapp}`);
+    // TASK-4300: wa.me links must carry the full international number (91 + national).
+    expect(getWhatsAppLink()).toBe(`https://wa.me/91${CONTACT.business.whatsapp}`);
+    expect(getWhatsAppLink()).toMatch(/^https:\/\/wa\.me\/91\d{10}$/);
   });
 
   it("exposes owner channel only when explicitly requested", () => {
     expect(getTelLink("owner")).toBe(`tel:+91${CONTACT.owner.phone}`);
-    expect(getWhatsAppLink("owner")).toBe(`https://wa.me/${CONTACT.owner.whatsapp}`);
+    expect(getWhatsAppLink("owner")).toBe(`https://wa.me/91${CONTACT.owner.whatsapp}`);
   });
 
   it("formats numbers consistently for display", () => {

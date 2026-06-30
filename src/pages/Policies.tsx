@@ -56,7 +56,7 @@ const Policies = () => {
   return (
     <LegalLayout
       current="policies"
-      title={`Guest Policies | ${brandName}`}
+      title="Guest Policies"
       description="Practical rules for bookings, arrivals, conduct, and how we keep stays predictable."
       lastUpdated={policyMetadata.effectiveDate}
     >

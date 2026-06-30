@@ -218,7 +218,7 @@ exports[`AboutPage > matches the snapshot 1`] = `
         <p
           class="text-base text-text-muted max-w-3xl leading-relaxed"
         >
-          Every Starguest House home is audited on the same quality framework. We match hotel-grade consistency with the warmth of local hosts so travelers never have to choose between comfort and character.
+          Every Atlas home is audited on the same quality framework. We match hotel-grade consistency with the warmth of local hosts so travelers never have to choose between comfort and character.
         </p>
         <div
           class="grid gap-4 sm:grid-cols-2"
@@ -439,7 +439,7 @@ exports[`AboutPage > matches the snapshot 1`] = `
           <h2
             class="text-2xl md:text-3xl font-bold"
           >
-            People who craft every Starguest House stay
+            People who craft every Atlas stay
           </h2>
           <p
             class="text-base text-text-muted max-w-2xl mt-2 leading-relaxed"
@@ -749,12 +749,12 @@ exports[`AboutPage > matches the snapshot 1`] = `
           <h3
             class="font-semibold text-text-primary mb-1"
           >
-            Recognized hosts
+            Owner-run hosts
           </h3>
           <p
             class="text-base text-text-muted leading-relaxed"
           >
-            Consistently rated 4.8★+ across partner platforms and recurring corporate stays.
+            Every home is run by its owner and held to a consistent quality, safety, and cleanliness standard.
           </p>
         </article>
         <article

@@ -203,7 +203,7 @@ export const GuestTypeSelector: React.FC<GuestTypeSelectorProps> = ({
         </span>
         {isAtCapacity && (
           <p className="mt-3 text-[13px] leading-relaxed text-[var(--support-error)] font-medium">
-            Maximum {maxCapacity} guests
+            Maximum {maxCapacity} guest{maxCapacity === 1 ? '' : 's'}
           </p>
         )}
       </button>
@@ -252,7 +252,7 @@ export const GuestTypeSelector: React.FC<GuestTypeSelectorProps> = ({
           {isAtCapacity && (
             <div className="mt-3 pt-3 border-t border-[var(--border-subtle)]">
               <p className="text-[13px] text-[var(--support-error)] font-medium">
-                Maximum capacity reached ({maxCapacity} guests)
+                Maximum capacity reached ({maxCapacity} guest{maxCapacity === 1 ? '' : 's'})
               </p>
             </div>
           )}

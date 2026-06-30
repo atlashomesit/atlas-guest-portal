@@ -1966,11 +1966,11 @@ useEffect(() => {
                       <div className="pp-v2-knowicon"><PpV2UsersIcon /></div>
                       <small>Base occupancy</small>
                       <strong>
-                        {data.maxGuests != null && data.maxGuests > 0 ? `${data.maxGuests} guests` : 'Ask host'}
+                        {data.maxGuests != null && data.maxGuests > 0 ? `${data.maxGuests} guest${data.maxGuests === 1 ? '' : 's'}` : 'Ask host'}
                       </strong>
                       <span>
                         {data.maxGuests != null && data.maxGuests > 0
-                          ? `Up to ${data.maxGuests} guests welcome.`
+                          ? `Up to ${data.maxGuests} guest${data.maxGuests === 1 ? '' : 's'} welcome.`
                           : 'Contact host for occupancy details.'}
                       </span>
                     </div>
