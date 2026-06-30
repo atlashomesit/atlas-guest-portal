@@ -1335,14 +1335,15 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       <Button
         type="submit"
         fullWidth
+        // TASK-4277: do NOT disable on blank dates — keep Reserve clickable so handleReserve
+        // can surface the inline "Please select check-in and check-out dates." validation
+        // instead of the button silently swallowing the click. Genuine blockers (service down,
+        // invalid range) still disable it.
         disabled={
           isSubmitting ||
           isLoading ||
-          !dateRange.startDate ||
-          !dateRange.endDate ||
           isBookingDisabled ||
-          invalidIstStayRange ||
-          priceDetails.nights < 1
+          (Boolean(dateRange.startDate) && Boolean(dateRange.endDate) && invalidIstStayRange)
         }
         className={`bw-reserve lv-booking-cta${isSubmitting || isLoading ? ' opacity-75' : ''}`}
         data-testid="guest-booking-submit"

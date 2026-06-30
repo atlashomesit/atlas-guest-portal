@@ -13,6 +13,7 @@ import { getTenantContext } from "../tenant/tenantContext";
 import { getTenantBrandName } from "../tenant/displayBrand";
 import { getTenantOverrides, getTenantPublicListingIdAllowlist, getUnitNoun, shouldHideAtlasBranding } from "../tenant/tenantOverrides";
 import { LoadingState } from "../components/LoadingState";
+import SEO from "../components/SEO"; // TASK-4290
 import OptimizedImage from "../components/ui/OptimizedImage";
 import OwnerShareBadge from "../components/OwnerShareBadge"; // TASK-1705
 import DirectDiscountBanner from "../components/DirectDiscountBanner"; // TASK-1708
@@ -851,6 +852,11 @@ const SearchPage = () => {
 
   return (
     <div className="min-h-screen bg-bg-muted py-10">
+      {/* TASK-4290: give /search a real document title instead of the bare "Atlas" default. */}
+      <SEO
+        title={`Search stays | ${getTenantBrandName()}`}
+        description={`Search available homes and rooms and compare nightly rates on ${getTenantBrandName()}.`}
+      />
       <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 md:px-8">
         {isMarketplaceSearch ? (
           <div className="sticky top-[var(--nav-height)] z-30 -mx-4 bg-bg-muted px-4 py-3 md:static md:mx-0 md:bg-transparent md:p-0">
