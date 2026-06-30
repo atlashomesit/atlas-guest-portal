@@ -271,18 +271,23 @@ export default function FavoritesPage() {
                       <div className="w-full h-40 bg-bg-muted" aria-hidden />
                     )}
                   </Link>
-                  <button
-                    type="button"
-                    data-testid={`favorites-remove-${l.id}`}
-                    className="absolute top-2 right-2 z-10 rounded-full bg-bg-surface/95 p-2 shadow-level1 border border-border-subtle hover:opacity-95 transition-opacity"
-                    aria-label="Remove from saved"
-                    onClick={() => {
-                      toggleFavorite(l.id);
-                      setFavEpoch((e) => e + 1);
-                    }}
-                  >
-                    <FaHeart className="h-5 w-5 text-red-500" aria-hidden />
-                  </button>
+                  {/* TASK-4297: in a SHARED wishlist view the listing isn't the viewer's own save —
+                      the remove heart would silently mutate the viewer's own favorites and never
+                      update this (shared-IDs-driven) card. Only show it on the viewer's own list. */}
+                  {!sharedWishlistIds && (
+                    <button
+                      type="button"
+                      data-testid={`favorites-remove-${l.id}`}
+                      className="absolute top-2 right-2 z-10 rounded-full bg-bg-surface/95 p-2 shadow-level1 border border-border-subtle hover:opacity-95 transition-opacity"
+                      aria-label="Remove from saved"
+                      onClick={() => {
+                        toggleFavorite(l.id);
+                        setFavEpoch((e) => e + 1);
+                      }}
+                    >
+                      <FaHeart className="h-5 w-5 text-red-500" aria-hidden />
+                    </button>
+                  )}
                 </div>
                 <Link to={path} className="block p-4 pb-2">
                   <p className="font-semibold text-text-primary">{l.name ?? l.propertyName ?? `Listing ${l.id}`}</p>
