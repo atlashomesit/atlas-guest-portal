@@ -1369,7 +1369,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           data-testid="bw-direct-savings-line"
           style={{ textAlign: 'center', fontSize: 12, color: '#157046', marginTop: 6, lineHeight: 1.45 }}
         >
-          Save ~{displayPrice(illustrativeOtaGuestFeeComparison.illustrativeGuestFee)} vs typical booking sites (illustrative) — no guest service fee on direct bookings.
+          Save ~{displayPrice(illustrativeOtaGuestFeeComparison.illustrativeGuestFee)} vs typical booking sites (illustrative) — direct booking, lower fees than OTAs.
         </p>
       )}
 
