@@ -1235,11 +1235,14 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             </div>
           )}
         </div>
-        {/* v2 block (4): Price breakdown — always-visible, lv-* classes */}
+        {/* v2 block (4): Price breakdown — hidden until both dates are selected (TASK-4276).
+            Showing a partial breakdown (base price without GST) when only one date is
+            set would display a price lower than the final total, misleading the guest. */}
+        {hasSelectedRange && (
         <div className="lv-price-rows">
           <div className="lv-price-row" data-testid="bw-bd-subtotal-row price-line-base">
             <span>
-              {hasSelectedRange && priceDetails.nights > 0 && perNightForDisplay > 0
+              {priceDetails.nights > 0 && perNightForDisplay > 0
                 ? `${displayPrice(perNightForDisplay)} × ${priceDetails.nights} ${priceDetails.nights === 1 ? 'night' : 'nights'}`
                 : 'Accommodation'}
             </span>
@@ -1311,6 +1314,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             <span className="lv-num">{displayPrice(Math.max(1, finalTotal))}</span>
           </div>
         </div>
+        )}
         </div>
       {/* end lv-booking-form */}
 
