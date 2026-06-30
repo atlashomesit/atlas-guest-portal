@@ -182,9 +182,11 @@ function AppWrapper() {
           ))}
           <Route path="/search" element={withBoundary(<Suspense fallback={<LazyFallback />}><SearchPage /></Suspense>, "search-route")} />
           <Route path="/blog" element={withBoundary(<Suspense fallback={<LazyFallback />}><BlogHome /></Suspense>, "blog-home-route")} />
+          {/* TASK-4307: single-segment /blog/:segment is handled by BlogCategory, which
+              renders the article when the segment is a post slug (canonical /blog/<slug>)
+              and the category listing otherwise. The old shadowed /blog/:slug route is gone. */}
           <Route path="/blog/:category" element={withBoundary(<Suspense fallback={<LazyFallback />}><BlogCategory /></Suspense>, "blog-category-route")} />
           <Route path="/blog/:category/:slug" element={withBoundary(<Suspense fallback={<LazyFallback />}><BlogPostPage /></Suspense>, "blog-post-route")} />
-          <Route path="/blog/:slug" element={withBoundary(<Suspense fallback={<LazyFallback />}><BlogPostPage /></Suspense>, "blog-legacy-route")} />
           <Route path="/policies" element={withBoundary(<Suspense fallback={<LazyFallback />}><Policies /></Suspense>, "policies-route")} />
           <Route path="/privacy" element={withBoundary(<Suspense fallback={<LazyFallback />}><PrivacyPolicyPage /></Suspense>, "privacy-route")} />
           <Route path="/privacy-policy" element={withBoundary(<Suspense fallback={<LazyFallback />}><PrivacyPage /></Suspense>, "privacy-policy-legacy-route")} />

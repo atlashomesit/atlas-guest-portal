@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import SEO from "../../components/SEO";
 import { getLocalizedBlogPosts, BlogCategory as BlogCategoryType } from "../../data/blogPosts";
 import { getTenantBrandName } from "../../tenant/displayBrand";
+import BlogPostPage from "./BlogPostPage";
 
 const BlogCategory = () => {
   const brandName = getTenantBrandName();
@@ -26,6 +27,12 @@ const BlogCategory = () => {
   };
 
   const { category } = useParams();
+  // TASK-4307: /blog/:category and the canonical /blog/:slug share the same single-segment
+  // route. When the segment isn't a known category, treat it as an article slug and render
+  // the post — otherwise "Read more" (which links to /blog/<slug>) looped back to a listing.
+  if (!isValidCategory(category) && posts.some((p) => p.slug === category)) {
+    return <BlogPostPage />;
+  }
   const safeCategory: BlogCategoryType = isValidCategory(category) ? category : "guest-guides";
   const meta = categoryMeta[safeCategory];
   const filtered = posts.filter((post) => post.category === safeCategory);
