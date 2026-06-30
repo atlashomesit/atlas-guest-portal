@@ -949,7 +949,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         holdPriceBreakdown: {
           baseAmount: typeof serverBaseAmount === 'number' && serverBaseAmount > 0 ? serverBaseAmount : breakdownPrice,
           discountAmount: 0,
-          convenienceFeeAmount: typeof serverConvFee === 'number' ? serverConvFee : breakdownConvenienceFee,
+          // TASK-4286: only trust server convenienceFeeAmount when it is a positive number.
+          // The init-hold mode API returns convenienceFeeAmount=0 (a valid JS number) when
+          // it doesn't compute the fee, which caused the checkout page to show ₹0 processing
+          // fee and a total ₹378 lower than the listing widget. Fall back to the client-computed
+          // breakdownConvenienceFee so both surfaces agree.
+          convenienceFeeAmount: typeof serverConvFee === 'number' && serverConvFee > 0 ? serverConvFee : breakdownConvenienceFee,
           finalAmount: typeof serverFinalAmount === 'number' && serverFinalAmount > 0 ? serverFinalAmount : (finalTotal > 0 ? finalTotal : breakdownFinalTotal),
           nights: stayNights,
           currency: 'INR',
