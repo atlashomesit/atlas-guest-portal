@@ -121,6 +121,9 @@ const LAST_UPI_VPA_KEY = 'atlas_last_upi_vpa';
 const CHECKOUT_DRAFT_KEY = 'atlas_guest_checkout_draft';
 /** TASK-2882: survive hard reload on GuestDetailsPage with a still-valid server hold. */
 const CHECKOUT_HOLD_KEY = 'atlas_guest_checkout_hold';
+/** TASK-4296: must match the API's CheckoutHoldConstants.HoldMinutes (5). Drives both the
+ *  countdown progress baseline and the hold-expiry copy so they agree on the real duration. */
+const CHECKOUT_HOLD_MINUTES = 5;
 
 type CheckoutHoldCache = {
   holdId: number;
@@ -179,7 +182,7 @@ function formatCountdown(expiresAt: string): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-function remainingPct(expiresAt: string, ttlMs = 15 * 60 * 1000): number {
+function remainingPct(expiresAt: string, ttlMs = CHECKOUT_HOLD_MINUTES * 60 * 1000): number {
   const ms = new Date(expiresAt).getTime() - Date.now();
   return Math.max(0, Math.min(1, ms / ttlMs));
 }
@@ -1006,7 +1009,7 @@ const GuestDetailsPage: React.FC = () => {
             <div className="gd-modal-icon"><IconClock size={22} /></div>
             <h3 id="gd-nohold-title">Let's pick your dates again</h3>
             <p>
-              Your 15-minute hold has expired or was cleared. Pick your dates again to start a
+              Your {CHECKOUT_HOLD_MINUTES}-minute hold has expired or was cleared. Pick your dates again to start a
               fresh hold — any details you entered are saved and will be waiting for you.
             </p>
             <button type="button" className="gd-modal-cta" onClick={handleBackToProperty}>
@@ -1081,7 +1084,7 @@ const GuestDetailsPage: React.FC = () => {
             <div className="gd-modal-icon"><IconClock size={22}/></div>
             <h3 id="gd-expired-title">Your hold just expired.</h3>
             <p>
-              The 15-minute reservation has ended and those dates are back on the calendar.
+              The {CHECKOUT_HOLD_MINUTES}-minute reservation has ended and those dates are back on the calendar.
               Re-select to continue — your details aren't lost.
             </p>
             <button type="button" className="gd-modal-cta" onClick={handleBackToProperty}>
@@ -1810,11 +1813,14 @@ const TrustBand: React.FC<TrustBandProps> = ({ freeCancelDisplay, brandName, wha
         <span>
           Stuck?{' '}
           <a
-            href={`https://wa.me/${whatsappNumber.replace(/\D/g, '')}`}
+            // TASK-4294/TASK-4300: use the canonical contact helpers — getWhatsAppLink() carries
+            // the 91 country code and formatDisplayNumber() shows "+91-…", instead of the raw
+            // tenant whatsappBookingPhone (no +, no country code, wrong number on the marketplace).
+            href={getWhatsAppLink()}
             target="_blank"
             rel="noopener noreferrer"
           >
-            WhatsApp {brandName} on {whatsappNumber}
+            WhatsApp {brandName} on {formatDisplayNumber()}
           </a>
         </span>
       </div>

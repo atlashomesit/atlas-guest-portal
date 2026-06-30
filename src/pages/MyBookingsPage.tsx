@@ -146,7 +146,9 @@ export default function MyBookingsPage() {
       <StateMessage
         data-testid="my-bookings-error-state"
         icon="📋"
-        title="Bookings not found"
+        // TASK-4280: a logged-out guest must not read "Bookings not found" (reads as "your
+        // booking was lost"). Show a sign-in prompt instead; the CTA below already routes to login.
+        title={auth.isAuthenticated ? "Bookings not found" : "Sign in to view your bookings"}
         message={error}
         primaryAction={{
           label: auth.isAuthenticated ? "Browse homes" : "Log in",
