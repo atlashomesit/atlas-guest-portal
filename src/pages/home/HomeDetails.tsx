@@ -388,6 +388,7 @@ const HomeDetails = () => {
               latitude={Number(lat)}
               longitude={Number(lng)}
               label={room.title}
+              address={apiListing?.propertyAddress ?? undefined}
               height={320}
             />
           </div>

@@ -3,7 +3,7 @@ import { GOOGLE_MAPS_API_KEY } from "@/config/googleMaps";
 import OptimizedImage from "@/components/ui/OptimizedImage";
 import { Button } from "@/components/ui/Button";
 import { Typography } from "@/components/ui/Typography";
-import { loadGoogleMapsJs } from "@/components/map/googleMapsJsLoader";
+import { isMapsAuthFailed, loadGoogleMapsJs, MAPS_AUTH_FAILURE_EVENT } from "@/components/map/googleMapsJsLoader";
 
 export interface SinglePinGoogleMapProps {
   lat: number;
@@ -29,9 +29,20 @@ export default function SinglePinGoogleMap({
 }: SinglePinGoogleMapProps) {
   const mapRef = useRef<HTMLDivElement | null>(null);
   const hasInit = useRef(false);
-  const [status, setStatus] = useState<"loading" | "ready" | "failed">("loading");
+  // Initialise as failed immediately if billing error already fired this tab.
+  const [status, setStatus] = useState<"loading" | "ready" | "failed">(() =>
+    isMapsAuthFailed() ? "failed" : "loading",
+  );
   const [retryCount, setRetryCount] = useState(0);
   const apiKey = GOOGLE_MAPS_API_KEY;
+
+  // Listen for billing-failure event fired by googleMapsJsLoader's gm_authFailure
+  // interceptor.  Switch to fallback immediately and stop any pending retry.
+  useEffect(() => {
+    const handler = () => setStatus("failed");
+    window.addEventListener(MAPS_AUTH_FAILURE_EVENT, handler);
+    return () => window.removeEventListener(MAPS_AUTH_FAILURE_EVENT, handler);
+  }, []);
 
   const staticMapUrl = useMemo(() => {
     if (!apiKey) return "/images/atlas-homestays-static-map.svg";
@@ -107,16 +118,18 @@ export default function SinglePinGoogleMap({
             }}
           />
           <div className="flex flex-col sm:flex-row gap-3 items-center">
-            <Button type="button" variant="secondary" onClick={() => setRetryCount((c) => c + 1)}>
-              Retry loading map
-            </Button>
+            {!isMapsAuthFailed() && (
+              <Button type="button" variant="secondary" onClick={() => setRetryCount((c) => c + 1)}>
+                Retry loading map
+              </Button>
+            )}
             <a
               className="rb-button rb-button--secondary"
               href={`https://maps.google.com/?q=${lat},${lng}`}
               rel="noopener noreferrer"
               target="_blank"
             >
-              Open in Google Maps
+              {markerTitle ? `View ${markerTitle} on Google Maps` : "View on Google Maps"}
             </a>
           </div>
         </div>
