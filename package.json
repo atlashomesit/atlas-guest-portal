@@ -79,7 +79,7 @@
     "react-slick": "^0.31.0",
     "react-toastify": "^11.0.3",
     "slick-carousel": "^1.8.1",
-    "swiper": "^12.2.0"
+    "swiper": "^14.0.1"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
