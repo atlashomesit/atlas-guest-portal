@@ -1,5 +1,6 @@
 import './Homepage_PropertyDetails.css';
 import React from 'react';
+import { toast } from 'react-toastify'; // TASK-4288: share fallback feedback
 import { getListingDisplayName } from '@/lib/listingDisplayName';
 import { getTenantContext as _getTenantCtx } from '@/tenant/tenantContext';
 import { getTenantOverrides, shouldHideAtlasBranding } from '@/tenant/tenantOverrides';
@@ -1433,9 +1434,27 @@ useEffect(() => {
                     // TASK-2873: do not advertise a price for a Draft (unpublished) listing.
                     const priceText = !ppIsDraft && directBookingNightly > 0 ? ` from ₹${directBookingNightly.toLocaleString('en-IN')}/night` : '';
                     const text = `Check out ${data.property_name}${priceText} on ${ppBrandName}`;
+                    // TASK-4288: navigator.share() rejects on desktop ("Must be handling a user
+                    // gesture") with no fallback, spamming monitoring. Guard with canShare, swallow
+                    // user-cancel (AbortError), and fall back to clipboard + toast, then wa.me.
+                    const shareData = { title: document.title, text, url };
                     const share = async () => {
-                      if (typeof navigator.share === 'function') {
-                        return navigator.share({ title: document.title, text, url });
+                      if (typeof navigator.share === 'function' && (navigator.canShare?.(shareData) ?? true)) {
+                        try {
+                          await navigator.share(shareData);
+                          return;
+                        } catch (err) {
+                          if ((err as Error)?.name === 'AbortError') return; // user dismissed the sheet
+                        }
+                      }
+                      try {
+                        if (navigator.clipboard?.writeText) {
+                          await navigator.clipboard.writeText(url);
+                          toast.success('Link copied to clipboard.');
+                          return;
+                        }
+                      } catch {
+                        /* clipboard blocked — fall through to wa.me */
                       }
                       window.open(`https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`, '_blank', 'noopener,noreferrer');
                     };
@@ -1966,11 +1985,11 @@ useEffect(() => {
                       <div className="pp-v2-knowicon"><PpV2UsersIcon /></div>
                       <small>Base occupancy</small>
                       <strong>
-                        {data.maxGuests != null && data.maxGuests > 0 ? `${data.maxGuests} guests` : 'Ask host'}
+                        {data.maxGuests != null && data.maxGuests > 0 ? `${data.maxGuests} guest${data.maxGuests === 1 ? '' : 's'}` : 'Ask host'}
                       </strong>
                       <span>
                         {data.maxGuests != null && data.maxGuests > 0
-                          ? `Up to ${data.maxGuests} guests welcome.`
+                          ? `Up to ${data.maxGuests} guest${data.maxGuests === 1 ? '' : 's'} welcome.`
                           : 'Contact host for occupancy details.'}
                       </span>
                     </div>

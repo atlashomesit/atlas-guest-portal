@@ -7,12 +7,16 @@ import { getTenantContext } from "../../tenant/tenantContext";
 import { getTenantOverrides, getUnitNoun } from "../../tenant/tenantOverrides";
 
 const BlogPostPage = () => {
-  const { slug } = useParams();
+  // TASK-4307: this component serves both /blog/:category/:slug and the canonical
+  // /blog/:slug (dispatched from BlogCategory when the segment is a post slug, not a
+  // category). Resolve the slug from whichever param carries it.
+  const { slug, category } = useParams();
+  const effectiveSlug = slug ?? category;
   const brandName = getTenantBrandName();
   const unitNoun = getUnitNoun(getTenantOverrides(getTenantContext()?.slug));
   const listingsLabel = `Our ${unitNoun.capitalPlural}`;
   const posts = useMemo(() => getLocalizedBlogPosts(brandName), [brandName]);
-  const post = posts.find((p) => p.slug === slug);
+  const post = posts.find((p) => p.slug === effectiveSlug);
 
   if (!post) {
     return (

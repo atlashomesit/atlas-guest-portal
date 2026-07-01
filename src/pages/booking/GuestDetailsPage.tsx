@@ -121,6 +121,9 @@ const LAST_UPI_VPA_KEY = 'atlas_last_upi_vpa';
 const CHECKOUT_DRAFT_KEY = 'atlas_guest_checkout_draft';
 /** TASK-2882: survive hard reload on GuestDetailsPage with a still-valid server hold. */
 const CHECKOUT_HOLD_KEY = 'atlas_guest_checkout_hold';
+/** TASK-4296: must match the API's CheckoutHoldConstants.HoldMinutes (5). Drives both the
+ *  countdown progress baseline and the hold-expiry copy so they agree on the real duration. */
+const CHECKOUT_HOLD_MINUTES = 5;
 
 type CheckoutHoldCache = {
   holdId: number;
@@ -179,7 +182,7 @@ function formatCountdown(expiresAt: string): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-function remainingPct(expiresAt: string, ttlMs = 15 * 60 * 1000): number {
+function remainingPct(expiresAt: string, ttlMs = CHECKOUT_HOLD_MINUTES * 60 * 1000): number {
   const ms = new Date(expiresAt).getTime() - Date.now();
   return Math.max(0, Math.min(1, ms / ttlMs));
 }
@@ -1006,7 +1009,7 @@ const GuestDetailsPage: React.FC = () => {
             <div className="gd-modal-icon"><IconClock size={22} /></div>
             <h3 id="gd-nohold-title">Let's pick your dates again</h3>
             <p>
-              Your 15-minute hold has expired or was cleared. Pick your dates again to start a
+              Your {CHECKOUT_HOLD_MINUTES}-minute hold has expired or was cleared. Pick your dates again to start a
               fresh hold — any details you entered are saved and will be waiting for you.
             </p>
             <button type="button" className="gd-modal-cta" onClick={handleBackToProperty}>
@@ -1081,7 +1084,7 @@ const GuestDetailsPage: React.FC = () => {
             <div className="gd-modal-icon"><IconClock size={22}/></div>
             <h3 id="gd-expired-title">Your hold just expired.</h3>
             <p>
-              The 15-minute reservation has ended and those dates are back on the calendar.
+              The {CHECKOUT_HOLD_MINUTES}-minute reservation has ended and those dates are back on the calendar.
               Re-select to continue — your details aren't lost.
             </p>
             <button type="button" className="gd-modal-cta" onClick={handleBackToProperty}>
@@ -1251,6 +1254,8 @@ const GuestDetailsPage: React.FC = () => {
                   <button
                     type="button"
                     className="gd-disclosure-trigger"
+                    aria-expanded={promoOpen}
+                    aria-controls="gd-promo-panel"
                     onClick={() => setPromoOpen((v) => !v)}
                   >
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
@@ -1265,37 +1270,35 @@ const GuestDetailsPage: React.FC = () => {
                       <IconChevronDown size={16}/>
                     </span>
                   </button>
-                  {promoOpen && (
-                    <div className="gd-disclosure-panel gd-disclosure-panel-pad-top">
-                      <div className="gd-inline-input">
-                        <input
-                          type="text"
-                          placeholder="Enter code"
-                          value={promoCode}
-                          onChange={(e) => {
-                            setPromoCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 32));
-                            setPromoMessage(null);
-                            setAppliedPromoCode(null);
-                            setPromoDiscountAmount(0);
-                          }}
-                          onBlur={() => void handlePromoBlur()}
-                          data-testid="guest-booking-promo"
-                        />
-                        <button type="button" onClick={() => void handlePromoBlur()} disabled={promoValidating}>
-                          {appliedPromoCode ? 'Applied' : 'Apply'}
-                        </button>
-                      </div>
-                      {promoValidating && <div className="gd-input-help">Validating…</div>}
-                      {!promoValidating && promoMessage && (
-                        <div className={`gd-input-help${appliedPromoCode ? ' success' : ' error'}`}>
-                          {promoMessage}
-                        </div>
-                      )}
-                      {!promoValidating && !promoMessage && promoCode && (
-                        <div className="gd-input-help">Codes are case-insensitive. Tax recalculates after apply.</div>
-                      )}
+                  <div id="gd-promo-panel" className="gd-disclosure-panel gd-disclosure-panel-pad-top" data-testid="gd-promo-panel">
+                    <div className="gd-inline-input">
+                      <input
+                        type="text"
+                        placeholder="Enter code"
+                        value={promoCode}
+                        onChange={(e) => {
+                          setPromoCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 32));
+                          setPromoMessage(null);
+                          setAppliedPromoCode(null);
+                          setPromoDiscountAmount(0);
+                        }}
+                        onBlur={() => void handlePromoBlur()}
+                        data-testid="guest-booking-promo"
+                      />
+                      <button type="button" onClick={() => void handlePromoBlur()} disabled={promoValidating}>
+                        {appliedPromoCode ? 'Applied' : 'Apply'}
+                      </button>
                     </div>
-                  )}
+                    {promoValidating && <div className="gd-input-help">Validating…</div>}
+                    {!promoValidating && promoMessage && (
+                      <div className={`gd-input-help${appliedPromoCode ? ' success' : ' error'}`}>
+                        {promoMessage}
+                      </div>
+                    )}
+                    {!promoValidating && !promoMessage && promoCode && (
+                      <div className="gd-input-help">Codes are case-insensitive. Tax recalculates after apply.</div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Referral code */}
@@ -1303,6 +1306,8 @@ const GuestDetailsPage: React.FC = () => {
                   <button
                     type="button"
                     className="gd-disclosure-trigger"
+                    aria-expanded={referralOpen}
+                    aria-controls="gd-referral-panel"
                     onClick={() => setReferralOpen((v) => !v)}
                   >
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
@@ -1317,36 +1322,34 @@ const GuestDetailsPage: React.FC = () => {
                       <IconChevronDown size={16}/>
                     </span>
                   </button>
-                  {referralOpen && (
-                    <div className="gd-disclosure-panel gd-disclosure-panel-pad-top">
-                      <div className="gd-inline-input">
-                        <input
-                          type="text"
-                          placeholder="Enter referral code"
-                          value={referralCode}
-                          onChange={(e) => {
-                            const next = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 32);
-                            setReferralCode(next);
-                            setReferralMessage(null);
-                            setAppliedReferralCode(null);
-                            setReferralDiscountAmount(0);
-                            if (next) { try { localStorage.setItem('atlas_guest_referral_code', next); } catch { /* ignore */ } }
-                          }}
-                          onBlur={handleReferralBlur}
-                          data-testid="guest-booking-referral"
-                        />
-                        <button type="button" onClick={handleReferralBlur} disabled={referralValidating}>
-                          {appliedReferralCode ? 'Applied' : 'Apply'}
-                        </button>
-                      </div>
-                      {referralValidating && <div className="gd-input-help">Validating…</div>}
-                      {!referralValidating && referralMessage && (
-                        <div className={`gd-input-help${appliedReferralCode ? '' : ' error'}`}>
-                          {referralMessage}
-                        </div>
-                      )}
+                  <div id="gd-referral-panel" className="gd-disclosure-panel gd-disclosure-panel-pad-top" data-testid="gd-referral-panel">
+                    <div className="gd-inline-input">
+                      <input
+                        type="text"
+                        placeholder="Enter referral code"
+                        value={referralCode}
+                        onChange={(e) => {
+                          const next = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 32);
+                          setReferralCode(next);
+                          setReferralMessage(null);
+                          setAppliedReferralCode(null);
+                          setReferralDiscountAmount(0);
+                          if (next) { try { localStorage.setItem('atlas_guest_referral_code', next); } catch { /* ignore */ } }
+                        }}
+                        onBlur={handleReferralBlur}
+                        data-testid="guest-booking-referral"
+                      />
+                      <button type="button" onClick={handleReferralBlur} disabled={referralValidating}>
+                        {appliedReferralCode ? 'Applied' : 'Apply'}
+                      </button>
                     </div>
-                  )}
+                    {referralValidating && <div className="gd-input-help">Validating…</div>}
+                    {!referralValidating && referralMessage && (
+                      <div className={`gd-input-help${appliedReferralCode ? '' : ' error'}`}>
+                        {referralMessage}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Add-ons (only if available) */}
@@ -1355,6 +1358,8 @@ const GuestDetailsPage: React.FC = () => {
                     <button
                       type="button"
                       className="gd-disclosure-trigger"
+                      aria-expanded={addOnsOpen}
+                      aria-controls="gd-addons-panel"
                       onClick={() => setAddOnsOpen((v) => !v)}
                     >
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
@@ -1369,55 +1374,53 @@ const GuestDetailsPage: React.FC = () => {
                         <IconChevronDown size={16}/>
                       </span>
                     </button>
-                    {addOnsOpen && (
-                      <div className="gd-disclosure-panel gd-disclosure-panel-pad-top">
-                        {availableAddOns.map((ao) => {
-                          const qty = selectedAddOns[ao.addOnServiceId] ?? 0;
-                          const lineTotal = addOnLineTotal(ao, qty || 1, nights, stayGuestCount);
-                          return (
-                            <div key={ao.addOnServiceId} className="gd-addon">
-                              <div>
-                                <div className="gd-addon-name">{ao.name}</div>
-                                {ao.description && <div className="gd-addon-desc">{ao.description}</div>}
-                                <div className="gd-addon-desc">
-                                  {displayPrice(ao.price)} {addOnPriceHint(ao.priceType, nights, stayGuestCount)}
-                                </div>
-                              </div>
-                              <div className="gd-addon-price" style={{ textAlign: 'right' }}>
-                                {qty > 0 ? displayPrice(lineTotal) : displayPrice(ao.price)}
-                                <div className="gd-addon-qty">
-                                  <button
-                                    type="button"
-                                    className="gd-addon-qty-btn"
-                                    aria-label={`Decrease ${ao.name}`}
-                                    disabled={qty <= 0}
-                                    onClick={() => setSelectedAddOns((p) => ({
-                                      ...p,
-                                      [ao.addOnServiceId]: Math.max(0, (p[ao.addOnServiceId] ?? 0) - 1),
-                                    }))}
-                                  >
-                                    −
-                                  </button>
-                                  <span className="gd-addon-qty-val" aria-live="polite">{qty}</span>
-                                  <button
-                                    type="button"
-                                    className="gd-addon-qty-btn"
-                                    aria-label={`Increase ${ao.name}`}
-                                    disabled={qty >= ADD_ON_MAX_QTY}
-                                    onClick={() => setSelectedAddOns((p) => ({
-                                      ...p,
-                                      [ao.addOnServiceId]: Math.min(ADD_ON_MAX_QTY, (p[ao.addOnServiceId] ?? 0) + 1),
-                                    }))}
-                                  >
-                                    +
-                                  </button>
-                                </div>
+                    <div id="gd-addons-panel" className="gd-disclosure-panel gd-disclosure-panel-pad-top">
+                      {availableAddOns.map((ao) => {
+                        const qty = selectedAddOns[ao.addOnServiceId] ?? 0;
+                        const lineTotal = addOnLineTotal(ao, qty || 1, nights, stayGuestCount);
+                        return (
+                          <div key={ao.addOnServiceId} className="gd-addon">
+                            <div>
+                              <div className="gd-addon-name">{ao.name}</div>
+                              {ao.description && <div className="gd-addon-desc">{ao.description}</div>}
+                              <div className="gd-addon-desc">
+                                {displayPrice(ao.price)} {addOnPriceHint(ao.priceType, nights, stayGuestCount)}
                               </div>
                             </div>
-                          );
-                        })}
-                      </div>
-                    )}
+                            <div className="gd-addon-price" style={{ textAlign: 'right' }}>
+                              {qty > 0 ? displayPrice(lineTotal) : displayPrice(ao.price)}
+                              <div className="gd-addon-qty">
+                                <button
+                                  type="button"
+                                  className="gd-addon-qty-btn"
+                                  aria-label={`Decrease ${ao.name}`}
+                                  disabled={qty <= 0}
+                                  onClick={() => setSelectedAddOns((p) => ({
+                                    ...p,
+                                    [ao.addOnServiceId]: Math.max(0, (p[ao.addOnServiceId] ?? 0) - 1),
+                                  }))}
+                                >
+                                  −
+                                </button>
+                                <span className="gd-addon-qty-val" aria-live="polite">{qty}</span>
+                                <button
+                                  type="button"
+                                  className="gd-addon-qty-btn"
+                                  aria-label={`Increase ${ao.name}`}
+                                  disabled={qty >= ADD_ON_MAX_QTY}
+                                  onClick={() => setSelectedAddOns((p) => ({
+                                    ...p,
+                                    [ao.addOnServiceId]: Math.min(ADD_ON_MAX_QTY, (p[ao.addOnServiceId] ?? 0) + 1),
+                                  }))}
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
 
@@ -1426,6 +1429,8 @@ const GuestDetailsPage: React.FC = () => {
                   <button
                     type="button"
                     className="gd-disclosure-trigger"
+                    aria-expanded={notesOpen}
+                    aria-controls="gd-notes-panel"
                     onClick={() => setNotesOpen((v) => !v)}
                   >
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
@@ -1437,21 +1442,19 @@ const GuestDetailsPage: React.FC = () => {
                       <IconChevronDown size={16}/>
                     </span>
                   </button>
-                  {notesOpen && (
-                    <div className="gd-disclosure-panel gd-disclosure-panel-pad-top">
-                      <textarea
-                        className="gd-input"
-                        rows={3}
-                        maxLength={500}
-                        placeholder="E.g. early check-in, dietary needs, accessibility requests"
-                        value={formData.notes}
-                        onChange={(e) => setFormData((p) => ({ ...p, notes: e.target.value }))}
-                        style={{ resize: 'vertical' }}
-                        data-testid="guest-booking-notes"
-                      />
-                      <div className="gd-input-help">Max 500 characters · we share these with your host directly.</div>
-                    </div>
-                  )}
+                  <div id="gd-notes-panel" className="gd-disclosure-panel gd-disclosure-panel-pad-top" data-testid="gd-notes-panel">
+                    <textarea
+                      className="gd-input"
+                      rows={3}
+                      maxLength={500}
+                      placeholder="E.g. early check-in, dietary needs, accessibility requests"
+                      value={formData.notes}
+                      onChange={(e) => setFormData((p) => ({ ...p, notes: e.target.value }))}
+                      style={{ resize: 'vertical' }}
+                      data-testid="guest-booking-notes"
+                    />
+                    <div className="gd-input-help">Max 500 characters · we share these with your host directly.</div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1810,11 +1813,14 @@ const TrustBand: React.FC<TrustBandProps> = ({ freeCancelDisplay, brandName, wha
         <span>
           Stuck?{' '}
           <a
-            href={`https://wa.me/${whatsappNumber.replace(/\D/g, '')}`}
+            // TASK-4294/TASK-4300: use the canonical contact helpers — getWhatsAppLink() carries
+            // the 91 country code and formatDisplayNumber() shows "+91-…", instead of the raw
+            // tenant whatsappBookingPhone (no +, no country code, wrong number on the marketplace).
+            href={getWhatsAppLink()}
             target="_blank"
             rel="noopener noreferrer"
           >
-            WhatsApp {brandName} on {whatsappNumber}
+            WhatsApp {brandName} on {formatDisplayNumber()}
           </a>
         </span>
       </div>
@@ -2298,9 +2304,11 @@ const gdStyles = `
 .gd-disclosure-trigger svg { color: var(--gd-faint); transition: transform .2s ease; }
 .gd-disclosure.open .gd-disclosure-trigger svg { transform: rotate(180deg); }
 .gd-disclosure-panel {
+  display: none;
   padding: 0 16px 16px;
   border-top: 1px solid var(--gd-line);
 }
+.gd-disclosure.open .gd-disclosure-panel { display: block; }
 .gd-disclosure-panel-pad-top { padding-top: 14px; }
 
 /* Pill badge */

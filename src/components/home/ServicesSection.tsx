@@ -60,9 +60,11 @@ export const SERVICES_CONTENT: {
 
 const ServicesSection = () => {
   const brandName = getTenantBrandName();
+  // TASK-4305: replace the whole "our exclusive range of services" clause so the brandified
+  // copy doesn't read "<brand>'s services of services" (duplicated "services").
   const servicesSummary = servicesSummaryCopy.replace(
-    "our exclusive range",
-    `${brandName}'s services`,
+    "our exclusive range of services",
+    `${brandName}'s curated services`,
   );
   const useExperimentalLayout =
     enableServicesConcreteCopy ||

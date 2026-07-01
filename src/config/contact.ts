@@ -115,7 +115,10 @@ export function getTelLink(channel: ContactChannel = DEFAULT_CONTACT_CHANNEL) {
 
 export function getWhatsAppLink(channel: ContactChannel = DEFAULT_CONTACT_CHANNEL) {
   const p = getWhatsAppPhone(channel);
-  return p ? `https://wa.me/${p}` : "";
+  // TASK-4300: wa.me requires the full international number. getWhatsAppPhone returns
+  // a 10-digit Indian national number (country code stripped), so prepend 91 here —
+  // without it the link resolves to "phone number is incorrect" / the wrong country.
+  return p ? `https://wa.me/91${p}` : "";
 }
 
 export function formatDisplayNumber(channel: ContactChannel = DEFAULT_CONTACT_CHANNEL) {

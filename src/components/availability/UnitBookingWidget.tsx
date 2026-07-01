@@ -949,7 +949,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         holdPriceBreakdown: {
           baseAmount: typeof serverBaseAmount === 'number' && serverBaseAmount > 0 ? serverBaseAmount : breakdownPrice,
           discountAmount: 0,
-          convenienceFeeAmount: typeof serverConvFee === 'number' ? serverConvFee : breakdownConvenienceFee,
+          // TASK-4286: only trust server convenienceFeeAmount when it is a positive number.
+          // The init-hold mode API returns convenienceFeeAmount=0 (a valid JS number) when
+          // it doesn't compute the fee, which caused the checkout page to show ₹0 processing
+          // fee and a total ₹378 lower than the listing widget. Fall back to the client-computed
+          // breakdownConvenienceFee so both surfaces agree.
+          convenienceFeeAmount: typeof serverConvFee === 'number' && serverConvFee > 0 ? serverConvFee : breakdownConvenienceFee,
           finalAmount: typeof serverFinalAmount === 'number' && serverFinalAmount > 0 ? serverFinalAmount : (finalTotal > 0 ? finalTotal : breakdownFinalTotal),
           nights: stayNights,
           currency: 'INR',
@@ -1006,7 +1011,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
       {/* v2 block (1): Price headline */}
       <div className="lv-booking-headline" data-testid="bw-header">
-        {hasSelectedRange && finalTotal > 0 ? (
+        {hasSelectedRange && !invalidIstStayRange && finalTotal > 0 ? (
           <>
             <div className="lv-booking-total">
               <b data-testid="bw-per-night-price">{displayPrice(Math.max(1, finalTotal))}</b>
@@ -1235,11 +1240,15 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             </div>
           )}
         </div>
-        {/* v2 block (4): Price breakdown — always-visible, lv-* classes */}
+        {/* v2 block (4): Price breakdown — hidden until both dates are selected (TASK-4276)
+            AND the range is valid (checkout > checkin) (TASK-4284).
+            Showing a breakdown for a reversed or same-day range would display either a
+            missing-GST or ₹1 total, misleading the guest. */}
+        {hasSelectedRange && !invalidIstStayRange && (
         <div className="lv-price-rows">
           <div className="lv-price-row" data-testid="bw-bd-subtotal-row price-line-base">
             <span>
-              {hasSelectedRange && priceDetails.nights > 0 && perNightForDisplay > 0
+              {priceDetails.nights > 0 && perNightForDisplay > 0
                 ? `${displayPrice(perNightForDisplay)} × ${priceDetails.nights} ${priceDetails.nights === 1 ? 'night' : 'nights'}`
                 : 'Accommodation'}
             </span>
@@ -1311,6 +1320,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             <span className="lv-num">{displayPrice(Math.max(1, finalTotal))}</span>
           </div>
         </div>
+        )}
         </div>
       {/* end lv-booking-form */}
 
@@ -1335,14 +1345,15 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       <Button
         type="submit"
         fullWidth
+        // TASK-4277: do NOT disable on blank dates — keep Reserve clickable so handleReserve
+        // can surface the inline "Please select check-in and check-out dates." validation
+        // instead of the button silently swallowing the click. Genuine blockers (service down,
+        // invalid range) still disable it.
         disabled={
           isSubmitting ||
           isLoading ||
-          !dateRange.startDate ||
-          !dateRange.endDate ||
           isBookingDisabled ||
-          invalidIstStayRange ||
-          priceDetails.nights < 1
+          (Boolean(dateRange.startDate) && Boolean(dateRange.endDate) && invalidIstStayRange)
         }
         className={`bw-reserve lv-booking-cta${isSubmitting || isLoading ? ' opacity-75' : ''}`}
         data-testid="guest-booking-submit"
@@ -1364,7 +1375,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           data-testid="bw-direct-savings-line"
           style={{ textAlign: 'center', fontSize: 12, color: '#157046', marginTop: 6, lineHeight: 1.45 }}
         >
-          Save ~{displayPrice(illustrativeOtaGuestFeeComparison.illustrativeGuestFee)} vs typical booking sites (illustrative) — no guest service fee on direct bookings.
+          Save ~{displayPrice(illustrativeOtaGuestFeeComparison.illustrativeGuestFee)} vs typical booking sites (illustrative) — direct booking, lower fees than OTAs.
         </p>
       )}
 

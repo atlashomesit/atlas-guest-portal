@@ -232,7 +232,7 @@ export default function MarketplaceHomepage() {
                     </span>
                   )}
 
-                  <p className="text-sm text-text-body">Sleeps up to {item.maxGuests} guests</p>
+                  <p className="text-sm text-text-body">Sleeps up to {item.maxGuests} guest{item.maxGuests === 1 ? '' : 's'}</p>
 
                   {/* TASK-1873: rating row */}
                   {item.rating != null && item.rating > 0 && (
@@ -267,6 +267,20 @@ export default function MarketplaceHomepage() {
             );
           })}
       </div>
+
+      {/* TASK-4309: explicit empty state so a filter/search with no matches shows a
+          message instead of a blank gap between the filter bar and the footer. */}
+      {!loading && items.length === 0 && (
+        <div
+          data-testid="marketplace-empty"
+          className="mt-8 rounded-2xl border border-dashed border-border bg-bg-surface p-10 text-center"
+        >
+          <p className="text-base font-semibold text-text-primary">No stays match these filters yet</p>
+          <p className="mt-1 text-sm text-text-muted">
+            Try the “All” tab or a different city to see available homes and rooms.
+          </p>
+        </div>
+      )}
     </section>
   );
 }
