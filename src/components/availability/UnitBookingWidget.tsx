@@ -317,9 +317,19 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     const end = getIstStartOfDay(new Date(co));
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return;
     if (end.getTime() <= start.getTime()) return;
+    // TASK-4285: URL-param dates (?checkIn=&checkOut=) bypass the calendar's past-date guard.
+    // Reject a past-dated check-in — still hydrate the fields so the guest sees what was
+    // requested, but surface an explicit error and let `invalidIstStayRange` keep the Reserve
+    // button disabled + the price quote hidden (no wasted quote, no past-dated hold).
+    if (start.getTime() < today.getTime()) {
+      setDateRange({ startDate: start, endDate: end });
+      setDateError('Check-in date must be today or in the future.');
+      hasHydratedFromContextRef.current = true;
+      return;
+    }
     setDateRange({ startDate: start, endDate: end });
     hasHydratedFromContextRef.current = true;
-  }, [booking.checkIn, booking.checkOut]);
+  }, [booking.checkIn, booking.checkOut, today]);
 
   useEffect(() => {
     const g = booking.guests;
@@ -744,8 +754,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     if (!dateRange.startDate || !dateRange.endDate) return false;
     const s = getIstStartOfDay(dateRange.startDate).getTime();
     const e = getIstStartOfDay(dateRange.endDate).getTime();
-    return e <= s;
-  }, [dateRange.startDate, dateRange.endDate]);
+    if (e <= s) return true;
+    // TASK-4285: a past-dated check-in (e.g. via URL params) is never bookable — disable Reserve
+    // and suppress the price breakdown just as for an inverted range.
+    if (s < today.getTime()) return true;
+    return false;
+  }, [dateRange.startDate, dateRange.endDate, today]);
   const { loading: dailyPricingLoading, error: _dailyPricingError, getListingPricing } = useDailyPricingSummary();
   const dailyPricing = useMemo(
     () => (listingId != null && String(listingId).trim() !== '' ? getListingPricing(listingId) : null),
@@ -864,6 +878,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     const checkoutIst = getIstStartOfDay(dateRange.endDate);
     if (checkoutIst.getTime() <= checkinIst.getTime()) {
       setDateError('Check-out must be after check-in.');
+      return;
+    }
+    // TASK-4285: defense-in-depth — never create a hold for a past-dated check-in, even if the
+    // dates arrived via URL params and bypassed the calendar's disabled-day guard.
+    if (checkinIst.getTime() < today.getTime()) {
+      setDateError('Check-in date must be today or in the future.');
       return;
     }
     const stayNights = calculateNights(checkinIst, checkoutIst);
@@ -987,7 +1007,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       setIsSubmitting(false);
     }
   }, [
-    isSubmitting, isBookingDisabled, dateRange, dateStatusMap, blockedSet,
+    isSubmitting, isBookingDisabled, dateRange, dateStatusMap, blockedSet, today,
     listingId, guests, propertySlug, unitSlug, listingName, breakdownPrice, breakdownConvenienceFee,
     breakdownFinalTotal, finalTotal, updateBooking, navigate,
   ]);

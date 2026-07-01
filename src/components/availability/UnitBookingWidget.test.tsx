@@ -154,6 +154,31 @@ describe('UnitBookingWidget - TASK-2630: URL date hydration and picker interacti
   });
 });
 
+describe('UnitBookingWidget - TASK-4285: past-dated check-in from URL params is rejected', () => {
+  const filePath = resolve(__dirname, './UnitBookingWidget.tsx');
+  let content: string;
+
+  it('URL-param hydration guards against a past-dated check-in with an explicit error', () => {
+    content = readFileSync(filePath, 'utf-8');
+    // The hydration effect must compare the incoming check-in against today and, when it is in
+    // the past, surface the guest-facing error instead of silently accepting the range.
+    expect(content).toContain('start.getTime() < today.getTime()');
+    expect(content).toContain('Check-in date must be today or in the future.');
+  });
+
+  it('invalidIstStayRange treats a past-dated check-in as invalid (disables Reserve + hides price)', () => {
+    content = readFileSync(filePath, 'utf-8');
+    // invalidIstStayRange is used both to disable the Reserve button and to hide the price
+    // breakdown, so flagging a past check-in there covers the whole AC2 surface.
+    expect(content).toContain('if (s < today.getTime()) return true;');
+  });
+
+  it('handleReserve refuses to create a hold for a past-dated check-in (defense-in-depth)', () => {
+    content = readFileSync(filePath, 'utf-8');
+    expect(content).toContain('checkinIst.getTime() < today.getTime()');
+  });
+});
+
 describe('UnitBookingWidget - TASK-2870: accommodation GST uses 18% slab above ₹7,500', () => {
   const filePath = resolve(__dirname, './UnitBookingWidget.tsx');
 
