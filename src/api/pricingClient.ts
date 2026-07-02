@@ -111,10 +111,15 @@ export async function fetchPricingBreakdown(
         if (dayDate < params.checkIn || dayDate >= params.checkOut) continue;
       }
       const base = Number(d.baseAmount ?? d.BaseAmount ?? 0);
+      // TASK-4322: `discountAmount` here is the summed per-day tenant GLOBAL discount
+      // (CalendarPricingDayDto has no LOS field at all — the calendar endpoint doesn't
+      // expose genuine TASK-571 long-stay discounts). It must NOT be labeled/returned as
+      // `losDiscountAmount` — doing so caused UnitBookingWidget to subtract this same
+      // discount a second time (it's already netted into `actualPrice` below / in
+      // fetchCalendarPricing), understating the displayed total vs. what the server charges.
       const discount = Number(d.discountAmount ?? d.DiscountAmount ?? 0);
-      const los = Number(d.losDiscountAmount ?? d.LosDiscountAmount ?? 0);
       totalBase += base;
-      totalDiscount += discount + los;
+      totalDiscount += discount;
       if (convenienceFeePercent === 0) {
         const pct = d.convenienceFeePercent ?? d.ConvenienceFeePercent;
         if (pct !== undefined && pct !== null) convenienceFeePercent = Number(pct);
@@ -125,8 +130,11 @@ export async function fetchPricingBreakdown(
       baseAmount: totalBase,
       discountAmount: totalDiscount,
       convenienceFeeAmount: Math.round((totalBase * convenienceFeePercent) / 100),
-      losDiscountAmount: totalDiscount,
-      losDiscountPercent: totalDiscount > 0 ? Math.round((totalDiscount / totalBase) * 100) : 0,
+      // TASK-4322: no genuine LOS field exists in this calendar DTO — never populate
+      // losDiscountAmount/losDiscountPercent from the global discount. Leave at 0 until
+      // TASK-571 wires a real per-day LOS field into CalendarPricingDayDto.
+      losDiscountAmount: 0,
+      losDiscountPercent: 0,
       finalAmount: totalBase - totalDiscount,
     };
   }
