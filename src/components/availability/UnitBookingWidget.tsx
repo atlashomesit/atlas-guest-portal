@@ -512,24 +512,58 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
 
   // Fetch per-day calendar pricing so price updates when user selects dates.
   // Fetch on mount and when calendar opens or month changes; do not clear when calendar closes.
+  //
+  // TASK-4327: MERGE fetched months into the existing map instead of replacing it wholesale.
+  // Calendar open resets `shownDate` to today (below), which re-fires this effect for
+  // months 0-2 from today. A prior `setCalendarDailyPrices(result.dateToPrice)` REPLACE
+  // wiped out any far-out months a guest had already selected/priced, so
+  // `selectedRangeTotalFromCalendar` fell back to today's rate for a range 4+ months out —
+  // silently changing the displayed total on nothing but a close/reopen. Each server
+  // response is authoritative for its OWN date range (30s cache per PricingController), so
+  // merging never leaves stale data for the months it actually returns.
   useEffect(() => {
     if (!listingId || String(listingId).trim() === '') return;
     const controller = new AbortController();
     setCalendarPricingLoading(true);
     fetchCalendarPricing(listingId, shownMonthIso, 3, controller.signal)
       .then((result) => {
-        setCalendarDailyPrices(result.dateToPrice);
+        setCalendarDailyPrices((prev) => new Map([...prev, ...result.dateToPrice]));
         setCalendarConvenienceFeePercent(result.convenienceFeePercent);
       })
       .catch(() => {
-        setCalendarDailyPrices(new Map());
-        setCalendarConvenienceFeePercent(undefined);
+        // Fetch failure: leave any already-merged prices in place rather than clearing the
+        // whole map (a transient failure for the current month shouldn't blank out prices
+        // already fetched for the selected range).
       })
       .finally(() => {
         setCalendarPricingLoading(false);
       });
     return () => controller.abort();
   }, [listingId, shownMonthIso]);
+
+  // TASK-4327: when a range is selected, ensure ITS months are (re-)fetched on calendar
+  // open — not just the 3 months from `shownMonthIso` (which resets to today's month on
+  // every open, see the shownDate-reset effect above). Without this, a far-out selected
+  // range's prices could go stale (past the 30s server cache TTL) across a close/reopen
+  // with no refetch to correct them, since `shownMonthIso` may not itself change value if
+  // the calendar happened to already be showing today's month before this open.
+  useEffect(() => {
+    if (!openCalendar) return;
+    if (!listingId || String(listingId).trim() === '') return;
+    if (!dateRange.startDate) return;
+    const selectedMonthIso = toISODate(startOfMonth(dateRange.startDate));
+    if (selectedMonthIso === shownMonthIso) return; // already covered by the effect above
+    const controller = new AbortController();
+    fetchCalendarPricing(listingId, selectedMonthIso, 3, controller.signal)
+      .then((result) => {
+        setCalendarDailyPrices((prev) => new Map([...prev, ...result.dateToPrice]));
+      })
+      .catch(() => {
+        // Leave existing prices in place; selectedRangeTotalFromCalendar's own
+        // effectiveDailyPricing fallback covers a fully-failed fetch.
+      });
+    return () => controller.abort();
+  }, [openCalendar, listingId, dateRange.startDate, shownMonthIso]);
 
   // TASK-4322: previously fetched a "LOS discount" here via the calendar breakdown client and
   // rendered it as a "Long-stay discount" row — but that value was actually the summed
