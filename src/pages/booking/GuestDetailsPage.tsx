@@ -128,6 +128,7 @@ const CHECKOUT_HOLD_MINUTES = 5;
 type CheckoutHoldCache = {
   holdId: number;
   holdExpiresAt: string;
+  holdToken?: string | null;
   holdListingId?: number | null;
   holdPropertySlug?: string | null;
   holdUnitSlug?: string | null;
@@ -247,6 +248,7 @@ const GuestDetailsPage: React.FC = () => {
         updateBooking({
           holdId: cached.holdId,
           holdExpiresAt: cached.holdExpiresAt,
+          holdToken: cached.holdToken ?? null,
           holdListingId: cached.holdListingId ?? null,
           holdPropertySlug: cached.holdPropertySlug ?? null,
           holdUnitSlug: cached.holdUnitSlug ?? null,
@@ -263,6 +265,7 @@ const GuestDetailsPage: React.FC = () => {
 
   // ── Hold state from context ──────────────────────────────────────────────
   const holdId = booking.holdId;
+  const holdToken = booking.holdToken;
   const holdExpiresAt = booking.holdExpiresAt;
   const holdListingId = booking.holdListingId;
   const priceBreakdown = booking.holdPriceBreakdown;
@@ -342,6 +345,7 @@ const GuestDetailsPage: React.FC = () => {
     const payload: CheckoutHoldCache = {
       holdId: Number(holdId),
       holdExpiresAt,
+      holdToken: holdToken ?? null,
       holdListingId: holdListingId ?? null,
       holdPropertySlug: booking.holdPropertySlug ?? propertySlug ?? null,
       holdUnitSlug: booking.holdUnitSlug ?? unitSlug ?? null,
@@ -355,7 +359,7 @@ const GuestDetailsPage: React.FC = () => {
       window.sessionStorage.setItem(CHECKOUT_HOLD_KEY, JSON.stringify(payload));
     } catch { /* ignore */ }
   }, [
-    holdId, holdExpiresAt, holdListingId, priceBreakdown, booking.checkIn, booking.checkOut,
+    holdId, holdToken, holdExpiresAt, holdListingId, priceBreakdown, booking.checkIn, booking.checkOut,
     booking.guests, booking.holdPropertySlug, booking.holdUnitSlug, booking.holdListingName,
     propertySlug, unitSlug,
   ]);
@@ -618,6 +622,8 @@ const GuestDetailsPage: React.FC = () => {
 
       const payload = {
         holdId: numericHoldId,
+        // TASK-4354: prove ownership of the hold — server rejects a guessed holdId without this token.
+        holdToken: holdToken ?? undefined,
         currency: 'INR',
         guestConsentAccepted: true,
         securityDepositAccepted: false,
@@ -960,7 +966,7 @@ const GuestDetailsPage: React.FC = () => {
       }
     },
     [
-      isSubmitting, holdExpired, validateForm, holdId, phoneDialCode, formData,
+      isSubmitting, holdExpired, validateForm, holdId, holdToken, phoneDialCode, formData,
       availableAddOns, selectedAddOns, referralCode, promoCode, whatsappOptIn,
       holdListingId, updateBooking, navigate, booking.checkIn, booking.checkOut, displayTotal,
       checkInDisplay, checkOutDisplay, brandName,
