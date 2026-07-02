@@ -19,7 +19,7 @@ import { formatCurrency } from '@/utils/formatting';
 import { HelpCircle } from 'lucide-react';
 import { calculateNightlyPrice, inferUnitType } from '@/utils/pricing';
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
-import { fetchCalendarPricing, fetchPricingBreakdown } from '@/api/pricingClient';
+import { fetchCalendarPricing } from '@/api/pricingClient';
 import { fetchPublicListings } from '@/api/listingClient';
 import { useListingPhotosFromApi } from '@/contexts/ListingPhotosContext';
 import OptimizedImage from '@/components/ui/OptimizedImage';
@@ -165,9 +165,6 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [calendarDailyPrices, setCalendarDailyPrices] = useState<Map<string, number>>(new Map());
   const [calendarConvenienceFeePercent, setCalendarConvenienceFeePercent] = useState<number | undefined>(undefined);
   const [calendarPricingLoading, setCalendarPricingLoading] = useState(false);
-  // TASK-571: long-stay (LOS) auto-discount shown in the price breakdown.
-  const [losDiscountAmount, setLosDiscountAmount] = useState<number>(0);
-  const [losDiscountPercent, setLosDiscountPercent] = useState<number>(0);
   const [guests, setGuests] = useState(2);
   const [guestsOpen, setGuestsOpen] = useState(false);
   const [_bookedDates, setBookedDates] = useState<Date[]>([]);
@@ -530,42 +527,15 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     return () => controller.abort();
   }, [listingId, shownMonthIso]);
 
-  const rangeStartIso = dateRange?.startDate ? toISODate(dateRange.startDate) : null;
-  const rangeEndIso = dateRange?.endDate ? toISODate(dateRange.endDate) : null;
-
-  // TASK-571: Fetch long-stay (LOS) discount breakdown when guest selects a valid range.
-  useEffect(() => {
-    if (!listingId || String(listingId).trim() === '') {
-      setLosDiscountAmount(0);
-      setLosDiscountPercent(0);
-      return;
-    }
-    if (!dateRange?.startDate || !dateRange?.endDate) {
-      setLosDiscountAmount(0);
-      setLosDiscountPercent(0);
-      return;
-    }
-    const controller = new AbortController();
-    fetchPricingBreakdown(
-      {
-        listingId,
-        checkIn: rangeStartIso!,
-        checkOut: rangeEndIso!,
-      },
-      controller.signal,
-    )
-      .then((b) => {
-        const amt = Number(b.losDiscountAmount ?? b.LosDiscountAmount ?? 0);
-        const pct = Number(b.losDiscountPercent ?? b.LosDiscountPercent ?? 0);
-        setLosDiscountAmount(Number.isFinite(amt) && amt > 0 ? amt : 0);
-        setLosDiscountPercent(Number.isFinite(pct) && pct > 0 ? pct : 0);
-      })
-      .catch(() => {
-        setLosDiscountAmount(0);
-        setLosDiscountPercent(0);
-      });
-    return () => controller.abort();
-  }, [listingId, rangeStartIso, rangeEndIso, dateRange?.startDate, dateRange?.endDate]);
+  // TASK-4322: previously fetched a "LOS discount" here via the calendar breakdown client and
+  // rendered it as a "Long-stay discount" row — but that value was actually the summed
+  // per-day tenant GLOBAL discount (CalendarPricingDayDto has no genuine LOS field), and
+  // it was being subtracted a SECOND time from `breakdownPrice` below, which is already
+  // discount-net (see fetchCalendarPricing's `actualPrice = base - discount`,
+  // src/api/pricingClient.ts). That double subtraction understated the displayed total
+  // vs. the server's charged amount. Removed entirely until TASK-571 wires a real
+  // per-day LOS field into the calendar pricing DTO — at which point this should fetch
+  // and render genuine LOS data instead of re-deriving it from the global discount.
 
   const isCheckInAllowed = (date: Date) => {
   const iso = toISODate(getIstStartOfDay(date));
@@ -813,9 +783,18 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       ? accommodationGstSlabPercent(perNightForDisplay)
       : null;
 
-  /** GST component of room fare (ADDITIVE — CPO formula per 2026-05-21). */
-  const losApplied = losDiscountAmount > 0 && priceDetails.nights >= 7 ? losDiscountAmount : 0;
-  const taxableBase = Math.max(0, breakdownPrice - losApplied);
+  /**
+   * GST component of room fare (ADDITIVE — CPO formula per 2026-05-21).
+   * TASK-4322: `breakdownPrice` (from selectedRangeTotalFromCalendar / effectiveDailyPricing.actualPrice)
+   * is ALREADY discount-net — the tenant global discount is netted in server-side per-day
+   * `actualPrice = base - discount` (src/api/pricingClient.ts). A second subtraction here
+   * (previously via a mislabeled "LOS discount") double-counted the same discount and
+   * understated the total vs. what the server actually charges. taxableBase == breakdownPrice.
+   * Real TASK-571 LOS discounts are not exposed by the calendar pricing DTO today, so there
+   * is nothing genuine left to subtract; when that DTO gains a real per-day LOS field, apply
+   * it here (once) instead of re-deriving it from the discount already netted into the price.
+   */
+  const taxableBase = Math.max(0, breakdownPrice);
   const gstLineAmount =
     gstSlabPercent != null && taxableBase > 0
       ? accommodationGstLineAmount(taxableBase, perNightForDisplay)
@@ -825,7 +804,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   // Sreekar canonical clarification 2026-05-21 (memory: project_guest_booking_pricing_formula).
   const breakdownConvenienceFee = Math.round((taxableBase + gstLineAmount) * convenienceFeePercent);
 
-  // TASK-2631: Total = Base − LOS + GST + Service Fee (CPO-canonical formula).
+  // TASK-4322: Total = discount-net base + GST + Service Fee (canonical formula).
   const breakdownFinalTotal = Math.max(1, taxableBase + gstLineAmount + breakdownConvenienceFee);
 
   const finalTotal =
@@ -1293,15 +1272,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
           {/* TASK-2631 final fix: phantom discount line — appliedDiscountPercent from globalDiscountPercent is not applied to finalTotal, so we hide it to prevent "vapor" discount display */}
 
-          {/* TASK-571: long-stay discount row — only render if nights >= 7 AND discount > 0 */}
-          {losDiscountAmount > 0 && priceDetails.nights >= 7 && (
-            <div className="lv-price-row">
-              <span style={{ color: '#157046' }}>
-                Long-stay discount{losDiscountPercent > 0 ? ` (−${Math.round(losDiscountPercent)}%)` : ''}
-              </span>
-              <span className="lv-num" style={{ color: '#157046' }}>−{displayPrice(losDiscountAmount)}</span>
-            </div>
-          )}
+          {/* TASK-4322: "Long-stay discount" row removed — it was rendering the tenant
+              GLOBAL discount (already netted into breakdownPrice above) mislabeled as a
+              TASK-571 LOS discount, and double-subtracting it from the total. The calendar
+              pricing DTO has no genuine per-day LOS field today; re-add this row only when
+              TASK-571 wires real LOS data through (see the fetchCalendarPricing / disabled
+              LOS-fetch-effect comments above). */}
 
           <div className="lv-price-row" data-testid="bw-bd-service-fee-row">
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>

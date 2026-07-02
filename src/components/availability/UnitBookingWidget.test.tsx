@@ -190,3 +190,33 @@ describe('UnitBookingWidget - TASK-2870: accommodation GST uses 18% slab above �
     expect(content).not.toContain('else 12%');
   });
 });
+
+describe('UnitBookingWidget - TASK-4322: global discount applied exactly once, no fake LOS row', () => {
+  const filePath = resolve(__dirname, './UnitBookingWidget.tsx');
+
+  it('no longer subtracts a second "losApplied"/losDiscountAmount from the taxable base', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    // breakdownPrice (from selectedRangeTotalFromCalendar / effectiveDailyPricing.actualPrice)
+    // is already discount-net server-side — taxableBase must equal it directly, not
+    // breakdownPrice minus a second "losApplied" derived from the global discount.
+    expect(content).not.toContain('losApplied');
+    expect(content).not.toContain('losDiscountAmount');
+    expect(content).not.toContain('losDiscountPercent');
+    expect(content).toContain('const taxableBase = Math.max(0, breakdownPrice);');
+  });
+
+  it('no longer renders a "Long-stay discount" row (calendar DTO has no genuine LOS field)', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    // The removed JSX row rendered the literal label text as a span child — assert that
+    // specific rendered-text pattern is gone (code comments referencing the old row/task
+    // for context are fine and expected to remain).
+    expect(content).not.toMatch(/>\s*Long-stay discount/);
+    // Leaves a pointer back to TASK-571 for when real LOS data becomes available.
+    expect(content).toContain('TASK-571');
+  });
+
+  it('no longer imports/calls fetchPricingBreakdown (was only used to (mis)populate LOS state)', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    expect(content).not.toContain('fetchPricingBreakdown');
+  });
+});
