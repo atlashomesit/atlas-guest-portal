@@ -12,6 +12,7 @@ import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 import { messageFromApiResponse } from "../utils/serverErrorFromResponse";
 import { getContactEmail, getContactPhone, hasHostContact } from "../config/contact";
 import { useGuestBookingQrToken } from "../hooks/useGuestBookingQrToken";
+import GuestMessageThread from "../components/messaging/GuestMessageThread";
 
 /** Minimal shape of the non-standard `beforeinstallprompt` event — only `prompt()` is used here. */
 interface BeforeInstallPromptEvent extends Event {
@@ -1224,6 +1225,11 @@ export default function BookingConfirmationPage() {
         {/* TASK-2490: guest web self-check-in */}
         {!isCancelled && bookingId && token && (
           <SelfCheckInCard bookingId={Number(bookingId)} token={token} />
+        )}
+
+        {/* TASK-4333: guest-facing messages thread — read + reply to host */}
+        {bookingId && token && (
+          <GuestMessageThread bookingId={Number(bookingId)} token={token} />
         )}
 
         {/* WiFi */}
