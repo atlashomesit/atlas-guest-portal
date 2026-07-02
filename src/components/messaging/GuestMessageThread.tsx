@@ -41,7 +41,9 @@ export default function GuestMessageThread({ bookingId, token }: { bookingId: nu
     async (signal?: AbortSignal) => {
       try {
         const thread = await fetchGuestMessages(bookingId, token, signal);
-        setMessages(thread.messages);
+        // Defensive: a malformed/partial payload (missing `messages`) must not white-screen
+        // the confirmation page — fall back to an empty thread. (TASK-4333 hardening)
+        setMessages(thread?.messages ?? []);
         setLoadError(null);
       } catch (err) {
         if ((err as { name?: string })?.name === "AbortError") return;
