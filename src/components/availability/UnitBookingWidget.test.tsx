@@ -276,3 +276,31 @@ describe('UnitBookingWidget - TASK-4326: checkout-day off-by-one on back-to-back
     expect(disabledDaySection).toContain('if (dateRange.startDate &&');
   });
 });
+
+describe('UnitBookingWidget - TASK-4327: calendar reopen must not silently re-price a far-out selected range', () => {
+  const filePath = resolve(__dirname, './UnitBookingWidget.tsx');
+
+  it('merges fetched calendar pricing months instead of replacing the map wholesale', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    // Old bug: a bare `setCalendarDailyPrices(result.dateToPrice)` replace wiped out any
+    // previously-fetched far-out months on every effect re-fire. Assert the live call sites
+    // merge via functional update; a code comment documenting the old bug may still mention
+    // the literal old call, so match the specific `.then((result) => {` call-site pattern
+    // rather than a bare substring check across the whole file.
+    expect(content).toContain('setCalendarDailyPrices((prev) => new Map([...prev, ...result.dateToPrice]))');
+    expect(content).not.toMatch(/\.then\(\(result\) => \{\s*\n\s*setCalendarDailyPrices\(result\.dateToPrice\)/);
+  });
+
+  it('does not clear calendarDailyPrices to an empty Map on a fetch failure', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    // Old bug: `.catch(() => { setCalendarDailyPrices(new Map()); ... })` blanked the whole
+    // map on any transient failure, including for months already successfully fetched.
+    expect(content).not.toContain('setCalendarDailyPrices(new Map())');
+  });
+
+  it('fetches the selected range\'s own month(s) when the calendar opens, independent of shownMonthIso', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    expect(content).toContain('selectedMonthIso === shownMonthIso');
+    expect(content).toMatch(/useEffect\(\(\) => \{\s*\n\s*if \(!openCalendar\) return;/);
+  });
+});
