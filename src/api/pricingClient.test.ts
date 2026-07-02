@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearRuntimeConfig, setRuntimeConfig } from '@/runtime-config';
-import { fetchPricingBreakdown } from './pricingClient';
+import { fetchGuestGstBreakdown, fetchPricingBreakdown } from './pricingClient';
 
 const defaultRuntimeConfig = {
   apiBaseUrl: 'https://api.test',
@@ -74,5 +74,56 @@ describe('fetchPricingBreakdown — TASK-4322 no double-counted / mislabeled LOS
     expect(result.losDiscountAmount).toBe(0);
     expect(result.losDiscountPercent).toBe(0);
     expect(result.finalAmount).toBe(1000);
+  });
+});
+
+/**
+ * TASK-4331: fetchGuestGstBreakdown calls GET /api/pricing/guest-breakdown (PricingService.
+ * GetPublicBreakdownAsync — the SAME server computation RazorpayPaymentService uses to build
+ * the actual Razorpay order amount), and must surface its gstPercent/gstAmount/finalAmount
+ * as-is so the widget can render the server's real charged slab instead of re-deriving one
+ * client-side from a pre-adjustment per-night rate.
+ */
+describe('fetchGuestGstBreakdown — TASK-4331 server-sourced GST slab', () => {
+  it('surfaces gstPercent/gstAmount/finalAmount from the guest-breakdown response (camelCase)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ gstPercent: 5, gstAmount: 360, finalAmount: 7560 }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await fetchGuestGstBreakdown(42, '2026-08-01', '2026-08-08');
+
+    expect(result.gstPercent).toBe(5);
+    expect(result.gstAmount).toBe(360);
+    expect(result.finalAmount).toBe(7560);
+  });
+
+  it('falls back to PascalCase fields when the server returns them', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ GstPercent: 18, GstAmount: 1260, FinalAmount: 8260 }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await fetchGuestGstBreakdown(42, '2026-08-01', '2026-08-08');
+
+    expect(result.gstPercent).toBe(18);
+    expect(result.gstAmount).toBe(1260);
+    expect(result.finalAmount).toBe(8260);
+  });
+
+  it('returns null fields (not 0) when the response omits them, so callers can distinguish "no data yet" from a real 0% slab', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({}),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await fetchGuestGstBreakdown(42, '2026-08-01', '2026-08-08');
+
+    expect(result.gstPercent).toBeNull();
+    expect(result.gstAmount).toBeNull();
+    expect(result.finalAmount).toBeNull();
   });
 });

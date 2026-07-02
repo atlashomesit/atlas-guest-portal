@@ -72,7 +72,57 @@ export type CalendarPricingViewDto = {
 };
 
 const BREAKDOWN_ENDPOINT = '/api/pricing/breakdown';
+const GUEST_BREAKDOWN_ENDPOINT = '/api/pricing/guest-breakdown';
 const DAILY_SUMMARY_ENDPOINT = '/api/pricing/daily-summary';
+
+/**
+ * TASK-4331: GST slab/amount as computed server-side (PricingService.GetPublicBreakdownAsync),
+ * i.e. post-LOS/last-minute/min-price-floor adjustment — the SAME basis the Razorpay order
+ * amount is charged on (RazorpayPaymentService reads breakdown.GstAmount/GstPercent from this
+ * same service call). Null fields mean the request failed or the stay has no nights/base.
+ */
+export type GuestGstBreakdown = {
+  gstPercent: number | null;
+  gstAmount: number | null;
+  finalAmount: number | null;
+};
+
+/**
+ * GET /pricing/guest-breakdown?listingId=&checkIn=&checkOut= — server-computed GST slab/amount
+ * for a check-in/check-out range. TASK-4331: use this instead of re-deriving the 5%/18% slab
+ * client-side from a pre-adjustment per-night rate, which can disagree with the server's
+ * post-LOS/last-minute/min-floor basis near the ₹7,500 boundary.
+ */
+export async function fetchGuestGstBreakdown(
+  listingId: string | number,
+  checkIn: string,
+  checkOut: string,
+  signal?: AbortSignal,
+): Promise<GuestGstBreakdown> {
+  const url = new URL(buildApiUrl(GUEST_BREAKDOWN_ENDPOINT));
+  url.searchParams.set('listingId', String(listingId));
+  url.searchParams.set('checkIn', checkIn);
+  url.searchParams.set('checkOut', checkOut);
+
+  const response = await fetch(url.toString(), { signal, headers: getApiHeaders() });
+  if (!response.ok) {
+    throw new Error(await messageFromApiResponse(response));
+  }
+
+  const raw = (await response.json()) as {
+    gstPercent?: number; GstPercent?: number;
+    gstAmount?: number; GstAmount?: number;
+    finalAmount?: number; FinalAmount?: number;
+  };
+  const gstPercent = raw.gstPercent ?? raw.GstPercent;
+  const gstAmount = raw.gstAmount ?? raw.GstAmount;
+  const finalAmount = raw.finalAmount ?? raw.FinalAmount;
+  return {
+    gstPercent: gstPercent !== undefined && gstPercent !== null ? Number(gstPercent) : null,
+    gstAmount: gstAmount !== undefined && gstAmount !== null ? Number(gstAmount) : null,
+    finalAmount: finalAmount !== undefined && finalAmount !== null ? Number(finalAmount) : null,
+  };
+}
 
 export async function fetchPricingBreakdown(
   params: PricingBreakdownParams,

@@ -220,3 +220,32 @@ describe('UnitBookingWidget - TASK-4322: global discount applied exactly once, n
     expect(content).not.toContain('fetchPricingBreakdown');
   });
 });
+
+describe('UnitBookingWidget - TASK-4331: GST slab sourced from server, not a pre-adjustment client basis', () => {
+  const filePath = resolve(__dirname, './UnitBookingWidget.tsx');
+
+  it('fetches the server GST breakdown for the selected range', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    expect(content).toContain('fetchGuestGstBreakdown');
+    expect(content).toContain('serverGstPercent');
+    expect(content).toContain('serverGstAmount');
+  });
+
+  it('gstSlabPercent prefers the server value when it matches the current selection', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    // Must check serverGstMatchesSelection && serverGstPercent != null BEFORE falling back
+    // to the client-derived accommodationGstSlabPercent(perNightForDisplay).
+    expect(content).toMatch(
+      /const gstSlabPercent =\s*\n\s*serverGstMatchesSelection && serverGstPercent != null/,
+    );
+    // Client-derived slab must remain as the fallback path (loading/offline UX), not removed.
+    expect(content).toContain('accommodationGstSlabPercent(perNightForDisplay)');
+  });
+
+  it('gstLineAmount prefers the server-computed amount over recomputing from taxableBase', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    expect(content).toMatch(
+      /const gstLineAmount =\s*\n\s*serverGstMatchesSelection && serverGstAmount != null/,
+    );
+  });
+});
