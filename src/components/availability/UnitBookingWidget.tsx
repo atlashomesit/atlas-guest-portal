@@ -19,7 +19,7 @@ import { formatCurrency } from '@/utils/formatting';
 import { HelpCircle } from 'lucide-react';
 import { calculateNightlyPrice, inferUnitType } from '@/utils/pricing';
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
-import { fetchCalendarPricing } from '@/api/pricingClient';
+import { fetchCalendarPricing, fetchGuestGstBreakdown } from '@/api/pricingClient';
 import { fetchPublicListings } from '@/api/listingClient';
 import { useListingPhotosFromApi } from '@/contexts/ListingPhotosContext';
 import OptimizedImage from '@/components/ui/OptimizedImage';
@@ -165,6 +165,10 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [calendarDailyPrices, setCalendarDailyPrices] = useState<Map<string, number>>(new Map());
   const [calendarConvenienceFeePercent, setCalendarConvenienceFeePercent] = useState<number | undefined>(undefined);
   const [calendarPricingLoading, setCalendarPricingLoading] = useState(false);
+  // TASK-4331: server-computed GST slab/amount (post-LOS/last-minute/min-floor basis),
+  // preferred over the client-derived slab below when available.
+  const [serverGstPercent, setServerGstPercent] = useState<number | null>(null);
+  const [serverGstAmount, setServerGstAmount] = useState<number | null>(null);
   const [guests, setGuests] = useState(2);
   const [guestsOpen, setGuestsOpen] = useState(false);
   const [_bookedDates, setBookedDates] = useState<Date[]>([]);
@@ -537,6 +541,43 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   // per-day LOS field into the calendar pricing DTO — at which point this should fetch
   // and render genuine LOS data instead of re-deriving it from the global discount.
 
+  const gstRangeStartIso = dateRange?.startDate ? toISODate(dateRange.startDate) : null;
+  const gstRangeEndIso = dateRange?.endDate ? toISODate(dateRange.endDate) : null;
+
+  // TASK-4331: fetch the server's own GST slab/amount for the selected range instead of
+  // re-deriving 5%/18% client-side from a pre-adjustment per-night rate. The calendar
+  // pricing endpoint (`fetchCalendarPricing`, used for `perNightForDisplay` below) only
+  // knows base/weekend/override rate minus the tenant global discount — it has no idea
+  // about LOS, last-minute, or min-price-floor adjustments. The server's charged GST
+  // (`PricingService.GetPublicBreakdownAsync`, same call `RazorpayPaymentService` uses to
+  // build the order) decides the slab from the per-night rate AFTER those adjustments.
+  // Near the ₹7,500 boundary the two bases can pick different slabs, so we fetch the
+  // server's real value here and prefer it; the client-derived slab below remains only as
+  // a fallback while this request is in flight or if it fails.
+  useEffect(() => {
+    if (!listingId || String(listingId).trim() === '') {
+      setServerGstPercent(null);
+      setServerGstAmount(null);
+      return;
+    }
+    if (!gstRangeStartIso || !gstRangeEndIso) {
+      setServerGstPercent(null);
+      setServerGstAmount(null);
+      return;
+    }
+    const controller = new AbortController();
+    fetchGuestGstBreakdown(listingId, gstRangeStartIso, gstRangeEndIso, controller.signal)
+      .then((b) => {
+        setServerGstPercent(b.gstPercent);
+        setServerGstAmount(b.gstAmount);
+      })
+      .catch(() => {
+        setServerGstPercent(null);
+        setServerGstAmount(null);
+      });
+    return () => controller.abort();
+  }, [listingId, gstRangeStartIso, gstRangeEndIso]);
+
   const isCheckInAllowed = (date: Date) => {
   const iso = toISODate(getIstStartOfDay(date));
   
@@ -777,11 +818,32 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         ? effectiveDailyPricing.actualPrice
         : 0;
 
-  /** TASK-2870: slab from average nightly room tariff for the selected stay. */
+  // TASK-4331: does the in-flight/loaded server GST fetch match the CURRENTLY selected range?
+  // Guards against a stale serverGstPercent (from a prior selection) being applied to a new
+  // one for one render before the effect above re-fires.
+  const serverGstMatchesSelection =
+    hasSelectedRange && gstRangeStartIso === toISODate(dateRange.startDate!) && gstRangeEndIso === toISODate(dateRange.endDate!);
+
+  /**
+   * TASK-4331: GST slab basis divergence fix. The client-derived slab below (from
+   * `perNightForDisplay`) uses the calendar endpoint's rate — base/weekend/override MINUS
+   * global discount only, with NO knowledge of LOS/last-minute/min-price-floor adjustments.
+   * The server (`PricingService.GetPublicBreakdownAsync`, PricingService.cs:137-145) decides
+   * the slab from the per-night rate AFTER those adjustments — the SAME computation
+   * `RazorpayPaymentService` uses to build the actual charged order. Near the ₹7,500/night
+   * boundary the two bases can disagree (e.g. a 10% LOS discount can push a ₹8,000 listing's
+   * effective per-night below ₹7,500, flipping 18%→5%). Prefer the server's own computed
+   * gstPercent/gstAmount (fetched via fetchGuestGstBreakdown) whenever it has loaded for the
+   * current selection — single source of truth, matches what gets charged. Fall back to the
+   * client-derived slab only while that fetch is in flight or has failed (loading/offline UX),
+   * consistent with the widget's existing graceful-degradation pattern.
+   */
   const gstSlabPercent =
-    hasSelectedRange && perNightForDisplay > 0
-      ? accommodationGstSlabPercent(perNightForDisplay)
-      : null;
+    serverGstMatchesSelection && serverGstPercent != null
+      ? serverGstPercent
+      : hasSelectedRange && perNightForDisplay > 0
+        ? accommodationGstSlabPercent(perNightForDisplay)
+        : null;
 
   /**
    * GST component of room fare (ADDITIVE — CPO formula per 2026-05-21).
@@ -795,10 +857,14 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
    * it here (once) instead of re-deriving it from the discount already netted into the price.
    */
   const taxableBase = Math.max(0, breakdownPrice);
+  // TASK-4331: prefer the server's own computed GST amount (already rounded server-side on
+  // its own post-adjustment base) over recomputing from the (possibly divergent) taxableBase.
   const gstLineAmount =
-    gstSlabPercent != null && taxableBase > 0
-      ? accommodationGstLineAmount(taxableBase, perNightForDisplay)
-      : 0;
+    serverGstMatchesSelection && serverGstAmount != null
+      ? serverGstAmount
+      : gstSlabPercent != null && taxableBase > 0
+        ? accommodationGstLineAmount(taxableBase, perNightForDisplay)
+        : 0;
 
   // Razorpay charges its 3% fee on the FULL amount it processes (base + GST), not just base.
   // Sreekar canonical clarification 2026-05-21 (memory: project_guest_booking_pricing_formula).
