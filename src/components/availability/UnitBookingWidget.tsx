@@ -1026,6 +1026,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       const {
         holdId,
         holdExpiresAt,
+        prepToken,
         baseAmount: serverBaseAmount,
         convenienceFeeAmount: serverConvFee,
         finalAmount: serverFinalAmount,
@@ -1037,6 +1038,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       // Store hold state in context and navigate to details page
       updateBooking({
         holdId: Number(holdId),
+        // TASK-4354: keep the hold ownership token so the final-charge call can prove it owns the hold.
+        holdToken: typeof prepToken === 'string' ? prepToken : null,
         holdExpiresAt: typeof holdExpiresAt === 'string' ? holdExpiresAt : new Date(holdExpiresAt).toISOString(),
         holdPropertySlug: propertySlug ?? null,
         holdUnitSlug: unitSlug ?? null,
