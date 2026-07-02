@@ -219,9 +219,14 @@ export default function MyBookingsPage() {
               const statusLabel = inStay
                 ? `In progress · check out ${checkoutFormatted}`
                 : b.status;
+              // TASK-4360: funnel in-portal browsers of completed stays to the review page.
+              // Eligibility is derived client-side (Past tab = checkout passed, non-cancelled);
+              // ReviewSubmitPage's server check (`checkedOut`/`alreadyReviewed`) stays the source
+              // of truth, so an ineligible/already-reviewed click still lands on its own message.
+              const canReview = tab === "past" && b.status !== "Lead";
               return (
+                <div key={b.id} className="space-y-2">
                 <Link
-                  key={b.id}
                   to={`/booking/${b.id}?t=${encodeURIComponent(b.token)}`}
                   className="block rounded-xl border border-border-subtle bg-bg-surface px-4 py-4 hover:border-brand-primary/40 transition-colors"
                 >
@@ -248,6 +253,16 @@ export default function MyBookingsPage() {
                     </p>
                   )}
                 </Link>
+                {canReview && (
+                  <Link
+                    to={`/review/${b.id}?t=${encodeURIComponent(b.token)}`}
+                    data-testid="my-bookings-review-cta"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-brand-primary/40 px-3 py-2 text-sm font-semibold text-brand-primary hover:bg-brand-primary/5 transition-colors"
+                  >
+                    <span aria-hidden="true">★</span> Rate your stay
+                  </Link>
+                )}
+                </div>
               );
             })}
           </div>
