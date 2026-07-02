@@ -107,10 +107,13 @@ describe('UnitBookingWidget - TASK-2623: .bw-* design header, price labels, trus
     expect(content).toContain("charged yet");
   });
 
-  it('has "Free cancellation until 48 hours before check-in" trust strip', () => {
+  it('has a computed-deadline trust strip (TASK-4334 — no hardcoded "48 hours")', () => {
     content = readFileSync(filePath, 'utf-8');
     expect(content).toContain('bw-trust');
-    expect(content).toContain('Free cancellation until 48 hours before check-in');
+    expect(content).toContain('Free cancellation until ${cancellationDeadlineText}');
+    expect(content).toContain('Select check-in dates to see your free cancellation deadline');
+    // The old hardcoded claim must not reappear as a static string.
+    expect(content).not.toContain('Free cancellation until 48 hours before check-in');
   });
 
   it('passes holdListingName to updateBooking in handleReserve', () => {
