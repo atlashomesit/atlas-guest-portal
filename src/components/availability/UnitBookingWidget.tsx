@@ -14,6 +14,11 @@ import { buildApiUrl, getApiHeaders, getOrderRequestHeaders } from '@/api/client
 import { dedupedAvailabilityCalendarFetch } from '@/api/availabilityCalendarClient';
 import { getIstStartOfDay } from '@/utils/date';
 import { calculateNights, formatDateInTimezone } from '@/utils/dateHelpers';
+import {
+  type CancellationTier,
+  computeCancellationDeadline,
+  formatCancellationDeadline,
+} from '@/utils/cancellationPolicy';
 import { doesRangeIntersectBlocked, toISODate } from '@/utils/dateRange';
 import { formatCurrency } from '@/utils/formatting';
 import { HelpCircle } from 'lucide-react';
@@ -183,6 +188,8 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [formError, setFormError] = useState<string | null>(null);
   const [dateError, setDateError] = useState<string | null>(null);
   const [resolvedMinStay, setResolvedMinStay] = useState(1);
+  // TASK-4334: cancellation tier drives the trust-strip deadline computation below.
+  const [resolvedCancellationTier, setResolvedCancellationTier] = useState<CancellationTier | null>(null);
   const minAdvanceDays: number = 0;
 
   useEffect(() => {
@@ -200,8 +207,12 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
       .then((listings) => {
         const match = listings.find((l) => l.id === id);
         setResolvedMinStay(Math.max(1, match?.minStay ?? 1));
+        setResolvedCancellationTier(match?.cancellationTier ?? null);
       })
-      .catch(() => setResolvedMinStay(1));
+      .catch(() => {
+        setResolvedMinStay(1);
+        setResolvedCancellationTier(null);
+      });
     return () => ctrl.abort();
   }, [listingId, minStayNightsProp]);
 
@@ -802,6 +813,15 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     if (s < today.getTime()) return true;
     return false;
   }, [dateRange.startDate, dateRange.endDate, today]);
+
+  // TASK-4334: recompute the free-cancellation deadline whenever the guest's selected
+  // check-in date or the listing's resolved cancellation tier changes.
+  const cancellationDeadlineText = useMemo(() => {
+    if (!dateRange.startDate) return null;
+    const deadline = computeCancellationDeadline(dateRange.startDate, resolvedCancellationTier);
+    return formatCancellationDeadline(deadline);
+  }, [dateRange.startDate, resolvedCancellationTier]);
+
   const { loading: dailyPricingLoading, error: _dailyPricingError, getListingPricing } = useDailyPricingSummary();
   const dailyPricing = useMemo(
     () => (listingId != null && String(listingId).trim() !== '' ? getListingPricing(listingId) : null),
@@ -1472,12 +1492,17 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         </p>
       )}
 
-      {/* TASK-2623: Trust strip — free cancellation (v2 style) */}
+      {/* TASK-2623/TASK-4334: Trust strip — free cancellation, actual computed deadline
+          when a check-in date is selected; generic fallback copy otherwise. */}
       <div className="lv-booking-cancel bw-trust" data-testid="bw-trust-strip">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M20 6L9 17l-5-5"/>
         </svg>
-        <span>Free cancellation until 48 hours before check-in</span>
+        <span data-testid="bw-trust-strip-text">
+          {cancellationDeadlineText
+            ? `Free cancellation until ${cancellationDeadlineText}`
+            : 'Select check-in dates to see your free cancellation deadline'}
+        </span>
       </div>
 
       {/* Payment trust logos before Razorpay checkout */}
