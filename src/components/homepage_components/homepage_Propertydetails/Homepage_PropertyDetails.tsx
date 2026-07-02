@@ -1232,7 +1232,9 @@ useEffect(() => {
         const fromListingPolicy = policies.find((p) =>
             typeof p?.type === 'string' && p.type.toLowerCase().includes('cancellation'),
         )?.value;
-        return fromListingPolicy || inlinePolicySnippets?.cancellation || 'Standard cancellation policy applies.';
+        // TASK-4356: honest default when the host hasn't set an explicit tier or custom text —
+        // matches the server's 7-day free-cancellation default (CancellationPolicyWindow.cs).
+        return fromListingPolicy || inlinePolicySnippets?.cancellation || 'Full refund if cancelled 7+ days before check-in.';
     })();
 
     // TASK-1385: tier-specific plain-language text overrides generic policy copy when set

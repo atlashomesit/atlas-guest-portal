@@ -190,6 +190,8 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [resolvedMinStay, setResolvedMinStay] = useState(1);
   // TASK-4334: cancellation tier drives the trust-strip deadline computation below.
   const [resolvedCancellationTier, setResolvedCancellationTier] = useState<CancellationTier | null>(null);
+  // TASK-4356: server-computed window (hours), source of truth — overrides the local tier→hours map.
+  const [resolvedCancellationWindowHours, setResolvedCancellationWindowHours] = useState<number | null>(null);
   const minAdvanceDays: number = 0;
 
   useEffect(() => {
@@ -208,10 +210,12 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         const match = listings.find((l) => l.id === id);
         setResolvedMinStay(Math.max(1, match?.minStay ?? 1));
         setResolvedCancellationTier(match?.cancellationTier ?? null);
+        setResolvedCancellationWindowHours(match?.cancellationWindowHours ?? null);
       })
       .catch(() => {
         setResolvedMinStay(1);
         setResolvedCancellationTier(null);
+        setResolvedCancellationWindowHours(null);
       });
     return () => ctrl.abort();
   }, [listingId, minStayNightsProp]);
@@ -818,9 +822,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   // check-in date or the listing's resolved cancellation tier changes.
   const cancellationDeadlineText = useMemo(() => {
     if (!dateRange.startDate) return null;
-    const deadline = computeCancellationDeadline(dateRange.startDate, resolvedCancellationTier);
+    const deadline = computeCancellationDeadline(dateRange.startDate, resolvedCancellationTier, resolvedCancellationWindowHours);
     return formatCancellationDeadline(deadline);
-  }, [dateRange.startDate, resolvedCancellationTier]);
+  }, [dateRange.startDate, resolvedCancellationTier, resolvedCancellationWindowHours]);
 
   const { loading: dailyPricingLoading, error: _dailyPricingError, getListingPricing } = useDailyPricingSummary();
   const dailyPricing = useMemo(

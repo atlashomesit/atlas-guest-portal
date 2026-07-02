@@ -25,7 +25,15 @@ export const FREE_CANCELLATION_WINDOW_HOURS: Record<CancellationTier, number> = 
   Strict: 7 * 24,
 };
 
-/** Default tier used when a listing has no cancellationTier set (matches existing fallback copy). */
+/**
+ * TASK-4356 (founder decision, 2026-07-02): a listing with NO explicit cancellationTier gets a
+ * 7-day (168h) free-cancellation window by default — mirrors the server default in
+ * `Atlas.Api/Services/Bookings/CancellationPolicyWindow.cs`. Hosts change this per listing in
+ * AtlasPMS ("Cancellation policy" cards on the listing edit page).
+ */
+export const DEFAULT_FREE_CANCELLATION_WINDOW_HOURS = 168;
+
+/** @deprecated Only used by the local fallback map when no server-sourced tier/hours are available. */
 export const DEFAULT_CANCELLATION_TIER: CancellationTier = 'Flexible';
 
 function isCancellationTier(value: unknown): value is CancellationTier {
@@ -33,17 +41,27 @@ function isCancellationTier(value: unknown): value is CancellationTier {
 }
 
 /**
- * Computes the absolute free-cancellation deadline (as a JS Date) for a given check-in
- * date and listing cancellation tier. `checkInDate` should be the IST calendar date the
- * guest selected (time-of-day is ignored — check-in is treated as IST midnight, consistent
- * with `getIstStartOfDay` used elsewhere for date-range logic).
+ * Computes the absolute free-cancellation deadline (as a JS Date) for a given check-in date.
+ * `checkInDate` should be the IST calendar date the guest selected (time-of-day is ignored —
+ * check-in is treated as IST midnight, consistent with `getIstStartOfDay` used elsewhere).
+ *
+ * `windowHoursOverride` should be `PublicListing.cancellationWindowHours` (server-computed,
+ * always populated, defaults to 168 when the listing has no tier) — pass it whenever available so
+ * the guest-visible deadline can never drift from what the server actually stamps on the booking.
+ * When absent (e.g. an older cached listing payload), falls back to the local tier→hours map, and
+ * to `DEFAULT_FREE_CANCELLATION_WINDOW_HOURS` when the tier itself is unrecognized.
  */
 export function computeCancellationDeadline(
   checkInDate: Date,
   tier: CancellationTier | string | null | undefined,
+  windowHoursOverride?: number | null,
 ): Date {
-  const resolvedTier = isCancellationTier(tier) ? tier : DEFAULT_CANCELLATION_TIER;
-  const windowHours = FREE_CANCELLATION_WINDOW_HOURS[resolvedTier];
+  const windowHours =
+    typeof windowHoursOverride === 'number' && windowHoursOverride > 0
+      ? windowHoursOverride
+      : isCancellationTier(tier)
+        ? FREE_CANCELLATION_WINDOW_HOURS[tier]
+        : DEFAULT_FREE_CANCELLATION_WINDOW_HOURS;
   const checkInIst = DateTime.fromJSDate(checkInDate).setZone('Asia/Kolkata').startOf('day');
   return checkInIst.minus({ hours: windowHours }).toJSDate();
 }

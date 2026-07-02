@@ -26,12 +26,25 @@ describe('computeCancellationDeadline', () => {
     expect(deadline.toISOString()).toBe(new Date('2026-07-05T00:00:00+05:30').toISOString());
   });
 
-  it('defaults to Flexible (48h) when tier is null/undefined/unrecognized', () => {
+  it('defaults to 168h (7 days) when tier is null/undefined/unrecognized (TASK-4356 founder default)', () => {
     const checkIn = new Date('2026-07-12T00:00:00+05:30');
-    const expected = new Date('2026-07-10T00:00:00+05:30').toISOString();
+    const expected = new Date('2026-07-05T00:00:00+05:30').toISOString();
     expect(computeCancellationDeadline(checkIn, null).toISOString()).toBe(expected);
     expect(computeCancellationDeadline(checkIn, undefined).toISOString()).toBe(expected);
     expect(computeCancellationDeadline(checkIn, 'NonRefundable').toISOString()).toBe(expected);
+  });
+
+  it('prefers the server-sourced windowHoursOverride over the local tier map', () => {
+    const checkIn = new Date('2026-07-12T00:00:00+05:30');
+    // Server says 72h even though the local map would say Flexible=48h — override wins.
+    const deadline = computeCancellationDeadline(checkIn, 'Flexible', 72);
+    expect(deadline.toISOString()).toBe(new Date('2026-07-09T00:00:00+05:30').toISOString());
+  });
+
+  it('ignores a non-positive windowHoursOverride and falls back to the tier map', () => {
+    const checkIn = new Date('2026-07-12T00:00:00+05:30');
+    const deadline = computeCancellationDeadline(checkIn, 'Moderate', 0);
+    expect(deadline.toISOString()).toBe(new Date('2026-07-07T00:00:00+05:30').toISOString());
   });
 
   it('recomputes a different deadline when the check-in date changes', () => {
