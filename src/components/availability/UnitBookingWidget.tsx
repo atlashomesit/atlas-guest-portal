@@ -601,39 +601,36 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
 
   const disabledDay = useCallback((date: Date) => {
   const normalized = getIstStartOfDay(date);
-  
+
   // Disable past dates
   if (normalized.getTime() < today.getTime()) return true;
 
   const iso = toISODate(normalized);
-  
+
   // Get status from dateStatusMap (from GET API response)
   const status = dateStatusMap.get(iso);
-  
-  // Disable dates with "Blocked" or "Hold" status
-  // Exception: Allow check-out for blocked/hold date if it's right after startDate
-  if (status === 'Blocked' || status === 'Hold') {
-    if (dateRange.startDate) {
-      const nextDay = addDays(dateRange.startDate, 1);
-      if (normalized.getTime() === nextDay.getTime()) {
-        return false; // allow check-out on blocked/hold date if it's right after startDate
-      }
-    }
-    return true; // disable blocked and hold dates
+  const isBlockedOrHold = status === 'Blocked' || status === 'Hold' || blockedSet.has(iso);
+
+  if (!isBlockedOrHold) {
+    return false; // all other dates are selectable
   }
 
-  // Also check blockedSet for backward compatibility
-  if (blockedSet.has(iso)) {
-    if (dateRange.startDate) {
-      const nextDay = addDays(dateRange.startDate, 1);
-      if (normalized.getTime() === nextDay.getTime()) {
-        return false; // allow check-out
-      }
+  // TASK-4326: checkout is exclusive — a candidate date blocked by the NEXT booking (or a
+  // hold) is still a valid CHECKOUT as long as every NIGHT strictly between startDate and
+  // the candidate is free (doesRangeIntersectBlocked treats [checkIn, checkOut) correctly).
+  // The old rule only exempted candidate === startDate+1, so any back-to-back stay longer
+  // than 1 night (e.g. check-in D-2, blocked date D as checkout, nights D-2/D-1 free) was
+  // unbookable even though the validator in handleRangeChange already accepts it. Still
+  // disabled as a CHECK-IN date — this only exempts candidates that could be a checkout for
+  // the currently-selected startDate.
+  if (dateRange.startDate && normalized.getTime() > getIstStartOfDay(dateRange.startDate).getTime()) {
+    const startISO = toISODate(getIstStartOfDay(dateRange.startDate));
+    if (!doesRangeIntersectBlocked(startISO, iso, blockedSet)) {
+      return false; // valid checkout — nights in between are all free
     }
-    return true; // block dates in blockedSet
   }
 
-  return false; // all other dates are selectable
+  return true; // disable blocked/hold dates otherwise (including as a check-in candidate)
 }, [blockedSet, dateStatusMap, today, dateRange.startDate]);
 
 const handleRangeChange = (next: AtlasDateRangePickerValue) => {

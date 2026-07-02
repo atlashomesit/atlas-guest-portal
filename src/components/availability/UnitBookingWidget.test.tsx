@@ -249,3 +249,30 @@ describe('UnitBookingWidget - TASK-4331: GST slab sourced from server, not a pre
     );
   });
 });
+
+describe('UnitBookingWidget - TASK-4326: checkout-day off-by-one on back-to-back stays', () => {
+  const filePath = resolve(__dirname, './UnitBookingWidget.tsx');
+
+  it('disabledDay reuses doesRangeIntersectBlocked instead of only exempting startDate+1', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    // Old rule: `const nextDay = addDays(dateRange.startDate, 1); if (normalized.getTime() === nextDay.getTime())`
+    // — only ever exempted a 1-night stay. Must be gone from disabledDay.
+    const disabledDaySection = content.slice(
+      content.indexOf('const disabledDay = useCallback'),
+      content.indexOf('}, [blockedSet, dateStatusMap, today, dateRange.startDate]);'),
+    );
+    expect(disabledDaySection).toContain('doesRangeIntersectBlocked');
+    expect(disabledDaySection).not.toContain('const nextDay = addDays(dateRange.startDate, 1)');
+  });
+
+  it('still disables a blocked/hold date entirely when no startDate is selected (check-in gating unchanged)', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    const disabledDaySection = content.slice(
+      content.indexOf('const disabledDay = useCallback'),
+      content.indexOf('}, [blockedSet, dateStatusMap, today, dateRange.startDate]);'),
+    );
+    // The checkout exemption is gated behind `dateRange.startDate &&` — without a startDate
+    // selected, a blocked/hold candidate must fall through to `return true`.
+    expect(disabledDaySection).toContain('if (dateRange.startDate &&');
+  });
+});
