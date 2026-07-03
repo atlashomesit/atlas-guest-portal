@@ -267,6 +267,9 @@ const Home = () => {
                 // eslint-disable-next-line atlas-brand/no-atlas-string-leak -- Atlas marketplace Twitter handle; guarded by hideAtlasBranding (undefined on white-label tenants)
                 twitterSite={hideAtlasBranding ? undefined : "@atlashomestays"}
                 jsonLd={homepageJsonLd}
+                // TASK-4381/4386 / ADR-0068: internal (non-customer) tenants must never be indexed —
+                // the storefront/home route stays fully functional, only search indexing is suppressed.
+                robots={getTenantContext()?.isInternal ? "noindex, nofollow" : undefined}
             />
             <section className="relative font-roboto select-none">
                 <div className="w-full h-fit relative ">
