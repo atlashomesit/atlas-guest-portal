@@ -107,10 +107,13 @@ describe('UnitBookingWidget - TASK-2623: .bw-* design header, price labels, trus
     expect(content).toContain("charged yet");
   });
 
-  it('has "Free cancellation until 48 hours before check-in" trust strip', () => {
+  it('has a computed-deadline trust strip (TASK-4334 — no hardcoded "48 hours")', () => {
     content = readFileSync(filePath, 'utf-8');
     expect(content).toContain('bw-trust');
-    expect(content).toContain('Free cancellation until 48 hours before check-in');
+    expect(content).toContain('Free cancellation until ${cancellationDeadlineText}');
+    expect(content).toContain('Select check-in dates to see your free cancellation deadline');
+    // The old hardcoded claim must not reappear as a static string.
+    expect(content).not.toContain('Free cancellation until 48 hours before check-in');
   });
 
   it('passes holdListingName to updateBooking in handleReserve', () => {
@@ -154,6 +157,31 @@ describe('UnitBookingWidget - TASK-2630: URL date hydration and picker interacti
   });
 });
 
+describe('UnitBookingWidget - TASK-4285: past-dated check-in from URL params is rejected', () => {
+  const filePath = resolve(__dirname, './UnitBookingWidget.tsx');
+  let content: string;
+
+  it('URL-param hydration guards against a past-dated check-in with an explicit error', () => {
+    content = readFileSync(filePath, 'utf-8');
+    // The hydration effect must compare the incoming check-in against today and, when it is in
+    // the past, surface the guest-facing error instead of silently accepting the range.
+    expect(content).toContain('start.getTime() < today.getTime()');
+    expect(content).toContain('Check-in date must be today or in the future.');
+  });
+
+  it('invalidIstStayRange treats a past-dated check-in as invalid (disables Reserve + hides price)', () => {
+    content = readFileSync(filePath, 'utf-8');
+    // invalidIstStayRange is used both to disable the Reserve button and to hide the price
+    // breakdown, so flagging a past check-in there covers the whole AC2 surface.
+    expect(content).toContain('if (s < today.getTime()) return true;');
+  });
+
+  it('handleReserve refuses to create a hold for a past-dated check-in (defense-in-depth)', () => {
+    content = readFileSync(filePath, 'utf-8');
+    expect(content).toContain('checkinIst.getTime() < today.getTime()');
+  });
+});
+
 describe('UnitBookingWidget - TASK-2870: accommodation GST uses 18% slab above ₹7,500', () => {
   const filePath = resolve(__dirname, './UnitBookingWidget.tsx');
 
@@ -163,5 +191,151 @@ describe('UnitBookingWidget - TASK-2870: accommodation GST uses 18% slab above �
     expect(content).toContain('accommodationGstLineAmount');
     expect(content).not.toMatch(/<= 7500 \? 5 : 12/);
     expect(content).not.toContain('else 12%');
+  });
+});
+
+describe('UnitBookingWidget - TASK-4322: global discount applied exactly once, no fake LOS row', () => {
+  const filePath = resolve(__dirname, './UnitBookingWidget.tsx');
+
+  it('no longer subtracts a second "losApplied"/losDiscountAmount from the taxable base', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    // breakdownPrice (from selectedRangeTotalFromCalendar / effectiveDailyPricing.actualPrice)
+    // is already discount-net server-side — taxableBase must equal it directly, not
+    // breakdownPrice minus a second "losApplied" derived from the global discount.
+    expect(content).not.toContain('losApplied');
+    expect(content).not.toContain('losDiscountAmount');
+    expect(content).not.toContain('losDiscountPercent');
+    expect(content).toContain('const taxableBase = Math.max(0, breakdownPrice);');
+  });
+
+  it('no longer renders a "Long-stay discount" row (calendar DTO has no genuine LOS field)', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    // The removed JSX row rendered the literal label text as a span child — assert that
+    // specific rendered-text pattern is gone (code comments referencing the old row/task
+    // for context are fine and expected to remain).
+    expect(content).not.toMatch(/>\s*Long-stay discount/);
+    // Leaves a pointer back to TASK-571 for when real LOS data becomes available.
+    expect(content).toContain('TASK-571');
+  });
+
+  it('no longer imports/calls fetchPricingBreakdown (was only used to (mis)populate LOS state)', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    expect(content).not.toContain('fetchPricingBreakdown');
+  });
+});
+
+describe('UnitBookingWidget - TASK-4331: GST slab sourced from server, not a pre-adjustment client basis', () => {
+  const filePath = resolve(__dirname, './UnitBookingWidget.tsx');
+
+  it('fetches the server GST breakdown for the selected range', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    expect(content).toContain('fetchGuestGstBreakdown');
+    expect(content).toContain('serverGstPercent');
+    expect(content).toContain('serverGstAmount');
+  });
+
+  it('gstSlabPercent prefers the server value when it matches the current selection', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    // Must check serverGstMatchesSelection && serverGstPercent != null BEFORE falling back
+    // to the client-derived accommodationGstSlabPercent(perNightForDisplay).
+    expect(content).toMatch(
+      /const gstSlabPercent =\s*\n\s*serverGstMatchesSelection && serverGstPercent != null/,
+    );
+    // Client-derived slab must remain as the fallback path (loading/offline UX), not removed.
+    expect(content).toContain('accommodationGstSlabPercent(perNightForDisplay)');
+  });
+
+  it('gstLineAmount prefers the server-computed amount over recomputing from taxableBase', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    expect(content).toMatch(
+      /const gstLineAmount =\s*\n\s*serverGstMatchesSelection && serverGstAmount != null/,
+    );
+  });
+});
+
+describe('UnitBookingWidget - TASK-4326: checkout-day off-by-one on back-to-back stays', () => {
+  const filePath = resolve(__dirname, './UnitBookingWidget.tsx');
+
+  it('disabledDay reuses doesRangeIntersectBlocked instead of only exempting startDate+1', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    // Old rule: `const nextDay = addDays(dateRange.startDate, 1); if (normalized.getTime() === nextDay.getTime())`
+    // — only ever exempted a 1-night stay. Must be gone from disabledDay.
+    const disabledDaySection = content.slice(
+      content.indexOf('const disabledDay = useCallback'),
+      content.indexOf('}, [blockedSet, dateStatusMap, today, dateRange.startDate]);'),
+    );
+    expect(disabledDaySection).toContain('doesRangeIntersectBlocked');
+    expect(disabledDaySection).not.toContain('const nextDay = addDays(dateRange.startDate, 1)');
+  });
+
+  it('still disables a blocked/hold date entirely when no startDate is selected (check-in gating unchanged)', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    const disabledDaySection = content.slice(
+      content.indexOf('const disabledDay = useCallback'),
+      content.indexOf('}, [blockedSet, dateStatusMap, today, dateRange.startDate]);'),
+    );
+    // The checkout exemption is gated behind `dateRange.startDate &&` — without a startDate
+    // selected, a blocked/hold candidate must fall through to `return true`.
+    expect(disabledDaySection).toContain('if (dateRange.startDate &&');
+  });
+});
+
+describe('UnitBookingWidget - TASK-4327: calendar reopen must not silently re-price a far-out selected range', () => {
+  const filePath = resolve(__dirname, './UnitBookingWidget.tsx');
+
+  it('merges fetched calendar pricing months instead of replacing the map wholesale', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    // Old bug: a bare `setCalendarDailyPrices(result.dateToPrice)` replace wiped out any
+    // previously-fetched far-out months on every effect re-fire. Assert the live call sites
+    // merge via functional update; a code comment documenting the old bug may still mention
+    // the literal old call, so match the specific `.then((result) => {` call-site pattern
+    // rather than a bare substring check across the whole file.
+    expect(content).toContain('setCalendarDailyPrices((prev) => new Map([...prev, ...result.dateToPrice]))');
+    expect(content).not.toMatch(/\.then\(\(result\) => \{\s*\n\s*setCalendarDailyPrices\(result\.dateToPrice\)/);
+  });
+
+  it('does not clear calendarDailyPrices to an empty Map on a fetch failure', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    // Old bug: `.catch(() => { setCalendarDailyPrices(new Map()); ... })` blanked the whole
+    // map on any transient failure, including for months already successfully fetched.
+    expect(content).not.toContain('setCalendarDailyPrices(new Map())');
+  });
+
+  it('fetches the selected range\'s own month(s) when the calendar opens, independent of shownMonthIso', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    expect(content).toContain('selectedMonthIso === shownMonthIso');
+    expect(content).toMatch(/useEffect\(\(\) => \{\s*\n\s*if \(!openCalendar\) return;/);
+  });
+});
+
+describe('UnitBookingWidget - TASK-4293: Reserve button disabled when the selected check-in is unavailable', () => {
+  const filePath = resolve(__dirname, './UnitBookingWidget.tsx');
+
+  it('derives checkinUnavailable from the same Blocked/Hold/blockedSet check handleReserve uses', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    const memoSection = content.slice(
+      content.indexOf('const checkinUnavailable = useMemo('),
+      content.indexOf('}, [dateRange.startDate, dateStatusMap, blockedSet]);'),
+    );
+    expect(memoSection).toBeTruthy();
+    // Mirrors handleReserve's guard exactly so the button state can never disagree with the submit path.
+    expect(memoSection).toContain("checkinStatus === 'Blocked' || checkinStatus === 'Hold' || blockedSet.has(checkinISO)");
+    // Only needs a startDate — must NOT require endDate (blank dates stay clickable per TASK-4277).
+    expect(memoSection).toContain('if (!dateRange.startDate) return false;');
+  });
+
+  it('wires checkinUnavailable into the Reserve button disabled condition', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    const buttonSection = content.slice(
+      content.indexOf('data-testid="guest-booking-submit"') - 900,
+      content.indexOf('data-testid="guest-booking-submit"'),
+    );
+    expect(buttonSection).toContain('checkinUnavailable');
+  });
+
+  it('surfaces the unavailability reason proactively (disabled button cannot fire the click-time formError)', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    expect(content).toContain('data-testid="guest-booking-checkin-unavailable"');
+    expect(content).toContain('Check-in date is not available. Please select a different check-in date.');
   });
 });

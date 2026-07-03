@@ -332,10 +332,17 @@ const MonthGrid: React.FC<MonthProps> = ({
           const isDisabledByWidget = !isPast && disabledDay(date);
           const apiStatus = dateStatusMap.get(iso);
 
+          // TASK-4326: disabledDay is the single source of truth for click-ability —
+          // including its checkout exemption for a Blocked/Hold date whose preceding nights
+          // (from the selected start date) are all free (checkout is exclusive; the guest
+          // never occupies that night). Previously this branch OR'd in a raw
+          // `apiStatus === 'Blocked' || 'Hold'` check that re-disabled the exact dates
+          // disabledDay had just exempted, so the exemption never had any visible effect —
+          // the guest could never click a valid back-to-back checkout day.
           let state: CalendarDayState;
           if (isPast) {
             state = 'past';
-          } else if (isDisabledByWidget || apiStatus === 'Blocked' || apiStatus === 'Hold') {
+          } else if (isDisabledByWidget) {
             state = 'unavailable';
           } else if (apiStatus === 'Turnover') {
             state = 'turnover';

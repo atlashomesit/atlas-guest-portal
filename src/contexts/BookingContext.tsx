@@ -32,6 +32,11 @@ type BookingState = {
   // TASK-2612: Two-step booking flow — set at Reserve, read at GuestDetailsPage.
   /** BookingId of the PaymentPending hold created by init-hold mode. */
   holdId: number | null;
+  /**
+   * TASK-4354: ownership token for the hold — the `prepToken` returned by init-hold. Echoed back on
+   * the final-charge order call so the server can prove this client owns the hold. Session-only.
+   */
+  holdToken: string | null;
   /** Route slug of the property being booked — used to navigate back if hold expires. */
   holdPropertySlug: string | null;
   /** Route slug of the listing unit being booked. */
@@ -68,6 +73,7 @@ const defaultState: BookingState = {
   paymentHoldToken: null,
   holdExpiresAt: null,
   holdId: null,
+  holdToken: null,
   holdPropertySlug: null,
   holdUnitSlug: null,
   holdPriceBreakdown: null,
@@ -102,6 +108,7 @@ const loadState = (): BookingState => {
       paymentHoldToken: null,
       holdExpiresAt: null,
       holdId: null,
+      holdToken: null,
       holdPropertySlug: null,
       holdUnitSlug: null,
       holdPriceBreakdown: null,

@@ -133,6 +133,12 @@ export type PublicListing = {
   reviewCount?: number | null;
   /** TASK-1385: Cancellation policy tier — "Flexible", "Moderate", or "Strict". Null when host hasn't set one. */
   cancellationTier?: 'Flexible' | 'Moderate' | 'Strict' | null;
+  /**
+   * TASK-4356: free-cancellation window in hours before check-in, resolved server-side (defaults to
+   * 168 = 7 days when cancellationTier is null). Source of truth for the trust-strip deadline —
+   * prefer this over re-deriving hours from cancellationTier client-side.
+   */
+  cancellationWindowHours?: number;
   /** TASK-2552: amenity code strings (e.g. "AC", "Pool", "WiFi") returned by PublicListingDto. */
   amenityCodes?: string[];
   /**
@@ -220,6 +226,9 @@ function normalizePublicListing(payload: Record<string, unknown>): PublicListing
     cancellationTier: (payload.cancellationTier === 'Flexible' || payload.cancellationTier === 'Moderate' || payload.cancellationTier === 'Strict')
       ? payload.cancellationTier
       : null, // TASK-1385
+    cancellationWindowHours: typeof payload.cancellationWindowHours === 'number' && payload.cancellationWindowHours > 0
+      ? payload.cancellationWindowHours
+      : undefined, // TASK-4356
     // TASK-2552: wire amenityCodes from API so nomad/amenity filters and badges work
     amenityCodes: Array.isArray(payload.amenityCodes)
       ? payload.amenityCodes.filter((x): x is string => typeof x === 'string')

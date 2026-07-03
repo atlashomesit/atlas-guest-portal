@@ -14,12 +14,17 @@ import { buildApiUrl, getApiHeaders, getOrderRequestHeaders } from '@/api/client
 import { dedupedAvailabilityCalendarFetch } from '@/api/availabilityCalendarClient';
 import { getIstStartOfDay } from '@/utils/date';
 import { calculateNights, formatDateInTimezone } from '@/utils/dateHelpers';
+import {
+  type CancellationTier,
+  computeCancellationDeadline,
+  formatCancellationDeadline,
+} from '@/utils/cancellationPolicy';
 import { doesRangeIntersectBlocked, toISODate } from '@/utils/dateRange';
 import { formatCurrency } from '@/utils/formatting';
 import { HelpCircle } from 'lucide-react';
 import { calculateNightlyPrice, inferUnitType } from '@/utils/pricing';
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
-import { fetchCalendarPricing, fetchPricingBreakdown } from '@/api/pricingClient';
+import { fetchCalendarPricing, fetchGuestGstBreakdown } from '@/api/pricingClient';
 import { fetchPublicListings } from '@/api/listingClient';
 import { useListingPhotosFromApi } from '@/contexts/ListingPhotosContext';
 import OptimizedImage from '@/components/ui/OptimizedImage';
@@ -165,9 +170,10 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [calendarDailyPrices, setCalendarDailyPrices] = useState<Map<string, number>>(new Map());
   const [calendarConvenienceFeePercent, setCalendarConvenienceFeePercent] = useState<number | undefined>(undefined);
   const [calendarPricingLoading, setCalendarPricingLoading] = useState(false);
-  // TASK-571: long-stay (LOS) auto-discount shown in the price breakdown.
-  const [losDiscountAmount, setLosDiscountAmount] = useState<number>(0);
-  const [losDiscountPercent, setLosDiscountPercent] = useState<number>(0);
+  // TASK-4331: server-computed GST slab/amount (post-LOS/last-minute/min-floor basis),
+  // preferred over the client-derived slab below when available.
+  const [serverGstPercent, setServerGstPercent] = useState<number | null>(null);
+  const [serverGstAmount, setServerGstAmount] = useState<number | null>(null);
   const [guests, setGuests] = useState(2);
   const [guestsOpen, setGuestsOpen] = useState(false);
   const [_bookedDates, setBookedDates] = useState<Date[]>([]);
@@ -182,6 +188,10 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [formError, setFormError] = useState<string | null>(null);
   const [dateError, setDateError] = useState<string | null>(null);
   const [resolvedMinStay, setResolvedMinStay] = useState(1);
+  // TASK-4334: cancellation tier drives the trust-strip deadline computation below.
+  const [resolvedCancellationTier, setResolvedCancellationTier] = useState<CancellationTier | null>(null);
+  // TASK-4356: server-computed window (hours), source of truth — overrides the local tier→hours map.
+  const [resolvedCancellationWindowHours, setResolvedCancellationWindowHours] = useState<number | null>(null);
   const minAdvanceDays: number = 0;
 
   useEffect(() => {
@@ -199,8 +209,14 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
       .then((listings) => {
         const match = listings.find((l) => l.id === id);
         setResolvedMinStay(Math.max(1, match?.minStay ?? 1));
+        setResolvedCancellationTier(match?.cancellationTier ?? null);
+        setResolvedCancellationWindowHours(match?.cancellationWindowHours ?? null);
       })
-      .catch(() => setResolvedMinStay(1));
+      .catch(() => {
+        setResolvedMinStay(1);
+        setResolvedCancellationTier(null);
+        setResolvedCancellationWindowHours(null);
+      });
     return () => ctrl.abort();
   }, [listingId, minStayNightsProp]);
 
@@ -317,9 +333,19 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     const end = getIstStartOfDay(new Date(co));
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return;
     if (end.getTime() <= start.getTime()) return;
+    // TASK-4285: URL-param dates (?checkIn=&checkOut=) bypass the calendar's past-date guard.
+    // Reject a past-dated check-in — still hydrate the fields so the guest sees what was
+    // requested, but surface an explicit error and let `invalidIstStayRange` keep the Reserve
+    // button disabled + the price quote hidden (no wasted quote, no past-dated hold).
+    if (start.getTime() < today.getTime()) {
+      setDateRange({ startDate: start, endDate: end });
+      setDateError('Check-in date must be today or in the future.');
+      hasHydratedFromContextRef.current = true;
+      return;
+    }
     setDateRange({ startDate: start, endDate: end });
     hasHydratedFromContextRef.current = true;
-  }, [booking.checkIn, booking.checkOut]);
+  }, [booking.checkIn, booking.checkOut, today]);
 
   useEffect(() => {
     const g = booking.guests;
@@ -501,18 +527,28 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
 
   // Fetch per-day calendar pricing so price updates when user selects dates.
   // Fetch on mount and when calendar opens or month changes; do not clear when calendar closes.
+  //
+  // TASK-4327: MERGE fetched months into the existing map instead of replacing it wholesale.
+  // Calendar open resets `shownDate` to today (below), which re-fires this effect for
+  // months 0-2 from today. A prior `setCalendarDailyPrices(result.dateToPrice)` REPLACE
+  // wiped out any far-out months a guest had already selected/priced, so
+  // `selectedRangeTotalFromCalendar` fell back to today's rate for a range 4+ months out —
+  // silently changing the displayed total on nothing but a close/reopen. Each server
+  // response is authoritative for its OWN date range (30s cache per PricingController), so
+  // merging never leaves stale data for the months it actually returns.
   useEffect(() => {
     if (!listingId || String(listingId).trim() === '') return;
     const controller = new AbortController();
     setCalendarPricingLoading(true);
     fetchCalendarPricing(listingId, shownMonthIso, 3, controller.signal)
       .then((result) => {
-        setCalendarDailyPrices(result.dateToPrice);
+        setCalendarDailyPrices((prev) => new Map([...prev, ...result.dateToPrice]));
         setCalendarConvenienceFeePercent(result.convenienceFeePercent);
       })
       .catch(() => {
-        setCalendarDailyPrices(new Map());
-        setCalendarConvenienceFeePercent(undefined);
+        // Fetch failure: leave any already-merged prices in place rather than clearing the
+        // whole map (a transient failure for the current month shouldn't blank out prices
+        // already fetched for the selected range).
       })
       .finally(() => {
         setCalendarPricingLoading(false);
@@ -520,42 +556,76 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     return () => controller.abort();
   }, [listingId, shownMonthIso]);
 
-  const rangeStartIso = dateRange?.startDate ? toISODate(dateRange.startDate) : null;
-  const rangeEndIso = dateRange?.endDate ? toISODate(dateRange.endDate) : null;
+  // TASK-4327: when a range is selected, ensure ITS months are (re-)fetched on calendar
+  // open — not just the 3 months from `shownMonthIso` (which resets to today's month on
+  // every open, see the shownDate-reset effect above). Without this, a far-out selected
+  // range's prices could go stale (past the 30s server cache TTL) across a close/reopen
+  // with no refetch to correct them, since `shownMonthIso` may not itself change value if
+  // the calendar happened to already be showing today's month before this open.
+  useEffect(() => {
+    if (!openCalendar) return;
+    if (!listingId || String(listingId).trim() === '') return;
+    if (!dateRange.startDate) return;
+    const selectedMonthIso = toISODate(startOfMonth(dateRange.startDate));
+    if (selectedMonthIso === shownMonthIso) return; // already covered by the effect above
+    const controller = new AbortController();
+    fetchCalendarPricing(listingId, selectedMonthIso, 3, controller.signal)
+      .then((result) => {
+        setCalendarDailyPrices((prev) => new Map([...prev, ...result.dateToPrice]));
+      })
+      .catch(() => {
+        // Leave existing prices in place; selectedRangeTotalFromCalendar's own
+        // effectiveDailyPricing fallback covers a fully-failed fetch.
+      });
+    return () => controller.abort();
+  }, [openCalendar, listingId, dateRange.startDate, shownMonthIso]);
 
-  // TASK-571: Fetch long-stay (LOS) discount breakdown when guest selects a valid range.
+  // TASK-4322: previously fetched a "LOS discount" here via the calendar breakdown client and
+  // rendered it as a "Long-stay discount" row — but that value was actually the summed
+  // per-day tenant GLOBAL discount (CalendarPricingDayDto has no genuine LOS field), and
+  // it was being subtracted a SECOND time from `breakdownPrice` below, which is already
+  // discount-net (see fetchCalendarPricing's `actualPrice = base - discount`,
+  // src/api/pricingClient.ts). That double subtraction understated the displayed total
+  // vs. the server's charged amount. Removed entirely until TASK-571 wires a real
+  // per-day LOS field into the calendar pricing DTO — at which point this should fetch
+  // and render genuine LOS data instead of re-deriving it from the global discount.
+
+  const gstRangeStartIso = dateRange?.startDate ? toISODate(dateRange.startDate) : null;
+  const gstRangeEndIso = dateRange?.endDate ? toISODate(dateRange.endDate) : null;
+
+  // TASK-4331: fetch the server's own GST slab/amount for the selected range instead of
+  // re-deriving 5%/18% client-side from a pre-adjustment per-night rate. The calendar
+  // pricing endpoint (`fetchCalendarPricing`, used for `perNightForDisplay` below) only
+  // knows base/weekend/override rate minus the tenant global discount — it has no idea
+  // about LOS, last-minute, or min-price-floor adjustments. The server's charged GST
+  // (`PricingService.GetPublicBreakdownAsync`, same call `RazorpayPaymentService` uses to
+  // build the order) decides the slab from the per-night rate AFTER those adjustments.
+  // Near the ₹7,500 boundary the two bases can pick different slabs, so we fetch the
+  // server's real value here and prefer it; the client-derived slab below remains only as
+  // a fallback while this request is in flight or if it fails.
   useEffect(() => {
     if (!listingId || String(listingId).trim() === '') {
-      setLosDiscountAmount(0);
-      setLosDiscountPercent(0);
+      setServerGstPercent(null);
+      setServerGstAmount(null);
       return;
     }
-    if (!dateRange?.startDate || !dateRange?.endDate) {
-      setLosDiscountAmount(0);
-      setLosDiscountPercent(0);
+    if (!gstRangeStartIso || !gstRangeEndIso) {
+      setServerGstPercent(null);
+      setServerGstAmount(null);
       return;
     }
     const controller = new AbortController();
-    fetchPricingBreakdown(
-      {
-        listingId,
-        checkIn: rangeStartIso!,
-        checkOut: rangeEndIso!,
-      },
-      controller.signal,
-    )
+    fetchGuestGstBreakdown(listingId, gstRangeStartIso, gstRangeEndIso, controller.signal)
       .then((b) => {
-        const amt = Number(b.losDiscountAmount ?? b.LosDiscountAmount ?? 0);
-        const pct = Number(b.losDiscountPercent ?? b.LosDiscountPercent ?? 0);
-        setLosDiscountAmount(Number.isFinite(amt) && amt > 0 ? amt : 0);
-        setLosDiscountPercent(Number.isFinite(pct) && pct > 0 ? pct : 0);
+        setServerGstPercent(b.gstPercent);
+        setServerGstAmount(b.gstAmount);
       })
       .catch(() => {
-        setLosDiscountAmount(0);
-        setLosDiscountPercent(0);
+        setServerGstPercent(null);
+        setServerGstAmount(null);
       });
     return () => controller.abort();
-  }, [listingId, rangeStartIso, rangeEndIso, dateRange?.startDate, dateRange?.endDate]);
+  }, [listingId, gstRangeStartIso, gstRangeEndIso]);
 
   const isCheckInAllowed = (date: Date) => {
   const iso = toISODate(getIstStartOfDay(date));
@@ -580,39 +650,36 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
 
   const disabledDay = useCallback((date: Date) => {
   const normalized = getIstStartOfDay(date);
-  
+
   // Disable past dates
   if (normalized.getTime() < today.getTime()) return true;
 
   const iso = toISODate(normalized);
-  
+
   // Get status from dateStatusMap (from GET API response)
   const status = dateStatusMap.get(iso);
-  
-  // Disable dates with "Blocked" or "Hold" status
-  // Exception: Allow check-out for blocked/hold date if it's right after startDate
-  if (status === 'Blocked' || status === 'Hold') {
-    if (dateRange.startDate) {
-      const nextDay = addDays(dateRange.startDate, 1);
-      if (normalized.getTime() === nextDay.getTime()) {
-        return false; // allow check-out on blocked/hold date if it's right after startDate
-      }
-    }
-    return true; // disable blocked and hold dates
+  const isBlockedOrHold = status === 'Blocked' || status === 'Hold' || blockedSet.has(iso);
+
+  if (!isBlockedOrHold) {
+    return false; // all other dates are selectable
   }
 
-  // Also check blockedSet for backward compatibility
-  if (blockedSet.has(iso)) {
-    if (dateRange.startDate) {
-      const nextDay = addDays(dateRange.startDate, 1);
-      if (normalized.getTime() === nextDay.getTime()) {
-        return false; // allow check-out
-      }
+  // TASK-4326: checkout is exclusive — a candidate date blocked by the NEXT booking (or a
+  // hold) is still a valid CHECKOUT as long as every NIGHT strictly between startDate and
+  // the candidate is free (doesRangeIntersectBlocked treats [checkIn, checkOut) correctly).
+  // The old rule only exempted candidate === startDate+1, so any back-to-back stay longer
+  // than 1 night (e.g. check-in D-2, blocked date D as checkout, nights D-2/D-1 free) was
+  // unbookable even though the validator in handleRangeChange already accepts it. Still
+  // disabled as a CHECK-IN date — this only exempts candidates that could be a checkout for
+  // the currently-selected startDate.
+  if (dateRange.startDate && normalized.getTime() > getIstStartOfDay(dateRange.startDate).getTime()) {
+    const startISO = toISODate(getIstStartOfDay(dateRange.startDate));
+    if (!doesRangeIntersectBlocked(startISO, iso, blockedSet)) {
+      return false; // valid checkout — nights in between are all free
     }
-    return true; // block dates in blockedSet
   }
 
-  return false; // all other dates are selectable
+  return true; // disable blocked/hold dates otherwise (including as a check-in candidate)
 }, [blockedSet, dateStatusMap, today, dateRange.startDate]);
 
 const handleRangeChange = (next: AtlasDateRangePickerValue) => {
@@ -744,8 +811,34 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     if (!dateRange.startDate || !dateRange.endDate) return false;
     const s = getIstStartOfDay(dateRange.startDate).getTime();
     const e = getIstStartOfDay(dateRange.endDate).getTime();
-    return e <= s;
-  }, [dateRange.startDate, dateRange.endDate]);
+    if (e <= s) return true;
+    // TASK-4285: a past-dated check-in (e.g. via URL params) is never bookable — disable Reserve
+    // and suppress the price breakdown just as for an inverted range.
+    if (s < today.getTime()) return true;
+    return false;
+  }, [dateRange.startDate, dateRange.endDate, today]);
+
+  // TASK-4293: the selected check-in day is itself Blocked/Hold (turnover/cleaning window or an
+  // explicit block). handleReserve already refuses these (formError), but that only fires AFTER a
+  // click — mirror the same check reactively so the Reserve button can be disabled up front and the
+  // guest gets clear prevention instead of a confusing post-click failure. Only needs startDate
+  // (the check-in day itself is unavailable regardless of checkout); blank dates stay clickable
+  // (TASK-4277) because this is false without a startDate.
+  const checkinUnavailable = useMemo(() => {
+    if (!dateRange.startDate) return false;
+    const checkinISO = toISODate(getIstStartOfDay(dateRange.startDate));
+    const checkinStatus = dateStatusMap.get(checkinISO);
+    return checkinStatus === 'Blocked' || checkinStatus === 'Hold' || blockedSet.has(checkinISO);
+  }, [dateRange.startDate, dateStatusMap, blockedSet]);
+
+  // TASK-4334: recompute the free-cancellation deadline whenever the guest's selected
+  // check-in date or the listing's resolved cancellation tier changes.
+  const cancellationDeadlineText = useMemo(() => {
+    if (!dateRange.startDate) return null;
+    const deadline = computeCancellationDeadline(dateRange.startDate, resolvedCancellationTier, resolvedCancellationWindowHours);
+    return formatCancellationDeadline(deadline);
+  }, [dateRange.startDate, resolvedCancellationTier, resolvedCancellationWindowHours]);
+
   const { loading: dailyPricingLoading, error: _dailyPricingError, getListingPricing } = useDailyPricingSummary();
   const dailyPricing = useMemo(
     () => (listingId != null && String(listingId).trim() !== '' ? getListingPricing(listingId) : null),
@@ -793,25 +886,59 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         ? effectiveDailyPricing.actualPrice
         : 0;
 
-  /** TASK-2870: slab from average nightly room tariff for the selected stay. */
-  const gstSlabPercent =
-    hasSelectedRange && perNightForDisplay > 0
-      ? accommodationGstSlabPercent(perNightForDisplay)
-      : null;
+  // TASK-4331: does the in-flight/loaded server GST fetch match the CURRENTLY selected range?
+  // Guards against a stale serverGstPercent (from a prior selection) being applied to a new
+  // one for one render before the effect above re-fires.
+  const serverGstMatchesSelection =
+    hasSelectedRange && gstRangeStartIso === toISODate(dateRange.startDate!) && gstRangeEndIso === toISODate(dateRange.endDate!);
 
-  /** GST component of room fare (ADDITIVE — CPO formula per 2026-05-21). */
-  const losApplied = losDiscountAmount > 0 && priceDetails.nights >= 7 ? losDiscountAmount : 0;
-  const taxableBase = Math.max(0, breakdownPrice - losApplied);
+  /**
+   * TASK-4331: GST slab basis divergence fix. The client-derived slab below (from
+   * `perNightForDisplay`) uses the calendar endpoint's rate — base/weekend/override MINUS
+   * global discount only, with NO knowledge of LOS/last-minute/min-price-floor adjustments.
+   * The server (`PricingService.GetPublicBreakdownAsync`, PricingService.cs:137-145) decides
+   * the slab from the per-night rate AFTER those adjustments — the SAME computation
+   * `RazorpayPaymentService` uses to build the actual charged order. Near the ₹7,500/night
+   * boundary the two bases can disagree (e.g. a 10% LOS discount can push a ₹8,000 listing's
+   * effective per-night below ₹7,500, flipping 18%→5%). Prefer the server's own computed
+   * gstPercent/gstAmount (fetched via fetchGuestGstBreakdown) whenever it has loaded for the
+   * current selection — single source of truth, matches what gets charged. Fall back to the
+   * client-derived slab only while that fetch is in flight or has failed (loading/offline UX),
+   * consistent with the widget's existing graceful-degradation pattern.
+   */
+  const gstSlabPercent =
+    serverGstMatchesSelection && serverGstPercent != null
+      ? serverGstPercent
+      : hasSelectedRange && perNightForDisplay > 0
+        ? accommodationGstSlabPercent(perNightForDisplay)
+        : null;
+
+  /**
+   * GST component of room fare (ADDITIVE — CPO formula per 2026-05-21).
+   * TASK-4322: `breakdownPrice` (from selectedRangeTotalFromCalendar / effectiveDailyPricing.actualPrice)
+   * is ALREADY discount-net — the tenant global discount is netted in server-side per-day
+   * `actualPrice = base - discount` (src/api/pricingClient.ts). A second subtraction here
+   * (previously via a mislabeled "LOS discount") double-counted the same discount and
+   * understated the total vs. what the server actually charges. taxableBase == breakdownPrice.
+   * Real TASK-571 LOS discounts are not exposed by the calendar pricing DTO today, so there
+   * is nothing genuine left to subtract; when that DTO gains a real per-day LOS field, apply
+   * it here (once) instead of re-deriving it from the discount already netted into the price.
+   */
+  const taxableBase = Math.max(0, breakdownPrice);
+  // TASK-4331: prefer the server's own computed GST amount (already rounded server-side on
+  // its own post-adjustment base) over recomputing from the (possibly divergent) taxableBase.
   const gstLineAmount =
-    gstSlabPercent != null && taxableBase > 0
-      ? accommodationGstLineAmount(taxableBase, perNightForDisplay)
-      : 0;
+    serverGstMatchesSelection && serverGstAmount != null
+      ? serverGstAmount
+      : gstSlabPercent != null && taxableBase > 0
+        ? accommodationGstLineAmount(taxableBase, perNightForDisplay)
+        : 0;
 
   // Razorpay charges its 3% fee on the FULL amount it processes (base + GST), not just base.
   // Sreekar canonical clarification 2026-05-21 (memory: project_guest_booking_pricing_formula).
   const breakdownConvenienceFee = Math.round((taxableBase + gstLineAmount) * convenienceFeePercent);
 
-  // TASK-2631: Total = Base − LOS + GST + Service Fee (CPO-canonical formula).
+  // TASK-4322: Total = discount-net base + GST + Service Fee (canonical formula).
   const breakdownFinalTotal = Math.max(1, taxableBase + gstLineAmount + breakdownConvenienceFee);
 
   const finalTotal =
@@ -864,6 +991,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     const checkoutIst = getIstStartOfDay(dateRange.endDate);
     if (checkoutIst.getTime() <= checkinIst.getTime()) {
       setDateError('Check-out must be after check-in.');
+      return;
+    }
+    // TASK-4285: defense-in-depth — never create a hold for a past-dated check-in, even if the
+    // dates arrived via URL params and bypassed the calendar's disabled-day guard.
+    if (checkinIst.getTime() < today.getTime()) {
+      setDateError('Check-in date must be today or in the future.');
       return;
     }
     const stayNights = calculateNights(checkinIst, checkoutIst);
@@ -930,6 +1063,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       const {
         holdId,
         holdExpiresAt,
+        prepToken,
         baseAmount: serverBaseAmount,
         convenienceFeeAmount: serverConvFee,
         finalAmount: serverFinalAmount,
@@ -941,6 +1075,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       // Store hold state in context and navigate to details page
       updateBooking({
         holdId: Number(holdId),
+        // TASK-4354: keep the hold ownership token so the final-charge call can prove it owns the hold.
+        holdToken: typeof prepToken === 'string' ? prepToken : null,
         holdExpiresAt: typeof holdExpiresAt === 'string' ? holdExpiresAt : new Date(holdExpiresAt).toISOString(),
         holdPropertySlug: propertySlug ?? null,
         holdUnitSlug: unitSlug ?? null,
@@ -987,7 +1123,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       setIsSubmitting(false);
     }
   }, [
-    isSubmitting, isBookingDisabled, dateRange, dateStatusMap, blockedSet,
+    isSubmitting, isBookingDisabled, dateRange, dateStatusMap, blockedSet, today,
     listingId, guests, propertySlug, unitSlug, listingName, breakdownPrice, breakdownConvenienceFee,
     breakdownFinalTotal, finalTotal, updateBooking, navigate,
   ]);
@@ -1273,15 +1409,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
           {/* TASK-2631 final fix: phantom discount line — appliedDiscountPercent from globalDiscountPercent is not applied to finalTotal, so we hide it to prevent "vapor" discount display */}
 
-          {/* TASK-571: long-stay discount row — only render if nights >= 7 AND discount > 0 */}
-          {losDiscountAmount > 0 && priceDetails.nights >= 7 && (
-            <div className="lv-price-row">
-              <span style={{ color: '#157046' }}>
-                Long-stay discount{losDiscountPercent > 0 ? ` (−${Math.round(losDiscountPercent)}%)` : ''}
-              </span>
-              <span className="lv-num" style={{ color: '#157046' }}>−{displayPrice(losDiscountAmount)}</span>
-            </div>
-          )}
+          {/* TASK-4322: "Long-stay discount" row removed — it was rendering the tenant
+              GLOBAL discount (already netted into breakdownPrice above) mislabeled as a
+              TASK-571 LOS discount, and double-subtracting it from the total. The calendar
+              pricing DTO has no genuine per-day LOS field today; re-add this row only when
+              TASK-571 wires real LOS data through (see the fetchCalendarPricing / disabled
+              LOS-fetch-effect comments above). */}
 
           <div className="lv-price-row" data-testid="bw-bd-service-fee-row">
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
@@ -1341,6 +1474,14 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         </p>
       )}
 
+      {/* TASK-4293: the check-in day is Blocked/Hold — the Reserve button is disabled, so surface the
+          reason proactively (the click-time formError can no longer fire). */}
+      {checkinUnavailable && (
+        <p className="text-sm text-support-error" role="alert" data-testid="guest-booking-checkin-unavailable" style={{ marginTop: 4 }}>
+          Check-in date is not available. Please select a different check-in date.
+        </p>
+      )}
+
       {/* TASK-2612/2623: Reserve button — init-hold mode, navigates to GuestDetailsPage */}
       <Button
         type="submit"
@@ -1353,13 +1494,17 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           isSubmitting ||
           isLoading ||
           isBookingDisabled ||
-          (Boolean(dateRange.startDate) && Boolean(dateRange.endDate) && invalidIstStayRange)
+          (Boolean(dateRange.startDate) && Boolean(dateRange.endDate) && invalidIstStayRange) ||
+          // TASK-4293: check-in day itself is Blocked/Hold — disable up front, don't let the click
+          // reach a confusing API-level failure.
+          checkinUnavailable
         }
+        title={checkinUnavailable ? 'Check-in date is not available. Please select a different check-in date.' : undefined}
         className={`bw-reserve lv-booking-cta${isSubmitting || isLoading ? ' opacity-75' : ''}`}
         data-testid="guest-booking-submit"
         style={{ marginTop: 20, width: '100%', background: '#c2410c', color: '#fff', border: 0, borderRadius: 12, padding: '14px 24px', fontSize: 15, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer', transition: 'background .2s' }}
       >
-        {isBookingDisabled
+        {isBookingDisabled || checkinUnavailable
           ? 'Unavailable'
           : isSubmitting || isLoading
             ? 'Reserving…'
@@ -1379,12 +1524,17 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         </p>
       )}
 
-      {/* TASK-2623: Trust strip — free cancellation (v2 style) */}
+      {/* TASK-2623/TASK-4334: Trust strip — free cancellation, actual computed deadline
+          when a check-in date is selected; generic fallback copy otherwise. */}
       <div className="lv-booking-cancel bw-trust" data-testid="bw-trust-strip">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M20 6L9 17l-5-5"/>
         </svg>
-        <span>Free cancellation until 48 hours before check-in</span>
+        <span data-testid="bw-trust-strip-text">
+          {cancellationDeadlineText
+            ? `Free cancellation until ${cancellationDeadlineText}`
+            : 'Select check-in dates to see your free cancellation deadline'}
+        </span>
       </div>
 
       {/* Payment trust logos before Razorpay checkout */}
