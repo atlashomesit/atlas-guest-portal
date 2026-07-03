@@ -1,4 +1,6 @@
 /* TASK-2748: content-hash bump clears poisoned CORS cache keys on /assets/* after deploy. */
+@import "./styles/themes/index.css";
+@import "./styles/responsive.css";
 @import "tailwindcss";
 
 @theme {
@@ -38,9 +40,6 @@
   --radius-lg: var(--radius-lg);
   --radius-pill: var(--radius-pill);
 }
-
-@import "./styles/themes/index.css";
-@import "./styles/responsive.css";
 
 /* ============================================
    PREMIUM PLATINUM COLOR PALETTE
