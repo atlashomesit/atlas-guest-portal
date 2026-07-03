@@ -307,3 +307,35 @@ describe('UnitBookingWidget - TASK-4327: calendar reopen must not silently re-pr
     expect(content).toMatch(/useEffect\(\(\) => \{\s*\n\s*if \(!openCalendar\) return;/);
   });
 });
+
+describe('UnitBookingWidget - TASK-4293: Reserve button disabled when the selected check-in is unavailable', () => {
+  const filePath = resolve(__dirname, './UnitBookingWidget.tsx');
+
+  it('derives checkinUnavailable from the same Blocked/Hold/blockedSet check handleReserve uses', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    const memoSection = content.slice(
+      content.indexOf('const checkinUnavailable = useMemo('),
+      content.indexOf('}, [dateRange.startDate, dateStatusMap, blockedSet]);'),
+    );
+    expect(memoSection).toBeTruthy();
+    // Mirrors handleReserve's guard exactly so the button state can never disagree with the submit path.
+    expect(memoSection).toContain("checkinStatus === 'Blocked' || checkinStatus === 'Hold' || blockedSet.has(checkinISO)");
+    // Only needs a startDate — must NOT require endDate (blank dates stay clickable per TASK-4277).
+    expect(memoSection).toContain('if (!dateRange.startDate) return false;');
+  });
+
+  it('wires checkinUnavailable into the Reserve button disabled condition', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    const buttonSection = content.slice(
+      content.indexOf('data-testid="guest-booking-submit"') - 900,
+      content.indexOf('data-testid="guest-booking-submit"'),
+    );
+    expect(buttonSection).toContain('checkinUnavailable');
+  });
+
+  it('surfaces the unavailability reason proactively (disabled button cannot fire the click-time formError)', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    expect(content).toContain('data-testid="guest-booking-checkin-unavailable"');
+    expect(content).toContain('Check-in date is not available. Please select a different check-in date.');
+  });
+});
