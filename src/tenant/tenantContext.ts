@@ -71,6 +71,13 @@ export interface TenantInfo {
    * it in; consumers should pair each read with a brand-neutral fallback.
    */
   legalContactPack?: TenantLegalContactPack;
+  /**
+   * TASK-4381/4386 / ADR-0068: true when this tenant is an internal (non-customer) tenant —
+   * atlas-smoke, atlas-showcase, atlas-sandbox. Pages must render
+   * `<meta name="robots" content="noindex, nofollow">` (via `SEO.tsx`'s `robots` prop) while
+   * staying fully functional. Undefined/false = normal indexable tenant.
+   */
+  isInternal?: boolean;
 }
 
 /** RA-006 §3.5: legal/contact identity returned by /tenants/from-domain.LegalContactPack. */
@@ -99,6 +106,11 @@ let tenantInfo: TenantInfo | null = null;
 
 export function getTenantContext(): TenantInfo | null {
   return tenantInfo;
+}
+
+/** TASK-4386: site-wide robots directive for internal tenants (ADR-0068). */
+export function getInternalTenantRobots(): string | undefined {
+  return tenantInfo?.isInternal ? 'noindex, nofollow' : undefined;
 }
 
 /**
@@ -232,6 +244,8 @@ export async function resolveFromDomain(apiBaseUrl: string, domain: string): Pro
             isCustomDomain: Boolean(data.legalContactPack.isCustomDomain),
           }
         : undefined,
+      // TASK-4381/4386 / ADR-0068
+      isInternal: Boolean(data.isInternal),
     };
     return tenantInfo;
   } catch (error) {
@@ -291,6 +305,8 @@ export async function validateTenant(slug: string): Promise<TenantInfo> {
           landmarks: Array.isArray(data.locationContent.landmarks) ? data.locationContent.landmarks : undefined,
         }
       : undefined,
+    // TASK-4381/4386 / ADR-0068
+    isInternal: Boolean(data.isInternal),
   };
   return tenantInfo;
 }

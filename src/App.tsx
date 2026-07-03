@@ -15,6 +15,7 @@ import NativeShellBridge from "./native/NativeShellBridge"
 import { trackEvent } from "./utils/analytics"
 import { isAtlastaysMarketplaceSurface, isMarketplaceMode } from "./tenant/tenantResolver"
 import { CITY_LANDING_SLUGS } from "./content/cities/cityLandingSlugs"
+import InternalTenantRobotsMeta from "./components/InternalTenantRobotsMeta"
 
 const Home = React.lazy(() => import("./pages/home/Home"))
 const ContactUs = React.lazy(() => import("./pages/contactus/ContactUs"))
@@ -146,6 +147,7 @@ function AppWrapper() {
 
   return (
     <>
+      <InternalTenantRobotsMeta />
       <GuestNativeHooks />
       <a href="#main-content" className="skip-to-main">
         Skip to main content
