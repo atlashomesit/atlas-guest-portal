@@ -1325,7 +1325,9 @@ useEffect(() => {
     const ppIsDraft = publishStatus === 'Draft';
     // TASK-2888: allow-list — only Published (or legacy undefined) listings are bookable.
     const ppIsBookable = publishStatus == null || publishStatus === 'Published';
-    const ppSeoNoIndex = publishStatus != null && publishStatus !== 'Published';
+    // TASK-4381/4386 / ADR-0068: internal (non-customer) tenants must never be indexed, in
+    // addition to the existing Draft-listing noindex — the listing stays fully functional.
+    const ppSeoNoIndex = (publishStatus != null && publishStatus !== 'Published') || Boolean(ppTenantCtx?.isInternal);
     const ppHasMapCoordinates =
       typeof data.latitude === 'number' &&
       typeof data.longitude === 'number' &&
