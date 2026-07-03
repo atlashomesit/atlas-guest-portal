@@ -818,6 +818,19 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     return false;
   }, [dateRange.startDate, dateRange.endDate, today]);
 
+  // TASK-4293: the selected check-in day is itself Blocked/Hold (turnover/cleaning window or an
+  // explicit block). handleReserve already refuses these (formError), but that only fires AFTER a
+  // click — mirror the same check reactively so the Reserve button can be disabled up front and the
+  // guest gets clear prevention instead of a confusing post-click failure. Only needs startDate
+  // (the check-in day itself is unavailable regardless of checkout); blank dates stay clickable
+  // (TASK-4277) because this is false without a startDate.
+  const checkinUnavailable = useMemo(() => {
+    if (!dateRange.startDate) return false;
+    const checkinISO = toISODate(getIstStartOfDay(dateRange.startDate));
+    const checkinStatus = dateStatusMap.get(checkinISO);
+    return checkinStatus === 'Blocked' || checkinStatus === 'Hold' || blockedSet.has(checkinISO);
+  }, [dateRange.startDate, dateStatusMap, blockedSet]);
+
   // TASK-4334: recompute the free-cancellation deadline whenever the guest's selected
   // check-in date or the listing's resolved cancellation tier changes.
   const cancellationDeadlineText = useMemo(() => {
@@ -1461,6 +1474,14 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         </p>
       )}
 
+      {/* TASK-4293: the check-in day is Blocked/Hold — the Reserve button is disabled, so surface the
+          reason proactively (the click-time formError can no longer fire). */}
+      {checkinUnavailable && (
+        <p className="text-sm text-support-error" role="alert" data-testid="guest-booking-checkin-unavailable" style={{ marginTop: 4 }}>
+          Check-in date is not available. Please select a different check-in date.
+        </p>
+      )}
+
       {/* TASK-2612/2623: Reserve button — init-hold mode, navigates to GuestDetailsPage */}
       <Button
         type="submit"
@@ -1473,13 +1494,17 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           isSubmitting ||
           isLoading ||
           isBookingDisabled ||
-          (Boolean(dateRange.startDate) && Boolean(dateRange.endDate) && invalidIstStayRange)
+          (Boolean(dateRange.startDate) && Boolean(dateRange.endDate) && invalidIstStayRange) ||
+          // TASK-4293: check-in day itself is Blocked/Hold — disable up front, don't let the click
+          // reach a confusing API-level failure.
+          checkinUnavailable
         }
+        title={checkinUnavailable ? 'Check-in date is not available. Please select a different check-in date.' : undefined}
         className={`bw-reserve lv-booking-cta${isSubmitting || isLoading ? ' opacity-75' : ''}`}
         data-testid="guest-booking-submit"
         style={{ marginTop: 20, width: '100%', background: '#c2410c', color: '#fff', border: 0, borderRadius: 12, padding: '14px 24px', fontSize: 15, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer', transition: 'background .2s' }}
       >
-        {isBookingDisabled
+        {isBookingDisabled || checkinUnavailable
           ? 'Unavailable'
           : isSubmitting || isLoading
             ? 'Reserving…'
