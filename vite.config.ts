@@ -1,5 +1,6 @@
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import fs from "fs";
 
@@ -85,6 +86,7 @@ function devManifestJsonAliasPlugin() {
 
 export default defineConfig({
   plugins: [
+    tailwindcss(),
     react(),
     devRuntimeConfigPlugin(),
     devManifestJsonAliasPlugin(),

@@ -1,10 +1,46 @@
 /* TASK-2748: content-hash bump clears poisoned CORS cache keys on /assets/* after deploy. */
+@import "tailwindcss";
+
+@theme {
+  --color-bg-primary: var(--bg-primary);
+  --color-bg-surface: var(--bg-surface);
+  --color-bg-muted: var(--bg-muted);
+  --color-text-primary: var(--text-primary);
+  --color-text-muted: var(--text-muted);
+  --color-accent-primary: rgb(var(--accent-primary-rgb) / <alpha-value>);
+  --color-accent-soft: rgb(var(--accent-soft-rgb) / <alpha-value>);
+  --color-cta-primary: rgb(var(--cta-primary-rgb) / <alpha-value>);
+  --color-cta-primary-hover: rgb(var(--cta-primary-hover-rgb) / <alpha-value>);
+  --color-cta-secondary: rgb(var(--cta-secondary-rgb) / <alpha-value>);
+  --color-brand-primary: var(--brand-primary);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-strong: var(--border-strong);
+  --color-primary: rgb(var(--cta-primary-rgb) / <alpha-value>);
+  --color-success: var(--support-success);
+  --color-danger: var(--support-danger);
+
+  --font-roboto: "Roboto Slab", serif;
+  --font-sans: var(--font-family-base), "Plus Jakarta Sans", Inter, system-ui, sans-serif;
+
+  --shadow-level1: var(--shadow-level-1);
+  --shadow-level2: var(--shadow-level-2);
+
+  --spacing-1: var(--space-1);
+  --spacing-2: var(--space-2);
+  --spacing-3: var(--space-3);
+  --spacing-4: var(--space-4);
+  --spacing-5: var(--space-5);
+  --spacing-6: var(--space-6);
+  --spacing-8: var(--space-8);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-pill: var(--radius-pill);
+}
+
 @import "./styles/themes/index.css";
 @import "./styles/responsive.css";
-
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
 
 /* ============================================
    PREMIUM PLATINUM COLOR PALETTE
