@@ -18,6 +18,7 @@ import { getTenantBrandName } from "../../tenant/displayBrand";
 import { getTenantOverrides, shouldHideAtlasBranding } from "../../tenant/tenantOverrides";
 import { usePropertyListings } from "../../hooks/usePropertyListings";
 import { addRecentlyViewed } from "../../utils/guestHistory";
+import { filterGuestImageUrls } from "../../utils/guestImageUrl";
 import { track } from "../../lib/events";
 import SEO from "../../components/SEO";
 import { buildHomeDetailsLodgingJsonLd } from "./homeDetailsJsonLd";
@@ -199,7 +200,9 @@ const HomeDetails = () => {
       listingId: lid,
       path: room.href,
       name: room.title,
-      coverPhotoUrl: room.images?.[0],
+      // TASK-4289: persist only a guest-displayable image so the Recently-viewed strip never
+      // stores a blocked/non-canonical URL that would render blank.
+      coverPhotoUrl: filterGuestImageUrls(room.images)[0],
     });
   }, [room, roomNo]);
 
