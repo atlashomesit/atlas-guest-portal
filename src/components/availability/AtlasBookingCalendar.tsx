@@ -77,12 +77,14 @@ const MONTH_NAMES = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
-const DOW_MON = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+// TASK-4278: Sunday-first to match the availability calendar (AvailabilityCalendar, Su-first)
+// shown on the same listing page — a single week-start standard (Sunday, common in India)
+// avoids guests reading the same date under a different column across the two calendars.
+const DOW_SUN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-/** Monday-first grid offset (0=Mon … 6=Sun) */
+/** Sunday-first grid offset (0=Sun … 6=Sat) */
 function startOfMonthOffset(year: number, month: number): number {
-  const first = new Date(year, month, 1).getDay(); // 0=Sun…6=Sat
-  return (first + 6) % 7;
+  return new Date(year, month, 1).getDay(); // 0=Sun…6=Sat
 }
 
 function daysInMonth(year: number, month: number): number {
@@ -157,7 +159,7 @@ interface DayCellProps {
   hover: Date | null;
   onPick: (date: Date) => void;
   setHover: (date: Date | null) => void;
-  dowIndex: number; // 0=Mon…6=Sun in the week row
+  dowIndex: number; // grid column index, 0=first column (Sun) … 6=last column (Sat)
 }
 
 const DayCell: React.FC<DayCellProps> = ({
@@ -316,7 +318,7 @@ const MonthGrid: React.FC<MonthProps> = ({
         <span className="bc-month-year">{year}</span>
       </div>
       <div className="bc-dow-row">
-        {DOW_MON.map((d) => (
+        {DOW_SUN.map((d) => (
           <div key={d} className="bc-dow">{d}</div>
         ))}
       </div>
