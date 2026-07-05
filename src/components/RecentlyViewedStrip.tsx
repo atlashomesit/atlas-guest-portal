@@ -5,6 +5,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { getRecentlyViewed, removeRecentlyViewed, type GuestListingHistoryItem } from "../utils/guestHistory";
+import { sanitizeGuestImageUrl } from "../utils/guestImageUrl";
 import OptimizedImage from "./ui/OptimizedImage";
 
 const DISPLAY_CAP = 8;
@@ -44,7 +45,11 @@ export default function RecentlyViewedStrip() {
         className="flex gap-3 overflow-x-auto pb-1 [scrollbar-width:thin] snap-x snap-mandatory sm:grid sm:grid-cols-4 sm:overflow-visible"
         role="list"
       >
-        {items.map((it) => (
+        {items.map((it) => {
+          // TASK-4289: drop blocked/non-canonical URLs (incl. entries stored before this fix) so a
+          // bad src never renders a broken image — fall back to the styled placeholder instead.
+          const cover = sanitizeGuestImageUrl(it.coverPhotoUrl);
+          return (
           <div
             key={`${it.listingId}-${it.viewedAtUtc}`}
             role="listitem"
@@ -55,9 +60,9 @@ export default function RecentlyViewedStrip() {
               className="flex flex-col overflow-hidden rounded-xl border border-border-subtle bg-bg-muted transition hover:border-cta-primary"
             >
               <div className="aspect-[4/3] w-full bg-bg-muted flex items-center justify-center">
-                {it.coverPhotoUrl ? (
+                {cover ? (
                   <OptimizedImage
-                    src={it.coverPhotoUrl}
+                    src={cover}
                     alt={it.name ?? `Listing ${it.listingId}`}
                     className="h-full w-full object-cover"
                     wrapperClassName="h-full"
@@ -86,7 +91,8 @@ export default function RecentlyViewedStrip() {
               ×
             </button>
           </div>
-        ))}
+          );
+        })}
       </div>
     </section>
   );

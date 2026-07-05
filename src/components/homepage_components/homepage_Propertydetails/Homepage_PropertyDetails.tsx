@@ -983,7 +983,10 @@ useEffect(() => {
           listingId: lid,
           path,
           name: getListingDisplayName(lid, data.property_name),
-          coverPhotoUrl: Array.isArray(data.property_img) ? data.property_img[0] : undefined,
+          // TASK-4289: store the first *guest-displayable* image (same filter the gallery uses),
+          // not the raw property_img[0] — a blocked/non-canonical blob URL would persist and render
+          // blank in the Recently-viewed strip on /search.
+          coverPhotoUrl: filterGuestImageUrls(data.property_img ?? [])[0],
           location: data.property_location,
           pricePerNight:
               typeof data.property_price === "number" && data.property_price > 0
