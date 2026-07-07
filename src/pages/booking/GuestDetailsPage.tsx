@@ -37,6 +37,7 @@ import { track } from '@/lib/events';
 import { mapRazorpayFailureCode } from '@/utils/razorpayGuestErrors';
 import { formatDisplayNumber, getContactEmail, getTelLink, getWhatsAppLink } from '@/config/contact';
 import { accommodationGstLineAmount, accommodationGstSlabPercent } from '@/utils/guestPriceEstimate';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -282,6 +283,12 @@ const GuestDetailsPage: React.FC = () => {
     holdExpiresAt ? remainingPct(holdExpiresAt) : 0,
   );
   const [holdExpired, setHoldExpired] = useState(false);
+
+  // TASK-4439: focus management for the blocking hold dialogs (WCAG 2.4.3 / 2.1.2)
+  const noHoldDialogRef = useFocusTrap<HTMLDivElement>(
+    holdHydrationDone && (!holdId || !holdExpiresAt),
+  );
+  const expiredDialogRef = useFocusTrap<HTMLDivElement>(holdExpired);
 
   useEffect(() => {
     if (!holdExpiresAt) return;
@@ -1010,7 +1017,7 @@ const GuestDetailsPage: React.FC = () => {
   if (!holdId || !holdExpiresAt) {
     return (
       <div className="gd-page">
-        <div className="gd-modal-shade" role="dialog" aria-modal="true" aria-labelledby="gd-nohold-title">
+        <div ref={noHoldDialogRef} className="gd-modal-shade" role="dialog" aria-modal="true" aria-labelledby="gd-nohold-title">
           <div className="gd-modal">
             <div className="gd-modal-icon"><IconClock size={22} /></div>
             <h3 id="gd-nohold-title">Let's pick your dates again</h3>
@@ -1085,7 +1092,7 @@ const GuestDetailsPage: React.FC = () => {
 
       {/* ── Hold expired modal ── */}
       {holdExpired && (
-        <div className="gd-modal-shade" role="dialog" aria-modal="true" aria-labelledby="gd-expired-title">
+        <div ref={expiredDialogRef} className="gd-modal-shade" role="dialog" aria-modal="true" aria-labelledby="gd-expired-title">
           <div className="gd-modal">
             <div className="gd-modal-icon"><IconClock size={22}/></div>
             <h3 id="gd-expired-title">Your hold just expired.</h3>

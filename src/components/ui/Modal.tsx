@@ -1,4 +1,5 @@
 import React, { useEffect } from "react";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
 import "./ui.css";
 
 interface ModalProps {
@@ -18,6 +19,9 @@ export const Modal: React.FC<ModalProps> = ({
   actions,
   fullscreen = false,
 }) => {
+  // TASK-4439: focus trap + focus return (WCAG 2.4.3 / 2.1.2)
+  const dialogRef = useFocusTrap<HTMLDivElement>(isOpen);
+
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
@@ -37,6 +41,7 @@ export const Modal: React.FC<ModalProps> = ({
   return (
     <div className="rb-modal__overlay" onClick={onClose} role="presentation">
       <div
+        ref={dialogRef}
         className={`rb-modal ${fullscreen ? "rb-modal--fullscreen" : ""}`}
         onClick={(e) => e.stopPropagation()}
         role="dialog"

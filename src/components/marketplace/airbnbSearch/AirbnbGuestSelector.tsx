@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Minus, Plus } from 'lucide-react';
 import type { GuestCounts } from '@/components/ui/GuestTypeSelector';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 type RowProps = {
   label: string;
@@ -67,13 +68,25 @@ export function AirbnbGuestSelector({
   const totalOccupancy = value.adults + value.children;
   const isAtCapacity = totalOccupancy >= maxCapacity;
 
+  // TASK-4439: focus trap + focus return (WCAG 2.4.3 / 2.1.2)
+  const dialogRef = useFocusTrap<HTMLDivElement>(isOpen);
+
   useEffect(() => {
     if (!isOpen) return;
     const onDoc = (e: MouseEvent) => {
       if (rootRef.current && !rootRef.current.contains(e.target as Node)) onClose();
     };
+    // TASK-4439: Escape must close — with the focus trap active, click-outside
+    // alone would leave keyboard users with no way to dismiss the popover.
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
     document.addEventListener('mousedown', onDoc);
-    return () => document.removeEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onKey);
+    };
   }, [isOpen, onClose]);
 
   return (
@@ -90,6 +103,7 @@ export function AirbnbGuestSelector({
       </button>
       {isOpen && (
         <div
+          ref={dialogRef}
           role="dialog"
           aria-label="Guest selector"
           className="absolute left-0 top-full z-50 mt-2 min-w-[300px] rounded-2xl border border-border bg-bg-surface p-4 shadow-lg"
