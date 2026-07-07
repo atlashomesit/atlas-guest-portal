@@ -1148,44 +1148,50 @@ const GuestDetailsPage: React.FC = () => {
               </div>
 
               <div className="gd-field">
-                <div className="gd-field-label">
-                  <span>Full name <span style={{ color: 'var(--gd-coral)', marginLeft: 4 }}>*</span></span>
-                </div>
+                <label className="gd-field-label" htmlFor="gd-name">
+                  <span>Full name <span aria-hidden="true" style={{ color: 'var(--gd-coral)', marginLeft: 4 }}>*</span></span>
+                </label>
                 <input
                   id="gd-name"
                   type="text"
                   autoComplete="name"
+                  aria-required="true"
+                  aria-invalid={formErrors.name ? true : undefined}
+                  aria-describedby={formErrors.name ? 'gd-name-error' : undefined}
                   className={`gd-input${formErrors.name ? ' gd-input--error' : ''}`}
                   placeholder="As on a government ID"
                   value={formData.name}
                   onChange={(e) => setFormData((p) => ({ ...p, name: e.target.value }))}
                   data-testid="guest-booking-name"
                 />
-                {formErrors.name && <div className="gd-input-help error" role="alert">{formErrors.name}</div>}
+                {formErrors.name && <div id="gd-name-error" className="gd-input-help error" role="alert">{formErrors.name}</div>}
               </div>
 
               <div className="gd-field">
-                <div className="gd-field-label">
-                  <span>Email <span style={{ color: 'var(--gd-coral)', marginLeft: 4 }}>*</span></span>
-                </div>
+                <label className="gd-field-label" htmlFor="gd-email">
+                  <span>Email <span aria-hidden="true" style={{ color: 'var(--gd-coral)', marginLeft: 4 }}>*</span></span>
+                </label>
                 <input
                   id="gd-email"
                   type="email"
                   autoComplete="email"
+                  aria-required="true"
+                  aria-invalid={formErrors.email ? true : undefined}
+                  aria-describedby={formErrors.email ? 'gd-email-help gd-email-error' : 'gd-email-help'}
                   className={`gd-input${formErrors.email ? ' gd-input--error' : ''}`}
                   placeholder="you@example.com"
                   value={formData.email}
                   onChange={(e) => setFormData((p) => ({ ...p, email: e.target.value }))}
                   data-testid="guest-booking-email"
                 />
-                <div className="gd-input-help">Booking confirmation goes here</div>
-                {formErrors.email && <div className="gd-input-help error" role="alert">{formErrors.email}</div>}
+                <div id="gd-email-help" className="gd-input-help">Booking confirmation goes here</div>
+                {formErrors.email && <div id="gd-email-error" className="gd-input-help error" role="alert">{formErrors.email}</div>}
               </div>
 
               <div className="gd-field">
-                <div className="gd-field-label">
-                  <span>Phone <span style={{ color: 'var(--gd-coral)', marginLeft: 4 }}>*</span></span>
-                </div>
+                <label className="gd-field-label" htmlFor="gd-phone">
+                  <span>Phone <span aria-hidden="true" style={{ color: 'var(--gd-coral)', marginLeft: 4 }}>*</span></span>
+                </label>
                 <div className={`gd-row${formErrors.phone ? ' gd-input--error-wrap' : ''}`}>
                   <div className="gd-dial">
                     <select
@@ -1208,6 +1214,9 @@ const GuestDetailsPage: React.FC = () => {
                     type="tel"
                     inputMode="numeric"
                     autoComplete="tel-national"
+                    aria-required="true"
+                    aria-invalid={formErrors.phone ? true : undefined}
+                    aria-describedby={formErrors.phone ? 'gd-phone-help gd-phone-error' : 'gd-phone-help'}
                     className="gd-input"
                     placeholder={getGuestDialOption(phoneDialCode).placeholder}
                     maxLength={getGuestDialOption(phoneDialCode).maxDigits}
@@ -1222,8 +1231,8 @@ const GuestDetailsPage: React.FC = () => {
                     data-testid="guest-booking-phone"
                   />
                 </div>
-                <div className="gd-input-help">We'll WhatsApp you check-in details</div>
-                {formErrors.phone && <div className="gd-input-help error" role="alert">{formErrors.phone}</div>}
+                <div id="gd-phone-help" className="gd-input-help">We'll WhatsApp you check-in details</div>
+                {formErrors.phone && <div id="gd-phone-error" className="gd-input-help error" role="alert">{formErrors.phone}</div>}
               </div>
 
               <div className="gd-field">
@@ -1279,7 +1288,11 @@ const GuestDetailsPage: React.FC = () => {
                   <div id="gd-promo-panel" className="gd-disclosure-panel gd-disclosure-panel-pad-top" data-testid="gd-promo-panel">
                     <div className="gd-inline-input">
                       <input
+                        id="gd-promo-input"
                         type="text"
+                        aria-label="Promo code"
+                        aria-describedby={!promoValidating && promoMessage ? 'gd-promo-message' : undefined}
+                        aria-invalid={!promoValidating && promoMessage && !appliedPromoCode ? true : undefined}
                         placeholder="Enter code"
                         value={promoCode}
                         onChange={(e) => {
@@ -1297,7 +1310,7 @@ const GuestDetailsPage: React.FC = () => {
                     </div>
                     {promoValidating && <div className="gd-input-help">Validating…</div>}
                     {!promoValidating && promoMessage && (
-                      <div className={`gd-input-help${appliedPromoCode ? ' success' : ' error'}`}>
+                      <div id="gd-promo-message" className={`gd-input-help${appliedPromoCode ? ' success' : ' error'}`} role={appliedPromoCode ? undefined : 'alert'}>
                         {promoMessage}
                       </div>
                     )}
@@ -1331,7 +1344,11 @@ const GuestDetailsPage: React.FC = () => {
                   <div id="gd-referral-panel" className="gd-disclosure-panel gd-disclosure-panel-pad-top" data-testid="gd-referral-panel">
                     <div className="gd-inline-input">
                       <input
+                        id="gd-referral-input"
                         type="text"
+                        aria-label="Referral code"
+                        aria-describedby={!referralValidating && referralMessage ? 'gd-referral-message' : undefined}
+                        aria-invalid={!referralValidating && referralMessage && !appliedReferralCode ? true : undefined}
                         placeholder="Enter referral code"
                         value={referralCode}
                         onChange={(e) => {
@@ -1351,7 +1368,7 @@ const GuestDetailsPage: React.FC = () => {
                     </div>
                     {referralValidating && <div className="gd-input-help">Validating…</div>}
                     {!referralValidating && referralMessage && (
-                      <div className={`gd-input-help${appliedReferralCode ? '' : ' error'}`}>
+                      <div id="gd-referral-message" className={`gd-input-help${appliedReferralCode ? '' : ' error'}`} role={appliedReferralCode ? undefined : 'alert'}>
                         {referralMessage}
                       </div>
                     )}

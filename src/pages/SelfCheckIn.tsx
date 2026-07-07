@@ -188,21 +188,29 @@ export default function SelfCheckIn() {
             <p className="text-text-secondary text-sm mb-6">Enter your booking details to access check-in instructions.</p>
 
             {error && (
-              <p className="rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 mb-4">{error}</p>
+              <p id="checkin-auth-error" role="alert" className="rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 mb-4">{error}</p>
             )}
 
-            <label className="block text-sm font-medium text-text-primary mb-1">Booking reference</label>
+            <label htmlFor="checkin-booking-ref" className="block text-sm font-medium text-text-primary mb-1">Booking reference</label>
             <input
+              id="checkin-booking-ref"
               type="text"
+              aria-required="true"
+              aria-invalid={error ? true : undefined}
+              aria-describedby={error ? "checkin-auth-error" : undefined}
               className="w-full rounded-lg border border-border-subtle px-4 py-2.5 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-brand-primary"
               placeholder="e.g. ATL2026-001234"
               value={bookingRef}
               onChange={e => setBookingRef(e.target.value)}
             />
 
-            <label className="block text-sm font-medium text-text-primary mb-1">Last name</label>
+            <label htmlFor="checkin-last-name" className="block text-sm font-medium text-text-primary mb-1">Last name</label>
             <input
+              id="checkin-last-name"
               type="text"
+              aria-required="true"
+              aria-invalid={error ? true : undefined}
+              aria-describedby={error ? "checkin-auth-error" : undefined}
               className="w-full rounded-lg border border-border-subtle px-4 py-2.5 text-sm mb-6 focus:outline-none focus:ring-2 focus:ring-brand-primary"
               placeholder="As per your booking"
               value={lastName}
@@ -262,8 +270,9 @@ export default function SelfCheckIn() {
               <span className="block mt-1 text-text-muted">(Optional — you can skip this step)</span>
             </p>
 
-            <label className="block text-sm font-medium text-text-primary mb-1">ID type</label>
+            <label htmlFor="checkin-id-type" className="block text-sm font-medium text-text-primary mb-1">ID type</label>
             <select
+              id="checkin-id-type"
               className="w-full rounded-lg border border-border-subtle px-4 py-2.5 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-brand-primary bg-white"
               value={govtIdType}
               onChange={e => setGovtIdType(e.target.value)}
@@ -275,8 +284,9 @@ export default function SelfCheckIn() {
               <option value="DrivingLicence">Driving Licence</option>
             </select>
 
-            <label className="block text-sm font-medium text-text-primary mb-1">ID number</label>
+            <label htmlFor="checkin-id-number" className="block text-sm font-medium text-text-primary mb-1">ID number</label>
             <input
+              id="checkin-id-number"
               type="text"
               className="w-full rounded-lg border border-border-subtle px-4 py-2.5 text-sm mb-5 focus:outline-none focus:ring-2 focus:ring-brand-primary"
               placeholder="Enter your ID number"
@@ -285,19 +295,21 @@ export default function SelfCheckIn() {
             />
 
             {/* TASK-4009: ID document file upload */}
-            <label className="block text-sm font-medium text-text-primary mb-2">ID photo (optional)</label>
-            <p className="text-xs text-text-muted mb-3">JPG, PNG, or PDF — max 10 MB</p>
+            <label htmlFor="checkin-id-photo" className="block text-sm font-medium text-text-primary mb-2">ID photo (optional)</label>
+            <p id="checkin-id-photo-help" className="text-xs text-text-muted mb-3">JPG, PNG, or PDF — max 10 MB</p>
 
             <div className="rounded-lg border-2 border-dashed border-border-subtle p-4 mb-4 text-center cursor-pointer hover:border-brand-primary transition"
               onClick={() => fileInputRef.current?.click()}
             >
               <input
                 ref={fileInputRef}
+                id="checkin-id-photo"
                 type="file"
                 accept="image/*,.pdf"
                 onChange={handleFileSelect}
                 className="hidden"
-                aria-label="Upload government ID"
+                aria-label="ID photo (optional)"
+                aria-describedby={error ? "checkin-id-photo-help checkin-id-error" : "checkin-id-photo-help"}
               />
               {idFilePreview ? (
                 <div className="space-y-2">
@@ -315,7 +327,7 @@ export default function SelfCheckIn() {
             </div>
 
             {error && (
-              <p className="rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 mb-4">{error}</p>
+              <p id="checkin-id-error" role="alert" className="rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 mb-4">{error}</p>
             )}
 
             <div className="flex gap-3">
