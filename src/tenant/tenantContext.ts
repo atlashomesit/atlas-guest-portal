@@ -104,6 +104,11 @@ export interface TenantLegalContactPack {
 
 let tenantInfo: TenantInfo | null = null;
 
+/** Test-only: clear resolved tenant info (module state outlives test files under isolate:false). */
+export function _resetTenantContextForTests(): void {
+  tenantInfo = null;
+}
+
 export function getTenantContext(): TenantInfo | null {
   return tenantInfo;
 }

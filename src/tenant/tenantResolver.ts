@@ -16,6 +16,12 @@ export function setMarketplaceMode(enabled: boolean): void {
   _marketplaceMode = enabled;
 }
 
+/** Test-only: clear boot-time resolution state (module state outlives test files under isolate:false). */
+export function _resetTenantResolutionForTests(): void {
+  _domainResolvedSlug = null;
+  _marketplaceMode = false;
+}
+
 export function isMarketplaceMode(): boolean {
   return _marketplaceMode;
 }
