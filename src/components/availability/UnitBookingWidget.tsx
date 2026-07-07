@@ -170,6 +170,9 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [calendarDailyPrices, setCalendarDailyPrices] = useState<Map<string, number>>(new Map());
   const [calendarConvenienceFeePercent, setCalendarConvenienceFeePercent] = useState<number | undefined>(undefined);
   const [calendarPricingLoading, setCalendarPricingLoading] = useState(false);
+  // TASK-4303: pricing fetch terminally failed (network/API error, not an abort). Only then do
+  // we degrade to the base-rate fallback estimate instead of holding the loading skeleton.
+  const [calendarPricingFailed, setCalendarPricingFailed] = useState(false);
   // TASK-4331: server-computed GST slab/amount (post-LOS/last-minute/min-floor basis),
   // preferred over the client-derived slab below when available.
   const [serverGstPercent, setServerGstPercent] = useState<number | null>(null);
@@ -544,11 +547,16 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
       .then((result) => {
         setCalendarDailyPrices((prev) => new Map([...prev, ...result.dateToPrice]));
         setCalendarConvenienceFeePercent(result.convenienceFeePercent);
+        setCalendarPricingFailed(false);
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         // Fetch failure: leave any already-merged prices in place rather than clearing the
         // whole map (a transient failure for the current month shouldn't blank out prices
         // already fetched for the selected range).
+        // TASK-4303: flag a genuine failure (not an unmount/StrictMode abort) so the
+        // pricing-pending gate below can degrade to the fallback estimate instead of
+        // holding the skeleton forever.
+        if ((error as Error)?.name !== 'AbortError') setCalendarPricingFailed(true);
       })
       .finally(() => {
         setCalendarPricingLoading(false);
@@ -579,6 +587,47 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
       });
     return () => controller.abort();
   }, [openCalendar, listingId, dateRange.startDate, shownMonthIso]);
+
+  // TASK-4303: does every night of the selected range have a REAL per-date price from the
+  // pricing API? Until then, any total the widget could compute rides on the base-rate
+  // fallback (no weekend uplift) with a ₹0 processing fee — the exact provisional number
+  // that later "jumps" +~12% once the API resolves. Used below to hold a loading skeleton
+  // instead of that misleading number.
+  const selectedRangeNightsPriced = useMemo(() => {
+    if (!dateRange.startDate || !dateRange.endDate) return false;
+    let d = getIstStartOfDay(dateRange.startDate);
+    const end = getIstStartOfDay(dateRange.endDate);
+    if (end.getTime() <= d.getTime()) return false;
+    while (d.getTime() < end.getTime()) {
+      if (!calendarDailyPrices.has(toISODate(d))) return false;
+      d = addDays(d, 1);
+    }
+    return true;
+  }, [dateRange.startDate, dateRange.endDate, calendarDailyPrices]);
+
+  // TASK-4303: ensure the SELECTED range's months get fetched even when the guest never opens
+  // the calendar (e.g. dates hydrated from ?checkIn=&checkOut= URL params for a range beyond
+  // the mount-fetched 3-month window). Without this, such a range would previously show the
+  // silent base-rate fallback total — and with the pending gate below it would instead hold
+  // the skeleton forever, since no fetch would ever cover its nights.
+  const selectedStartMonthIso = dateRange.startDate ? toISODate(startOfMonth(dateRange.startDate)) : null;
+  useEffect(() => {
+    if (!listingId || String(listingId).trim() === '') return;
+    if (!selectedStartMonthIso || !dateRange.endDate) return;
+    if (selectedRangeNightsPriced) return; // already covered by a prior fetch
+    if (selectedStartMonthIso === shownMonthIso) return; // covered by the mount/month effect above
+    const controller = new AbortController();
+    fetchCalendarPricing(listingId, selectedStartMonthIso, 3, controller.signal)
+      .then((result) => {
+        setCalendarDailyPrices((prev) => new Map([...prev, ...result.dateToPrice]));
+        if (result.convenienceFeePercent != null) setCalendarConvenienceFeePercent(result.convenienceFeePercent);
+        setCalendarPricingFailed(false);
+      })
+      .catch((error: unknown) => {
+        if ((error as Error)?.name !== 'AbortError') setCalendarPricingFailed(true);
+      });
+    return () => controller.abort();
+  }, [listingId, selectedStartMonthIso, dateRange.endDate, selectedRangeNightsPriced, shownMonthIso]);
 
   // TASK-4322: previously fetched a "LOS discount" here via the calendar breakdown client and
   // rendered it as a "Long-stay discount" row — but that value was actually the summed
@@ -870,6 +919,14 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
   // When API has loaded: use API price (or calendar sum). When API has not loaded: use 0.
   const hasSelectedRange = Boolean(dateRange.startDate && dateRange.endDate);
+
+  // TASK-4303: per-date pricing + fee percent for the selected range are still resolving.
+  // While pending, the headline total and price breakdown render a loading skeleton instead
+  // of the provisional base-rate/₹0-fee number that would otherwise silently jump ~12% once
+  // the pricing API responds. Only a terminal fetch failure degrades to the old fallback
+  // estimate (graceful offline UX) — matching the widget's existing degradation pattern.
+  const rangePricingPending =
+    hasSelectedRange && !invalidIstStayRange && !selectedRangeNightsPriced && !calendarPricingFailed;
   const breakdownPrice =
     hasSelectedRange && selectedRangeTotalFromCalendar != null
       ? selectedRangeTotalFromCalendar
@@ -1147,7 +1204,20 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
       {/* v2 block (1): Price headline */}
       <div className="lv-booking-headline" data-testid="bw-header">
-        {hasSelectedRange && !invalidIstStayRange && finalTotal > 0 ? (
+        {/* TASK-4303: while per-date pricing resolves, show a skeleton — never the provisional
+            base-rate total that silently jumps once the API responds. */}
+        {hasSelectedRange && !invalidIstStayRange && rangePricingPending ? (
+          <>
+            <div className="lv-booking-total" data-testid="bw-price-pending" aria-busy="true">
+              <span
+                className="inline-block h-6 w-24 animate-pulse rounded bg-slate-200 align-middle"
+                aria-hidden="true"
+              />
+              <span>total · {priceDetails.nights} {priceDetails.nights === 1 ? 'night' : 'nights'}</span>
+            </div>
+            <p className="lv-booking-sub" role="status">Fetching latest prices…</p>
+          </>
+        ) : hasSelectedRange && !invalidIstStayRange && finalTotal > 0 ? (
           <>
             <div className="lv-booking-total">
               <b data-testid="bw-per-night-price">{displayPrice(Math.max(1, finalTotal))}</b>
@@ -1379,8 +1449,24 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         {/* v2 block (4): Price breakdown — hidden until both dates are selected (TASK-4276)
             AND the range is valid (checkout > checkin) (TASK-4284).
             Showing a breakdown for a reversed or same-day range would display either a
-            missing-GST or ₹1 total, misleading the guest. */}
-        {hasSelectedRange && !invalidIstStayRange && (
+            missing-GST or ₹1 total, misleading the guest.
+            TASK-4303: also held behind a skeleton until per-date pricing + fee percent have
+            resolved — the provisional breakdown (base rate × nights, ₹0 processing fee) read
+            ~12% below the settled total and silently jumped once the API responded. */}
+        {hasSelectedRange && !invalidIstStayRange && rangePricingPending && (
+          <div className="lv-price-rows" data-testid="bw-breakdown-pending" aria-busy="true" role="status">
+            <div className="lv-price-row">
+              <span className="inline-block h-4 w-32 animate-pulse rounded bg-slate-200" aria-hidden="true" />
+              <span className="lv-num inline-block h-4 w-16 animate-pulse rounded bg-slate-200" aria-hidden="true" />
+            </div>
+            <div className="lv-price-row">
+              <span className="inline-block h-4 w-24 animate-pulse rounded bg-slate-200" aria-hidden="true" />
+              <span className="lv-num inline-block h-4 w-12 animate-pulse rounded bg-slate-200" aria-hidden="true" />
+            </div>
+            <p className="text-xs text-text-muted" style={{ marginTop: 4 }}>Fetching latest prices…</p>
+          </div>
+        )}
+        {hasSelectedRange && !invalidIstStayRange && !rangePricingPending && (
         <div className="lv-price-rows">
           <div className="lv-price-row" data-testid="bw-bd-subtotal-row price-line-base">
             <span>
@@ -1497,7 +1583,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           (Boolean(dateRange.startDate) && Boolean(dateRange.endDate) && invalidIstStayRange) ||
           // TASK-4293: check-in day itself is Blocked/Hold — disable up front, don't let the click
           // reach a confusing API-level failure.
-          checkinUnavailable
+          checkinUnavailable ||
+          // TASK-4303: pricing still resolving for the selected range (1–3 s worst case) —
+          // reserving now would seed holdPriceBreakdown's client fallback with the provisional
+          // base-rate/₹0-fee numbers (see the TASK-4286 fallback in handleReserve). Blank dates
+          // stay clickable (TASK-4277): rangePricingPending is false without both dates.
+          rangePricingPending
         }
         title={checkinUnavailable ? 'Check-in date is not available. Please select a different check-in date.' : undefined}
         className={`bw-reserve lv-booking-cta${isSubmitting || isLoading ? ' opacity-75' : ''}`}

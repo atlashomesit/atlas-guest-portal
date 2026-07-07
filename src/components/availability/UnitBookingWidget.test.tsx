@@ -1,11 +1,64 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { AxiosError } from 'axios';
+import { act, cleanup, render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import { addDays, nextFriday } from 'date-fns';
 import {
   getOrderCreationGuestErrorMessage,
   PROVIDER_NOT_CONFIGURED_WHATSAPP_HINT,
 } from './unitBookingPaymentOrderErrors';
+import { toISODate } from '@/utils/dateRange';
+import { getIstStartOfDay } from '@/utils/date';
+
+// ---- TASK-4303 render-test mocks (hoisted; only the render suite below imports the widget) ----
+const task4303 = vi.hoisted(() => ({
+  fetchCalendarPricing: vi.fn(),
+  fetchGuestGstBreakdown: vi.fn(),
+  booking: { checkIn: null as string | null, checkOut: null as string | null, guests: 2 },
+}));
+
+vi.mock('@/runtime-config', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  hasRuntimeConfig: () => true,
+}));
+vi.mock('@/api/client', () => ({
+  buildApiUrl: (path: string) => `http://localhost:5120${path}`,
+  getApiHeaders: () => ({}),
+  getOrderRequestHeaders: () => ({}),
+}));
+vi.mock('@/api/availabilityCalendarClient', () => ({
+  dedupedAvailabilityCalendarFetch: async () =>
+    new Response(JSON.stringify([]), { status: 200, headers: { 'content-type': 'application/json' } }),
+}));
+vi.mock('@/api/pricingClient', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  fetchCalendarPricing: task4303.fetchCalendarPricing,
+  fetchGuestGstBreakdown: task4303.fetchGuestGstBreakdown,
+}));
+vi.mock('@/api/listingClient', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  fetchPublicListings: async () => [],
+}));
+vi.mock('@/contexts/BookingContext', () => ({
+  useBooking: () => ({ booking: task4303.booking, updateBooking: vi.fn() }),
+}));
+vi.mock('@/contexts/ListingPhotosContext', () => ({
+  useListingPhotosFromApi: () => ({ getUrlsForListingId: () => undefined }),
+}));
+vi.mock('@/hooks/useDailyPricingSummary', () => ({
+  useDailyPricingSummary: () => ({
+    data: null,
+    loading: false,
+    error: null,
+    // Base card rate ₹6,000 — the stale provisional source TASK-4303 must never render as a total.
+    getListingPricing: () => ({ baseAmount: 6000, actualPrice: 6000, globalDiscountPercent: 0 }),
+  }),
+}));
+vi.mock('@/components/FomoBar', () => ({ default: () => null }));
+vi.mock('@/lib/events', () => ({ track: vi.fn() }));
+vi.mock('./AtlasBookingCalendar', () => ({ AtlasBookingCalendar: () => null }));
 
 describe('UnitBookingWidget - TASK-2460: order API errors surface body.message', () => {
   it('422 PAYMENT_PROVIDER_NOT_CONFIGURED_TENANT includes API message and WhatsApp hint', () => {
@@ -337,5 +390,104 @@ describe('UnitBookingWidget - TASK-4293: Reserve button disabled when the select
     const content = readFileSync(filePath, 'utf-8');
     expect(content).toContain('data-testid="guest-booking-checkin-unavailable"');
     expect(content).toContain('Check-in date is not available. Please select a different check-in date.');
+  });
+});
+
+describe('UnitBookingWidget - TASK-4303: no provisional total before per-date pricing resolves (source)', () => {
+  const filePath = resolve(__dirname, './UnitBookingWidget.tsx');
+
+  it('derives rangePricingPending from per-night coverage and gates headline + breakdown behind it', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    expect(content).toContain('const rangePricingPending =');
+    expect(content).toContain('selectedRangeNightsPriced');
+    // Headline and breakdown must render a skeleton — not the base-rate provisional — while pending.
+    expect(content).toContain('data-testid="bw-price-pending"');
+    expect(content).toContain('data-testid="bw-breakdown-pending"');
+    expect(content).toContain('hasSelectedRange && !invalidIstStayRange && !rangePricingPending && (');
+  });
+
+  it('only a terminal (non-abort) pricing fetch failure degrades to the fallback estimate', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    expect(content).toContain('calendarPricingFailed');
+    expect(content).toContain("!== 'AbortError'");
+  });
+
+  it('Reserve is disabled while pricing is pending so the TASK-4286 client fallback cannot carry ₹0 fee forward', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    const buttonSection = content.slice(
+      content.indexOf('data-testid="guest-booking-submit"') - 1400,
+      content.indexOf('data-testid="guest-booking-submit"'),
+    );
+    expect(buttonSection).toContain('rangePricingPending');
+  });
+});
+
+describe('UnitBookingWidget - TASK-4303: first rendered Total equals the settled Total (render)', () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+    task4303.booking.checkIn = null;
+    task4303.booking.checkOut = null;
+  });
+
+  it('shows a skeleton (no Total) while pricing resolves, then the settled weekend total on first paint', async () => {
+    // Weekend range at least a week out: Fri check-in → Sun check-out (2 weekend nights).
+    const friday = getIstStartOfDay(nextFriday(addDays(new Date(), 7)));
+    const sunday = addDays(friday, 2);
+    const nightIsos = [toISODate(friday), toISODate(addDays(friday, 1))];
+    task4303.booking.checkIn = toISODate(friday);
+    task4303.booking.checkOut = toISODate(sunday);
+
+    // Deferred per-date pricing: weekend uplift ₹6,500/night + 3% processing fee.
+    let resolvePricing!: (r: { dateToPrice: Map<string, number>; convenienceFeePercent?: number }) => void;
+    const pricingPromise = new Promise<{ dateToPrice: Map<string, number>; convenienceFeePercent?: number }>(
+      (res) => { resolvePricing = res; },
+    );
+    task4303.fetchCalendarPricing.mockImplementation(() => pricingPromise);
+    // Server GST for the range: 5% of ₹13,000 = ₹650.
+    task4303.fetchGuestGstBreakdown.mockResolvedValue({ gstPercent: 5, gstAmount: 650, finalAmount: 14060 });
+
+    const { default: UnitBookingWidget } = await import('./UnitBookingWidget');
+    render(
+      <MemoryRouter>
+        <UnitBookingWidget
+          listingId={7}
+          propertyId={3}
+          listingName="Atlas 501 PH"
+          propertySlug="atlas501-ph"
+          unitSlug="ph"
+        />
+      </MemoryRouter>,
+    );
+
+    // While per-date pricing is unresolved: skeletons, and NO Total row / provisional numbers.
+    await screen.findByTestId('bw-price-pending');
+    expect(screen.getByTestId('bw-breakdown-pending')).toBeInTheDocument();
+    expect(screen.queryByText('Total')).toBeNull();
+    // The stale provisional numbers from the base rate (₹6,000 × 2 → ₹12,000 / ₹12,600) must never render.
+    expect(screen.queryByText(/12,000/)).toBeNull();
+    expect(screen.queryByText(/12,600/)).toBeNull();
+    // Reserve is disabled while the quote is unresolved.
+    expect(screen.getByTestId('guest-booking-submit')).toBeDisabled();
+
+    await act(async () => {
+      resolvePricing({ dateToPrice: new Map(nightIsos.map((iso) => [iso, 6500])), convenienceFeePercent: 3 });
+      await pricingPromise;
+    });
+
+    // Settled: base ₹6,500 × 2 = ₹13,000; GST 5% = ₹650; fee 3% × ₹13,650 = ₹410; Total ₹14,060.
+    const totalLabel = await screen.findByText('Total');
+    const totalValue = totalLabel.parentElement?.querySelector('.lv-num')?.textContent ?? '';
+    expect(totalValue.replace(/[^0-9]/g, '')).toBe('14060');
+    // Headline total matches the breakdown total — the FIRST total ever rendered IS the settled one
+    // (the queryByText('Total') assertion above proved nothing rendered earlier).
+    expect(screen.getByTestId('bw-per-night-price').textContent?.replace(/[^0-9]/g, '')).toBe('14060');
+    // Processing fee shows the real 3% amount, never a ₹0 placeholder.
+    const feeRow = screen.getByTestId('bw-bd-service-fee-row');
+    expect(feeRow.querySelector('.lv-num')?.textContent?.replace(/[^0-9]/g, '')).toBe('410');
+    // Skeletons are gone.
+    expect(screen.queryByTestId('bw-price-pending')).toBeNull();
+    expect(screen.queryByTestId('bw-breakdown-pending')).toBeNull();
+    expect(screen.getByTestId('guest-booking-submit')).toBeEnabled();
   });
 });
