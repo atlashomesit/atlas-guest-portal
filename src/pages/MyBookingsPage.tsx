@@ -8,6 +8,7 @@ import { messageFromApiResponse } from "../utils/serverErrorFromResponse";
 import { getContactEmail, getTelLink, hasHostContact } from "../config/contact";
 import { getTenantBrandName } from "../tenant/displayBrand";
 import { useGuestAuth } from "../contexts/GuestAuthContext";
+import { formatCurrency } from "../utils/formatting";
 
 interface BookingItem {
   id: number;
@@ -245,7 +246,7 @@ export default function MyBookingsPage() {
                   <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-text-secondary">
                     <span>{b.checkinDate} → {b.checkoutDate}</span>
                     <span className="font-mono text-base text-text-muted">#{b.bookingRef}</span>
-                    <span className="ml-auto font-medium text-text-primary">₹{Number(b.totalAmount).toLocaleString("en-IN")}</span>
+                    <span className="ml-auto font-medium text-text-primary">{formatCurrency(b.totalAmount ?? 0)}</span>
                   </div>
                   {inStay && (
                     <p className="mt-2 text-sm text-text-muted" data-testid="my-bookings-in-stay-hint">
