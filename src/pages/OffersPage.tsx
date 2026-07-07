@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import SEO from "../components/SEO";
+import { Button } from "../components/ui/Button";
 import { buildApiUrl } from "@/api/client";
 import { useTenantListings, type TenantPropertyRecord } from "@/hooks/useTenantListings";
 import { getTenantBrandName } from "@/tenant/displayBrand";
@@ -39,7 +40,7 @@ function extractLastMinutePercent(properties: TenantPropertyRecord[]): number {
 }
 
 export default function OffersPage() {
-  const { properties, state } = useTenantListings();
+  const { properties, state, fetchErrorMessage, refetch } = useTenantListings();
   const brandName = getTenantBrandName();
 
   const [promoCode, setPromoCode] = useState("");
@@ -111,6 +112,25 @@ export default function OffersPage() {
             <span className="text-xs font-normal text-emerald-700">{copied === "DIRECT5" ? "Copied!" : "Copy"}</span>
           </button>
         </div>
+
+        {/* TASK-4462: explicit error/retry state — a failed deals load must be
+            distinguishable from "no deals" (previously the sections just vanished). */}
+        {state === "error" && (
+          <div
+            role="alert"
+            data-testid="offers-deals-error"
+            className="rounded-2xl bg-red-50 border border-red-200 p-6 space-y-3"
+          >
+            <h2 className="font-bold text-red-900 text-lg">We couldn't load current deals</h2>
+            <p className="text-red-800 text-sm">
+              {fetchErrorMessage?.trim() ||
+                "We're having trouble loading current deals right now. Please try again."}
+            </p>
+            <Button type="button" variant="secondary" size="sm" onClick={() => void refetch()}>
+              Try again
+            </Button>
+          </div>
+        )}
 
         {/* LOS discount tiers */}
         {(state === "loading" || discountTiers.length > 0) && (
