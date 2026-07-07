@@ -109,8 +109,14 @@ export default function GuestAssistant({ listingId }: GuestAssistantProps) {
     setExpandedIdx((prev) => (prev === idx ? null : idx));
   }, []);
 
-  const filtered = useMemo(() => {
+  // Reset any prior AI reply when the query actually changes — must NOT run during
+  // render (a set-state-during-render inside the useMemo below triggered React's
+  // "cannot update a component while rendering" warning and dropped the reply). (TASK-4461)
+  useEffect(() => {
     setAiReply(null);
+  }, [query]);
+
+  const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
     if (!q) return faqs;
     return faqs.filter(
