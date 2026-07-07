@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { X, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { buildApiUrl, getApiHeaders } from '../api/client';
 import { messageFromApiResponse } from '../utils/serverErrorFromResponse';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 
 interface FaqEntry {
   q: string;
@@ -33,6 +34,21 @@ export default function GuestAssistant({ listingId }: GuestAssistantProps) {
   const [aiReply, setAiReply] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // TASK-4439: focus trap + focus return (WCAG 2.4.3 / 2.1.2).
+  // The floating trigger unmounts while the panel is open, so the trap's own
+  // focus-return can't find it — we re-focus the remounted trigger ourselves.
+  const panelRef = useFocusTrap<HTMLDivElement>(isOpen);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const wasOpenRef = useRef(false);
+  useEffect(() => {
+    if (isOpen) {
+      wasOpenRef.current = true;
+    } else if (wasOpenRef.current) {
+      wasOpenRef.current = false;
+      triggerRef.current?.focus();
+    }
+  }, [isOpen]);
 
   // Fetch FAQ entries when listing ID is known
   useEffect(() => {
@@ -113,6 +129,7 @@ export default function GuestAssistant({ listingId }: GuestAssistantProps) {
       {/* Floating trigger — bottom-left to avoid collision with SupportWidget (bottom-right) */}
       {!isOpen && (
         <button
+          ref={triggerRef}
           type="button"
           onClick={() => setIsOpen(true)}
           aria-label="View frequently asked questions"
@@ -147,6 +164,7 @@ export default function GuestAssistant({ listingId }: GuestAssistantProps) {
 
           {/* Panel — full-width sheet on mobile, card on md+ */}
           <div
+            ref={panelRef}
             role="dialog"
             aria-modal="true"
             aria-label="Listing FAQ"

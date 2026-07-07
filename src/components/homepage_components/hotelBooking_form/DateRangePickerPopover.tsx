@@ -1,5 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 interface DateRangePickerPopoverProps {
   anchorRef: React.RefObject<HTMLElement>;
@@ -56,6 +57,10 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
   const [position, setPosition] = useState({ top: 0, left: 0, width: 420, caretLeft: 24 });
   const localPopoverRef = useRef<HTMLDivElement | null>(null);
   const isMobile = useMediaQuery('(max-width: 768px)');
+
+  // TASK-4439: focus trap + focus return (WCAG 2.4.3 / 2.1.2) — Escape close is
+  // handled by the parent widget (SearchAvailabilityWidget / AtlasDateRangePicker).
+  useFocusTrap<HTMLDivElement>(open, localPopoverRef);
 
   const setPopoverRef = (node: HTMLDivElement | null) => {
     localPopoverRef.current = node;

@@ -17,6 +17,7 @@ import React, {
 } from 'react';
 import { addDays, format, isSameDay, startOfMonth } from 'date-fns';
 import { type AtlasDateRangePickerValue } from '@/components/date/AtlasDateRangePicker';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 import './AtlasBookingCalendar.css';
 
 // ---------------------------------------------------------------------------
@@ -409,6 +410,9 @@ export const AtlasBookingCalendar: React.FC<AtlasBookingCalendarProps> = ({
   const [activePreset, setActivePreset] = useState<string | null>(null);
   const popoverRef = useRef<HTMLDivElement | null>(null);
   const [positionStyle, setPositionStyle] = useState<React.CSSProperties>({});
+
+  // TASK-4439: focus trap + focus return (WCAG 2.4.3 / 2.1.2); Escape close below.
+  useFocusTrap<HTMLDivElement>(open, popoverRef);
 
   // Position the popover below the anchor button, extending left so it stays
   // within the viewport.  Re-runs every time the popover opens or the anchor
