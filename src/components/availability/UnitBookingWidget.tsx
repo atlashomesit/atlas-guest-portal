@@ -1469,14 +1469,62 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         )}
         {hasSelectedRange && !invalidIstStayRange && !rangePricingPending && (
         <div className="lv-price-rows">
-          <div className="lv-price-row" data-testid="bw-bd-subtotal-row price-line-base">
-            <span>
-              {priceDetails.nights > 0 && perNightForDisplay > 0
-                ? `${displayPrice(perNightForDisplay)} × ${priceDetails.nights} ${priceDetails.nights === 1 ? 'night' : 'nights'}`
-                : 'Accommodation'}
-            </span>
-            <span className="lv-num">{displayPrice(breakdownPrice)}</span>
-          </div>
+          {/* TASK-4282: Show per-night breakdown when rates vary, or averaged format when uniform */}
+          {(() => {
+            // Collect daily prices for the selected range
+            const dailyPrices: { date: string; price: number }[] = [];
+            if (dateRange.startDate && dateRange.endDate) {
+              let d = getIstStartOfDay(dateRange.startDate);
+              const end = getIstStartOfDay(dateRange.endDate);
+              while (d.getTime() < end.getTime()) {
+                const iso = toISODate(d);
+                const price = calendarDailyPrices.get(iso) ?? effectiveDailyPricing?.actualPrice ?? 0;
+                dailyPrices.push({ date: iso, price });
+                d = addDays(d, 1);
+              }
+            }
+
+            // Check if rates vary
+            const uniquePrices = new Set(dailyPrices.map(dp => dp.price));
+            const ratesVary = uniquePrices.size > 1;
+
+            if (ratesVary && dailyPrices.length > 0) {
+              // Show per-night breakdown
+              return (
+                <>
+                  {dailyPrices.map((dp, idx) => {
+                    const dateObj = new Date(dp.date + 'T00:00:00Z');
+                    const dayName = format(dateObj, 'EEE');
+                    const dateNum = format(dateObj, 'd MMM');
+                    return (
+                      <div key={idx} className="lv-price-row" data-testid={`bw-bd-night-row-${idx}`}>
+                        <span className="text-sm">
+                          {dayName} {dateNum}
+                        </span>
+                        <span className="lv-num">{displayPrice(dp.price)}</span>
+                      </div>
+                    );
+                  })}
+                  <div className="lv-price-row" data-testid="bw-bd-accommodation-subtotal">
+                    <span className="font-semibold">Subtotal</span>
+                    <span className="lv-num font-semibold">{displayPrice(breakdownPrice)}</span>
+                  </div>
+                </>
+              );
+            } else {
+              // Show averaged format (original behavior)
+              return (
+                <div className="lv-price-row" data-testid="bw-bd-subtotal-row price-line-base">
+                  <span>
+                    {priceDetails.nights > 0 && perNightForDisplay > 0
+                      ? `${displayPrice(perNightForDisplay)} × ${priceDetails.nights} ${priceDetails.nights === 1 ? 'night' : 'nights'}`
+                      : 'Accommodation'}
+                  </span>
+                  <span className="lv-num">{displayPrice(breakdownPrice)}</span>
+                </div>
+              );
+            }
+          })()}
 
           {gstSlabPercent != null && breakdownPrice > 0 && gstLineAmount > 0 && (
             <div className="lv-price-row" data-testid="bw-bd-gst-row">
