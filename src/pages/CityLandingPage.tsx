@@ -162,11 +162,8 @@ const CityLandingPage = ({ citySlug }: CityLandingPageProps) => {
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Destination guide</p>
         <h1 className="mt-2 text-3xl sm:text-4xl font-bold text-text-primary">{content.h1}</h1>
         <p className="mt-3 text-sm text-text-muted max-w-3xl">
-          Live homestays below are drawn from our public catalogue and matched to {content.cityName} using address and
-          title keywords. The API does not yet expose{" "}
-          <code className="text-xs bg-bg-muted px-1 rounded">GET /listings/public?city=…</code>, so results may omit
-          valid homes when addresses omit common locality spellings. A server-side city filter is planned as a
-          follow-up for accuracy at scale.
+          Showing available homes in {content.cityName}. Browse below and find your perfect stay.
+          {/* TASK-4516: server-side city filter planned (warm backlog item D4) */}
         </p>
       </header>
 
