@@ -157,8 +157,6 @@ const Navbar = () => {
           <div className="util-bar-right">
             <a className="util-bar-phone" href={telLink}>{formatDisplayNumber()}</a>
             <span className="util-bar-sep" aria-hidden="true" />
-            <span className="util-bar-locale">INR ₹</span>
-            <span className="util-bar-sep" aria-hidden="true" />
             {/* TASK-4018: Language switcher */}
             <div className="relative">
               <button
