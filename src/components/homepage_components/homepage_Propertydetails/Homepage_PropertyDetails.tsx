@@ -48,6 +48,7 @@ const UnitBookingWidget = lazy(() => import('../../availability/UnitBookingWidge
 const AvailabilityCalendar = lazy(() => import('../../AvailabilityCalendar'));
 const GuestAssistant = lazy(() => import('../../GuestAssistant')); // TASK-1728
 const VirtualTourSection = lazy(() => import('../../VirtualTourSection')); // Task 37
+const ReviewSummary = lazy(() => import('../../ReviewSummary')); // TASK-4404
 
 interface PropertyAmenity {
     amenities_icon: string;
@@ -1887,6 +1888,10 @@ useEffect(() => {
 
                       {api.reviews.length > 0 ? (
                         <>
+                          {/* TASK-4404: review summary (sentiment + top keywords) */}
+                          <Suspense fallback={null}>
+                            <ReviewSummary listingId={property.numericId} />
+                          </Suspense>
                           {/* v2: 3-col card layout with quote marks */}
                           <div className="pp-v2-review-grid" data-testid="reviews-grid">
                             {ppDisplayedReviews.map((r, idx) => (
