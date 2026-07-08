@@ -1888,9 +1888,9 @@ useEffect(() => {
 
                       {api.reviews.length > 0 ? (
                         <>
-                          {/* TASK-4404: review summary (sentiment + top keywords) */}
+                          {/* TASK-4404: review summary (sentiment + top keywords) — same id source as the reviews fetch */}
                           <Suspense fallback={null}>
-                            <ReviewSummary listingId={property.numericId} />
+                            <ReviewSummary listingId={Number(resolvedListingId ?? NaN)} />
                           </Suspense>
                           {/* v2: 3-col card layout with quote marks */}
                           <div className="pp-v2-review-grid" data-testid="reviews-grid">
