@@ -228,12 +228,13 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   /** RA-006: payment provider not configured for this tenant. */
   const [providerBlocked, setProviderBlocked] = useState(false);
 
-  // Availability range always starts from today, independent of selected dates or shown date
+  // TASK-4551: Availability range must cover the full selectable booking range (today + 365 days)
+  // to prevent booked dates beyond 60 days from appearing available. Re-fetch when shown month changes.
   const availabilityRange = useMemo(() => {
     const startDate = today; // Always start from today
-    const endDate = addDays(startDate, 60);
+    const endDate = maxBookingDate; // Cover full 365-day range
     return { startDate, endDate };
-  }, [today]);
+  }, [today, maxBookingDate]);
 
   useEffect(() => {
     if (!isBookingDisabled || !openCalendar) return;
