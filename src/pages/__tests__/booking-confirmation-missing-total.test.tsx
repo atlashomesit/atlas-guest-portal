@@ -1,6 +1,4 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
 import { formatCurrency } from '@/utils/formatting';
 
 // Mock the utils that would be imported in BookingConfirmationPage
