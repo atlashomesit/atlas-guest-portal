@@ -21,6 +21,7 @@ import React, {
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { useBooking, type BookingPriceBreakdown } from '@/contexts/BookingContext';
+import { useCurrency } from '@/contexts/CurrencyContext';
 import { buildApiUrl, getApiHeaders, getOrderRequestHeaders } from '@/api/client';
 import {
   clampNationalDigits,
@@ -239,6 +240,7 @@ const GuestDetailsPage: React.FC = () => {
   const { propertySlug, unitSlug } = useParams<{ propertySlug: string; unitSlug: string }>();
   const { booking, updateBooking } = useBooking();
   const brandName = getTenantBrandName();
+  const { currency, formatINR } = useCurrency();
   const [holdHydrationDone, setHoldHydrationDone] = useState(false);
 
   // TASK-2882: rehydrate hold from sessionStorage after hard reload before showing "pick dates" modal.
@@ -1767,6 +1769,12 @@ const GuestDetailsPage: React.FC = () => {
             <div className="gd-pay-microcopy">
               You'll be charged <b>{displayPrice(chargeInr)}</b> now to confirm.
               {freeCancelDisplay && ` Free cancellation until ${freeCancelDisplay}.`}
+              {/* TASK-4410: INR charge disclosure for non-INR shoppers */}
+              {currency !== 'INR' && (
+                <div style={{ marginTop: 8, fontSize: '0.85em', color: '#64748b' }}>
+                  Charged in {formatINR(chargeInr)} — your bank may apply its own conversion fee.
+                </div>
+              )}
             </div>
           )}
 
