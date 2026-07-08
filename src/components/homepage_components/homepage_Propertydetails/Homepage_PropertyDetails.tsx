@@ -1206,7 +1206,7 @@ useEffect(() => {
                     data-testid="listing-not-found-homepage"
                     icon="🏠"
                     title="Home not found"
-                    message={`Please check the link and try again, or return to browse available homes on ${brandName}.`}
+                    message={`Please check the link and try again, or return to browse available homes on ${getTenantBrandName()}.`}
                     primaryAction={{ label: "Browse available homes", to: "/" }}
                     secondaryActions={[{ label: "Go back", onClick: () => window.history.back() }]}
                 />
