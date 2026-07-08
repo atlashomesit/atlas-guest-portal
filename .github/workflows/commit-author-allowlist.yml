@@ -21,7 +21,7 @@ jobs:
       - uses: actions/github-script@v7
         with:
           script: |
-            const ALLOW = /^(sreekaratla81|sreekar\.atla|atlashomesit|noreply|150553417\+sreekaratla81)@.*$/;
+            const ALLOW = /^(sreekaratla81|sreekar\.atla|atlashomesit|noreply|150553417\+sreekaratla81|udaykumar\.ragipindi)@.*$/;
             let commits = [];
             if (context.eventName === 'pull_request') {
               commits = await github.paginate(github.rest.pulls.listCommits, {
