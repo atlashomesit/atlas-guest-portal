@@ -161,6 +161,9 @@ interface DayCellProps {
   onPick: (date: Date) => void;
   setHover: (date: Date | null) => void;
   dowIndex: number; // grid column index, 0=first column (Sun) … 6=last column (Sat)
+  // Keyboard navigation
+  tabIndex: number;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLButtonElement>) => void;
 }
 
 const DayCell: React.FC<DayCellProps> = ({
@@ -172,6 +175,8 @@ const DayCell: React.FC<DayCellProps> = ({
   onPick,
   setHover,
   dowIndex,
+  tabIndex,
+  onKeyDown,
 }) => {
   const { checkIn, checkOut } = range;
 
@@ -256,7 +261,12 @@ const DayCell: React.FC<DayCellProps> = ({
         className={cellClasses.join(' ')}
         disabled={blocked}
         onClick={handleClick}
+        onKeyDown={onKeyDown}
         aria-label={ariaLabel}
+        role="gridcell"
+        tabIndex={tabIndex}
+        aria-selected={isStart || isEnd}
+        aria-current={isToday ? 'date' : undefined}
       >
         <span className="bc-num">{date.getDate()}</span>
         {info.price != null && info.state !== 'past' && (
@@ -284,6 +294,8 @@ interface MonthProps {
   calendarDailyPrices: Map<string, number>;
   fallbackPrice: number | null;
   pricingLoading: boolean;
+  focusedDate: Date | null;
+  onKeyDown: (date: Date, e: React.KeyboardEvent<HTMLButtonElement>) => void;
 }
 
 const MonthGrid: React.FC<MonthProps> = ({
@@ -299,6 +311,8 @@ const MonthGrid: React.FC<MonthProps> = ({
   calendarDailyPrices,
   fallbackPrice,
   pricingLoading,
+  focusedDate,
+  onKeyDown,
 }) => {
   const dim = daysInMonth(year, month);
   const offset = startOfMonthOffset(year, month);
@@ -323,7 +337,7 @@ const MonthGrid: React.FC<MonthProps> = ({
           <div key={d} className="bc-dow">{d}</div>
         ))}
       </div>
-      <div className="bc-grid">
+      <div className="bc-grid" role="grid">
         {cells.map((d, i) => {
           if (d === null) {
             return <div key={i} className="bc-cell-wrap bc-empty" />;
@@ -377,6 +391,8 @@ const MonthGrid: React.FC<MonthProps> = ({
               hover={hover}
               setHover={setHover}
               dowIndex={i % 7}
+              tabIndex={focusedDate && isSameDay(date, focusedDate) ? 0 : -1}
+              onKeyDown={(e) => onKeyDown(date, e)}
             />
           );
         })}
@@ -408,6 +424,7 @@ export const AtlasBookingCalendar: React.FC<AtlasBookingCalendarProps> = ({
 }) => {
   const [hover, setHover] = useState<Date | null>(null);
   const [activePreset, setActivePreset] = useState<string | null>(null);
+  const [focusedDate, setFocusedDate] = useState<Date | null>(null);
   const popoverRef = useRef<HTMLDivElement | null>(null);
   const [positionStyle, setPositionStyle] = useState<React.CSSProperties>({});
 
@@ -554,6 +571,71 @@ export const AtlasBookingCalendar: React.FC<AtlasBookingCalendarProps> = ({
     return () => document.removeEventListener('mousedown', handleMouseDown);
   }, [open, onClose, anchorRef]);
 
+  // TASK-4512: Initialize focusedDate to today or minDate when calendar opens
+  useEffect(() => {
+    if (open && focusedDate === null) {
+      setFocusedDate(today >= minDate ? today : minDate);
+    }
+  }, [open, minDate, today, focusedDate]);
+
+  // Keyboard navigation handler for arrow keys
+  const handleGridKeyDown = useCallback(
+    (date: Date, e: React.KeyboardEvent<HTMLButtonElement>) => {
+      if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'Enter', ' '].includes(e.key)) {
+        return;
+      }
+
+      e.preventDefault();
+
+      // Enter/Space = select the date
+      if (e.key === 'Enter' || e.key === ' ') {
+        handlePick(date);
+        return;
+      }
+
+      // Arrow navigation
+      let nextDate = new Date(date);
+      const DOW = date.getDay(); // 0=Sun…6=Sat
+
+      if (e.key === 'ArrowLeft') {
+        nextDate = addDays(date, -1);
+      } else if (e.key === 'ArrowRight') {
+        nextDate = addDays(date, 1);
+      } else if (e.key === 'ArrowUp') {
+        nextDate = addDays(date, -7);
+      } else if (e.key === 'ArrowDown') {
+        nextDate = addDays(date, 7);
+      } else if (e.key === 'Home') {
+        // Home = first day of week (Sunday)
+        nextDate = addDays(date, -DOW);
+      } else if (e.key === 'End') {
+        // End = last day of week (Saturday)
+        nextDate = addDays(date, 6 - DOW);
+      }
+
+      // Clamp to valid range
+      if (nextDate >= minDate && nextDate <= maxDate) {
+        setFocusedDate(nextDate);
+
+        // If navigating out of the shown month, advance the view
+        if (nextDate.getMonth() !== viewMonth || nextDate.getFullYear() !== viewYear) {
+          const targetMonth = nextDate.getMonth();
+          const targetYear = nextDate.getFullYear();
+          onShownDateChange(new Date(targetYear, targetMonth, 1));
+        }
+
+        // Immediately focus the new button (will happen on next render)
+        setTimeout(() => {
+          const btn = popoverRef.current?.querySelector(
+            `button[role="gridcell"]:not([disabled])`
+          ) as HTMLButtonElement | null;
+          btn?.focus();
+        }, 0);
+      }
+    },
+    [handlePick, minDate, maxDate, viewMonth, viewYear, onShownDateChange, popoverRef],
+  );
+
   // Escape key to close
   useEffect(() => {
     if (!open) return;
@@ -628,6 +710,8 @@ export const AtlasBookingCalendar: React.FC<AtlasBookingCalendarProps> = ({
             calendarDailyPrices={calendarDailyPrices}
             fallbackPrice={fallbackPrice}
             pricingLoading={pricingLoading}
+            focusedDate={focusedDate}
+            onKeyDown={handleGridKeyDown}
           />
           <MonthGrid
             year={m2.year}
@@ -642,6 +726,8 @@ export const AtlasBookingCalendar: React.FC<AtlasBookingCalendarProps> = ({
             calendarDailyPrices={calendarDailyPrices}
             fallbackPrice={fallbackPrice}
             pricingLoading={pricingLoading}
+            focusedDate={focusedDate}
+            onKeyDown={handleGridKeyDown}
           />
         </div>
 
