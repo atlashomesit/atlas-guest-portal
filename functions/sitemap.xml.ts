@@ -3,6 +3,9 @@ interface Env {
   ATLAS_TENANT_KEY?: string;
 }
 
+// TASK-4414: city landing pages for SEO acquisition
+const CITY_LANDING_SLUGS = ["goa", "coorg", "hyderabad", "manali"] as const;
+
 const CORE_PATHS = [
   "/",
   "/amenities",
@@ -17,6 +20,8 @@ const CORE_PATHS = [
   "/about",
   "/faq",
   "/terms",
+  // City landing pages (TASK-4414)
+  ...CITY_LANDING_SLUGS.map((slug) => `/homestays-in-${slug}`),
 ];
 
 // Backward-compatible export used by tests; includes static (always-on) sitemap paths.
