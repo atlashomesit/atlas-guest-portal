@@ -624,10 +624,14 @@ export const AtlasBookingCalendar: React.FC<AtlasBookingCalendarProps> = ({
           onShownDateChange(new Date(targetYear, targetMonth, 1));
         }
 
-        // Immediately focus the new button (will happen on next render)
+        // Immediately focus the new button (will happen on next render).
+        // BUG FIX 2026-07-08: this selected the FIRST enabled gridcell, so arrow keys
+        // snapped DOM focus back to cell #1 on every keystroke — keyboard users could
+        // never move. The roving-tabindex cell ([tabindex="0"]) IS the new focusedDate
+        // after re-render; focus that.
         setTimeout(() => {
           const btn = popoverRef.current?.querySelector(
-            `button[role="gridcell"]:not([disabled])`
+            `button[role="gridcell"][tabindex="0"]`
           ) as HTMLButtonElement | null;
           btn?.focus();
         }, 0);
