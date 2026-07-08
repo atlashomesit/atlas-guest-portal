@@ -1,0 +1,63 @@
+# TASK-2733 — server-side author-email allowlist (docs/governance/feedback_author_email_allowlist.md in atlas-e2e).
+# Durable defense against placeholder-identity commits (atlas@example.com class) that bypass client-side hooks.
+# Founder-approved 2026-07-08 (interactive session). GHA-COST-APPROVED: 360
+name: Author email allowlist
+
+on:
+  push:
+    branches: [dev]
+  pull_request:
+    branches: [dev, main]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  author-allowlist:
+    name: Author email allowlist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const ALLOW = /^(sreekaratla81|sreekar\.atla|atlashomesit|noreply|150553417\+sreekaratla81)@.*$/;
+            let commits = [];
+            if (context.eventName === 'pull_request') {
+              commits = await github.paginate(github.rest.pulls.listCommits, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.payload.pull_request.number,
+                per_page: 100,
+              });
+            } else {
+              const before = context.payload.before;
+              if (before && !/^0+$/.test(before)) {
+                const cmp = await github.rest.repos.compareCommitsWithBasehead({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  basehead: `${before}...${context.payload.after}`,
+                });
+                commits = cmp.data.commits;
+              } else {
+                commits = (context.payload.commits || []).map(c => ({
+                  sha: c.id,
+                  commit: { author: { email: c.author.email }, committer: { email: c.committer?.email || c.author.email } },
+                }));
+              }
+            }
+            const denied = [];
+            for (const c of commits) {
+              for (const who of ['author', 'committer']) {
+                const email = c.commit?.[who]?.email || '';
+                // GitHub's web-flow committer signs merge/squash commits made in the UI
+                if (email === 'noreply@github.com') continue;
+                if (!ALLOW.test(email)) denied.push(`AUTHOR-DENIED: ${c.sha} ${who}=${email}`);
+              }
+            }
+            if (denied.length) {
+              denied.forEach(d => core.error(d));
+              core.setFailed(`${denied.length} commit identity violation(s). Fix git config user.email (see atlas-e2e/docs/governance/feedback_author_email_allowlist.md).`);
+            } else {
+              core.info(`All ${commits.length} commit identities allowlisted.`);
+            }
