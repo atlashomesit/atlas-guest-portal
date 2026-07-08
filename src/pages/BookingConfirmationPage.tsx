@@ -12,6 +12,7 @@ import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 import { messageFromApiResponse } from "../utils/serverErrorFromResponse";
 import { getContactEmail, getContactPhone, hasHostContact } from "../config/contact";
 import { useGuestBookingQrToken } from "../hooks/useGuestBookingQrToken";
+import { formatCurrency } from "../utils/formatting";
 import GuestMessageThread from "../components/messaging/GuestMessageThread";
 
 /** Minimal shape of the non-standard `beforeinstallprompt` event — only `prompt()` is used here. */
@@ -1057,7 +1058,7 @@ export default function BookingConfirmationPage() {
               {booking.nights} {booking.nights === 1 ? "night" : "nights"}
             </span>
             <span className="text-base font-bold text-text-primary" data-testid="confirmation-total">
-              {booking.currency}&nbsp;{booking.totalAmount.toLocaleString("en-IN")}
+              {formatCurrency(booking.totalAmount ?? 0, { currency: booking.currency })}
             </span>
           </div>
           {canRequestModification && (
