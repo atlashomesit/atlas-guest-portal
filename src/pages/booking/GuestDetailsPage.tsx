@@ -225,7 +225,7 @@ function loadRazorpayScript(onSuccess: () => void, onError: (msg: string) => voi
     handleSuccess();
   };
   script.onerror = () => handleError('Failed to load Razorpay checkout script.');
-  document.body.appendChild(script);
+  document.head.appendChild(script);
 
   // 10-second timeout safety
   timeoutId = setTimeout(() => {
