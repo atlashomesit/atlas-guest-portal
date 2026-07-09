@@ -1275,9 +1275,11 @@ useEffect(() => {
     const ppHideAtlasBranding = shouldHideAtlasBranding(ppTenantCtx, ppTenantOverrides);
     const ppBrandName = getTenantBrandName();
     const ppHasRealHost = !!data.hostName?.trim();
+    // TASK-4311: On the marketplace, check for ?tenant=TenantName query param to show the actual listing's tenant
+    const tenantNameFromUrl = searchParams.get('tenant')?.trim();
     const ppHostDisplayName = ppHasRealHost
       ? data.hostName!.trim()
-      : `Listed by ${ppBrandName}`;
+      : tenantNameFromUrl ? `Listed by ${tenantNameFromUrl}` : `Listed by ${ppBrandName}`;
     const ppHostInitial = ppHostDisplayName.charAt(0).toUpperCase();
     const ppHasOnlinePayment =
       typeof _getTenantCtx()?.paymentProvider === 'string' && _getTenantCtx()?.paymentProvider !== 'MANUAL';
