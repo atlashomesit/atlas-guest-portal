@@ -1560,7 +1560,7 @@ const SearchPage = () => {
                             )}
                             <p className="text-sm text-text-muted">per night</p>
                             <p className="text-xs text-text-muted">
-                              {formatEstTotalInclGst(displayedPrice, estimateNights, formatDisplayCurrency)}
+                              {formatEstTotalInclGst(displayedPrice, estimateNights, formatDisplayCurrency, 3, unit.isGstRegistered)}
                             </p>
                           </>
                         );

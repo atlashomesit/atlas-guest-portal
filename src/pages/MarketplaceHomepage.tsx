@@ -375,9 +375,9 @@ export default function MarketplaceHomepage() {
                     <span className="ml-1 text-sm font-normal text-text-muted">/ night</span>
                   </p>
 
-                  {/* TASK-1873/TASK-2903: GST-inclusive estimate — use shared utility for consistency */}
+                  {/* TASK-1873/TASK-2903: GST-inclusive estimate — use shared utility for consistency; TASK-4312: respect listing GST status */}
                   <p className="text-xs text-text-muted">
-                    {formatEstTotalInclGst(item.pricePerNight, 2, (amount) => formatCurrency(amount, { maximumFractionDigits: 0 }))}
+                    {formatEstTotalInclGst(item.pricePerNight, 2, (amount) => formatCurrency(amount, { maximumFractionDigits: 0 }), 3, item.isGstRegistered)}
                   </p>
 
                   {/* TASK-4511: Owner-share trust badge — no nightlyPrice prop (matches SearchPage.tsx's

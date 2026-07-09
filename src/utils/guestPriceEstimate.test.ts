@@ -23,4 +23,17 @@ describe('guestPriceEstimate GST slab (TASK-2870/2871)', () => {
     expect(label).toContain('2 nights');
     expect(label).toContain('3% payment processing');
   });
+
+  it('respects isGstRegistered flag — omits GST when false (TASK-4312)', () => {
+    // Non-registered host: 3000 × 1 night, no GST, +3% fee = 3000 + 90 = 3090
+    const labelNoGst = formatEstTotalInclGst(3000, 1, (n) => `₹${n}`, 3, false);
+    expect(labelNoGst).toContain('est. total');
+    expect(labelNoGst).not.toContain('GST');
+    expect(labelNoGst).toContain('3% payment processing');
+
+    // Registered host (default): same rate applies 5% GST = 3000 + 150 (GST) = 3150, +3% fee = 3150 + 95 = 3245
+    const labelWithGst = formatEstTotalInclGst(3000, 1, (n) => `₹${n}`, 3, true);
+    expect(labelWithGst).toContain('5% GST');
+    expect(labelWithGst).toContain('3% payment processing');
+  });
 });
