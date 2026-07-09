@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getTenantBrandName } from "../tenant/displayBrand";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react"; // TASK-1476
@@ -14,6 +14,8 @@ import { getContactEmail, getContactPhone, hasHostContact } from "../config/cont
 import { useGuestBookingQrToken } from "../hooks/useGuestBookingQrToken";
 import { formatCurrency } from "../utils/formatting";
 import GuestMessageThread from "../components/messaging/GuestMessageThread";
+
+const GuestAssistant = lazy(() => import("../components/GuestAssistant")); // TASK-4415
 
 /** Minimal shape of the non-standard `beforeinstallprompt` event — only `prompt()` is used here. */
 interface BeforeInstallPromptEvent extends Event {
@@ -1231,6 +1233,11 @@ export default function BookingConfirmationPage() {
         {/* TASK-4333: guest-facing messages thread — read + reply to host */}
         {bookingId && token && (
           <GuestMessageThread bookingId={Number(bookingId)} token={token} />
+        )}
+
+        {/* TASK-4415: guest self-serve FAQ — same as listing detail page */}
+        {booking.listingId && (
+          <GuestAssistant listingId={booking.listingId} />
         )}
 
         {/* WiFi */}
