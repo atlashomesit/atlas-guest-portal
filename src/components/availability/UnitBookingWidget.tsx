@@ -347,6 +347,14 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
       hasHydratedFromContextRef.current = true;
       return;
     }
+    // TASK-4556: enforce min-stay on URL-hydrated dates
+    const nights = calculateNights(start, end);
+    if (minStayNights > 1 && nights < minStayNights) {
+      setDateRange({ startDate: start, endDate: end });
+      setDateError(`Minimum stay is ${minStayNights} nights.`);
+      hasHydratedFromContextRef.current = true;
+      return;
+    }
     setDateRange({ startDate: start, endDate: end });
     hasHydratedFromContextRef.current = true;
   }, [booking.checkIn, booking.checkOut, today]);
@@ -516,11 +524,12 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
       }
       
       // Update date range to next available date if found
+      // TASK-4556: respect minStayNights when auto-selecting
       if (nextAvailableDate) {
         hasAutoAdjustedRef.current = true;
         setDateRange({
           startDate: nextAvailableDate,
-          endDate: addDays(nextAvailableDate, 1),
+          endDate: addDays(nextAvailableDate, Math.max(1, minStayNights)),
         });
       }
     } else {
@@ -1060,6 +1069,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     const stayNights = calculateNights(checkinIst, checkoutIst);
     if (stayNights < 1) {
       setDateError('Check-out must be after check-in.');
+      return;
+    }
+    // TASK-4556: enforce min-stay on handleReserve (like handleRangeChange does)
+    if (minStayNights > 1 && stayNights < minStayNights) {
+      setDateError(`Minimum stay is ${minStayNights} nights.`);
       return;
     }
 
