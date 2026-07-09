@@ -45,94 +45,19 @@ function listingTimeToIcsHHMM(t: string | undefined, fallback: string): string {
 }
 
 /** TASK-2490: guest web self-check-in form — posts arrival time + party size + optional ID link. */
-function SelfCheckInCard({ bookingId, token }: { bookingId: number; token: string }) {
-  const [arrival, setArrival] = useState("");
-  const [guests, setGuests] = useState("");
-  const [idUrl, setIdUrl] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [done, setDone] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
-  const submit = async () => {
-    setSubmitting(true);
-    setErr(null);
-    try {
-      const res = await fetch(
-        buildApiUrl(`/api/guest/bookings/${bookingId}/check-in?t=${encodeURIComponent(token)}`),
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Accept: "application/json", ...getApiHeaders() },
-          body: JSON.stringify({
-            estimatedArrivalTime: arrival || null,
-            guestCount: guests ? Number(guests) : null,
-            idDocumentUrl: idUrl.trim() || null,
-          }),
-        },
-      );
-      if (!res.ok) throw new Error("submit failed");
-      setDone(true);
-    } catch {
-      setErr("Could not submit your check-in details. Please try again.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  if (done) {
-    return (
-      <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5" data-testid="self-checkin-done">
-        <h2 className="text-sm font-semibold text-text-primary mb-1">✓ Check-in details received</h2>
-        <p className="text-sm text-text-secondary">Thanks! Your host now has your arrival details.</p>
-      </div>
-    );
-  }
-
+function SelfCheckInCard() {
+  // TASK-4514: Card is now a status + CTA into canonical SelfCheckIn flow
+  // The divergent /api/guest/bookings/{bookingId}/check-in endpoint is superseded by the canonical flow
   return (
-    <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3" data-testid="self-checkin-card">
-      <h2 className="text-sm font-semibold text-text-primary">Web check-in</h2>
-      <p className="text-sm text-text-secondary">Share your arrival details so your host can prepare for you.</p>
-      {err && <p className="text-sm text-red-600" role="alert">{err}</p>}
-      <label className="block text-sm">
-        <span className="text-text-secondary">Estimated arrival time</span>
-        <input
-          type="time"
-          value={arrival}
-          onChange={(e) => setArrival(e.target.value)}
-          className="mt-1 block w-full rounded-lg border border-border-subtle px-3 py-3 text-base"
-          data-testid="self-checkin-arrival"
-        />
-      </label>
-      <label className="block text-sm">
-        <span className="text-text-secondary">Number of guests</span>
-        <input
-          type="number"
-          min={1}
-          value={guests}
-          onChange={(e) => setGuests(e.target.value)}
-          className="mt-1 block w-full rounded-lg border border-border-subtle px-3 py-3 text-base"
-          data-testid="self-checkin-guests"
-        />
-      </label>
-      <label className="block text-sm">
-        <span className="text-text-secondary">ID document link (optional)</span>
-        <input
-          type="url"
-          value={idUrl}
-          onChange={(e) => setIdUrl(e.target.value)}
-          placeholder="https://…"
-          className="mt-1 block w-full rounded-lg border border-border-subtle px-3 py-3 text-base"
-          data-testid="self-checkin-id"
-        />
-      </label>
-      <button
-        type="button"
-        disabled={submitting}
-        onClick={() => void submit()}
-        className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-3 hover:bg-brand-primary/90 transition-colors disabled:opacity-70"
-        data-testid="self-checkin-submit"
+    <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5" data-testid="self-checkin-done">
+      <h2 className="text-sm font-semibold text-text-primary mb-1">Complete your check-in</h2>
+      <p className="text-sm text-text-secondary mb-3">Share your arrival details and verify your ID through our secure check-in process.</p>
+      <a
+        href="/check-in"
+        className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-3 hover:bg-brand-primary/90 transition-colors"
       >
-        {submitting ? "Submitting…" : "Submit check-in"}
-      </button>
+        Start check-in →
+      </a>
     </div>
   );
 }
@@ -1242,7 +1167,7 @@ export default function BookingConfirmationPage() {
 
         {/* TASK-2490: guest web self-check-in */}
         {!isCancelled && bookingId && token && (
-          <SelfCheckInCard bookingId={Number(bookingId)} token={token} />
+          <SelfCheckInCard />
         )}
 
         {/* TASK-4333: guest-facing messages thread — read + reply to host */}
