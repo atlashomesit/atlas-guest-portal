@@ -118,13 +118,16 @@ export default function SelfCheckIn() {
     setBusy(true);
     setError("");
     try {
-      // TASK-4009: Upload ID document if provided
+      // TASK-4346: Upload ID document if provided — reference-scoped auth (bookingRef + last name),
+      // same factor as the rest of self check-in. NOT a login/OTP/JWT step.
       let idDocumentUrl: string | null = null;
       if (idFile) {
         const formData = new FormData();
         formData.append("file", idFile);
         const uploadRes = await fetch(
-          buildApiUrl(`/api/guests/kyc-documents`),
+          buildApiUrl(
+            `/api/public/checkin/${encodeURIComponent(bookingRef.trim())}/id-document?lastName=${encodeURIComponent(lastName.trim())}`
+          ),
           {
             method: "POST",
             headers: getApiHeaders(),
@@ -132,12 +135,12 @@ export default function SelfCheckIn() {
           }
         );
         if (!uploadRes.ok) {
-          console.warn("ID upload failed, continuing without it");
-          // Non-critical — don't fail the whole checkin
-        } else {
-          const uploadData = (await uploadRes.json()) as { url?: string };
-          idDocumentUrl = uploadData.url || null;
+          setError("Could not upload your ID document. Please try again or skip this step.");
+          setBusy(false);
+          return;
         }
+        const uploadData = (await uploadRes.json()) as { url?: string };
+        idDocumentUrl = uploadData.url || null;
       }
 
       const url = buildApiUrl(`/api/public/checkin/${encodeURIComponent(bookingRef.trim())}/complete`);
