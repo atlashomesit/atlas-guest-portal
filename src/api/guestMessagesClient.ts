@@ -13,6 +13,8 @@ export type GuestConversationMessage = {
 export type GuestConversationThread = {
   conversationId: number | null;
   messages: GuestConversationMessage[];
+  /** TASK-4359: true if the host has replied since the guest last viewed this thread. */
+  hasUnreadMessages?: boolean;
 };
 
 /** Contract: GET /api/guest/bookings/{bookingId}/messages?t={token} */
