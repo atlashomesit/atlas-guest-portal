@@ -12,6 +12,7 @@ import { trackEvent } from '../../../utils/analytics';
 import { getFavoriteIds } from '../../../utils/guestHistory';
 import { useBooking } from '../../../contexts/BookingContext';
 import { useTranslation } from '../../../hooks/useTranslation';
+import { LANGUAGE_SWITCHER_ENABLED } from '../../../i18n/i18n'; // TASK-4517
 
 const Navbar = () => {
   const tenant = getTenantContext();
@@ -157,44 +158,46 @@ const Navbar = () => {
           <div className="util-bar-right">
             <a className="util-bar-phone" href={telLink}>{formatDisplayNumber()}</a>
             <span className="util-bar-sep" aria-hidden="true" />
-            {/* TASK-4018: Language switcher */}
-            <div className="relative">
-              <button
-                type="button"
-                className="util-bar-locale lang-switcher"
-                onClick={() => setLangMenuOpen(!langMenuOpen)}
-                onBlur={() => window.setTimeout(() => setLangMenuOpen(false), 150)}
-                aria-label="Change language"
-                aria-expanded={langMenuOpen}
-              >
-                {language.toUpperCase()}
-              </button>
-              {langMenuOpen && (
-                <div
-                  className="absolute right-0 top-full z-50 mt-1 min-w-[8rem] rounded-lg border border-border-subtle bg-bg-surface shadow-lg"
-                  role="menu"
+            {/* TASK-4018: Language switcher — TASK-4517: hidden until translation coverage is real */}
+            {LANGUAGE_SWITCHER_ENABLED && (
+              <div className="relative">
+                <button
+                  type="button"
+                  className="util-bar-locale lang-switcher"
+                  onClick={() => setLangMenuOpen(!langMenuOpen)}
+                  onBlur={() => window.setTimeout(() => setLangMenuOpen(false), 150)}
+                  aria-label="Change language"
+                  aria-expanded={langMenuOpen}
                 >
-                  {availableLanguages.map((lang) => (
-                    <button
-                      key={lang}
-                      type="button"
-                      role="menuitem"
-                      className={`block w-full text-left px-4 py-2 text-sm ${
-                        language === lang
-                          ? 'bg-brand-primary/10 font-semibold text-brand-primary'
-                          : 'text-text-primary hover:bg-bg-muted'
-                      }`}
-                      onClick={() => {
-                        changeLanguage(lang);
-                        setLangMenuOpen(false);
-                      }}
-                    >
-                      {getLanguageName(lang)}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+                  {language.toUpperCase()}
+                </button>
+                {langMenuOpen && (
+                  <div
+                    className="absolute right-0 top-full z-50 mt-1 min-w-[8rem] rounded-lg border border-border-subtle bg-bg-surface shadow-lg"
+                    role="menu"
+                  >
+                    {availableLanguages.map((lang) => (
+                      <button
+                        key={lang}
+                        type="button"
+                        role="menuitem"
+                        className={`block w-full text-left px-4 py-2 text-sm ${
+                          language === lang
+                            ? 'bg-brand-primary/10 font-semibold text-brand-primary'
+                            : 'text-text-primary hover:bg-bg-muted'
+                        }`}
+                        onClick={() => {
+                          changeLanguage(lang);
+                          setLangMenuOpen(false);
+                        }}
+                      >
+                        {getLanguageName(lang)}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
