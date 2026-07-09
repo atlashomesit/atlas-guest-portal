@@ -8,12 +8,17 @@ const DEFAULT_SIZES = "(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
 const PLACEHOLDER_CLASS =
   "bg-bg-muted bg-[linear-gradient(135deg,color-mix(in_srgb,var(--border-subtle)_55%,transparent)_0%,color-mix(in_srgb,var(--bg-muted)_92%,transparent)_100%)]";
 
-/** imgproxy-style params break Azure private blobs and are ignored by most static file hosts */
+/**
+ * TASK-4513: Enable responsive srcset for Azure blob storage (Option a).
+ * Query params like ?w=480 are safe for Azure blobs and ignored if not supported.
+ * This degrades gracefully: if the host doesn't resize, the full image still loads.
+ */
 function shouldBuildResponsiveSrcSet(src: string): boolean {
   try {
     const base = typeof window !== "undefined" ? window.location.origin : "https://example.invalid";
     const url = new URL(src, base);
-    if (url.hostname.includes("blob.core.windows.net")) return false;
+    // Allow Azure blob URLs (TASK-4513 Option a)
+    if (url.hostname.includes("blob.core.windows.net")) return true;
     if (url.hostname === "localhost" || url.hostname === "127.0.0.1") return false;
     if (url.pathname.includes("/uploads/")) return false;
     return true;
