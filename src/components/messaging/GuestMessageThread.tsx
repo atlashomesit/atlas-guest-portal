@@ -35,6 +35,7 @@ export default function GuestMessageThread({ bookingId, token }: { bookingId: nu
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
   const threadEndRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(
@@ -44,6 +45,7 @@ export default function GuestMessageThread({ bookingId, token }: { bookingId: nu
         // Defensive: a malformed/partial payload (missing `messages`) must not white-screen
         // the confirmation page — fall back to an empty thread. (TASK-4333 hardening)
         setMessages(thread?.messages ?? []);
+        setHasUnreadMessages(thread?.hasUnreadMessages ?? false);
         setLoadError(null);
       } catch (err) {
         if ((err as { name?: string })?.name === "AbortError") return;
@@ -89,7 +91,15 @@ export default function GuestMessageThread({ bookingId, token }: { bookingId: nu
 
   return (
     <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3" data-testid="guest-message-thread">
-      <h2 className="text-sm font-semibold text-text-primary">Messages</h2>
+      <div className="flex items-center gap-2">
+        <h2 className="text-sm font-semibold text-text-primary">Messages</h2>
+        {hasUnreadMessages && (
+          <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full" data-testid="messages-unread-badge">
+            <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
+            New reply
+          </span>
+        )}
+      </div>
       <p className="text-sm text-text-secondary">Ask your host a question or read past replies.</p>
 
       {loading ? (
