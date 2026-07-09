@@ -671,13 +671,11 @@ const GuestDetailsPage: React.FC = () => {
           const idempotencyKey = crypto.randomUUID();
           track('start_checkout', numericListingId);
 
-          console.log('[GuestDetailsPage] Creating Razorpay order for booking...');
           const response = await axios.post(buildApiUrl('/api/Razorpay/order'), payload, {
             headers: getOrderRequestHeaders(idempotencyKey),
             timeout: 20000,
           });
           const responseData = response.data;
-          console.log('[GuestDetailsPage] Razorpay order created successfully:', { orderId: responseData?.orderId, amount: responseData?.amount, keyId: responseData?.keyId });
 
           const {
             keyId: respKeyId,
@@ -902,20 +900,18 @@ const GuestDetailsPage: React.FC = () => {
                 throw new Error('Razorpay SDK is not available. Please refresh and try again.');
               }
 
-              console.log('[GuestDetailsPage] Creating Razorpay instance with order:', { orderId, amount, keyId });
               type RazorpayCheckout = {
                 open: () => void;
                 on: (event: string, handler: (r: unknown) => void) => void;
               };
               const rzp = new window.Razorpay(options) as RazorpayCheckout;
-              console.log('[GuestDetailsPage] Razorpay instance created successfully');
 
               rzp.on('payment.failed', (failRes: unknown) => {
                 paymentCompleted = true;
                 const fr = failRes as { error?: { code?: string; description?: string } };
                 const code = String(fr?.error?.code ?? '');
                 const desc = String(fr?.error?.description ?? '');
-                console.log('[GuestDetailsPage] Payment failed:', { code, desc });
+
                 setOrderError(`No money was taken. ${mapRazorpayFailureCode(code, desc)}`);
                 // TASK-2906: Store the order ID and amount so the "Resume payment" button can retry
                 setRazorpayOrderId(orderId);
@@ -926,9 +922,7 @@ const GuestDetailsPage: React.FC = () => {
               rzp.on('close', handleClose);
 
               track('payment_init', holdListingId ? Number(holdListingId) : 0);
-              console.log('[GuestDetailsPage] Opening Razorpay modal for order:', orderId);
               rzp.open();
-              console.log('[GuestDetailsPage] Modal open call completed');
             } catch (err) {
               console.error('[GuestDetailsPage] Razorpay init error:', err);
               setOrderError("Couldn't reach our servers. Your details are saved — check your connection and try again. No payment was taken.");
