@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { FaHeart, FaRegHeart } from 'react-icons/fa';
 import { buildApiUrl } from '@/api/client';
 import { formatCurrency } from '@/utils/formatting'; // TASK-1872
@@ -63,15 +63,26 @@ export default function MarketplaceHomepage() {
   // TL-PROP: map view of all marketplace properties. Toggle to show/hide.
   const [showMap, setShowMap] = useState(false);
   const [mapPins, setMapPins] = useState<MapPin[]>([]);
+  // TASK-4413: read dates and guest count from URL params (from AirbnbSearchBar)
+  const [searchParams] = useSearchParams();
 
   const apiPath = useMemo(() => {
     const p = new URLSearchParams();
     if (category !== 'all') p.set('category', category);
     if (query.trim()) p.set('city', query.trim());
+    // TASK-4413: pass date/guest filters to API if present
+    const city = searchParams.get('city');
+    if (city?.trim()) p.set('city', city.trim());
+    const checkIn = searchParams.get('checkIn');
+    if (checkIn) p.set('checkIn', checkIn);
+    const checkOut = searchParams.get('checkOut');
+    if (checkOut) p.set('checkOut', checkOut);
+    const guests = searchParams.get('guests');
+    if (guests) p.set('guests', guests);
     p.set('page', '1');
     p.set('pageSize', '20');
     return `/marketplace/listings?${p.toString()}`;
-  }, [category, query]);
+  }, [category, query, searchParams]);
 
   useEffect(() => {
     let cancelled = false;
