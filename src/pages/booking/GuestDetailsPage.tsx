@@ -936,6 +936,18 @@ const GuestDetailsPage: React.FC = () => {
                 },
               };
 
+              // TASK-4541: gate opening Razorpay if hold has expired or insufficient time remains
+              if (holdExpired) {
+                throw new Error('Hold expired — please re-select your dates.');
+              }
+              if (holdExpiresAt) {
+                const remainingMs = new Date(holdExpiresAt).getTime() - Date.now();
+                // Require ≥ 30 seconds remaining to open checkout (guest has time to pay)
+                if (remainingMs < 30000) {
+                  throw new Error(`Hold expires in ${Math.ceil(remainingMs / 1000)} seconds — please re-select your dates to avoid an interruption during payment.`);
+                }
+              }
+
               if (!window.Razorpay) {
                 throw new Error('Razorpay SDK is not available. Please refresh and try again.');
               }
@@ -946,7 +958,28 @@ const GuestDetailsPage: React.FC = () => {
               };
               const rzp = new window.Razorpay(options) as RazorpayCheckout;
 
+              // TASK-4541: monitor hold expiry while payment modal is open and close on expiry
+              const expireCheckInterval = setInterval(() => {
+                if (holdExpired || !holdExpiresAt) {
+                  clearInterval(expireCheckInterval);
+                  if (holdExpired && !paymentCompleted) {
+                    paymentCompleted = true;
+                    setOrderError('Hold expired while payment was in progress. Please re-select your dates and try again.');
+                    setIsSubmitting(false);
+                  }
+                  return;
+                }
+                const remainingMs = new Date(holdExpiresAt).getTime() - Date.now();
+                if (remainingMs <= 0 && !paymentCompleted) {
+                  clearInterval(expireCheckInterval);
+                  paymentCompleted = true;
+                  setOrderError('Hold expired while payment was in progress. Please re-select your dates and try again.');
+                  setIsSubmitting(false);
+                }
+              }, 1000);
+
               rzp.on('payment.failed', (failRes: unknown) => {
+                clearInterval(expireCheckInterval);
                 paymentCompleted = true;
                 const fr = failRes as { error?: { code?: string; description?: string } };
                 const code = String(fr?.error?.code ?? '');
@@ -959,7 +992,10 @@ const GuestDetailsPage: React.FC = () => {
                 setPaymentCancelled(false);
                 setIsSubmitting(false);
               });
-              rzp.on('close', handleClose);
+              rzp.on('close', () => {
+                clearInterval(expireCheckInterval);
+                handleClose();
+              });
 
               track('payment_init', holdListingId ? Number(holdListingId) : 0);
               rzp.open();
