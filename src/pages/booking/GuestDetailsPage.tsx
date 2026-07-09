@@ -421,6 +421,7 @@ const GuestDetailsPage: React.FC = () => {
 
   // ── Pricing ───────────────────────────────────────────────────────────────
   const baseAmount = priceBreakdown?.baseAmount ?? 0;
+  const globalDiscountAmount = priceBreakdown?.discountAmount ?? 0;
   const convenienceFeeAmount = priceBreakdown?.convenienceFeeAmount ?? 0;
   const nights = priceBreakdown?.nights ?? 0;
 
@@ -437,20 +438,26 @@ const GuestDetailsPage: React.FC = () => {
 
   const displayPrice = (n: number) => formatCurrency(n, { maximumFractionDigits: 0 });
 
-  // GST: 5% (≤₹7,500/night) or 18% (above) on accommodation — ADDITIVE per CPO-canonical
-  // formula 2026-05-21; 18% upper slab per the 22 Sep 2025 reform (TASK-2870).
-  // baseAmount from API is pre-GST (price_per_night × nights)
-  const perNight = nights > 0 ? Math.round(baseAmount / nights) : 0;
+  // TASK-4421: Apply global discount first, THEN compute GST on the discounted base.
+  // This matches PricingService.cs order-of-operations so displayTotal reconciles with the server.
+  // Order: baseAmount → global discount → discountedSubtotal → GST (5%/18%) → convenience fee
+  const discountedSubtotal = Math.max(0, baseAmount - globalDiscountAmount);
+
+  // GST: 5% (≤₹7,500/night) or 18% (above) on accommodation — computed on POST-discount base.
+  // 18% upper slab per the 22 Sep 2025 reform (TASK-2870).
+  // Recompute perNight from discountedSubtotal, not pre-discount baseAmount, to ensure
+  // GST slab decision is consistent with the server.
+  const perNight = nights > 0 ? Math.round(discountedSubtotal / nights) : 0;
   const gstSlabPercent = accommodationGstSlabPercent(perNight);
   const gstLineAmount =
-    gstSlabPercent != null && baseAmount > 0
-      ? accommodationGstLineAmount(baseAmount, perNight)
+    gstSlabPercent != null && discountedSubtotal > 0
+      ? accommodationGstLineAmount(discountedSubtotal, perNight)
       : 0;
 
-  // TASK-2631: Total = Base + GST + Service Fee + Add-ons − Discounts (CPO-canonical formula)
+  // TASK-4421 / TASK-2631: Total = (Base − GlobalDiscount) + GST(post-discount) + Service Fee + Add-ons − PromoDiscount − ReferralDiscount
   const displayTotal = Math.max(
     1,
-    baseAmount + gstLineAmount + convenienceFeeAmount + addOnsTotal - promoDiscountAmount - referralDiscountAmount,
+    discountedSubtotal + gstLineAmount + convenienceFeeAmount + addOnsTotal - promoDiscountAmount - referralDiscountAmount,
   );
 
   // ── Check-in/out display ─────────────────────────────────────────────────
