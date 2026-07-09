@@ -324,11 +324,12 @@ export default function BookingConfirmationPage() {
   const [searchParams] = useSearchParams();
   const token = searchParams.get("t");
   const bookingIdNum = bookingId ? Number(bookingId) : undefined;
-  const { qrToken, expiresAtUtc: qrExpiresAtUtc } = useGuestBookingQrToken(
+  const { qrToken, expiresAtUtc: qrExpiresAtUtc, loading: qrTokenLoading } = useGuestBookingQrToken(
     Number.isFinite(bookingIdNum) ? bookingIdNum : undefined,
     token ?? undefined,
   );
-  const qrEncodeToken = qrToken ?? token;
+  // TASK-4437: only encode the rotating qrToken, never the durable access token
+  const qrEncodeToken = qrToken;
   const brandName = getTenantBrandName();
 
   const [booking, setBooking] = useState<BookingSummary | null>(null);
@@ -1077,29 +1078,43 @@ export default function BookingConfirmationPage() {
           )}
         </div>
 
-        {/* TASK-1476: QR check-in code — guests can scan on arrival to confirm identity */}
-        {!isCancelled && token && qrEncodeToken && (
+        {/* TASK-1476: QR check-in code — guests can scan on arrival to confirm identity
+            TASK-4437: only show QR once the rotating qrToken is available; show loading state until then */}
+        {!isCancelled && token && (
           <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-5 flex flex-col items-center gap-3" data-testid="confirmation-qr-section">
-            <QRCodeSVG
-              value={`${window.location.origin}/booking/${bookingId}?t=${encodeURIComponent(qrEncodeToken)}`}
-              size={180}
-              bgColor="#ffffff"
-              fgColor="#0F172A"
-              level="M"
-              aria-label={`QR code for booking #${bookingId}`}
-            />
-            <p className="text-sm text-center text-text-secondary max-w-xs">
-              Show this to the host on arrival
-            </p>
-            {qrToken && qrExpiresAtUtc ? (
-              <p className="text-xs text-center text-text-muted max-w-xs" data-testid="confirmation-qr-expiry">
-                This code refreshes automatically and expires at{" "}
-                {new Date(qrExpiresAtUtc).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}.
-              </p>
+            {qrTokenLoading ? (
+              <>
+                <div className="w-[180px] h-[180px] bg-gray-100 rounded-lg flex items-center justify-center animate-pulse">
+                  <span className="text-text-muted text-xs">Loading...</span>
+                </div>
+                <p className="text-sm text-center text-text-secondary max-w-xs">
+                  Generating your check-in code...
+                </p>
+              </>
+            ) : qrEncodeToken ? (
+              <>
+                <QRCodeSVG
+                  value={`${window.location.origin}/booking/${bookingId}?t=${encodeURIComponent(qrEncodeToken)}`}
+                  size={180}
+                  bgColor="#ffffff"
+                  fgColor="#0F172A"
+                  level="M"
+                  aria-label={`QR code for booking #${bookingId}`}
+                />
+                <p className="text-sm text-center text-text-secondary max-w-xs">
+                  Show this to the host on arrival
+                </p>
+                {qrExpiresAtUtc ? (
+                  <p className="text-xs text-center text-text-muted max-w-xs" data-testid="confirmation-qr-expiry">
+                    This code refreshes automatically and expires at{" "}
+                    {new Date(qrExpiresAtUtc).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}.
+                  </p>
+                ) : null}
+                <p className="text-xs text-center text-support-error/80 max-w-xs">
+                  Don't share this QR publicly — anyone who scans it can access your booking details.
+                </p>
+              </>
             ) : null}
-            <p className="text-xs text-center text-support-error/80 max-w-xs">
-              Don't share this QR publicly — anyone who scans it can access your booking details.
-            </p>
           </div>
         )}
 
