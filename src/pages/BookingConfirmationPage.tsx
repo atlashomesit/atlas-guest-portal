@@ -1,4 +1,4 @@
-import { lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getTenantBrandName } from "../tenant/displayBrand";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react"; // TASK-1476
@@ -1177,7 +1177,9 @@ export default function BookingConfirmationPage() {
 
         {/* TASK-4415: guest self-serve FAQ — same as listing detail page */}
         {booking.listingId && (
-          <GuestAssistant listingId={booking.listingId} />
+          <Suspense fallback={null}>
+            <GuestAssistant listingId={booking.listingId} />
+          </Suspense>
         )}
 
         {/* WiFi */}

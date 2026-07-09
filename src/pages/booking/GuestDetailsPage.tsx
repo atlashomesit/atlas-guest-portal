@@ -681,6 +681,7 @@ const GuestDetailsPage: React.FC = () => {
         let bookingId: number;
         let amount: number;
         let bookingToken: string | null = null;
+        let idempotencyKey: string;
 
         const pendingLaunch = pendingRazorpayLaunchRef.current;
         if (pendingLaunch) {

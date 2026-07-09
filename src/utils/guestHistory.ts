@@ -1,5 +1,5 @@
 import { buildApiUrl, getApiHeaders } from "../api/client";
-import { GuestAuthContext } from "../contexts/GuestAuthContext";
+import { getCachedGuestAuthState } from "../storage/guestAuthStorage";
 
 const RECENT_KEY = "atlas_recent_listings_v1";
 const FAV_KEY = "atlas_favorites_v1";
@@ -85,7 +85,7 @@ export function toggleFavorite(listingId: number): boolean {
     /* non-browser */
   }
   // TASK-4515: sync to server if guest is authenticated
-  if (typeof window !== "undefined" && window.guestAuthContext?.isAuthenticated) {
+  if (getCachedGuestAuthState()?.isAuthenticated) {
     syncFavoritesToServer(next).catch(() => { /* non-critical — fire and forget */ });
   }
   // TASK-1709: persist save to backend if we have the guest's email (from previous booking).
@@ -121,9 +121,12 @@ async function syncFavoritesToServer(favoriteIds: number[]): Promise<void> {
   }
 }
 
-/** TASK-4515: load favorite listing IDs from server if guest is authenticated (merge server + local). */
-export async function loadFavoritesIfAuthenticated(authContext: typeof GuestAuthContext): Promise<void> {
-  if (favoritesSynced || !authContext?.isAuthenticated) return;
+/**
+ * TASK-4515: load favorite listing IDs from server if guest is authenticated (merge server + local).
+ * Not yet wired into a call site (e.g. GuestAuthProvider login/hydration) — follow-on work.
+ */
+export async function loadFavoritesIfAuthenticated(): Promise<void> {
+  if (favoritesSynced || !getCachedGuestAuthState()?.isAuthenticated) return;
   favoritesSynced = true;
 
   try {
