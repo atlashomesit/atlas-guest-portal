@@ -42,6 +42,9 @@ export default function SelfCheckIn() {
   // TASK-4009: Government ID file upload
   const [idFile, setIdFile] = useState<File | null>(null);
   const [idFilePreview, setIdFilePreview] = useState<string | null>(null);
+  // TASK-4514: Collect arrival time and guest count in canonical flow
+  const [arrivalTime, setArrivalTime] = useState("");
+  const [guestCount, setGuestCount] = useState("");
 
   const stepIndex: Record<Step, number> = {
     auth: 0, summary: 1, "id-upload": 2, "house-rules": 3, done: 4,
@@ -140,6 +143,9 @@ export default function SelfCheckIn() {
           houseRulesAccepted: rulesAccepted,
           govtIdType: govtIdType || null,
           govtIdNumber: govtIdNumber.trim() || null,
+          // TASK-4514: include arrival time and guest count from canonical flow
+          estimatedArrivalTime: arrivalTime || null,
+          guestCount: guestCount ? Number(guestCount) : null,
         }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -251,6 +257,34 @@ export default function SelfCheckIn() {
                 {details.checkinInstructions}
               </div>
             )}
+
+            {/* TASK-4514: Collect arrival time and guest count in canonical flow */}
+            <div className="mb-5 pt-4 border-t border-border-subtle">
+              <h3 className="text-sm font-semibold text-text-primary mb-3">Arrival details</h3>
+              <label htmlFor="checkin-arrival-time" className="block text-sm font-medium text-text-primary mb-1">
+                Estimated arrival time (optional)
+              </label>
+              <input
+                id="checkin-arrival-time"
+                type="time"
+                value={arrivalTime}
+                onChange={(e) => setArrivalTime(e.target.value)}
+                className="w-full rounded-lg border border-border-subtle px-4 py-2.5 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-brand-primary"
+              />
+
+              <label htmlFor="checkin-guest-count" className="block text-sm font-medium text-text-primary mb-1">
+                Number of guests (optional)
+              </label>
+              <input
+                id="checkin-guest-count"
+                type="number"
+                min="1"
+                value={guestCount}
+                onChange={(e) => setGuestCount(e.target.value)}
+                placeholder="e.g. 2"
+                className="w-full rounded-lg border border-border-subtle px-4 py-2.5 text-sm mb-5 focus:outline-none focus:ring-2 focus:ring-brand-primary"
+              />
+            </div>
 
             <button
               onClick={() => setStep("id-upload")}
