@@ -13,6 +13,8 @@ import AirbnbSearchBar from '@/components/marketplace/airbnbSearch/AirbnbSearchB
 import { buildHomeUnitPath, getPropertySlug } from '@/utils/navigation';
 import { sanitizeGuestImageUrl } from '@/utils/guestImageUrl';
 import { enrichMarketplaceCoverItems } from '@/utils/marketplaceListingCover';
+import ReviewSummary from '@/components/ReviewSummary'; // TASK-4511
+import OwnerShareBadge from '@/components/OwnerShareBadge'; // TASK-4511
 
 // TL-PROP: shape from GET /marketplace/properties (powers the map view).
 type MarketplacePropertyApi = {
@@ -68,6 +70,11 @@ export default function MarketplaceHomepage() {
   const [mapPins, setMapPins] = useState<MapPin[]>([]);
   // TASK-4413: read dates and guest count from URL params (from AirbnbSearchBar)
   const [searchParams] = useSearchParams();
+  // TASK-4413: price-range control — client-side filter over the fetched grid, mirroring
+  // SearchPage.tsx's minPrice/maxPrice pattern. Local state (not URL) — the marketplace
+  // grid fetch already covers date/guest/category/city; price narrows the same result set.
+  const [minPriceInput, setMinPriceInput] = useState('');
+  const [maxPriceInput, setMaxPriceInput] = useState('');
 
   const apiPath = useMemo(() => {
     const p = new URLSearchParams();
@@ -106,6 +113,34 @@ export default function MarketplaceHomepage() {
       cancelled = true;
     };
   }, [apiPath]);
+
+  // TASK-4413: client-side price filter over the fetched grid, mirroring SearchPage.tsx's
+  // minPrice/maxPrice behavior. Applying a price filter does not touch `category` state, so
+  // the active category tab selection is preserved.
+  const minPrice = useMemo(() => {
+    const n = Number(minPriceInput);
+    return minPriceInput.trim() !== '' && Number.isFinite(n) ? n : null;
+  }, [minPriceInput]);
+  const maxPrice = useMemo(() => {
+    const n = Number(maxPriceInput);
+    return maxPriceInput.trim() !== '' && Number.isFinite(n) ? n : null;
+  }, [maxPriceInput]);
+
+  const visibleItems = useMemo(() => {
+    if (minPrice == null && maxPrice == null) return items;
+    return items.filter((item) => {
+      if (minPrice != null && item.pricePerNight < minPrice) return false;
+      if (maxPrice != null && item.pricePerNight > maxPrice) return false;
+      return true;
+    });
+  }, [items, minPrice, maxPrice]);
+
+  // TASK-4511: honest trust-strip numbers — derived entirely from the real /marketplace/listings
+  // response already fetched above. No fabricated/urgency copy.
+  const verifiedHomesCount = useMemo(
+    () => items.filter((item) => item.hasVerifiedPhotos).length,
+    [items],
+  );
 
   // TL-PROP: separately fetch the canonical marketplace properties endpoint for map pins.
   // Independent of the card grid — different endpoint shape, different fields.
@@ -154,6 +189,22 @@ export default function MarketplaceHomepage() {
       <h1 className="text-3xl font-bold text-text-primary">Atlastays Marketplace</h1>
       <p className="mt-2 text-text-body">Discover homes and rooms across verified hosts.</p>
 
+      {/* TASK-4511: trust strip — real computed numbers only, no fabricated stats/urgency. */}
+      {!loading && items.length > 0 && (
+        <div
+          data-testid="marketplace-trust-strip"
+          className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-text-muted"
+        >
+          <span>{verifiedHomesCount} Verified homes</span>
+          <span aria-hidden>·</span>
+          <span>{items.length} listings</span>
+          <span aria-hidden>·</span>
+          <span className="font-medium text-emerald-700">0% Platform commission</span>
+          <span aria-hidden>·</span>
+          <span>GST-inclusive pricing shown upfront · book direct</span>
+        </div>
+      )}
+
       <div className="mt-8">
         <AirbnbSearchBar />
       </div>
@@ -189,6 +240,46 @@ export default function MarketplaceHomepage() {
         )}
       </div>
 
+      {/* TASK-4413: price-range control — client-side filter over the fetched grid. */}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <label htmlFor="marketplace-min-price" className="text-sm font-medium text-text-muted">
+          Price / night
+        </label>
+        <input
+          id="marketplace-min-price"
+          type="number"
+          min={0}
+          inputMode="numeric"
+          placeholder="Min"
+          value={minPriceInput}
+          onChange={(e) => setMinPriceInput(e.target.value)}
+          className="min-h-[40px] w-24 rounded-lg border border-border px-3 py-1.5 text-sm"
+        />
+        <span aria-hidden className="text-text-muted">–</span>
+        <input
+          id="marketplace-max-price"
+          type="number"
+          min={0}
+          inputMode="numeric"
+          placeholder="Max"
+          value={maxPriceInput}
+          onChange={(e) => setMaxPriceInput(e.target.value)}
+          className="min-h-[40px] w-24 rounded-lg border border-border px-3 py-1.5 text-sm"
+        />
+        {(minPriceInput !== '' || maxPriceInput !== '') && (
+          <button
+            type="button"
+            onClick={() => {
+              setMinPriceInput('');
+              setMaxPriceInput('');
+            }}
+            className="min-h-[40px] rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-text-primary hover:bg-bg-muted"
+          >
+            Clear price
+          </button>
+        )}
+      </div>
+
       {showMap && mapPins.length > 0 && (
         <div className="mt-6">
           <MultiPinMap pins={mapPins} height={400} />
@@ -200,7 +291,7 @@ export default function MarketplaceHomepage() {
         {loading && Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
 
         {!loading &&
-          items.map((item) => {
+          visibleItems.map((item) => {
             const isFav = favIds.has(item.id);
 
             return (
@@ -275,6 +366,9 @@ export default function MarketplaceHomepage() {
                     </p>
                   )}
 
+                  {/* TASK-4511: keyword-bucketed sentiment chip — matches SearchPage.tsx card treatment */}
+                  <ReviewSummary listingId={item.id} />
+
                   {/* TASK-1872: formatCurrency replaces raw 'INR X' */}
                   <p className="text-xl font-bold text-text-primary">
                     {formatCurrency(item.pricePerNight, { maximumFractionDigits: 0 })}
@@ -285,6 +379,10 @@ export default function MarketplaceHomepage() {
                   <p className="text-xs text-text-muted">
                     {formatEstTotalInclGst(item.pricePerNight, 2, (amount) => formatCurrency(amount, { maximumFractionDigits: 0 }))}
                   </p>
+
+                  {/* TASK-4511: Owner-share trust badge — no nightlyPrice prop (matches SearchPage.tsx's
+                      BUG-7 fix; avoids leaking a fabricated host payout figure). */}
+                  <OwnerShareBadge className="self-start" />
 
                   <Link
                     className="mt-auto inline-flex min-h-[40px] items-center justify-center rounded-xl bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 transition-colors"
@@ -299,8 +397,9 @@ export default function MarketplaceHomepage() {
       </div>
 
       {/* TASK-4309: explicit empty state so a filter/search with no matches shows a
-          message instead of a blank gap between the filter bar and the footer. */}
-      {!loading && items.length === 0 && (
+          message instead of a blank gap between the filter bar and the footer.
+          TASK-4413: also covers a price filter that narrows the grid to zero results. */}
+      {!loading && visibleItems.length === 0 && (
         <div
           data-testid="marketplace-empty"
           className="mt-8 rounded-2xl border border-dashed border-border bg-bg-surface p-10 text-center"
