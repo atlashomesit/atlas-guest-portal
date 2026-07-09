@@ -123,9 +123,9 @@ const LAST_UPI_VPA_KEY = 'atlas_last_upi_vpa';
 const CHECKOUT_DRAFT_KEY = 'atlas_guest_checkout_draft';
 /** TASK-2882: survive hard reload on GuestDetailsPage with a still-valid server hold. */
 const CHECKOUT_HOLD_KEY = 'atlas_guest_checkout_hold';
-/** TASK-4296: must match the API's CheckoutHoldConstants.HoldMinutes (5). Drives both the
+/** TASK-4296, TASK-4432: must match the API's CheckoutHoldConstants.HoldMinutes (15). Drives both the
  *  countdown progress baseline and the hold-expiry copy so they agree on the real duration. */
-const CHECKOUT_HOLD_MINUTES = 5;
+const CHECKOUT_HOLD_MINUTES = 15;
 
 type CheckoutHoldCache = {
   holdId: number;
