@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
  * TASK-4513: Unit tests for responsive srcset builder in OptimizedImage.tsx
@@ -10,12 +10,20 @@ import { describe, expect, it, beforeEach } from 'vitest';
  * - Localhost exclusion
  */
 
-// Mock the window.location.origin for URL resolution
+// Mock the window.location.origin for URL resolution. MUST go through
+// vi.stubGlobal + unstubAllGlobals (same pattern as tenantResolver.test.ts /
+// runtime-config/loader.test.ts): the shared-fast vitest project runs with
+// isolate:false, so a raw `Object.defineProperty(global, 'window', ...)`
+// without a restore leaks a plain-object window into every later test file in
+// the worker and crashes react-dom commits (instanceof win.HTMLIFrameElement).
 beforeEach(() => {
-  Object.defineProperty(global, 'window', {
-    value: { location: { origin: 'https://dev.atlashomestays.com' } },
-    writable: true,
+  vi.stubGlobal('window', {
+    location: { origin: 'https://dev.atlashomestays.com' },
   });
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 // Helper function extracted from OptimizedImage.tsx for testing
