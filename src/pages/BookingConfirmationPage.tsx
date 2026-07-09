@@ -14,6 +14,7 @@ import { getContactEmail, getContactPhone, hasHostContact } from "../config/cont
 import { useGuestBookingQrToken } from "../hooks/useGuestBookingQrToken";
 import { formatCurrency } from "../utils/formatting";
 import GuestMessageThread from "../components/messaging/GuestMessageThread";
+import GuestGuidebook from "../components/GuestGuidebook"; // TASK-4510
 
 const GuestAssistant = lazy(() => import("../components/GuestAssistant")); // TASK-4415
 
@@ -103,6 +104,12 @@ interface BookingSummary {
   bookingRef?: string;
   /** TASK-2071: ISO 639-1 language code from guest profile. Null defaults to "en". */
   preferredLanguage?: string | null;
+  // TASK-4510: Digital Guest Guidebook
+  guidebookAppliancesText?: string | null;
+  guidebookWifiTroubleshootingText?: string | null;
+  guidebookTrashParkingText?: string | null;
+  guidebookCheckoutChecklistText?: string | null;
+  guidebookFoodThingsTodoText?: string | null;
 }
 
 const statusLabel: Record<string, { label: string; color: string }> = {
@@ -1198,6 +1205,17 @@ export default function BookingConfirmationPage() {
             <h2 className="text-sm font-semibold text-text-primary mb-1">📶 WiFi</h2>
             <p className="text-sm text-text-secondary">WiFi details will be available here 48 hours before check-in.</p>
           </div>
+        )}
+
+        {/* TASK-4510: Digital Guest Guidebook — host-authored content sections */}
+        {!isCancelled && (
+          <GuestGuidebook
+            appliances={booking.guidebookAppliancesText}
+            wifiTroubleshooting={booking.guidebookWifiTroubleshootingText}
+            trashParking={booking.guidebookTrashParkingText}
+            checkoutChecklist={booking.guidebookCheckoutChecklistText}
+            foodThingsToDo={booking.guidebookFoodThingsTodoText}
+          />
         )}
 
         {/* TASK-4086: nearby landmarks — non-sensitive context shown immediately, not gated on 72h window */}

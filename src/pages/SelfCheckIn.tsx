@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { buildApiUrl, getApiHeaders } from "../api/client";
 import SEO from "../components/SEO";
 import { getTenantBrandName } from "../tenant/displayBrand";
+import GuestGuidebook from "../components/GuestGuidebook"; // TASK-4510
 
 interface CheckinDetails {
   bookingRef: string;
@@ -20,6 +21,12 @@ interface CheckinDetails {
   doorCode: string;
   idUploadRequired: boolean;
   houseRulesSignedAt: string | null;
+  // TASK-4510: Digital Guest Guidebook
+  guidebookAppliancesText?: string | null;
+  guidebookWifiTroubleshootingText?: string | null;
+  guidebookTrashParkingText?: string | null;
+  guidebookCheckoutChecklistText?: string | null;
+  guidebookFoodThingsTodoText?: string | null;
 }
 
 type Step = "auth" | "summary" | "id-upload" | "house-rules" | "done";
@@ -439,6 +446,17 @@ export default function SelfCheckIn() {
               {details.wifiPassword && <InfoRow label="WiFi password" value={details.wifiPassword} />}
               {details.doorCode && <InfoRow label="Door code" value={details.doorCode} />}
               {details.emergencyContactPhone && <InfoRow label="Emergency contact" value={details.emergencyContactPhone} />}
+            </div>
+
+            {/* TASK-4510: Digital Guest Guidebook — shown after successful check-in */}
+            <div className="mb-6">
+              <GuestGuidebook
+                appliances={details.guidebookAppliancesText}
+                wifiTroubleshooting={details.guidebookWifiTroubleshootingText}
+                trashParking={details.guidebookTrashParkingText}
+                checkoutChecklist={details.guidebookCheckoutChecklistText}
+                foodThingsToDo={details.guidebookFoodThingsTodoText}
+              />
             </div>
 
             <a
