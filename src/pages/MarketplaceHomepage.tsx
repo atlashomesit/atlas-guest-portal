@@ -40,6 +40,9 @@ type MarketplaceItem = {
   // TASK-1873: rating + reviewCount for parity with ListingCard
   rating?: number | null;
   reviewCount?: number | null;
+  // TASK-4511: Trust signals
+  hasVerifiedPhotos?: boolean;
+  isGstRegistered?: boolean;
 };
 
 function marketplaceListingPath(item: Pick<MarketplaceItem, 'id' | 'title' | 'tenantSlug'>): string {
@@ -235,6 +238,22 @@ export default function MarketplaceHomepage() {
                 <div className="flex flex-1 flex-col gap-2 p-4">
                   <div className="text-xs uppercase tracking-wide text-text-muted">{item.tenantName}</div>
                   <h2 className="text-base font-semibold text-text-primary leading-snug">{item.title}</h2>
+
+                  {/* TASK-4511: Trust signal badges */}
+                  {(item.hasVerifiedPhotos || item.isGstRegistered) && (
+                    <div className="flex flex-wrap gap-1">
+                      {item.hasVerifiedPhotos && (
+                        <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full" title="Verified photos">
+                          ✓ Verified photos
+                        </span>
+                      )}
+                      {item.isGstRegistered && (
+                        <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full" title="GST registered">
+                          ✓ GST registered
+                        </span>
+                      )}
+                    </div>
+                  )}
 
                   {/* TASK-1873: neighborhood/city chip */}
                   {item.city && (
