@@ -991,9 +991,9 @@ const SearchPage = () => {
                 updateParam("availableNow", checked ? "true" : "");
                 if (checked && (checkIn || checkOut)) {
                   const now = new Date();
-                  const todayStr = now.toISOString().slice(0, 10);
+                  const todayStr = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(now);
                   const tom = new Date(now.getTime() + 86400000);
-                  const tomStr = tom.toISOString().slice(0, 10);
+                  const tomStr = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(tom);
                   updateParam("checkIn", todayStr);
                   updateParam("checkOut", tomStr);
                 }
