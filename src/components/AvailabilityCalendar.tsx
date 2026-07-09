@@ -6,7 +6,7 @@ import { useBooking } from '../contexts/BookingContext';
 
 interface DayEntry {
   date: string; // yyyy-MM-dd
-  status: 'available' | 'blocked' | 'booked' | 'turnover';
+  status: 'available' | 'blocked' | 'booked' | 'turnover' | 'hold'; // TASK-4557: include 'hold'
 }
 
 interface Props {
@@ -213,7 +213,8 @@ export default function AvailabilityCalendar({ listingId, onDateSelect }: Props)
       } else if (isPast) {
         bg = 'bg-bg-muted cursor-default';
         text = 'text-gray-600';
-      } else if (status === 'booked' || status === 'blocked') {
+      } else if (status === 'booked' || status === 'blocked' || status === 'hold') {
+        // TASK-4557: hold dates styled unavailable like booked/blocked
         bg = 'bg-gray-100 cursor-not-allowed';
         text = 'text-gray-700 line-through';
         extra = '';
