@@ -483,6 +483,10 @@ const GuestDetailsPage: React.FC = () => {
   const [razorpayOrderId, setRazorpayOrderId] = useState<string | null>(null);
   const [razorpayAmountPaise, setRazorpayAmount] = useState<number | null>(null);
   const pendingBookingTokenRef = useRef<string | null>(null);
+  // TASK-4536: Track the stable idempotency key for the current attempt so retries reuse it.
+  const currentAttemptIdempotencyKeyRef = useRef<string | null>(null);
+  // TASK-4537: Track the poll timer so we can clear it on unmount.
+  const pollTimerRef = useRef<NodeJS.Timeout | null>(null);
   /** TASK-2875: when server total differs from the client quote, require a second Pay tap before Razorpay opens. */
   const [serverTotalConfirmRequired, setServerTotalConfirmRequired] = useState(false);
   const pendingRazorpayLaunchRef = useRef<{
@@ -491,6 +495,7 @@ const GuestDetailsPage: React.FC = () => {
     bookingId: number;
     amount: number;
     bookingToken: string | null;
+    idempotencyKey: string; // TASK-4536: stable key for retry/resume deduplication
   } | null>(null);
   const serverTotalWarnRef = useRef<HTMLDivElement>(null);
 
@@ -501,6 +506,24 @@ const GuestDetailsPage: React.FC = () => {
       serverTotalWarnRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
   }, [serverTotalConfirmRequired]);
+
+  // TASK-4536: Invalidate the pending order when cart contents change (add-ons, promo, referral).
+  // If a cart edit happens after "Total updated — tap Pay again" gate, the next Pay tap must
+  // create a fresh order at the new total, not reuse the stale order/amount.
+  useEffect(() => {
+    pendingRazorpayLaunchRef.current = null;
+    setServerTotalConfirmRequired(false);
+  }, [selectedAddOns, promoCode, referralCode]);
+
+  // TASK-4537: Clear poll timers on unmount so late navigate() doesn't yank the guest off their page.
+  useEffect(() => {
+    return () => {
+      if (pollTimerRef.current) {
+        clearTimeout(pollTimerRef.current);
+        pollTimerRef.current = null;
+      }
+    };
+  }, []);
 
   /** TASK-2875: when the server total differs, the Pay CTA shows the authoritative charge (INR). */
   const chargeInr =
@@ -663,12 +686,18 @@ const GuestDetailsPage: React.FC = () => {
         if (pendingLaunch) {
           pendingRazorpayLaunchRef.current = null;
           setServerTotalConfirmRequired(false);
-          ({ keyId, orderId, bookingId, amount, bookingToken } = pendingLaunch);
+          ({ keyId, orderId, bookingId, amount, bookingToken, idempotencyKey } = pendingLaunch);
+          currentAttemptIdempotencyKeyRef.current = idempotencyKey;
           pendingBookingTokenRef.current = bookingToken;
           setRazorpayOrderId(orderId);
           setRazorpayAmount(amount);
         } else {
-          const idempotencyKey = crypto.randomUUID();
+          // TASK-4536: Generate stable idempotency key for this attempt (same key across retries).
+          let idempotencyKey = currentAttemptIdempotencyKeyRef.current;
+          if (!idempotencyKey) {
+            idempotencyKey = crypto.randomUUID();
+            currentAttemptIdempotencyKeyRef.current = idempotencyKey;
+          }
           track('start_checkout', numericListingId);
 
           const response = await axios.post(buildApiUrl('/api/Razorpay/order'), payload, {
@@ -743,6 +772,7 @@ const GuestDetailsPage: React.FC = () => {
               bookingId,
               amount,
               bookingToken,
+              idempotencyKey, // TASK-4536: stash the idempotency key so retries reuse it
             };
             setServerTotalConfirmRequired(true);
             setIsSubmitting(false);
@@ -839,6 +869,8 @@ const GuestDetailsPage: React.FC = () => {
                         sessionStorage.removeItem(CHECKOUT_DRAFT_KEY);
                         sessionStorage.removeItem(CHECKOUT_HOLD_KEY);
                       } catch { /* ignore */ }
+                      // TASK-4536: Clear the attempt's idempotency key on successful payment.
+                      currentAttemptIdempotencyKeyRef.current = null;
                       updateBooking({
                         holdId: null, holdExpiresAt: null, holdPropertySlug: null,
                         holdUnitSlug: null, holdPriceBreakdown: null, holdListingId: null,
@@ -860,9 +892,11 @@ const GuestDetailsPage: React.FC = () => {
                     const waText = encodeURIComponent(
                       `Hi, my payment succeeded but booking verification failed. Payment ID: ${paymentId}. Booking ID: ${bookingId}.`,
                     );
+                    // TASK-4537: Poll runs for ~1m45s (15s delay + 3×30s retries = 4 total tries).
+                    // Copy must accurately reflect the actual poll window, not aspirational "10 minutes".
                     setOrderError(
                       `Payment received but we could not confirm your booking yet. Payment ID: ${paymentId} · Booking #${bookingId}. ` +
-                        `We will retry automatically — if your stay is not confirmed in 10 minutes, contact us on WhatsApp (${getWhatsAppLink()}?text=${waText}) ` +
+                        `We will retry automatically for about 2 minutes — if your stay is not confirmed by then, contact us on WhatsApp (${getWhatsAppLink()}?text=${waText}) ` +
                         `or email ${getContactEmail()}. No need to pay again.`,
                     );
                     // Poll booking-summary endpoint; navigate automatically when server confirms
@@ -879,6 +913,7 @@ const GuestDetailsPage: React.FC = () => {
                           const d: { status?: string } = await r.json();
                           const s = d?.status;
                           if (s === 'Confirmed' || s === 'CheckedIn' || s === 'PaymentReceived') {
+                            pollTimerRef.current = null;
                             navigate(
                               pollToken ? `/booking/${bookingId}?t=${encodeURIComponent(pollToken)}` : `/booking/${bookingId}`,
                               { replace: true },
@@ -887,9 +922,13 @@ const GuestDetailsPage: React.FC = () => {
                           }
                         }
                       } catch { /* ignore, keep polling */ }
-                      if (pollTries < 4) setTimeout(pollStatus, 30000);
+                      if (pollTries < 4) {
+                        pollTimerRef.current = setTimeout(pollStatus, 30000);
+                      } else {
+                        pollTimerRef.current = null;
+                      }
                     };
-                    setTimeout(pollStatus, 15000);
+                    pollTimerRef.current = setTimeout(pollStatus, 15000);
                   } finally {
                     setIsSubmitting(false);
                   }
@@ -948,14 +987,31 @@ const GuestDetailsPage: React.FC = () => {
         if (isTimeout) {
           setOrderError('Payment initialization timed out. Please check your connection and try again.');
         } else if (status === 409) {
-          const datesLabel =
-            booking.checkIn && booking.checkOut
-              ? `${checkInDisplay} – ${checkOutDisplay}`
-              : 'those dates';
-          setOrderError(
-            `Someone else just booked these dates. We couldn't confirm ${datesLabel}. Pick different dates to continue. No payment was taken.`,
-          );
-          setOrderErrorIs409(true);
+          // TASK-4537: Distinguish the guest's OWN confirmed booking from an availability race.
+          // If the message mentions "confirmed booking" or "already exists", this is likely
+          // the guest's own booking (e.g., UPI collect approved after modal dismiss, confirmed via webhook).
+          const lowerMessage = serverMessage.toLowerCase();
+          if (lowerMessage.includes('confirmed booking') || lowerMessage.includes('already exists')) {
+            // Guest's own confirmed booking — route to confirmation page, not "pick other dates".
+            const datesLabel =
+              booking.checkIn && booking.checkOut
+                ? `${checkInDisplay} – ${checkOutDisplay}`
+                : 'those dates';
+            setOrderError(
+              `A confirmed booking already exists for ${datesLabel}. Check your email for the booking confirmation.`,
+            );
+            setOrderErrorIs409(false); // Not a race; don't show the race-specific UI
+          } else {
+            // Availability race — dates are no longer available.
+            const datesLabel =
+              booking.checkIn && booking.checkOut
+                ? `${checkInDisplay} – ${checkOutDisplay}`
+                : 'those dates';
+            setOrderError(
+              `Someone else just booked these dates. We couldn't confirm ${datesLabel}. Pick different dates to continue. No payment was taken.`,
+            );
+            setOrderErrorIs409(true);
+          }
         } else if (status === 400 || status === 422) {
           setOrderError(`Validation error: ${serverMessage || 'Please check your details and try again.'}`);
         } else if (status && status >= 500) {
@@ -980,6 +1036,8 @@ const GuestDetailsPage: React.FC = () => {
     setPaymentCancelled(false);
     setOrderError(null);
     setOrderErrorIs409(false);
+    // TASK-4536: Keep the idempotency key so the retry uses the same one (deduped by Razorpay).
+    // The key is preserved in currentAttemptIdempotencyKeyRef and will be reused on the next Pay tap.
   }, []);
 
   // Mobile: the sticky Pay bar can't show the desktop "tick consent" microcopy, so tapping
@@ -990,6 +1048,10 @@ const GuestDetailsPage: React.FC = () => {
     setConsentFlash(true);
     window.setTimeout(() => setConsentFlash(false), 1200);
   }, []);
+
+  // TASK-4537: Determine if the error message indicates a charged-but-unconfirmed state
+  // that warrants showing clickable support affordance.
+  const isChargedUnconfirmed = orderError && orderError.startsWith('Payment received but we could not confirm');
 
   const handleBackToProperty = useCallback(() => {
     try { window.sessionStorage.removeItem(CHECKOUT_HOLD_KEY); } catch { /* ignore */ }
@@ -1562,14 +1624,20 @@ const GuestDetailsPage: React.FC = () => {
                       ? 'Payment cancelled — no money taken.'
                       : orderError.startsWith('No money was taken')
                         ? 'Payment failed — no money taken.'
-                        : 'Something went wrong.'}
+                        : isChargedUnconfirmed
+                          ? 'Payment received — we\'re confirming your booking.'
+                          : 'Something went wrong.'}
                   </b><br/>
                   <span>{orderError}</span>
-                  {orderError.startsWith('No money was taken') && (
+                  {/* TASK-4537: Show support affordance for both "No money taken" (need to retry)
+                      and charged-unconfirmed (already charged, monitoring for confirmation). */}
+                  {(orderError.startsWith('No money was taken') || isChargedUnconfirmed) && (
                     <div style={{ marginTop: 12 }} data-testid="payment-failed-support">
-                      <p style={{ margin: '0 0 8px', fontSize: 14 }}>Need help finishing your booking?</p>
+                      <p style={{ margin: '0 0 8px', fontSize: 14 }}>
+                        {isChargedUnconfirmed ? 'We\'ll contact you shortly.' : 'Need help finishing your booking?'}
+                      </p>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px 16px', alignItems: 'center' }}>
-                        {razorpayOrderId && (
+                        {!isChargedUnconfirmed && razorpayOrderId && (
                           <button type="button" className="gd-resume-btn" onClick={handleResume}>
                             Resume payment
                           </button>
