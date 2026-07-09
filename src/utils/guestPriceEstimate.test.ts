@@ -17,9 +17,10 @@ describe('guestPriceEstimate GST slab (TASK-2870/2871)', () => {
     expect(accommodationGstLineAmount(10_000, 5000)).toBe(500);
   });
 
-  it('formats est-total with 18% multiplier for premium nightly rates', () => {
+  it('formats est-total with 18% multiplier for premium nightly rates and includes 3% payment processing fee (TASK-4302)', () => {
     const label = formatEstTotalInclGst(8000, 2, (n) => `₹${n}`);
     expect(label).toContain('18% GST');
     expect(label).toContain('2 nights');
+    expect(label).toContain('3% payment processing');
   });
 });
