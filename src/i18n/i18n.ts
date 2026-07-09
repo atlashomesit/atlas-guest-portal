@@ -17,6 +17,14 @@ const STORAGE_KEY = 'atlas_language';
 const DEFAULT_LANGUAGE: Language = 'en';
 
 /**
+ * TASK-4517: Language switcher visibility flag (gate until coverage is real).
+ * Currently only ~12 i18n keys exist; Navbar itself is the only consumer.
+ * Threshold for re-enable: search + booking + confirmation flows translated.
+ * TODO: Add full coverage for core guest flows before enabling.
+ */
+export const LANGUAGE_SWITCHER_ENABLED = false;
+
+/**
  * Get the current user language preference from localStorage, or default to EN
  */
 export function getCurrentLanguage(): Language {

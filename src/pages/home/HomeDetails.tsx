@@ -1,7 +1,7 @@
 import { Link, useParams } from "react-router-dom";
 import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/http";
-import { useLocale } from "@/contexts/LocaleContext";
+import { getCurrentLanguage } from "@/i18n/i18n"; // TASK-4517: migrate from LocaleContext to i18n
 import type { LucideIcon } from "lucide-react";
 import {
   Wifi, Snowflake, Tv, Car, UtensilsCrossed, WashingMachine,
@@ -96,7 +96,7 @@ function AmenityChip({ label }: { label: string }) {
 
 const HomeDetails = () => {
   const { roomNo } = useParams<{ roomNo: string }>();
-  const { locale } = useLocale();
+  const locale = getCurrentLanguage(); // TASK-4517: use i18n's persisted language
   const brandName = getTenantBrandName();
   const { homes: apiHomes, listingsById } = usePropertyListings();
   const tenant = getTenantContext();
