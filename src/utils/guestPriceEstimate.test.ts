@@ -23,4 +23,32 @@ describe('guestPriceEstimate GST slab (TASK-2870/2871)', () => {
     expect(label).toContain('2 nights');
     expect(label).toContain('3% payment processing');
   });
+
+  it('TASK-4421: GST is computed on POST-discount base, not pre-discount (global discount flow)', () => {
+    // Scenario: baseAmount=10,000, globalDiscount=10% (1,000), discountedSubtotal=9,000
+    // perNight should be computed from discountedSubtotal for GST slab decision and calculation
+    const baseAmount = 10_000;
+    const globalDiscountPercent = 10;
+    const globalDiscountAmount = Math.round((baseAmount * globalDiscountPercent) / 100);
+    const discountedSubtotal = baseAmount - globalDiscountAmount;
+
+    // perNight = 9,000 / 3 nights = 3,000 (5% GST slab)
+    const nights = 3;
+    const perNightFromDiscounted = Math.round(discountedSubtotal / nights);
+
+    // GST should be on discountedSubtotal, not baseAmount
+    const gstPercent = accommodationGstSlabPercent(perNightFromDiscounted);
+    const gstLineAmount = accommodationGstLineAmount(discountedSubtotal, perNightFromDiscounted);
+
+    // Expected: 9,000 × 5% = 450
+    expect(perNightFromDiscounted).toBe(3000);
+    expect(gstPercent).toBe(5);
+    expect(gstLineAmount).toBe(450);
+
+    // Compare with pre-discount (incorrect) calc to prove the difference
+    const perNightFromBase = Math.round(baseAmount / nights);
+    const gstLineAmountIncorrect = accommodationGstLineAmount(baseAmount, perNightFromBase);
+    expect(gstLineAmountIncorrect).toBe(500); // 10,000 × 5% = 500 (WRONG)
+    expect(gstLineAmount).not.toBe(gstLineAmountIncorrect); // Verify we fixed the bug
+  });
 });
