@@ -149,7 +149,6 @@ export const ensureUniquePropertyIds = (
 
 const mapDtosToData = (
   dtos: PublicListing[],
-  photosByListingId: Map<number, string[]>,
 ): { listings: Listing[]; properties: TenantPropertyRecord[] } => {
   const tenant = getTenantContext();
   const overrides = getTenantOverrides(tenant?.slug);
@@ -213,7 +212,7 @@ export function useTenantListings(): UseTenantListings {
 
       // TASK-4444: Trust DTO photos — the public DTO already carries photoUrls/coverPhotoUrl
       // Removed per-property photo fetches that were blocking first paint with N HTTP calls
-      const mapped = mapDtosToData(dtos, new Map());
+      const mapped = mapDtosToData(dtos);
       setData(mapped);
       setState("success");
     } catch (error) {
