@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, vi } from 'vitest';
+import { describe, expect, it, beforeEach } from 'vitest';
 
 /**
  * TASK-4513: Unit tests for responsive srcset builder in OptimizedImage.tsx
@@ -11,7 +11,6 @@ import { describe, expect, it, beforeEach, vi } from 'vitest';
  */
 
 // Mock the window.location.origin for URL resolution
-const originalWindow = global.window;
 beforeEach(() => {
   Object.defineProperty(global, 'window', {
     value: { location: { origin: 'https://dev.atlashomestays.com' } },
