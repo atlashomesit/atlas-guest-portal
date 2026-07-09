@@ -365,6 +365,7 @@ export const Apartments = () => {
             losDiscountPercent: (property as { losDiscountPercent?: number | null }).losDiscountPercent ?? null,
             losDiscount2MinNights: (property as { losDiscount2MinNights?: number | null }).losDiscount2MinNights ?? null,
             losDiscount2Percent: (property as { losDiscount2Percent?: number | null }).losDiscount2Percent ?? null,
+            lastMinuteDiscountPercent: (property as { lastMinuteDiscountPercent?: number | null }).lastMinuteDiscountPercent ?? null, // TASK-4528
           };
         } catch (error) {
           console.error(`Error processing listing ${listing.id}:`, error);
