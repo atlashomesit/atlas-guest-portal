@@ -25,11 +25,16 @@ export function formatEstTotalInclGst(
   perNight: number,
   nights: number,
   formatCurrency: (amount: number, options?: { maximumFractionDigits?: number }) => string,
+  convenienceFeePercent: number = 3,
 ): string {
   const stayNights = Math.max(1, nights);
   const gstPct = accommodationGstSlabPercent(perNight) ?? 5;
   const gstMult = gstPct === 18 ? 1.18 : 1.05;
-  const total = Math.round(perNight * stayNights * gstMult);
+  const baseTotal = perNight * stayNights;
+  const withGst = Math.round(baseTotal * gstMult);
+  // TASK-4302: include payment processing fee (3% of base+GST) in the displayed total
+  const convenienceFee = Math.round((withGst * convenienceFeePercent) / 100);
+  const total = Math.round(withGst + convenienceFee);
   const nightLabel = stayNights === 1 ? '1 night' : `${stayNights} nights`;
-  return `${formatCurrency(total, { maximumFractionDigits: 0 })} est. total incl. ${gstPct}% GST (${nightLabel})`;
+  return `${formatCurrency(total, { maximumFractionDigits: 0 })} est. total incl. ${gstPct}% GST + 3% payment processing (${nightLabel})`;
 }
