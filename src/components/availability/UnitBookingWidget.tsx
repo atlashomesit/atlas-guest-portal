@@ -556,7 +556,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     fetchCalendarPricing(listingId, shownMonthIso, 3, controller.signal)
       .then((result) => {
         setCalendarDailyPrices((prev) => new Map([...prev, ...result.dateToPrice]));
-        setCalendarConvenienceFeePercent(result.convenienceFeePercent);
+        if (result.convenienceFeePercent != null) setCalendarConvenienceFeePercent(result.convenienceFeePercent);
         setCalendarPricingFailed(false);
       })
       .catch((error: unknown) => {
@@ -590,6 +590,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     fetchCalendarPricing(listingId, selectedMonthIso, 3, controller.signal)
       .then((result) => {
         setCalendarDailyPrices((prev) => new Map([...prev, ...result.dateToPrice]));
+        if (result.convenienceFeePercent != null) setCalendarConvenienceFeePercent(result.convenienceFeePercent);
       })
       .catch(() => {
         // Leave existing prices in place; selectedRangeTotalFromCalendar's own
