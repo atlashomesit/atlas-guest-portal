@@ -783,9 +783,6 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     }
   }
 
-  const startISO = toISODate(startIST);
-  const endISO = toISODate(endIST);
-
   // Check if range overlaps with any blocked/hold dates from either blockedSet or dateStatusMap.
   // dateStatusMap is the source of truth from the availability API, while blockedSet is a
   // cached set for performance. We must check both to catch dates that the API marks as
