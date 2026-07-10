@@ -786,8 +786,25 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   const startISO = toISODate(startIST);
   const endISO = toISODate(endIST);
 
-  // Prevent blocked/hold ranges
-  if (doesRangeIntersectBlocked(startISO, endISO, blockedSet)) {
+  // Check if range overlaps with any blocked/hold dates from either blockedSet or dateStatusMap.
+  // dateStatusMap is the source of truth from the availability API, while blockedSet is a
+  // cached set for performance. We must check both to catch dates that the API marks as
+  // Blocked/Hold but haven't been added to blockedSet (e.g., new blocks created mid-session).
+  const hasOverlap = (() => {
+    let cursor = getIstStartOfDay(startIST);
+    while (cursor.getTime() < getIstStartOfDay(endIST).getTime()) {
+      const dayISO = toISODate(cursor);
+      // Check both blockedSet and dateStatusMap for unavailable dates
+      const status = dateStatusMap.get(dayISO);
+      if (blockedSet.has(dayISO) || status === 'Blocked' || status === 'Hold') {
+        return true;
+      }
+      cursor = addDays(cursor, 1);
+    }
+    return false;
+  })();
+
+  if (hasOverlap) {
     // Exception: allow single-day checkout if blocked/hold (check-out on blocked/hold date is allowed)
     const prevDay = addDays(startDate, 1);
     const endISOForCheck = toISODate(endDate);
