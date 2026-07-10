@@ -8,11 +8,15 @@ interface BookingCardProps {
   supportPadding?: boolean;
 }
 
-const today = () => new Date().toISOString().slice(0, 10);
+const getISTDateString = (date: Date): string => {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(date);
+};
+
+const today = () => getISTDateString(new Date());
 const tomorrow = () => {
   const d = new Date();
   d.setDate(d.getDate() + 1);
-  return d.toISOString().slice(0, 10);
+  return getISTDateString(d);
 };
 
 const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = false }) => {

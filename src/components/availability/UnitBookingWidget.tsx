@@ -347,6 +347,14 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
       hasHydratedFromContextRef.current = true;
       return;
     }
+    // TASK-4556: enforce min-stay on URL-hydrated dates
+    const nights = calculateNights(start, end);
+    if (minStayNights > 1 && nights < minStayNights) {
+      setDateRange({ startDate: start, endDate: end });
+      setDateError(`Minimum stay is ${minStayNights} nights.`);
+      hasHydratedFromContextRef.current = true;
+      return;
+    }
     setDateRange({ startDate: start, endDate: end });
     hasHydratedFromContextRef.current = true;
   }, [booking.checkIn, booking.checkOut, today]);
@@ -516,11 +524,12 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
       }
       
       // Update date range to next available date if found
+      // TASK-4556: respect minStayNights when auto-selecting
       if (nextAvailableDate) {
         hasAutoAdjustedRef.current = true;
         setDateRange({
           startDate: nextAvailableDate,
-          endDate: addDays(nextAvailableDate, 1),
+          endDate: addDays(nextAvailableDate, Math.max(1, minStayNights)),
         });
       }
     } else {
@@ -1062,6 +1071,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       setDateError('Check-out must be after check-in.');
       return;
     }
+    // TASK-4556: enforce min-stay on handleReserve (like handleRangeChange does)
+    if (minStayNights > 1 && stayNights < minStayNights) {
+      setDateError(`Minimum stay is ${minStayNights} nights.`);
+      return;
+    }
 
     const checkinISO = toISODate(checkinIst);
     const checkinStatus = dateStatusMap.get(checkinISO);
@@ -1218,10 +1232,19 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             </div>
             <p className="lv-booking-sub" role="status">Fetching latest prices…</p>
           </>
+        ) : hasSelectedRange && !invalidIstStayRange && calendarPricingFailed ? (
+          <>
+            <div className="lv-booking-total">
+              <span className="text-sm text-text-warning" data-testid="bw-pricing-error">
+                Couldn't load prices
+              </span>
+            </div>
+            <p className="lv-booking-sub">Please try selecting dates again</p>
+          </>
         ) : hasSelectedRange && !invalidIstStayRange && finalTotal > 0 ? (
           <>
             <div className="lv-booking-total">
-              <b data-testid="bw-per-night-price">{displayPrice(Math.max(1, finalTotal))}</b>
+              <b data-testid="bw-per-night-price">{displayPrice(finalTotal)}</b>
               <span>total · {priceDetails.nights} {priceDetails.nights === 1 ? 'night' : 'nights'}</span>
             </div>
             <p className="lv-booking-sub">
@@ -1637,7 +1660,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           // reserving now would seed holdPriceBreakdown's client fallback with the provisional
           // base-rate/₹0-fee numbers (see the TASK-4286 fallback in handleReserve). Blank dates
           // stay clickable (TASK-4277): rangePricingPending is false without both dates.
-          rangePricingPending
+          rangePricingPending ||
+          // TASK-4554: pricing fetch failed — disable Reserve until a real price loads.
+          (hasSelectedRange && calendarPricingFailed)
         }
         title={checkinUnavailable ? 'Check-in date is not available. Please select a different check-in date.' : undefined}
         className={`bw-reserve lv-booking-cta${isSubmitting || isLoading ? ' opacity-75' : ''}`}

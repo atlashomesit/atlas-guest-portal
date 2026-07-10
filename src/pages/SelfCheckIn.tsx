@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { buildApiUrl, getApiHeaders } from "../api/client";
 import SEO from "../components/SEO";
 import { getTenantBrandName } from "../tenant/displayBrand";
+import GuestGuidebook from "../components/GuestGuidebook"; // TASK-4510
 
 interface CheckinDetails {
   bookingRef: string;
@@ -20,6 +21,12 @@ interface CheckinDetails {
   doorCode: string;
   idUploadRequired: boolean;
   houseRulesSignedAt: string | null;
+  // TASK-4510: Digital Guest Guidebook
+  guidebookAppliancesText?: string | null;
+  guidebookWifiTroubleshootingText?: string | null;
+  guidebookTrashParkingText?: string | null;
+  guidebookCheckoutChecklistText?: string | null;
+  guidebookFoodThingsTodoText?: string | null;
 }
 
 type Step = "auth" | "summary" | "id-upload" | "house-rules" | "done";
@@ -42,6 +49,9 @@ export default function SelfCheckIn() {
   // TASK-4009: Government ID file upload
   const [idFile, setIdFile] = useState<File | null>(null);
   const [idFilePreview, setIdFilePreview] = useState<string | null>(null);
+  // TASK-4514: Collect arrival time and guest count in canonical flow
+  const [arrivalTime, setArrivalTime] = useState("");
+  const [guestCount, setGuestCount] = useState("");
 
   const stepIndex: Record<Step, number> = {
     auth: 0, summary: 1, "id-upload": 2, "house-rules": 3, done: 4,
@@ -108,13 +118,16 @@ export default function SelfCheckIn() {
     setBusy(true);
     setError("");
     try {
-      // TASK-4009: Upload ID document if provided
+      // TASK-4346: Upload ID document if provided — reference-scoped auth (bookingRef + last name),
+      // same factor as the rest of self check-in. NOT a login/OTP/JWT step.
       let idDocumentUrl: string | null = null;
       if (idFile) {
         const formData = new FormData();
         formData.append("file", idFile);
         const uploadRes = await fetch(
-          buildApiUrl(`/api/guests/kyc-documents`),
+          buildApiUrl(
+            `/api/public/checkin/${encodeURIComponent(bookingRef.trim())}/id-document?lastName=${encodeURIComponent(lastName.trim())}`
+          ),
           {
             method: "POST",
             headers: getApiHeaders(),
@@ -122,12 +135,12 @@ export default function SelfCheckIn() {
           }
         );
         if (!uploadRes.ok) {
-          console.warn("ID upload failed, continuing without it");
-          // Non-critical — don't fail the whole checkin
-        } else {
-          const uploadData = (await uploadRes.json()) as { url?: string };
-          idDocumentUrl = uploadData.url || null;
+          setError("Could not upload your ID document. Please try again or skip this step.");
+          setBusy(false);
+          return;
         }
+        const uploadData = (await uploadRes.json()) as { url?: string };
+        idDocumentUrl = uploadData.url || null;
       }
 
       const url = buildApiUrl(`/api/public/checkin/${encodeURIComponent(bookingRef.trim())}/complete`);
@@ -140,6 +153,9 @@ export default function SelfCheckIn() {
           houseRulesAccepted: rulesAccepted,
           govtIdType: govtIdType || null,
           govtIdNumber: govtIdNumber.trim() || null,
+          // TASK-4514: include arrival time and guest count from canonical flow
+          estimatedArrivalTime: arrivalTime || null,
+          guestCount: guestCount ? Number(guestCount) : null,
         }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -251,6 +267,34 @@ export default function SelfCheckIn() {
                 {details.checkinInstructions}
               </div>
             )}
+
+            {/* TASK-4514: Collect arrival time and guest count in canonical flow */}
+            <div className="mb-5 pt-4 border-t border-border-subtle">
+              <h3 className="text-sm font-semibold text-text-primary mb-3">Arrival details</h3>
+              <label htmlFor="checkin-arrival-time" className="block text-sm font-medium text-text-primary mb-1">
+                Estimated arrival time (optional)
+              </label>
+              <input
+                id="checkin-arrival-time"
+                type="time"
+                value={arrivalTime}
+                onChange={(e) => setArrivalTime(e.target.value)}
+                className="w-full rounded-lg border border-border-subtle px-4 py-2.5 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-brand-primary"
+              />
+
+              <label htmlFor="checkin-guest-count" className="block text-sm font-medium text-text-primary mb-1">
+                Number of guests (optional)
+              </label>
+              <input
+                id="checkin-guest-count"
+                type="number"
+                min="1"
+                value={guestCount}
+                onChange={(e) => setGuestCount(e.target.value)}
+                placeholder="e.g. 2"
+                className="w-full rounded-lg border border-border-subtle px-4 py-2.5 text-sm mb-5 focus:outline-none focus:ring-2 focus:ring-brand-primary"
+              />
+            </div>
 
             <button
               onClick={() => setStep("id-upload")}
@@ -405,6 +449,17 @@ export default function SelfCheckIn() {
               {details.wifiPassword && <InfoRow label="WiFi password" value={details.wifiPassword} />}
               {details.doorCode && <InfoRow label="Door code" value={details.doorCode} />}
               {details.emergencyContactPhone && <InfoRow label="Emergency contact" value={details.emergencyContactPhone} />}
+            </div>
+
+            {/* TASK-4510: Digital Guest Guidebook — shown after successful check-in */}
+            <div className="mb-6">
+              <GuestGuidebook
+                appliances={details.guidebookAppliancesText}
+                wifiTroubleshooting={details.guidebookWifiTroubleshootingText}
+                trashParking={details.guidebookTrashParkingText}
+                checkoutChecklist={details.guidebookCheckoutChecklistText}
+                foodThingsToDo={details.guidebookFoodThingsTodoText}
+              />
             </div>
 
             <a

@@ -1,7 +1,11 @@
 import { buildApiUrl, getApiHeaders } from "../api/client";
+import { getCachedGuestAuthState } from "../storage/guestAuthStorage";
 
 const RECENT_KEY = "atlas_recent_listings_v1";
 const FAV_KEY = "atlas_favorites_v1";
+
+/** TASK-4515: track if we've synced favorites this session to avoid redundant API calls */
+let favoritesSynced = false;
 
 export type GuestListingHistoryItem = {
   listingId: number;
@@ -80,8 +84,12 @@ export function toggleFavorite(listingId: number): boolean {
   } catch {
     /* non-browser */
   }
+  // TASK-4515: sync to server if guest is authenticated
+  if (getCachedGuestAuthState()?.isAuthenticated) {
+    syncFavoritesToServer(next).catch(() => { /* non-critical — fire and forget */ });
+  }
   // TASK-1709: persist save to backend if we have the guest's email (from previous booking).
-  if (adding) {
+  else if (adding) {
     try {
       const email = localStorage.getItem("atlas_guest_email");
       if (email) {
@@ -95,5 +103,50 @@ export function toggleFavorite(listingId: number): boolean {
     } catch { /* ignore */ }
   }
   return next.includes(listingId);
+}
+
+/** TASK-4515: sync favorite listing IDs to authenticated guest account. */
+async function syncFavoritesToServer(favoriteIds: number[]): Promise<void> {
+  try {
+    const response = await fetch(buildApiUrl("/api/saved-listings/account"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...getApiHeaders() },
+      body: JSON.stringify({ favoriteListingIds: favoriteIds }),
+    });
+    if (!response.ok) {
+      console.warn("Failed to sync favorites to server:", response.statusText);
+    }
+  } catch (err) {
+    console.warn("Failed to sync favorites to server:", err);
+  }
+}
+
+/**
+ * TASK-4515: load favorite listing IDs from server if guest is authenticated (merge server + local).
+ * Not yet wired into a call site (e.g. GuestAuthProvider login/hydration) — follow-on work.
+ */
+export async function loadFavoritesIfAuthenticated(): Promise<void> {
+  if (favoritesSynced || !getCachedGuestAuthState()?.isAuthenticated) return;
+  favoritesSynced = true;
+
+  try {
+    const response = await fetch(buildApiUrl("/api/saved-listings/account"), {
+      headers: getApiHeaders(),
+    });
+    if (response.ok) {
+      const data = await response.json();
+      const serverFavorites = (data.favoriteListingIds ?? []) as number[];
+      const localFavorites = getFavoriteIds();
+      const merged = Array.from(new Set([...serverFavorites, ...localFavorites]));
+      localStorage.setItem(FAV_KEY, JSON.stringify(merged));
+      try {
+        window.dispatchEvent(new CustomEvent("atlas-favorites-changed"));
+      } catch {
+        /* non-browser */
+      }
+    }
+  } catch (err) {
+    console.warn("Failed to load server favorites:", err);
+  }
 }
 

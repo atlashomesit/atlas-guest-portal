@@ -134,13 +134,15 @@ export function AirbnbGuestSelector({
             sublabel="Under 2"
             value={value.infants}
             min={0}
-            onChange={(n) => onChange({ ...value, infants: Math.max(0, n) })}
+            max={5}
+            onChange={(n) => onChange({ ...value, infants: Math.max(0, Math.min(5, n)) })}
           />
           <GuestRow
             label="Pets"
             value={value.pets}
             min={0}
-            onChange={(n) => onChange({ ...value, pets: Math.max(0, n) })}
+            max={5}
+            onChange={(n) => onChange({ ...value, pets: Math.max(0, Math.min(5, n)) })}
           />
         </div>
       )}

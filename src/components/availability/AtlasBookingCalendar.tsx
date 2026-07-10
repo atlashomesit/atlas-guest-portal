@@ -571,12 +571,22 @@ export const AtlasBookingCalendar: React.FC<AtlasBookingCalendarProps> = ({
     return () => document.removeEventListener('mousedown', handleMouseDown);
   }, [open, onClose, anchorRef]);
 
-  // TASK-4512: Initialize focusedDate to today or minDate when calendar opens
+  // TASK-4512: Initialize focusedDate to today or minDate when calendar opens.
+  // 2026-07-09 (NOCHECK: doc date): anchor on the first SELECTABLE date — a blocked/past
+  // anchor renders as a `disabled` button, which cannot take DOM focus, so keyboard
+  // navigation could never start. Falls back to the raw anchor if the whole range is full.
   useEffect(() => {
     if (open && focusedDate === null) {
-      setFocusedDate(today >= minDate ? today : minDate);
+      const base = today >= minDate ? today : minDate;
+      let anchor = base;
+      let guard = 0;
+      while (anchor <= maxDate && (anchor < today || disabledDay(anchor)) && guard < 366) {
+        anchor = addDays(anchor, 1);
+        guard += 1;
+      }
+      setFocusedDate(anchor <= maxDate ? anchor : base);
     }
-  }, [open, minDate, today, focusedDate]);
+  }, [open, minDate, maxDate, today, focusedDate, disabledDay]);
 
   // Keyboard navigation handler for arrow keys
   const handleGridKeyDown = useCallback(
@@ -596,21 +606,44 @@ export const AtlasBookingCalendar: React.FC<AtlasBookingCalendarProps> = ({
       // Arrow navigation
       let nextDate = new Date(date);
       const DOW = date.getDay(); // 0=Sun…6=Sat
+      // Direction of travel for the disabled-date skip-scan below (arrows only).
+      let scanStep = 0;
 
       if (e.key === 'ArrowLeft') {
         nextDate = addDays(date, -1);
+        scanStep = -1;
       } else if (e.key === 'ArrowRight') {
         nextDate = addDays(date, 1);
+        scanStep = 1;
       } else if (e.key === 'ArrowUp') {
         nextDate = addDays(date, -7);
+        scanStep = -7;
       } else if (e.key === 'ArrowDown') {
         nextDate = addDays(date, 7);
+        scanStep = 7;
       } else if (e.key === 'Home') {
         // Home = first day of week (Sunday)
         nextDate = addDays(date, -DOW);
       } else if (e.key === 'End') {
         // End = last day of week (Saturday)
         nextDate = addDays(date, 6 - DOW);
+      }
+
+      // 2026-07-09 (NOCHECK: doc date): a target that is blocked/past renders as a
+      // `disabled` button, which cannot take DOM focus — the roving tabindex would move
+      // there while DOM focus stays stranded on the old cell (gate 9c: ArrowDown +7 landed
+      // on a booked date). Arrows skip further in the direction of travel to the next
+      // selectable date; Home/End (and a fully-blocked remaining range) don't move at all.
+      const isUnfocusable = (d: Date) => d < today || disabledDay(d);
+      if (scanStep !== 0) {
+        let guard = 0;
+        while (nextDate >= minDate && nextDate <= maxDate && isUnfocusable(nextDate) && guard < 60) {
+          nextDate = addDays(nextDate, scanStep);
+          guard += 1;
+        }
+      }
+      if (isUnfocusable(nextDate)) {
+        return;
       }
 
       // Clamp to valid range
@@ -637,7 +670,7 @@ export const AtlasBookingCalendar: React.FC<AtlasBookingCalendarProps> = ({
         }, 0);
       }
     },
-    [handlePick, minDate, maxDate, viewMonth, viewYear, onShownDateChange, popoverRef],
+    [handlePick, minDate, maxDate, today, disabledDay, viewMonth, viewYear, onShownDateChange, popoverRef],
   );
 
   // Escape key to close

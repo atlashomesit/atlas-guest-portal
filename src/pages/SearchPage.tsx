@@ -557,8 +557,13 @@ const SearchPage = () => {
         if (!haystack.includes(dest)) return false;
       }
       if (guests && guests > unit.maxGuests) return false;
-      if (minPrice && unit.pricePerNight > 0 && unit.pricePerNight < minPrice) return false;
-      if (maxPrice && unit.pricePerNight > maxPrice) return false;
+      // TASK-4555: Use displayed price (actualPrice with fallback to pricePerNight) for filter,
+      // not the base rate, so discounted listings sort/filter by the shown price.
+      const displayedPrice = (getDailyListingPricing(unit.numericId)?.actualPrice ?? 0) > 0
+        ? getDailyListingPricing(unit.numericId)!.actualPrice
+        : unit.pricePerNight;
+      if (minPrice && displayedPrice > 0 && displayedPrice < minPrice) return false;
+      if (maxPrice && displayedPrice > maxPrice) return false;
       // TASK-1865: exclude listings confirmed unavailable for selected dates; skip when still loading or fetch failed
       if (checkIn && checkOut && !dateAvailLoading && dateAvailableIds !== null) {
         if (!dateAvailableIds.has(unit.numericId)) return false;
@@ -605,6 +610,7 @@ const SearchPage = () => {
     dateAvailableIds,
     dateAvailLoading,
     destinationParam,
+    getDailyListingPricing,
     guests,
     hasInvalidDates,
     isMarketplaceSearch,
@@ -625,13 +631,35 @@ const SearchPage = () => {
   const sortedUnits = useMemo(() => {
     const s = [...filteredUnits];
     switch (sortBy) {
-      case "price_asc":   return s.sort((a, b) => a.pricePerNight - b.pricePerNight);
-      case "price_desc":  return s.sort((a, b) => b.pricePerNight - a.pricePerNight);
+      case "price_asc": {
+        // TASK-4555: Sort by displayed price (actualPrice with fallback), not base rate.
+        return s.sort((a, b) => {
+          const priceA = (getDailyListingPricing(a.numericId)?.actualPrice ?? 0) > 0
+            ? getDailyListingPricing(a.numericId)!.actualPrice
+            : a.pricePerNight;
+          const priceB = (getDailyListingPricing(b.numericId)?.actualPrice ?? 0) > 0
+            ? getDailyListingPricing(b.numericId)!.actualPrice
+            : b.pricePerNight;
+          return priceA - priceB;
+        });
+      }
+      case "price_desc": {
+        // TASK-4555: Sort by displayed price (actualPrice with fallback), not base rate.
+        return s.sort((a, b) => {
+          const priceA = (getDailyListingPricing(a.numericId)?.actualPrice ?? 0) > 0
+            ? getDailyListingPricing(a.numericId)!.actualPrice
+            : a.pricePerNight;
+          const priceB = (getDailyListingPricing(b.numericId)?.actualPrice ?? 0) > 0
+            ? getDailyListingPricing(b.numericId)!.actualPrice
+            : b.pricePerNight;
+          return priceB - priceA;
+        });
+      }
       case "rating_desc": return s.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
       case "newest":      return s.sort((a, b) => b.numericId - a.numericId);
       default:            return s; // "recommended" — preserve Atlas weighting
     }
-  }, [filteredUnits, sortBy]);
+  }, [filteredUnits, sortBy, getDailyListingPricing]);
 
   useEffect(() => {
     setVisibleCount(ITEMS_PER_PAGE);
@@ -991,9 +1019,9 @@ const SearchPage = () => {
                 updateParam("availableNow", checked ? "true" : "");
                 if (checked && (checkIn || checkOut)) {
                   const now = new Date();
-                  const todayStr = now.toISOString().slice(0, 10);
+                  const todayStr = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(now);
                   const tom = new Date(now.getTime() + 86400000);
-                  const tomStr = tom.toISOString().slice(0, 10);
+                  const tomStr = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(tom);
                   updateParam("checkIn", todayStr);
                   updateParam("checkOut", tomStr);
                 }
@@ -1532,7 +1560,7 @@ const SearchPage = () => {
                             )}
                             <p className="text-sm text-text-muted">per night</p>
                             <p className="text-xs text-text-muted">
-                              {formatEstTotalInclGst(displayedPrice, estimateNights, formatDisplayCurrency)}
+                              {formatEstTotalInclGst(displayedPrice, estimateNights, formatDisplayCurrency, 3, unit.isGstRegistered)}
                             </p>
                           </>
                         );

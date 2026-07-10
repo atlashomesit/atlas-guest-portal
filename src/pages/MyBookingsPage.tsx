@@ -20,6 +20,7 @@ interface BookingItem {
   status: string;
   totalAmount: number;
   token: string;
+  hasUnreadMessages?: boolean; // TASK-4359: guest portal messaging unread indicator
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -232,8 +233,14 @@ export default function MyBookingsPage() {
                   className="block rounded-xl border border-border-subtle bg-bg-surface px-4 py-4 hover:border-brand-primary/40 transition-colors"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <div className="space-y-0.5">
-                      <p className="text-base font-semibold text-text-primary">{b.listingName}</p>
+                    <div className="space-y-0.5 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="text-base font-semibold text-text-primary">{b.listingName}</p>
+                        {/* TASK-4359: unread message indicator on booking card */}
+                        {b.hasUnreadMessages && (
+                          <span className="inline-flex w-2 h-2 bg-blue-500 rounded-full" data-testid="my-bookings-unread-dot" />
+                        )}
+                      </div>
                       <p className="text-sm text-text-muted">{b.propertyName}</p>
                     </div>
                     <span

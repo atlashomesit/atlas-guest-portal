@@ -40,6 +40,8 @@ type ListingCardProps = {
   estimateNights?: number;
   /** TASK-4011: last-minute discount percentage (0-100) when available. */
   lastMinuteDiscountPercent?: number | null;
+  /** TASK-4312: whether the listing owner is GST-registered. */
+  isGstRegistered?: boolean;
   onClick?: () => void;
 };
 
@@ -70,6 +72,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
   losDiscount2Percent,
   estimateNights: estimateNightsProp,
   lastMinuteDiscountPercent,
+  isGstRegistered = true, // TASK-4312: default to true for backward compat
   onClick,
 }) => {
   const { format: formatCurrency } = useCurrency();
@@ -301,7 +304,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
                 ) : (
                   <div className="flex flex-col gap-1">
                     <span className="text-xs text-text-muted">
-                      {formatEstTotalInclGst(finalPrice, estimateNights, formatCurrency)}
+                      {formatEstTotalInclGst(finalPrice, estimateNights, formatCurrency, 3, isGstRegistered)}
                     </span>
                     <button
                       type="button"

@@ -2,9 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   fetchPublicListings,
-  fetchPropertyListingPhotos,
-  listingPhotosToSortedUrls,
-  type ListingPhoto,
   type PublicListing,
 } from "@/api/listingClient";
 import { LISTINGS, type Listing } from "@/data/listings";
@@ -73,17 +70,16 @@ const inferUnitTypeFromName = (name: string | undefined | null): string => {
   return (name ?? "").toLowerCase().includes("penthouse") ? "penthouse" : "1bhk";
 };
 
-const mapDtoToProperty = (dto: PublicListing, photosFromEndpoint: string[]): TenantPropertyRecord => {
+const mapDtoToProperty = (dto: PublicListing): TenantPropertyRecord => {
   const local = localPropertyByListingId.get(dto.id);
   const propertyNumber =
     local?.id ??
     extractPropertyNumberFromName(dto.name ?? dto.propertyName) ??
     dto.id;
 
-  const endpointPhotos = photosFromEndpoint.length > 0 ? photosFromEndpoint : null;
   const apiPhotos = dto.photoUrls && dto.photoUrls.length > 0 ? dto.photoUrls : null;
   const fallbackPhotos = local?.property_img ?? [];
-  const photoUrls = endpointPhotos ?? apiPhotos ?? fallbackPhotos;
+  const photoUrls = apiPhotos ?? fallbackPhotos;
 
   return {
     id: propertyNumber,
@@ -153,7 +149,6 @@ export const ensureUniquePropertyIds = (
 
 const mapDtosToData = (
   dtos: PublicListing[],
-  photosByListingId: Map<number, string[]>,
 ): { listings: Listing[]; properties: TenantPropertyRecord[] } => {
   const tenant = getTenantContext();
   const overrides = getTenantOverrides(tenant?.slug);
@@ -161,7 +156,7 @@ const mapDtosToData = (
 
   let properties = dtos
     .filter((dto) => dto.id > 0)
-    .map((dto) => mapDtoToProperty(dto, photosByListingId.get(dto.id) ?? []));
+    .map((dto) => mapDtoToProperty(dto));
 
   // Marketplace tenant shows all listings; other tenants apply the allowlist filter
   if (tenantAllowedIds.size > 0 && tenant?.slug !== 'marketplace') {
@@ -215,39 +210,9 @@ export function useTenantListings(): UseTenantListings {
       const dtos = await fetchPublicListings(controller.signal);
       if (controller.signal.aborted) return;
 
-      // Fetch photos for each unique property (with caching to avoid redundant calls)
-      const photosByListingId = new Map<number, string[]>();
-      const uniquePropertyIds = [
-        ...new Set(
-          dtos
-            .map((d) => d.propertyId)
-            .filter((id): id is number => id != null && id > 0),
-        ),
-      ];
-      const photosByPropertyId = new Map<number, ListingPhoto[]>();
-
-      // Use shared cache if available, otherwise fetch
-      await Promise.all(
-        uniquePropertyIds.map(async (pid) => {
-          try {
-            const photos = await fetchPropertyListingPhotos(pid, controller.signal);
-            photosByPropertyId.set(pid, photos);
-          } catch (error) {
-            console.warn(`[useTenantListings] Failed to fetch photos for property ${pid}:`, error);
-            /* keep dto.photoUrls / local fallback */
-          }
-        }),
-      );
-
-      for (const dto of dtos) {
-        if (dto.id <= 0 || dto.propertyId == null || dto.propertyId <= 0) continue;
-        const rows = photosByPropertyId.get(dto.propertyId) ?? [];
-        const urls = listingPhotosToSortedUrls(rows, dto.id);
-        if (urls.length > 0) photosByListingId.set(dto.id, urls);
-      }
-      if (controller.signal.aborted) return;
-
-      const mapped = mapDtosToData(dtos, photosByListingId);
+      // TASK-4444: Trust DTO photos — the public DTO already carries photoUrls/coverPhotoUrl
+      // Removed per-property photo fetches that were blocking first paint with N HTTP calls
+      const mapped = mapDtosToData(dtos);
       setData(mapped);
       setState("success");
     } catch (error) {

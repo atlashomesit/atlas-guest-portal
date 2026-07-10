@@ -25,11 +25,19 @@ export function formatEstTotalInclGst(
   perNight: number,
   nights: number,
   formatCurrency: (amount: number, options?: { maximumFractionDigits?: number }) => string,
+  convenienceFeePercent: number = 3,
+  isGstRegistered: boolean = true, // TASK-4312: respect listing's GST registration status
 ): string {
   const stayNights = Math.max(1, nights);
-  const gstPct = accommodationGstSlabPercent(perNight) ?? 5;
-  const gstMult = gstPct === 18 ? 1.18 : 1.05;
-  const total = Math.round(perNight * stayNights * gstMult);
+  // TASK-4312: if listing is not GST-registered, no GST is charged; otherwise apply slab rate
+  const gstPct = isGstRegistered ? (accommodationGstSlabPercent(perNight) ?? 5) : 0;
+  const gstMult = gstPct === 18 ? 1.18 : gstPct === 5 ? 1.05 : 1.0;
+  const baseTotal = perNight * stayNights;
+  const withGst = Math.round(baseTotal * gstMult);
+  // TASK-4302 / TASK-4312: include payment processing fee (3% of base+GST) in the displayed total
+  const convenienceFee = Math.round((withGst * convenienceFeePercent) / 100);
+  const total = Math.round(withGst + convenienceFee);
   const nightLabel = stayNights === 1 ? '1 night' : `${stayNights} nights`;
-  return `${formatCurrency(total, { maximumFractionDigits: 0 })} est. total incl. ${gstPct}% GST (${nightLabel})`;
+  const gstLabel = gstPct > 0 ? `incl. ${gstPct}% GST + ` : '';
+  return `${formatCurrency(total, { maximumFractionDigits: 0 })} est. total ${gstLabel}3% payment processing (${nightLabel})`;
 }

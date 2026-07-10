@@ -35,6 +35,7 @@ import {
     resolveStaticMaxGuests,
 } from '../../../api/listingClient';
 import SEO from '../../SEO';
+import StateMessage from '../../StateMessage';
 import MultiPinMap, { type MapPin } from '../../map/MultiPinMap';
 import SinglePinGoogleMap from '../../map/SinglePinGoogleMap';
 import { selectPropertyMapMode } from './propertyMapMode';
@@ -1201,25 +1202,14 @@ useEffect(() => {
     if (!data) {
         if (notFound) {
             return (
-                <div className="min-h-screen flex items-center justify-center">
-                    <div className="text-center max-w-xl px-4">
-                        <h1 className="text-2xl font-semibold text-text-primary mb-4">Home Not Found</h1>
-                        <div className="text-text-muted">
-                            Please check the link and try again, or head back to our homes catalog to continue browsing.
-                        </div>
-                        <div className="mt-6 flex flex-wrap gap-3 justify-center">
-                            <Button onClick={() => window.history.back()} className="w-full sm:w-auto">
-                                Go Back
-                            </Button>
-                            <Link
-                                to="/"
-                                className="inline-flex items-center justify-center rounded-full border border-border-subtle px-5 py-3 text-sm font-semibold text-text-primary transition hover:border-[color:var(--cta-primary)] hover:text-[color:var(--cta-primary)]"
-                            >
-                                Return to homepage
-                            </Link>
-                        </div>
-                    </div>
-                </div>
+                <StateMessage
+                    data-testid="listing-not-found-homepage"
+                    icon="🏠"
+                    title="Home not found"
+                    message={`Please check the link and try again, or return to browse available homes on ${getTenantBrandName()}.`}
+                    primaryAction={{ label: "Browse available homes", to: "/" }}
+                    secondaryActions={[{ label: "Go back", onClick: () => window.history.back() }]}
+                />
             );
         }
         return <PropertyDetailsSkeleton />;
@@ -1285,9 +1275,11 @@ useEffect(() => {
     const ppHideAtlasBranding = shouldHideAtlasBranding(ppTenantCtx, ppTenantOverrides);
     const ppBrandName = getTenantBrandName();
     const ppHasRealHost = !!data.hostName?.trim();
+    // TASK-4311: On the marketplace, check for ?tenant=TenantName query param to show the actual listing's tenant
+    const tenantNameFromUrl = searchParams.get('tenant')?.trim();
     const ppHostDisplayName = ppHasRealHost
       ? data.hostName!.trim()
-      : `Listed by ${ppBrandName}`;
+      : tenantNameFromUrl ? `Listed by ${tenantNameFromUrl}` : `Listed by ${ppBrandName}`;
     const ppHostInitial = ppHostDisplayName.charAt(0).toUpperCase();
     const ppHasOnlinePayment =
       typeof _getTenantCtx()?.paymentProvider === 'string' && _getTenantCtx()?.paymentProvider !== 'MANUAL';

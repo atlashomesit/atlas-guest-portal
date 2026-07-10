@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { format, startOfDay, startOfMonth } from 'date-fns';
 import { Search, X } from 'lucide-react';
 
@@ -49,6 +49,7 @@ function buildSearchParams(values: AirbnbSearchValues): URLSearchParams {
 
 export default function AirbnbSearchBar() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const today = useMemo(() => startOfDay(new Date()), []);
 
@@ -209,7 +210,18 @@ export default function AirbnbSearchBar() {
     if (!values) return;
     persistRecentSearch(values);
     setRecentEpoch((n) => n + 1);
-    navigate({ pathname: '/search', search: buildSearchParams(values).toString() });
+    // TASK-4413: On marketplace homepage, filter grid in-place; otherwise redirect to /search
+    if (location.pathname === '/') {
+      const p = new URLSearchParams();
+      p.set('city', values.destination.trim());
+      p.set('checkIn', values.checkIn);
+      p.set('checkOut', values.checkOut);
+      const guestTotal = values.guests.adults + values.guests.children;
+      if (guestTotal > 0) p.set('guests', String(guestTotal));
+      navigate({ pathname: '/', search: p.toString() });
+    } else {
+      navigate({ pathname: '/search', search: buildSearchParams(values).toString() });
+    }
   };
 
   const handleClearAll = () => {

@@ -1,7 +1,7 @@
 import { Link, useParams } from "react-router-dom";
 import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/http";
-import { useLocale } from "@/contexts/LocaleContext";
+import { getCurrentLanguage } from "@/i18n/i18n"; // TASK-4517: migrate from LocaleContext to i18n
 import type { LucideIcon } from "lucide-react";
 import {
   Wifi, Snowflake, Tv, Car, UtensilsCrossed, WashingMachine,
@@ -21,6 +21,7 @@ import { addRecentlyViewed } from "../../utils/guestHistory";
 import { filterGuestImageUrls } from "../../utils/guestImageUrl";
 import { track } from "../../lib/events";
 import SEO from "../../components/SEO";
+import StateMessage from "../../components/StateMessage";
 import { buildHomeDetailsLodgingJsonLd } from "./homeDetailsJsonLd";
 
 const UnitBookingWidget = lazy(() => import("../../components/availability/UnitBookingWidget"));
@@ -95,7 +96,7 @@ function AmenityChip({ label }: { label: string }) {
 
 const HomeDetails = () => {
   const { roomNo } = useParams<{ roomNo: string }>();
-  const { locale } = useLocale();
+  const locale = getCurrentLanguage(); // TASK-4517: use i18n's persisted language
   const brandName = getTenantBrandName();
   const { homes: apiHomes, listingsById } = usePropertyListings();
   const tenant = getTenantContext();
@@ -230,15 +231,13 @@ const HomeDetails = () => {
           title={`Home not found | ${brandName}`}
           description={`This stay is not listed on ${brandName}. Browse available homes to find your next booking.`}
         />
-        <section className="max-w-3xl mx-auto px-4 py-12">
-          <h1 className="text-3xl font-bold text-text-primary">Home not found</h1>
-          <p className="mt-3 text-text-secondary">
-            We could not find that home on {brandName}. Please return to the catalog to see available stays.
-          </p>
-          <Link to="/#our-homes" className="inline-flex mt-6 rounded-full bg-[color:var(--cta-primary)] px-4 py-3 text-white font-semibold">
-            Browse {brandName} homes
-          </Link>
-        </section>
+        <StateMessage
+          data-testid="listing-not-found"
+          icon="🏠"
+          title="Home not found"
+          message={`We could not find that home on ${brandName}. Let's get you back to browsing available stays.`}
+          primaryAction={{ label: `Browse ${brandName} homes`, to: "/" }}
+        />
       </>
     );
   }

@@ -61,15 +61,15 @@ export default function FavoritesPage() {
     };
   }, []);
 
-  // TASK-4010: Check if SavedListingsController API is available
+  // TASK-4010: Check if SavedListingsController API is available (TASK-4526: only count as synced if GET works)
   const checkApiAvailability = React.useCallback(async () => {
     try {
       const res = await fetch(buildApiUrl("/api/saved-listings"), {
-        method: "HEAD",
+        method: "GET",
         headers: getApiHeaders(),
       });
-      // If endpoint exists (HEAD succeeds or returns non-404), API is available
-      if (res.status !== 404) {
+      // Only mark as synced if GET succeeds (200/partial content); favorites are server-synced
+      if (res.ok) {
         setSyncStatus("synced");
       } else {
         setSyncStatus("local");
@@ -109,13 +109,28 @@ export default function FavoritesPage() {
           })
         )
       );
-      const anySuccess = results.some(
+      // TASK-4526: Count successes and failures separately; only proceed if ALL succeeded
+      const successful = results.filter(
         (r) => r.status === "fulfilled" && r.value.ok
-      );
-      if (!anySuccess) {
+      ).length;
+      const failed = ids.length - successful;
+
+      if (successful === 0) {
         setReminderState("error");
         return;
       }
+
+      // If any failed, show a partial-failure message via error state
+      if (failed > 0) {
+        // Store the email anyway (guest will get reminders for the successful ones)
+        localStorage.setItem("atlas_guest_email", email);
+        setHasStoredEmail(true);
+        // Show error state but include success count context
+        alert(`Reminder set for ${successful} of ${ids.length} homes. Please check your email.`);
+        setReminderState("done");
+        return;
+      }
+
       localStorage.setItem("atlas_guest_email", email);
       setHasStoredEmail(true);
       setReminderState("done");

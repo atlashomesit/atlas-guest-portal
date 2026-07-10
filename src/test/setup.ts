@@ -6,6 +6,31 @@ import { _resetTenantResolutionForTests } from "../tenant/tenantResolver";
 import { _resetTenantContextForTests } from "../tenant/tenantContext";
 import { _resetAvailabilityCalendarCacheForTests } from "../api/availabilityCalendarClient";
 
+// Re-arm the real jsdom `window` if a previous test file in this worker replaced
+// the global and leaked it (e.g. `Object.defineProperty(global, "window", ...)`
+// without an afterEach restore — see OptimizedImage.test.ts regression, gate runs
+// 2026-07-10). Under shared-fast (isolate:false, single worker) a leaked
+// plain-object window crashes the NEXT React commit in react-dom's
+// getActiveElementDeep (`element instanceof win.HTMLIFrameElement` → TypeError:
+// RHS is not an object), which corrupts React's workInProgress state and makes
+// every later test's afterEach(cleanup) throw "Should not already be working" —
+// a whole-worker cascade whose membership varies with file ordering. This setup
+// file re-executes per test file, so restoring here confines any such leak to
+// the offending file. The real window is stashed on globalThis (not in module
+// scope) because this module's scope is re-created on each re-execution.
+const REAL_WINDOW_KEY = "__atlasRealJsdomWindow__";
+const globals = globalThis as unknown as Record<string, unknown>;
+if (globals[REAL_WINDOW_KEY] === undefined) {
+  globals[REAL_WINDOW_KEY] = globalThis.window;
+}
+if (globalThis.window !== globals[REAL_WINDOW_KEY]) {
+  Object.defineProperty(globalThis, "window", {
+    value: globals[REAL_WINDOW_KEY],
+    writable: true,
+    configurable: true,
+  });
+}
+
 // Module-level state that boot code (main.tsx / resolveFromDomain) mutates must be
 // re-armed per test file: under the shared-fast project (isolate:false, see
 // vitest.config.ts) modules outlive test files, so state set by one file (e.g.

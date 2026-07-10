@@ -6,6 +6,7 @@ import {
   persistGuestAuthState,
   clearGuestAuthState,
 } from '@/storage/guestAuthStorage';
+import { loadFavoritesIfAuthenticated } from '@/utils/guestHistory'; // TASK-4515: sync favorites on login
 
 /**
  * TASK-4017: Guest authentication context
@@ -69,6 +70,10 @@ export const GuestAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setAuth(newAuth);
     void persistGuestAuthState(newAuth).catch((error) => {
       console.error('Failed to save guest auth to storage:', error);
+    });
+    // TASK-4515: sync server favorites with local on authenticated login
+    void loadFavoritesIfAuthenticated().catch((error) => {
+      console.warn('Failed to sync favorites on login:', error);
     });
   }, []);
 

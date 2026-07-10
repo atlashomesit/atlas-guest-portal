@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getTenantBrandName } from "../tenant/displayBrand";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react"; // TASK-1476
@@ -12,7 +12,11 @@ import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 import { messageFromApiResponse } from "../utils/serverErrorFromResponse";
 import { getContactEmail, getContactPhone, hasHostContact } from "../config/contact";
 import { useGuestBookingQrToken } from "../hooks/useGuestBookingQrToken";
+import { formatCurrency } from "../utils/formatting";
 import GuestMessageThread from "../components/messaging/GuestMessageThread";
+import GuestGuidebook from "../components/GuestGuidebook"; // TASK-4510
+
+const GuestAssistant = lazy(() => import("../components/GuestAssistant")); // TASK-4415
 
 /** Minimal shape of the non-standard `beforeinstallprompt` event — only `prompt()` is used here. */
 interface BeforeInstallPromptEvent extends Event {
@@ -42,94 +46,19 @@ function listingTimeToIcsHHMM(t: string | undefined, fallback: string): string {
 }
 
 /** TASK-2490: guest web self-check-in form — posts arrival time + party size + optional ID link. */
-function SelfCheckInCard({ bookingId, token }: { bookingId: number; token: string }) {
-  const [arrival, setArrival] = useState("");
-  const [guests, setGuests] = useState("");
-  const [idUrl, setIdUrl] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [done, setDone] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
-  const submit = async () => {
-    setSubmitting(true);
-    setErr(null);
-    try {
-      const res = await fetch(
-        buildApiUrl(`/api/guest/bookings/${bookingId}/check-in?t=${encodeURIComponent(token)}`),
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Accept: "application/json", ...getApiHeaders() },
-          body: JSON.stringify({
-            estimatedArrivalTime: arrival || null,
-            guestCount: guests ? Number(guests) : null,
-            idDocumentUrl: idUrl.trim() || null,
-          }),
-        },
-      );
-      if (!res.ok) throw new Error("submit failed");
-      setDone(true);
-    } catch {
-      setErr("Could not submit your check-in details. Please try again.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  if (done) {
-    return (
-      <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5" data-testid="self-checkin-done">
-        <h2 className="text-sm font-semibold text-text-primary mb-1">✓ Check-in details received</h2>
-        <p className="text-sm text-text-secondary">Thanks! Your host now has your arrival details.</p>
-      </div>
-    );
-  }
-
+function SelfCheckInCard() {
+  // TASK-4514: Card is now a status + CTA into canonical SelfCheckIn flow
+  // The divergent /api/guest/bookings/{bookingId}/check-in endpoint is superseded by the canonical flow
   return (
-    <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3" data-testid="self-checkin-card">
-      <h2 className="text-sm font-semibold text-text-primary">Web check-in</h2>
-      <p className="text-sm text-text-secondary">Share your arrival details so your host can prepare for you.</p>
-      {err && <p className="text-sm text-red-600" role="alert">{err}</p>}
-      <label className="block text-sm">
-        <span className="text-text-secondary">Estimated arrival time</span>
-        <input
-          type="time"
-          value={arrival}
-          onChange={(e) => setArrival(e.target.value)}
-          className="mt-1 block w-full rounded-lg border border-border-subtle px-3 py-3 text-base"
-          data-testid="self-checkin-arrival"
-        />
-      </label>
-      <label className="block text-sm">
-        <span className="text-text-secondary">Number of guests</span>
-        <input
-          type="number"
-          min={1}
-          value={guests}
-          onChange={(e) => setGuests(e.target.value)}
-          className="mt-1 block w-full rounded-lg border border-border-subtle px-3 py-3 text-base"
-          data-testid="self-checkin-guests"
-        />
-      </label>
-      <label className="block text-sm">
-        <span className="text-text-secondary">ID document link (optional)</span>
-        <input
-          type="url"
-          value={idUrl}
-          onChange={(e) => setIdUrl(e.target.value)}
-          placeholder="https://…"
-          className="mt-1 block w-full rounded-lg border border-border-subtle px-3 py-3 text-base"
-          data-testid="self-checkin-id"
-        />
-      </label>
-      <button
-        type="button"
-        disabled={submitting}
-        onClick={() => void submit()}
-        className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-3 hover:bg-brand-primary/90 transition-colors disabled:opacity-70"
-        data-testid="self-checkin-submit"
+    <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5" data-testid="self-checkin-done">
+      <h2 className="text-sm font-semibold text-text-primary mb-1">Complete your check-in</h2>
+      <p className="text-sm text-text-secondary mb-3">Share your arrival details and verify your ID through our secure check-in process.</p>
+      <a
+        href="/check-in"
+        className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-3 hover:bg-brand-primary/90 transition-colors"
       >
-        {submitting ? "Submitting…" : "Submit check-in"}
-      </button>
+        Start check-in →
+      </a>
     </div>
   );
 }
@@ -175,6 +104,12 @@ interface BookingSummary {
   bookingRef?: string;
   /** TASK-2071: ISO 639-1 language code from guest profile. Null defaults to "en". */
   preferredLanguage?: string | null;
+  // TASK-4510: Digital Guest Guidebook
+  guidebookAppliancesText?: string | null;
+  guidebookWifiTroubleshootingText?: string | null;
+  guidebookTrashParkingText?: string | null;
+  guidebookCheckoutChecklistText?: string | null;
+  guidebookFoodThingsTodoText?: string | null;
 }
 
 const statusLabel: Record<string, { label: string; color: string }> = {
@@ -321,11 +256,12 @@ export default function BookingConfirmationPage() {
   const [searchParams] = useSearchParams();
   const token = searchParams.get("t");
   const bookingIdNum = bookingId ? Number(bookingId) : undefined;
-  const { qrToken, expiresAtUtc: qrExpiresAtUtc } = useGuestBookingQrToken(
+  const { qrToken, expiresAtUtc: qrExpiresAtUtc, loading: qrTokenLoading } = useGuestBookingQrToken(
     Number.isFinite(bookingIdNum) ? bookingIdNum : undefined,
     token ?? undefined,
   );
-  const qrEncodeToken = qrToken ?? token;
+  // TASK-4437: only encode the rotating qrToken, never the durable access token
+  const qrEncodeToken = qrToken;
   const brandName = getTenantBrandName();
 
   const [booking, setBooking] = useState<BookingSummary | null>(null);
@@ -1057,7 +993,7 @@ export default function BookingConfirmationPage() {
               {booking.nights} {booking.nights === 1 ? "night" : "nights"}
             </span>
             <span className="text-base font-bold text-text-primary" data-testid="confirmation-total">
-              {booking.currency}&nbsp;{booking.totalAmount.toLocaleString("en-IN")}
+              {formatCurrency(booking.totalAmount ?? 0, { currency: booking.currency })}
             </span>
           </div>
           {canRequestModification && (
@@ -1074,29 +1010,43 @@ export default function BookingConfirmationPage() {
           )}
         </div>
 
-        {/* TASK-1476: QR check-in code — guests can scan on arrival to confirm identity */}
-        {!isCancelled && token && qrEncodeToken && (
+        {/* TASK-1476: QR check-in code — guests can scan on arrival to confirm identity
+            TASK-4437: only show QR once the rotating qrToken is available; show loading state until then */}
+        {!isCancelled && token && (
           <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-5 flex flex-col items-center gap-3" data-testid="confirmation-qr-section">
-            <QRCodeSVG
-              value={`${window.location.origin}/booking/${bookingId}?t=${encodeURIComponent(qrEncodeToken)}`}
-              size={180}
-              bgColor="#ffffff"
-              fgColor="#0F172A"
-              level="M"
-              aria-label={`QR code for booking #${bookingId}`}
-            />
-            <p className="text-sm text-center text-text-secondary max-w-xs">
-              Show this to the host on arrival
-            </p>
-            {qrToken && qrExpiresAtUtc ? (
-              <p className="text-xs text-center text-text-muted max-w-xs" data-testid="confirmation-qr-expiry">
-                This code refreshes automatically and expires at{" "}
-                {new Date(qrExpiresAtUtc).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}.
-              </p>
+            {qrTokenLoading ? (
+              <>
+                <div className="w-[180px] h-[180px] bg-gray-100 rounded-lg flex items-center justify-center animate-pulse">
+                  <span className="text-text-muted text-xs">Loading...</span>
+                </div>
+                <p className="text-sm text-center text-text-secondary max-w-xs">
+                  Generating your check-in code...
+                </p>
+              </>
+            ) : qrEncodeToken ? (
+              <>
+                <QRCodeSVG
+                  value={`${window.location.origin}/booking/${bookingId}?t=${encodeURIComponent(qrEncodeToken)}`}
+                  size={180}
+                  bgColor="#ffffff"
+                  fgColor="#0F172A"
+                  level="M"
+                  aria-label={`QR code for booking #${bookingId}`}
+                />
+                <p className="text-sm text-center text-text-secondary max-w-xs">
+                  Show this to the host on arrival
+                </p>
+                {qrExpiresAtUtc ? (
+                  <p className="text-xs text-center text-text-muted max-w-xs" data-testid="confirmation-qr-expiry">
+                    This code refreshes automatically and expires at{" "}
+                    {new Date(qrExpiresAtUtc).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}.
+                  </p>
+                ) : null}
+                <p className="text-xs text-center text-support-error/80 max-w-xs">
+                  Don't share this QR publicly — anyone who scans it can access your booking details.
+                </p>
+              </>
             ) : null}
-            <p className="text-xs text-center text-support-error/80 max-w-xs">
-              Don't share this QR publicly — anyone who scans it can access your booking details.
-            </p>
           </div>
         )}
 
@@ -1224,12 +1174,19 @@ export default function BookingConfirmationPage() {
 
         {/* TASK-2490: guest web self-check-in */}
         {!isCancelled && bookingId && token && (
-          <SelfCheckInCard bookingId={Number(bookingId)} token={token} />
+          <SelfCheckInCard />
         )}
 
         {/* TASK-4333: guest-facing messages thread — read + reply to host */}
         {bookingId && token && (
           <GuestMessageThread bookingId={Number(bookingId)} token={token} />
+        )}
+
+        {/* TASK-4415: guest self-serve FAQ — same as listing detail page */}
+        {booking.listingId && (
+          <Suspense fallback={null}>
+            <GuestAssistant listingId={booking.listingId} />
+          </Suspense>
         )}
 
         {/* WiFi */}
@@ -1248,6 +1205,17 @@ export default function BookingConfirmationPage() {
             <h2 className="text-sm font-semibold text-text-primary mb-1">📶 WiFi</h2>
             <p className="text-sm text-text-secondary">WiFi details will be available here 48 hours before check-in.</p>
           </div>
+        )}
+
+        {/* TASK-4510: Digital Guest Guidebook — host-authored content sections */}
+        {!isCancelled && (
+          <GuestGuidebook
+            appliances={booking.guidebookAppliancesText}
+            wifiTroubleshooting={booking.guidebookWifiTroubleshootingText}
+            trashParking={booking.guidebookTrashParkingText}
+            checkoutChecklist={booking.guidebookCheckoutChecklistText}
+            foodThingsToDo={booking.guidebookFoodThingsTodoText}
+          />
         )}
 
         {/* TASK-4086: nearby landmarks — non-sensitive context shown immediately, not gated on 72h window */}
