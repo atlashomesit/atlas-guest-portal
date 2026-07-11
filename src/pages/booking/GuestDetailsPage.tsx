@@ -517,8 +517,11 @@ const GuestDetailsPage: React.FC = () => {
   // TASK-4536: Invalidate the pending order when cart contents change (add-ons, promo, referral).
   // If a cart edit happens after "Total updated — tap Pay again" gate, the next Pay tap must
   // create a fresh order at the new total, not reuse the stale order/amount.
+  // TASK-4607: Also clear the idempotency key so the next attempt doesn't reuse a stale key
+  // with a changed payload, which would cause a 409 "different payload" error.
   useEffect(() => {
     pendingRazorpayLaunchRef.current = null;
+    currentAttemptIdempotencyKeyRef.current = null;
     setServerTotalConfirmRequired(false);
   }, [selectedAddOns, promoCode, referralCode]);
 
