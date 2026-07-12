@@ -391,6 +391,18 @@ describe('UnitBookingWidget - TASK-4293: Reserve button disabled when the select
     expect(content).toContain('data-testid="guest-booking-checkin-unavailable"');
     expect(content).toContain('Check-in date is not available. Please select a different check-in date.');
   });
+
+  it('re-hydrates URL dates after listingId resolves so auto-adjust cannot overwrite a Blocked check-in', () => {
+    // Hosted-dev failure mode (TASK-2629 / guest-book-now-disabled:86): PropertyDetails
+    // mounts the widget with listingId=undefined, then flips to the real id. The listingId
+    // effect clears hasHydratedFromContextRef; without listingId on the hydration deps,
+    // auto-adjust then replaces ?checkIn= (Blocked/Hold) with the next available night.
+    const content = readFileSync(filePath, 'utf-8');
+    const hydrateIdx = content.indexOf('Hydrate widget from booking context');
+    expect(hydrateIdx).toBeGreaterThan(-1);
+    const hydrateBlock = content.slice(hydrateIdx, hydrateIdx + 3200);
+    expect(hydrateBlock).toMatch(/\}, \[booking\.checkIn, booking\.checkOut, today, listingId/);
+  });
 });
 
 describe('UnitBookingWidget - TASK-4303: no provisional total before per-date pricing resolves (source)', () => {
