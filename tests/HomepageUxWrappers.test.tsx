@@ -1,3 +1,27 @@
+/**
+ * TASK-4492 Investigation Note (2026-07-12):
+ *
+ * STATUS: WhyChooseSection.tsx and BannerSecondary.tsx are NOT imported or rendered by the live Home.tsx.
+ * Only this test file (tests/HomepageUxWrappers.test.tsx, outside src/) renders them directly.
+ *
+ * FINDINGS:
+ * - Home.tsx imports: ServicesSection ✓, TestimonialsSection ✓
+ * - Home.tsx does NOT import: WhyChooseSection ✗, BannerSecondary ✗
+ * - Home.tsx renders an inline WHY_DIRECT_ITEMS 3-pillar strip (lines 287-316) which may have replaced WhyChooseSection
+ * - BannerSecondary is completely absent from Home.tsx
+ * - Both unreferenced components are still in the codebase and fully functional
+ * - The test asserts specific copy ("shows the established Why Choose experience", "not... accordion layout")
+ *   implying these components were once live on the homepage
+ *
+ * DECISION NEEDED (Founder question):
+ * Case (a): Were these sections intentionally dropped from the homepage in a past redesign?
+ *           → Action: Delete WhyChooseSection.tsx, BannerSecondary.tsx, and this entire test file
+ * Case (b): Did a refactor silently drop these from the homepage?
+ *           → Action: Restore imports and rendering in Home.tsx, keep test as regression guard
+ *
+ * Current decision: HOLD — do NOT delete without founder approval per TASK-4492 guardrail.
+ */
+
 import React from "react";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
