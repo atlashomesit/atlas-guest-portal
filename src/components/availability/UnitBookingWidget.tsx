@@ -185,7 +185,6 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const lastAvailabilityKeyRef = useRef<string | null>(null);
-  const hasAutoAdjustedRef = useRef(false);
   const hasHydratedFromContextRef = useRef(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -255,12 +254,9 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     }
   }, [openCalendar, today]);
 
-  // Reset auto-adjust / hydration flags when listing changes. The hydration effect
-  // below lists `listingId` in its deps so it re-applies ?checkIn=&checkOut= AFTER this
-  // reset — otherwise auto-adjust can overwrite a Blocked/Hold URL check-in once
-  // `resolvedListingId` flips from undefined→id (TASK-4293 hosted-dev regression).
+  // Reset hydration flag when listing changes so URL/`BookingContext` dates re-apply after
+  // PropertyDetails resolves listingId (undefined→id).
   useEffect(() => {
-    hasAutoAdjustedRef.current = false;
     hasHydratedFromContextRef.current = false;
   }, [listingId]);
 
@@ -333,9 +329,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   // Hydrate widget from booking context (e.g. ?checkIn=&checkOut=&guests= from property URL)
   // TASK-2630: Ensure AtlasBookingCalendar displays URL-param dates, not today+1/today+2 defaults
   // TASK-4293: `listingId` is a dep so this re-runs after PropertyDetails resolves the listing
-  // id (undefined→N). The listingId-change effect clears hasHydratedFromContextRef; without
-  // re-hydration, auto-adjust then replaces a Blocked/Hold URL check-in with the next
-  // available night and Reserve stays wrongly enabled.
+  // id (undefined→N) and the listingId-change effect clears hasHydratedFromContextRef.
   useEffect(() => {
     const ci = booking.checkIn;
     const co = booking.checkOut;
@@ -507,50 +501,6 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     };
     // availabilityRange is memoized and stable; rely on lastAvailabilityKeyRef deduplication for same requests
   }, [listingId, isBookingDisabled, availabilityRange, today, availabilityRefreshNonce]);
-
-  // Auto-select next available date if today is blocked or hold
-  useEffect(() => {
-    // Only run once when availability data is loaded and we haven't auto-adjusted yet
-    // Also skip if we've already hydrated dates from the booking context (URL params)
-    if (dateStatusMap.size === 0 || hasAutoAdjustedRef.current || hasHydratedFromContextRef.current) return;
-    
-    const todayISO = toISODate(today);
-    const todayStatus = dateStatusMap.get(todayISO);
-    const isTodayBlocked = todayStatus === 'Blocked' || todayStatus === 'Hold' || blockedSet.has(todayISO);
-    
-    // If today is blocked/hold, find next available date
-    if (isTodayBlocked) {
-      // Find next available date (up to 60 days ahead)
-      let nextAvailableDate: Date | null = null;
-      for (let i = 1; i <= 60; i++) {
-        const checkDate = addDays(today, i);
-        const checkISO = toISODate(checkDate);
-        const checkStatus = dateStatusMap.get(checkISO);
-        
-        // Skip if status is 'Blocked' or 'Hold' or date is in blockedSet
-        if (checkStatus === 'Blocked' || checkStatus === 'Hold' || blockedSet.has(checkISO)) {
-          continue;
-        }
-        
-        // Found an available date (status is 'Available' or not set)
-        nextAvailableDate = checkDate;
-        break;
-      }
-      
-      // Update date range to next available date if found
-      // TASK-4556: respect minStayNights when auto-selecting
-      if (nextAvailableDate) {
-        hasAutoAdjustedRef.current = true;
-        setDateRange({
-          startDate: nextAvailableDate,
-          endDate: addDays(nextAvailableDate, Math.max(1, minStayNights)),
-        });
-      }
-    } else {
-      // Today is available, mark as adjusted so we don't run again
-      hasAutoAdjustedRef.current = true;
-    }
-  }, [dateStatusMap, blockedSet, today, minStayNights]);
 
   // Fetch per-day calendar pricing so price updates when user selects dates.
   // Fetch on mount and when calendar opens or month changes; do not clear when calendar closes.

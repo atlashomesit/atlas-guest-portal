@@ -392,16 +392,24 @@ describe('UnitBookingWidget - TASK-4293: Reserve button disabled when the select
     expect(content).toContain('Check-in date is not available. Please select a different check-in date.');
   });
 
-  it('re-hydrates URL dates after listingId resolves so auto-adjust cannot overwrite a Blocked check-in', () => {
-    // Hosted-dev failure mode (TASK-2629 / guest-book-now-disabled:86): PropertyDetails
-    // mounts the widget with listingId=undefined, then flips to the real id. The listingId
-    // effect clears hasHydratedFromContextRef; without listingId on the hydration deps,
-    // auto-adjust then replaces ?checkIn= (Blocked/Hold) with the next available night.
+  it('re-hydrates URL dates after listingId resolves (listingId is a hydration dep)', () => {
+    // PropertyDetails mounts with listingId=undefined then flips to the real id; the
+    // listingId effect clears hasHydratedFromContextRef — listingId must be on the
+    // hydration deps so ?checkIn=&checkOut= Blocked/Hold dates are re-applied (TASK-4293).
     const content = readFileSync(filePath, 'utf-8');
     const hydrateIdx = content.indexOf('Hydrate widget from booking context');
     expect(hydrateIdx).toBeGreaterThan(-1);
     const hydrateBlock = content.slice(hydrateIdx, hydrateIdx + 3200);
     expect(hydrateBlock).toMatch(/\}, \[booking\.checkIn, booking\.checkOut, today, listingId/);
+  });
+
+  it('does not silently auto-fill dateRange when today is Blocked/Hold (TASK-2629 cancellation-deadline)', () => {
+    // Hosted-dev used to auto-select the next available night on load whenever today was
+    // blocked, which pre-filled the trust strip with "Free cancellation until …" instead of
+    // the fallback "Select check-in dates…" (guest-booking-cancellation-deadline:50).
+    const content = readFileSync(filePath, 'utf-8');
+    expect(content).not.toMatch(/Auto-select next available date if today is blocked/);
+    expect(content).not.toContain('hasAutoAdjustedRef');
   });
 });
 
