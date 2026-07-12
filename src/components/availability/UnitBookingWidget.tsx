@@ -13,7 +13,7 @@ import ErrorBanner from '@/components/ErrorBanner';
 import { buildApiUrl, getApiHeaders, getOrderRequestHeaders } from '@/api/client';
 import { dedupedAvailabilityCalendarFetch } from '@/api/availabilityCalendarClient';
 import { getIstStartOfDay } from '@/utils/date';
-import { calculateNights, formatDateInTimezone } from '@/utils/dateHelpers';
+import { calculateNights, formatDateInTimezone, formatIsoDateInTimezone } from '@/utils/dateHelpers';
 import {
   type CancellationTier,
   computeCancellationDeadline,
@@ -543,7 +543,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
       // Today is available, mark as adjusted so we don't run again
       hasAutoAdjustedRef.current = true;
     }
-  }, [dateStatusMap, blockedSet, today]);
+  }, [dateStatusMap, blockedSet, today, minStayNights]);
 
   // Fetch per-day calendar pricing so price updates when user selects dates.
   // Fetch on mount and when calendar opens or month changes; do not clear when calendar closes.
@@ -1550,9 +1550,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               return (
                 <>
                   {dailyPrices.map((dp, idx) => {
-                    const dateObj = new Date(dp.date + 'T00:00:00Z');
-                    const dayName = format(dateObj, 'EEE');
-                    const dateNum = format(dateObj, 'd MMM');
+                    const formatted = formatIsoDateInTimezone(dp.date, 'EEE d MMM', timezoneId);
+                    const parts = formatted.split(' ');
+                    const dayName = parts[0];
+                    const dateNum = parts.slice(1).join(' ');
                     return (
                       <div key={idx} className="lv-price-row" data-testid={`bw-bd-night-row-${idx}`}>
                         <span className="text-sm">
@@ -1642,7 +1643,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
           <div className="lv-price-row lv-total">
             <span>Total</span>
-            <span className="lv-num">{displayPrice(Math.max(1, finalTotal))}</span>
+            <span className="lv-num">{displayPrice(isNaN(finalTotal) ? 0 : Math.max(1, finalTotal))}</span>
           </div>
         </div>
         )}
@@ -1696,7 +1697,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           // stay clickable (TASK-4277): rangePricingPending is false without both dates.
           rangePricingPending ||
           // TASK-4554: pricing fetch failed — disable Reserve until a real price loads.
-          (hasSelectedRange && calendarPricingFailed)
+          (hasSelectedRange && calendarPricingFailed) ||
+          // TASK-4729: guard against NaN pricing (non-numeric server response)
+          (hasSelectedRange && !rangePricingPending && isNaN(finalTotal))
         }
         title={checkinUnavailable ? 'Check-in date is not available. Please select a different check-in date.' : undefined}
         className={`bw-reserve lv-booking-cta${isSubmitting || isLoading ? ' opacity-75' : ''}`}
