@@ -355,6 +355,13 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
       hasHydratedFromContextRef.current = true;
       return;
     }
+    // TASK-4726: check interior-night overlaps on URL-hydrated dates
+    if (checkInteriorNightOverlap(start, end)) {
+      setDateRange({ startDate: start, endDate: end });
+      setDateError('These dates overlap an existing booking or hold.');
+      hasHydratedFromContextRef.current = true;
+      return;
+    }
     setDateRange({ startDate: start, endDate: end });
     hasHydratedFromContextRef.current = true;
   }, [booking.checkIn, booking.checkOut, today]);
@@ -742,6 +749,24 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   return true; // disable blocked/hold dates otherwise (including as a check-in candidate)
 }, [blockedSet, dateStatusMap, today, dateRange.startDate]);
 
+// Helper function to check if a date range has interior-night overlaps with blocked/hold dates.
+// Used by URL hydration, handleRangeChange, and handleReserve to ensure consistent validation.
+const checkInteriorNightOverlap = (startDate: Date, endDate: Date): boolean => {
+  const startIST = getIstStartOfDay(startDate);
+  const endIST = getIstStartOfDay(endDate);
+  
+  let cursor = startIST;
+  while (cursor.getTime() < endIST.getTime()) {
+    const dayISO = toISODate(cursor);
+    const status = dateStatusMap.get(dayISO);
+    if (blockedSet.has(dayISO) || status === 'Blocked' || status === 'Hold') {
+      return true;
+    }
+    cursor = addDays(cursor, 1);
+  }
+  return false;
+};
+
 const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   setDateError(null);
   const { startDate, endDate } = next;
@@ -787,19 +812,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   // dateStatusMap is the source of truth from the availability API, while blockedSet is a
   // cached set for performance. We must check both to catch dates that the API marks as
   // Blocked/Hold but haven't been added to blockedSet (e.g., new blocks created mid-session).
-  const hasOverlap = (() => {
-    let cursor = getIstStartOfDay(startIST);
-    while (cursor.getTime() < getIstStartOfDay(endIST).getTime()) {
-      const dayISO = toISODate(cursor);
-      // Check both blockedSet and dateStatusMap for unavailable dates
-      const status = dateStatusMap.get(dayISO);
-      if (blockedSet.has(dayISO) || status === 'Blocked' || status === 'Hold') {
-        return true;
-      }
-      cursor = addDays(cursor, 1);
-    }
-    return false;
-  })();
+  const hasOverlap = checkInteriorNightOverlap(startIST, endIST);
 
   if (hasOverlap) {
     // Exception: allow single-day checkout if blocked/hold (check-out on blocked/hold date is allowed)
@@ -1096,6 +1109,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     const checkinStatus = dateStatusMap.get(checkinISO);
     if (checkinStatus === 'Blocked' || checkinStatus === 'Hold' || blockedSet.has(checkinISO)) {
       setFormError('Check-in date is not available. Please select a different check-in date.');
+      return;
+    }
+
+    // TASK-4726: check interior-night overlaps in handleReserve (like handleRangeChange does)
+    if (checkInteriorNightOverlap(checkinIst, checkoutIst)) {
+      setDateError('These dates overlap an existing booking or hold.');
       return;
     }
 
