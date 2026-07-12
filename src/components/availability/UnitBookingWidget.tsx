@@ -170,6 +170,12 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [calendarDailyPrices, setCalendarDailyPrices] = useState<Map<string, number>>(new Map());
   const [calendarConvenienceFeePercent, setCalendarConvenienceFeePercent] = useState<number | undefined>(undefined);
   const [calendarPricingLoading, setCalendarPricingLoading] = useState(false);
+  // TASK-4629: while calendar-open pricing refetch is in flight, keep showing the last settled
+  // headline instead of a mid-refetch lower total (fee/GST flash under F1 latency).
+  const [calendarOpenPricingPending, setCalendarOpenPricingPending] = useState(false);
+  const lastSettledHeadlineRef = useRef(0);
+  const calendarOpenFetchGenRef = useRef(0);
+  const openPricingInflightRef = useRef(0);
   // TASK-4303: pricing fetch terminally failed (network/API error, not an abort). Only then do
   // we degrade to the base-rate fallback estimate instead of holding the loading skeleton.
   const [calendarPricingFailed, setCalendarPricingFailed] = useState(false);
@@ -182,7 +188,8 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [_bookedDates, setBookedDates] = useState<Date[]>([]);
   const [blockedSet, setBlockedSet] = useState<Set<string>>(new Set());
   const [dateStatusMap, setDateStatusMap] = useState<Map<string, ListingCalendarDayStatus>>(new Map());
-  const [isLoading, setIsLoading] = useState(false);
+  // Availability fetch must NOT gate Reserve (TASK-4277 / 2026-07-12 hosted-dev: a prior
+  // `isLoading` flag left Reserve disabled during F1 availability latency after check-in-only).
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const lastAvailabilityKeyRef = useRef<string | null>(null);
   const hasHydratedFromContextRef = useRef(false);
@@ -253,6 +260,48 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
       setShownDate(today);
     }
   }, [openCalendar, today]);
+
+  // TASK-4629: rising-edge open with a selected range starts a headline freeze. Open-triggered
+  // pricing fetches (shown-month + selected-month) clear it via openPricingInflightRef.
+  // If neither fetch starts (effects early-return), the timeout clears the freeze.
+  useEffect(() => {
+    if (!openCalendar) {
+      calendarOpenFetchGenRef.current += 1; // invalidate in-flight open fetches
+      openPricingInflightRef.current = 0;
+      setCalendarOpenPricingPending(false);
+      return;
+    }
+    if (!dateRange.startDate || !dateRange.endDate) {
+      setCalendarOpenPricingPending(false);
+      return;
+    }
+    const gen = ++calendarOpenFetchGenRef.current;
+    openPricingInflightRef.current = 0;
+    setCalendarOpenPricingPending(true);
+    const t = window.setTimeout(() => {
+      if (gen === calendarOpenFetchGenRef.current && openPricingInflightRef.current === 0) {
+        setCalendarOpenPricingPending(false);
+      }
+    }, 0);
+    return () => window.clearTimeout(t);
+  }, [openCalendar, dateRange.startDate, dateRange.endDate]);
+
+  const openCalendarRef = useRef(openCalendar);
+  openCalendarRef.current = openCalendar;
+  const hasRangeRef = useRef(false);
+  hasRangeRef.current = Boolean(dateRange.startDate && dateRange.endDate);
+
+  const beginCalendarOpenPricingFetch = (gen: number) => {
+    if (gen !== calendarOpenFetchGenRef.current) return;
+    openPricingInflightRef.current += 1;
+  };
+  const endCalendarOpenPricingFetch = (gen: number) => {
+    if (gen !== calendarOpenFetchGenRef.current) return;
+    openPricingInflightRef.current = Math.max(0, openPricingInflightRef.current - 1);
+    if (openPricingInflightRef.current === 0) {
+      setCalendarOpenPricingPending(false);
+    }
+  };
 
   // Reset hydration flag when listing changes so URL/`BookingContext` dates re-apply after
   // PropertyDetails resolves listingId (undefined→id).
@@ -402,7 +451,6 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         }
         lastAvailabilityKeyRef.current = availabilityKey;
 
-        setIsLoading(true);
         setStatusMessage('Checking availability...');
 
         // TASK-2118: use dedupedAvailabilityCalendarFetch — module-level in-flight
@@ -487,10 +535,6 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
           // 404, CORS, or cancelled - that's OK, just clear the status message
           setStatusMessage('');
         }
-      } finally {
-        if (isActive) {
-          setIsLoading(false);
-        }
       }
     };
 
@@ -516,6 +560,9 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   useEffect(() => {
     if (!listingId || String(listingId).trim() === '') return;
     const controller = new AbortController();
+    const gen = calendarOpenFetchGenRef.current;
+    const trackOpen = openCalendarRef.current && hasRangeRef.current;
+    if (trackOpen) beginCalendarOpenPricingFetch(gen);
     setCalendarPricingLoading(true);
     fetchCalendarPricing(listingId, shownMonthIso, 3, controller.signal)
       .then((result) => {
@@ -534,6 +581,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
       })
       .finally(() => {
         setCalendarPricingLoading(false);
+        if (trackOpen) endCalendarOpenPricingFetch(gen);
       });
     return () => controller.abort();
   }, [listingId, shownMonthIso]);
@@ -547,10 +595,12 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   useEffect(() => {
     if (!openCalendar) return;
     if (!listingId || String(listingId).trim() === '') return;
-    if (!dateRange.startDate) return;
+    if (!dateRange.startDate || !dateRange.endDate) return;
     const selectedMonthIso = toISODate(startOfMonth(dateRange.startDate));
     if (selectedMonthIso === shownMonthIso) return; // already covered by the effect above
     const controller = new AbortController();
+    const gen = calendarOpenFetchGenRef.current;
+    beginCalendarOpenPricingFetch(gen);
     fetchCalendarPricing(listingId, selectedMonthIso, 3, controller.signal)
       .then((result) => {
         setCalendarDailyPrices((prev) => new Map([...prev, ...result.dateToPrice]));
@@ -559,9 +609,14 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
       .catch(() => {
         // Leave existing prices in place; selectedRangeTotalFromCalendar's own
         // effectiveDailyPricing fallback covers a fully-failed fetch.
+      })
+      .finally(() => {
+        endCalendarOpenPricingFetch(gen);
       });
-    return () => controller.abort();
-  }, [openCalendar, listingId, dateRange.startDate, shownMonthIso]);
+    return () => {
+      controller.abort();
+    };
+  }, [openCalendar, listingId, dateRange.startDate, dateRange.endDate, shownMonthIso]);
 
   // TASK-4303: does every night of the selected range have a REAL per-date price from the
   // pricing API? Until then, any total the widget could compute rides on the base-rate
@@ -1000,6 +1055,19 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         ? breakdownFinalTotal
         : 0;
 
+  // TASK-4629: keep last settled headline; while calendar-open pricing refetch is pending,
+  // never expose a lower recomputed total (fee/GST flash under F1).
+  useEffect(() => {
+    if (!calendarOpenPricingPending && hasSelectedRange && finalTotal > 1) {
+      lastSettledHeadlineRef.current = finalTotal;
+    }
+  }, [calendarOpenPricingPending, hasSelectedRange, finalTotal]);
+
+  const displayFinalTotal =
+    calendarOpenPricingPending && lastSettledHeadlineRef.current > 1
+      ? lastSettledHeadlineRef.current
+      : finalTotal;
+
   /** Format price; show ₹0 when 0 (e.g. when API not loaded or API returned 0). */
   const displayPrice = (n: number) =>
     formatCurrency(n, { maximumFractionDigits: 0 });
@@ -1232,10 +1300,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             </div>
             <p className="lv-booking-sub">Please try selecting dates again</p>
           </>
-        ) : hasSelectedRange && !invalidIstStayRange && finalTotal > 0 ? (
+        ) : hasSelectedRange && !invalidIstStayRange && displayFinalTotal > 0 ? (
           <>
             <div className="lv-booking-total">
-              <b data-testid="bw-per-night-price">{displayPrice(finalTotal)}</b>
+              <b data-testid="bw-per-night-price">{displayPrice(displayFinalTotal)}</b>
               <span>total · {priceDetails.nights} {priceDetails.nights === 1 ? 'night' : 'nights'}</span>
             </div>
             <p className="lv-booking-sub">
@@ -1642,7 +1710,6 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         // invalid range) still disable it.
         disabled={
           isSubmitting ||
-          isLoading ||
           isBookingDisabled ||
           (Boolean(dateRange.startDate) && Boolean(dateRange.endDate) && invalidIstStayRange) ||
           // TASK-4293: check-in day itself is Blocked/Hold — disable up front, don't let the click
@@ -1652,6 +1719,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           // reserving now would seed holdPriceBreakdown's client fallback with the provisional
           // base-rate/₹0-fee numbers (see the TASK-4286 fallback in handleReserve). Blank dates
           // stay clickable (TASK-4277): rangePricingPending is false without both dates.
+          // Do NOT gate on availability-fetch loading — that violated TASK-4277 on F1 (2026-07-12).
           rangePricingPending ||
           // TASK-4554: pricing fetch failed — disable Reserve until a real price loads.
           (hasSelectedRange && calendarPricingFailed) ||
@@ -1659,13 +1727,13 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           (hasSelectedRange && !rangePricingPending && isNaN(finalTotal))
         }
         title={checkinUnavailable ? 'Check-in date is not available. Please select a different check-in date.' : undefined}
-        className={`bw-reserve lv-booking-cta${isSubmitting || isLoading ? ' opacity-75' : ''}`}
+        className={`bw-reserve lv-booking-cta${isSubmitting ? ' opacity-75' : ''}`}
         data-testid="guest-booking-submit"
         style={{ marginTop: 20, width: '100%', background: '#c2410c', color: '#fff', border: 0, borderRadius: 12, padding: '14px 24px', fontSize: 15, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer', transition: 'background .2s' }}
       >
         {isBookingDisabled || checkinUnavailable
           ? 'Unavailable'
-          : isSubmitting || isLoading
+          : isSubmitting
             ? 'Reserving…'
             : 'Reserve'}
       </Button>
