@@ -40,3 +40,47 @@ export const formatDateInTimezone = (date: Date, timezoneId?: string): string =>
   }
 };
 
+/**
+ * Format a date string (ISO) in a specific timezone using date-fns-like format.
+ * Used for calendar per-night breakdown rows in booking widget.
+ * @param isoDate - ISO date string (YYYY-MM-DD)
+ * @param format - Format string ('EEE d MMM' → 'Mon 15 Jul')
+ * @param timezoneId - IANA timezone (defaults to Asia/Kolkata)
+ */
+export const formatIsoDateInTimezone = (
+  isoDate: string,
+  format: string,
+  timezoneId: string = 'Asia/Kolkata'
+): string => {
+  try {
+    // Parse the ISO date as a Date object in UTC, then display in the target timezone
+    const date = new Date(isoDate + 'T00:00:00Z');
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezoneId,
+      weekday: format.includes('EEE') ? 'short' : undefined,
+      day: format.includes('d') ? 'numeric' : undefined,
+      month: format.includes('MMM') ? 'short' : undefined,
+      year: format.includes('yyyy') ? 'numeric' : undefined,
+    });
+    const parts = formatter.formatToParts(date);
+    
+    // Reconstruct the formatted string based on the requested format
+    if (format === 'EEE d MMM') {
+      const weekday = parts.find(p => p.type === 'weekday')?.value || '';
+      const day = parts.find(p => p.type === 'day')?.value || '';
+      const month = parts.find(p => p.type === 'month')?.value || '';
+      return `${weekday} ${day} ${month}`;
+    }
+    return date.toLocaleDateString();
+  } catch {
+    // Fallback to UTC parsing
+    const date = new Date(isoDate + 'T00:00:00Z');
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const day = date.getUTCDate();
+    const month = monthNames[date.getUTCMonth()];
+    const weekday = dayNames[date.getUTCDay()];
+    return `${weekday} ${day} ${month}`;
+  }
+};
+

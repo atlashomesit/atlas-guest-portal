@@ -233,6 +233,8 @@ export async function fetchCalendarPricing(
       if (!dateStr) continue;
       const base = Number(d.baseAmount ?? d.BaseAmount ?? 0);
       const discount = Number(d.discountAmount ?? d.DiscountAmount ?? 0);
+      // Guard against NaN values (non-numeric data from server)
+      if (isNaN(base) || isNaN(discount)) continue;
       const actualPrice = Math.max(0, base - discount);
       map.set(dateStr, actualPrice);
       if (convenienceFeePercent === undefined) {
