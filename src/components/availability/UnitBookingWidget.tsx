@@ -255,7 +255,10 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     }
   }, [openCalendar, today]);
 
-  // Reset auto-adjust flag when listing changes
+  // Reset auto-adjust / hydration flags when listing changes. The hydration effect
+  // below lists `listingId` in its deps so it re-applies ?checkIn=&checkOut= AFTER this
+  // reset — otherwise auto-adjust can overwrite a Blocked/Hold URL check-in once
+  // `resolvedListingId` flips from undefined→id (TASK-4293 hosted-dev regression).
   useEffect(() => {
     hasAutoAdjustedRef.current = false;
     hasHydratedFromContextRef.current = false;
@@ -329,6 +332,10 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
 
   // Hydrate widget from booking context (e.g. ?checkIn=&checkOut=&guests= from property URL)
   // TASK-2630: Ensure AtlasBookingCalendar displays URL-param dates, not today+1/today+2 defaults
+  // TASK-4293: `listingId` is a dep so this re-runs after PropertyDetails resolves the listing
+  // id (undefined→N). The listingId-change effect clears hasHydratedFromContextRef; without
+  // re-hydration, auto-adjust then replaces a Blocked/Hold URL check-in with the next
+  // available night and Reserve stays wrongly enabled.
   useEffect(() => {
     const ci = booking.checkIn;
     const co = booking.checkOut;
@@ -364,7 +371,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     }
     setDateRange({ startDate: start, endDate: end });
     hasHydratedFromContextRef.current = true;
-  }, [booking.checkIn, booking.checkOut, today]);
+  }, [booking.checkIn, booking.checkOut, today, listingId, minStayNights]);
 
   useEffect(() => {
     const g = booking.guests;
