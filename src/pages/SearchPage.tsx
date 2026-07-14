@@ -7,6 +7,7 @@ import { fetchPublicListings, type PublicListing } from "../api/listingClient";
 import { getListingDisplayName } from "../lib/listingDisplayName";
 import { useDailyPricingSummary } from "../hooks/useDailyPricingSummary";
 import { parseDate } from "../utils/formatting";
+import { toISODate } from "../utils/dateRange";
 import { useCurrency } from "../contexts/CurrencyContext";
 import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 import { getTenantContext } from "../tenant/tenantContext";
@@ -465,8 +466,10 @@ const SearchPage = () => {
       setDateAvailLoading(false);
       return;
     }
-    const startStr = checkIn.toISOString().slice(0, 10);
-    const endStr = checkOut.toISOString().slice(0, 10);
+    // IST calendar day (toISODate) — checkIn/checkOut round-trip a UTC-midnight ISO param today,
+    // but toISODate keeps them correct if the source ever becomes a local Date (ADR-0077).
+    const startStr = toISODate(checkIn);
+    const endStr = toISODate(checkOut);
     const cacheKey = `${startStr}|${endStr}`;
     if (dateAvailCacheRef.current.has(cacheKey)) {
       setDateAvailableIds(new Set(dateAvailCacheRef.current.get(cacheKey)!));
