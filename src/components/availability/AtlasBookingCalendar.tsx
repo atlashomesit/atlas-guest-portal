@@ -121,20 +121,28 @@ const PRESETS: Preset[] = [
   { id: 'next-month',   label: 'Next month' },
 ];
 
-function computePreset(id: string, today: Date): { startDate: Date; endDate: Date } | null {
+// TASK-4847: exported so the preset date-math can be unit-tested (pure function, no DOM).
+export function computePreset(id: string, today: Date): { startDate: Date; endDate: Date } | null {
   const dow = today.getDay(); // 0=Sun…6=Sat
   if (id === 'tonight') {
     return { startDate: today, endDate: addDays(today, 1) };
   }
   if (id === 'this-weekend') {
-    const toFri = (5 - dow + 7) % 7 || 7;
-    const fri = addDays(today, toFri);
-    return { startDate: fri, endDate: addDays(fri, 2) };
+    // TASK-4847: align to AtlasDateRangePicker (the correct reference). The old `(5-dow+7)%7 || 7`
+    // fired `|| 7` on Fridays, skipping "this weekend" to next weekend. Drop the `|| 7` so Friday
+    // maps to today; special-case Saturday to this Sat→Sun.
+    const daysUntilFriday = (5 - dow + 7) % 7; // 0 when today is Friday
+    const fri = addDays(today, daysUntilFriday);
+    const start = dow === 6 ? today : fri;
+    const end = dow === 6 ? addDays(today, 1) : addDays(fri, 2);
+    return { startDate: start, endDate: end };
   }
   if (id === 'next-weekend') {
-    const toFri = (5 - dow + 7) % 7 || 7;
-    const fri = addDays(today, toFri + 7);
-    return { startDate: fri, endDate: addDays(fri, 2) };
+    // TASK-4847: same `|| 7` trap corrupted "next weekend" on Fridays (started this weekend again).
+    // Derive from the correctly-computed coming Friday: nextWeekend = thisWeekend's Friday + 7.
+    const daysUntilFriday = (5 - dow + 7) % 7; // 0 when today is Friday
+    const fri = addDays(today, daysUntilFriday);
+    return { startDate: addDays(fri, 7), endDate: addDays(fri, 9) };
   }
   if (id === 'this-week') {
     const toSun = (7 - dow) % 7 || 7;
