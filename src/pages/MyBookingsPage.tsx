@@ -21,6 +21,7 @@ interface BookingItem {
   totalAmount: number;
   token: string;
   hasUnreadMessages?: boolean; // TASK-4359: guest portal messaging unread indicator
+  reviewed?: boolean; // TASK-4360 AC2: server-supplied "already reviewed" flag (optional; forward-compatible)
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -225,7 +226,13 @@ export default function MyBookingsPage() {
               // Eligibility is derived client-side (Past tab = checkout passed, non-cancelled);
               // ReviewSubmitPage's server check (`checkedOut`/`alreadyReviewed`) stays the source
               // of truth, so an ineligible/already-reviewed click still lands on its own message.
-              const canReview = tab === "past" && b.status !== "Lead";
+              const reviewEligible = tab === "past" && b.status !== "Lead";
+              // TASK-4360 AC2: once the my-bookings payload carries a `reviewed` flag, an
+              // already-reviewed past stay shows a quiet "✓ Reviewed" state instead of the CTA
+              // (no re-nagging). Until that flag ships, `reviewed` is undefined and eligible past
+              // stays keep showing the CTA — server-side eligibility remains the source of truth.
+              const alreadyReviewed = reviewEligible && b.reviewed === true;
+              const canReview = reviewEligible && !alreadyReviewed;
               return (
                 <div key={b.id} className="space-y-2">
                 <Link
@@ -269,6 +276,14 @@ export default function MyBookingsPage() {
                   >
                     <span aria-hidden="true">★</span> Rate your stay
                   </Link>
+                )}
+                {alreadyReviewed && (
+                  <span
+                    data-testid="my-bookings-reviewed-badge"
+                    className="inline-flex items-center gap-1.5 text-sm font-medium text-text-muted"
+                  >
+                    <span aria-hidden="true">✓</span> Reviewed
+                  </span>
                 )}
                 </div>
               );
