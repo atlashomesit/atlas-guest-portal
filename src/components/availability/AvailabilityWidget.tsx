@@ -35,7 +35,7 @@ const AvailabilityCalendarView: React.FC<AvailabilityCalendarViewProps> = ({
       {loading ? <p>Loading availability…</p> : null}
       <ul data-testid="blocked-date-list">
         {blockedDates.map((date) => (
-          <li key={date.toISOString()}>{date.toISOString().slice(0, 10)}</li>
+          <li key={date.toISOString()}>{toISODate(date)}</li>
         ))}
       </ul>
     </div>
