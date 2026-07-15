@@ -21,6 +21,30 @@ export function estimateStayNights(checkIn: Date | null, checkOut: Date | null):
   return Math.max(1, days);
 }
 
+/**
+ * TASK-4832: single source of truth for the guest est-total number.
+ * Room fare × nights, plus slab GST (skipped when the host isn't GST-registered),
+ * plus the payment-processing fee — the exact amount rendered both in the collapsed
+ * estimate line and the expanded "See total" figure, so a card toggle never shows
+ * two different money totals.
+ */
+export function estTotalInclGst(
+  perNight: number,
+  nights: number,
+  convenienceFeePercent: number = 3,
+  isGstRegistered: boolean = true, // TASK-4312: respect listing's GST registration status
+): number {
+  const stayNights = Math.max(1, nights);
+  // TASK-4312: if listing is not GST-registered, no GST is charged; otherwise apply slab rate
+  const gstPct = isGstRegistered ? (accommodationGstSlabPercent(perNight) ?? 5) : 0;
+  const gstMult = gstPct === 18 ? 1.18 : gstPct === 5 ? 1.05 : 1.0;
+  const baseTotal = perNight * stayNights;
+  const withGst = Math.round(baseTotal * gstMult);
+  // TASK-4302 / TASK-4312: include payment processing fee (3% of base+GST) in the displayed total
+  const convenienceFee = Math.round((withGst * convenienceFeePercent) / 100);
+  return Math.round(withGst + convenienceFee);
+}
+
 export function formatEstTotalInclGst(
   perNight: number,
   nights: number,
@@ -31,12 +55,7 @@ export function formatEstTotalInclGst(
   const stayNights = Math.max(1, nights);
   // TASK-4312: if listing is not GST-registered, no GST is charged; otherwise apply slab rate
   const gstPct = isGstRegistered ? (accommodationGstSlabPercent(perNight) ?? 5) : 0;
-  const gstMult = gstPct === 18 ? 1.18 : gstPct === 5 ? 1.05 : 1.0;
-  const baseTotal = perNight * stayNights;
-  const withGst = Math.round(baseTotal * gstMult);
-  // TASK-4302 / TASK-4312: include payment processing fee (3% of base+GST) in the displayed total
-  const convenienceFee = Math.round((withGst * convenienceFeePercent) / 100);
-  const total = Math.round(withGst + convenienceFee);
+  const total = estTotalInclGst(perNight, stayNights, convenienceFeePercent, isGstRegistered);
   const nightLabel = stayNights === 1 ? '1 night' : `${stayNights} nights`;
   const gstLabel = gstPct > 0 ? `incl. ${gstPct}% GST + ` : '';
   return `${formatCurrency(total, { maximumFractionDigits: 0 })} est. total ${gstLabel}3% payment processing (${nightLabel})`;
