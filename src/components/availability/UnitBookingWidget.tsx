@@ -190,6 +190,14 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [dateStatusMap, setDateStatusMap] = useState<Map<string, ListingCalendarDayStatus>>(new Map());
   // Availability fetch must NOT gate Reserve (TASK-4277 / 2026-07-12 hosted-dev: a prior
   // `isLoading` flag left Reserve disabled during F1 availability latency after check-in-only).
+  //
+  // TASK-4830: a *terminal failure* of the availability fetch is different from mere latency.
+  // When the GET fails (404 / CORS / `Failed to fetch` / 5xx / parse error), `dateStatusMap`
+  // and `blockedSet` stay empty — which `checkInteriorNightOverlap`/`checkinUnavailable` read
+  // as "every night is free". That would leave Reserve enabled on already-booked nights. This
+  // flag lets the UI fail *closed* on failure (disable Reserve + offer retry) while STILL not
+  // gating on the loading/latency window (that stays TASK-4277-compliant — see the fetch effect).
+  const [availabilityFailed, setAvailabilityFailed] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const lastAvailabilityKeyRef = useRef<string | null>(null);
   const hasHydratedFromContextRef = useRef(false);
@@ -510,6 +518,9 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         
         setBlockedSet(newBlockedDates);
         setDateStatusMap(newDateStatusMap);
+        // TASK-4830: a successful load means the maps are authoritative again — clear any
+        // prior failure so Reserve is re-enabled (or correctly gated by real blocked dates).
+        setAvailabilityFailed(false);
         setBookedDates(Array.from(newBlockedDates).map(date => new Date(date)));
         const hasTurnover = Array.from(newDateStatusMap.values()).some((s) => s === 'Turnover');
         setStatusMessage(
@@ -520,21 +531,31 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
               : 'All dates shown are available to book.'
         );
       } catch (error) {
-        // Silently handle expected errors: 404, CORS, cancelled requests
+        // A cancelled request (StrictMode double-mount / unmount abort) is NOT a real
+        // failure — leave existing availability state untouched and do not fail-close.
+        const isCancelled = error instanceof Error && error.name === 'AbortError';
+        if (isCancelled || !isActive) return;
+
+        // TASK-4830: every other error (404 / CORS / `Failed to fetch` / 5xx / JSON parse)
+        // is a genuine failure. Previously these were swallowed silently, leaving the empty
+        // dateStatusMap/blockedSet to read as "all nights open" with Reserve still enabled —
+        // a guest could reserve already-booked nights and only hit a later server 409 (if any).
+        // Fail CLOSED instead: flag the failure so the Reserve button disables and a retry is
+        // offered. Do NOT confuse this with the loading window (TASK-4277 — never gated).
         const errorMessage = (error as { message?: string })?.message ?? String(error);
         const is404 = errorMessage.includes('HTTP 404') || errorMessage.includes('404');
-        const isCancelled = error instanceof Error && error.name === 'AbortError';
         const isCors = errorMessage.includes('CORS') || errorMessage.includes('Failed to fetch');
-
-        if (!is404 && !isCancelled && !isCors) {
+        // Keep the noisy console.error only for genuinely unexpected errors; 404/CORS are
+        // known-transient shapes (cold F1 dev API, cross-origin) and stay quiet.
+        if (!is404 && !isCors) {
           console.error('Error fetching blocked dates:', error);
-          if (isActive) {
-            setStatusMessage('');
-          }
-        } else if (isActive) {
-          // 404, CORS, or cancelled - that's OK, just clear the status message
-          setStatusMessage('');
         }
+        setAvailabilityFailed(true);
+        setStatusMessage('');
+        // Allow a manual retry to re-issue the GET for the same range: the effect early-returns
+        // when lastAvailabilityKeyRef still holds this URL, so clear it here (the retry handler
+        // bumps availabilityRefreshNonce to re-run the effect).
+        lastAvailabilityKeyRef.current = null;
       }
     };
 
@@ -545,6 +566,15 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     };
     // availabilityRange is memoized and stable; rely on lastAvailabilityKeyRef deduplication for same requests
   }, [listingId, isBookingDisabled, availabilityRange, today, availabilityRefreshNonce]);
+
+  // TASK-4830: manual retry after an availability-fetch failure. Clear the dedup key (the fetch
+  // effect early-returns while lastAvailabilityKeyRef still holds this URL) and bump the nonce so
+  // the effect re-runs and re-issues the GET. `availabilityFailed` stays true until a load
+  // succeeds, so Reserve remains fail-closed through the retry's loading window.
+  const handleAvailabilityRetry = useCallback(() => {
+    lastAvailabilityKeyRef.current = null;
+    setAvailabilityRefreshNonce((n) => n + 1);
+  }, []);
 
   // Fetch per-day calendar pricing so price updates when user selects dates.
   // Fetch on mount and when calendar opens or month changes; do not clear when calendar closes.
@@ -1099,6 +1129,13 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       setFormError('Service temporarily unavailable. Please try again later.');
       return;
     }
+    // TASK-4830: defense-in-depth — the Reserve button is disabled while availability failed,
+    // but a form submit (e.g. Enter key) could still invoke this. Refuse to create a hold when
+    // we could not confirm availability, since dateStatusMap/blockedSet are empty (fail-closed).
+    if (availabilityFailed) {
+      setFormError('We couldn’t confirm availability for these dates. Please retry checking availability before reserving.');
+      return;
+    }
     setDateError(null);
     setFormError(null);
 
@@ -1254,7 +1291,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       setIsSubmitting(false);
     }
   }, [
-    isSubmitting, isBookingDisabled, dateRange, dateStatusMap, blockedSet, today,
+    isSubmitting, isBookingDisabled, availabilityFailed, dateRange, dateStatusMap, blockedSet, today,
     listingId, guests, propertySlug, unitSlug, listingName, breakdownPrice, breakdownConvenienceFee,
     breakdownFinalTotal, finalTotal, updateBooking, navigate,
   ]);
@@ -1700,6 +1737,28 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         </p>
       )}
 
+      {/* TASK-4830: availability fetch failed — the Reserve button is disabled (we cannot trust the
+          empty dateStatusMap/blockedSet as all-open). Surface the failure and offer a retry so the
+          guest can re-check availability instead of reserving nights that may already be booked. */}
+      {availabilityFailed && (
+        <div
+          className="text-sm text-support-error"
+          role="alert"
+          data-testid="guest-booking-availability-error"
+          style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}
+        >
+          <span>We couldn’t check availability for these dates. Please retry before reserving.</span>
+          <button
+            type="button"
+            onClick={handleAvailabilityRetry}
+            data-testid="guest-booking-availability-retry"
+            style={{ background: 'transparent', color: '#c2410c', border: '1px solid #c2410c', borderRadius: 8, padding: '4px 12px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer' }}
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       {/* TASK-2612/2623: Reserve button — init-hold mode, navigates to GuestDetailsPage */}
       <Button
         type="submit"
@@ -1715,6 +1774,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           // TASK-4293: check-in day itself is Blocked/Hold — disable up front, don't let the click
           // reach a confusing API-level failure.
           checkinUnavailable ||
+          // TASK-4830: availability fetch FAILED — dateStatusMap/blockedSet are empty and cannot be
+          // trusted as all-open, so fail CLOSED (a retry control is offered above). This gates on a
+          // terminal failure only, NOT on the availability loading window (that stays TASK-4277-safe).
+          availabilityFailed ||
           // TASK-4303: pricing still resolving for the selected range (1–3 s worst case) —
           // reserving now would seed holdPriceBreakdown's client fallback with the provisional
           // base-rate/₹0-fee numbers (see the TASK-4286 fallback in handleReserve). Blank dates
@@ -1731,7 +1794,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         data-testid="guest-booking-submit"
         style={{ marginTop: 20, width: '100%', background: '#c2410c', color: '#fff', border: 0, borderRadius: 12, padding: '14px 24px', fontSize: 15, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer', transition: 'background .2s' }}
       >
-        {isBookingDisabled || checkinUnavailable
+        {isBookingDisabled || checkinUnavailable || availabilityFailed
           ? 'Unavailable'
           : isSubmitting
             ? 'Reserving…'
