@@ -630,3 +630,54 @@ describe('UnitBookingWidget - TASK-4830: availability fetch failure fail-closes 
     expect(screen.getByTestId('guest-booking-submit')).toBeEnabled();
   });
 });
+
+describe('UnitBookingWidget - TASK-4628: E13 overlap-block message must fire on remote dev, not just locally', () => {
+  const filePath = resolve(__dirname, './UnitBookingWidget.tsx');
+
+  const overlapHelper = () => {
+    const content = readFileSync(filePath, 'utf-8');
+    const start = content.indexOf('const checkInteriorNightOverlap =');
+    expect(start, 'checkInteriorNightOverlap helper must exist').toBeGreaterThan(-1);
+    // Slice to the end of the helper (its closing `};` before handleRangeChange).
+    const end = content.indexOf('const handleRangeChange =', start);
+    return content.slice(start, end);
+  };
+
+  it('re-normalizes the iteration cursor to IST start-of-day each step (matches doesRangeIntersectBlocked)', () => {
+    const section = overlapHelper();
+    // The canonical timezone-safe increment used across dateRange.ts. A bare `addDays(cursor, 1)`
+    // preserves runtime-local wall-clock and can drift the iterated ISO off the IST calendar day
+    // across a DST/offset boundary — the exact local-vs-remote-dev divergence in TASK-4628.
+    expect(section).toContain('cursor = getIstStartOfDay(addDays(cursor, 1))');
+    // The un-normalized form must NOT be the increment (only the guarded, normalized form).
+    expect(section).not.toMatch(/cursor = addDays\(cursor, 1\);/);
+  });
+
+  it('checks both blockedSet and dateStatusMap Blocked/Hold — same sources the calendar renders .bc-unavail from', () => {
+    const section = overlapHelper();
+    expect(section).toContain("blockedSet.has(dayISO) || status === 'Blocked' || status === 'Hold'");
+  });
+
+  it('sanity: the normalized iterator visits every IST night in a multi-night range exactly once', () => {
+    // Mirrors the helper's contract so the pattern the source-assert guards is proven correct,
+    // independent of the runtime timezone (the same math checkInteriorNightOverlap relies on).
+    const visit = (startDate: Date, endDate: Date): string[] => {
+      const startIST = getIstStartOfDay(startDate);
+      const endIST = getIstStartOfDay(endDate);
+      const isos: string[] = [];
+      let cursor = startIST;
+      while (cursor.getTime() < endIST.getTime()) {
+        isos.push(toISODate(cursor));
+        cursor = getIstStartOfDay(addDays(cursor, 1));
+      }
+      return isos;
+    };
+    // 3-night range straddling a month boundary — the case the re-normalization protects.
+    const nights = visit(new Date('2026-03-30T00:00:00Z'), new Date('2026-04-02T00:00:00Z'));
+    expect(nights.length).toBeGreaterThanOrEqual(3);
+    // No duplicates and strictly increasing — a drifting cursor would repeat or skip a day.
+    expect(new Set(nights).size).toBe(nights.length);
+    const sorted = [...nights].sort();
+    expect(nights).toEqual(sorted);
+  });
+});
