@@ -3,6 +3,7 @@ import {
   accommodationGstLineAmount,
   accommodationGstSlabPercent,
   estTotalInclGst,
+  computeCheckoutTotal,
   formatEstTotalInclGst,
 } from './guestPriceEstimate';
 
@@ -106,5 +107,90 @@ describe('guestPriceEstimate GST slab (TASK-2870/2871)', () => {
     const gstLineAmountIncorrect = accommodationGstLineAmount(baseAmount, perNightFromBase);
     expect(gstLineAmountIncorrect).toBe(500); // 10,000 × 5% = 500 (WRONG)
     expect(gstLineAmount).not.toBe(gstLineAmountIncorrect); // Verify we fixed the bug
+  });
+});
+
+describe('computeCheckoutTotal — TASK-4831 prefers server finalAmount over client GST-slab recompute', () => {
+  it('near the ₹7,500 slab boundary the total tracks server finalAmount, not the client slab recompute', () => {
+    // 2-night stay, base ₹15,001 → client per-night = round(7500.5) = 7501 → client picks the 18% slab.
+    // The server actually charged 5% (its per-night bucketing lands ≤ ₹7,500), so its finalAmount reflects
+    // 5% GST. Details must show the server figure, matching the widget + the Razorpay order amount.
+    const convenienceFeeAmount = 473; // ~3% of (15,001 + 750)
+    const serverFinalAmount = 15_001 + 750 + convenienceFeeAmount; // base + 5% GST + conv fee = 16,224
+
+    const result = computeCheckoutTotal({
+      baseAmount: 15_001,
+      globalDiscountAmount: 0,
+      convenienceFeeAmount,
+      nights: 2,
+      serverFinalAmount,
+      addOnsTotal: 0,
+      promoDiscountAmount: 0,
+      referralDiscountAmount: 0,
+    });
+
+    // Sanity: the discarded client recompute WOULD have used 18% and diverged.
+    expect(accommodationGstSlabPercent(result.perNight)).toBe(18);
+
+    // Total equals the server-authoritative finalAmount (no divergence, no "tap Pay again").
+    expect(result.displayTotal).toBe(serverFinalAmount);
+    // GST line is backed out of finalAmount so base + GST + conv fee == finalAmount.
+    expect(result.gstLineAmount).toBe(750);
+    // Percent label reflects the slab the server actually charged (5%), not the client's 18%.
+    expect(result.gstSlabPercent).toBe(5);
+  });
+
+  it('layers add-ons, promo, and referral on top of the server finalAmount', () => {
+    const serverFinalAmount = 16_224;
+    const result = computeCheckoutTotal({
+      baseAmount: 15_001,
+      globalDiscountAmount: 0,
+      convenienceFeeAmount: 473,
+      nights: 2,
+      serverFinalAmount,
+      addOnsTotal: 500,
+      promoDiscountAmount: 200,
+      referralDiscountAmount: 100,
+    });
+
+    expect(result.displayTotal).toBe(serverFinalAmount + 500 - 200 - 100); // 16,424
+  });
+
+  it('falls back to the client GST-slab recompute when no server finalAmount is present (regression guard)', () => {
+    // ₹15,000 / 2 nights = ₹7,500 per night → 5% slab → GST ₹750; total = base + GST + conv fee.
+    const result = computeCheckoutTotal({
+      baseAmount: 15_000,
+      globalDiscountAmount: 0,
+      convenienceFeeAmount: 450,
+      nights: 2,
+      serverFinalAmount: null,
+      addOnsTotal: 0,
+      promoDiscountAmount: 0,
+      referralDiscountAmount: 0,
+    });
+
+    expect(result.gstSlabPercent).toBe(5);
+    expect(result.gstLineAmount).toBe(750);
+    expect(result.displayTotal).toBe(16_200);
+  });
+
+  it('keeps the client GST estimate for the line but still prefers finalAmount for the total when the backed-out GST would be negative (legacy conv-fee fallback)', () => {
+    // Pathological legacy path: convenienceFeeAmount is a client fallback not baked into finalAmount,
+    // so finalAmount − base − conv fee < 0. The line falls back to the client slab estimate while the
+    // total still honours the server finalAmount.
+    const result = computeCheckoutTotal({
+      baseAmount: 7_000,
+      globalDiscountAmount: 0,
+      convenienceFeeAmount: 500,
+      nights: 1,
+      serverFinalAmount: 7_200,
+      addOnsTotal: 0,
+      promoDiscountAmount: 0,
+      referralDiscountAmount: 0,
+    });
+
+    expect(result.gstLineAmount).toBe(350); // client 5% of ₹7,000, not a negative backed-out value
+    expect(result.gstSlabPercent).toBe(5);
+    expect(result.displayTotal).toBe(7_200); // total still prefers the server finalAmount
   });
 });
