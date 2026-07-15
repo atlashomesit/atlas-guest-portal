@@ -15,6 +15,98 @@ export function accommodationGstLineAmount(baseAmount: number, perNight: number)
   return Math.max(1, Math.round((baseAmount * pct) / 100));
 }
 
+/**
+ * TASK-4831: Checkout total for GuestDetailsPage.
+ *
+ * The two-step booking flow stores a server-authoritative `finalAmount` on the hold breakdown
+ * (UnitBookingWidget → BookingContext.holdPriceBreakdown). `finalAmount` = base − discount + GST +
+ * convenience fee for the base stay, computed by the same server path (PricingService →
+ * RazorpayPaymentService) that builds the real Razorpay order amount.
+ *
+ * Historically GuestDetailsPage ignored `finalAmount` and re-derived the GST slab client-side from a
+ * per-night rate. Near the ₹7,500/night slab boundary (long-stay / last-minute pricing) the client
+ * slab decision disagreed with the server, so the /details total diverged from the listing widget and
+ * from the Razorpay order — surfacing only as the jarring "total updated — tap Pay again" gate.
+ *
+ * This helper prefers the server `finalAmount` for the base-stay total and backs the GST line out of it
+ * so the displayed line items (base − discount, GST, convenience fee) sum exactly to `finalAmount`. It
+ * falls back to the client slab recompute only when no server `finalAmount` is available. Add-ons, promo,
+ * and referral discounts are applied only at the final-charge step, so they are layered on top of the
+ * base-stay total.
+ */
+export type CheckoutTotalInput = {
+  baseAmount: number;
+  globalDiscountAmount: number;
+  convenienceFeeAmount: number;
+  nights: number;
+  /** Server-authoritative base-stay total from the hold breakdown; null/≤0 when unavailable. */
+  serverFinalAmount: number | null;
+  addOnsTotal: number;
+  promoDiscountAmount: number;
+  referralDiscountAmount: number;
+};
+
+export type CheckoutTotalBreakdown = {
+  discountedSubtotal: number;
+  perNight: number;
+  gstSlabPercent: number | null;
+  gstLineAmount: number;
+  /** base − discount + GST + convenience fee (server `finalAmount` when available). */
+  baseStayTotal: number;
+  displayTotal: number;
+};
+
+export function computeCheckoutTotal(input: CheckoutTotalInput): CheckoutTotalBreakdown {
+  const {
+    baseAmount,
+    globalDiscountAmount,
+    convenienceFeeAmount,
+    nights,
+    serverFinalAmount,
+    addOnsTotal,
+    promoDiscountAmount,
+    referralDiscountAmount,
+  } = input;
+
+  // TASK-4421: global discount applies before GST; per-night slab decision uses the post-discount base.
+  const discountedSubtotal = Math.max(0, baseAmount - globalDiscountAmount);
+  const perNight = nights > 0 ? Math.round(discountedSubtotal / nights) : 0;
+
+  const clientSlabPercent = accommodationGstSlabPercent(perNight);
+  const clientGstLineAmount =
+    clientSlabPercent != null && discountedSubtotal > 0
+      ? accommodationGstLineAmount(discountedSubtotal, perNight)
+      : 0;
+
+  const hasServerFinal = typeof serverFinalAmount === 'number' && serverFinalAmount > 0;
+
+  // Back the GST line out of the authoritative finalAmount so base + GST + convenience fee == finalAmount.
+  // Guard the legacy path (TASK-4286) where convenienceFeeAmount is a client fallback not baked into
+  // finalAmount, which would make the backed-out GST negative — there, keep the client slab estimate for
+  // the line while the total still prefers finalAmount.
+  const derivedGst = hasServerFinal
+    ? Math.round((serverFinalAmount as number) - discountedSubtotal - convenienceFeeAmount)
+    : null;
+  const useServerGst = derivedGst != null && derivedGst >= 0;
+
+  const gstLineAmount = useServerGst ? (derivedGst as number) : clientGstLineAmount;
+  const gstSlabPercent =
+    useServerGst && discountedSubtotal > 0 && gstLineAmount > 0
+      ? Math.round((gstLineAmount / discountedSubtotal) * 100)
+      : clientSlabPercent;
+
+  const baseStayTotal = hasServerFinal
+    ? (serverFinalAmount as number)
+    : discountedSubtotal + clientGstLineAmount + convenienceFeeAmount;
+
+  const displayTotal = Math.max(
+    1,
+    baseStayTotal + addOnsTotal - promoDiscountAmount - referralDiscountAmount,
+  );
+
+  return { discountedSubtotal, perNight, gstSlabPercent, gstLineAmount, baseStayTotal, displayTotal };
+}
+
 export function estimateStayNights(checkIn: Date | null, checkOut: Date | null): number {
   if (!checkIn || !checkOut || checkOut.getTime() <= checkIn.getTime()) return 1;
   const days = Math.round((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
