@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   accommodationGstLineAmount,
   accommodationGstSlabPercent,
+  estTotalInclGst,
   formatEstTotalInclGst,
 } from './guestPriceEstimate';
 
@@ -35,6 +36,48 @@ describe('guestPriceEstimate GST slab (TASK-2870/2871)', () => {
     const labelWithGst = formatEstTotalInclGst(3000, 1, (n) => `₹${n}`, 3, true);
     expect(labelWithGst).toContain('5% GST');
     expect(labelWithGst).toContain('3% payment processing');
+  });
+
+  it('TASK-4832: expanded "See total" number matches the collapsed est-total (incl. 3% fee + GST-registration flag)', () => {
+    // The collapsed estimate line and the expanded "See total" figure must be
+    // the same amount. ListingCard renders `estTotalInclGst(...)` for the expanded
+    // figure and `formatEstTotalInclGst(...)` for the collapsed line — both must
+    // resolve to the identical rupee value across the GST-slab and registration cases.
+    const cases: Array<{ perNight: number; nights: number; isGstRegistered: boolean }> = [
+      { perNight: 3000, nights: 1, isGstRegistered: true }, // 5% slab, registered
+      { perNight: 3000, nights: 2, isGstRegistered: false }, // no GST, not registered
+      { perNight: 8000, nights: 3, isGstRegistered: true }, // 18% slab, registered
+    ];
+
+    for (const { perNight, nights, isGstRegistered } of cases) {
+      const expandedTotal = estTotalInclGst(perNight, nights, 3, isGstRegistered);
+      // Extract the leading currency amount the collapsed helper renders.
+      const collapsedLabel = formatEstTotalInclGst(
+        perNight,
+        nights,
+        (n) => `₹${n}`,
+        3,
+        isGstRegistered,
+      );
+      const collapsedTotal = Number(collapsedLabel.match(/₹(\d+)/)![1]);
+      expect(expandedTotal).toBe(collapsedTotal);
+
+      // Guard against the old naive expanded formula (GST multiplier only, no 3% fee):
+      // the shared helper must be strictly larger because it adds the processing fee.
+      const naiveGstOnly = Math.round(
+        perNight * nights * (isGstRegistered ? (perNight <= 7500 ? 1.05 : 1.18) : 1),
+      );
+      expect(expandedTotal).toBeGreaterThan(naiveGstOnly);
+    }
+  });
+
+  it('TASK-4832: estTotalInclGst folds in the 3% payment-processing fee', () => {
+    // Non-registered host: 3000 × 1 night, no GST → base 3000, +3% fee = 3090.
+    expect(estTotalInclGst(3000, 1, 3, false)).toBe(3090);
+    // Registered host, 5% slab: 3000 × 1.05 = 3150, +3% fee = 3245 (rounded).
+    expect(estTotalInclGst(3000, 1, 3, true)).toBe(3245);
+    // nights floors at 1 to mirror the collapsed helper.
+    expect(estTotalInclGst(3000, 0, 3, false)).toBe(3090);
   });
 
   it('TASK-4421: GST is computed on POST-discount base, not pre-discount (global discount flow)', () => {
