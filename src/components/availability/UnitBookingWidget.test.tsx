@@ -1,8 +1,8 @@
-import { afterEach, describe, it, expect, vi } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { AxiosError } from 'axios';
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { addDays, nextFriday } from 'date-fns';
 import {
@@ -19,6 +19,13 @@ const task4303 = vi.hoisted(() => ({
   booking: { checkIn: null as string | null, checkOut: null as string | null, guests: 2 },
 }));
 
+// TASK-4830: a configurable availability-fetch mock so the failure suite below can make the
+// availability GET reject/404 and assert Reserve fail-closes. Defaults to an empty 200 body
+// (all dates available) so the existing TASK-4303 render suite is unaffected.
+const availabilityOk = () =>
+  new Response(JSON.stringify([]), { status: 200, headers: { 'content-type': 'application/json' } });
+const availabilityMock = vi.hoisted(() => ({ fetch: vi.fn() }));
+
 vi.mock('@/runtime-config', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   hasRuntimeConfig: () => true,
@@ -29,9 +36,10 @@ vi.mock('@/api/client', () => ({
   getOrderRequestHeaders: () => ({}),
 }));
 vi.mock('@/api/availabilityCalendarClient', () => ({
-  dedupedAvailabilityCalendarFetch: async () =>
-    new Response(JSON.stringify([]), { status: 200, headers: { 'content-type': 'application/json' } }),
+  dedupedAvailabilityCalendarFetch: (...args: unknown[]) => availabilityMock.fetch(...args),
 }));
+// Default: availability GET succeeds with an empty (all-available) calendar.
+availabilityMock.fetch.mockImplementation(availabilityOk);
 vi.mock('@/api/pricingClient', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   fetchCalendarPricing: task4303.fetchCalendarPricing,
@@ -508,6 +516,117 @@ describe('UnitBookingWidget - TASK-4303: first rendered Total equals the settled
     // Skeletons are gone.
     expect(screen.queryByTestId('bw-price-pending')).toBeNull();
     expect(screen.queryByTestId('bw-breakdown-pending')).toBeNull();
+    expect(screen.getByTestId('guest-booking-submit')).toBeEnabled();
+  });
+});
+
+describe('UnitBookingWidget - TASK-4830: availability fetch failure fail-closes Reserve (source)', () => {
+  const filePath = resolve(__dirname, './UnitBookingWidget.tsx');
+
+  it('tracks a terminal availability-fetch failure in an availabilityFailed flag', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    expect(content).toContain('const [availabilityFailed, setAvailabilityFailed] = useState(false);');
+    // Success path clears it; the catch sets it — but never for an AbortError (StrictMode/unmount).
+    expect(content).toContain('setAvailabilityFailed(false)');
+    expect(content).toContain('setAvailabilityFailed(true)');
+    expect(content).toContain("error.name === 'AbortError'");
+  });
+
+  it('fail-closes the Reserve button on availability failure (a terminal error, not TASK-4277 loading)', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    const buttonSection = content.slice(
+      content.indexOf('data-testid="guest-booking-submit"') - 1800,
+      content.indexOf('data-testid="guest-booking-submit"'),
+    );
+    expect(buttonSection).toContain('availabilityFailed ||');
+  });
+
+  it('offers a retry that clears the dedup key and re-issues the availability GET', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    expect(content).toContain('data-testid="guest-booking-availability-error"');
+    expect(content).toContain('data-testid="guest-booking-availability-retry"');
+    expect(content).toContain('const handleAvailabilityRetry = useCallback(');
+    const retrySection = content.slice(
+      content.indexOf('const handleAvailabilityRetry = useCallback('),
+      content.indexOf('const handleAvailabilityRetry = useCallback(') + 260,
+    );
+    expect(retrySection).toContain('lastAvailabilityKeyRef.current = null;');
+    expect(retrySection).toContain('setAvailabilityRefreshNonce((n) => n + 1);');
+  });
+
+  it('handleReserve refuses to create a hold while availability is unconfirmed (defense-in-depth)', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    expect(content).toMatch(/if \(availabilityFailed\) \{\s*\n\s*setFormError\(/);
+  });
+});
+
+describe('UnitBookingWidget - TASK-4830: availability fetch failure fail-closes Reserve (render)', () => {
+  beforeEach(() => {
+    // Pricing effects must resolve (not throw) so the render focuses on availability behaviour.
+    task4303.fetchCalendarPricing.mockResolvedValue({ dateToPrice: new Map(), convenienceFeePercent: 3 });
+    task4303.fetchGuestGstBreakdown.mockResolvedValue({ gstPercent: 5, gstAmount: 0, finalAmount: 0 });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+    availabilityMock.fetch.mockReset();
+    availabilityMock.fetch.mockImplementation(availabilityOk);
+    task4303.booking.checkIn = null;
+    task4303.booking.checkOut = null;
+  });
+
+  const renderWidget = async () => {
+    const { default: UnitBookingWidget } = await import('./UnitBookingWidget');
+    return render(
+      <MemoryRouter>
+        <UnitBookingWidget
+          listingId={7}
+          propertyId={3}
+          listingName="Atlas 501 PH"
+          propertySlug="atlas501-ph"
+          unitSlug="ph"
+        />
+      </MemoryRouter>,
+    );
+  };
+
+  it('disables Reserve and shows an error + retry when the availability GET returns 404', async () => {
+    // 404 exercises the `!response.ok` throw path (a resolved-but-not-ok Response).
+    availabilityMock.fetch.mockReset();
+    availabilityMock.fetch.mockResolvedValue(new Response('Not found', { status: 404 }));
+
+    await renderWidget();
+
+    // Fail-closed: error surfaced, retry offered, Reserve disabled and labelled "Unavailable".
+    await screen.findByTestId('guest-booking-availability-error');
+    expect(screen.getByTestId('guest-booking-availability-retry')).toBeInTheDocument();
+    const reserve = screen.getByTestId('guest-booking-submit');
+    expect(reserve).toBeDisabled();
+    expect(reserve.textContent).toContain('Unavailable');
+  });
+
+  it('re-enables Reserve after a successful retry (network failure → retry → 200 all-available)', async () => {
+    availabilityMock.fetch.mockReset();
+    // First GET fails at the network layer (CORS / Failed to fetch); the retry then succeeds.
+    availabilityMock.fetch
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockImplementation(availabilityOk);
+
+    await renderWidget();
+
+    const retry = await screen.findByTestId('guest-booking-availability-retry');
+    expect(screen.getByTestId('guest-booking-submit')).toBeDisabled();
+
+    await act(async () => {
+      fireEvent.click(retry);
+    });
+
+    // After a successful retry the error clears and — with no blocking date selection — Reserve
+    // is enabled again (blank dates stay clickable per TASK-4277; availabilityFailed was the only gate).
+    await waitFor(() => {
+      expect(screen.queryByTestId('guest-booking-availability-error')).toBeNull();
+    });
     expect(screen.getByTestId('guest-booking-submit')).toBeEnabled();
   });
 });
