@@ -6,7 +6,7 @@ import OptimizedImage from "../ui/OptimizedImage";
 import OwnerShareBadge from "../OwnerShareBadge"; // TASK-1705
 import { useCurrency } from "../../contexts/CurrencyContext";
 import { useBooking } from "../../contexts/BookingContext";
-import { estimateStayNights, formatEstTotalInclGst } from "../../utils/guestPriceEstimate";
+import { estTotalInclGst, estimateStayNights, formatEstTotalInclGst } from "../../utils/guestPriceEstimate";
 
 type ListingCardProps = {
   id: string;
@@ -281,7 +281,10 @@ const ListingCard: React.FC<ListingCardProps> = ({
                   <div className="text-2xl font-bold leading-tight text-cta-primary">
                     {showTotal ? (
                       <>
-                        {formatCurrency(Math.round(finalPrice * estimateNights * (finalPrice <= 7500 ? 1.05 : 1.18)))}
+                        {/* TASK-4832: use the same est-total helper/inputs as the collapsed
+                            estimate so the toggle never shows two different money totals
+                            (previously omitted the 3% fee and the GST-registration flag). */}
+                        {formatCurrency(estTotalInclGst(finalPrice, estimateNights, 3, isGstRegistered))}
                         <span className="ml-1 text-sm font-semibold text-text-muted">total</span>
                       </>
                     ) : (
