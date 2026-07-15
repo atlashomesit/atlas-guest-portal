@@ -796,7 +796,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
 const checkInteriorNightOverlap = (startDate: Date, endDate: Date): boolean => {
   const startIST = getIstStartOfDay(startDate);
   const endIST = getIstStartOfDay(endDate);
-  
+
   let cursor = startIST;
   while (cursor.getTime() < endIST.getTime()) {
     const dayISO = toISODate(cursor);
@@ -804,7 +804,16 @@ const checkInteriorNightOverlap = (startDate: Date, endDate: Date): boolean => {
     if (blockedSet.has(dayISO) || status === 'Blocked' || status === 'Hold') {
       return true;
     }
-    cursor = addDays(cursor, 1);
+    // TASK-4628: re-normalize each step to IST start-of-day, matching the canonical
+    // doesRangeIntersectBlocked/expandBookingsToBlockedSet iterators (dateRange.ts). A bare
+    // addDays preserves the runtime-local wall-clock, so across a DST/offset boundary the
+    // iterated dayISO can drift off the IST calendar day and MISS the occupied night — even
+    // though the calendar's per-cell disabledDay (which derives each ISO directly) still
+    // paints it .bc-unavail. That divergence is why the E13 overlap-block message fired
+    // locally (fixed-offset gate TZ) but not on remote dev (E13 seeds the occupied night one
+    // month out). Re-normalizing keeps the overlap check's per-night ISOs in lockstep with
+    // the calendar's block rendering.
+    cursor = getIstStartOfDay(addDays(cursor, 1));
   }
   return false;
 };
