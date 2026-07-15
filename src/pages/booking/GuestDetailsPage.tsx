@@ -37,7 +37,7 @@ import { formatDateInTimezone } from '@/utils/dateHelpers';
 import { track } from '@/lib/events';
 import { mapRazorpayFailureCode } from '@/utils/razorpayGuestErrors';
 import { formatDisplayNumber, getContactEmail, getTelLink, getWhatsAppLink } from '@/config/contact';
-import { accommodationGstLineAmount, accommodationGstSlabPercent } from '@/utils/guestPriceEstimate';
+import { computeCheckoutTotal } from '@/utils/guestPriceEstimate';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -438,27 +438,28 @@ const GuestDetailsPage: React.FC = () => {
 
   const displayPrice = (n: number) => formatCurrency(n, { maximumFractionDigits: 0 });
 
-  // TASK-4421: Apply global discount first, THEN compute GST on the discounted base.
-  // This matches PricingService.cs order-of-operations so displayTotal reconciles with the server.
-  // Order: baseAmount → global discount → discountedSubtotal → GST (5%/18%) → convenience fee
-  const discountedSubtotal = Math.max(0, baseAmount - globalDiscountAmount);
-
-  // GST: 5% (≤₹7,500/night) or 18% (above) on accommodation — computed on POST-discount base.
-  // 18% upper slab per the 22 Sep 2025 reform (TASK-2870).
-  // Recompute perNight from discountedSubtotal, not pre-discount baseAmount, to ensure
-  // GST slab decision is consistent with the server.
-  const perNight = nights > 0 ? Math.round(discountedSubtotal / nights) : 0;
-  const gstSlabPercent = accommodationGstSlabPercent(perNight);
-  const gstLineAmount =
-    gstSlabPercent != null && discountedSubtotal > 0
-      ? accommodationGstLineAmount(discountedSubtotal, perNight)
-      : 0;
-
-  // TASK-4421 / TASK-2631: Total = (Base − GlobalDiscount) + GST(post-discount) + Service Fee + Add-ons − PromoDiscount − ReferralDiscount
-  const displayTotal = Math.max(
-    1,
-    discountedSubtotal + gstLineAmount + convenienceFeeAmount + addOnsTotal - promoDiscountAmount - referralDiscountAmount,
-  );
+  // TASK-4831: prefer the server-authoritative hold `finalAmount` (base − discount + GST + convenience
+  // fee — the same figure the listing widget shows and RazorpayPaymentService charges) over a client-side
+  // GST-slab recompute, which diverges from the server near the ₹7,500/night slab boundary and made the
+  // /details total disagree with the widget and the Razorpay order until the "tap Pay again" gate.
+  // The GST line is backed out of `finalAmount` so the displayed line items reconcile with the total;
+  // add-ons / promo / referral (applied only at the final-charge step) are layered on top.
+  // TASK-4421: global discount still applies before GST; the slab decision uses the post-discount base.
+  const serverFinalAmount =
+    typeof priceBreakdown?.finalAmount === 'number' && priceBreakdown.finalAmount > 0
+      ? priceBreakdown.finalAmount
+      : null;
+  const { perNight, gstSlabPercent, gstLineAmount, displayTotal } =
+    computeCheckoutTotal({
+      baseAmount,
+      globalDiscountAmount,
+      convenienceFeeAmount,
+      nights,
+      serverFinalAmount,
+      addOnsTotal,
+      promoDiscountAmount,
+      referralDiscountAmount,
+    });
 
   // ── Check-in/out display ─────────────────────────────────────────────────
   const checkInDisplay = booking.checkIn
