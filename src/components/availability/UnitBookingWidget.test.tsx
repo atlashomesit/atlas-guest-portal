@@ -682,6 +682,58 @@ describe('UnitBookingWidget - TASK-4628: E13 overlap-block message must fire on 
   });
 });
 
+describe('UnitBookingWidget - TASK-4725: "Extra guest fee" row deleted (server never charges it)', () => {
+  const filePath = resolve(__dirname, './UnitBookingWidget.tsx');
+
+  it('no longer renders the phantom "Extra guest fee" breakdown row (source)', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    expect(content).not.toContain('Extra guest fee');
+    expect(content).not.toMatch(/priceDetails\.extraGuestsFee > 0 &&/);
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+    task4303.booking.checkIn = null;
+    task4303.booking.checkOut = null;
+    task4303.booking.guests = 2;
+  });
+
+  it('does not render "Extra guest fee" for a 3-guest booking even though the client-side fee would be > 0 (render)', async () => {
+    // "Atlas 501 PH" infers unitType "1bhk" (name has no "penthouse" substring), whose
+    // configured extraGuestFeeByUnitType is ₹500/night — guaranteed > 0 for 3 guests
+    // (includedGuestsByUnitType["1bhk"] = 2), which is exactly the condition that used
+    // to gate the deleted row on.
+    const friday = getIstStartOfDay(nextFriday(addDays(new Date(), 7)));
+    const sunday = addDays(friday, 2);
+    task4303.booking.checkIn = toISODate(friday);
+    task4303.booking.checkOut = toISODate(sunday);
+    task4303.booking.guests = 3;
+
+    task4303.fetchCalendarPricing.mockResolvedValue({
+      dateToPrice: new Map([[toISODate(friday), 3500], [toISODate(addDays(friday, 1)), 3500]]),
+      convenienceFeePercent: 3,
+    });
+    task4303.fetchGuestGstBreakdown.mockResolvedValue({ gstPercent: 5, gstAmount: 350, finalAmount: 7581 });
+
+    const { default: UnitBookingWidget } = await import('./UnitBookingWidget');
+    render(
+      <MemoryRouter>
+        <UnitBookingWidget
+          listingId={7}
+          propertyId={3}
+          listingName="Atlas 501 PH"
+          propertySlug="atlas501-ph"
+          unitSlug="ph"
+        />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText('Total');
+    expect(screen.queryByText('Extra guest fee')).toBeNull();
+  });
+});
+
 describe('UnitBookingWidget - TASK-4726: URL-hydrated interior-night overlap disables Reserve even when the availability GET resolves after mount', () => {
   afterEach(() => {
     cleanup();
