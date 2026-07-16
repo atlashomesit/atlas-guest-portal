@@ -10,12 +10,12 @@
 .ahv2-hero,
 .ahv2-ribbon,
 .ahv2-card {
-  --ahv2-ivory: var(--bg-primary, #fffaf5);
+  --ahv2-ivory: var(--bg-primary, #fff8e7);
   --ahv2-card: var(--bg-card, #ffffff);
-  --ahv2-muted: var(--bg-secondary, #fff3e8);
-  --ahv2-coral: var(--cta-primary, #c2410c);
-  --ahv2-coral-hover: var(--cta-primary-hover, #a8350a);
-  --ahv2-amber: var(--brand-accent, #ffb347);
+  --ahv2-muted: var(--bg-secondary, #fdf2e9);
+  --ahv2-coral: var(--cta-primary, #c45a3f);
+  --ahv2-coral-hover: var(--cta-primary-hover, #a84832);
+  --ahv2-amber: var(--brand-accent, #f08c71);
   --ahv2-ink: var(--text-primary, #1a1a2e);
   /* AA-safe muted (>=4.5:1 on ivory/white) for small 12-13px secondary text —
      reuses the theme's verified --text-muted instead of a low-contrast alpha. */
@@ -64,37 +64,61 @@
 }
 
 /* ============ HERO ============ */
+/* Centered gradient hero from the Stay by City Focus mockups: warm cream →
+   peach → soft lavender wash, interlocking wave motif under the header, all
+   content centred above the floating white search card. The photo split-panel
+   is retired (hidden below) — the gradient IS the hero artwork. */
 .ahv2-hero {
   display: grid;
-  grid-template-columns: 55fr 45fr;
+  grid-template-columns: 1fr;
   align-items: stretch;
   min-height: min(72vh, 760px);
   position: relative;
-  background: var(--ahv2-ivory);
+  background: var(--gradient-hero,
+      linear-gradient(135deg, #fff8e7 0%, #ffe4d6 45%, #f2e1eb 100%));
   color: var(--ahv2-ink);
 }
+/* Signature interlocking sine-wave band, drawn just below the fixed header.
+   NOTE: <main> already offsets by --nav-height for the fixed navbar, so the
+   hero's own coordinates start below the header — no extra nav offset here. */
+.ahv2-hero::before {
+  content: "";
+  position: absolute;
+  top: 12px;
+  left: 0;
+  right: 0;
+  height: 48px;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 48'%3E%3Cpath d='M0 24 C120 8 240 40 360 24 S600 8 720 24 S960 40 1080 24 S1320 8 1440 24' fill='none' stroke='%23f08c71' stroke-width='1.75' stroke-linecap='round' opacity='0.55'/%3E%3Cpath d='M0 30 C120 14 240 46 360 30 S600 14 720 30 S960 46 1080 30 S1320 14 1440 30' fill='none' stroke='%23f08c71' stroke-width='1.25' stroke-linecap='round' opacity='0.28'/%3E%3C/svg%3E");
+  background-repeat: repeat-x;
+  background-size: 1440px 48px;
+}
 .ahv2-hero-left {
-  background: var(--ahv2-ivory);
-  padding: calc(var(--nav-height, 96px) + clamp(20px, 3vw, 40px))
-    clamp(24px, 5vw, 80px) clamp(48px, 7vw, 96px);
+  background: transparent;
+  /* top padding clears the 48px wave band above (main already clears the navbar) */
+  padding: clamp(84px, 10vw, 128px) clamp(24px, 5vw, 80px) clamp(48px, 7vw, 96px);
   display: flex;
   flex-direction: column;
   justify-content: center;
+  align-items: center;
+  text-align: center;
   position: relative;
   z-index: 2;
 }
 .ahv2-hero-eyebrow {
   margin-bottom: 24px;
+  font-size: 12px;
+  letter-spacing: 0.24em;
 }
 .ahv2-hero-h1 {
   font-family: var(--ahv2-display);
   font-weight: 600;
-  font-size: clamp(44px, 5.8vw, 72px);
-  line-height: 1.1;
+  font-size: clamp(44px, 5.8vw, 76px);
+  line-height: 1.08;
   letter-spacing: -0.015em;
-  margin: 0 0 28px;
+  margin: 0 auto 28px;
   text-wrap: balance;
-  max-width: 20ch;
+  max-width: 18ch;
   color: var(--ahv2-ink);
   opacity: 0;
   transform: translateY(8px);
@@ -110,32 +134,103 @@
   line-height: 1.6;
   color: var(--ahv2-ink);
   opacity: 0.8;
-  max-width: 48ch;
-  margin: 0 0 40px;
+  max-width: 52ch;
+  margin: 0 auto 40px;
   opacity: 0;
   transform: translateY(8px);
   animation: ahv2-subtitle-in 700ms var(--ahv2-ease) 350ms forwards;
 }
 .ahv2-hero-widget {
   width: 100%;
-  max-width: 640px;
-  margin-bottom: 32px;
+  /* Must be wide enough for 4 equal field cards without clipping dates */
+  max-width: min(100%, 900px);
+  margin: 0 auto 32px;
+  text-align: left;
   opacity: 0;
   transform: translateY(12px);
   animation: ahv2-widget-in 700ms var(--ahv2-ease) 400ms forwards;
 }
+
+/* Hero booking fields — shared alignment shell */
+.ahv2-hero-widget .hero-form {
+  padding: 1rem;
+  gap: 0.75rem;
+}
+.ahv2-hero-widget .hero-form-grid {
+  gap: 0.75rem;
+  align-items: stretch;
+}
+.ahv2-hero-widget .field-card {
+  min-height: 112px;
+  height: 100%;
+  padding: 1rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 0.65rem;
+  overflow: visible;
+  box-sizing: border-box;
+  transform: none;
+}
+.ahv2-hero-widget .field-card:hover,
+.ahv2-hero-widget .field-card:focus-within {
+  transform: none;
+}
+.ahv2-hero-widget .field-card .date-value,
+.ahv2-hero-widget .field-card .guest-value {
+  margin-top: 0;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  font-size: clamp(15px, 1.35vw, 18px);
+  line-height: 1.25;
+  white-space: nowrap;
+}
+.ahv2-hero-widget .field-card .date-value > span:first-child,
+.ahv2-hero-widget .field-card .guest-value > span:first-child,
+.ahv2-hero-widget .field-card .hf-value-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ahv2-hero-widget .hf-field-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  line-height: 1;
+}
+.ahv2-hero-widget .hf-cta-card {
+  justify-content: center;
+  align-items: stretch;
+  gap: 0.5rem;
+  padding: 1rem;
+}
+.ahv2-hero-widget .hf-night-chip {
+  align-self: flex-start;
+  margin-top: auto;
+}
 .ahv2-chip-row {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: 10px;
-  margin: 0;
+  margin: 0 auto;
   padding: 0;
   list-style: none;
+  /* Align trust chips with the booking widget edge */
+  max-width: min(100%, 900px);
 }
 .ahv2-chip {
   font-size: 13px;
   color: var(--ahv2-ink);
-  background: rgba(255, 179, 71, 0.18);
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid color-mix(in srgb, var(--brand-accent, #f08c71) 40%, #ffffff);
   border-radius: var(--ahv2-r-pill);
   padding: 8px 16px;
   display: inline-flex;
@@ -167,8 +262,10 @@
   color: var(--ahv2-ink);
 }
 
-/* Hero right (photo) */
+/* Hero right (photo) — retired by the centred gradient hero; DOM stays for
+   tests/analytics but the panel no longer renders. */
 .ahv2-hero-right {
+  display: none;
   position: relative;
   overflow: hidden;
   min-height: 460px;
@@ -183,7 +280,7 @@
 }
 .ahv2-hero-photo--fallback {
   background: var(--gradient-hero,
-      linear-gradient(135deg, #fffaf5 0%, #ffe8d6 50%, #fff3e8 100%));
+      linear-gradient(135deg, #fff8e7 0%, #ffe4d6 45%, #f2e1eb 100%));
   animation: none;
   display: flex;
   flex-direction: column;
@@ -192,6 +289,11 @@
   gap: 14px;
   text-align: center;
   padding: 24px;
+}
+
+/* Soft grid wash when design artwork is used as hero fill */
+.ahv2-hero-photo--fallback[style*="stay-design"] {
+  background-color: #ffe4d6;
 }
 .ahv2-hero-fallback-mark {
   display: flex;
@@ -302,15 +404,13 @@
     grid-template-columns: 1fr;
     min-height: 0;
   }
-  .ahv2-hero-right {
-    order: -1;
-    aspect-ratio: 16 / 11;
-    min-height: 0;
-    margin: calc(var(--nav-height, 96px) + 12px) 16px 0;
-    border-radius: var(--ahv2-r-lg);
+  .ahv2-hero::before {
+    top: 8px;
+    height: 36px;
+    background-size: 900px 36px;
   }
   .ahv2-hero-left {
-    padding: 28px 18px 40px;
+    padding: 64px 18px 40px;
   }
   .ahv2-hero-h1 {
     font-size: clamp(32px, 8.5vw, 44px);
@@ -482,32 +582,40 @@
 }
 
 /* ============ HOME CARD ============ */
+/* White-bodied cards with alternating coral / lavender hairline borders and
+   landscape photos, straight from the "Havelis worth the journey" mockup. */
 .ahv2-card {
-  background: transparent;
-  border: 0;
-  border-radius: var(--ahv2-r-lg);
+  background: var(--ahv2-card, #ffffff);
+  border: 1px solid color-mix(in srgb, var(--brand-accent, #f08c71) 70%, #ffffff);
+  border-radius: 18px;
+  overflow: hidden;
   cursor: pointer;
-  transition: transform 240ms var(--ahv2-ease);
+  transition: transform 240ms var(--ahv2-ease), box-shadow 240ms var(--ahv2-ease);
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 0;
   position: relative;
+  box-shadow: var(--ahv2-shadow-soft);
+}
+.ahv2-card:nth-child(even) {
+  border-color: var(--lavender, #c5b4f3);
 }
 .ahv2-card:hover {
-  transform: translateY(-2px);
+  transform: translateY(-3px);
+  box-shadow: var(--ahv2-shadow-elev);
 }
 .ahv2-card-photo-wrap {
   position: relative;
-  border-radius: 16px;
+  border-radius: 0;
   overflow: hidden;
-  aspect-ratio: 4 / 5;
-  /* warm dusty-rose loading wash, never flat beige */
-  background: linear-gradient(135deg, #d9a89b 0%, #c8907f 100%);
+  aspect-ratio: 4 / 3;
+  /* warm peach loading wash (lavender on even cards), never flat beige */
+  background: linear-gradient(135deg, #f7c4ae 0%, #ee9d7f 100%);
   transition: box-shadow 240ms var(--ahv2-ease);
 }
-.ahv2-card:hover .ahv2-card-photo-wrap {
-  box-shadow: var(--ahv2-shadow-elev);
+.ahv2-card:nth-child(even) .ahv2-card-photo-wrap {
+  background: linear-gradient(135deg, #d9cdf7 0%, #b6a3ee 100%);
 }
 .ahv2-card-photo-inner {
   position: absolute;
@@ -569,7 +677,7 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 2px 4px 6px;
+  padding: 18px 20px 20px;
 }
 .ahv2-card-title {
   font-family: var(--ahv2-display);

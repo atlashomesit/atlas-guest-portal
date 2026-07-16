@@ -1368,7 +1368,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           <>
             <div className="lv-booking-total" data-testid="bw-price-pending" aria-busy="true">
               <span
-                className="inline-block h-6 w-24 animate-pulse rounded bg-slate-200 align-middle"
+                className="inline-block h-6 w-24 animate-pulse rounded bg-[#f0e6dc] align-middle"
                 aria-hidden="true"
               />
               <span>total · {priceDetails.nights} {priceDetails.nights === 1 ? 'night' : 'nights'}</span>
@@ -1416,7 +1416,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         )}
         {reviewCount != null && reviewCount > 0 && reviewRating != null && (
           <div className="bw-rating" data-testid="bw-rating-block" style={{ marginTop: 6 }}>
-            <svg viewBox="0 0 24 24" width="13" height="13" fill="#c2410c" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="#c45a3f" aria-hidden="true">
               <path d="M12 2l2.9 6.9 7.1.6-5.4 4.7 1.6 7.3-6.2-3.8-6.2 3.8 1.6-7.3L2 9.5l7.1-.6L12 2z"/>
             </svg>
             <span className="bw-rating-num">{reviewRating.toFixed(1)}</span>
@@ -1455,7 +1455,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       <div className="lv-booking-form">
         {minStayNights > 1 && (
           <p
-            className="inline-flex items-center rounded-full bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-900 border border-amber-200"
+            className="inline-flex items-center rounded-full bg-[#ffe4d6] px-3 py-1.5 text-sm font-medium text-[#4a3535] border border-[#e5cfc0]"
             style={{ marginBottom: 8 }}
             data-testid="min-stay-badge"
           >
@@ -1546,15 +1546,15 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         )}
         {/* Legend for calendar cell colours */}
         <p className="text-xs text-text-secondary" style={{ marginTop: 6, lineHeight: 1.5 }}>
-          <span className="mr-1 inline-block rounded bg-[#ffe8d6]/60 px-1.5 py-0.5 text-[#c2410c]">Available</span>
+          <span className="mr-1 inline-block rounded bg-[#ffe4d6]/60 px-1.5 py-0.5 text-[#c45a3f]">Available</span>
           open for booking.
-          <span className="mx-1 inline-block rounded bg-[#fff3e0] px-1.5 py-0.5 text-[#92400e]">Turnover</span>
+          <span className="mx-1 inline-block rounded bg-[#ffe4d6] px-1.5 py-0.5 text-[#4a3535]">Turnover</span>
           cleaning window (still bookable).
           <span
-            className="mx-1 inline-block rounded px-1.5 py-0.5 text-[#64748b]"
+            className="mx-1 inline-block rounded px-1.5 py-0.5 text-[#6b5a55]"
             style={{
               background:
-                'repeating-linear-gradient(-45deg, #f1f5f9, #f1f5f9 3px, #e2e8f0 3px, #e2e8f0 6px)',
+                'repeating-linear-gradient(-45deg, #f5ebe0, #f5ebe0 3px, #ecdfd2 3px, #ecdfd2 6px)',
             }}
           >
             Unavailable
@@ -1573,15 +1573,15 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             onClick={(e) => { e.stopPropagation(); setGuestsOpen((o) => !o); }}
           >
             <div>
-              <small style={{ display: 'block', fontSize: '9.5px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#475569', marginBottom: 4 }}>Guests</small>
+              <small style={{ display: 'block', fontSize: '9.5px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted, #6b5a55)', marginBottom: 4 }}>Guests</small>
               <span className="lv-guest-val">{guests} {guests === 1 ? 'adult' : 'adults'}</span>
               {guests >= effectiveMaxGuests && (
-                <small style={{ display: 'block', fontSize: '10px', color: '#64748b', marginTop: 2 }}>
+                <small style={{ display: 'block', fontSize: '10px', color: 'var(--text-muted, #6b5a55)', marginTop: 2 }}>
                   Maximum {effectiveMaxGuests} guest{effectiveMaxGuests === 1 ? '' : 's'} for this home
                 </small>
               )}
             </div>
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ color: '#475569', flexShrink: 0 }}><polyline points="6 9 12 15 18 9" /></svg>
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ color: 'var(--text-muted, #6b5a55)', flexShrink: 0 }}><polyline points="6 9 12 15 18 9" /></svg>
           </button>
           {guestsOpen && (
             <div className="bw-guests-pop" role="group" aria-label="Guest count">
@@ -1623,12 +1623,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         {hasSelectedRange && !invalidIstStayRange && rangePricingPending && (
           <div className="lv-price-rows" data-testid="bw-breakdown-pending" aria-busy="true" role="status">
             <div className="lv-price-row">
-              <span className="inline-block h-4 w-32 animate-pulse rounded bg-slate-200" aria-hidden="true" />
-              <span className="lv-num inline-block h-4 w-16 animate-pulse rounded bg-slate-200" aria-hidden="true" />
+              <span className="inline-block h-4 w-32 animate-pulse rounded bg-[#f0e6dc]" aria-hidden="true" />
+              <span className="lv-num inline-block h-4 w-16 animate-pulse rounded bg-[#f0e6dc]" aria-hidden="true" />
             </div>
             <div className="lv-price-row">
-              <span className="inline-block h-4 w-24 animate-pulse rounded bg-slate-200" aria-hidden="true" />
-              <span className="lv-num inline-block h-4 w-12 animate-pulse rounded bg-slate-200" aria-hidden="true" />
+              <span className="inline-block h-4 w-24 animate-pulse rounded bg-[#f0e6dc]" aria-hidden="true" />
+              <span className="lv-num inline-block h-4 w-12 animate-pulse rounded bg-[#f0e6dc]" aria-hidden="true" />
             </div>
             <p className="text-xs text-text-muted" style={{ marginTop: 4 }}>Fetching latest prices…</p>
           </div>
@@ -1837,7 +1837,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         title={checkinUnavailable ? 'Check-in date is not available. Please select a different check-in date.' : undefined}
         className={`bw-reserve lv-booking-cta${isSubmitting ? ' opacity-75' : ''}`}
         data-testid="guest-booking-submit"
-        style={{ marginTop: 20, width: '100%', background: '#c2410c', color: '#fff', border: 0, borderRadius: 12, padding: '14px 24px', fontSize: 15, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer', transition: 'background .2s' }}
+        style={{ marginTop: 20, width: '100%', background: 'var(--gradient-cta, linear-gradient(135deg, #f08c71, #e86a4a))', color: '#fff', border: 0, borderRadius: 12, padding: '14px 24px', fontSize: 15, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer', transition: 'filter .2s, box-shadow .2s', boxShadow: '0 4px 12px rgba(196, 90, 63, 0.25)' }}
       >
         {isBookingDisabled || checkinUnavailable || availabilityFailed
           ? 'Unavailable'
@@ -1845,7 +1845,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             ? 'Reserving…'
             : 'Reserve'}
       </Button>
-      <p className="bw-charge-note" data-testid="bw-charge-note" style={{ textAlign: 'center', fontSize: 12, color: '#64748b', marginTop: 8 }}>
+      <p className="bw-charge-note" data-testid="bw-charge-note" style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-muted, #6b5a55)', marginTop: 8 }}>
         You won&apos;t be charged yet
       </p>
 

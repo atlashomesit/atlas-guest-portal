@@ -76,47 +76,69 @@ const ServicesSection = () => {
     const items = enableServicesConcreteCopy ? SERVICES_CONTENT.concreteCopy : SERVICES_CONTENT.poeticCopy;
 
     return (
-      <section className="py-16 md:py-16 bg-bg-muted">
-        <div className="container mx-auto px-4 lg:px-8">
-          <div className="text-center flex flex-col gap-4">
-            <span className="text-accent-primary font-medium tracking-wider uppercase text-sm">Elite Experiences</span>
-            <h2 className="text-3xl lg:text-4xl font-bold text-text-primary">Discover Our Exclusive Services</h2>
-            <div className="w-24 h-1 bg-accent-primary mx-auto rounded"></div>
-            <p className="text-text-muted max-w-2xl mx-auto">{servicesSummary}</p>
+      <section className="py-14 md:py-16" style={{ background: "var(--bg-muted, #f5ebe0)" }}>
+        <div className="container mx-auto px-4 lg:px-8 max-w-6xl">
+          <div className="text-center flex flex-col gap-3 mb-2">
+            <span className="text-accent-primary font-medium tracking-[0.18em] uppercase text-xs">Elite Experiences</span>
+            <h2
+              className="text-3xl lg:text-4xl font-semibold text-text-primary"
+              style={{ fontFamily: "var(--font-family-display)" }}
+            >
+              Discover Our Exclusive Services
+            </h2>
+            <p className="text-text-muted max-w-xl mx-auto text-sm md:text-base leading-relaxed">{servicesSummary}</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 py-16">
-            {items.map((item, index) => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 md:gap-6 py-10 md:py-12 items-stretch">
+            {items.map((item, index) => {
+              const pastel =
+                index % 2 === 0
+                  ? "linear-gradient(160deg, #ffe4d6 0%, #f08c71 100%)"
+                  : "linear-gradient(160deg, #f0eafd 0%, #c5b4f3 100%)";
+              return (
               <div
                 key={item.title}
-                className={`group flex flex-col rounded-xl overflow-hidden border border-border-subtle ${
-                  enableServicesAlternatingBackgrounds && index % 2 === 1 ? 'bg-bg-muted' : 'bg-bg-surface'
+                className={`group flex h-full flex-col rounded-2xl overflow-hidden border border-border-subtle bg-bg-surface shadow-sm ${
+                  enableServicesAlternatingBackgrounds && index % 2 === 1 ? "bg-bg-muted" : ""
                 }`}
               >
                 {enableServicesIconography && (
-                  <div className="flex items-center justify-center bg-bg-muted p-6">
+                  <div
+                    className="flex items-center justify-center min-h-[120px] relative overflow-hidden"
+                    style={{ background: pastel }}
+                    aria-hidden
+                  >
+                    <div
+                      className="absolute inset-0 opacity-30"
+                      style={{
+                        backgroundImage:
+                          "linear-gradient(rgba(255,255,255,.35) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.35) 1px, transparent 1px)",
+                        backgroundSize: "28px 28px",
+                      }}
+                    />
                     {item.icon ? (
                       (() => {
                         const Icon = SERVICE_ICONS[item.icon as keyof typeof SERVICE_ICONS];
                         return Icon ? (
-                          <Icon className="h-10 w-10 text-accent-primary" aria-hidden />
+                          <Icon className="relative h-10 w-10 text-white drop-shadow-sm" aria-hidden />
                         ) : (
-                          <div className="h-12 w-12 rounded-full border border-dashed border-border-subtle" aria-hidden />
+                          <div className="h-12 w-12 rounded-full border border-dashed border-white/50" aria-hidden />
                         );
                       })()
                     ) : (
-                      <div className="h-12 w-12 rounded-full border border-dashed border-border-subtle" aria-hidden />
+                      <div className="h-12 w-12 rounded-full border border-dashed border-white/50" aria-hidden />
                     )}
                   </div>
                 )}
-                <div className="flex-1 flex flex-col gap-2 p-6">
+                <div className="flex-1 flex flex-col gap-2 p-5 md:p-6 min-h-[140px]">
                   <h3 className="text-lg font-semibold text-text-primary">{item.title}</h3>
-                  <p className="text-text-muted mb-4 flex-1">
+                  <p className="text-text-muted text-sm leading-relaxed flex-1">
                     {enableServicesOneLineDescriptions && item.oneLine ? item.oneLine : item.description}
                   </p>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>

@@ -2,7 +2,6 @@ import React from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { addDays, format, startOfDay, startOfMonth } from 'date-fns';
 import { CalendarRange, ChevronDown } from 'lucide-react';
-import { heroWidgetLayoutFlag } from '../../config/abFlags';
 import { trackEvent } from '../../utils/analytics';
 import { useBooking } from '../../contexts/BookingContext';
 import { AtlasDateRangePicker, type AtlasDateRangePickerValue } from '../date/AtlasDateRangePicker';
@@ -30,7 +29,6 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const enableWidgetExperiment = heroWidgetLayoutFlag();
   const today = React.useMemo(() => startOfDay(new Date()), []);
   const defaultRange = React.useMemo(
     () => ({
@@ -483,32 +481,31 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
     setHasInteracted(true);
   };
 
-  const formContainerClass = enableWidgetExperiment
-    ? 'hero-form w-full max-w-5xl rounded-[24px] bg-[var(--bg-surface)] shadow-[var(--shadow-level-3)] backdrop-blur-sm border border-[var(--border-subtle)] p-8 flex flex-col gap-6'
-    : 'hero-form w-full max-w-5xl rounded-[24px] bg-[var(--bg-surface)] shadow-[var(--shadow-level-3)] backdrop-blur-sm border border-[var(--border-subtle)] p-8 flex flex-col gap-6';
+  const formContainerClass =
+    'hero-form w-full rounded-2xl bg-[var(--bg-surface)] shadow-[var(--shadow-level-2)] border border-[var(--border-subtle)] p-4 flex flex-col gap-3';
 
-  // Gap 2 fix: give CTA column 1.4× share so "Check availability" text is never clipped
-  const formGridClass = enableWidgetExperiment
-    ? 'hero-form-grid grid grid-cols-1 gap-6 md:grid-cols-2 md:auto-rows-fr lg:grid-cols-[1fr_1fr_1fr_1.4fr]'
-    : 'hero-form-grid grid grid-cols-1 gap-6 md:grid-cols-2 md:auto-rows-fr lg:grid-cols-[1fr_1fr_1fr_1.4fr]';
+  // Equal columns so Check-in / Check-out / Guests / CTA values align on one baseline
+  const formGridClass =
+    'hero-form-grid grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:auto-rows-fr';
 
   const fieldShellClass =
-    'field-card flex h-full min-h-[120px] flex-col justify-between rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-7 py-7 shadow-[var(--shadow-level-1)] hover:shadow-[var(--shadow-level-2)] hover:scale-[1.01]';
+    'field-card flex h-full min-h-[112px] flex-col justify-start gap-2.5 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4 shadow-[var(--shadow-level-1)] hover:shadow-[var(--shadow-level-2)]';
   const dateFieldShellClass = `${fieldShellClass}${
     dateError ? ' border-[var(--support-error)] shadow-[0_0_0_1px_var(--support-error)] error-shake' : ''
   }`;
-  const labelClass =
-    'flex items-center gap-2.5 text-xs font-bold uppercase tracking-[0.10em] text-[var(--text-muted)] whitespace-nowrap';
+  const labelClass = 'hf-field-label';
+  const valueClass =
+    'date-value flex items-center justify-between gap-2 font-medium text-[var(--text-primary)]';
   return (
     <form onSubmit={handleSubmit} className={formContainerClass} data-testid="search-input" id="search-form">
       <div className="sr-only" role="status" aria-live="polite">
         {statusMessage || error || 'Hero form ready.'}
       </div>
       <div className={formGridClass} ref={calendarWrapperRef}>
-        <div className="relative">
+        <div className="relative min-w-0">
           <button
             type="button"
-            className={`${dateFieldShellClass} text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary${activeField === 'checkin' && isCalendarOpen ? ' ring-2 ring-[var(--cta-primary)] ring-offset-2' : ''}`}
+            className={`${dateFieldShellClass} w-full text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary${activeField === 'checkin' && isCalendarOpen ? ' ring-2 ring-[var(--cta-primary)] ring-offset-2' : ''}`}
             aria-label="Click to select check-in date, then choose from calendar"
             title="Click to select check-in date, then choose from calendar"
             aria-expanded={isCalendarOpen}
@@ -520,24 +517,25 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
             aria-controls={calendarContentId}
           >
             <span className={labelClass}>
-              <CalendarRange className="h-[18px] w-[18px] shrink-0 text-[var(--text-muted)]" aria-hidden="true" />
-              <span className="truncate">Check-in</span>
+              <CalendarRange className="h-4 w-4 shrink-0 text-[var(--text-muted)]" aria-hidden="true" />
+              <span>Check-in</span>
             </span>
-            <span className="date-value mt-4 flex items-center justify-between gap-2 text-[22px] font-medium text-[var(--text-primary)] leading-tight">
-              {checkInLabel}
-              <ChevronDown className={`h-[18px] w-[18px] shrink-0 text-[var(--text-muted)] transition-transform duration-200 ${isCalendarOpen ? 'rotate-180' : ''}`} aria-hidden />
+            <span className={valueClass}>
+              <span className="hf-value-text">{checkInLabel}</span>
+              <ChevronDown className={`h-4 w-4 shrink-0 text-[var(--text-muted)] transition-transform duration-200 ${isCalendarOpen ? 'rotate-180' : ''}`} aria-hidden />
             </span>
             {dateError && (
-              <span className="mt-2 text-sm font-semibold text-support-error" id={dateErrorId} role="alert">
+              <span className="text-sm font-semibold text-support-error" id={dateErrorId} role="alert">
                 {dateError}
               </span>
             )}
           </button>
         </div>
 
+        <div className="relative min-w-0">
         <button
           type="button"
-          className={`${dateFieldShellClass} text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary md:-ml-[1px]${activeField === 'checkout' && isCalendarOpen ? ' ring-2 ring-[var(--cta-primary)] ring-offset-2' : ''}`}
+          className={`${dateFieldShellClass} w-full text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary${activeField === 'checkout' && isCalendarOpen ? ' ring-2 ring-[var(--cta-primary)] ring-offset-2' : ''}`}
           aria-label="Click to select check-out date, then choose from calendar"
           title="Click to select check-out date, then choose from calendar"
           aria-expanded={isCalendarOpen}
@@ -547,21 +545,20 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
           aria-controls={calendarContentId}
         >
           <span className={labelClass}>
-            <CalendarRange className="h-[18px] w-[18px] shrink-0 text-[var(--text-muted)]" aria-hidden="true" />
-            <span className="truncate">Check-out</span>
+            <CalendarRange className="h-4 w-4 shrink-0 text-[var(--text-muted)]" aria-hidden="true" />
+            <span>Check-out</span>
           </span>
-          <span className="date-value mt-4 flex items-center justify-between gap-2 text-[22px] font-medium text-[var(--text-primary)] leading-tight">
-            {checkOutLabel}
-            <ChevronDown className={`h-[18px] w-[18px] shrink-0 text-[var(--text-muted)] transition-transform duration-200 ${isCalendarOpen ? 'rotate-180' : ''}`} aria-hidden />
+          <span className={valueClass}>
+            <span className="hf-value-text">{checkOutLabel}</span>
+            <ChevronDown className={`h-4 w-4 shrink-0 text-[var(--text-muted)] transition-transform duration-200 ${isCalendarOpen ? 'rotate-180' : ''}`} aria-hidden />
           </span>
           {dateRange.startDate && dateRange.endDate && calculateNights(dateRange.startDate, dateRange.endDate) > 0 && (
-            <div className="mt-3 flex items-center justify-center">
-              <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--accent-primary)] bg-[var(--bg-muted)] px-3 py-1.5 rounded-lg">
-                {formatNightCount(calculateNights(dateRange.startDate, dateRange.endDate))}
-              </span>
-            </div>
+            <span className="hf-night-chip inline-flex items-center text-xs font-semibold text-[var(--accent-primary)] bg-[var(--bg-muted)] px-2.5 py-1 rounded-full">
+              {formatNightCount(calculateNights(dateRange.startDate, dateRange.endDate))}
+            </span>
           )}
         </button>
+        </div>
 
         <AtlasDateRangePicker
           anchorRef={calendarWrapperRef}
@@ -641,12 +638,12 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
           onClose={() => setIsGuestsOpen(false)}
         />
 
-        <div className={`${fieldShellClass} md:-ml-[1px] lg:min-h-[120px] lg:items-stretch lg:justify-center lg:flex-col`}>
+        <div className={`${fieldShellClass} hf-cta-card min-w-0`}>
           <button
             type="submit"
             disabled={isSubmitDisabled || isSubmitting}
             data-testid="hero-search-submit"
-            className="inline-flex h-[60px] w-full items-center justify-center rounded-[14px] bg-[var(--cta-primary)] px-6 text-base font-semibold tracking-[0.02em] text-white shadow-[var(--shadow-level-2)] transition-all hover:scale-[1.02] hover:shadow-[var(--shadow-level-3)] active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cta-primary)] disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none disabled:hover:scale-100 aria-busy:cursor-progress aria-busy:opacity-90 whitespace-nowrap"
+            className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-[var(--cta-primary)] px-4 text-sm font-semibold tracking-[0.01em] text-white shadow-[var(--shadow-level-2)] transition-colors hover:bg-[var(--cta-primary-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cta-primary)] disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none aria-busy:cursor-progress aria-busy:opacity-90 whitespace-nowrap"
             onClick={() => setStatusMessage('Checking availability...')}
             aria-busy={isSubmitting}
           >
@@ -656,7 +653,7 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
             type="button"
             data-testid="hero-browse-all"
             onClick={() => navigate('/search')}
-            className="mt-1.5 text-sm text-center text-[color:var(--text-muted)] underline underline-offset-2 hover:text-[color:var(--text-primary)] transition-colors w-full"
+            className="text-sm text-center text-[color:var(--text-muted)] underline underline-offset-2 hover:text-[color:var(--text-primary)] transition-colors w-full"
           >
             Browse all homes
           </button>

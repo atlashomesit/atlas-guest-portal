@@ -18,7 +18,6 @@ import SEO from "../components/SEO"; // TASK-4290
 import OptimizedImage from "../components/ui/OptimizedImage";
 import OwnerShareBadge from "../components/OwnerShareBadge"; // TASK-1705
 import DirectDiscountBanner from "../components/DirectDiscountBanner"; // TASK-1708
-import ReviewSummary from "../components/ReviewSummary"; // TASK-1716
 import LongStayCalculator from "../components/LongStayCalculator"; // TASK-1739
 import { filterGuestImageUrls, sanitizeGuestImageUrl } from "../utils/guestImageUrl";
 import { compareAtlasHomesBuildingOrder } from "../utils/atlasHomesBuildingOrder";
@@ -35,6 +34,8 @@ import { fallbackCoordsForListing, hasMapCoords } from "../utils/mapCoords";
 import { amenityCodeMatchesCategory, resolveAmenityLabel } from "../utils/amenityCodes";
 import { estimateStayNights, formatEstTotalInclGst } from "../utils/guestPriceEstimate";
 import { CONTACT } from "../config/contact";
+import { getPropertyDesignImage } from "../config/branding";
+import "./search-page.css";
 
 const SearchResultsMap = lazy(() => import("../components/search/SearchResultsMap"));
 
@@ -103,7 +104,8 @@ function buildStaticListings(allowedIds?: Set<number>): NormalizedListing[] {
         location: property.property_location ?? "Hyderabad",
         pricePerNight: property.property_price ?? 0,
         maxGuests: property.maxCapacity ?? 4,
-        imageUrl: sanitizeGuestImageUrl(property.property_img?.[0]) ?? "",
+        imageUrl:
+          sanitizeGuestImageUrl(property.property_img?.[0]) ?? getPropertyDesignImage(id),
         amenities: property.property_amenities?.slice(0, 3) ?? [],
         canonicalPath,
         property,
@@ -136,7 +138,9 @@ function apiToNormalized(listings: PublicListing[]): NormalizedListing[] {
         pricePerNight: l.baseNightlyRate ?? 0,
         maxGuests: l.maxGuests,
         imageUrl:
-          filterGuestImageUrls(l.photoUrls ?? [])[0] ?? sanitizeGuestImageUrl(l.coverPhotoUrl) ?? "",
+          filterGuestImageUrls(l.photoUrls ?? [])[0] ??
+          sanitizeGuestImageUrl(l.coverPhotoUrl) ??
+          getPropertyDesignImage(l.id),
         // TASK-2552: use l.amenityCodes directly (now a proper field on PublicListing)
         amenities: (l.amenityCodes ?? []).map((code) => ({ amenities_icon: code })),
         canonicalPath,
@@ -185,7 +189,7 @@ function marketplaceToNormalized(items: MarketplaceApiItem[]): NormalizedListing
     location: item.city ?? "",
     pricePerNight: item.pricePerNight,
     maxGuests: item.maxGuests,
-    imageUrl: sanitizeGuestImageUrl(item.coverImageUrl) ?? "",
+    imageUrl: sanitizeGuestImageUrl(item.coverImageUrl) ?? getPropertyDesignImage(item.id),
     amenities: [],
     canonicalPath,
     rating: item.rating ?? undefined,
@@ -362,7 +366,6 @@ const SearchPage = () => {
   const [availabilityFetchDone, setAvailabilityFetchDone] = useState(false);
 
   const tenant = getTenantContext();
-  const brandName = getTenantBrandName();
   const overrides = getTenantOverrides(tenant?.slug);
   const hideAtlasBranding = shouldHideAtlasBranding(tenant, overrides);
   const unitNoun = getUnitNoun(overrides);
@@ -882,22 +885,21 @@ const SearchPage = () => {
   }, [listings, dateAvailableIds]);
 
   return (
-    <div className="min-h-screen bg-bg-muted py-10">
+    <div className="search-page min-h-screen bg-bg-muted">
       {/* TASK-4290: give /search a real document title instead of the bare "Atlas" default. */}
       <SEO
         title={`Search stays | ${getTenantBrandName()}`}
         description={`Search available homes and rooms and compare nightly rates on ${getTenantBrandName()}.`}
       />
-      <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 md:px-8">
+      <div className="search-page__shell">
         {isMarketplaceSearch ? (
-          <div className="sticky top-[var(--nav-height)] z-30 -mx-4 bg-bg-muted px-4 py-3 md:static md:mx-0 md:bg-transparent md:p-0">
+          <div className="sticky top-[var(--nav-height)] z-30 bg-bg-muted py-2 md:static md:bg-transparent md:p-0">
             <AirbnbSearchBar />
           </div>
         ) : null}
 
         <header className="space-y-2">
           <p className="text-sm font-semibold uppercase tracking-wide text-text-muted">Search results</p>
-          {/* TASK-1864: dynamic h1 — only say "homes for your dates" when dates are actually set */}
           <h1 className="text-3xl font-bold text-text-primary sm:text-4xl" data-testid="search-results-h1">
             {isMarketplaceSearch && destinationParam
               ? `Stays in ${destinationParam}`
@@ -916,7 +918,6 @@ const SearchPage = () => {
 
         <RecentlyViewedStrip />
 
-        {/* TASK-1456: filter surface label + active count badge */}
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-semibold text-text-primary">Filters</span>
           {activeFilterChips.length > 0 ? (
@@ -944,161 +945,159 @@ const SearchPage = () => {
                   className="inline-flex max-w-full items-center gap-1 rounded-full border border-border-subtle bg-bg-surface px-3 py-1.5 text-sm font-medium text-text-primary shadow-sm hover:border-support-error hover:text-support-error focus:outline-none focus:ring-2 focus:ring-cta-primary"
                 >
                   <span className="truncate">{c.label}</span>
-                  <span className="shrink-0 text-base leading-none" aria-hidden>
-                    ×
-                  </span>
+                  <span className="shrink-0 text-base leading-none" aria-hidden>×</span>
                 </button>
               </li>
             ))}
           </ul>
         ) : null}
 
-        {/* Filter bar — TASK-2075: sticky so it stays visible after scrolling past 8+ listings */}
-        <div className="sticky top-16 z-10 flex flex-wrap items-end gap-3 rounded-2xl border border-border-subtle bg-bg-surface px-4 py-3 shadow-sm">
-          <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-text-muted" htmlFor="filter-min-price">Min price / night</label>
-            <input
-              id="filter-min-price"
-              type="number"
-              min={0}
-              placeholder="₹ Any"
-              value={minPrice ?? ""}
-              onChange={(e) => updateParam("minPrice", e.target.value)}
-              className="min-h-11 w-32 rounded-lg border border-border-subtle bg-bg-muted px-3 py-2 text-base text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-cta-primary"
-            />
+        {/* Designer filter panel — one surface, three aligned rows + chips */}
+        <div className="search-filters sticky top-16 z-10">
+          <div className="search-filters__row search-filters__row--fields">
+            <div className="search-filters__field">
+              <label htmlFor="filter-min-price">Min price / night</label>
+              <input
+                id="filter-min-price"
+                type="number"
+                min={0}
+                placeholder="₹ Any"
+                value={minPrice ?? ""}
+                onChange={(e) => updateParam("minPrice", e.target.value)}
+              />
+            </div>
+            <div className="search-filters__field">
+              <label htmlFor="filter-max-price">Max price / night</label>
+              <input
+                id="filter-max-price"
+                type="number"
+                min={0}
+                placeholder="₹ Any"
+                value={maxPrice ?? ""}
+                onChange={(e) => updateParam("maxPrice", e.target.value)}
+              />
+            </div>
+            <div className="search-filters__field">
+              <label htmlFor="filter-guests">Guests</label>
+              <input
+                id="filter-guests"
+                type="number"
+                min={1}
+                max={16}
+                placeholder="Any"
+                value={guests ?? ""}
+                onChange={(e) => updateParam("guests", e.target.value)}
+              />
+            </div>
           </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-text-muted" htmlFor="filter-max-price">Max price / night</label>
-            <input
-              id="filter-max-price"
-              type="number"
-              min={0}
-              placeholder="₹ Any"
-              value={maxPrice ?? ""}
-              onChange={(e) => updateParam("maxPrice", e.target.value)}
-              className="min-h-11 w-32 rounded-lg border border-border-subtle bg-bg-muted px-3 py-2 text-base text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-cta-primary"
-            />
+
+          <div className="search-filters__row search-filters__row--toggles">
+            <label className="search-filters__toggle">
+              <input
+                type="checkbox"
+                id="filter-remote-work"
+                checked={remoteWork}
+                onChange={(e) => updateParam("remoteWork", e.target.checked ? "true" : "")}
+              />
+              <span>Remote work friendly</span>
+            </label>
+            <label className="search-filters__toggle">
+              <input
+                type="checkbox"
+                id="filter-long-stay"
+                checked={longStay}
+                onChange={(e) => updateParam("longStay", e.target.checked ? "true" : "")}
+              />
+              <span>Long stay (7+ nights)</span>
+            </label>
+            <label className="search-filters__toggle">
+              <input
+                type="checkbox"
+                id="filter-available-tonight"
+                checked={availableNow}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  updateParam("availableNow", checked ? "true" : "");
+                  if (checked && (checkIn || checkOut)) {
+                    const now = new Date();
+                    const todayStr = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(now);
+                    const tom = new Date(now.getTime() + 86400000);
+                    const tomStr = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(tom);
+                    updateParam("checkIn", todayStr);
+                    updateParam("checkOut", tomStr);
+                  }
+                }}
+                data-testid="search-filter-available-tonight"
+              />
+              <span>Available tonight</span>
+            </label>
           </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-text-muted" htmlFor="filter-guests">Guests</label>
-            <input
-              id="filter-guests"
-              type="number"
-              min={1}
-              max={16}
-              placeholder="Any"
-              value={guests ?? ""}
-              onChange={(e) => updateParam("guests", e.target.value)}
-              className="min-h-11 w-24 rounded-lg border border-border-subtle bg-bg-muted px-3 py-2 text-base text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-cta-primary"
-            />
-          </div>
-          <label className="flex items-center gap-2 rounded-lg border border-border-subtle bg-bg-muted px-3 py-2 text-sm">
-            <input
-              type="checkbox"
-              id="filter-remote-work"
-              checked={remoteWork}
-              onChange={(e) => updateParam("remoteWork", e.target.checked ? "true" : "")}
-              className="cursor-pointer"
-            />
-            <span className="text-text-primary">Remote work friendly</span>
-          </label>
-          <label className="flex items-center gap-2 rounded-lg border border-border-subtle bg-bg-muted px-3 py-2 text-sm">
-            <input
-              type="checkbox"
-              id="filter-long-stay"
-              checked={longStay}
-              onChange={(e) => updateParam("longStay", e.target.checked ? "true" : "")}
-              className="cursor-pointer"
-            />
-            <span className="text-text-primary">Long stay (7+ nights)</span>
-          </label>
-          <label className="flex items-center gap-2 rounded-lg border border-border-subtle bg-bg-muted px-3 py-2 text-sm">
-            <input
-              type="checkbox"
-              id="filter-available-tonight"
-              checked={availableNow}
-              onChange={(e) => {
-                const checked = e.target.checked;
-                updateParam("availableNow", checked ? "true" : "");
-                if (checked && (checkIn || checkOut)) {
-                  const now = new Date();
-                  const todayStr = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(now);
-                  const tom = new Date(now.getTime() + 86400000);
-                  const tomStr = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(tom);
-                  updateParam("checkIn", todayStr);
-                  updateParam("checkOut", tomStr);
-                }
-              }}
-              className="cursor-pointer"
-              data-testid="search-filter-available-tonight"
-            />
-            <span className="text-text-primary">Available tonight</span>
-          </label>
-          <div className="ml-auto flex items-end gap-3">
-            {!isLoading && listings.length > 0 && (
-              <span className="text-sm text-text-muted">
-                {/* TASK-1865: show availability check status for date filter (skip during initial load) */}
-                {filteredUnits.length === 0 && hasActiveFilters
+
+          <div className="search-filters__row search-filters__row--meta">
+            <span className="text-sm text-text-muted">
+              {!isLoading && listings.length > 0
+                ? filteredUnits.length === 0 && hasActiveFilters
                   ? "No properties match your filters"
-                  : `${filteredUnits.length} ${filteredUnits.length === 1 ? "property" : "properties"} found`}
-              </span>
-            )}
-            {hasActiveFilters && (
+                  : `${filteredUnits.length} ${filteredUnits.length === 1 ? "property" : "properties"} found`
+                : "\u00a0"}
+            </span>
+            {hasActiveFilters ? (
               <button
                 type="button"
                 onClick={clearFilters}
-                className="min-h-[48px] rounded-lg border border-border-subtle px-4 py-3 text-base font-medium text-text-muted hover:bg-bg-muted focus:outline-none"
+                className="min-h-10 rounded-lg border border-border-subtle px-4 text-sm font-medium text-text-muted hover:bg-bg-muted focus:outline-none"
               >
                 Clear filters
               </button>
+            ) : (
+              <span />
             )}
           </div>
-        </div>
 
-        {/* Amenity filters — TASK-1711: 6 basic chips + 2 nomad chips = 8 total */}
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-base font-medium text-text-muted uppercase tracking-wide">Amenities:</span>
-          {["AC", "Parking", "Pool", "WiFi", "Pet-friendly", "Balcony"].map((amenity) => (
-            <button
-              key={amenity}
-              onClick={() => toggleAmenity(amenity)}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors min-h-11 ${
-                selectedAmenities.includes(amenity)
-                  ? "bg-cta-primary text-white border border-cta-primary"
-                  : "bg-bg-surface border border-border-subtle text-text-primary hover:border-cta-primary"
-              } focus:outline-none focus:ring-2 focus:ring-cta-primary focus:ring-offset-2`}
-            >
-              {amenity}
-            </button>
-          ))}
-        </div>
+          <div className="search-filters__chips">
+            <span className="search-filters__chip-label">Amenities</span>
+            {["AC", "Parking", "Pool", "WiFi", "Pet-friendly", "Balcony"].map((amenity) => (
+              <button
+                key={amenity}
+                type="button"
+                onClick={() => toggleAmenity(amenity)}
+                className={`rounded-full px-3 py-1.5 text-sm font-medium min-h-9 ${
+                  selectedAmenities.includes(amenity)
+                    ? "bg-cta-primary text-white border border-cta-primary"
+                    : "bg-bg-muted border border-border-subtle text-text-primary hover:border-cta-primary"
+                }`}
+              >
+                {amenity}
+              </button>
+            ))}
+          </div>
 
-        {/* TASK-1738: Digital nomad filter chips */}
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-base font-medium text-text-muted uppercase tracking-wide">Digital nomad:</span>
-          {(
-            [
-              { param: "nomadWifi", active: nomadWifi, icon: Wifi, text: "WiFi 50+ Mbps" },
-              { param: "nomadWorkspace", active: nomadWorkspace, icon: Briefcase, text: "Workspace" },
-              { param: "longStay", active: longStay, icon: CalendarDays, text: "7+ nights" },
-              { param: "monthlyStay", active: monthlyStay, icon: CalendarRange, text: "30+ nights" },
-            ] as const
-          ).map(({ param, active, icon: Icon, text }) => (
-            <button
-              key={param}
-              type="button"
-              onClick={() => updateParam(param, active ? "" : "true")}
-              className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-colors min-h-11 ${
-                active
-                  ? "bg-emerald-600 text-white border border-emerald-600"
-                  : "bg-bg-surface border border-border-subtle text-text-primary hover:border-emerald-500"
-              } focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2`}
-              aria-pressed={active}
-            >
-              <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              <span>{text}</span>
-            </button>
-          ))}
+          <div className="search-filters__chips">
+            <span className="search-filters__chip-label">Digital nomad</span>
+            {(
+              [
+                { param: "nomadWifi", active: nomadWifi, icon: Wifi, text: "WiFi 50+ Mbps" },
+                { param: "nomadWorkspace", active: nomadWorkspace, icon: Briefcase, text: "Workspace" },
+                { param: "longStay", active: longStay, icon: CalendarDays, text: "7+ nights" },
+                { param: "monthlyStay", active: monthlyStay, icon: CalendarRange, text: "30+ nights" },
+              ] as const
+            ).map(({ param, active, icon: Icon, text }) => (
+              <button
+                key={param}
+                type="button"
+                onClick={() => updateParam(param, active ? "" : "true")}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium min-h-9 ${
+                  active
+                    ? "bg-emerald-600 text-white border border-emerald-600"
+                    : "bg-bg-muted border border-border-subtle text-text-primary hover:border-emerald-500"
+                }`}
+                aria-pressed={active}
+              >
+                <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                <span>{text}</span>
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* TASK-1457: list/map toggle · TASK-1714: sort */}
@@ -1295,9 +1294,9 @@ const SearchPage = () => {
                       className="flex flex-col overflow-hidden rounded-2xl border border-border-subtle bg-bg-surface shadow-sm"
                       data-testid="search-empty-suggestion-card"
                     >
-                      <div className="h-36 w-full bg-bg-muted">
+                      <div className="h-36 w-full overflow-hidden bg-bg-muted">
                         <OptimizedImage
-                          src={unit.imageUrl}
+                          src={unit.imageUrl?.trim() ? unit.imageUrl : getPropertyDesignImage(unit.numericId)}
                           alt={unit.title ?? "Property listing"}
                           className="h-full w-full object-cover"
                           wrapperClassName="h-full"
@@ -1383,7 +1382,7 @@ const SearchPage = () => {
                 >
                   <div className="h-16 w-full overflow-hidden rounded-lg bg-bg-muted">
                     <OptimizedImage
-                      src={unit.imageUrl}
+                      src={unit.imageUrl?.trim() ? unit.imageUrl : getPropertyDesignImage(unit.numericId)}
                       alt={unit.title ?? "Listing"}
                       className="h-full w-full object-cover"
                       wrapperClassName="h-full"
@@ -1432,197 +1431,145 @@ const SearchPage = () => {
 
         {!isLoading && !showDateAvailabilitySkeleton && !showEmptyState && !hasInvalidDates && !mapView && (
           <section
-            className="grid gap-6 sm:grid-cols-2"
+            className="search-results-grid"
             data-testid="guest-search-results"
             aria-live="polite"
             aria-label={`${filteredUnits.length} apartments match your filters`}
           >
-            {visibleUnits.map((unit) => (
-              <article
-                key={unit.id}
-                data-testid="guest-listing-card"
-                className="flex flex-col overflow-hidden rounded-2xl border border-border-subtle bg-bg-surface shadow-sm transition-colors hover:border-border-subtle"
-              >
-                <div className="h-48 w-full bg-bg-muted">
+            {visibleUnits.map((unit) => {
+              const amenityLabels = unit.amenities
+                .map((amenity, index) => {
+                  const code = amenity.amenities_icon?.trim();
+                  if (!code) return null;
+                  const label = resolveAmenityLabel(code);
+                  return label ? { key: `${unit.id}-amenity-${index}`, label } : null;
+                })
+                .filter((x): x is { key: string; label: string } => Boolean(x))
+                .slice(0, 4);
+              const dailyBreakdown = getDailyListingPricing(unit.numericId);
+              const displayedPrice =
+                (dailyBreakdown?.actualPrice ?? 0) > 0 ? dailyBreakdown!.actualPrice : unit.pricePerNight;
+
+              return (
+              <article key={unit.id} data-testid="guest-listing-card" className="search-card">
+                <div className="search-card__media">
                   <OptimizedImage
-                    src={unit.imageUrl}
+                    src={unit.imageUrl?.trim() ? unit.imageUrl : getPropertyDesignImage(unit.numericId)}
                     alt={unit.title ?? "Property listing"}
                     className="h-full w-full object-cover"
                     wrapperClassName="h-full"
                     sizes="(max-width: 640px) 100vw, 50vw"
                   />
                 </div>
-                {/* TASK-1460: reserve chip row so layout does not jump when summary loads */}
-                <div className="min-h-7 px-5 pt-3" data-testid="search-listing-availability-slot">
-                  {explicitDateSearch ? (
-                    dateAvailLoading ? (
-                      <span className="inline-block h-5 w-16 rounded-full bg-bg-muted" aria-hidden />
-                    ) : dateAvailableIds !== null ? (
-                      <span
-                        className="inline-flex max-w-full items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-emerald-100 text-emerald-800"
-                        data-testid="search-listing-availability-chip"
-                      >
-                        Available
-                      </span>
-                    ) : null
-                  ) : (() => {
-                    const chip = availabilityChip(availabilityById[unit.numericId]);
-                    return chip ? (
-                      <span
-                        className={`inline-flex max-w-full items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${chip.className}`}
-                        data-testid="search-listing-availability-chip"
-                      >
-                        {chip.label}
-                      </span>
-                    ) : !availabilityFetchDone ? (
-                      <span className="inline-block h-5 w-16 rounded-full bg-bg-muted" aria-hidden />
-                    ) : null;
-                  })()}
-                </div>
-                <div className="flex flex-1 flex-col gap-3 p-5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h2 className="text-xl font-semibold text-text-primary">{unit.title}</h2>
-                      {/* TASK-577: Show WiFi speed and co-working desk badges */}
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {/* TASK-1674: use lucide icons instead of emoji for visual consistency */}
-                        {unit.wifiSpeedMbps && unit.wifiSpeedMbps >= 25 && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700">
-                            <Wifi className="h-3 w-3" /> WiFi {unit.wifiSpeedMbps}Mbps
-                          </span>
-                        )}
-                        {unit.hasCoworkingDesk && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700">
-                            <Briefcase className="h-3 w-3" /> Co-working desk
-                          </span>
-                        )}
-                        {/* TASK-1298: composite Atlas Trusted Host badge — shown when both verified photos and GST reg are present */}
-                        {unit.hasVerifiedPhotos && unit.isGstRegistered ? (
-                          <span
-                            className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700 border border-emerald-200 cursor-help"
-                            title="Verified photos and GST registration on file. Listing details reviewed before publish."
-                          >
-                            {`✅ ${brandName} Trusted Host`}
-                          </span>
-                        ) : (
-                          <>
-                            {/* TASK-1725: Atlas-verified photos badge */}
-                            {unit.hasVerifiedPhotos && (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700">
-                                ✅ Verified photos
-                              </span>
-                            )}
-                            {/* TASK-1727: GST registered badge */}
-                            {unit.isGstRegistered && (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 border border-blue-200">
-                                🧾 GST Reg.
-                              </span>
-                            )}
-                          </>
-                        )}
-                        {/* TASK-1695: LOS discount badge — show highest configured tier */}
-                        {unit.losDiscount2MinNights != null && unit.losDiscount2MinNights > 0 &&
-                          unit.losDiscount2Percent != null && unit.losDiscount2Percent > 0 ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700">
-                            🏷️ Stay {unit.losDiscount2MinNights}+ nights — {unit.losDiscount2Percent}% off
-                          </span>
-                        ) : unit.losDiscountMinNights != null && unit.losDiscountMinNights > 0 &&
-                          unit.losDiscountPercent != null && unit.losDiscountPercent > 0 ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700">
-                            🏷️ Stay {unit.losDiscountMinNights}+ nights — {unit.losDiscountPercent}% off
-                          </span>
-                        ) : null}
-                      </div>
-                      {/* TASK-4012: rating snippet + TASK-1660: match ListingCard — no catalog star average without verified review count */}
+                <div className="search-card__body">
+                  <div className="min-h-6" data-testid="search-listing-availability-slot">
+                    {explicitDateSearch ? (
+                      dateAvailLoading ? (
+                        <span className="inline-block h-5 w-16 rounded-full bg-bg-muted" aria-hidden />
+                      ) : dateAvailableIds !== null ? (
+                        <span
+                          className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-emerald-100 text-emerald-800"
+                          data-testid="search-listing-availability-chip"
+                        >
+                          Available
+                        </span>
+                      ) : null
+                    ) : (() => {
+                      const chip = availabilityChip(availabilityById[unit.numericId]);
+                      return chip ? (
+                        <span
+                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${chip.className}`}
+                          data-testid="search-listing-availability-chip"
+                        >
+                          {chip.label}
+                        </span>
+                      ) : !availabilityFetchDone ? (
+                        <span className="inline-block h-5 w-16 rounded-full bg-bg-muted" aria-hidden />
+                      ) : null;
+                    })()}
+                  </div>
+
+                  <div className="search-card__title-row">
+                    <div className="min-w-0">
+                      <h2 className="search-card__title">{unit.title}</h2>
                       {(unit.reviewCount ?? 0) > 0 && unit.rating != null && unit.rating > 0 && (
-                        <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-yellow-50 border border-yellow-200 px-2.5 py-1 text-sm font-semibold text-yellow-800">
+                        <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-yellow-50 border border-yellow-200 px-2 py-0.5 text-xs font-semibold text-yellow-800">
                           <span aria-hidden>★</span>
                           <span>{unit.rating.toFixed(1)}</span>
-                          <span className="text-xs font-normal">({(unit.reviewCount ?? 0).toLocaleString()})</span>
+                          <span className="font-normal">({(unit.reviewCount ?? 0).toLocaleString()})</span>
                         </span>
                       )}
-                      {/* TASK-1716: keyword-bucketed sentiment summary */}
-                      <ReviewSummary listingId={unit.numericId} />
                     </div>
-                    <span className="rounded-full bg-bg-muted px-3 py-1 text-xs font-semibold text-text-primary">
-                      {unit.location}
-                    </span>
+                    <span className="search-card__loc" title={unit.location}>{unit.location}</span>
                   </div>
-                  {/* TASK-1705: Owner-share trust badge. BUG-7: removed nightlyPrice prop to stop leaking fabricated host payout amounts to guests. */}
+
+                  <div className="flex flex-wrap gap-1.5">
+                    {unit.wifiSpeedMbps && unit.wifiSpeedMbps >= 25 && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                        <Wifi className="h-3 w-3" /> {unit.wifiSpeedMbps}Mbps
+                      </span>
+                    )}
+                    {unit.hasCoworkingDesk && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                        <Briefcase className="h-3 w-3" /> Desk
+                      </span>
+                    )}
+                    {unit.hasVerifiedPhotos && (
+                      <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                        Verified photos
+                      </span>
+                    )}
+                    {unit.isGstRegistered && (
+                      <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 border border-blue-200">
+                        GST
+                      </span>
+                    )}
+                  </div>
+
                   <OwnerShareBadge className="self-start" />
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="space-y-1">
-                      {(() => {
-                        const dailyBreakdown = getDailyListingPricing(unit.numericId);
-                        const displayedPrice = (dailyBreakdown?.actualPrice ?? 0) > 0 ? dailyBreakdown!.actualPrice : unit.pricePerNight;
-                        return (
-                          <>
-                            <p className="text-2xl font-bold text-text-primary" data-testid="guest-listing-nightly-price">{formatDisplayCurrency(displayedPrice)}</p>
-                            {isConverted && (
-                              <p className="text-xs text-text-muted">{formatINR(displayedPrice)} on payment</p>
-                            )}
-                            <p className="text-sm text-text-muted">per night</p>
-                            <p className="text-xs text-text-muted">
-                              {formatEstTotalInclGst(displayedPrice, estimateNights, formatDisplayCurrency, 3, unit.isGstRegistered)}
-                            </p>
-                          </>
-                        );
-                      })()}
-                      {longStay && (
-                        <div className="text-sm font-semibold text-cta-primary">
-                          {/* TASK-2077 / TASK-1661: monthly line uses configured LOS tier; otherwise nightly×30 + honest hint */}
-                          {(() => {
-                            const discountPct = unit.losDiscount2Percent ?? unit.losDiscountPercent ?? 0;
-                            const base = unit.pricePerNight * 30;
-                            const discounted =
-                              discountPct > 0 ? Math.round(base * (1 - discountPct / 100)) : base;
-                            return discountPct > 0 ? (
-                              <p>{`from ${formatDisplayCurrency(discounted)}/month with long-stay discount`}</p>
-                            ) : (
-                              <>
-                                <p>{`from ${formatDisplayCurrency(base)}/month at listed nightly rate`}</p>
-                                <p className="mt-0.5 text-xs font-normal text-text-muted">
-                                  Many hosts offer 15–20% off for 30+ nights; use the calculator below to plan.
-                                </p>
-                              </>
-                            );
-                          })()}
-                        </div>
+
+                  {amenityLabels.length > 0 ? (
+                    <ul className="search-card__amenities">
+                      {amenityLabels.map((a) => (
+                        <li key={a.key}>{a.label}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="min-h-[2.25rem]" aria-hidden />
+                  )}
+
+                  <div className="search-card__foot">
+                    <div className="search-card__price">
+                      <p className="search-card__price-amt" data-testid="guest-listing-nightly-price">
+                        {formatDisplayCurrency(displayedPrice)}
+                      </p>
+                      {isConverted && (
+                        <p className="mt-0.5 text-xs text-text-muted">{formatINR(displayedPrice)} on payment</p>
                       )}
-                      {/* TASK-1739: LOS discount calculator — only shows when tiers are configured */}
-                      <LongStayCalculator
-                        pricePerNight={unit.pricePerNight}
-                        tier1MinNights={unit.losDiscountMinNights}
-                        tier1Percent={unit.losDiscountPercent}
-                        tier2MinNights={unit.losDiscount2MinNights}
-                        tier2Percent={unit.losDiscount2Percent}
-                      />
+                      <p className="mt-0.5 text-sm text-text-muted">per night</p>
+                      <p className="text-xs text-text-muted">
+                        {formatEstTotalInclGst(displayedPrice, estimateNights, formatDisplayCurrency, 3, unit.isGstRegistered)}
+                      </p>
+                      {longStay && (
+                        <LongStayCalculator
+                          pricePerNight={unit.pricePerNight}
+                          tier1MinNights={unit.losDiscountMinNights}
+                          tier1Percent={unit.losDiscountPercent}
+                          tier2MinNights={unit.losDiscount2MinNights}
+                          tier2Percent={unit.losDiscount2Percent}
+                        />
+                      )}
                     </div>
-                    <div className="flex flex-col gap-1 text-right text-xs text-text-muted">
-                      {unit.amenities.slice(0, 4).map((amenity, index) => {
-                        const code = amenity.amenities_icon?.trim();
-                        if (!code) return null;
-                        const label = resolveAmenityLabel(code);
-                        if (!label) return null;
-                        return (
-                          <span key={`${unit.id}-amenity-${index}`} className="font-semibold text-text-secondary">
-                            {label}
-                          </span>
-                        );
-                      })}
-                    </div>
-                    <Link
-                      to={`${unit.canonicalPath}${querySuffix}`}
-                      className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl bg-[var(--cta-primary-hover)] px-4 py-2 text-sm font-semibold text-white shadow hover:bg-[var(--cta-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
-                    >
+                    <Link to={`${unit.canonicalPath}${querySuffix}`} className="search-card__cta">
                       {`View ${unitNoun.singular}`}
                     </Link>
                   </div>
                 </div>
               </article>
-            ))}
+              );
+            })}
             {hasMore && (
-              <div className="col-span-full flex justify-center pt-4">
+              <div className="col-span-full flex justify-center pt-2">
                 <button
                   type="button"
                   onClick={() => setVisibleCount((prev) => prev + ITEMS_PER_PAGE)}

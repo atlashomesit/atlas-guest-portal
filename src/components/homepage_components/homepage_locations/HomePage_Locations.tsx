@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import Heading from "../../commonComponents/heading/Heading";
 import { type Listing } from "../../../data/listings";
-import { LOGO_URL } from "../../../config/branding";
+import { getPropertyDesignImage } from "../../../config/branding";
 import priceDisplayConfig from "../../../config/priceDisplay.config";
 import { calculateNightlyPrice, inferUnitType } from "../../../utils/pricing";
 import { sanitizeItems, getItemKey } from "../../../utils/sanitizeItems";
@@ -98,12 +98,13 @@ const createListingModel = (
     (fromTenant.length > 0 ? fromTenant : undefined) ??
     [];
   const filtered = filterGuestImageUrls(Array.isArray(raw) ? raw : []);
+  const designFallback = getPropertyDesignImage(listing.id);
   const images =
     filtered.length > 0
       ? filtered
       : tenantOverrides.hideLogo
-        ? [""]
-        : [sanitizeGuestImageUrl(LOGO_URL) ?? ""].filter(Boolean);
+        ? [designFallback]
+        : [sanitizeGuestImageUrl(designFallback) ?? designFallback].filter(Boolean);
 
   let price: ListingModel["price"];
 
@@ -311,7 +312,11 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
   }
 
   return (
-    <section className="py-16 px-4 sm:px-6 lg:px-8 bg-bg-surface scroll-mt-28" id="our-homes">
+    <section
+      className="py-16 px-4 sm:px-6 lg:px-8 scroll-mt-28"
+      style={{ background: "var(--bg-secondary, #fdf2e9)" }}
+      id="our-homes"
+    >
       <div className="max-w-7xl mx-auto flex flex-col gap-10">
         {/* Section header */}
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">

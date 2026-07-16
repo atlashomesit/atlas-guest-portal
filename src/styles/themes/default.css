@@ -1,86 +1,78 @@
-/* Luxury Hotel Theme — Warm ivory, coral & amber. No cold blues. */
+/* Stay by City Focus — Sandstone skin
+   Light cream · coral peach · soft lavender (from Theem images).
+   CTA solids stay WCAG-safe; gradients & accents keep the vibrant mockup coral. */
 :root,
 :root[data-theme="default"] {
-  /* Surfaces — warm and light only */
-  --bg-primary: #fffaf5;
-  --bg-secondary: #fff3e8;
+  /* Surfaces — warm cream, never stark white page wash */
+  --bg-primary: #fff8e7;
+  --bg-secondary: #fdf2e9;
   --bg-card: #ffffff;
   --bg-surface: #ffffff;
-  --bg-muted: #fff3e8;
+  --bg-muted: #f5ebe0;
 
-  /* Brand — vibrant coral + golden amber (only 2 primary colors) */
-  /* --brand-primary darkened from #ff6b35 → #c2410c. navbar.css uses this
-     token as text color in ~6 spots; the original `#ff6b35` on a light
-     `#fffaf5` body background failed WCAG AA contrast (2.73:1) — flagged
-     by tests/accessibility-wcag.e2e.spec.ts:81. Brand-accent (#ffb347) and
-     gradient stops stay where they are so the orange family is preserved
-     in non-text uses (banners, gradients, hero overlays). */
-  --brand-primary: #c2410c;
-  --brand-accent: #ffb347;
-  --brand-soft: #ffe8d6;
-  /* --accent-primary darkened from #ff6b35 → #c2410c to clear WCAG AA when used
-     as text color (navbar links, etc.) against the light background tokens
-     (#fffaf5, #fff). Contrast lifts from 2.73:1 to ~4.95:1. Flagged by
-     tests/accessibility-wcag.e2e.spec.ts:81. */
-  --accent-primary: #c2410c;
-  --accent-soft: #ffe8d6;
-  --romance-soft: #ffe8d6;
-  --accent-primary-rgb: 194 65 12;
-  --accent-soft-rgb: 255 232 214;
+  /* Brand — coral peach + lavender companion */
+  --brand-primary: #c45a3f;
+  --brand-accent: #f08c71;
+  --brand-soft: #ffe4d6;
+  --accent-primary: #c45a3f;
+  --accent-soft: #f2e1eb;
+  --romance-soft: #f0eafd;
+  --accent-primary-rgb: 196 90 63;
+  --accent-soft-rgb: 242 225 235;
 
-  /* CTA — gradient and solid coral.
-     Darkened from #ff6b35 → #c2410c so white-on-CTA reaches WCAG AA 4.5:1
-     (was 2.83:1, flagged by tests/accessibility-wcag.e2e.spec.ts:88). */
-  --cta-primary: #c2410c;
-  --cta-primary-hover: #a8350a;
-  --cta-secondary: #6b7280;
-  --cta-primary-rgb: 194 65 12;
-  --cta-primary-hover-rgb: 168 53 10;
-  --cta-secondary-rgb: 107 114 128;
+  /* Lavender secondary (cards, callouts, section washes) */
+  --lavender: #c5b4f3;
+  --lavender-soft: #f0eafd;
+  --lavender-deep: #8e7cc3;
 
-  /* Text — deep navy, never pure black */
-  --text-primary: #1a1a2e;
-  /* --text-secondary: #64748b (4.63:1 on white #fff — WCAG AA OK).
-     --text-muted: #475569 (slate-600, 6.8:1 on --bg-muted #fff3e8, 7.4:1 on white — WCAG AA OK). */
-  --text-secondary: #64748b;
-  --text-muted: #475569;
-  --text-body: #1a1a2e;
-  --text-on-hero: #ffffff;
+  /* CTA — solid coral safe for white text; hover a touch deeper */
+  --cta-primary: #c45a3f;
+  --cta-primary-hover: #a84832;
+  --cta-secondary: #8e7cc3;
+  --cta-primary-rgb: 196 90 63;
+  --cta-primary-hover-rgb: 168 72 50;
+  --cta-secondary-rgb: 142 124 195;
+
+  /* Text — warm espresso / taupe (not pure black) */
+  --text-primary: #4a3535;
+  --text-secondary: #706060;
+  --text-muted: #6b5a55;
+  --text-body: #4a3535;
+  --text-on-hero: #4a3535;
 
   /* Status & border */
   --success: #10b981;
   --support-success: #10b981;
   --support-danger: #dc2626;
   --support-error: #dc2626;
-  --border: #f0e6dc;
-  --border-subtle: #f0e6dc;
-  --border-strong: #e5d9ce;
+  --border: #f0ddd0;
+  --border-subtle: #f0ddd0;
+  --border-strong: #e5cfc0;
 
-  /* Gradients — editorial depth */
-  --gradient-hero: linear-gradient(135deg, #fffaf5 0%, #ffe8d6 50%, #fff3e8 100%);
-  --gradient-cta: linear-gradient(135deg, #ff6b35, #ffb347);
-  --gradient-card: linear-gradient(180deg, rgba(255, 107, 53, 0.03) 0%, transparent 100%);
+  /* Gradients — cream → peach → lavender (hero mockup) */
+  --gradient-hero: linear-gradient(135deg, #fff8e7 0%, #ffe4d6 45%, #f2e1eb 100%);
+  --gradient-cta: linear-gradient(135deg, #f08c71, #e86a4a);
+  --gradient-card: linear-gradient(180deg, rgba(240, 140, 113, 0.05) 0%, transparent 100%);
+  --gradient-section: linear-gradient(180deg, #fff8e7 0%, #f0eafd 100%);
 
-  /* Brand aliases for existing components.
-     --brand darkened to match --brand-primary so white-on-brand fills
-     (ListingCard CTA: `bg-[color:var(--brand)] text-[color:var(--text-contrast)]`)
-     meet WCAG AA contrast. */
-  --brand: #c2410c;
-  --brand-ink: #1a1a2e;
-  --brand-contrast: #fffaf5;
-  --brand-soft: #ffe8d6;
+  /* Brand aliases for existing components */
+  --brand: #c45a3f;
+  --brand-ink: #4a3535;
+  --brand-contrast: #fff8e7;
+  --brand-soft: #ffe4d6;
 
-  /* Footer — deep navy */
-  --footer-bg: #1a1a2e;
-  --footer-text: #9ca3af;
-  --footer-heading: #fffaf5;
-  --footer-link: #9ca3af;
+  /* Footer — deep chocolate brown from mockups */
+  --footer-bg: #4a3333;
+  --footer-text: #cbb8b0;
+  --footer-heading: #fff8e7;
+  --footer-link: #cbb8b0;
   --footer-link-hover: #ffffff;
 
-  /* Shadows — soft, warm */
-  --shadow-level-1: 0 2px 8px rgba(26, 26, 46, 0.04), 0 1px 3px rgba(26, 26, 46, 0.02);
-  --shadow-level-2: 0 8px 24px rgba(26, 26, 46, 0.06), 0 4px 12px rgba(26, 26, 46, 0.03);
-  --shadow-level-3: 0 24px 72px rgba(26, 26, 46, 0.08), 0 12px 32px rgba(26, 26, 46, 0.04);  --shadow-1: var(--shadow-level-1);
+  /* Shadows — soft warm */
+  --shadow-level-1: 0 2px 8px rgba(74, 53, 53, 0.05), 0 1px 3px rgba(74, 53, 53, 0.03);
+  --shadow-level-2: 0 8px 24px rgba(74, 53, 53, 0.07), 0 4px 12px rgba(74, 53, 53, 0.04);
+  --shadow-level-3: 0 24px 72px rgba(74, 53, 53, 0.09), 0 12px 32px rgba(74, 53, 53, 0.05);
+  --shadow-1: var(--shadow-level-1);
   --shadow-2: var(--shadow-level-2);
   --shadow-3: var(--shadow-level-3);
 }

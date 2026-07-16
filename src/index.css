@@ -5,9 +5,11 @@
 
 @theme {
   --color-bg-primary: var(--bg-primary);
+  --color-bg-secondary: var(--bg-secondary);
   --color-bg-surface: var(--bg-surface);
   --color-bg-muted: var(--bg-muted);
   --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
   --color-text-muted: var(--text-muted);
   --color-accent-primary: rgb(var(--accent-primary-rgb) / <alpha-value>);
   --color-accent-soft: rgb(var(--accent-soft-rgb) / <alpha-value>);
@@ -23,6 +25,16 @@
 
   --font-roboto: "Roboto Slab", serif;
   --font-sans: var(--font-family-base), "Plus Jakarta Sans", Inter, system-ui, sans-serif;
+  --font-display: var(--font-family-display), Georgia, serif;
+
+  /* Layout rhythm — `max-w-luxury` (footer/testimonials/CTA strip) aligns with
+     the 1280px `max-w-7xl` content sections; section-gap drives band padding.
+     Without these tokens Tailwind v4 emits nothing for those classes and the
+     bands stretch full-width with no vertical padding. */
+  --container-luxury: 80rem;
+  --spacing-section-gap: 4rem;
+  --spacing-section-gap-md: 5rem;
+  --spacing-section-gap-lg: 6rem;
 
   --shadow-level1: var(--shadow-level-1);
   --shadow-level2: var(--shadow-level-2);

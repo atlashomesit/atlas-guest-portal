@@ -14,7 +14,7 @@ import '../atlas-home-v2.css';
 // Ivory seam (left 120px) + a soft 8% coral wash over the hero photo. Kept as a
 // single overlay element so its backgroundImage is readable by jsdom-based tests.
 const HERO_OVERLAY_GRADIENT =
-  'linear-gradient(to right, #fffaf5 0px, rgba(255,250,245,0) 120px), linear-gradient(rgba(194,65,12,0.08), rgba(194,65,12,0.08))';
+  'linear-gradient(to right, #fff8e7 0px, rgba(255, 248, 231,0) 120px), linear-gradient(rgba(196, 90, 63,0.08), rgba(196, 90, 63,0.08))';
 
 const Slider = () => {
   // RA-006: only show the Atlas penthouse hero on the Atlas marketplace root.
@@ -139,15 +139,14 @@ const Slider = () => {
             aria-label={heroPhotoAriaLabel}
           />
         ) : (
-          <div className="ahv2-hero-photo ahv2-hero-photo--fallback" aria-hidden="true">
-            <span className="ahv2-hero-fallback-mark">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M3 10.5 12 3l9 7.5" />
-                <path d="M5 9.5V21h14V9.5" />
-                <path d="M9.5 21v-6h5v6" />
-              </svg>
+          <div
+            className="ahv2-hero-photo ahv2-hero-photo--fallback"
+            style={{ backgroundImage: 'url("/images/stay-design-peach.svg")', backgroundSize: "cover", backgroundPosition: "center" }}
+            aria-hidden="true"
+          >
+            <span className="ahv2-hero-fallback-name" style={{ background: "rgba(255,248,231,0.88)", padding: "8px 14px", borderRadius: 999 }}>
+              {brandName}
             </span>
-            <span className="ahv2-hero-fallback-name">{brandName}</span>
           </div>
         )}
         <div

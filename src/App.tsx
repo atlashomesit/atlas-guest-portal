@@ -67,8 +67,8 @@ function LazyFallback() {
       style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50vh' }}
     >
       <div style={{ textAlign: 'center' }}>
-        <div style={{ width: 40, height: 40, border: '4px solid #f3f4f6', borderTopColor: '#ea580c', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 1rem' }} />
-        <p style={{ color: '#6b7280', fontSize: '14px' }}>Loading page...</p>
+        <div style={{ width: 40, height: 40, border: '4px solid #f5ebe0', borderTopColor: 'var(--cta-primary, #c45a3f)', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 1rem' }} />
+        <p style={{ color: 'var(--text-muted, #6b5a55)', fontSize: '14px' }}>Loading page...</p>
       </div>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>

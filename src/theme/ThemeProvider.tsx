@@ -81,8 +81,9 @@ const DevThemeSwitcher: React.FC<DevThemeSwitcherProps> = ({ theme, onChange }) 
       style={{
         position: "fixed",
         bottom: "16px",
-        right: "16px",
-        zIndex: 9999,
+        left: "16px",
+        right: "auto",
+        zIndex: 40,
         padding: "10px 12px",
         borderRadius: "12px",
         background: "var(--bg-surface)",

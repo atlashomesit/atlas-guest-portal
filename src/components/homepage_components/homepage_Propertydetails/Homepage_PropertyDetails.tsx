@@ -199,8 +199,8 @@ function getPpCancellationInfo(
   };
 }
 
-const PP_REVIEW_BG_COLORS = ['#1a1a2e', '#ffb347', '#c2410c', '#94755b', '#e9f5ef'];
-const PP_REVIEW_TEXT_COLORS = ['#fffaf5', '#1a1a2e', '#fffaf5', '#fffaf5', '#157046'];
+const PP_REVIEW_BG_COLORS = ['#4a3535', '#f08c71', '#c45a3f', '#94755b', '#e9f5ef'];
+const PP_REVIEW_TEXT_COLORS = ['#fff8e7', '#4a3535', '#fff8e7', '#fff8e7', '#157046'];
 
 /** Shown while listing data is resolving (incl. API fallback). Matches loaded page layout for perceived performance. */
 function PropertyDetailsSkeleton() {
@@ -1391,11 +1391,11 @@ useEffect(() => {
                       marginBottom: 8,
                       padding: '3px 10px',
                       borderRadius: 999,
-                      background: '#fef3c7',
-                      color: '#92400e',
+                      background: 'var(--brand-soft, #ffe4d6)',
+                      color: 'var(--text-primary, #4a3535)',
                       fontSize: 12,
                       fontWeight: 600,
-                      border: '1px solid #fcd34d',
+                      border: '1px solid var(--border-strong, #e5cfc0)',
                     }}
                   >
                     Draft — not yet live
@@ -1563,7 +1563,7 @@ useEffect(() => {
                     </span>
                   )}
                 </div>
-                <div style={{ borderRadius: 16, overflow: 'hidden', border: '1px solid #f0e6dc' }}>
+                <div style={{ borderRadius: 16, overflow: 'hidden', border: '1px solid #f0ddd0' }}>
                   {(() => {
                     // Task 3: property's own coords win over custom embed / multi-pin / tenant default.
                     const mapSelection = selectPropertyMapMode({
@@ -1708,6 +1708,46 @@ useEffect(() => {
                   </div>
                 </section>
 
+                {/* A note from your host — lavender callout panel (Theem mockup) */}
+                <div
+                  role="note"
+                  aria-label="A note from your host"
+                  style={{
+                    margin: '20px 0 4px',
+                    borderRadius: 16,
+                    padding: '22px 26px',
+                    background: 'var(--lavender-soft, #f0eafd)',
+                    borderLeft: '4px solid var(--lavender-deep, #8e7cc3)',
+                  }}
+                >
+                  <p
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 600,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.18em',
+                      color: 'var(--lavender-deep, #8e7cc3)',
+                      margin: '0 0 10px',
+                    }}
+                  >
+                    A note from your host
+                  </p>
+                  <blockquote
+                    style={{
+                      fontFamily: 'var(--font-family-display)',
+                      fontSize: 'clamp(18px, 2vw, 22px)',
+                      lineHeight: 1.55,
+                      color: 'var(--text-primary, #4a3535)',
+                      margin: 0,
+                    }}
+                  >
+                    "We keep this home ready ourselves — come in, settle down, and
+                    message us any time. We're never more than a WhatsApp away."
+                  </blockquote>
+                  <p style={{ marginTop: 10, fontSize: 13, color: 'var(--text-muted, #6b5a55)' }}>
+                    — {ppHasRealHost ? `${ppHostDisplayName}, your host` : `The ${ppBrandName} host team`}
+                  </p>
+                </div>
 
                 {/* About this home */}
                 <section className="pp-section" aria-label="About this home">
@@ -1737,13 +1777,13 @@ useEffect(() => {
                       data-testid="property-check-in-schedule"
                     >
                       {resolvedCheckInTime && (
-                        <span style={{ fontSize: 14, color: '#475569' }} data-testid="property-check-in-time">
-                          <strong style={{ color: '#1a1a2e' }}>Check-in:</strong> {resolvedCheckInTime}
+                        <span style={{ fontSize: 14, color: 'var(--text-muted, #6b5a55)' }} data-testid="property-check-in-time">
+                          <strong style={{ color: 'var(--text-primary, #4a3535)' }}>Check-in:</strong> {resolvedCheckInTime}
                         </span>
                       )}
                       {resolvedCheckOutTime && (
-                        <span style={{ fontSize: 14, color: '#475569' }}>
-                          <strong style={{ color: '#1a1a2e' }}>Check-out:</strong> {resolvedCheckOutTime}
+                        <span style={{ fontSize: 14, color: 'var(--text-muted, #6b5a55)' }}>
+                          <strong style={{ color: 'var(--text-primary, #4a3535)' }}>Check-out:</strong> {resolvedCheckOutTime}
                         </span>
                       )}
                     </div>
@@ -1771,7 +1811,7 @@ useEffect(() => {
                           const label = amenityMaster.get(code.toLowerCase()) ?? formatAmenityName(code);
                           return (
                             <div key={code} className="pp-amenity">
-                              <span style={{ fontSize: 18, color: '#475569', flexShrink: 0 }} aria-hidden="true">
+                              <span style={{ fontSize: 18, color: 'var(--brand-accent, #f08c71)', flexShrink: 0 }} aria-hidden="true">
                                 {renderIconForCode(code)}
                               </span>
                               <span>{label}</span>
@@ -1780,7 +1820,7 @@ useEffect(() => {
                         })
                       : ppAmenityDisplay.map((label, idx) => (
                           <div key={`${label}-${idx}`} className="pp-amenity">
-                            <span style={{ fontSize: 18, color: '#475569', flexShrink: 0 }} aria-hidden="true">
+                            <span style={{ fontSize: 18, color: 'var(--brand-accent, #f08c71)', flexShrink: 0 }} aria-hidden="true">
                               {renderIcon(label)}
                             </span>
                             <span>{label}</span>
@@ -1808,7 +1848,7 @@ useEffect(() => {
                   if (api?.loading) return (
                     <section className="pp-section" aria-label="Guest reviews">
                       <div className="pp-section-head"><h2>Guest reviews</h2></div>
-                      <div style={{ height: 120, borderRadius: 16, background: '#f0e6dc' }} />
+                      <div style={{ height: 120, borderRadius: 16, background: '#f0ddd0' }} />
                     </section>
                   );
                   if (!api || api.totalCount <= 0) return null;
@@ -1851,8 +1891,8 @@ useEffect(() => {
                           ].filter(b => b.v != null);
                           if (bars.length === 0) {
                             return (
-                              <div style={{ fontSize: 14, color: '#475569', lineHeight: 1.6 }}>
-                                <p style={{ margin: '0 0 4px', fontWeight: 600, color: '#1a1a2e' }}>Overall rating</p>
+                              <div style={{ fontSize: 14, color: 'var(--text-muted, #6b5a55)', lineHeight: 1.6 }}>
+                                <p style={{ margin: '0 0 4px', fontWeight: 600, color: 'var(--text-primary, #4a3535)' }}>Overall rating</p>
                                 <p style={{ margin: 0 }}>
                                   {count} verified {count === 1 ? 'review' : 'reviews'} · all through this platform.
                                 </p>
@@ -1872,7 +1912,7 @@ useEffect(() => {
                                   </div>
                                 ))}
                               </div>
-                              <p style={{ fontSize: 12, color: '#64748b', marginTop: 6 }}>Based on {rs.length} recent review{rs.length !== 1 ? 's' : ''}</p>
+                              <p style={{ fontSize: 12, color: 'var(--text-muted, #6b5a55)', marginTop: 6 }}>Based on {rs.length} recent review{rs.length !== 1 ? 's' : ''}</p>
                             </>
                           );
                         })()}
@@ -1897,7 +1937,7 @@ useEffect(() => {
                                   if (r.ratingValue != null && r.ratingValue >= 1) chips.push({ label: 'Value', v: r.ratingValue });
                                   if (chips.length === 0) return null;
                                   return (
-                                    <p style={{ marginBottom: 6, fontSize: 11.5, color: '#64748b' }} data-testid="review-sub-ratings">
+                                    <p style={{ marginBottom: 6, fontSize: 11.5, color: 'var(--text-muted, #6b5a55)' }} data-testid="review-sub-ratings">
                                       {chips.map((c, i) => <span key={c.label}>{i > 0 ? ' · ' : ''}{c.label} {c.v}/5</span>)}
                                     </p>
                                   );
@@ -1950,7 +1990,7 @@ useEffect(() => {
                           )}
                         </>
                       ) : (
-                        <p style={{ fontSize: 14, color: '#475569', fontStyle: 'italic' }}>
+                        <p style={{ fontSize: 14, color: 'var(--text-muted, #6b5a55)', fontStyle: 'italic' }}>
                           Ratings only — written reviews coming soon.
                         </p>
                       )}
@@ -2022,7 +2062,7 @@ useEffect(() => {
                   if (s?.loading) return (
                     <section className="pp-section" aria-label="Similar stays">
                       <div className="pp-section-head"><h2>Similar stays</h2></div>
-                      <div style={{ height: 120, borderRadius: 16, background: '#f0e6dc' }} />
+                      <div style={{ height: 120, borderRadius: 16, background: '#f0ddd0' }} />
                     </section>
                   );
                   if (!s || !Array.isArray(s.items) || s.items.length === 0) return null;
@@ -2040,12 +2080,12 @@ useEffect(() => {
                             <Link
                               key={String(it.id)}
                               to={path}
-                              style={{ display: 'block', borderRadius: 16, border: '1px solid #f0e6dc', overflow: 'hidden', textDecoration: 'none', background: '#fff' }}
+                              style={{ display: 'block', borderRadius: 16, border: '1px solid var(--border-subtle, #f0ddd0)', overflow: 'hidden', textDecoration: 'none', background: '#fff' }}
                             >
                               {img && <img src={img} alt={name} style={{ width: '100%', height: 140, objectFit: 'cover' }} loading="lazy" decoding="async" width={300} height={140} />}
                               <div style={{ padding: '12px 14px' }}>
-                                <p style={{ fontWeight: 600, color: '#1a1a2e', fontSize: 14, margin: '0 0 4px' }}>{name}</p>
-                                <p style={{ fontSize: 12.5, color: '#64748b', margin: 0 }}>{String(it.propertyAddress ?? '').slice(0, 60)}</p>
+                                <p style={{ fontWeight: 600, color: 'var(--text-primary, #4a3535)', fontSize: 14, margin: '0 0 4px' }}>{name}</p>
+                                <p style={{ fontSize: 12.5, color: 'var(--text-muted, #6b5a55)', margin: 0 }}>{String(it.propertyAddress ?? '').slice(0, 60)}</p>
                               </div>
                             </Link>
                           );
@@ -2090,7 +2130,7 @@ useEffect(() => {
                           key={`attraction-${idx}`}
                           style={{
                             borderRadius: 12,
-                            border: '1px solid #f0e6dc',
+                            border: '1px solid #f0ddd0',
                             padding: 12,
                             textAlign: 'center',
                             background: '#fff',
@@ -2100,14 +2140,14 @@ useEffect(() => {
                           onMouseLeave={(e) => (e.currentTarget.style.boxShadow = 'none')}
                         >
                           <div style={{ fontSize: 28, marginBottom: 8 }} aria-hidden="true">{attraction.icon}</div>
-                          <p style={{ fontWeight: 600, color: '#1a1a2e', fontSize: 13, margin: '0 0 4px', minHeight: '2em' }}>
+                          <p style={{ fontWeight: 600, color: '#4a3535', fontSize: 13, margin: '0 0 4px', minHeight: '2em' }}>
                             {attraction.name}
                           </p>
-                          <p style={{ fontSize: 11, color: '#64748b', margin: '0 0 6px' }}>
+                          <p style={{ fontSize: 11, color: 'var(--text-muted, #6b5a55)', margin: '0 0 6px' }}>
                             {attraction.distance}
                           </p>
-                          {/* WCAG AA: #6b5138 on #f0e6dc ≈ 5.9:1 (was #94755b at 3.44:1 — axe color-contrast failure) */}
-                          <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: '#f0e6dc', color: '#6b5138' }}>
+                          {/* WCAG AA: #6b5138 on #f0ddd0 ≈ 5.9:1 (was #94755b at 3.44:1 — axe color-contrast failure) */}
+                          <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: '#f0ddd0', color: '#6b5138' }}>
                             {attraction.type}
                           </span>
                         </div>
@@ -2123,7 +2163,7 @@ useEffect(() => {
               {/* ===== RIGHT COLUMN — sticky booking ===== */}
               <aside className="pp-booking-col" aria-label="Booking">
                 {galleryUrls.length > 0 && (
-                  <p style={{ fontSize: 13, color: '#64748b', marginBottom: 8 }} aria-label="Photo count">
+                  <p style={{ fontSize: 13, color: 'var(--text-muted, #6b5a55)', marginBottom: 8 }} aria-label="Photo count">
                     {galleryUrls.length} photo{galleryUrls.length !== 1 ? 's' : ''}
                   </p>
                 )}
@@ -2133,16 +2173,16 @@ useEffect(() => {
                     data-testid="draft-booking-notice"
                     aria-label="Listing not yet available for booking"
                     style={{
-                      border: '1px solid #e2e8f0',
+                      border: '1px solid var(--border-subtle, #f0ddd0)',
                       borderRadius: 12,
                       padding: '20px 18px',
-                      background: '#f8fafc',
-                      color: '#64748b',
+                      background: 'var(--bg-muted, #f5ebe0)',
+                      color: 'var(--text-muted, #6b5a55)',
                       textAlign: 'center',
                       opacity: 0.85,
                     }}
                   >
-                    <div style={{ fontWeight: 600, color: '#475569', marginBottom: 6 }}>
+                    <div style={{ fontWeight: 600, color: 'var(--text-primary, #4a3535)', marginBottom: 6 }}>
                       Not yet available for booking
                     </div>
                     <div style={{ fontSize: 13 }}>
@@ -2173,14 +2213,14 @@ useEffect(() => {
                         marginTop: 16,
                         padding: '12px 14px',
                         borderRadius: 8,
-                        background: '#dcfce7',
-                        border: '1px solid #86efac',
+                        background: '#e9f5ef',
+                        border: '1px solid #d2ebde',
                       }} data-testid="save-vs-ota-delta">
-                        <div style={{ fontSize: 14, fontWeight: 600, color: '#166534', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: '#157046', display: 'flex', alignItems: 'center', gap: 6 }}>
                           <span>💰</span>
                           <span>Save ~₹{Math.round(data.property_price * 2 * 0.15).toLocaleString('en-IN')} by booking directly</span>
                         </div>
-                        <div style={{ fontSize: 12, color: '#15803d', marginTop: 4 }}>
+                        <div style={{ fontSize: 12, color: '#157046', marginTop: 4 }}>
                           vs OTA platforms that charge 15–18%
                         </div>
                       </div>
@@ -2265,7 +2305,7 @@ useEffect(() => {
                 {/* Availability Calendar */}
                 {resolvedListingId && (
                   <Suspense fallback={
-                    <div style={{ borderRadius: 12, border: '1px solid #f0e6dc', background: '#f9f5f0', height: 256, marginTop: 16 }} />
+                    <div style={{ borderRadius: 12, border: '1px solid #f0ddd0', background: '#f9f5f0', height: 256, marginTop: 16 }} />
                   }>
                     <AvailabilityCalendar
                       listingId={resolvedListingId}
@@ -2278,9 +2318,9 @@ useEffect(() => {
                 )}
 
                 {showAvailabilityPlaceholder && (
-                  <div style={{ borderRadius: 18, border: '1px solid #f0e6dc', background: '#fff', padding: 24, marginTop: 16 }}>
-                    <h3 style={{ fontSize: 18, fontWeight: 600, color: '#1a1a2e', marginBottom: 8 }}>Check Availability</h3>
-                    <p style={{ fontSize: 14, color: '#64748b', marginBottom: 16 }}>
+                  <div style={{ borderRadius: 18, border: '1px solid #f0ddd0', background: '#fff', padding: 24, marginTop: 16 }}>
+                    <h3 style={{ fontSize: 18, fontWeight: 600, color: '#4a3535', marginBottom: 8 }}>Check Availability</h3>
+                    <p style={{ fontSize: 14, color: 'var(--text-muted, #6b5a55)', marginBottom: 16 }}>
                       Availability check is currently unavailable. Please try again later.
                     </p>
                     <Button
@@ -2323,7 +2363,7 @@ useEffect(() => {
               aria-label="Listing not yet available for booking"
               data-testid="mobile-draft-notice"
             >
-              <div className="pp-m-sticky-price" style={{ color: '#64748b' }}>
+              <div className="pp-m-sticky-price" style={{ color: 'var(--text-muted, #6b5a55)' }}>
                 <b style={{ fontWeight: 600 }}>Not yet available</b>
                 <span>for booking</span>
               </div>

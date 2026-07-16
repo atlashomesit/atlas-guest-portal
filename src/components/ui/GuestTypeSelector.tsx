@@ -185,24 +185,24 @@ export const GuestTypeSelector: React.FC<GuestTypeSelectorProps> = ({
   const isAtCapacity = totalOccupancy >= maxCapacity;
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div className="relative min-w-0" ref={dropdownRef}>
       <button
         type="button"
         onClick={onToggle}
-        className="field-card flex h-full min-h-[120px] flex-col justify-between rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-7 py-7 shadow-[var(--shadow-level-1)] hover:shadow-[var(--shadow-level-2)] hover:scale-[1.01] text-left w-full transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cta-primary)]"
+        className="field-card flex h-full min-h-[112px] flex-col justify-start gap-2.5 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4 shadow-[var(--shadow-level-1)] hover:shadow-[var(--shadow-level-2)] text-left w-full transition-shadow focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cta-primary)]"
         aria-expanded={isOpen}
         aria-label="Select guests"
       >
-        <span className="flex items-center gap-2.5 text-xs font-bold uppercase tracking-[0.10em] text-[var(--text-muted)] whitespace-nowrap">
-          <Users className="h-[18px] w-[18px] shrink-0 text-[var(--text-muted)]" aria-hidden="true" />
-          <span className="truncate">Guests</span>
+        <span className="hf-field-label flex items-center gap-2 text-xs font-bold uppercase tracking-[0.10em] text-[var(--text-muted)]">
+          <Users className="h-4 w-4 shrink-0 text-[var(--text-muted)]" aria-hidden="true" />
+          <span>Guests</span>
         </span>
-        <span className="guest-value mt-4 flex items-center justify-between gap-2 text-[22px] font-medium text-[var(--text-primary)] leading-tight">
-          {summary}
-          <ChevronDown className={`h-[18px] w-[18px] shrink-0 text-[var(--text-muted)] transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} aria-hidden />
+        <span className="guest-value flex items-center justify-between gap-2 font-medium text-[var(--text-primary)]">
+          <span className="hf-value-text">{summary}</span>
+          <ChevronDown className={`h-4 w-4 shrink-0 text-[var(--text-muted)] transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} aria-hidden />
         </span>
         {isAtCapacity && (
-          <p className="mt-3 text-[13px] leading-relaxed text-[var(--support-error)] font-medium">
+          <p className="text-[12px] leading-snug text-[var(--support-error)] font-medium">
             Maximum {maxCapacity} guest{maxCapacity === 1 ? '' : 's'}
           </p>
         )}

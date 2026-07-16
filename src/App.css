@@ -24,11 +24,17 @@
   }
 }
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-  font-family: var(--font-family-base);  user-select: none;
+/* Base reset lives in @layer base so Tailwind utilities (@layer utilities)
+   keep precedence. The old UNLAYERED `* { margin: 0; padding: 0 }` beat every
+   layered utility under Tailwind v4's native cascade layers — it silently
+   killed all margin/padding/mx-auto spacing utilities app-wide. Zeroing is
+   already handled by Tailwind preflight. */
+@layer base {
+  * {
+    box-sizing: border-box;
+    font-family: var(--font-family-base);
+    user-select: none;
+  }
 }
 
 html::-webkit-scrollbar,
@@ -125,7 +131,7 @@ body::-webkit-scrollbar {
   z-index: 100;
   padding: 0.5rem 1rem;
   border-radius: 0.5rem;
-  background: var(--cta-primary, #ea580c);
+  background: var(--cta-primary, #c45a3f);
   color: var(--text-contrast, #fff);
   font-size: 0.875rem;
   font-weight: 600;

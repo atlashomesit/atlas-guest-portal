@@ -206,19 +206,22 @@ const Navbar = () => {
 
         {/* LEFT - Logo and Mobile Menu Button */}
         <div className="flex items-center justify-between w-full lg:w-auto">
-          <Link to="/" className="flex items-center gap-2">
+          <Link to="/" className="flex items-center gap-2 navbar-brand-link">
             {showLogo && (
               <img
                 src={logoSrc}
-                alt={brandName || "Site logo"}
-                className="navbar-logo"
+                alt={brandName || "Stay by City Focus"}
+                className={`navbar-logo${logoSrc.includes("stay-bycityfocus") ? " navbar-logo--wordmark" : ""}`}
                 loading="eager"
                 decoding="async"
-                width={48}
-                height={48}
+                width={logoSrc.includes("stay-bycityfocus") ? 52 : 48}
+                height={logoSrc.includes("stay-bycityfocus") ? 48 : 48}
               />
             )}
-            {brandName ? <span className="navbar-logo-text">{brandName}</span> : null}
+            {/* Wordmark logos already include the brand name — hide duplicate text */}
+            {brandName && !logoSrc.includes("stay-bycityfocus") ? (
+              <span className="navbar-logo-text">{brandName}</span>
+            ) : null}
           </Link>
 
           {/* Mobile Menu Button - Only visible on mobile */}

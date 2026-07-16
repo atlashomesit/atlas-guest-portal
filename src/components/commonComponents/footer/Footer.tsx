@@ -57,13 +57,13 @@ const Footer = () => {
     if (overrides.contact?.address?.trim()) {
         locateRows.push({
             key: "address",
-            icon: <FaMapMarkerAlt className="mt-0.5 shrink-0 text-lg" aria-hidden />,
+            icon: <FaMapMarkerAlt className="shrink-0 text-base" aria-hidden />,
             content: <span className="text-left">{overrides.contact.address.trim()}</span>,
         });
     }
     locateRows.push({
         key: "email",
-        icon: <IoIosMail className="shrink-0 text-xl" aria-hidden />,
+        icon: <IoIosMail className="shrink-0 text-lg" aria-hidden />,
         content: (
             <a href={`mailto:${email}`} className="break-all text-left hover:text-[var(--footer-link-hover)]">
                 {email}
@@ -72,7 +72,7 @@ const Footer = () => {
     });
     locateRows.push({
         key: "phone",
-        icon: <IoIosCall className="shrink-0 text-xl" aria-hidden />,
+        icon: <IoIosCall className="shrink-0 text-lg" aria-hidden />,
         content: (
             <a href={getTelLink()} className="text-left hover:text-[var(--footer-link-hover)]">
                 {formatDisplayNumber()}
@@ -98,15 +98,21 @@ const Footer = () => {
 
     return (
         <footer
-            className='py-16 md:py-20 px-[5%] text-[var(--footer-text)] border-t border-white/10'
+            className='pt-16 md:pt-20 pb-28 md:pb-24 px-[5%] text-[var(--footer-text)] border-t border-white/10'
             style={{ background: 'var(--footer-bg)' }}
         >
-            <div className='max-w-luxury mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-12'>
-                <div className='flex flex-col gap-4 items-center lg:items-start'>
+            <div className='max-w-luxury mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-8 lg:gap-10 lg:items-start'>
+                <div className='flex flex-col gap-3 items-center lg:items-start'>
                     {showLogo && (
-                        <img className='w-32 md:w-24 rounded-md' src={logoSrc} alt="" aria-hidden loading="lazy" decoding="async" />
+                        <img
+                            className={`rounded-md object-contain ${logoSrc.includes('stay-bycityfocus') ? 'w-24 md:w-28 bg-[#fff8e7] p-2.5' : 'w-28 md:w-24'}`}
+                            src={logoSrc}
+                            alt={footerBrand}
+                            loading="lazy"
+                            decoding="async"
+                        />
                     )}
-                    <p className='text-sm text-[var(--footer-link)]'>{footerTagline}</p>
+                    <p className='text-sm leading-relaxed text-[var(--footer-link)]'>{footerTagline}</p>
                     {tenant?.isGstVerified && (
                         <span className='inline-flex items-center gap-1.5 text-xs font-medium text-emerald-400 border border-emerald-400/40 rounded-full px-2.5 py-0.5' title='This property manager has a verified GSTIN on file'>
                             <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='currentColor' className='w-3.5 h-3.5' aria-hidden='true'><path fillRule='evenodd' d='M16.403 12.652a3 3 0 0 0 0-5.304 3 3 0 0 0-3.75-3.751 3 3 0 0 0-5.305 0 3 3 0 0 0-3.751 3.751 3 3 0 0 0 0 5.305 3 3 0 0 0 3.751 3.75 3 3 0 0 0 5.305 0 3 3 0 0 0 3.75-3.75Zm-2.546-4.46a.75.75 0 0 0-1.214-.883l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z' clipRule='evenodd'/></svg>
@@ -137,7 +143,7 @@ const Footer = () => {
                 </div>
 
                 <div className='text-center lg:text-left'>
-                    <h2 className='font-display text-xl font-semibold mb-4 text-[var(--footer-heading)]' style={{ fontFamily: 'var(--font-family-display)' }}>Quick Links</h2>
+                    <h2 className='font-display text-lg font-semibold mb-3 text-[var(--footer-heading)] leading-tight' style={{ fontFamily: 'var(--font-family-display)' }}>Quick Links</h2>
                     <div className='flex flex-col gap-2 text-base'>
                         {primaryNav.filter((item) => !item.hidden).map((item) => (
                             <Link key={item.label} to={item.to} className='text-[var(--footer-link)] hover:text-[var(--footer-link-hover)] transition-colors'>
@@ -148,7 +154,7 @@ const Footer = () => {
                 </div>
 
                 <div className='text-center lg:text-left'>
-                    <h2 className='font-display text-xl font-semibold mb-4 text-[var(--footer-heading)]' style={{ fontFamily: 'var(--font-family-display)' }}>More</h2>
+                    <h2 className='font-display text-lg font-semibold mb-3 text-[var(--footer-heading)] leading-tight' style={{ fontFamily: 'var(--font-family-display)' }}>More</h2>
                     <div className='flex flex-col gap-2 text-base'>
                         {moreNav.filter((item) => !item.hidden).map((item) => (
                             item.external ? (
@@ -164,7 +170,7 @@ const Footer = () => {
                 </div>
 
                 <div className="text-center lg:text-left">
-                    <h2 className="font-display text-xl font-semibold mb-4 text-[var(--footer-heading)]" style={{ fontFamily: 'var(--font-family-display)' }}>Help</h2>
+                    <h2 className="font-display text-lg font-semibold mb-3 text-[var(--footer-heading)] leading-tight" style={{ fontFamily: 'var(--font-family-display)' }}>Help</h2>
                     <div className="text-base flex flex-col gap-2">
                         {helpNav.map((item) => (
                             <Link key={item.label} to={item.to} className="text-[var(--footer-link)] hover:text-[var(--footer-link-hover)] transition-colors">                                {item.label}
@@ -174,12 +180,14 @@ const Footer = () => {
                 </div>
 
                 <div className="text-center lg:text-left min-w-0">
-                    <h2 className="font-display text-xl font-semibold mb-4 text-[var(--footer-heading)]" style={{ fontFamily: 'var(--font-family-display)' }}>Locate Us</h2>
+                    <h2 className="font-display text-lg font-semibold mb-3 text-[var(--footer-heading)] leading-tight" style={{ fontFamily: 'var(--font-family-display)' }}>Locate Us</h2>
                     <ul className="m-0 flex list-none flex-col gap-3 p-0 text-base text-[var(--footer-link)]">
                         {locateRows.map((row) => (
-                            <li key={row.key} className="flex flex-row items-start justify-center gap-3 lg:justify-start">
-                                <span className="text-[var(--footer-link)] shrink-0 leading-relaxed">{row.icon}</span>
-                                <span className="min-w-0 flex-1 leading-relaxed">{row.content}</span>
+                            <li key={row.key} className="flex flex-row items-center justify-center gap-3 lg:justify-start">
+                                <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center text-[var(--footer-link)] [&_svg]:block">
+                                    {row.icon}
+                                </span>
+                                <span className="min-w-0 flex-1 leading-snug text-left">{row.content}</span>
                             </li>
                         ))}
                     </ul>

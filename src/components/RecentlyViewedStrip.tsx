@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { getRecentlyViewed, removeRecentlyViewed, type GuestListingHistoryItem } from "../utils/guestHistory";
 import { sanitizeGuestImageUrl } from "../utils/guestImageUrl";
+import { getPropertyDesignImage } from "../config/branding";
 import OptimizedImage from "./ui/OptimizedImage";
 
 const DISPLAY_CAP = 8;
@@ -31,62 +32,68 @@ export default function RecentlyViewedStrip() {
 
   return (
     <section
-      className="rounded-2xl border border-border-subtle bg-bg-surface px-3 py-4 shadow-sm"
+      className="rounded-2xl border border-border-subtle bg-bg-surface px-4 py-4 shadow-sm"
       data-testid="recently-viewed-strip"
       aria-label="Recently viewed"
     >
-      <div className="mb-3 flex items-center justify-between gap-2 px-1">
+      <div className="mb-3 flex items-center justify-between gap-2">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Recently viewed</h2>
         <Link to="/recent" className="text-xs font-medium text-cta-primary hover:underline">
           See all
         </Link>
       </div>
       <div
-        className="flex gap-3 overflow-x-auto pb-1 [scrollbar-width:thin] snap-x snap-mandatory sm:grid sm:grid-cols-4 sm:overflow-visible"
+        className="flex gap-3 overflow-x-auto pb-1 [scrollbar-width:thin] snap-x snap-mandatory"
         role="list"
       >
         {items.map((it) => {
-          // TASK-4289: drop blocked/non-canonical URLs (incl. entries stored before this fix) so a
-          // bad src never renders a broken image — fall back to the styled placeholder instead.
+          // Only render a real <img> for sanitized canonical URLs (TASK-4289).
+          // Blocked/empty covers get a CSS design wash — never a broken img src.
           const cover = sanitizeGuestImageUrl(it.coverPhotoUrl);
+          const designWash = getPropertyDesignImage(it.listingId);
           return (
           <div
             key={`${it.listingId}-${it.viewedAtUtc}`}
             role="listitem"
-            className="relative w-[140px] shrink-0 snap-start sm:w-auto"
+            className="relative w-[152px] shrink-0 snap-start"
           >
             <Link
               to={it.path}
-              className="flex flex-col overflow-hidden rounded-xl border border-border-subtle bg-bg-muted transition hover:border-cta-primary"
+              className="flex h-full flex-col overflow-hidden rounded-xl border border-border-subtle bg-bg-muted transition hover:border-cta-primary"
             >
-              <div className="aspect-[4/3] w-full bg-bg-muted flex items-center justify-center">
+              <div className="aspect-[4/3] w-full overflow-hidden bg-bg-muted">
                 {cover ? (
                   <OptimizedImage
                     src={cover}
                     alt={it.name ?? `Listing ${it.listingId}`}
                     className="h-full w-full object-cover"
                     wrapperClassName="h-full"
-                    sizes="140px"
+                    sizes="160px"
                   />
                 ) : (
-                  <div className="flex flex-col h-full w-full items-center justify-center gap-1" aria-hidden>
-                    <svg className="w-6 h-6 text-text-muted/40" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" />
-                    </svg>
-                  </div>
+                  <div
+                    className="h-full w-full"
+                    style={{
+                      backgroundImage: `url("${designWash}")`,
+                      backgroundSize: "cover",
+                      backgroundPosition: "center",
+                    }}
+                    aria-hidden
+                  />
                 )}
               </div>
-              <div className="line-clamp-2 p-2 pb-0 text-xs font-medium text-text-primary">{it.name ?? `Listing ${it.listingId}`}</div>
-              {/* TASK-2578: re-engagement nudge */}
-              <div className="px-2 pb-2">
+              <div className="line-clamp-2 p-2 pb-0 text-xs font-medium text-text-primary">
+                {it.name ?? `Listing ${it.listingId}`}
+              </div>
+              <div className="mt-auto px-2 pb-2 pt-1">
                 <span className="block text-[10px] text-text-muted leading-tight">Still available? Book now →</span>
               </div>
             </Link>
             <button
               type="button"
               onClick={() => removeRecentlyViewed(it.listingId)}
-              className="absolute right-1 top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-black/40 text-white text-xs leading-none hover:bg-black/60"
-              aria-label={`Remove ${it.name ?? 'this listing'} from recently viewed`}
+              className="absolute right-1.5 top-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/45 text-white text-xs leading-none hover:bg-black/60"
+              aria-label={`Remove ${it.name ?? "this listing"} from recently viewed`}
             >
               ×
             </button>
