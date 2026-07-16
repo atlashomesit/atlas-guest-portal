@@ -218,7 +218,9 @@ exports[`AboutPage > matches the snapshot 1`] = `
         <p
           class="text-base text-text-muted max-w-3xl leading-relaxed"
         >
-          Every Atlas home is audited on the same quality framework. We match hotel-grade consistency with the warmth of local hosts so travelers never have to choose between comfort and character.
+          Every 
+          Atlastays
+           home is audited on the same quality framework. We match hotel-grade consistency with the warmth of local hosts so travelers never have to choose between comfort and character.
         </p>
         <div
           class="grid gap-4 sm:grid-cols-2"
@@ -434,17 +436,20 @@ exports[`AboutPage > matches the snapshot 1`] = `
           <p
             class="text-base uppercase tracking-[0.18em] text-primary font-semibold"
           >
-            Meet the team
+            Who you're booking with
           </p>
           <h2
             class="text-2xl md:text-3xl font-bold"
           >
-            People who craft every Atlas stay
+            Atlastays
+             is owner-run
           </h2>
           <p
             class="text-base text-text-muted max-w-2xl mt-2 leading-relaxed"
           >
-            Our distributed team blends hospitality know-how with operational rigor, ensuring each apartment is cared for like a boutique property.
+            There's no distant call center and no cast of department heads here. Every 
+            Atlastays
+             home is looked after by the people who actually own it — the same person who checks the linens is the one who'll reply to your message.
           </p>
         </div>
         <div
@@ -478,105 +483,8 @@ exports[`AboutPage > matches the snapshot 1`] = `
               r="4"
             />
           </svg>
-          Local hosts + central operations
+          Owner-run, not outsourced
         </div>
-      </div>
-      <div
-        class="grid gap-4 mt-6 md:grid-cols-3"
-      >
-        <article
-          class="border border-border-subtle rounded-2xl p-5 bg-gradient-to-b from-bg-surface to-bg-muted/60 shadow-level1"
-        >
-          <div
-            class="flex items-center gap-3 mb-3"
-          >
-            <div
-              aria-hidden="true"
-              class="w-12 h-12 rounded-full bg-primary/15 text-primary font-semibold flex items-center justify-center uppercase"
-            >
-              AR
-            </div>
-            <div>
-              <h3
-                class="font-semibold text-text-primary"
-              >
-                Aisha Rao
-              </h3>
-              <p
-                class="text-base text-text-muted"
-              >
-                Guest Experience Lead
-              </p>
-            </div>
-          </div>
-          <p
-            class="text-base text-text-muted leading-relaxed"
-          >
-            Designs arrival rituals, accessibility checklists, and empathetic support scripts for our hosts.
-          </p>
-        </article>
-        <article
-          class="border border-border-subtle rounded-2xl p-5 bg-gradient-to-b from-bg-surface to-bg-muted/60 shadow-level1"
-        >
-          <div
-            class="flex items-center gap-3 mb-3"
-          >
-            <div
-              aria-hidden="true"
-              class="w-12 h-12 rounded-full bg-primary/15 text-primary font-semibold flex items-center justify-center uppercase"
-            >
-              LM
-            </div>
-            <div>
-              <h3
-                class="font-semibold text-text-primary"
-              >
-                Luis Mendoza
-              </h3>
-              <p
-                class="text-base text-text-muted"
-              >
-                Operations Strategist
-              </p>
-            </div>
-          </div>
-          <p
-            class="text-base text-text-muted leading-relaxed"
-          >
-            Coordinates local partners, 24/7 maintenance coverage, and quality audits across every city we serve.
-          </p>
-        </article>
-        <article
-          class="border border-border-subtle rounded-2xl p-5 bg-gradient-to-b from-bg-surface to-bg-muted/60 shadow-level1"
-        >
-          <div
-            class="flex items-center gap-3 mb-3"
-          >
-            <div
-              aria-hidden="true"
-              class="w-12 h-12 rounded-full bg-primary/15 text-primary font-semibold flex items-center justify-center uppercase"
-            >
-              NM
-            </div>
-            <div>
-              <h3
-                class="font-semibold text-text-primary"
-              >
-                Nihar Mehta
-              </h3>
-              <p
-                class="text-base text-text-muted"
-              >
-                Hospitality Technologist
-              </p>
-            </div>
-          </div>
-          <p
-            class="text-base text-text-muted leading-relaxed"
-          >
-            Builds the digital tools that keep housekeeping, concierge, and guest messaging in perfect sync.
-          </p>
-        </article>
       </div>
     </section>
     <section
