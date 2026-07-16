@@ -201,6 +201,14 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const lastAvailabilityKeyRef = useRef<string | null>(null);
   const hasHydratedFromContextRef = useRef(false);
+  // TASK-4726 fix: the URL-hydration effect below runs as soon as ?checkIn=/?checkOut= are
+  // parsed — typically before the async availability-calendar GET (fetchBlockedDates) has
+  // resolved, so blockedSet/dateStatusMap are still empty and an interior-night overlap is
+  // invisible to `checkInteriorNightOverlap` at that moment. Remember the hydrated range here
+  // so a second effect (below) can re-validate it once real availability data arrives, without
+  // re-deriving dateRange from the URL every time blockedSet/dateStatusMap change (which would
+  // clobber a date range the guest has since edited by hand).
+  const hydratedRangeRef = useRef<{ start: Date; end: Date } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [dateError, setDateError] = useState<string | null>(null);
@@ -403,6 +411,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
       setDateRange({ startDate: start, endDate: end });
       setDateError('Check-in date must be today or in the future.');
       hasHydratedFromContextRef.current = true;
+      hydratedRangeRef.current = { start, end };
       return;
     }
     // TASK-4556: enforce min-stay on URL-hydrated dates
@@ -411,18 +420,47 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
       setDateRange({ startDate: start, endDate: end });
       setDateError(`Minimum stay is ${minStayNights} nights.`);
       hasHydratedFromContextRef.current = true;
+      hydratedRangeRef.current = { start, end };
       return;
     }
-    // TASK-4726: check interior-night overlaps on URL-hydrated dates
+    // TASK-4726: check interior-night overlaps on URL-hydrated dates. NOTE: at first run this
+    // effect very likely fires before the availability-calendar GET resolves, so blockedSet/
+    // dateStatusMap can still be empty here — see the hydratedRangeRef re-validation effect
+    // below, which catches an overlap that only becomes visible once that fetch settles.
     if (checkInteriorNightOverlap(start, end)) {
       setDateRange({ startDate: start, endDate: end });
       setDateError('These dates overlap an existing booking or hold.');
       hasHydratedFromContextRef.current = true;
+      hydratedRangeRef.current = { start, end };
       return;
     }
     setDateRange({ startDate: start, endDate: end });
     hasHydratedFromContextRef.current = true;
+    hydratedRangeRef.current = { start, end };
   }, [booking.checkIn, booking.checkOut, today, listingId, minStayNights]);
+
+  // TASK-4726 fix: re-validate a URL-hydrated range against interior-night overlaps once the
+  // availability-calendar fetch (blockedSet/dateStatusMap) has actually loaded. The hydration
+  // effect above runs on mount using whatever blockedSet/dateStatusMap happen to be in scope at
+  // that instant — on a fresh page load that's before the async GET resolves, so a booked night
+  // in the MIDDLE of the URL-hydrated range (edges still open) was silently missed and Reserve
+  // stayed enabled. Only acts while the guest hasn't changed the selection away from the
+  // hydrated range (compares against hydratedRangeRef), so it never clobbers a manual edit.
+  useEffect(() => {
+    const hydrated = hydratedRangeRef.current;
+    if (!hydrated) return;
+    if (
+      !dateRange.startDate ||
+      !dateRange.endDate ||
+      dateRange.startDate.getTime() !== hydrated.start.getTime() ||
+      dateRange.endDate.getTime() !== hydrated.end.getTime()
+    ) {
+      return;
+    }
+    if (checkInteriorNightOverlap(hydrated.start, hydrated.end)) {
+      setDateError('These dates overlap an existing booking or hold.');
+    }
+  }, [blockedSet, dateStatusMap, dateRange.startDate, dateRange.endDate]);
 
   useEffect(() => {
     const g = booking.guests;
