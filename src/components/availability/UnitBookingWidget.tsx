@@ -1702,12 +1702,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             </div>
           )}
 
-          {priceDetails.extraGuestsFee > 0 && (
-            <div className="lv-price-row">
-              <span>Extra guest fee</span>
-              <span className="lv-num">{displayPrice(priceDetails.extraGuestsFee)}</span>
-            </div>
-          )}
+          {/* TASK-4725: the extra-guest-fee breakdown row was removed — the server-authoritative
+              Razorpay charge never included that component, so the row never matched what the
+              guest was actually billed. priceDetails.extraGuestsFee is still computed above for
+              potential guest-count validation use elsewhere. */}
 
           {/* TASK-2631 final fix: phantom discount line — appliedDiscountPercent from globalDiscountPercent is not applied to finalTotal, so we hide it to prevent "vapor" discount display */}
 
