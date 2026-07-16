@@ -106,24 +106,6 @@ const trustBadges = [
   },
 ];
 
-const teamMembers = [
-  {
-    name: "Aisha Rao",
-    title: "Guest Experience Lead",
-    focus: "Designs arrival rituals, accessibility checklists, and empathetic support scripts for our hosts.",
-  },
-  {
-    name: "Luis Mendoza",
-    title: "Operations Strategist",
-    focus: "Coordinates local partners, 24/7 maintenance coverage, and quality audits across every city we serve.",
-  },
-  {
-    name: "Nihar Mehta",
-    title: "Hospitality Technologist",
-    focus: "Builds the digital tools that keep housekeeping, concierge, and guest messaging in perfect sync.",
-  },
-];
-
 const missionHighlights = [
   "Pair the reliability of boutique hotels with the character of privately hosted homes.",
   "Champion hospitality careers by training local teams and celebrating their craft.",
@@ -189,7 +171,7 @@ const AboutPage = () => {
           <p className="text-base uppercase tracking-[0.18em] text-primary font-semibold">Hospitality standards</p>
           <h2 className="text-2xl md:text-3xl font-bold">Standards that travel with you</h2>
           <p className="text-base text-text-muted max-w-3xl leading-relaxed">
-            Every Atlas home is audited on the same quality framework. We match hotel-grade consistency with the warmth of local hosts so travelers never have to choose between comfort and character.
+            Every {brandName} home is audited on the same quality framework. We match hotel-grade consistency with the warmth of local hosts so travelers never have to choose between comfort and character.
           </p>
           <div className="grid gap-4 sm:grid-cols-2">
             {hospitalityStandards.map(({ title, description, icon: Icon }) => (
@@ -211,38 +193,24 @@ const AboutPage = () => {
         </figure>
       </section>
 
+      {/* TASK-4301: replaces a fabricated "Meet the team" section (three invented names and
+          bios, one of which falsely claimed multi-city coverage) with an honest, tenant-neutral
+          owner-run statement. No headcounts, city names, or department titles are hardcoded here
+          — this component is shared across every tenant's guest portal, so the copy is written to
+          stay true regardless of which {brandName} is resolved at render time. */}
       <section className="bg-bg-surface border border-border-subtle rounded-3xl p-8 shadow-level1" data-testid="team-section">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <p className="text-base uppercase tracking-[0.18em] text-primary font-semibold">Meet the team</p>
-            <h2 className="text-2xl md:text-3xl font-bold">People who craft every Atlas stay</h2>
+            <p className="text-base uppercase tracking-[0.18em] text-primary font-semibold">Who you're booking with</p>
+            <h2 className="text-2xl md:text-3xl font-bold">{brandName} is owner-run</h2>
             <p className="text-base text-text-muted max-w-2xl mt-2 leading-relaxed">
-              Our distributed team blends hospitality know-how with operational rigor, ensuring each apartment is cared for like a boutique property.
+              There's no distant call center and no cast of department heads here. Every {brandName} home is looked after by the people who actually own it — the same person who checks the linens is the one who'll reply to your message.
             </p>
           </div>
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-cta-primary text-[var(--text-contrast)] font-semibold shadow-level1">
             <Users className="w-4 h-4" />
-            Local hosts + central operations
+            Owner-run, not outsourced
           </div>
-        </div>
-        <div className="grid gap-4 mt-6 md:grid-cols-3">
-          {teamMembers.map(({ name, title, focus }) => (
-            <article key={name} className="border border-border-subtle rounded-2xl p-5 bg-gradient-to-b from-bg-surface to-bg-muted/60 shadow-level1">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-12 h-12 rounded-full bg-primary/15 text-primary font-semibold flex items-center justify-center uppercase" aria-hidden>
-                  {name
-                    .split(" ")
-                    .map((part) => part[0])
-                    .join("")}
-                </div>
-                <div>
-                  <h3 className="font-semibold text-text-primary">{name}</h3>
-                  <p className="text-base text-text-muted">{title}</p>
-                </div>
-              </div>
-              <p className="text-base text-text-muted leading-relaxed">{focus}</p>
-            </article>
-          ))}
         </div>
       </section>
 
