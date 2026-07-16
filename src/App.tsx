@@ -30,6 +30,7 @@ const GalleryPage = React.lazy(() => import("./pages/GalleryPage"))
 const OffersPage = React.lazy(() => import("./pages/OffersPage"))
 const AboutPage = React.lazy(() => import("./pages/AboutPage"))
 const FaqPage = React.lazy(() => import("./pages/FaqPage"))
+const SitemapPage = React.lazy(() => import("./pages/SitemapPage"))
 const BlogHome = React.lazy(() => import("./pages/blog/BlogHome"))
 const BlogCategory = React.lazy(() => import("./pages/blog/BlogCategory"))
 const BlogPostPage = React.lazy(() => import("./pages/blog/BlogPostPage"))
@@ -217,6 +218,8 @@ function AppWrapper() {
           <Route path="/property_LocationDetails/:id" element={withBoundary(<Suspense fallback={<LazyFallback />}><Homepage_LocationDetails /></Suspense>, "location-details-route")} />
           {/* TASK-2612: Guest details step — MUST be before /:shortCode catch-all */}
           <Route path="/book/:propertySlug/:unitSlug/details" element={withBoundary(<Suspense fallback={<LazyFallback />}><GuestDetailsPage /></Suspense>, "guest-details-route")} />
+          {/* TASK-4308: human-readable sitemap page — MUST be before /:shortCode catch-all */}
+          <Route path="/sitemap" element={withBoundary(<Suspense fallback={<LazyFallback />}><SitemapPage /></Suspense>, "sitemap-route")} />
           <Route path="/:shortCode" element={withBoundary(<Suspense fallback={<LazyFallback />}><ShortLinkRedirect /></Suspense>, "shortlink-route")} />
           <Route path="/*" element={withBoundary(<Suspense fallback={<LazyFallback />}><PageNotFound /></Suspense>, "fallback-route")} />
         </Routes>

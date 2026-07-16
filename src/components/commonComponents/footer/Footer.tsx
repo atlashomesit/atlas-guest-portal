@@ -144,7 +144,7 @@ const Footer = () => {
                                 {item.label}
                             </Link>
                         ))}
-                        <Link to='/sitemap.xml' className='text-[var(--footer-link)] hover:text-[var(--footer-link-hover)] transition-colors'>Sitemap</Link>                    </div>
+                        <Link to='/sitemap' className='text-[var(--footer-link)] hover:text-[var(--footer-link-hover)] transition-colors'>Sitemap</Link>                    </div>
                 </div>
 
                 <div className='text-center lg:text-left'>
