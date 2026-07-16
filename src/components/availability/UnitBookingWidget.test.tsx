@@ -681,3 +681,82 @@ describe('UnitBookingWidget - TASK-4628: E13 overlap-block message must fire on 
     expect(nights).toEqual(sorted);
   });
 });
+
+describe('UnitBookingWidget - TASK-4726: URL-hydrated interior-night overlap disables Reserve even when the availability GET resolves after mount', () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+    availabilityMock.fetch.mockReset();
+    availabilityMock.fetch.mockImplementation(availabilityOk);
+    task4303.booking.checkIn = null;
+    task4303.booking.checkOut = null;
+  });
+
+  it('disables Reserve / shows a date error once availability data (loaded AFTER mount) reveals an interior booked night', async () => {
+    // 3-night URL-hydrated range; only the MIDDLE night is booked — both edges are open, which
+    // is exactly the shape TASK-4726 targets (distinct from a blocked check-in/check-out edge).
+    const rangeStart = getIstStartOfDay(addDays(new Date(), 14));
+    const middleNight = addDays(rangeStart, 1);
+    const rangeEnd = addDays(rangeStart, 3);
+    task4303.booking.checkIn = toISODate(rangeStart);
+    task4303.booking.checkOut = toISODate(rangeEnd);
+
+    // Every night of the range is REAL-priced so `selectedRangeNightsPriced`/`rangePricingPending`
+    // never gate Reserve — isolating the assertion to the interior-night-overlap check itself,
+    // not an unrelated pricing-pending disablement.
+    const dateToPrice = new Map<string, number>([
+      [toISODate(rangeStart), 5000],
+      [toISODate(middleNight), 5000],
+      [toISODate(addDays(rangeStart, 2)), 5000],
+    ]);
+    task4303.fetchCalendarPricing.mockResolvedValue({ dateToPrice, convenienceFeePercent: 3 });
+    task4303.fetchGuestGstBreakdown.mockResolvedValue({ gstPercent: 5, gstAmount: 750, finalAmount: 15750 });
+
+    // Defer the availability-calendar GET so the URL-hydration effect runs first (mount) against
+    // empty blockedSet/dateStatusMap — reproducing the real page-load race — then resolve it with
+    // the interior night marked Booked, simulating the fetch settling after mount.
+    let resolveAvailability!: (r: Response) => void;
+    const availabilityPromise = new Promise<Response>((res) => { resolveAvailability = res; });
+    availabilityMock.fetch.mockReset();
+    availabilityMock.fetch.mockImplementation(() => availabilityPromise);
+
+    const { default: UnitBookingWidget } = await import('./UnitBookingWidget');
+    render(
+      <MemoryRouter>
+        <UnitBookingWidget
+          listingId={7}
+          propertyId={3}
+          listingName="Atlas 501 PH"
+          propertySlug="atlas501-ph"
+          unitSlug="ph"
+        />
+      </MemoryRouter>,
+    );
+
+    // Before availability resolves: pricing has already settled for the full range, so Reserve
+    // would be ENABLED here if not for the (still in-flight) availability check — proving that
+    // once it later reveals the interior conflict, the disablement is genuinely attributable to
+    // the interior-night-overlap logic and not some other unrelated gate.
+    await waitFor(() => {
+      expect(screen.getByTestId('guest-booking-submit')).toBeEnabled();
+    });
+
+    await act(async () => {
+      resolveAvailability(
+        new Response(
+          JSON.stringify([{ date: toISODate(middleNight), status: 'Booked' }]),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      );
+      await availabilityPromise;
+    });
+
+    // The regression: without the fix, the URL-hydration effect never re-runs after blockedSet/
+    // dateStatusMap populate, so neither the date-error nor the disabled Reserve ever appear.
+    await waitFor(() => {
+      const dateError = screen.queryByTestId('guest-booking-date-error');
+      const reserve = screen.getByTestId('guest-booking-submit');
+      expect(Boolean(dateError) || reserve.hasAttribute('disabled')).toBe(true);
+    });
+  });
+});
