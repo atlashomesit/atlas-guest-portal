@@ -77,6 +77,15 @@ export type TenantLocationContent = {
 export type TenantOverrides = {
   /** Hide the logo image in the navbar/footer/subheading. */
   hideLogo?: boolean;
+  /**
+   * Same-origin logo artwork for this tenant (e.g. "/images/<brand>-logo.png").
+   * Wins over `tenant.logoUrl` from the API so repo-shipped brand marks stay
+   * pixel-exact. Only affects the tenant under this slug — every other tenant
+   * keeps its API logo / the brand-neutral LOGO_URL fallback.
+   */
+  logoUrl?: string;
+  /** Same-origin favicon for this tenant; wins over `tenant.faviconUrl`. */
+  faviconUrl?: string;
   /** Hide default marketplace / parent-brand copy where we show a listing brand row. */ // TODO(CPO-001-followup): align naming with displayBrand helpers
   hideAtlasHomesBranding?: boolean;
   /** Hide the "List your property" CTA in the header (desktop + mobile). */
@@ -166,6 +175,14 @@ export function getUnitNoun(overrides: TenantOverrides): {
 }
 
 const TENANT_OVERRIDES: Record<string, TenantOverrides> = {
+  // Stay by City Focus — dev branded subdomain devstaybycf.atlastays.com
+  // (subdomain label == tenant slug, TenantsController from-domain resolution).
+  // Logo artwork ships same-origin in public/images; scoped here so no other
+  // tenant (incl. the atlastays.com marketplace apex) ever renders this mark.
+  devstaybycf: {
+    logoUrl: '/images/stay-bycityfocus-logo.png',
+    faviconUrl: '/images/stay-bycityfocus-logo.png',
+  },
   atlas: {
     // TASK-4300 (founder decision 2026-06-30): canonical guest-facing support WhatsApp =
     // +91-7032493290 (Atlastays platform line). The tenant API returns the Atlas Homes admin

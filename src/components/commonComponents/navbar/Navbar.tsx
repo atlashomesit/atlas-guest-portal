@@ -17,7 +17,9 @@ import { LANGUAGE_SWITCHER_ENABLED } from '../../../i18n/i18n'; // TASK-4517
 const Navbar = () => {
   const tenant = getTenantContext();
   const overrides = getTenantOverrides(tenant?.slug);
-  const logoSrc = tenant?.logoUrl ?? LOGO_URL;
+  // Repo-shipped per-tenant artwork (overrides.logoUrl) wins over the API logo;
+  // both fall back to the brand-neutral placeholder for logo-less tenants.
+  const logoSrc = overrides.logoUrl ?? tenant?.logoUrl ?? LOGO_URL;
   // RA-006 §3.5: prefer tenant name everywhere; only fall back to "Home" on the Atlas root.
   const brandName = getTenantBrandName();
   const showLogo = !overrides.hideLogo;
@@ -210,7 +212,7 @@ const Navbar = () => {
             {showLogo && (
               <img
                 src={logoSrc}
-                alt={brandName || "Stay by City Focus"}
+                alt={brandName || "Site logo"}
                 className={`navbar-logo${logoSrc.includes("stay-bycityfocus") ? " navbar-logo--wordmark" : ""}`}
                 loading="eager"
                 decoding="async"

@@ -35,7 +35,7 @@ const Footer = () => {
     };
     const overrides = getTenantOverrides(tenant?.slug);
     const hideAtlasBranding = shouldHideAtlasBranding(tenant, overrides);
-    const logoSrc = overrides.hideLogo ? "" : (tenant?.logoUrl ?? LOGO_URL);
+    const logoSrc = overrides.hideLogo ? "" : (overrides.logoUrl ?? tenant?.logoUrl ?? LOGO_URL);
     const showLogo = Boolean(logoSrc);
     // RA-006 §3.5: footer brand always prefers the tenant's own name. Atlas-specific
     // copy is reached only on the Atlas marketplace root where hideAtlasBranding=false.
