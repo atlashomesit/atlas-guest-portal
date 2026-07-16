@@ -4,7 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import Footer from "@/components/commonComponents/footer/Footer";
 
 describe("Footer links", () => {
-  it("exposes sitemap.xml via an internal link", () => {
+  it("exposes the human sitemap page via an internal link", () => {
     render(
       <MemoryRouter>
         <Footer />
@@ -12,6 +12,6 @@ describe("Footer links", () => {
     );
 
     const sitemap = screen.getByRole("link", { name: /sitemap/i });
-    expect(sitemap).toHaveAttribute("href", "/sitemap.xml");
+    expect(sitemap).toHaveAttribute("href", "/sitemap");
   });
 });
