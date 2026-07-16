@@ -7,6 +7,15 @@ Approved workflows are listed in `atlas-e2e/docs/governance/APPROVED-WORKFLOWS.m
 If a task needs a new workflow, stop — add it to MANUAL-DEVELOPER-BACKLOG.md and wait
 for Sreekar's approval. Violations will be reverted.
 
+## HARD RULE — Theme ≠ integration (Sreekar-approved 2026-07-17, canonical for ALL changes to this repo)
+
+**A theme change changes theme content only — never the Atlas PMS integration.** Two directions, both binding:
+
+1. **Presentation and integration are separate layers.** Theme work (a theme package under `src/themes/`, tokens, CSS, page composition) must not modify the PMS integration layer: API clients (`src/api/`), booking/payment/hold flows, tenant resolution (`src/tenant/`), entitlement handling, data hooks, or shared business-logic components. Dependency direction is one-way: themes import from the shared library; nothing in the shared library may ever import from `src/themes/`. A PR whose purpose is a theme may only touch `src/themes/<id>/**` (plus its E2E smoke spec); if a theme genuinely needs a shared-layer change, that change is a separate, theme-agnostic PR justified on its own merits.
+2. **Everything tenant-variable is configurable from Atlas PMS.** Behavior or content that differs per tenant must be driven by API/DB config (`Tenant` fields, `WebsiteThemeId`, entitlements, listing data) — never hardcoded per tenant in this repo (no slug-keyed conditionals in shared components). `src/tenant/tenantOverrides.ts` is an acknowledged legacy stopgap being absorbed into DB config — do not add new entries when a DB field exists, and never extend the pattern elsewhere.
+
+Why this exists: 2026-07 incident — tenant-specific edits in shared code shipped to every tenant's site. Architecture: ADR-0081 (+ 2026-07-17 amendments), epic `guest-portal-theme-gallery.md`. Violations will be reverted.
+
 ---
 
 For AI assistants (Cursor, Codex, etc.) working in this repo:
