@@ -12,6 +12,7 @@
  * rule in `eslint.config.js` and the HARD RULE in `AGENTS.md` ("Theme ≠ integration").
  */
 import type { LayoutThemeDefinition, LayoutThemeId, LayoutThemeModule } from "./types";
+import { heritageDefaultColorTokens } from "./heritage/defaultColorTokens";
 
 export const DEFAULT_LAYOUT_THEME_ID: LayoutThemeId = "classic";
 
@@ -42,6 +43,22 @@ export const themeRegistry: Record<LayoutThemeId, LayoutThemeDefinition> = {
       "christmas",
       "newYear",
     ],
+  },
+  heritage: {
+    id: "heritage",
+    label: "Heritage (Pre-Coral Atlas)",
+    description:
+      "The Atlas guest-portal look preserved from before the Sandstone Coral re-theme (d1ab2590^) — " +
+      "warm ivory, deep coral/amber accents, deep-navy text. Recovered so Atlas (or any tenant) can " +
+      "switch back to it with a single WebsiteThemeId flip (ADR-0081 amendment 2026-07-17 pt.4, TASK-4914).",
+    load: () => import("./heritage"),
+    // ADR-0081 D6 — heritage does not opt into any of the 14 shared color presets; it ships
+    // its own baked default palette instead (`defaultColorTokens` below), recovered verbatim
+    // from the pre-coral `default.css`. Empty is an explicitly allowed declaration (D6's own
+    // text: "may be empty"), not an oversight — revisit if/when a specific preset is verified
+    // to look coherent against heritage's warmer, deeper palette.
+    supportedColorPresets: [],
+    defaultColorTokens: heritageDefaultColorTokens,
   },
 };
 
