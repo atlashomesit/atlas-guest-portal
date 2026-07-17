@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import { AxiosError } from 'axios';
+import axios, { AxiosError } from 'axios';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { addDays, nextFriday } from 'date-fns';
@@ -810,5 +810,96 @@ describe('UnitBookingWidget - TASK-4726: URL-hydrated interior-night overlap dis
       const reserve = screen.getByTestId('guest-booking-submit');
       expect(Boolean(dateError) || reserve.hasAttribute('disabled')).toBe(true);
     });
+  });
+});
+
+describe('UnitBookingWidget - TASK-4911: Reserve CTA surfaces inline validation instead of silently no-op-ing on incomplete dates', () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+    availabilityMock.fetch.mockReset();
+    availabilityMock.fetch.mockImplementation(availabilityOk);
+    task4303.booking.checkIn = null;
+    task4303.booking.checkOut = null;
+  });
+
+  const renderWidget = async () => {
+    const { default: UnitBookingWidget } = await import('./UnitBookingWidget');
+    return render(
+      <MemoryRouter>
+        <UnitBookingWidget
+          listingId={7}
+          propertyId={3}
+          listingName="Atlas 501 PH"
+          propertySlug="atlas501-ph"
+          unitSlug="ph"
+        />
+      </MemoryRouter>,
+    );
+  };
+
+  it('clicking Reserve with no dates selected shows "Add a check-in date to continue." and does not start checkout', async () => {
+    const postSpy = vi.spyOn(axios, 'post').mockResolvedValue({ data: {} });
+
+    await renderWidget();
+
+    const reserve = screen.getByTestId('guest-booking-submit');
+    expect(reserve).toBeEnabled(); // TASK-4277: blank dates must not html-disable the CTA
+
+    await act(async () => {
+      fireEvent.click(reserve);
+    });
+
+    const error = await screen.findByTestId('guest-booking-date-error');
+    expect(error.textContent).toContain('Add a check-in date to continue.');
+    expect(error).toHaveAttribute('role', 'alert');
+
+    // Silence, not just a blocked submit, was the bug — assert the checkout call never fired.
+    expect(postSpy).not.toHaveBeenCalled();
+    // Focus moves to the missing (check-in) field instead of leaving the guest stranded.
+    expect(document.activeElement).toBe(document.getElementById('unit-booking-dates'));
+  });
+
+  it('clicking Reserve with only check-in selected shows "Add a check-out date to continue.", focuses check-out, and does not start checkout', async () => {
+    const postSpy = vi.spyOn(axios, 'post').mockResolvedValue({ data: {} });
+
+    await renderWidget();
+
+    // AtlasBookingCalendar is mocked out for this render suite; the widget also listens for the
+    // atlas:set-checkin window event (used by the bottom AvailabilityCalendar, TASK-2630) — the
+    // only available hook here to land the widget in a check-in-only state for this assertion.
+    const checkin = addDays(getIstStartOfDay(new Date()), 5);
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('atlas:set-checkin', { detail: toISODate(checkin) }));
+    });
+
+    const reserve = screen.getByTestId('guest-booking-submit');
+    expect(reserve).toBeEnabled();
+
+    await act(async () => {
+      fireEvent.click(reserve);
+    });
+
+    const error = await screen.findByTestId('guest-booking-date-error');
+    expect(error.textContent).toContain('Add a check-out date to continue.');
+    expect(error).toHaveAttribute('role', 'alert');
+
+    expect(postSpy).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(screen.getByTestId('unit-booking-checkout-cell'));
+  });
+
+  it('the check-in and check-out date cells are aria-described-by the inline error once shown', async () => {
+    await renderWidget();
+
+    const reserve = screen.getByTestId('guest-booking-submit');
+    await act(async () => {
+      fireEvent.click(reserve);
+    });
+
+    const error = await screen.findByTestId('guest-booking-date-error');
+    const errorId = error.getAttribute('id');
+    expect(errorId).toBeTruthy();
+    expect(document.getElementById('unit-booking-dates')).toHaveAttribute('aria-describedby', errorId);
+    expect(screen.getByTestId('unit-booking-checkout-cell')).toHaveAttribute('aria-describedby', errorId);
   });
 });
