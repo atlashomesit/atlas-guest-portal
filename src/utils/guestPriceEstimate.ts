@@ -132,8 +132,9 @@ export function estTotalInclGst(
   const gstMult = gstPct === 18 ? 1.18 : gstPct === 5 ? 1.05 : 1.0;
   const baseTotal = perNight * stayNights;
   const withGst = Math.round(baseTotal * gstMult);
-  // TASK-4302 / TASK-4312: include payment processing fee (3% of base+GST) in the displayed total
-  const convenienceFee = Math.round((withGst * convenienceFeePercent) / 100);
+  // TASK-4302 / TASK-4312: include payment processing fee in the displayed total.
+  // TASK-4913 (founder-ruled 2026-07-17, option c): fee is 3% of BASE only, not base+GST.
+  const convenienceFee = Math.round((baseTotal * convenienceFeePercent) / 100);
   return Math.round(withGst + convenienceFee);
 }
 
