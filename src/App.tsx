@@ -16,19 +16,30 @@ import { trackEvent } from "./utils/analytics"
 import { isAtlastaysMarketplaceSurface, isMarketplaceMode } from "./tenant/tenantResolver"
 import { CITY_LANDING_SLUGS } from "./content/cities/cityLandingSlugs"
 import InternalTenantRobotsMeta from "./components/InternalTenantRobotsMeta"
+// TASK-4903 (ADR-0081): the theme mount point. Sole allowed import of `./themes/registry`
+// outside `src/themes/` itself (ESLint boundary rule, eslint.config.js) — resolves which
+// registered layout theme's Home/PropertyDetails/Gallery/About/Contact pages to render.
+import { getCurrentLayoutThemeId, loadLayoutTheme } from "./themes/registry"
 
-const Home = React.lazy(() => import("./pages/home/Home"))
-const ContactUs = React.lazy(() => import("./pages/contactus/ContactUs"))
-const Homepage_PropertyDetails = React.lazy(() => import("./components/homepage_components/homepage_Propertydetails/Homepage_PropertyDetails"))
+// TASK-4903: the five themed pages (home, listing detail, gallery, about, contact) are
+// resolved from the boot-resolved layout theme's package instead of a fixed page-file path.
+// `getCurrentLayoutThemeId()` is read lazily inside each loader — safe because React only
+// invokes a `React.lazy()` loader on first render, well after `src/main.tsx`'s boot sequence
+// has already called `setCurrentLayoutThemeId()`. Stubbed to "classic" until TASK-4904 lands
+// `effectiveThemeId` server-side — today this resolves identically to the pre-4903 direct
+// imports below (classic re-exports the same page components verbatim).
+const Home = React.lazy(() => loadLayoutTheme(getCurrentLayoutThemeId()).then((mod) => ({ default: mod.Home })))
+const ContactUs = React.lazy(() => loadLayoutTheme(getCurrentLayoutThemeId()).then((mod) => ({ default: mod.Contact })))
+const Homepage_PropertyDetails = React.lazy(() => loadLayoutTheme(getCurrentLayoutThemeId()).then((mod) => ({ default: mod.PropertyDetails })))
+const GalleryPage = React.lazy(() => loadLayoutTheme(getCurrentLayoutThemeId()).then((mod) => ({ default: mod.Gallery })))
+const AboutPage = React.lazy(() => loadLayoutTheme(getCurrentLayoutThemeId()).then((mod) => ({ default: mod.About })))
 const Homepage_LocationDetails = React.lazy(() => import("./components/homepage_components/homepage_locationsdetails/Homepage_LocationDetails"))
 const Policies = React.lazy(() => import("./pages/Policies"))
 const Terms = React.lazy(() => import("./pages/Terms"))
 const PrivacyPage = React.lazy(() => import("./pages/PrivacyPage"))
 const Amenities = React.lazy(() => import("./pages/Amenities"))
 const LocationPage = React.lazy(() => import("./pages/LocationPage"))
-const GalleryPage = React.lazy(() => import("./pages/GalleryPage"))
 const OffersPage = React.lazy(() => import("./pages/OffersPage"))
-const AboutPage = React.lazy(() => import("./pages/AboutPage"))
 const FaqPage = React.lazy(() => import("./pages/FaqPage"))
 const SitemapPage = React.lazy(() => import("./pages/SitemapPage"))
 const BlogHome = React.lazy(() => import("./pages/blog/BlogHome"))

@@ -74,4 +74,37 @@ export default tseslint.config(
       'no-restricted-syntax': 'off',
     },
   },
+  {
+    // TASK-4903 / ADR-0081 amendment 2026-07-17 point 6 — "Theme ≠ integration" HARD RULE
+    // (AGENTS.md): dependency direction is one-way, themes consume the shared library, never
+    // the reverse. No module outside `src/themes/` may import from `src/themes/`, with exactly
+    // one override: the theme mount point (`src/App.tsx`/`src/main.tsx` importing
+    // `src/themes/registry`). Blanket restriction (not an enumerated shared-dir list) so new
+    // `src/` folders are covered by default — only the two mount files and `src/themes/**`
+    // itself (intra-theme imports) are exempted below.
+    files: ['**/*.{ts,tsx}'],
+    // `src/test/setup.ts` is test-lifecycle infrastructure (not production integration code):
+    // it imports registry.ts's `_resetCurrentLayoutThemeIdForTests()` only, the same
+    // reset-between-test-files pattern already used for `tenant/tenantContext`'s
+    // `_resetTenantContextForTests()` — it never reads/depends on theme *content*.
+    ignores: ['src/themes/**', 'src/App.tsx', 'src/main.tsx', 'src/test/setup.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              // Deliberately requires a sub-path segment after "themes/" — a bare "**/themes"
+              // pattern would also match `./themes` in `src/theme/ThemeProvider.tsx` (the
+              // pre-existing, singular `src/theme/` color-preset-option-list module, a
+              // different and unrelated directory this ADR explicitly does not touch).
+              group: ['**/themes/*', '@/themes/*'],
+              message:
+                'Theme boundary (ADR-0081 amendment 2026-07-17 pt.6; AGENTS.md HARD RULE "Theme ≠ integration"): only src/App.tsx and src/main.tsx may import from src/themes/. Theme packages are presentation-only, consumed solely at the mount point — a needed shared-layer change belongs in a separate, theme-agnostic PR.',
+            },
+          ],
+        },
+      ],
+    },
+  },
 )
