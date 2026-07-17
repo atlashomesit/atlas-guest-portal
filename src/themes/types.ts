@@ -34,7 +34,7 @@ export interface LayoutThemeModule {
  * TASK-4914 ("heritage"), TASK-4906 ("noir"), TASK-4907 ("coastal"),
  * TASK-4924 ("editorial"), TASK-4925 ("photoFirst").
  */
-export type LayoutThemeId = "classic" | "heritage" | "noir";
+export type LayoutThemeId = "classic" | "heritage" | "noir" | "coastal";
 
 export interface LayoutThemeDefinition {
   id: LayoutThemeId;
