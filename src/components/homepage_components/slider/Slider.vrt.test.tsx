@@ -54,7 +54,7 @@ describe("Slider VRT snapshots", () => {
     const form = container.querySelector("form");
     expect(form).toBeTruthy();
     expect(form?.className).toMatchInlineSnapshot(
-      `"hero-form w-full max-w-5xl rounded-[24px] bg-[var(--bg-surface)] shadow-[var(--shadow-level-3)] backdrop-blur-sm border border-[var(--border-subtle)] p-8 flex flex-col gap-6"`,
+      `"hero-form w-full rounded-2xl bg-[var(--bg-surface)] shadow-[var(--shadow-level-2)] border border-[var(--border-subtle)] p-4 flex flex-col gap-3"`,
     );
     const primaryCtas = Array.from(form?.querySelectorAll("button") ?? []).map((btn) => btn.textContent?.trim());
     expect(primaryCtas.slice(0, 4)).toMatchInlineSnapshot(`
@@ -74,7 +74,7 @@ describe("Slider VRT snapshots", () => {
     const form = container.querySelector("form");
     expect(form).toBeTruthy();
     expect(form?.className).toMatchInlineSnapshot(
-      `"hero-form w-full max-w-5xl rounded-[24px] bg-[var(--bg-surface)] shadow-[var(--shadow-level-3)] backdrop-blur-sm border border-[var(--border-subtle)] p-8 flex flex-col gap-6"`,
+      `"hero-form w-full rounded-2xl bg-[var(--bg-surface)] shadow-[var(--shadow-level-2)] border border-[var(--border-subtle)] p-4 flex flex-col gap-3"`,
     );
   });
 
@@ -85,7 +85,7 @@ describe("Slider VRT snapshots", () => {
     const form = container.querySelector("form");
     expect(form).toBeTruthy();
     expect(form?.className).toMatchInlineSnapshot(
-      `"hero-form w-full max-w-5xl rounded-[24px] bg-[var(--bg-surface)] shadow-[var(--shadow-level-3)] backdrop-blur-sm border border-[var(--border-subtle)] p-8 flex flex-col gap-6"`,
+      `"hero-form w-full rounded-2xl bg-[var(--bg-surface)] shadow-[var(--shadow-level-2)] border border-[var(--border-subtle)] p-4 flex flex-col gap-3"`,
     );
   });
 });

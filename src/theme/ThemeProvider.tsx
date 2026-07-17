@@ -81,8 +81,9 @@ const DevThemeSwitcher: React.FC<DevThemeSwitcherProps> = ({ theme, onChange }) 
       style={{
         position: "fixed",
         bottom: "16px",
-        right: "16px",
-        zIndex: 9999,
+        left: "16px",
+        right: "auto",
+        zIndex: 40,
         padding: "10px 12px",
         borderRadius: "12px",
         background: "var(--bg-surface)",
@@ -96,6 +97,7 @@ const DevThemeSwitcher: React.FC<DevThemeSwitcherProps> = ({ theme, onChange }) 
       <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>Theme</span>
       <select
         value={theme}
+        aria-label="Select theme"
         onChange={(e) => onChange(isThemeName(e.target.value) ? e.target.value : DEFAULT_THEME)}
         style={{
           background: "transparent",

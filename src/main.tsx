@@ -153,7 +153,7 @@ const bootstrapApp = async () => {
     await new Promise(resolve => setTimeout(resolve, 100));
 
     root.render(
-      <ThemeProvider initialTheme={DEFAULT_THEME}>
+      <ThemeProvider initialTheme={DEFAULT_THEME} enableDevSwitcher>
         <ErrorBoundary name="app-shell">
           <TenantJsonLd />
           <ApiConfigGuard>

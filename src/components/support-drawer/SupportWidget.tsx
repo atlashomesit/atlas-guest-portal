@@ -16,7 +16,7 @@ import SupportDrawer, { useSupportDrawerView } from "./SupportDrawer";
 import SupportWidgetTrigger from "./SupportWidgetTrigger";
 import { CallbackStatus, SupportAnalyticsMetadata } from "./supportDrawer.types";
 
-const SCROLL_BUFFER_PX = 200;
+const SCROLL_BUFFER_PX = 320;
 const DISMISS_KEY = "supportDrawer:dismissed";
 
 const SupportWidgetContent = () => {
@@ -96,7 +96,7 @@ const SupportWidgetContent = () => {
       const doc = document.documentElement;
       const scrollBottom = window.scrollY + window.innerHeight;
       const distanceToBottom = doc.scrollHeight - scrollBottom;
-      setFooterOffset(distanceToBottom < SCROLL_BUFFER_PX ? 72 : 0);
+      setFooterOffset(distanceToBottom < SCROLL_BUFFER_PX ? 120 : 0);
     };
 
     updateOffset();

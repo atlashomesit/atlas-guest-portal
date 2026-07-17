@@ -21,6 +21,7 @@ import {
 import { useBooking } from "../../contexts/BookingContext";
 import { useLocation } from "react-router-dom";
 import FaqHighlights from "../../components/faq/FaqHighlights";
+import WaveDivider from "../../components/ui/WaveDivider";
 import pricingConfig from "../../config/pricing.config";
 import { getEffectiveDiscountPercent } from "../../utils/pricing";
 import { getPublicSiteOrigin } from "../../config/siteOrigin";
@@ -79,7 +80,7 @@ const Home = () => {
     const hideAtlasBranding = shouldHideAtlasBranding(tenant, overrides);
     /** CPO-001 / SEO: never emit a wrong hardcoded brand in JSON-LD — use resolved tenant or marketplace baseline. */
     const schemaBrandName = getTenantBrandName();
-    const schemaLogo = overrides.hideLogo ? undefined : sanitizeGuestImageUrl(tenant?.logoUrl) ?? LOGO_URL;
+    const schemaLogo = overrides.hideLogo ? undefined : sanitizeGuestImageUrl(overrides.logoUrl ?? tenant?.logoUrl) ?? LOGO_URL;
     const contactEmail = getContactEmail();
     const penthouse = propertyData.find((property) => property.id === 501);
     const room101Cover = sanitizeGuestImageUrl(propertyData.find((property) => property.id === 101)?.property_img?.[0]);
@@ -278,33 +279,70 @@ const Home = () => {
                 <div className="w-full h-fit relative ">
                     <Slider />
                 </div>
+                <WaveDivider tone="coral" className="px-[5%] md:px-[12%] -mt-1" />
                 <AtlasNeighbourhoodRibbon />
                 <div>
                     <HomePage_Locations />
                 </div>
+
+                {/* A note from your host — lavender callout panel (Theem mockup §host-note) */}
+                <section
+                    aria-labelledby="host-note-heading"
+                    className="px-4 sm:px-6 lg:px-8 py-10 md:py-14"
+                    style={{ background: 'var(--bg-primary, #fff8e7)' }}
+                >
+                    <div
+                        className="max-w-6xl mx-auto rounded-2xl px-6 py-7 md:px-10 md:py-9"
+                        style={{
+                            background: 'var(--lavender-soft, #f0eafd)',
+                            borderLeft: '4px solid var(--lavender-deep, #8e7cc3)',
+                        }}
+                    >
+                        <p
+                            id="host-note-heading"
+                            className="text-xs font-semibold uppercase tracking-[0.18em] mb-3"
+                            style={{ color: 'var(--lavender-text, #6f5aa8)' }}
+                        >
+                            A note from your host
+                        </p>
+                        <blockquote
+                            className="text-xl md:text-2xl leading-relaxed text-text-primary"
+                            style={{ fontFamily: 'var(--font-family-display)' }}
+                        >
+                            "Every home on this page is one we clean, restock, and hand over
+                            ourselves. Arrive, settle in, and let us take care of the rest —
+                            we're just down the street if you need us."
+                        </blockquote>
+                        <p className="mt-3 text-sm text-text-muted">— The {schemaBrandName} host team</p>
+                    </div>
+                </section>
+
+                <WaveDivider tone="lavender" className="px-[8%] md:px-[18%]" />
                 <AtlasNeighbourhoodRibbon variant="closer" />
 
-                {/* Why-direct 3-pillar strip — Home v2 design §5 */}
+                {/* Why-direct 3-pillar strip — tighter, centred columns (layout fix from screen 2) */}
                 <section
-                    className="border-t border-b border-border-subtle mt-0"
-                    style={{ background: 'var(--bg-secondary, #f9f6f2)' }}
+                    className="mt-0"
+                    style={{ background: 'var(--bg-secondary, #fdf2e9)' }}
                     aria-labelledby="why-direct-heading"
                 >
-                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+                    <WaveDivider tone="coral" className="opacity-80" />
+                    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-14">
                         <h2 id="why-direct-heading" className="sr-only">Why book direct</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
-                            {WHY_DIRECT_ITEMS.map((item) => (
-                                <div key={item.heading} className="flex flex-col gap-3">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-10">
+                            {WHY_DIRECT_ITEMS.map((item, index) => (
+                                <div key={item.heading} className="flex flex-col items-center text-center gap-3 max-w-xs mx-auto">
+                                    {/* Bare alternating coral/lavender icons — trust strip per Theem mockups */}
                                     <span
-                                        className="inline-flex items-center justify-center w-11 h-11 rounded-xl border border-border-subtle"
-                                        style={{ background: '#fff', color: 'var(--brand-primary, #ea580c)' }}
+                                        className="inline-flex items-center justify-center w-12 h-12"
+                                        style={{ color: index % 2 === 1 ? 'var(--lavender-deep, #8e7cc3)' : 'var(--brand-accent, #f08c71)' }}
                                         aria-hidden="true"
                                     >
                                         {item.icon}
                                     </span>
                                     <h3
-                                        className="text-2xl font-medium text-text-primary"
-                                        style={{ fontFamily: 'var(--font-family-display)', letterSpacing: '-0.005em', lineHeight: '1.15' }}
+                                        className="text-xl md:text-2xl font-medium text-text-primary"
+                                        style={{ fontFamily: 'var(--font-family-display)', letterSpacing: '-0.005em', lineHeight: '1.2' }}
                                     >
                                         {item.heading}
                                     </h3>
@@ -313,20 +351,24 @@ const Home = () => {
                             ))}
                         </div>
                     </div>
+                    <WaveDivider tone="lavender" flip />
                 </section>
 
                 <div className="">
                     <ServicesSection />
                 </div>
-                <div className="px-4 lg:px-20 py-8">
+                <WaveDivider tone="coral" className="px-[10%]" />
+                <div className="px-4 lg:px-20 py-10 md:py-12" style={{ background: 'var(--bg-primary, #fff8e7)' }}>
                     <FaqHighlights />
                 </div>
+                <WaveDivider tone="lavender" className="px-[10%]" />
                 <div className="">
                     <TestimonialsSection />
                 </div>
                 {enableFooterMiniCtaAboveFooter && (
                     <FooterCtaStrip />
                 )}
+                <WaveDivider tone="cream" className="px-[6%]" />
             </section>
         </>
     );

@@ -17,7 +17,9 @@ import { LANGUAGE_SWITCHER_ENABLED } from '../../../i18n/i18n'; // TASK-4517
 const Navbar = () => {
   const tenant = getTenantContext();
   const overrides = getTenantOverrides(tenant?.slug);
-  const logoSrc = tenant?.logoUrl ?? LOGO_URL;
+  // Repo-shipped per-tenant artwork (overrides.logoUrl) wins over the API logo;
+  // both fall back to the brand-neutral placeholder for logo-less tenants.
+  const logoSrc = overrides.logoUrl ?? tenant?.logoUrl ?? LOGO_URL;
   // RA-006 §3.5: prefer tenant name everywhere; only fall back to "Home" on the Atlas root.
   const brandName = getTenantBrandName();
   const showLogo = !overrides.hideLogo;
@@ -206,19 +208,22 @@ const Navbar = () => {
 
         {/* LEFT - Logo and Mobile Menu Button */}
         <div className="flex items-center justify-between w-full lg:w-auto">
-          <Link to="/" className="flex items-center gap-2">
+          <Link to="/" className="flex items-center gap-2 navbar-brand-link">
             {showLogo && (
               <img
                 src={logoSrc}
                 alt={brandName || "Site logo"}
-                className="navbar-logo"
+                className={`navbar-logo${logoSrc.includes("stay-bycityfocus") ? " navbar-logo--wordmark" : ""}`}
                 loading="eager"
                 decoding="async"
-                width={48}
-                height={48}
+                width={logoSrc.includes("stay-bycityfocus") ? 52 : 48}
+                height={logoSrc.includes("stay-bycityfocus") ? 48 : 48}
               />
             )}
-            {brandName ? <span className="navbar-logo-text">{brandName}</span> : null}
+            {/* Wordmark logos already include the brand name — hide duplicate text */}
+            {brandName && !logoSrc.includes("stay-bycityfocus") ? (
+              <span className="navbar-logo-text">{brandName}</span>
+            ) : null}
           </Link>
 
           {/* Mobile Menu Button - Only visible on mobile */}

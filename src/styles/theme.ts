@@ -1,7 +1,7 @@
 export const themeRegistry = {
   default: { 
-    label: "Premium Platinum",
-    description: "Refined platinum palette for everyday elegance"
+    label: "Sandstone Coral",
+    description: "Cream, coral peach & soft lavender — light heritage stay skin"
   },
   privateIslandNoir: {
     label: "Private Island Noir",
@@ -28,6 +28,26 @@ export const themeRegistry = {
     label: "Aurora Champagne",
     description: "Dreamy champagne penthouse sunrise with glassy glow",
     category: "Premium"
+  },
+  sunriseCoral: {
+    label: "Sunrise Coral",
+    description: "Light peach sunrise with vibrant coral accents",
+    category: "Light Vibrant"
+  },
+  oceanLuxury: {
+    label: "Ocean Luxury",
+    description: "Airy aqua blues for coastal stays",
+    category: "Light Vibrant"
+  },
+  emeraldOasis: {
+    label: "Emerald Oasis",
+    description: "Fresh mint greens on soft light grounds",
+    category: "Light Vibrant"
+  },
+  royalViolet: {
+    label: "Royal Violet",
+    description: "Soft lilac washes with vivid violet accents",
+    category: "Light Vibrant"
   },
   valentine: { 
     label: "Romantic Rose",

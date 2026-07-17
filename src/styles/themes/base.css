@@ -17,6 +17,11 @@ html {
   --line-height-relaxed: 1.75;
   --text-contrast: #ffffff;
   --text-on-hero: #ffffff;
+  /* Text-role accent fallbacks — WCAG AA (>=4.5:1 on light surface tints).
+     Every theme SHOULD override with its own brand-matched passing values;
+     these defaults keep small accent TEXT readable in themes that haven't. */
+  --accent-text: #a84832;
+  --lavender-text: #6f5aa8;
   /* Fluid type scale for luxury hierarchy */
   --text-hero: clamp(3.25rem, 8vw, 6rem);
   --text-h2: clamp(2rem, 5vw, 3.5rem);

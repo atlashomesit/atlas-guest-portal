@@ -7,6 +7,7 @@ import OwnerShareBadge from "../OwnerShareBadge"; // TASK-1705
 import { useCurrency } from "../../contexts/CurrencyContext";
 import { useBooking } from "../../contexts/BookingContext";
 import { estTotalInclGst, estimateStayNights, formatEstTotalInclGst } from "../../utils/guestPriceEstimate";
+import { getPropertyDesignImage } from "../../config/branding";
 
 type ListingCardProps = {
   id: string;
@@ -176,7 +177,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
     >
       <div className="relative h-56 w-full overflow-hidden">
         <OptimizedImage
-          src={image}
+          src={image?.trim() ? image : getPropertyDesignImage(id)}
           alt={name}
           className="h-full w-full object-cover transition duration-200 md:group-hover:scale-105"
           wrapperClassName="h-full"

@@ -117,7 +117,7 @@ export default function GuestLoginPage() {
                   style={{
                     width: '100%',
                     padding: '0.75rem',
-                    backgroundColor: isLoading ? '#9ca3af' : '#ea580c',
+                    backgroundColor: isLoading ? '#b8a89f' : 'var(--cta-primary, #c45a3f)',
                     color: 'white',
                     border: 'none',
                     borderRadius: '6px',
@@ -160,7 +160,7 @@ export default function GuestLoginPage() {
                   style={{
                     width: '100%',
                     padding: '0.75rem',
-                    backgroundColor: isLoading || otp.length !== 6 ? '#9ca3af' : '#ea580c',
+                    backgroundColor: isLoading || otp.length !== 6 ? '#b8a89f' : 'var(--cta-primary, #c45a3f)',
                     color: 'white',
                     border: 'none',
                     borderRadius: '6px',
@@ -184,8 +184,8 @@ export default function GuestLoginPage() {
                     marginTop: '1rem',
                     padding: '0.75rem',
                     backgroundColor: 'transparent',
-                    color: '#ea580c',
-                    border: '1px solid #ea580c',
+                    color: 'var(--cta-primary, #c45a3f)',
+                    border: '1px solid var(--cta-primary, #c45a3f)',
                     borderRadius: '6px',
                     fontSize: '1rem',
                     fontWeight: '600',

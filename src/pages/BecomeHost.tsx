@@ -90,8 +90,8 @@ const stepLabels = ["Contact", "Property", "Import & Confirm"];
 const styles = {
   page: {
     minHeight: "100vh",
-    background: "linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)",
-    paddingTop: 100,
+    background: "var(--gradient-hero, linear-gradient(135deg, #fff8e7 0%, #ffe4d6 45%, #f2e1eb 100%))",
+    paddingTop: 40,
     paddingBottom: 60,
   } as React.CSSProperties,
   container: {
@@ -127,15 +127,15 @@ const styles = {
     background: active
       ? "var(--cta-primary, #2563eb)"
       : completed
-        ? "#22c55e"
-        : "#e2e8f0",
+        ? "#157046"
+        : "#f0e6dc",
     transition: "all 0.3s ease",
   }),
   stepLine: (completed: boolean): React.CSSProperties => ({
     width: 40,
     height: 3,
     borderRadius: 2,
-    background: completed ? "#22c55e" : "#e2e8f0",
+    background: completed ? "#157046" : "#f0e6dc",
     alignSelf: "center",
     transition: "background 0.3s ease",
   }),
@@ -172,7 +172,7 @@ const styles = {
     display: "flex",
     justifyContent: "space-between",
     padding: "6px 0",
-    borderBottom: "1px solid #e2e8f0",
+    borderBottom: "1px solid var(--border-subtle, #f0ddd0)",
     fontSize: 14,
   } as React.CSSProperties,
   successBox: {
@@ -517,7 +517,7 @@ const BecomeHost = () => {
         </h1>
         <p
           className="mt-4 text-lg"
-          style={{ color: "#64748b", maxWidth: 560, margin: "16px auto 0" }}
+          style={{ color: "var(--text-muted, #6b5a55)", maxWidth: 560, margin: "16px auto 0" }}
         >
           {pmsLabel} gives you the tools to manage guest bookings, pricing, and
           channels — so you earn more while staying in control.
@@ -568,7 +568,7 @@ const BecomeHost = () => {
           >
             How much could you earn?
           </h2>
-          <p className="text-base mb-6" style={{ color: "#64748b" }}>
+          <p className="text-base mb-6" style={{ color: "var(--text-muted, #6b5a55)" }}>
             Properties in your area earn{" "}
             <strong style={{ color: "var(--cta-primary, #2563eb)" }}>
               ₹45,000 – ₹1,20,000/month
@@ -576,7 +576,7 @@ const BecomeHost = () => {
           </p>
           <label
             className="block text-base font-medium mb-2"
-            style={{ color: "#475569" }}
+            style={{ color: "var(--text-muted, #6b5a55)" }}
           >
             Number of rooms: <strong>{estimatorRooms}</strong>
           </label>
@@ -588,11 +588,11 @@ const BecomeHost = () => {
             onChange={(e) => setEstimatorRooms(Number(e.target.value))}
             aria-label="Number of rooms"
             aria-valuetext={`${estimatorRooms} ${estimatorRooms === 1 ? "room" : "rooms"}`}
-            className="w-full accent-blue-600"
+            className="w-full accent-[#c45a3f]"
           />
           <div
             className="flex justify-between text-base mt-1 mb-4"
-            style={{ color: "#64748b" }}
+            style={{ color: "var(--text-muted, #6b5a55)" }}
           >
             <span>1 room</span>
             <span>10 rooms</span>
@@ -600,12 +600,12 @@ const BecomeHost = () => {
           <div
             className="rounded-xl p-4"
             style={{
-              background: "linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)",
+              background: "linear-gradient(135deg, #ffe4d6 0%, #f0eafd 100%)",
             }}
             aria-live="polite"
             aria-atomic="true"
           >
-            <p className="text-base" style={{ color: "#475569" }}>
+            <p className="text-base" style={{ color: "var(--text-muted, #6b5a55)" }}>
               Estimated monthly earnings
             </p>
             <p
@@ -614,7 +614,7 @@ const BecomeHost = () => {
             >
               ₹{formatINR(estimatorRooms * 15000)} – ₹{formatINR(estimatorRooms * 40000)}
             </p>
-            <p className="text-base mt-2" style={{ color: "#64748b" }}>
+            <p className="text-base mt-2" style={{ color: "var(--text-muted, #6b5a55)" }}>
               Based on average occupancy for properties using {pmsLabel}
             </p>
           </div>
@@ -637,17 +637,17 @@ const BecomeHost = () => {
             >
               DIY vs {pmsLabel} Software
             </h2>
-            <p className="text-sm mt-1" style={{ color: "#64748b" }}>
+            <p className="text-sm mt-1" style={{ color: "var(--text-muted, #6b5a55)" }}>
               See what you get with {pmsLabel} software
             </p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr style={{ borderBottom: "2px solid #e2e8f0" }}>
+                <tr style={{ borderBottom: "2px solid var(--border-strong, #e5cfc0)" }}>
                   <th
                     className="text-left p-3 pl-6 font-semibold"
-                    style={{ color: "#475569" }}
+                    style={{ color: "var(--text-muted, #6b5a55)" }}
                   >
                     Feature
                   </th>
@@ -672,7 +672,7 @@ const BecomeHost = () => {
                     style={{
                       borderBottom:
                         i < COMPARISON_FEATURES.length - 1
-                          ? "1px solid #f1f5f9"
+                          ? "1px solid var(--border-subtle, #f0ddd0)"
                           : "none",
                     }}
                   >
@@ -690,7 +690,7 @@ const BecomeHost = () => {
                     </td>
                     <td
                       className="p-3 pr-6 text-center font-semibold"
-                      style={{ color: "#16a34a" }}
+                      style={{ color: "#157046" }}
                     >
                       ✓ {row.atlas}
                     </td>
@@ -722,13 +722,13 @@ const BecomeHost = () => {
             >
               <p
                 className="text-sm leading-relaxed flex-1"
-                style={{ color: "#475569" }}
+                style={{ color: "var(--text-muted, #6b5a55)" }}
               >
                 &ldquo;{t.quote}&rdquo;
               </p>
               <div
                 className="mt-4 pt-3"
-                style={{ borderTop: "1px solid #f1f5f9" }}
+                style={{ borderTop: "1px solid var(--border-subtle, #f0ddd0)" }}
               >
                 <p
                   className="font-semibold text-sm"
@@ -1034,7 +1034,7 @@ const BecomeHost = () => {
                   </Typography>
                   {Object.entries(airbnb.prefilled).map(([key, val]) => (
                     <div key={key} style={styles.prefillItem}>
-                      <span style={{ color: "#64748b", textTransform: "capitalize" }}>
+                      <span style={{ color: "var(--text-muted, #6b5a55)", textTransform: "capitalize" }}>
                         {key.replace(/([A-Z])/g, " $1")}
                       </span>
                       <span style={{ fontWeight: 600 }}>{String(val)}</span>
@@ -1046,7 +1046,7 @@ const BecomeHost = () => {
               <hr
                 style={{
                   border: "none",
-                  borderTop: "1px solid #e2e8f0",
+                  borderTop: "1px solid var(--border-subtle, #f0ddd0)",
                   margin: "20px 0",
                 }}
               />
@@ -1061,35 +1061,35 @@ const BecomeHost = () => {
                 }}
               >
                 <div>
-                  <span style={{ color: "#64748b" }}>Name</span>
+                  <span style={{ color: "var(--text-muted, #6b5a55)" }}>Name</span>
                   <p style={{ fontWeight: 600 }}>{contact.displayName}</p>
                 </div>
                 <div>
-                  <span style={{ color: "#64748b" }}>Email</span>
+                  <span style={{ color: "var(--text-muted, #6b5a55)" }}>Email</span>
                   <p style={{ fontWeight: 600 }}>{contact.email}</p>
                 </div>
                 <div>
-                  <span style={{ color: "#64748b" }}>Phone</span>
+                  <span style={{ color: "var(--text-muted, #6b5a55)" }}>Phone</span>
                   <p style={{ fontWeight: 600 }}>{contact.phone}</p>
                 </div>
                 <div>
-                  <span style={{ color: "#64748b" }}>Type</span>
+                  <span style={{ color: "var(--text-muted, #6b5a55)" }}>Type</span>
                   <p style={{ fontWeight: 600 }}>{property.propertyType}</p>
                 </div>
                 <div>
-                  <span style={{ color: "#64748b" }}>City</span>
+                  <span style={{ color: "var(--text-muted, #6b5a55)" }}>City</span>
                   <p style={{ fontWeight: 600 }}>{property.city}</p>
                 </div>
                 <div>
-                  <span style={{ color: "#64748b" }}>Pincode</span>
+                  <span style={{ color: "var(--text-muted, #6b5a55)" }}>Pincode</span>
                   <p style={{ fontWeight: 600 }}>{property.pincode}</p>
                 </div>
                 <div style={{ gridColumn: "1 / -1" }}>
-                  <span style={{ color: "#64748b" }}>Address</span>
+                  <span style={{ color: "var(--text-muted, #6b5a55)" }}>Address</span>
                   <p style={{ fontWeight: 600 }}>{property.address}</p>
                 </div>
                 <div>
-                  <span style={{ color: "#64748b" }}>Rooms</span>
+                  <span style={{ color: "var(--text-muted, #6b5a55)" }}>Rooms</span>
                   <p style={{ fontWeight: 600 }}>{property.roomCount}</p>
                 </div>
               </div>

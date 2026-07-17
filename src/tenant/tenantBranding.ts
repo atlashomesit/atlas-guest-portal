@@ -6,6 +6,7 @@
 
 import type { TenantInfo } from './tenantContext';
 import { MARKETPLACE_BRAND_BASELINE } from './displayBrand';
+import { getTenantOverrides } from './tenantOverrides';
 
 let manifestObjectUrl: string | null = null;
 
@@ -64,20 +65,26 @@ export function applyTenantBranding(tenant: TenantInfo): void {
     }
   }
 
+  // Repo-shipped per-tenant brand assets (tenantOverrides.ts) win over API values
+  // so same-origin artwork stays pixel-exact for that slug only.
+  const overrides = getTenantOverrides(tenant.slug);
+
   // 3a. Logo URL — set as CSS variable for components that reference it
-  if (tenant.logoUrl) {
-    document.documentElement.style.setProperty('--brand-logo-url', `url("${tenant.logoUrl}")`);
+  const logoUrl = overrides.logoUrl ?? tenant.logoUrl;
+  if (logoUrl) {
+    document.documentElement.style.setProperty('--brand-logo-url', `url("${logoUrl}")`);
   }
 
   // 4. Favicon
-  if (tenant.faviconUrl) {
+  const faviconUrl = overrides.faviconUrl ?? tenant.faviconUrl;
+  if (faviconUrl) {
     let link = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
     if (!link) {
       link = document.createElement('link');
       link.rel = 'icon';
       document.head.appendChild(link);
     }
-    link.href = tenant.faviconUrl;
+    link.href = faviconUrl;
   }
 
   applyTenantWebManifest(tenant);
