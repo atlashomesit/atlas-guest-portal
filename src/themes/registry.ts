@@ -13,6 +13,7 @@
  */
 import type { LayoutThemeDefinition, LayoutThemeId, LayoutThemeModule } from "./types";
 import { heritageDefaultColorTokens } from "./heritage/defaultColorTokens";
+import { noirDefaultColorTokens } from "./noir/defaultColorTokens";
 import { coastalDefaultColorTokens } from "./coastal/defaultColorTokens";
 
 export const DEFAULT_LAYOUT_THEME_ID: LayoutThemeId = "classic";
@@ -60,6 +61,25 @@ export const themeRegistry: Record<LayoutThemeId, LayoutThemeDefinition> = {
     // to look coherent against heritage's warmer, deeper palette.
     supportedColorPresets: [],
     defaultColorTokens: heritageDefaultColorTokens,
+  },
+  noir: {
+    id: "noir",
+    label: "Dark Luxury Noir",
+    description:
+      "Nocturnal palette, gold accents, full-bleed imagery, minimal chrome — a moodier, " +
+      "high-end night-stay register (TASK-4906, ADR-0081 D8).",
+    load: () => import("./noir"),
+    // ADR-0081 D6 curated matrix — the founder-approved list for noir explicitly names
+    // privateIslandNoir/emeraldDynasty (epic §3.1) as coherent dark/jewel-toned presets;
+    // both verified dark (bg-primary #0b0c10 / #04120b), gold-accented, and AA-passing
+    // (>=6.3:1 on every text/bg pair actually rendered — see defaultColorTokens.ts's
+    // in-line contrast table for noir's own default palette, computed the same way).
+    // Light presets (jetsetPearl, loversRetreatBlush, auroraChampagne, the seasonal trio —
+    // all light-background per their own CSS) read as mismatched against noir's dark
+    // register and are deliberately left undeclared, same reasoning `classic`'s comment
+    // above applies in reverse.
+    supportedColorPresets: ["privateIslandNoir", "emeraldDynasty"],
+    defaultColorTokens: noirDefaultColorTokens,
   },
   coastal: {
     id: "coastal",
