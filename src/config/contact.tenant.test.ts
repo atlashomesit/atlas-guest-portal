@@ -188,3 +188,56 @@ describe("white-label tenant (isCustomDomain true) — no Atlas defaults must le
     expect(isWhiteLabelTenant()).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// TASK-4899: Neutral-mode tenant reached via a non-custom-domain host (e.g. before its
+// own subdomain/DNS is cut over) must ALSO be treated as white-label — isCustomDomain
+// alone under-covers this case. Additive, undefined-safe: never fires until atlas-api
+// ships TenantFromDomainDto.GuestCommsBrandingMode.
+// ---------------------------------------------------------------------------
+describe("TASK-4899: Neutral-mode tenant on a non-custom-domain host — no Atlas defaults must leak", () => {
+  it("isWhiteLabelTenant is true for a Neutral-mode tenant even when isCustomDomain is false", () => {
+    ovr.mockReturnValue({});
+    ctx.mockReturnValue(
+      tenant({
+        slug: "new-neutral-tenant",
+        guestCommsBrandingMode: "Neutral",
+        legalContactPack: { isCustomDomain: false, showAtlasFooterCredit: false },
+      }),
+    );
+    expect(isWhiteLabelTenant()).toBe(true);
+  });
+
+  it("getContactPhone / getContactEmail omit rather than leak the Atlas default for that tenant", () => {
+    ovr.mockReturnValue({});
+    ctx.mockReturnValue(
+      tenant({
+        slug: "new-neutral-tenant",
+        guestCommsBrandingMode: "Neutral",
+        legalContactPack: { isCustomDomain: false, showAtlasFooterCredit: false },
+      }),
+    );
+    expect(getContactPhone("business")).toBe("");
+    expect(getContactEmail()).toBe("");
+  });
+
+  it("Platform-mode regression: guestCommsBrandingMode='Platform' on a non-custom-domain host still gets Atlas defaults", () => {
+    ovr.mockReturnValue({});
+    ctx.mockReturnValue(
+      tenant({
+        slug: "atlas",
+        guestCommsBrandingMode: "Platform",
+        legalContactPack: { isCustomDomain: false, showAtlasFooterCredit: true },
+      }),
+    );
+    expect(isWhiteLabelTenant()).toBe(false);
+    expect(getContactPhone("business")).toBe(ATLAS_DEFAULT);
+  });
+
+  it("API-gap regression: guestCommsBrandingMode undefined on a non-custom-domain host is unchanged from today", () => {
+    ovr.mockReturnValue({});
+    ctx.mockReturnValue(tenant({ slug: "atlas" }));
+    expect(isWhiteLabelTenant()).toBe(false);
+    expect(getContactPhone("business")).toBe(ATLAS_DEFAULT);
+  });
+});

@@ -92,6 +92,18 @@ export interface TenantInfo {
    * `TenantFromDomainDto.EffectiveColorPresetId`.
    */
   effectiveColorPresetId?: string | null;
+  /**
+   * TASK-4899 (epic `guest-comms-neutral-branding.md` §3.6, backed by TASK-4894's
+   * `TenantProfile.GuestCommsBrandingMode` column): `"Neutral"` for every tenant except
+   * Atlas's own (`TenantId=1`, `"Platform"`) — governs whether an unconfigured-branding
+   * fallback may render an Atlas mark (see `tenant/displayBrand.ts`'s `isNeutralBrandingMode()`).
+   * **Undefined today** — as of this task, `GET /tenants/from-domain` does not yet emit this
+   * field (verified by reading `TenantsController.GetFromDomain`'s `TenantFromDomainDto`
+   * construction; see this task's PR for the exact finding). Every consumer of this field
+   * must treat `undefined` as "not Neutral" (today's rendering), never as "assume Neutral" —
+   * that is the safe direction until the API ships the field.
+   */
+  guestCommsBrandingMode?: 'Platform' | 'Neutral';
 }
 
 /** RA-006 §3.5: legal/contact identity returned by /tenants/from-domain.LegalContactPack. */
@@ -273,6 +285,12 @@ export async function resolveFromDomain(apiBaseUrl: string, domain: string): Pro
       effectiveColorPresetId:
         typeof data.effectiveColorPresetId === 'string' || data.effectiveColorPresetId === null
           ? data.effectiveColorPresetId
+          : undefined,
+      // TASK-4899: defensive read — absent/unrecognized value stays undefined (never assumed
+      // Neutral) until atlas-api ships TenantFromDomainDto.GuestCommsBrandingMode.
+      guestCommsBrandingMode:
+        data.guestCommsBrandingMode === 'Platform' || data.guestCommsBrandingMode === 'Neutral'
+          ? data.guestCommsBrandingMode
           : undefined,
     };
     return tenantInfo;

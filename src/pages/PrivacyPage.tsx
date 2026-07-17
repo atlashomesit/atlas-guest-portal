@@ -8,7 +8,7 @@ import { privacyMetadata, privacySections } from "../content/legal/privacy";
 import { CONTACT } from "../config/contact";
 import { buildWaLink, defaultPrefill } from "../utils/whatsapp";
 import { resetCookieConsent } from "../utils/cookieConsent";
-import { MARKETPLACE_BRAND_BASELINE } from "../tenant/displayBrand";
+import { MARKETPLACE_BRAND_BASELINE, getTenantBrandName } from "../tenant/displayBrand";
 import { getTenantContext } from "../tenant/tenantContext";
 
 /**
@@ -35,13 +35,21 @@ const PrivacyPage = () => {
   // Build the active legal pack from server-provided values, falling back to the
   // Baseline notice names MARKETPLACE_BRAND_BASELINE. Empty/missing fields can't be
   // substituted in — we keep the baseline string so guests don't see a blank.
+  // TASK-4899: `legalName`'s no-legalContactPack fallback goes through getTenantBrandName()
+  // (not the hardcoded `privacyMetadata.dataFiduciary`/"Atlastays" baseline) so a Neutral-mode
+  // tenant with zero configured branding shows generic/property-only copy here too, matching
+  // every other guest-portal surface's fallback — `shareDomain` derives from that same
+  // resolved name for the same reason. Platform mode (Atlas's own tenant) is unaffected: its
+  // `legalContactPack.legalName` is configured, so this fallback path is never exercised, and
+  // even if it were, getTenantBrandName()'s own fallback is the identical "Atlastays" baseline.
   const tenant = getTenantContext();
   const pack = useMemo(() => {
     const lp = tenant?.legalContactPack;
+    const legalName = lp?.legalName?.trim() || getTenantBrandName();
     return {
-      legalName: lp?.legalName?.trim() || privacyMetadata.dataFiduciary,
+      legalName,
       contactEmail: lp?.contactEmail?.trim() || privacyMetadata.grievanceOfficer.email,
-      shareDomain: (lp?.legalName ? `${lp.legalName.toLowerCase().replace(/[^a-z0-9]+/g, '')}.com` : 'atlashomestays.com'),
+      shareDomain: `${legalName.toLowerCase().replace(/[^a-z0-9]+/g, '')}.com`,
       grievanceName: privacyMetadata.grievanceOfficer.name, // not yet on the server pack
       grievancePhone: lp?.contactPhone?.trim() || privacyMetadata.grievanceOfficer.phone,
     };

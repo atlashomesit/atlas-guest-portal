@@ -5,10 +5,20 @@
  */
 
 import type { TenantInfo } from './tenantContext';
-import { MARKETPLACE_BRAND_BASELINE } from './displayBrand';
+import { MARKETPLACE_BRAND_BASELINE, NEUTRAL_NO_BRAND_FALLBACK } from './displayBrand';
 import { getTenantOverrides } from './tenantOverrides';
 
 let manifestObjectUrl: string | null = null;
+
+/**
+ * TASK-4899: brand-neutral fallback for document title / apple-mobile-web-app-title /
+ * PWA manifest name when a tenant has no `brandName`/`name` at all. A `Neutral`-mode tenant
+ * gets the generic property-only fallback; every other tenant (Platform mode, or a tenant
+ * whose Neutral status the API hasn't shipped yet) keeps today's `MARKETPLACE_BRAND_BASELINE`.
+ */
+function resolveNoBrandFallback(tenant: TenantInfo): string {
+  return tenant.guestCommsBrandingMode === 'Neutral' ? NEUTRAL_NO_BRAND_FALLBACK : MARKETPLACE_BRAND_BASELINE;
+}
 
 /** Rejects non-hex brand strings from the API so CSS variables are never injected with arbitrary values. */
 function isSafeBrandHex(value: string): boolean {
@@ -44,7 +54,7 @@ function darkenRgb(rgb: string, amount = 20): string {
 
 export function applyTenantBranding(tenant: TenantInfo): void {
   // 1. Document title — prefer guest-facing brandName over internal slug/name (CPO-001)
-  const docTitle = (tenant.brandName?.trim() || tenant.name?.trim() || MARKETPLACE_BRAND_BASELINE);
+  const docTitle = (tenant.brandName?.trim() || tenant.name?.trim() || resolveNoBrandFallback(tenant));
   document.title = docTitle;
 
   // 2. Primary color — apply to CSS RGB variables used by Tailwind and CSS custom props
@@ -93,7 +103,7 @@ export function applyTenantBranding(tenant: TenantInfo): void {
 
 function applyAppleWebAppTitle(tenant: TenantInfo): void {
   const short =
-    tenant.brandName?.trim() || tenant.name?.trim() || MARKETPLACE_BRAND_BASELINE;
+    tenant.brandName?.trim() || tenant.name?.trim() || resolveNoBrandFallback(tenant);
   const appleTitle = short.length > 12 ? short.slice(0, 12) : short;
   let meta = document.querySelector<HTMLMetaElement>('meta[name="apple-mobile-web-app-title"]');
   if (!meta) {
@@ -109,7 +119,7 @@ function applyTenantWebManifest(tenant: TenantInfo): void {
   if (typeof document === 'undefined' || typeof fetch === 'undefined') return;
 
   const displayName =
-    tenant.brandName?.trim() || tenant.name?.trim() || MARKETPLACE_BRAND_BASELINE;
+    tenant.brandName?.trim() || tenant.name?.trim() || resolveNoBrandFallback(tenant);
   const shortName = displayName.length > 12 ? `${displayName.slice(0, 12)}…` : displayName;
 
   void fetch('/manifest.webmanifest')

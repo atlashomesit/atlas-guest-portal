@@ -15,13 +15,22 @@ function tenantContact() {
 }
 
 /**
- * True for a white-label tenant resolved via its own custom domain / branded subdomain.
- * For these tenants the Atlas marketplace phone/email MUST NEVER appear as the host contact —
- * that is a cross-tenant leak. The DEFAULT_* platform values below are only valid on the
- * Atlas default/marketplace domain (isCustomDomain falsey).
+ * True for a white-label tenant resolved via its own custom domain / branded subdomain, OR
+ * (TASK-4899) a `Neutral`-mode tenant on ANY host shape. For these tenants the Atlas
+ * marketplace phone/email MUST NEVER appear as the host contact — that is a cross-tenant
+ * leak. The DEFAULT_* platform values below are only valid on the Atlas default/marketplace
+ * domain for a Platform-mode tenant.
+ *
+ * TASK-4899 rationale: `isCustomDomain` alone under-covers a real-but-rare case — a
+ * `Neutral`-mode tenant reached via the shared Atlas default domain (e.g. before its own
+ * subdomain/DNS is cut over) previously still fell back to Atlas's own number/email. The
+ * `guestCommsBrandingMode` check below is additive and undefined-safe: until atlas-api ships
+ * the field (see `TenantInfo.guestCommsBrandingMode`), this OR-clause never fires and
+ * behavior is unchanged from today.
  */
 export function isWhiteLabelTenant(): boolean {
-  return Boolean(getTenantContext()?.legalContactPack?.isCustomDomain);
+  const ctx = getTenantContext();
+  return Boolean(ctx?.legalContactPack?.isCustomDomain) || ctx?.guestCommsBrandingMode === "Neutral";
 }
 
 /**
