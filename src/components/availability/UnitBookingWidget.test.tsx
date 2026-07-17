@@ -903,3 +903,85 @@ describe('UnitBookingWidget - TASK-4911: Reserve CTA surfaces inline validation 
     expect(screen.getByTestId('unit-booking-checkout-cell')).toHaveAttribute('aria-describedby', errorId);
   });
 });
+
+describe('UnitBookingWidget - TASK-4910: no misleading GST-less total in incomplete date selection', () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+    availabilityMock.fetch.mockReset();
+    availabilityMock.fetch.mockImplementation(availabilityOk);
+    task4303.booking.checkIn = null;
+    task4303.booking.checkOut = null;
+  });
+
+  const renderWidget = async () => {
+    const { default: UnitBookingWidget } = await import('./UnitBookingWidget');
+    return render(
+      <MemoryRouter>
+        <UnitBookingWidget
+          listingId={7}
+          propertyId={3}
+          listingName="Atlas 501 PH"
+          propertySlug="atlas501-ph"
+          unitSlug="ph"
+        />
+      </MemoryRouter>,
+    );
+  };
+
+  it('check-in-only selection renders NO Total and no partial breakdown rows — only "Select dates to see total price"', async () => {
+    task4303.fetchCalendarPricing.mockResolvedValue({ dateToPrice: new Map(), convenienceFeePercent: 3 });
+    task4303.fetchGuestGstBreakdown.mockResolvedValue({ gstPercent: 5, gstAmount: 0, finalAmount: 0 });
+
+    await renderWidget();
+
+    // Land the widget in a check-in-only state (same technique as the TASK-4911 suite above —
+    // AtlasBookingCalendar is mocked out, so the atlas:set-checkin window event is the only
+    // available hook to select a check-in without a check-out).
+    const checkin = addDays(getIstStartOfDay(new Date()), 5);
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('atlas:set-checkin', { detail: toISODate(checkin) }));
+    });
+
+    // The card must still say "Select dates to see total price" ...
+    expect(await screen.findByText('Select dates to see total price')).toBeInTheDocument();
+    // ... and must NEVER show a concrete "Total" row, or any of the partial breakdown rows
+    // (Accommodation + Payment processing summing to a total that silently omitted GST) that
+    // the TASK-4910 repro captured alongside that same message.
+    expect(screen.queryByText('Total')).toBeNull();
+    expect(screen.queryByTestId('bw-bd-service-fee-row')).toBeNull();
+    expect(screen.queryByTestId('bw-bd-gst-row')).toBeNull();
+    expect(screen.queryByTestId('bw-bd-subtotal-row price-line-base')).toBeNull();
+    expect(screen.queryByTestId('bw-bd-accommodation-subtotal')).toBeNull();
+    expect(screen.queryByTestId('bw-breakdown-pending')).toBeNull();
+    expect(screen.queryByTestId('bw-price-pending')).toBeNull();
+  });
+
+  it('a complete date range still renders the full breakdown, including the GST line, once selection is valid', async () => {
+    // 1 night ₹6,000 → GST 5% = ₹300; processing fee 3% × (6,000+300) = ₹189; Total ₹6,489 —
+    // matches the valid-quote formula from the TASK-4910 repro (30 Jun→01 Jul example).
+    const checkin = addDays(getIstStartOfDay(new Date()), 5);
+    const checkout = addDays(checkin, 1);
+    const nightIso = toISODate(checkin);
+    task4303.booking.checkIn = toISODate(checkin);
+    task4303.booking.checkOut = toISODate(checkout);
+    task4303.fetchCalendarPricing.mockResolvedValue({
+      dateToPrice: new Map([[nightIso, 6000]]),
+      convenienceFeePercent: 3,
+    });
+    task4303.fetchGuestGstBreakdown.mockResolvedValue({ gstPercent: 5, gstAmount: 300, finalAmount: 6489 });
+
+    await renderWidget();
+
+    const totalLabel = await screen.findByText('Total');
+    const totalValue = totalLabel.parentElement?.querySelector('.lv-num')?.textContent ?? '';
+    expect(totalValue.replace(/[^0-9]/g, '')).toBe('6489');
+
+    const gstRow = screen.getByTestId('bw-bd-gst-row');
+    expect(gstRow.textContent).toContain('GST (5%)');
+    expect(gstRow.querySelector('.lv-num')?.textContent?.replace(/[^0-9]/g, '')).toBe('300');
+
+    const feeRow = screen.getByTestId('bw-bd-service-fee-row');
+    expect(feeRow.querySelector('.lv-num')?.textContent?.replace(/[^0-9]/g, '')).toBe('189');
+  });
+});
