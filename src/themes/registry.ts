@@ -15,6 +15,7 @@ import type { LayoutThemeDefinition, LayoutThemeId, LayoutThemeModule } from "./
 import { heritageDefaultColorTokens } from "./heritage/defaultColorTokens";
 import { noirDefaultColorTokens } from "./noir/defaultColorTokens";
 import { coastalDefaultColorTokens } from "./coastal/defaultColorTokens";
+import { photoFirstDefaultColorTokens } from "./photoFirst/defaultColorTokens";
 
 export const DEFAULT_LAYOUT_THEME_ID: LayoutThemeId = "classic";
 
@@ -101,6 +102,32 @@ export const themeRegistry: Record<LayoutThemeId, LayoutThemeDefinition> = {
     // text/background pairs verified ≥4.5:1 AA (see PR description for the full ratio table).
     supportedColorPresets: ["oceanLuxury", "emeraldOasis", "newYear"],
     defaultColorTokens: coastalDefaultColorTokens,
+  },
+  photoFirst: {
+    id: "photoFirst",
+    label: "Minimal Photo-First",
+    description:
+      "Near-zero chrome, huge full-bleed photography, and a sticky booking bar — a " +
+      "photography-led register for hosts whose property photos are the strongest sell " +
+      "(TASK-4925, ADR-0081 D8).",
+    load: () => import("./photoFirst"),
+    // ADR-0081 D6 curated-matrix declaration: `oceanLuxury` and `royalViolet` are both light,
+    // airy "Light Vibrant" presets whose own text/bg pairs are extremely high-contrast (dark
+    // navy-on-ice-blue / near-black-on-lilac-white — see PR description for the full ratio
+    // table) and whose CTA-button-on-white-text contrast clears 4.5:1 (4.87:1 / 7.02:1) —
+    // verified deliberately, since two sibling "Premium" presets (jetsetPearl/auroraChampagne)
+    // were checked and REJECTED here: their own --cta-primary is a pastel rose-gold whose
+    // white-button-text contrast is ~2.2-2.4:1 (fails AA) and whose accent-as-link-text
+    // contrast is ~2.1-2.4:1 (also fails) — the same decorative-token-bound-to-text failure
+    // mode TASK-4923 root-caused for `classic`'s own default. Rather than ship a curated combo
+    // this task can't verify passes (or silently work around the mismatch), those two presets
+    // are left undeclared for this layout. `sunriseCoral`/`emeraldOasis` were also checked and
+    // rejected for the same reason (their white-on-cta contrast is 3.15:1/3.77:1). Warmer/
+    // saturated presets (the seasonal trio, the remaining seven) are deliberately excluded as
+    // visually mismatched against this layout's neutral, photography-forward brief — same
+    // judgment-call pattern every other layout's registry comment already establishes.
+    supportedColorPresets: ["oceanLuxury", "royalViolet"],
+    defaultColorTokens: photoFirstDefaultColorTokens,
   },
 };
 

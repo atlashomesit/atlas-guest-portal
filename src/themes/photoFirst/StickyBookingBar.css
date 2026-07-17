@@ -1,0 +1,32 @@
+/**
+ * TASK-4925 — "photoFirst" layout's sticky booking bar styling. Presentation only, entirely
+ * contained within src/themes/photoFirst/** (AGENTS.md "Theme ≠ integration" HARD RULE) — no
+ * shared CSS files touched. Uses the existing CSS-variable design-token system so tenant
+ * color-preset overrides (ADR-0081 D5/D6) still apply.
+ *
+ * The bar is deliberately a SOLID surface (var(--bg-card)), not a translucent overlay over the
+ * page's photography — this is what keeps its text contrast deterministic (epic §3.11/AC15,
+ * this task's stop-and-ask), independent of whatever photo happens to be scrolled behind it.
+ */
+
+.photofirst-sticky-bar {
+  /* Fixed (not `sticky`) so the bar stays pinned to the viewport bottom throughout the whole
+     scroll — a `sticky` element only engages once its containing block's edge reaches the
+     viewport edge, which would NOT be "persistent while scrolling" for a bar placed once near
+     the end of Home's content. Fixed is what the founder's brief ("persistent call-to-action
+     while scrolling") actually requires. */
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: var(--z-sticky, 20);
+  background: var(--bg-card, #ffffff);
+  border-top: 1px solid var(--border-strong, #7d7b75);
+  box-shadow: var(--shadow-level-2, 0 8px 24px rgba(17, 17, 17, 0.08));
+  padding: 0.75rem 1rem calc(0.75rem + var(--safe-area-bottom, 0px));
+}
+
+.photofirst-sticky-bar-inner {
+  max-width: 72rem;
+  margin: 0 auto;
+}
