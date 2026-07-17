@@ -357,7 +357,7 @@ export default function MarketplaceHomepage() {
 
                   {/* TASK-1873: rating row */}
                   {item.rating != null && item.rating > 0 && (
-                    <p className="text-sm font-medium text-accent-primary">
+                    <p className="text-sm font-medium text-[var(--accent-text)]">
                       {'★'.repeat(Math.round(item.rating))}
                       <span className="ml-1 text-text-muted">{item.rating.toFixed(1)}</span>
                       {item.reviewCount != null && item.reviewCount > 0 && (

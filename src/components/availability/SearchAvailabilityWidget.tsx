@@ -574,7 +574,7 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
             <ChevronDown className={`h-4 w-4 shrink-0 text-[var(--text-muted)] transition-transform duration-200 ${isCalendarOpen ? 'rotate-180' : ''}`} aria-hidden />
           </span>
           {dateRange.startDate && dateRange.endDate && calculateNights(dateRange.startDate, dateRange.endDate) > 0 && (
-            <span className="hf-night-chip inline-flex items-center text-xs font-semibold text-[var(--accent-primary)] bg-[var(--bg-muted)] px-2.5 py-1 rounded-full">
+            <span className="hf-night-chip inline-flex items-center text-xs font-semibold text-[var(--accent-text)] bg-[var(--bg-muted)] px-2.5 py-1 rounded-full">
               {formatNightCount(calculateNights(dateRange.startDate, dateRange.endDate))}
             </span>
           )}
@@ -682,7 +682,7 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
       </div>
 
       {error && (
-        <p className="text-left text-sm font-semibold text-[color-mix(in_srgb,var(--cta-secondary)_90%,transparent)]">
+        <p className="text-left text-sm font-semibold text-[var(--lavender-text)]">
           {error}
         </p>
       )}
