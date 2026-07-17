@@ -83,3 +83,38 @@ describe('applyTenantBranding — per-tenant brand assets', () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// TASK-4899: document.title / apple-mobile-web-app-title no-brand-configured fallback
+// must be brand-neutral for a Neutral-mode tenant, never "Atlastays".
+// ---------------------------------------------------------------------------
+describe('applyTenantBranding — TASK-4899 no-brand-configured fallback', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('neutral-no-branding: document.title falls back to the generic property-only name, never an Atlas mark', () => {
+    applyTenantBranding(makeTenant({ slug: 'brand-new-tenant', name: '', guestCommsBrandingMode: 'Neutral' }));
+    expect(document.title.toLowerCase()).not.toContain('atlas');
+    expect(document.title).toBe('Your Stay');
+  });
+
+  it('neutral-with-branding: document.title uses the tenant name unchanged', () => {
+    applyTenantBranding(makeTenant({ slug: 'gaurav', name: 'Elsiya Loft', guestCommsBrandingMode: 'Neutral' }));
+    expect(document.title).toBe('Elsiya Loft');
+  });
+
+  it('platform-mode regression: unset name still falls back to the Atlas marketplace baseline', () => {
+    applyTenantBranding(makeTenant({ slug: 'atlas', name: '', guestCommsBrandingMode: 'Platform' }));
+    expect(document.title).toBe('Atlastays');
+  });
+
+  it('API-gap regression: unset name + undefined guestCommsBrandingMode still falls back to the Atlas marketplace baseline', () => {
+    applyTenantBranding(makeTenant({ slug: 'some-tenant', name: '' }));
+    expect(document.title).toBe('Atlastays');
+  });
+});
