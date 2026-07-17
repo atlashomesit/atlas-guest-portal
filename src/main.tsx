@@ -19,6 +19,9 @@ import { applyTenantBranding } from './tenant/tenantBranding'
 import { ConfigLoadingScreen } from './runtime-config/ConfigLoadingScreen'
 import { ConfigErrorScreen } from './runtime-config/ConfigErrorScreen'
 import TenantJsonLd from './components/TenantJsonLd'
+// TASK-4903 (ADR-0081): boot-time layout-theme resolution + prefetch. `src/App.tsx` is the
+// only other mount point allowed to import `src/themes/registry` (ESLint boundary rule).
+import { loadLayoutTheme, resolveLayoutThemeId, setCurrentLayoutThemeId } from './themes/registry'
 
 // Suppress chrome extension module loading errors in console (non-critical, expected in dev).
 // ErrorEvent.message is typed `string` but is nullish for some cross-origin / platform error
@@ -136,6 +139,18 @@ const bootstrapApp = async () => {
       applyTenantBranding(resolved);
     }
 
+    // TASK-4903 (ADR-0081 D2/D3/D5/D6a): resolve the layout-theme + color-preset axes once
+    // tenant resolution completes. `resolved.effectiveThemeId`/`effectiveColorPresetId` are
+    // undefined until TASK-4904 lands the server-side DTO fields — resolving here already
+    // stubs "classic"/"default" in that case, so this wiring needs no further change once
+    // TASK-4904 ships. Marketplace apex skips this — it isn't a single resolved tenant and
+    // already renders with the boot-time DEFAULT_THEME applied above.
+    const effectiveThemeId = resolveLayoutThemeId(resolved?.effectiveThemeId)
+    setCurrentLayoutThemeId(effectiveThemeId)
+    if (!(isMarketplaceMode() && isAtlastaysMarketplaceSurface()) && resolved) {
+      applyTheme(resolved.effectiveColorPresetId ?? DEFAULT_THEME)
+    }
+
     // TASK-2400: `/` uses React.lazy (Home or MarketplaceHomepage). Under slow CDN or
     // parallel E2E load, the route chunk can still be loading after domcontentloaded —
     // body text stays tiny (Suspense fallback) and a11y/homepage tests flake. Prefetch
@@ -144,7 +159,9 @@ const bootstrapApp = async () => {
       if (isMarketplaceMode() && isAtlastaysMarketplaceSurface()) {
         void import('./pages/MarketplaceHomepage');
       } else {
-        void import('./pages/home/Home');
+        // TASK-4903: prefetch the resolved layout theme's package (contains Home) instead
+        // of the page file directly — Home now ships inside its theme's chunk.
+        void loadLayoutTheme(effectiveThemeId);
       }
     }
 

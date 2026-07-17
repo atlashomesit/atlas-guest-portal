@@ -78,6 +78,20 @@ export interface TenantInfo {
    * staying fully functional. Undefined/false = normal indexable tenant.
    */
   isInternal?: boolean;
+  /**
+   * TASK-4903/4904 (ADR-0081 D2/D3): the tenant's resolved layout-theme id (e.g. "classic",
+   * "heritage"). Undefined until TASK-4904 lands `TenantFromDomainDto.EffectiveThemeId` —
+   * callers must resolve a safe default themselves (see `src/themes/registry.ts`'s
+   * `resolveLayoutThemeId()`), never assume this field is present.
+   */
+  effectiveThemeId?: string;
+  /**
+   * TASK-4903/4904 (ADR-0081 D5/D6a): the tenant's resolved color-preset id (a
+   * `styles/theme.ts` `ThemeName`), or null when no preset is resolved (layout renders its
+   * own authored default + `BrandColor` override, D6b). Undefined until TASK-4904 lands
+   * `TenantFromDomainDto.EffectiveColorPresetId`.
+   */
+  effectiveColorPresetId?: string | null;
 }
 
 /** RA-006 §3.5: legal/contact identity returned by /tenants/from-domain.LegalContactPack. */
@@ -251,6 +265,15 @@ export async function resolveFromDomain(apiBaseUrl: string, domain: string): Pro
         : undefined,
       // TASK-4381/4386 / ADR-0068
       isInternal: Boolean(data.isInternal),
+      // TASK-4903/4904 (ADR-0081): read defensively — undefined until TASK-4904 ships the
+      // DTO fields server-side; the guest portal's theme-resolution wiring (src/main.tsx)
+      // already treats `undefined` as "fall back to classic/default", so no further wiring
+      // change is needed once these are populated.
+      effectiveThemeId: typeof data.effectiveThemeId === 'string' ? data.effectiveThemeId : undefined,
+      effectiveColorPresetId:
+        typeof data.effectiveColorPresetId === 'string' || data.effectiveColorPresetId === null
+          ? data.effectiveColorPresetId
+          : undefined,
     };
     return tenantInfo;
   } catch (error) {
