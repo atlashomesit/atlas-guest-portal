@@ -34,7 +34,7 @@ export interface LayoutThemeModule {
  * TASK-4914 ("heritage"), TASK-4906 ("noir"), TASK-4907 ("coastal"),
  * TASK-4924 ("editorial"), TASK-4925 ("photoFirst").
  */
-export type LayoutThemeId = "classic";
+export type LayoutThemeId = "classic" | "heritage";
 
 export interface LayoutThemeDefinition {
   id: LayoutThemeId;
@@ -50,4 +50,15 @@ export interface LayoutThemeDefinition {
    * selectable/renderable for this layout (safe no-op fallback, not an error).
    */
   supportedColorPresets: ThemeName[];
+  /**
+   * ADR-0081 D5/D6b (2026-07-17 evening amendment) — this layout's own authored default
+   * color palette (CSS custom-property key/value pairs), painted when
+   * `effectiveColorPresetId` resolves to `null` (no chosen/seasonal preset applies).
+   * Optional: `classic`'s "default" look already lives in `src/styles/themes/default.css`
+   * as the `default` color-preset registry entry, so it has no separate palette of its
+   * own here. `heritage` (TASK-4914) is the first layout to populate this field — see
+   * `src/themes/heritage/defaultColorTokens.ts` for provenance and the runtime-wiring
+   * note (TASK-4904 scope, not applied by any code in this repo yet).
+   */
+  defaultColorTokens?: Readonly<Record<string, string>>;
 }
