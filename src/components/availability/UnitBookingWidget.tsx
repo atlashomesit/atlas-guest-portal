@@ -1,5 +1,5 @@
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { addDays, format, startOfMonth } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -159,6 +159,10 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const maxBookingDate = useMemo(() => addDays(today, 365), [today]);
 
   const calendarButtonRef = useRef<HTMLButtonElement | null>(null);
+  // TASK-4911: separate ref for the check-out cell so an incomplete-date Reserve click can
+  // focus whichever field is actually missing.
+  const checkoutCellRef = useRef<HTMLButtonElement | null>(null);
+  const dateErrorId = useId();
 
   const [dateRange, setDateRange] = useState<AtlasDateRangePickerValue>({
     startDate: null,
@@ -1187,8 +1191,19 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     setFormError(null);
 
     // Date validation
+    // TASK-4911: distinguish which field is actually missing (instead of a generic "select
+    // both dates" message) and move focus there, so the guest isn't left guessing why Reserve
+    // didn't proceed.
     if (!dateRange.startDate || !dateRange.endDate) {
-      setDateError('Please select check-in and check-out dates.');
+      const message = !dateRange.startDate
+        ? 'Add a check-in date to continue.'
+        : 'Add a check-out date to continue.';
+      setDateError(message);
+      if (!dateRange.startDate) {
+        calendarButtonRef.current?.focus();
+      } else {
+        checkoutCellRef.current?.focus();
+      }
       return;
     }
     const checkinIst = getIstStartOfDay(dateRange.startDate);
@@ -1474,6 +1489,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             type="button"
             className="lv-date-cell"
             aria-label="Select check-in date"
+            aria-describedby={dateError ? dateErrorId : undefined}
+            aria-invalid={dateError ? true : undefined}
             disabled={isBookingDisabled}
             onClick={(e) => {
               e.preventDefault();
@@ -1489,10 +1506,14 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             }
           </button>
           <button
+            ref={checkoutCellRef}
             type="button"
             className="lv-date-cell"
             aria-label="Select check-out date"
+            aria-describedby={dateError ? dateErrorId : undefined}
+            aria-invalid={dateError ? true : undefined}
             disabled={isBookingDisabled}
+            data-testid="unit-booking-checkout-cell"
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -1760,7 +1781,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       {/* TASK-2612: Add-ons moved to GuestDetailsPage */}
 
       {dateError && (
-        <p role="alert" data-testid="guest-booking-date-error" className="text-sm text-support-error" style={{ marginTop: 4 }}>
+        <p id={dateErrorId} role="alert" data-testid="guest-booking-date-error" className="text-sm text-support-error" style={{ marginTop: 4 }}>
           {dateError}
         </p>
       )}
@@ -1808,10 +1829,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       <Button
         type="submit"
         fullWidth
-        // TASK-4277: do NOT disable on blank dates — keep Reserve clickable so handleReserve
-        // can surface the inline "Please select check-in and check-out dates." validation
-        // instead of the button silently swallowing the click. Genuine blockers (service down,
-        // invalid range) still disable it.
+        // TASK-4277 / TASK-4911: do NOT disable on blank dates — keep Reserve clickable so
+        // handleReserve can surface the inline "Add a check-in/check-out date to continue."
+        // validation (and focus the missing field) instead of the button silently swallowing
+        // the click. Genuine blockers (service down, invalid range) still disable it.
         disabled={
           isSubmitting ||
           isBookingDisabled ||

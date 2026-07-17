@@ -65,6 +65,9 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
   const latestWidgetStateRef = React.useRef({ hasSelection: false, guests: 2, guestCounts });
   const calendarWrapperRef = React.useRef<HTMLDivElement | null>(null);
   const toggleButtonRef = React.useRef<HTMLButtonElement | null>(null);
+  // TASK-4911: separate ref for the check-out toggle so an incomplete-date submit can focus
+  // whichever field is actually missing, instead of only ever focusing check-in.
+  const checkoutToggleButtonRef = React.useRef<HTMLButtonElement | null>(null);
   const lastFocusedTriggerRef = React.useRef<HTMLElement | null>(null);
   const hasHydratedRef = React.useRef(false);
   const calendarContentId = React.useId();
@@ -334,9 +337,20 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
     setDateError(rangeError);
 
     if (!startDate || !endDate) {
-      const message = 'Please select your check-in and check-out dates.';
+      // TASK-4911: distinguish which field is actually missing so the guest doesn't have to
+      // guess, and move focus there — mirrors the UnitBookingWidget Reserve CTA pattern
+      // (TASK-4277) instead of silently no-op'ing on a disabled button.
+      const message = !startDate
+        ? 'Add a check-in date to continue.'
+        : 'Add a check-out date to continue.';
       setError(message);
-      setStatusMessage('Select both check-in and check-out dates to continue.');
+      setDateError(message);
+      setStatusMessage(message);
+      if (!startDate) {
+        toggleButtonRef.current?.focus();
+      } else {
+        checkoutToggleButtonRef.current?.focus();
+      }
       return { isValid: false };
     }
 
@@ -466,12 +480,17 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
 
   const checkInLabel = dateRange.startDate ? format(dateRange.startDate, 'dd MMM yyyy') : 'Check-in';
   const checkOutLabel = dateRange.endDate ? format(dateRange.endDate, 'dd MMM yyyy') : 'Check-out';
+  // TASK-4911: do NOT disable on incomplete/missing dates — keep "Check availability" clickable
+  // so handleSubmit -> handleValidation can surface the inline "Add a check-out date to
+  // continue." message and focus the missing field, instead of the button silently swallowing
+  // the click (mirrors the UnitBookingWidget Reserve CTA fix, TASK-4277). Only genuine hard
+  // blockers (a real date-order conflict with both dates present, or an invalid guest count)
+  // still disable it.
   const isSubmitDisabled =
-    !dateRange.startDate ||
-    !dateRange.endDate ||
-    dateRange.endDate <= dateRange.startDate ||
+    isSubmitting ||
     guestCounts.adults < 1 ||
-    Boolean(dateError || guestError);
+    Boolean(guestError) ||
+    Boolean(dateRange.startDate && dateRange.endDate && dateRange.endDate <= dateRange.startDate);
 
 
   const markHeroInteraction = () => {
@@ -542,6 +561,8 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
           aria-describedby={dateError ? dateErrorId : undefined}
           aria-invalid={dateError ? true : undefined}
           onClick={() => toggleCalendar('checkout')}
+          data-testid="hero-date-toggle-checkout"
+          ref={checkoutToggleButtonRef}
           aria-controls={calendarContentId}
         >
           <span className={labelClass}>
