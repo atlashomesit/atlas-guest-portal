@@ -473,7 +473,7 @@ describe('UnitBookingWidget - TASK-4303: first rendered Total equals the settled
     );
     task4303.fetchCalendarPricing.mockImplementation(() => pricingPromise);
     // Server GST for the range: 5% of ₹13,000 = ₹650.
-    task4303.fetchGuestGstBreakdown.mockResolvedValue({ gstPercent: 5, gstAmount: 650, finalAmount: 14060 });
+    task4303.fetchGuestGstBreakdown.mockResolvedValue({ gstPercent: 5, gstAmount: 650, finalAmount: 14040 });
 
     const { default: UnitBookingWidget } = await import('./UnitBookingWidget');
     render(
@@ -503,16 +503,17 @@ describe('UnitBookingWidget - TASK-4303: first rendered Total equals the settled
       await pricingPromise;
     });
 
-    // Settled: base ₹6,500 × 2 = ₹13,000; GST 5% = ₹650; fee 3% × ₹13,650 = ₹410; Total ₹14,060.
+    // Settled: base ₹6,500 × 2 = ₹13,000; GST 5% = ₹650; fee 3% × ₹13,000 = ₹390 (base only,
+    // TASK-4913 founder-ruled 2026-07-17 option c); Total ₹14,040.
     const totalLabel = await screen.findByText('Total');
     const totalValue = totalLabel.parentElement?.querySelector('.lv-num')?.textContent ?? '';
-    expect(totalValue.replace(/[^0-9]/g, '')).toBe('14060');
+    expect(totalValue.replace(/[^0-9]/g, '')).toBe('14040');
     // Headline total matches the breakdown total — the FIRST total ever rendered IS the settled one
     // (the queryByText('Total') assertion above proved nothing rendered earlier).
-    expect(screen.getByTestId('bw-per-night-price').textContent?.replace(/[^0-9]/g, '')).toBe('14060');
+    expect(screen.getByTestId('bw-per-night-price').textContent?.replace(/[^0-9]/g, '')).toBe('14040');
     // Processing fee shows the real 3% amount, never a ₹0 placeholder.
     const feeRow = screen.getByTestId('bw-bd-service-fee-row');
-    expect(feeRow.querySelector('.lv-num')?.textContent?.replace(/[^0-9]/g, '')).toBe('410');
+    expect(feeRow.querySelector('.lv-num')?.textContent?.replace(/[^0-9]/g, '')).toBe('390');
     // Skeletons are gone.
     expect(screen.queryByTestId('bw-price-pending')).toBeNull();
     expect(screen.queryByTestId('bw-breakdown-pending')).toBeNull();
@@ -958,8 +959,9 @@ describe('UnitBookingWidget - TASK-4910: no misleading GST-less total in incompl
   });
 
   it('a complete date range still renders the full breakdown, including the GST line, once selection is valid', async () => {
-    // 1 night ₹6,000 → GST 5% = ₹300; processing fee 3% × (6,000+300) = ₹189; Total ₹6,489 —
-    // matches the valid-quote formula from the TASK-4910 repro (30 Jun→01 Jul example).
+    // 1 night ₹6,000 → GST 5% = ₹300; processing fee 3% × 6,000 = ₹180 (base only, TASK-4913
+    // founder-ruled 2026-07-17 option c); Total ₹6,480 — matches the TASK-4910 repro example
+    // (30 Jun→01 Jul) updated to the base-only fee ruling.
     const checkin = addDays(getIstStartOfDay(new Date()), 5);
     const checkout = addDays(checkin, 1);
     const nightIso = toISODate(checkin);
@@ -969,19 +971,19 @@ describe('UnitBookingWidget - TASK-4910: no misleading GST-less total in incompl
       dateToPrice: new Map([[nightIso, 6000]]),
       convenienceFeePercent: 3,
     });
-    task4303.fetchGuestGstBreakdown.mockResolvedValue({ gstPercent: 5, gstAmount: 300, finalAmount: 6489 });
+    task4303.fetchGuestGstBreakdown.mockResolvedValue({ gstPercent: 5, gstAmount: 300, finalAmount: 6480 });
 
     await renderWidget();
 
     const totalLabel = await screen.findByText('Total');
     const totalValue = totalLabel.parentElement?.querySelector('.lv-num')?.textContent ?? '';
-    expect(totalValue.replace(/[^0-9]/g, '')).toBe('6489');
+    expect(totalValue.replace(/[^0-9]/g, '')).toBe('6480');
 
     const gstRow = screen.getByTestId('bw-bd-gst-row');
     expect(gstRow.textContent).toContain('GST (5%)');
     expect(gstRow.querySelector('.lv-num')?.textContent?.replace(/[^0-9]/g, '')).toBe('300');
 
     const feeRow = screen.getByTestId('bw-bd-service-fee-row');
-    expect(feeRow.querySelector('.lv-num')?.textContent?.replace(/[^0-9]/g, '')).toBe('189');
+    expect(feeRow.querySelector('.lv-num')?.textContent?.replace(/[^0-9]/g, '')).toBe('180');
   });
 });

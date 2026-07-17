@@ -1122,9 +1122,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         ? accommodationGstLineAmount(taxableBase, perNightForDisplay)
         : 0;
 
-  // Razorpay charges its 3% fee on the FULL amount it processes (base + GST), not just base.
-  // Sreekar canonical clarification 2026-05-21 (memory: project_guest_booking_pricing_formula).
-  const breakdownConvenienceFee = Math.round((taxableBase + gstLineAmount) * convenienceFeePercent);
+  // TASK-4913 (founder-ruled 2026-07-17, option c): the 3% "Payment processing" fee is charged
+  // on the BASE accommodation amount only — NOT on base+GST. Supersedes the prior base+GST rule
+  // (memory: project_guest_booking_pricing_formula) which overcharged guests relative to the
+  // "no guest service fee / save vs OTA" booking-card copy. Mirrors PricingService.BuildBreakdown.
+  const breakdownConvenienceFee = Math.round(taxableBase * convenienceFeePercent);
 
   // TASK-4322: Total = discount-net base + GST + Service Fee (canonical formula).
   const breakdownFinalTotal = Math.max(1, taxableBase + gstLineAmount + breakdownConvenienceFee);

@@ -33,7 +33,8 @@ describe('guestPriceEstimate GST slab (TASK-2870/2871)', () => {
     expect(labelNoGst).not.toContain('GST');
     expect(labelNoGst).toContain('3% payment processing');
 
-    // Registered host (default): same rate applies 5% GST = 3000 + 150 (GST) = 3150, +3% fee = 3150 + 95 = 3245
+    // Registered host (default): same rate applies 5% GST = 3000 + 150 (GST) = 3150; +3% fee on
+    // base only (TASK-4913) = 3150 + 90 = 3240
     const labelWithGst = formatEstTotalInclGst(3000, 1, (n) => `₹${n}`, 3, true);
     expect(labelWithGst).toContain('5% GST');
     expect(labelWithGst).toContain('3% payment processing');
@@ -72,11 +73,11 @@ describe('guestPriceEstimate GST slab (TASK-2870/2871)', () => {
     }
   });
 
-  it('TASK-4832: estTotalInclGst folds in the 3% payment-processing fee', () => {
-    // Non-registered host: 3000 × 1 night, no GST → base 3000, +3% fee = 3090.
+  it('TASK-4832 / TASK-4913: estTotalInclGst folds in the 3% payment-processing fee on base only', () => {
+    // Non-registered host: 3000 × 1 night, no GST → base 3000, +3% fee (base) = 3090.
     expect(estTotalInclGst(3000, 1, 3, false)).toBe(3090);
-    // Registered host, 5% slab: 3000 × 1.05 = 3150, +3% fee = 3245 (rounded).
-    expect(estTotalInclGst(3000, 1, 3, true)).toBe(3245);
+    // Registered host, 5% slab: 3000 × 1.05 = 3150; +3% fee of BASE (3000, not 3150) = 3150 + 90 = 3240.
+    expect(estTotalInclGst(3000, 1, 3, true)).toBe(3240);
     // nights floors at 1 to mirror the collapsed helper.
     expect(estTotalInclGst(3000, 0, 3, false)).toBe(3090);
   });
