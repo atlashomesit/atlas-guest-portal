@@ -79,7 +79,7 @@ const ServicesSection = () => {
       <section className="py-14 md:py-16" style={{ background: "var(--bg-muted, #f5ebe0)" }}>
         <div className="container mx-auto px-4 lg:px-8 max-w-6xl">
           <div className="text-center flex flex-col gap-3 mb-2">
-            <span className="text-accent-primary font-medium tracking-[0.18em] uppercase text-xs">Elite Experiences</span>
+            <span className="text-[var(--accent-text)] font-medium tracking-[0.18em] uppercase text-xs">Elite Experiences</span>
             <h2
               className="text-3xl lg:text-4xl font-semibold text-text-primary"
               style={{ fontFamily: "var(--font-family-display)" }}

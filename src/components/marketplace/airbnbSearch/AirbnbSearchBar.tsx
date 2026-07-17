@@ -359,7 +359,7 @@ export default function AirbnbSearchBar() {
             {whenLabel}
           </button>
           {nights > 0 && (
-            <p className="mt-1 text-xs font-medium text-accent-primary">{formatNightCount(nights)}</p>
+            <p className="mt-1 text-xs font-medium text-[var(--accent-text)]">{formatNightCount(nights)}</p>
           )}
           {dateError && (
             <p id={dateErrorId} className="mt-1 text-xs text-red-600" role="alert">

@@ -281,7 +281,7 @@ const Homepage_LocationDetails = () => {
                                         </div>
 
                                         {/* Location */}
-                                        <div className="text-sm text-accent-primary">{data.property_location}</div>
+                                        <div className="text-sm text-[var(--accent-text)]">{data.property_location}</div>
 
                                         {/* Description */}
                                         {data.property_description && (
