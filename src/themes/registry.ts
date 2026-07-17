@@ -15,6 +15,7 @@ import type { LayoutThemeDefinition, LayoutThemeId, LayoutThemeModule } from "./
 import { heritageDefaultColorTokens } from "./heritage/defaultColorTokens";
 import { noirDefaultColorTokens } from "./noir/defaultColorTokens";
 import { coastalDefaultColorTokens } from "./coastal/defaultColorTokens";
+import { editorialDefaultColorTokens } from "./editorial/defaultColorTokens";
 
 export const DEFAULT_LAYOUT_THEME_ID: LayoutThemeId = "classic";
 
@@ -101,6 +102,46 @@ export const themeRegistry: Record<LayoutThemeId, LayoutThemeDefinition> = {
     // text/background pairs verified ≥4.5:1 AA (see PR description for the full ratio table).
     supportedColorPresets: ["oceanLuxury", "emeraldOasis", "newYear"],
     defaultColorTokens: coastalDefaultColorTokens,
+  },
+  editorial: {
+    id: "editorial",
+    label: "Editorial Magazine",
+    description:
+      "Text-forward composition, serif display typography, story-driven section flow — " +
+      "the most structurally distinct layout in the lineup (founder-specified, TASK-4924, ADR-0081 D8).",
+    load: () => import("./editorial"),
+    // ADR-0081 D6 curated-matrix declaration (task text, TASK-4924): a coherent, warm/elegant
+    // subset of the 14 shared color presets that reads as "editorial"/literary rather than
+    // beachy (coastal), nocturnal (noir), or the coral default (classic). `loversRetreatBlush`
+    // already authors a serif display font ("Cormorant Garamond") in its own CSS, the closest
+    // built-in match to this layout's serif-typography brief; `auroraChampagne` and
+    // `jetsetPearl` are both warm/pearl ivory-paper registers that read coherently against
+    // this layout's paper/ink composition. The dark/nocturnal presets (privateIslandNoir,
+    // emeraldDynasty), the sea-blue presets (oceanLuxury, emeraldOasis), ultraYachtAzure, and
+    // the seasonal trio are deliberately excluded — they read as mismatched against this
+    // layout's warm, literary register (same judgment-call pattern `noir`'s/`coastal`'s own
+    // registry comments already establish).
+    //
+    // WCAG AA binding discipline (verified 2026-07-17, computed via the standard
+    // relative-luminance formula — see `defaultColorTokens.ts`'s and `Home.css`'s own header
+    // comments for the full reasoning): `Home.tsx`/`EditorialPullQuote.tsx`/
+    // `EditorialFeaturedStays.tsx` bind ALL normal-text copy to `--text-primary`/`--text-body`
+    // only, never to `--brand-primary`/`--cta-primary`/`--text-muted` (those are reserved for
+    // borders, decorative rules, and `aria-hidden` decorative glyphs, which carry no
+    // text-contrast requirement) — a deliberate, narrower binding discipline than
+    // `coastal`'s, adopted specifically because this layout's curated presets span a much
+    // wider brand-color lightness range (loversRetreatBlush's `--cta-primary` #a4545a is
+    // fairly dark; jetsetPearl's/auroraChampagne's #d4a3a0/#d49a85 are both pale), so no
+    // single fixed label/accent color could otherwise be guaranteed >=4.5:1 (body text) or
+    // even >=3:1 (large text) against every declared preset's `--bg-primary`. Verified
+    // `--text-primary`/`--text-body` ratios against each preset's own `--bg-primary`:
+    //   loversRetreatBlush: #3d2e2a / #fdf8f5 -> 12.28:1; #524340 / #fdf8f5 -> 8.91:1
+    //   auroraChampagne:    #3d342f / #fffdf9 -> 11.94:1; #5c524b / #fffdf9 ->  7.49:1
+    //   jetsetPearl:        #2a2e32 / #f8f8f6 -> 12.86:1; #3a4046 / #f8f8f6 ->  9.86:1
+    // All comfortably clear the 4.5:1 normal-text AA threshold. This layout's own authored
+    // default palette's full ratio table lives in `defaultColorTokens.ts`.
+    supportedColorPresets: ["loversRetreatBlush", "auroraChampagne", "jetsetPearl"],
+    defaultColorTokens: editorialDefaultColorTokens,
   },
 };
 
