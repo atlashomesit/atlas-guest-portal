@@ -193,7 +193,7 @@
 }
 
 .navbar-center .nav-link:hover {
-  color: var(--brand-primary);
+  color: var(--accent-text, #a84832);
 }
 
 .navbar-center .nav-link:hover::after {
@@ -201,7 +201,7 @@
 }
 
 .navbar-center .nav-link.text-white {
-  color: var(--brand-primary);
+  color: var(--accent-text, #a84832);
 }
 
 .navbar-center .nav-link.text-white::after {
