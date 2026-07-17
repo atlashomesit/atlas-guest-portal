@@ -33,6 +33,15 @@ export const FREE_CANCELLATION_WINDOW_HOURS: Record<CancellationTier, number> = 
  */
 export const DEFAULT_FREE_CANCELLATION_WINDOW_HOURS = 168;
 
+/**
+ * TASK-4405 (founder ruling, 2026-07-16): platform default for the universal "book with confidence"
+ * post-booking free-cancellation grace window — mirrors `CancellationPolicyWindow.PlatformDefaultGraceHours`
+ * / `Cancellation:UniversalGraceHoursDefault` in atlas-api. Marketing-copy-only constant for surfaces with
+ * no listing/booking context (e.g. the homepage hero trust strip) — any surface that HAS a listing or
+ * booking in scope must use the server-resolved `PublicListing.graceHours` instead of this constant.
+ */
+export const PLATFORM_DEFAULT_GRACE_HOURS = 24;
+
 /** @deprecated Only used by the local fallback map when no server-sourced tier/hours are available. */
 export const DEFAULT_CANCELLATION_TIER: CancellationTier = 'Flexible';
 
@@ -74,4 +83,36 @@ export function formatCancellationDeadline(deadline: Date): string {
   return DateTime.fromJSDate(deadline)
     .setZone('Asia/Kolkata')
     .toFormat("h:mm a, d LLL");
+}
+
+/**
+ * TASK-4405: the effective free-cancellation deadline including the universal "book with confidence"
+ * post-booking grace window — mirrors `CancellationPolicyWindow.ComputeEffectiveFreeCancellationDeadlineUtc`
+ * in atlas-api (later-of the tier deadline and the possibly-voided grace deadline). `graceHours` MUST come
+ * from the server-resolved `PublicListing.graceHours` (booking/listing payload) — never hardcode 24
+ * client-side, and never show a grace-window disclosure when `graceHours` is null/undefined (flag-off
+ * parity: the server omits the field when `Cancellation:UniversalGraceEnabled` is off).
+ */
+export function computeEffectiveCancellationDeadline(
+  checkInDate: Date,
+  tier: CancellationTier | string | null | undefined,
+  windowHoursOverride: number | null | undefined,
+  bookingCreatedAt: Date,
+  graceHours: number | null | undefined,
+): Date {
+  const tierDeadline = computeCancellationDeadline(checkInDate, tier, windowHoursOverride);
+
+  if (typeof graceHours !== 'number' || graceHours <= 0) {
+    return tierDeadline;
+  }
+
+  const checkInIstMidnight = DateTime.fromJSDate(checkInDate).setZone('Asia/Kolkata').startOf('day');
+  const bookingCreatedAtDt = DateTime.fromJSDate(bookingCreatedAt);
+  const graceVoided = checkInIstMidnight.minus({ hours: graceHours }) < bookingCreatedAtDt;
+  if (graceVoided) {
+    return tierDeadline;
+  }
+
+  const graceDeadline = bookingCreatedAtDt.plus({ hours: graceHours }).toJSDate();
+  return graceDeadline.getTime() > tierDeadline.getTime() ? graceDeadline : tierDeadline;
 }

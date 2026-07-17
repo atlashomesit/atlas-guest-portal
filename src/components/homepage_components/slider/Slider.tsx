@@ -9,6 +9,7 @@ import {
   resolveDirectBookingPromo,
 } from '../../../utils/directBookingPromo';
 import { SearchAvailabilityWidget } from '../../availability/SearchAvailabilityWidget';
+import { PLATFORM_DEFAULT_GRACE_HOURS } from '../../../utils/cancellationPolicy';
 import '../atlas-home-v2.css';
 
 // Ivory seam (left 120px) + a soft 8% coral wash over the hero photo. Kept as a
@@ -125,6 +126,15 @@ const Slider = () => {
               <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
             </span>
             Free cancellation 48h before check-in
+          </li>
+          {/* TASK-4405: universal "book with confidence" grace window — generic pre-search marketing
+              copy (no listing/booking is in scope on the homepage hero). The per-listing/per-booking
+              surfaces (booking widget, checkout) show the server-resolved exact hour count instead. */}
+          <li role="listitem" className="ahv2-chip">
+            <span className="ahv2-tick" aria-hidden="true">
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+            </span>
+            Free cancellation within {PLATFORM_DEFAULT_GRACE_HOURS}h of booking
           </li>
         </ul>
       </div>
