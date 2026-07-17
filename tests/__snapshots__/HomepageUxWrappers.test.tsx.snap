@@ -58,7 +58,7 @@ exports[`Homepage UX wrappers (default path) > uses verified guest reviews inste
       >
         <p
           class="font-semibold tracking-[0.18em] uppercase text-xs md:text-sm mb-3"
-          style="color: var(--accent-primary, #c45a3f);"
+          style="color: var(--accent-text, #a84832);"
         >
           Kind words
         </p>

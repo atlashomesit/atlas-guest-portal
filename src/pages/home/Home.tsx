@@ -301,7 +301,7 @@ const Home = () => {
                         <p
                             id="host-note-heading"
                             className="text-xs font-semibold uppercase tracking-[0.18em] mb-3"
-                            style={{ color: 'var(--lavender-deep, #8e7cc3)' }}
+                            style={{ color: 'var(--lavender-text, #6f5aa8)' }}
                         >
                             A note from your host
                         </p>

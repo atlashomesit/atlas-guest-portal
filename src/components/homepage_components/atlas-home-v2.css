@@ -15,6 +15,9 @@
   --ahv2-muted: var(--bg-secondary, #fdf2e9);
   --ahv2-coral: var(--cta-primary, #c45a3f);
   --ahv2-coral-hover: var(--cta-primary-hover, #a84832);
+  /* Text-safe coral (>=4.5:1 on white/ivory) for small coral TEXT — decorative
+     surfaces keep --ahv2-coral. Mirrors the AA-safe --ahv2-muted pattern below. */
+  --ahv2-coral-text: var(--accent-text, #a84832);
   --ahv2-amber: var(--brand-accent, #f08c71);
   --ahv2-ink: var(--text-primary, #1a1a2e);
   /* AA-safe muted (>=4.5:1 on ivory/white) for small 12-13px secondary text —
@@ -49,7 +52,7 @@
   font-weight: 600;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--ahv2-coral);
+  color: var(--ahv2-coral-text);
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -506,7 +509,7 @@
 }
 .ahv2-ribbon-right {
   font-size: 14px;
-  color: var(--ahv2-coral);
+  color: var(--ahv2-coral-text);
   font-weight: 500;
   position: relative;
   white-space: nowrap;
@@ -746,7 +749,7 @@
 .ahv2-price-save {
   font-size: 13px;
   font-weight: 600;
-  color: var(--ahv2-coral);
+  color: var(--ahv2-coral-text);
 }
 .ahv2-price-meta {
   font-size: 12px;
@@ -754,7 +757,7 @@
 }
 .ahv2-see-link {
   font-size: 13px;
-  color: var(--ahv2-coral);
+  color: var(--ahv2-coral-text);
   font-weight: 500;
   position: relative;
   white-space: nowrap;

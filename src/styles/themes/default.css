@@ -25,6 +25,13 @@
   --lavender-soft: #f0eafd;
   --lavender-deep: #8e7cc3;
 
+  /* Text-role accents — WCAG AA contract: every theme MUST set these to values
+     passing >=4.5:1 on ALL of its surface tints (here: #ffffff, #fff8e7, #ffefe6,
+     #f5ebe0, #f0eafd). Use for small/body TEXT only; decorative/CTA surfaces keep
+     the vibrant hues above. Verified: #a84832 = 4.90-5.77, #6f5aa8 = 4.83-5.67. */
+  --accent-text: #a84832;
+  --lavender-text: #6f5aa8;
+
   /* CTA — solid coral safe for white text; hover a touch deeper */
   --cta-primary: #c45a3f;
   --cta-primary-hover: #a84832;

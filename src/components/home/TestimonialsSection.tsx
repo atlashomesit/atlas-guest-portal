@@ -49,7 +49,7 @@ const StarRow = ({ stars, label }: { stars: number; label?: string }) => (
 
 const KindWordsHeader = ({ ratingLine, headline }: { ratingLine?: string; headline?: string }) => (
   <div className="text-center max-w-prose mx-auto mb-12">
-    <p className="font-semibold tracking-[0.18em] uppercase text-xs md:text-sm mb-3" style={{ color: "var(--accent-primary, #c45a3f)" }}>
+    <p className="font-semibold tracking-[0.18em] uppercase text-xs md:text-sm mb-3" style={{ color: "var(--accent-text, #a84832)" }}>
       Kind words
     </p>
     <h2

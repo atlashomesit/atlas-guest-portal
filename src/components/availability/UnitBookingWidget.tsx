@@ -1546,7 +1546,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         )}
         {/* Legend for calendar cell colours */}
         <p className="text-xs text-text-secondary" style={{ marginTop: 6, lineHeight: 1.5 }}>
-          <span className="mr-1 inline-block rounded bg-[#ffe4d6]/60 px-1.5 py-0.5 text-[#c45a3f]">Available</span>
+          <span className="mr-1 inline-block rounded bg-[#ffe4d6]/60 px-1.5 py-0.5 text-[color:var(--accent-text,#a84832)]">Available</span>
           open for booking.
           <span className="mx-1 inline-block rounded bg-[#ffe4d6] px-1.5 py-0.5 text-[#4a3535]">Turnover</span>
           cleaning window (still bookable).

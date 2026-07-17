@@ -1726,7 +1726,7 @@ useEffect(() => {
                       fontWeight: 600,
                       textTransform: 'uppercase',
                       letterSpacing: '0.18em',
-                      color: 'var(--lavender-deep, #8e7cc3)',
+                      color: 'var(--lavender-text, #6f5aa8)',
                       margin: '0 0 10px',
                     }}
                   >
