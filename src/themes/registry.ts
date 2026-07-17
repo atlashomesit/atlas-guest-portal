@@ -13,6 +13,7 @@
  */
 import type { LayoutThemeDefinition, LayoutThemeId, LayoutThemeModule } from "./types";
 import { heritageDefaultColorTokens } from "./heritage/defaultColorTokens";
+import { coastalDefaultColorTokens } from "./coastal/defaultColorTokens";
 
 export const DEFAULT_LAYOUT_THEME_ID: LayoutThemeId = "classic";
 
@@ -59,6 +60,27 @@ export const themeRegistry: Record<LayoutThemeId, LayoutThemeDefinition> = {
     // to look coherent against heritage's warmer, deeper palette.
     supportedColorPresets: [],
     defaultColorTokens: heritageDefaultColorTokens,
+  },
+  coastal: {
+    id: "coastal",
+    label: "Coastal Airy",
+    description:
+      "Light sea-blue palette, horizontal gallery listings, and wave-motif section dividers " +
+      "— an airy register for beach/coastal-stay hosts (founder-specified, TASK-4907, ADR-0081 D8).",
+    load: () => import("./coastal"),
+    // ADR-0081 D6 curated-matrix declaration (task text, TASK-4907): a coherent, light/
+    // blue-leaning subset of the 14 shared color presets — `oceanLuxury` ("airy aqua blues
+    // for coastal stays") and `emeraldOasis` (fresh, light, beach-adjacent mint) both already
+    // read as coastal-coherent by their own authored descriptions; `newYear` (light bg,
+    // midnight-blue CTA) is included as a seasonal option that stays visually coherent with
+    // the sea-blue register. `valentine`/`christmas` (warm rose/red-green) and the
+    // dark/navy-premium presets (privateIslandNoir, jetsetPearl, ultraYachtAzure,
+    // loversRetreatBlush, emeraldDynasty, auroraChampagne) are deliberately excluded — they
+    // read as mismatched against this layout's light, airy brief (same judgment-call pattern
+    // `classic`'s own registry comment already establishes). All three declared presets'
+    // text/background pairs verified ≥4.5:1 AA (see PR description for the full ratio table).
+    supportedColorPresets: ["oceanLuxury", "emeraldOasis", "newYear"],
+    defaultColorTokens: coastalDefaultColorTokens,
   },
 };
 
