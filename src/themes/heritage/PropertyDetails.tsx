@@ -180,37 +180,43 @@ function getPpRefundSteps(hasOnlinePayment: boolean): Array<{ title: string; des
 
 function getPpCancellationInfo(
   tier: string | null | undefined,
-  opts?: { fallbackText?: string; hasOnlinePayment?: boolean },
+  opts?: { fallbackText?: string; hasOnlinePayment?: boolean; graceHours?: number | null },
 ): PpCancellationInfo {
   const steps = getPpRefundSteps(opts?.hasOnlinePayment !== false);
+  // TASK-4405 (copy-QA rider): mirrors Homepage_PropertyDetails.tsx — the universal grace window
+  // applies FIRST, so a tier headline must not silently contradict what the engine actually refunds
+  // during the grace window. Only shown when the server resolved a non-null graceHours.
+  const graceNote = opts?.graceHours
+    ? ` You can also cancel free within ${opts.graceHours} hours of booking, regardless of this policy.`
+    : '';
   if (tier === 'Flexible') return {
     headline: 'Full refund if cancelled 48 hours before check-in',
-    description: opts?.hasOnlinePayment !== false
+    description: (opts?.hasOnlinePayment !== false
       ? 'Money returns to the exact UPI or card you paid with. No phone calls needed.'
-      : 'Your host arranges the refund directly with you.',
+      : 'Your host arranges the refund directly with you.') + graceNote,
     steps,
   };
   if (tier === 'Moderate') return {
     headline: 'Full refund if cancelled 5 days before check-in',
-    description: 'Partial refund for cancellations after the window. Check your booking for exact terms.',
+    description: 'Partial refund for cancellations after the window. Check your booking for exact terms.' + graceNote,
     steps,
   };
   if (tier === 'Strict') return {
     headline: '50% refund if cancelled 7 days before check-in',
-    description: 'No refund within 7 days of check-in. Check your booking for exact terms.',
+    description: 'No refund within 7 days of check-in. Check your booking for exact terms.' + graceNote,
     steps,
   };
   const fallback = opts?.fallbackText?.trim();
   if (fallback) {
     return {
       headline: 'Cancellation policy',
-      description: fallback,
+      description: fallback + graceNote,
       steps,
     };
   }
   return {
     headline: 'Flexible cancellation — full refund 48+ hours before check-in',
-    description: 'Standard direct-booking policy. See your booking confirmation for exact cut-off times.',
+    description: 'Standard direct-booking policy. See your booking confirmation for exact cut-off times.' + graceNote,
     steps,
   };
 }
@@ -321,6 +327,8 @@ interface Property {
     virtualTourUrl?: string | null;
     /** TASK-1385: Cancellation policy tier from listing — Flexible, Moderate, or Strict. */
     cancellationTier?: 'Flexible' | 'Moderate' | 'Strict' | null;
+    /** TASK-4405: server-resolved universal grace-window hours. Null when the flag is off (flag-off parity). */
+    graceHours?: number | null;
     /** TL-GUEST: from GET /listings/{id} or /listings/public — drives same Google Maps JS path as Location page. */
     latitude?: number | null;
     longitude?: number | null;
@@ -355,6 +363,7 @@ function coerceProperty(item: Partial<Property> & { id?: number | string }): Pro
         property_address: item.property_address,
         virtualTourUrl: item.virtualTourUrl,
         cancellationTier: item.cancellationTier,
+        graceHours: item.graceHours,
         latitude: item.latitude,
         longitude: item.longitude,
     };
@@ -956,6 +965,10 @@ const PropertyDetails = () => {
                             const raw = (apiListing as Record<string, unknown>).cancellationTier ?? pub.cancellationTier;
                             return (raw === 'Flexible' || raw === 'Moderate' || raw === 'Strict') ? raw : null;
                         })(), // TASK-1385
+                        graceHours: (() => {
+                            const raw = (apiListing as Record<string, unknown>).graceHours ?? pub.graceHours;
+                            return typeof raw === 'number' && raw > 0 ? raw : null;
+                        })(), // TASK-4405
                         latitude: (() => {
                             const raw =
                                 (apiListing as Record<string, unknown>).latitude ??
@@ -1302,6 +1315,7 @@ useEffect(() => {
     const ppCancellationInfo = getPpCancellationInfo(data.cancellationTier, {
       fallbackText: _resolvedCancellationText,
       hasOnlinePayment: ppHasOnlinePayment,
+      graceHours: data.graceHours,
     });
     const ppHasLocation =
         (typeof data.latitude === 'number' && Number.isFinite(data.latitude)) ||

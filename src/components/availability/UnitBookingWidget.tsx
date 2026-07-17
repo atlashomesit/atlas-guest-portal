@@ -17,6 +17,7 @@ import { calculateNights, formatDateInTimezone, formatIsoDateInTimezone } from '
 import {
   type CancellationTier,
   computeCancellationDeadline,
+  computeEffectiveCancellationDeadline,
   formatCancellationDeadline,
 } from '@/utils/cancellationPolicy';
 import { doesRangeIntersectBlocked, toISODate } from '@/utils/dateRange';
@@ -221,6 +222,9 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [resolvedCancellationTier, setResolvedCancellationTier] = useState<CancellationTier | null>(null);
   // TASK-4356: server-computed window (hours), source of truth — overrides the local tier→hours map.
   const [resolvedCancellationWindowHours, setResolvedCancellationWindowHours] = useState<number | null>(null);
+  // TASK-4405: server-resolved universal grace-window hours. Null when Cancellation:UniversalGraceEnabled
+  // is off server-side — never hardcode a fallback here (flag-off parity).
+  const [resolvedGraceHours, setResolvedGraceHours] = useState<number | null>(null);
   const minAdvanceDays: number = 0;
 
   useEffect(() => {
@@ -240,11 +244,13 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         setResolvedMinStay(Math.max(1, match?.minStay ?? 1));
         setResolvedCancellationTier(match?.cancellationTier ?? null);
         setResolvedCancellationWindowHours(match?.cancellationWindowHours ?? null);
+        setResolvedGraceHours(match?.graceHours ?? null);
       })
       .catch(() => {
         setResolvedMinStay(1);
         setResolvedCancellationTier(null);
         setResolvedCancellationWindowHours(null);
+        setResolvedGraceHours(null);
       });
     return () => ctrl.abort();
   }, [listingId, minStayNightsProp]);
@@ -1011,13 +1017,18 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     return checkinStatus === 'Blocked' || checkinStatus === 'Hold' || blockedSet.has(checkinISO);
   }, [dateRange.startDate, dateStatusMap, blockedSet]);
 
-  // TASK-4334: recompute the free-cancellation deadline whenever the guest's selected
-  // check-in date or the listing's resolved cancellation tier changes.
+  // TASK-4334/TASK-4405: recompute the free-cancellation deadline whenever the guest's selected
+  // check-in date, the listing's resolved cancellation tier, or the resolved grace hours changes.
+  // Uses "now" as the booking-time estimate (the actual booking doesn't exist yet at this stage) —
+  // same estimate posture the tier-only deadline already used pre-booking.
   const cancellationDeadlineText = useMemo(() => {
     if (!dateRange.startDate) return null;
-    const deadline = computeCancellationDeadline(dateRange.startDate, resolvedCancellationTier, resolvedCancellationWindowHours);
+    const deadline = resolvedGraceHours
+      ? computeEffectiveCancellationDeadline(
+          dateRange.startDate, resolvedCancellationTier, resolvedCancellationWindowHours, new Date(), resolvedGraceHours)
+      : computeCancellationDeadline(dateRange.startDate, resolvedCancellationTier, resolvedCancellationWindowHours);
     return formatCancellationDeadline(deadline);
-  }, [dateRange.startDate, resolvedCancellationTier, resolvedCancellationWindowHours]);
+  }, [dateRange.startDate, resolvedCancellationTier, resolvedCancellationWindowHours, resolvedGraceHours]);
 
   const { loading: dailyPricingLoading, error: _dailyPricingError, getListingPricing } = useDailyPricingSummary();
   const dailyPricing = useMemo(
@@ -1894,6 +1905,19 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             : 'Select check-in dates to see your free cancellation deadline'}
         </span>
       </div>
+
+      {/* TASK-4405: universal "book with confidence" post-booking grace-window disclosure — only
+          shown when the server has resolved a non-null graceHours for this listing (flag-off parity). */}
+      {resolvedGraceHours ? (
+        <div className="lv-booking-cancel bw-trust" data-testid="bw-grace-window-strip">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M20 6L9 17l-5-5"/>
+          </svg>
+          <span data-testid="bw-grace-window-strip-text">
+            {`Free cancellation for ${resolvedGraceHours} hours after you book`}
+          </span>
+        </div>
+      ) : null}
 
       {/* Payment trust logos before Razorpay checkout */}
       <div className="lv-pay-rail" data-testid="bw-payment-trust-logos">
