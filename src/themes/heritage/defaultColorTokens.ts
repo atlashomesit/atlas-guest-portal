@@ -10,14 +10,11 @@
  * `heritage` declares `supportedColorPresets: []` (`registry.ts`) — it does not opt into
  * any of the 14 shared color presets, so this is its only palette.
  *
- * Declared as data only (ADR-0081 amendment 2026-07-17 pt.5 — theme selection/painting
- * must stay a runtime read, never a build-time input). Runtime application — painting
- * these CSS custom properties onto `document.documentElement` when the resolved layout is
- * `heritage` and `effectiveColorPresetId` is null — is TASK-4904's boot-wiring scope
- * (`src/main.tsx`'s `applyTheme()` call currently always resolves to the shared
- * `default`/Sandstone-Coral CSS-variable set; making it layout-aware is that task's
- * wiring, not invented here per this task's "do not build a new prod-facing selection
- * surface" instruction).
+ * Runtime application — painting these CSS custom properties onto
+ * `document.documentElement` when the resolved layout is `heritage` and
+ * `effectiveColorPresetId` is null — is wired in `src/main.tsx`'s boot sequence via
+ * `applyLayoutDefaultColorTokens` as of PR #348 (TASK-4904); `applyTheme()` no longer
+ * always resolves to the shared `default`/Sandstone-Coral CSS-variable set.
  */
 export const heritageDefaultColorTokens: Readonly<Record<string, string>> = {
   "--bg-primary": "#fffaf5",

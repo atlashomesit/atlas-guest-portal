@@ -8,9 +8,9 @@
  * seasonal color preset applies). Mirrors `heritage/defaultColorTokens.ts`'s shape/keys
  * (TASK-4914 precedent) so the same CSS-variable surface every shared component already
  * reads works unchanged for this layout too. Runtime application (painting these onto
- * `document.documentElement` when resolved layout is `coastal` and no preset is active)
- * is TASK-4904's boot-wiring scope, not invented here — same "data only" note as heritage's
- * file.
+ * `document.documentElement` when resolved layout is `coastal` and no preset is active) is
+ * wired in `src/main.tsx`'s boot sequence via `applyLayoutDefaultColorTokens` as of PR #348
+ * (TASK-4904) — same wiring as heritage's file.
  *
  * WCAG AA verified (2026-07-17, computed via WCAG relative-luminance formula, not eyeballed
  * — see PR description for the full ratio table):

@@ -11,8 +11,9 @@
  *
  * Painted when `effectiveColorPresetId` resolves to `null` (no tenant-chosen or seasonal
  * color preset applies), per D6b — mirrors `heritage`/`noir`/`coastal`'s
- * `defaultColorTokens.ts` shape/key set so `applyTheme()`'s CSS-variable consumers
- * (TASK-4904 wiring) need no per-layout special-casing.
+ * `defaultColorTokens.ts` shape/key set so `applyTheme()`'s CSS-variable consumers need no
+ * per-layout special-casing. Runtime application is wired in `src/main.tsx`'s boot sequence
+ * via `applyLayoutDefaultColorTokens` as of PR #348 (TASK-4904).
  *
  * WCAG AA contrast (computed via the standard relative-luminance formula, not eyeballed —
  * TASK-4924's hard bar, epic §3.11/AC14/AC15). Ratios for every text/background pair this
