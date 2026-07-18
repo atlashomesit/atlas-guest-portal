@@ -45,6 +45,9 @@
   --footer-heading: #fdfbf7;
   --footer-link: #b8aa85;
   --footer-link-hover: #fdfbf7;
+  /* TASK-4951 — dark footer; restore the bright emerald-400 the GST-verified badge
+     originally hardcoded (base.css's light-tuned default would fail here). */
+  --support-success-text: #34d399;
 
   /* Shadows - cinematic, diffused */
   --shadow-level-1: 0 8px 24px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.25);
