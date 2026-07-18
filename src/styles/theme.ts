@@ -160,9 +160,17 @@ const isRegisteredTheme = (theme: string): theme is ThemeName => {
 
 export const availableThemes = Object.keys(themeRegistry) as ThemeName[];
 
+/**
+ * Narrow an arbitrary (DB-sourced, possibly stale/unknown) preset id to a registered
+ * `ThemeName`, falling back to `DEFAULT_THEME`. Exported so callers that need the resolved
+ * value as a *typed* `ThemeName` (e.g. `src/main.tsx` seeding `ThemeProvider.initialTheme`)
+ * share `applyTheme()`'s fallback rule instead of re-implementing it.
+ */
+export const resolveThemeName = (theme: string = DEFAULT_THEME): ThemeName =>
+  isRegisteredTheme(theme) ? theme : DEFAULT_THEME;
+
 export const applyTheme = (theme: string = DEFAULT_THEME) => {
   if (typeof document === "undefined") return;
 
-  const resolvedTheme: ThemeName = isRegisteredTheme(theme) ? theme : DEFAULT_THEME;
-  document.documentElement.dataset.theme = resolvedTheme;
+  document.documentElement.dataset.theme = resolveThemeName(theme);
 };

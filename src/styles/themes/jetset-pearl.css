@@ -39,11 +39,14 @@
   --support-danger: #ef4444;
   --support-error: #ef4444;
 
-  /* Footer */
+  /* Footer — light pearl surface, so every footer token must clear 4.5:1 against
+     --footer-bg (this preset's footer is light-on-light, unlike the dark-footer presets
+     where a pale link is safe). Verified against #f1eeeb via axe-core's color-contrast
+     rule / WCAG 2.x relative luminance: text 6.29, link 4.60, hover 11.83, heading 11.83. */
   --footer-bg: #f1eeeb;
   --footer-text: #52575f;
   --footer-heading: #2a2e32;
-  --footer-link: #7a828c;
+  --footer-link: #656c74;
   --footer-link-hover: #2a2e32;
 
   /* Shadows - light, floating */

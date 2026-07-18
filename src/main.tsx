@@ -3,7 +3,7 @@ import 'react-date-range/dist/styles.css'
 import 'react-date-range/dist/theme/default.css'
 import './index.css'
 import 'react-toastify/dist/ReactToastify.css'
-import { DEFAULT_THEME, applyTheme } from './styles/theme'
+import { DEFAULT_THEME, applyTheme, resolveThemeName, type ThemeName } from './styles/theme'
 import App from './App.tsx'
 import ErrorBoundary from './components/ErrorBoundary'
 import ApiConfigGuard from './components/ApiConfigGuard'
@@ -145,10 +145,23 @@ const bootstrapApp = async () => {
     // stubs "classic"/"default" in that case, so this wiring needs no further change once
     // TASK-4904 ships. Marketplace apex skips this — it isn't a single resolved tenant and
     // already renders with the boot-time DEFAULT_THEME applied above.
-    const effectiveThemeId = resolveLayoutThemeId(resolved?.effectiveThemeId)
+    // DEV-only override: `?layout=<id>` renders any registered layout theme without needing a
+    // tenant whose server-side `effectiveThemeId` is set. Added while root-causing the shared
+    // Footer's contrast bug, which is only reproducible on the non-`classic` layouts — there was
+    // otherwise no way to render them locally. DEV-gated, so production resolution is unchanged.
+    const devLayoutOverride = import.meta.env.DEV
+      ? new URLSearchParams(window.location.search).get('layout')
+      : null
+    const effectiveThemeId = resolveLayoutThemeId(devLayoutOverride ?? resolved?.effectiveThemeId)
     setCurrentLayoutThemeId(effectiveThemeId)
+    // Capture the resolved preset so it can seed `ThemeProvider.initialTheme` below. Passing the
+    // hardcoded DEFAULT_THEME there instead made ThemeProvider's mount-time `applyTheme(theme)`
+    // effect immediately overwrite this line's correctly-resolved preset with "default" — i.e.
+    // NO tenant ever actually painted its configured color preset, in dev or production.
+    let effectiveColorPresetId: ThemeName = DEFAULT_THEME
     if (!(isMarketplaceMode() && isAtlastaysMarketplaceSurface()) && resolved) {
-      applyTheme(resolved.effectiveColorPresetId ?? DEFAULT_THEME)
+      effectiveColorPresetId = resolveThemeName(resolved.effectiveColorPresetId ?? DEFAULT_THEME)
+      applyTheme(effectiveColorPresetId)
     }
 
     // TASK-2400: `/` uses React.lazy (Home or MarketplaceHomepage). Under slow CDN or
@@ -170,7 +183,7 @@ const bootstrapApp = async () => {
     await new Promise(resolve => setTimeout(resolve, 100));
 
     root.render(
-      <ThemeProvider initialTheme={DEFAULT_THEME} enableDevSwitcher>
+      <ThemeProvider initialTheme={effectiveColorPresetId} enableDevSwitcher>
         <ErrorBoundary name="app-shell">
           <TenantJsonLd />
           <ApiConfigGuard>

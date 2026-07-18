@@ -40,12 +40,17 @@
   --support-danger: #dc2626;
   --support-error: #dc2626;
 
-  /* Footer - Warm Champagne */
+  /* Footer - Warm Champagne — light surface, so every footer token must clear 4.5:1 against
+     --footer-bg (light-on-light, unlike the dark-footer presets where a pale link is safe).
+     The hover keeps its rose hue but is darkened past the resting link so the hover cue stays
+     a visible step, not just a hue shift. Verified against #f5ebe5 via axe-core's
+     color-contrast rule / WCAG 2.x relative luminance:
+     text 5.57, link 4.65, hover 6.04, heading 11.03. */
   --footer-bg: #f5ebe5;
   --footer-text: #6b5a54;
   --footer-heading: #3d2e2a;
-  --footer-link: #8c7570;
-  --footer-link-hover: #a4545a;
+  --footer-link: #796561;
+  --footer-link-hover: #86454a;
 
   /* Shadows - Soft, Romantic Glow */
   --shadow-level-1: 0 4px 12px rgba(164, 84, 90, 0.08), 0 2px 4px rgba(61, 46, 42, 0.04);
