@@ -22,6 +22,22 @@ html {
      these defaults keep small accent TEXT readable in themes that haven't. */
   --accent-text: #a84832;
   --lavender-text: #6f5aa8;
+  /* TASK-4951 — same "-text" text-role pattern as --accent-text/--lavender-text above.
+     The shared Footer "GST Verified" badge was hardcoded to Tailwind's `emerald-400`
+     (#34d399, a decorative/dark-surface accent, never audited for use on light
+     backgrounds), which read as unreadable (<4.5:1) against 7 of the 14 registered
+     color presets' `--footer-bg` — every LIGHT footer preset (jetsetPearl #f1eeeb,
+     loversRetreatBlush #f5ebe5, auroraChampagne #f8f1eb, sunriseCoral #FFF0E6,
+     oceanLuxury #E0F4FF, emeraldOasis #DCFCE7, royalViolet #F0E6FF). This default
+     (#065f46, Tailwind's emerald-800) is tuned against the LIGHT group — the binding
+     constraint — clearing >=6.39:1 against the tightest of the seven (royalViolet).
+     The 7 DARK-footer presets (default, privateIslandNoir, ultraYachtAzure,
+     emeraldDynasty, valentine, christmas, newYear) already read fine with the
+     original bright `emerald-400` value, so each overrides this token back to
+     #34d399 in its own preset CSS (see e.g. `default.css`) rather than reusing this
+     dark default, which would itself fail against a dark footer. See
+     `footer-success-text-contrast.test.ts` for the full computed ratio table. */
+  --support-success-text: #065f46;
   /* TASK-4908 gate fix — same "-text" text-role pattern as --accent-text/--lavender-text
      above, generalized for any layout that needs a small-TEXT-safe variant of its CTA/brand
      hue (first consumer: `coastal/ListingsGallery.tsx`'s price + "View stay" link, which were

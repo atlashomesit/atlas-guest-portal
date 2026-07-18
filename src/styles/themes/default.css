@@ -74,6 +74,10 @@
   --footer-heading: #fff8e7;
   --footer-link: #cbb8b0;
   --footer-link-hover: #ffffff;
+  /* TASK-4951 — dark footer, base.css's own light-tuned --support-success-text
+     (#065f46) would be unreadable here; restore the original bright emerald-400,
+     which already clears AA on this dark bg (see base.css's comment + test file). */
+  --support-success-text: #34d399;
 
   /* Shadows — soft warm */
   --shadow-level-1: 0 2px 8px rgba(74, 53, 53, 0.05), 0 1px 3px rgba(74, 53, 53, 0.03);
