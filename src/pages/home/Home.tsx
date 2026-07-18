@@ -313,7 +313,17 @@ const Home = () => {
                             ourselves. Arrive, settle in, and let us take care of the rest —
                             we're just down the street if you need us."
                         </blockquote>
-                        <p className="mt-3 text-sm text-text-muted">— The {schemaBrandName} host team</p>
+                        {/* TASK-4923 pattern — bound to the panel's own lavender text role, not
+                            `--text-muted`. This panel paints `var(--lavender-soft, #f0eafd)`, but
+                            `--lavender-soft` is defined ONLY in default.css, so all 5 other classic
+                            presets fall through to that hardcoded lavender — a surface their own
+                            `--text-muted` was never tuned against (each is tuned to its own
+                            `--bg-section-alt`). All landed just under AA on it: sunriseCoral 4.43,
+                            oceanLuxury 4.48, emeraldOasis 4.45, newYear 4.41, valentine/christmas
+                            4.05. `--lavender-text` is the token that IS contrast-validated against
+                            this surface (default.css documents 4.83:1 on #f0eafd) and is already
+                            used by the eyebrow directly above. */}
+                        <p className="mt-3 text-sm" style={{ color: 'var(--lavender-text, #6f5aa8)' }}>— The {schemaBrandName} host team</p>
                     </div>
                 </section>
 

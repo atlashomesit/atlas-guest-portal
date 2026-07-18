@@ -6,7 +6,11 @@
   
   /* Text - Clear Winter Contrast */
   --text-primary: #1E293B;       /* Platinum-800 */
-  --text-muted: #64748B;         /* Platinum-500 */
+  /* WCAG AA fix: was #64748B (Platinum-500), never contrast-validated against this
+     preset's own surfaces — 4.33:1 on --bg-muted #DCFCE7, 4.31:1 on the shared cream
+     #FDF2E9 why-direct strip, 4.05:1 on the lavender host-note panel. Platinum-600
+     clears all three with margin: 6.90 / 6.88 / 6.46. */
+  --text-muted: #475569;         /* Platinum-600 */
   --text-body: #334155;          /* Platinum-700 */
   --text-on-hero: #FFFFFF;
   
