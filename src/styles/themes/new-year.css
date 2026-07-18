@@ -6,7 +6,7 @@
   
   /* Text - Elegant Contrast */
   --text-primary: #0F172A;       /* Slate-900 */
-  --text-muted: #64748B;         /* Slate-500 */
+  --text-muted: #5F6E84;         /* WCAG AA fix: was #64748B (4.3:1 on classic/coastal layout mutedbg, needs 4.5:1) */
   --text-body: #1E293B;          /* Slate-800 */
   --text-on-hero: #FFFFFF;
   

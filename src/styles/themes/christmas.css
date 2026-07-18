@@ -29,6 +29,7 @@
   --brand: #047857;              /* Emerald-700 */
   --brand-ink: #065F46;          /* Emerald-800 */
   --brand-contrast: #F0FDF4;
+  --util-bar-text: var(--brand-contrast); /* WCAG AA fix: default gold #cbb89b was 3.97:1 on this dark --brand-ink */
   --brand-soft: #D1FAE5;
   
   /* Borders */

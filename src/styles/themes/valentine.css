@@ -29,6 +29,7 @@
   --brand: #BE185D;
   --brand-ink: #9F1239;
   --brand-contrast: #FFF5F7;
+  --util-bar-text: var(--brand-contrast); /* WCAG AA fix: default gold #cbb89b was 4.14:1 on this dark --brand-ink */
   --brand-soft: #FCE7F3;
   
   /* Borders */
