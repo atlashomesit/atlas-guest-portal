@@ -10,6 +10,19 @@
   --text-body: #d4e0ed;
   --text-on-hero: #ffffff;
 
+  /* Text-role accents — TASK-4962. base.css's defaults (#a84832 coral / #6f5aa8 lavender) are
+     tuned for LIGHT surface tints and were never overridden here, so they rendered small accent
+     TEXT (price chips, badges — SearchAvailabilityWidget/MarketplaceHomepage/Homepage_LocationDetails)
+     directly on this preset's dark navy: accent-text 3.14:1 on --bg-primary and 2.86:1 on
+     --bg-surface, lavender-text 3.21:1/2.91:1 — all under the 4.5:1 AA floor. Same bug class
+     TASK-4952 fixed for privateIslandNoir/emeraldDynasty, which this preset was missed by.
+     Values are brand-matched lifts of the palette's own hues (azure --accent-primary, silver-blue
+     neutrals) rather than new colors. Verified worst-case (the LIGHTER of the two backgrounds,
+     --bg-surface #0f1f38): --accent-text 6.71:1, --lavender-text 8.88:1; on --bg-primary #0a1628
+     7.38:1 / 9.77:1. See `accent-text-preset-contrast.test.ts` for the computed table. */
+  --accent-text: #6aa9f0;
+  --lavender-text: #adc0d8;
+
   /* Accent - Sapphire Azure + Silver */
   --accent-primary: #3b82f6;
   --accent-soft: #1e3a5f;
