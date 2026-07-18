@@ -61,15 +61,17 @@ const Footer = () => {
             content: <span className="text-left">{overrides.contact.address.trim()}</span>,
         });
     }
-    locateRows.push({
-        key: "email",
-        icon: <IoIosMail className="shrink-0 text-lg" aria-hidden />,
-        content: (
-            <a href={`mailto:${email}`} className="break-all text-left hover:text-[var(--footer-link-hover)]">
-                {email}
-            </a>
-        ),
-    });
+    if (email) {
+        locateRows.push({
+            key: "email",
+            icon: <IoIosMail className="shrink-0 text-lg" aria-hidden />,
+            content: (
+                <a href={`mailto:${email}`} className="break-all text-left hover:text-[var(--footer-link-hover)]">
+                    {email}
+                </a>
+            ),
+        });
+    }
     locateRows.push({
         key: "phone",
         icon: <IoIosCall className="shrink-0 text-lg" aria-hidden />,
