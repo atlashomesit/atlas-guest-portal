@@ -77,6 +77,20 @@ export const themeRegistry: Record<LayoutThemeId, LayoutThemeDefinition> = {
     // both verified dark (bg-primary #0b0c10 / #04120b), gold-accented, and AA-passing
     // (>=6.3:1 on every text/bg pair actually rendered — see defaultColorTokens.ts's
     // in-line contrast table for noir's own default palette, computed the same way).
+    //
+    // CORRECTION (2026-07-18): that ">=6.3:1 on every text/bg pair actually rendered" claim
+    // did NOT hold once the palettes were actually painted — noir's gold `--cta-primary`
+    // (#d4af37) rendered white button labels at 2.10:1, the exact decorative-token-bound-to-
+    // text failure mode `photoFirst`'s comment below already documents for jetsetPearl/
+    // auroraChampagne. Root cause was a missing on-CTA label token, now added
+    // (`--text-on-cta`, see `base.css` and `noir/defaultColorTokens.ts`).
+    //
+    // Re-checking the two curated presets above found the SAME defect in both — each ships a
+    // gold `--cta-primary` (#c29b2f) whose white label measures 2.62:1 (hover 3.73/3.53:1,
+    // `--cta-secondary` 4.08/4.15:1) — so the original claim was wrong for all three of noir's
+    // palettes, not just its default. Both preset files now declare their own `--text-on-cta`
+    // (see their in-line ratio notes). The claim holds again as written, for the default
+    // palette and both curated presets; `cta-label-contrast.test.ts` now enforces it.
     // Light presets (jetsetPearl, loversRetreatBlush, auroraChampagne, the seasonal trio —
     // all light-background per their own CSS) read as mismatched against noir's dark
     // register and are deliberately left undeclared, same reasoning `classic`'s comment

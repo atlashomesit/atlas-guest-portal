@@ -23,6 +23,11 @@
   --cta-primary-rgb: 194 155 47;
   --cta-primary-hover-rgb: 164 127 31;
   --cta-secondary-rgb: 143 124 74;
+  /* On-CTA label (see base.css). This preset's gold fills are all too light to carry the
+     inherited #ffffff default: white measures 2.62:1 on --cta-primary, 3.73:1 on the hover
+     shade and 4.08:1 on --cta-secondary — all under the 4.5:1 normal-text AA floor. Near-black
+     ink instead (reusing --bg-primary's hex): 7.47:1 / 5.24:1 / 4.79:1 respectively. */
+  --text-on-cta: #0b0c10;
 
   /* Brand */
   --brand: #0f1117;

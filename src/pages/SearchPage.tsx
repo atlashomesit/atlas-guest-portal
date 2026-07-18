@@ -1309,7 +1309,7 @@ const SearchPage = () => {
                         <p className="text-lg font-bold text-text-primary">{formatDisplayCurrency((getDailyListingPricing(unit.numericId)?.actualPrice ?? 0) > 0 ? getDailyListingPricing(unit.numericId)!.actualPrice : unit.pricePerNight)}<span className="text-sm font-normal text-text-muted"> / night</span></p>
                         <Link
                           to={`${unit.canonicalPath}${querySuffix}`}
-                          className="mt-auto inline-flex min-h-[44px] items-center justify-center rounded-xl bg-[var(--cta-primary-hover)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--cta-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
+                          className="mt-auto inline-flex min-h-[44px] items-center justify-center rounded-xl bg-[var(--cta-primary-hover)] px-4 py-2 text-sm font-semibold text-[var(--text-on-cta)] hover:bg-[var(--cta-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
                         >
                           {`View ${unitNoun.singular}`}
                         </Link>

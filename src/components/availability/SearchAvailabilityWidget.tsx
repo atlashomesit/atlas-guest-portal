@@ -618,7 +618,7 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
       data-testid={`hero-date-${format(day, 'yyyy-MM-dd')}`}
       className={`relative z-10 flex items-center justify-center text-sm font-medium transition ${
         isRangeStart || isRangeEnd
-          ? 'bg-[var(--cta-primary)] text-white rounded-xl px-3 py-3 shadow-sm'
+          ? 'bg-[var(--cta-primary)] text-[var(--text-on-cta)] rounded-xl px-3 py-3 shadow-sm'
           : isDisabled
           ? 'text-[var(--border-strong)] cursor-not-allowed opacity-50'
           : 'text-[var(--brand)]'
@@ -664,7 +664,7 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
             type="submit"
             disabled={isSubmitDisabled || isSubmitting}
             data-testid="hero-search-submit"
-            className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-[var(--cta-primary)] px-4 text-sm font-semibold tracking-[0.01em] text-white shadow-[var(--shadow-level-2)] transition-colors hover:bg-[var(--cta-primary-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cta-primary)] disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none aria-busy:cursor-progress aria-busy:opacity-90 whitespace-nowrap"
+            className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-[var(--cta-primary)] px-4 text-sm font-semibold tracking-[0.01em] text-[var(--text-on-cta)] shadow-[var(--shadow-level-2)] transition-colors hover:bg-[var(--cta-primary-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cta-primary)] disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none aria-busy:cursor-progress aria-busy:opacity-90 whitespace-nowrap"
             onClick={() => setStatusMessage('Checking availability...')}
             aria-busy={isSubmitting}
           >

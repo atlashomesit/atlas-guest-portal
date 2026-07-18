@@ -58,6 +58,14 @@ export const coastalDefaultColorTokens: Readonly<Record<string, string>> = {
   "--cta-primary": "#0e7490",
   "--cta-primary-hover": "#0b5a70",
   "--cta-secondary": "#22b8d8",
+  // NOTE (see base.css's `--text-on-cta` comment): the deep teal `--cta-primary` carries the
+  // inherited #ffffff label fine (5.36:1, hover 7.75:1), so this palette needs no override.
+  // The bright aqua `--cta-secondary` does NOT (#ffffff → 2.36:1). No call site paints a
+  // `--cta-secondary` fill with a label on it today except `ui.css`'s `.rb-button` gradient,
+  // which ends on it — and no single label colour satisfies both ends (white fails the aqua
+  // end at 2.36:1; teal ink #082f3a fails the teal end at 2.65:1). Pinned as a `KNOWN_GAPS`
+  // entry in `cta-label-contrast.test.ts` and filed as atlas-e2e TASK-4949: it needs a
+  // gradient or palette change, not a label token.
   "--cta-primary-rgb": "14 116 144",
   "--cta-primary-hover-rgb": "11 90 112",
   "--cta-secondary-rgb": "34 184 216",
