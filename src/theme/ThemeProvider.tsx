@@ -22,6 +22,11 @@ const isThemeName = (value: string): value is ThemeName =>
   (availableThemes as string[]).includes(value);
 
 const DEV_LOCAL_STORAGE_KEY = "atlas-dev-theme";
+// Set only by `setTheme()` — i.e. only when a developer picks a theme in the DevThemeSwitcher.
+// Without it the stored theme is ignored, so a value left behind by an earlier tenant's boot
+// cannot shadow the next tenant's server-resolved preset. Clear it (or use a fresh profile) to
+// go back to following the tenant.
+const DEV_EXPLICIT_CHOICE_KEY = "atlas-dev-theme-explicit";
 
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({
   initialTheme = DEFAULT_THEME,
@@ -35,23 +40,24 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
     applyTheme(theme);
   }, [theme]);
 
-  // Optional dev-only localStorage override
+  // Optional dev-only localStorage override. Honoured ONLY for an explicit DevThemeSwitcher
+  // pick: `initialTheme` is the tenant's boot-resolved preset, and a merely-remembered value
+  // must not outrank it (browse tenant A then tenant B and B rendered A's palette).
   useEffect(() => {
     if (!import.meta.env.DEV) return;
+    if (localStorage.getItem(DEV_EXPLICIT_CHOICE_KEY) !== "true") return;
     const stored = localStorage.getItem(DEV_LOCAL_STORAGE_KEY);
     if (stored && isThemeName(stored)) {
       setThemeState(stored);
       applyTheme(stored);
-    } else {
-      localStorage.setItem(DEV_LOCAL_STORAGE_KEY, initialTheme);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const setTheme = (next: ThemeName) => {
     setThemeState(next);
     if (import.meta.env.DEV) {
       localStorage.setItem(DEV_LOCAL_STORAGE_KEY, next);
+      localStorage.setItem(DEV_EXPLICIT_CHOICE_KEY, "true");
     }
   };
 
