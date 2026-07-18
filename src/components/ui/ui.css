@@ -9,7 +9,7 @@
   font-weight: 600;
   font-size: var(--font-size-md);
   border: 1px solid transparent;
-  color: var(--text-contrast);
+  color: var(--text-on-cta);
   background: linear-gradient(135deg, var(--cta-primary) 0%, var(--cta-secondary) 100%);
   box-shadow: var(--shadow-level-1);
   transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease;

@@ -51,6 +51,35 @@ html {
      preset whose hover shade doesn't clear 4.5:1 should override `--cta-text` explicitly,
      the same way a theme overrides --accent-text/--lavender-text above. */
   --cta-text: var(--cta-primary-hover);
+  /* On-CTA label token — the INVERSE of `--cta-text` above, and easy to confuse with it:
+       --cta-text     = CTA-hue text drawn ON a page/card surface (link/price copy)
+       --text-on-cta  = label text drawn ON a filled CTA button
+     Introduced because `--text-contrast` (#ffffff above) was doing double duty as both the
+     on-CTA label AND the over-dark-photography label (`Parallax.tsx`, gallery captions) and
+     even as a background fill (`homepage_location.css`) — roles that agree only while every
+     palette's CTA is dark. They diverge the moment a layout ships a LIGHT CTA on a DARK page:
+     `noir`'s gold `--cta-primary` (#d4af37) rendered white label text at 2.10:1, far under the
+     4.5:1 normal-text AA floor. Same decorative-token-bound-to-text failure mode TASK-4923
+     root-caused for `classic`, and that `registry.ts`'s `photoFirst` comment documents for
+     jetsetPearl/auroraChampagne.
+
+     Bound ONLY at call sites that actually paint a CTA fill — the arbitrary-value utilities
+     (`bg-[var(--cta-primary)]`, `bg-[color:var(--brand)]`) and plain CSS (`ui.css`'s
+     `.rb-button`, `App.css`'s skip link). The named utilities `bg-cta-primary`/`bg-primary`/
+     `bg-cta-secondary`/`bg-accent-primary` are NOT bound, because they currently render no
+     background at all: `src/index.css`'s `@theme` defines their colors with Tailwind v3's
+     `<alpha-value>` placeholder, which is invalid under v4 and drops the declaration (verified
+     in-browser: `bg-cta-primary` computes to `rgba(0, 0, 0, 0)`). Text at those sites sits on
+     the surface behind it, not on a CTA, so it correctly stays on `--text-contrast`. When that
+     `@theme` bug is fixed those sites gain real fills and must move to this token — see the
+     board task filed alongside this change (atlas-e2e TASK-4949).
+
+     Default is #ffffff so every existing theme/preset renders byte-identically to before; a
+     palette overrides it ONLY when its own CTA fill can't carry white. Verified white-on-fill
+     for the layouts that keep the default (relative-luminance formula, primary/hover):
+     editorial 9.30/12.06, heritage 5.18/6.61, photoFirst 18.88/14.16, coastal 5.36/7.75 — all
+     clear 4.5:1. `noir` and both noir-curated presets override it; see their own files. */
+  --text-on-cta: #ffffff;
   /* Fluid type scale for luxury hierarchy */
   --text-hero: clamp(3.25rem, 8vw, 6rem);
   --text-h2: clamp(2rem, 5vw, 3.5rem);

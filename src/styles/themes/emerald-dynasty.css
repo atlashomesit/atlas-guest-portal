@@ -21,6 +21,10 @@
   --cta-primary: #c29b2f;
   --cta-primary-hover: #a68426;
   --cta-secondary: #8e7b41;
+  /* On-CTA label (see base.css) — same gold-fill problem as private-island-noir.css: white
+     measures 2.62:1 / 3.53:1 / 4.15:1 on --cta-primary / hover / --cta-secondary, all under
+     the 4.5:1 AA floor. Near-black ink (--bg-primary's hex): 7.32:1 / 5.43:1 / 4.61:1. */
+  --text-on-cta: #04120b;
   --cta-primary-rgb: 194 155 47;
   --cta-primary-hover-rgb: 166 132 38;
   --cta-secondary-rgb: 142 123 65;

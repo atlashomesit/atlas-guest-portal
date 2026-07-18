@@ -5,21 +5,39 @@
  * TASK-4906): "dark luxury noir" — nocturnal palette, gold accents, full-bleed imagery,
  * minimal chrome. Painted when `effectiveColorPresetId` resolves to `null` (no tenant-chosen
  * or seasonal color preset applies), per D6b — mirrors `heritage/defaultColorTokens.ts`'s
- * pattern and key set exactly so `applyTheme()`'s CSS-variable consumers (TASK-4904 wiring)
- * need no per-layout special-casing.
+ * pattern and key set exactly so `applyTheme()`'s CSS-variable consumers (painted at boot by
+ * `applyLayoutDefaultColorTokens()` in `src/styles/theme.ts`) need no per-layout special-casing.
  *
  * WCAG AA contrast (computed via the standard relative-luminance formula, not eyeballed —
  * TASK-4906's hard bar, epic §3.11/AC14/AC15). Ratios for every text/background pair this
  * palette actually binds to (checked against `SearchAvailabilityWidget`, the shared
- * `PropertyDetailsSkeleton`/booking-flow CSS-variable class usage, and the footer):
+ * `PropertyDetailsSkeleton`/booking-flow CSS-variable class usage, and the footer).
+ *
+ * CORRECTION (2026-07-18): the two CTA-button rows below previously read "dark button text
+ * (#14171f)" and this header claimed every pair cleared 4.5:1. That was aspirational — no
+ * such token existed. The shared button surfaces (`ui.css`'s `.rb-button` and
+ * `SearchAvailabilityWidget`'s hero search button) resolved their label to `--text-contrast`,
+ * which `base.css` pins to #ffffff and nothing overrode — so this gold CTA rendered WHITE
+ * text at 2.10:1, well under the 4.5:1 normal-text floor. Fixed by introducing
+ * `--text-on-cta` (declared below, defined in `base.css`) and binding the real CTA fills to
+ * it, rather than lightening the gold, which would break the nocturnal brief.
+ *
+ * Scope note: the `bg-cta-primary`-style Tailwind utilities are NOT bound to `--text-on-cta`,
+ * because they currently paint no background at all (Tailwind v3 `<alpha-value>` syntax in a
+ * v4 `@theme` — atlas-e2e TASK-4949). They must move to it when that is fixed. The rows below
+ * describe the token this palette actually declares and the components actually consume.
  *   --text-primary   (#f5f0e6) / --bg-primary   (#0b0d12)  → 17.11:1
  *   --text-secondary (#c9c2b3) / --bg-primary   (#0b0d12)  → 10.97:1
  *   --text-muted     (#9a9282) / --bg-primary   (#0b0d12)  →  6.30:1
  *   --text-body      (#f5f0e6) / --bg-card      (#171a22)  → 15.31:1
  *   --brand-primary  (#d4af37) / --bg-primary   (#0b0d12)  →  9.24:1  (gold accent text/links)
  *   --brand-accent   (#f0c869) / --bg-primary   (#0b0d12)  → 12.19:1
- *   dark button text (#14171f) / --cta-primary  (#d4af37)  →  8.52:1  (gold CTA button label)
- *   dark button text (#14171f) / --cta-primary-hover (#c19a2c) → 6.76:1
+ *   --text-on-cta    (#0b0d12) / --cta-primary  (#d4af37)  →  9.24:1  (gold CTA button label)
+ *   --text-on-cta    (#0b0d12) / --cta-primary-hover (#c19a2c) → 7.34:1
+ *   --text-on-cta    (#0b0d12) / --cta-secondary (#8f7c4a) →  4.77:1  (.rb-button gradient end)
+ *   --accent-text    (#f0c869) / --bg-muted     (#1c2029)  → 10.23:1  (worst of five surfaces)
+ *   --lavender-text  (#c9c2b3) / --bg-muted     (#1c2029)  →  9.20:1  (worst of five surfaces)
+ *   util-bar text    (#cbb89b) / --brand-ink    (#14171f)  →  9.27:1
  *   --cta-secondary  (#8f7c4a) / --bg-primary   (#0b0d12)  →  4.77:1
  *   --footer-text    (#c9c2b3) / --footer-bg    (#060709)  → 11.37:1
  *   --footer-link    (#b8aa85) / --footer-bg    (#060709)  →  8.76:1
@@ -51,6 +69,12 @@ export const noirDefaultColorTokens: Readonly<Record<string, string>> = {
   "--cta-primary": "#d4af37",
   "--cta-primary-hover": "#c19a2c",
   "--cta-secondary": "#8f7c4a",
+  // On-CTA label colour (see base.css's `--text-on-cta` comment). noir is the reason this
+  // token exists: it is the only layout whose CTA fill is LIGHTER than its page background,
+  // so the inherited #ffffff default rendered 2.10:1 on gold. Near-black instead — the same
+  // hex as `--bg-primary`, keeping the nocturnal brief intact rather than lightening the gold.
+  // 9.24:1 on `--cta-primary`, 7.34:1 on `--cta-primary-hover`, 4.77:1 on `--cta-secondary`.
+  "--text-on-cta": "#0b0d12",
   "--cta-primary-rgb": "212 175 55",
   "--cta-primary-hover-rgb": "193 154 44",
   "--cta-secondary-rgb": "143 124 74",
@@ -60,6 +84,18 @@ export const noirDefaultColorTokens: Readonly<Record<string, string>> = {
   "--text-muted": "#9a9282",
   "--text-body": "#f5f0e6",
   "--text-on-hero": "#ffffff",
+
+  // Small-accent TEXT roles. `base.css` defaults these to a coral/violet pair chosen for LIGHT
+  // surfaces (#a84832 / #6f5aa8) and explicitly asks every theme to override with its own
+  // brand-matched passing values — noir never did, so on its dark surfaces they measured
+  // 2.82-3.43:1 (worst case `--bg-muted`), under the 4.5:1 floor. Caught rendering live on the
+  // search widget's "1 night" chip at 2.82:1. Both reuse hexes already in this palette:
+  //   --accent-text   (#f0c869 = --brand-accent)   → 10.23:1 worst-case across all five surfaces
+  //   --lavender-text (#c9c2b3 = --text-secondary) →  9.20:1 worst-case
+  // noir collapses the coral/violet accent axis onto its gold-and-stone register, consistent
+  // with how `--romance-soft`/`--accent-soft` already both resolve to the same gold tint above.
+  "--accent-text": "#f0c869",
+  "--lavender-text": "#c9c2b3",
 
   "--success": "#3ecf8e",
   "--support-success": "#3ecf8e",
@@ -74,7 +110,15 @@ export const noirDefaultColorTokens: Readonly<Record<string, string>> = {
   "--gradient-card": "linear-gradient(180deg, rgba(212, 175, 55, 0.04) 0%, transparent 100%)",
 
   "--brand": "#d4af37",
-  "--brand-ink": "#f5f0e6",
+  // `--brand-ink` reads like "ink for the brand surface" (i.e. light, on noir's dark chrome),
+  // and this palette originally set it that way — but it has exactly ONE consumer in the repo,
+  // `navbar.css`'s `.util-bar`, which uses it as the BACKGROUND of a "slim dark strip" and pairs
+  // it with hardcoded warm-light text (#cbb89b / #ffe8d6). The light cream therefore rendered
+  // light-on-light: 1.70:1 and 1.04:1, caught by an axe run against `/?layout=noir`. Every other
+  // palette sets this dark (base #1f2c45, coastal #082f3a, editorial #1f1b16, heritage #1a1a2e,
+  // photoFirst #111111); noir was the lone outlier. `--bg-secondary`'s hex keeps the strip
+  // slightly lifted off `--bg-primary`: 9.27:1 and 15.16:1 against that pair.
+  "--brand-ink": "#14171f",
   "--brand-contrast": "#0b0d12",
 
   "--footer-bg": "#060709",

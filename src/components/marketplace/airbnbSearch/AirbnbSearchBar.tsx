@@ -411,7 +411,7 @@ export default function AirbnbSearchBar() {
           <button
             type="submit"
             aria-label="Search"
-            className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--cta-primary,#222)] text-white shadow-md transition hover:scale-105 hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cta-primary,#222)] md:h-14 md:w-14"
+            className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--cta-primary,#222)] text-[var(--text-on-cta,#fff)] shadow-md transition hover:scale-105 hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cta-primary,#222)] md:h-14 md:w-14"
             data-testid="airbnb-search-submit"
           >
             <Search className="h-5 w-5" aria-hidden />
