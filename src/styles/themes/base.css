@@ -22,6 +22,19 @@ html {
      these defaults keep small accent TEXT readable in themes that haven't. */
   --accent-text: #a84832;
   --lavender-text: #6f5aa8;
+  /* TASK-4908 gate fix — same "-text" text-role pattern as --accent-text/--lavender-text
+     above, generalized for any layout that needs a small-TEXT-safe variant of its CTA/brand
+     hue (first consumer: `coastal/ListingsGallery.tsx`'s price + "View stay" link, which were
+     bound directly to `--cta-primary` — a decorative/button token never audited for text use,
+     and confirmed failing 3.77-4.30:1 against a white card across its curated presets and its
+     classic-default fallback). `--cta-primary-hover` is, by convention, already a darker shade
+     of `--cta-primary` in every preset file in this repo (verified computed here: oceanLuxury
+     7.47:1, emeraldOasis 5.48:1, newYear 10.36:1, and the classic-default fallback 5.77:1 — all
+     on white; see PR body for the full table) — reusing it needs no new hex values and keeps
+     buttons' own `--cta-primary`/`--cta-primary-hover` usages completely unchanged. A future
+     preset whose hover shade doesn't clear 4.5:1 should override `--cta-text` explicitly,
+     the same way a theme overrides --accent-text/--lavender-text above. */
+  --cta-text: var(--cta-primary-hover);
   /* Fluid type scale for luxury hierarchy */
   --text-hero: clamp(3.25rem, 8vw, 6rem);
   --text-h2: clamp(2rem, 5vw, 3.5rem);

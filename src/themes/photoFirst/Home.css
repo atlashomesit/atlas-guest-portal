@@ -139,6 +139,21 @@
   pointer-events: none;
 }
 
+/* TASK-4908 gate fix: `.photofirst-stack-scrim` above only darkens the photo — it is a
+   SIBLING of this caption (both absolute children of `.photofirst-stack-frame`), never an
+   ancestor of the title/location/price text. A WCAG contrast check (and any tool/user-agent
+   that walks the DOM ancestor chain rather than rasterizing the composited pixels — this
+   repo's own axe-core gate included) cannot see a sibling's background at all; it resolves
+   the nearest ANCESTOR with a background, which is `.photofirst-stack{background:
+   var(--bg-primary)}` — a LIGHT color in every curated preset (oceanLuxury #F0F9FF,
+   royalViolet #FAF7FF; confirmed via a live axe-core color-contrast scan against this exact
+   markup: white text measured ~1.06:1 against that ancestor). Giving the caption ITSELF a
+   solid dark backing (not just relying on the sibling scrim) makes the guarantee real and
+   photo-independent: verified >=15.3:1 for white text even in the worst case (a pure-white
+   photo/ancestor behind it) — see PR body for the composite-color table. Visually this only
+   adds a touch more depth directly behind the caption's own text — the sibling scrim still
+   does the broader full-photo darkening unchanged. No border/radius added (this layout's
+   "near-zero chrome" brief, its own file-header comment above). */
 .photofirst-stack-caption {
   position: absolute;
   left: 0;
@@ -148,6 +163,7 @@
   flex-direction: column;
   gap: 0.15rem;
   padding: 1.5rem;
+  background: rgba(6, 7, 9, 0.88);
 }
 
 .photofirst-stack-title {

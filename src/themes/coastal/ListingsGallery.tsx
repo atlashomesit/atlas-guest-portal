@@ -119,14 +119,19 @@ const CoastalListingsGallery = () => {
                     </p>
                   )}
                   <div className="flex items-center justify-between mt-2">
+                    {/* TASK-4908 gate fix: was bound to --cta-primary (a decorative/button
+                        token, unaudited for text use) — confirmed failing AA (3.77-4.30:1)
+                        against this card's white background. --cta-text is a small-TEXT-safe
+                        variant (see base.css's token comment); --cta-primary itself, and every
+                        button that uses it, is unchanged. */}
                     {price != null ? (
-                      <span className="text-sm font-semibold" style={{ color: "var(--cta-primary, #0e7490)" }}>
+                      <span className="text-sm font-semibold" style={{ color: "var(--cta-text, #0b5a70)" }}>
                         {formatCurrency(price)} / night
                       </span>
                     ) : (
                       <span />
                     )}
-                    <span className="text-sm font-medium underline" style={{ color: "var(--cta-primary, #0e7490)" }}>
+                    <span className="text-sm font-medium underline" style={{ color: "var(--cta-text, #0b5a70)" }}>
                       View stay →
                     </span>
                   </div>
