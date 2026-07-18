@@ -28,7 +28,7 @@ export default function FavoritesPage() {
 
   // TASK-1709: reminder email capture
   const [reminderEmail, setReminderEmail] = useState("");
-  const [reminderState, setReminderState] = useState<"idle" | "busy" | "done" | "error">("idle");
+  const [reminderState, setReminderState] = useState<"idle" | "busy" | "done" | "error" | "invalid">("idle");
   const [hasStoredEmail, setHasStoredEmail] = useState(() => {
     try { return !!localStorage.getItem("atlas_guest_email"); } catch { return false; }
   });
@@ -96,7 +96,13 @@ export default function FavoritesPage() {
   const handleReminderSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const email = reminderEmail.trim().toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
+    // TASK-4968: this regex is stricter than the browser's native `type="email"` check
+    // (e.g. it rejects `me@localhost`), so a rejection here must surface feedback via
+    // the existing error-state UI instead of silently no-opping.
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setReminderState("invalid");
+      return;
+    }
     setReminderState("busy");
     try {
       const ids = getFavoriteIds();
@@ -265,6 +271,11 @@ export default function FavoritesPage() {
             {reminderState === "error" && (
               <p className="text-xs text-red-600 mt-2" role="alert">
                 We couldn&apos;t save your reminder for every saved home. Please try again in a moment.
+              </p>
+            )}
+            {reminderState === "invalid" && (
+              <p className="text-xs text-red-600 mt-2" role="alert">
+                Please enter a valid email address.
               </p>
             )}
           </div>
