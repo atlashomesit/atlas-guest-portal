@@ -20,10 +20,24 @@
  *   --text-secondary (#3a6b78) on --bg-primary (#f2fbfd): 5.63:1
  *   --cta-primary (#0e7490) on #ffffff / --bg-secondary: 5.36:1 / 4.77:1
  *   --footer-text (#a9cdd6) on --footer-bg (#082f3a): 8.38:1
- * All pass the 4.5:1 normal-text AA threshold. `--text-muted` (#5c8a96, ~3.61:1 on
- * --bg-primary) intentionally stays below 4.5:1 — per this layout's own Home.tsx
- * composition, it is never bound to normal-size body text (only to large/decorative UI),
- * consistent with the ≥3:1 large-text/UI-component threshold.
+ *
+ * `--text-muted` is an AA-safe TEXT-ROLE token, same contract as `--accent-text` /
+ * `--lavender-text` in `src/styles/themes/default.css` (TASK-4923): it MUST clear 4.5:1
+ * on ALL three of this layout's text surfaces. Current value #3f7080 (2026-07-18):
+ *   #3f7080 on #ffffff (card surfaces):   5.47:1
+ *   #3f7080 on --bg-primary (#f2fbfd):    5.21:1
+ *   #3f7080 on --bg-secondary (#e3f5fa):  4.87:1
+ *
+ * It was previously #5c8a96 (3.80 / 3.61 / 3.38 — all failing), justified by a comment
+ * claiming the token "is never bound to normal-size body text". A live browser audit of
+ * /?layout=coastal falsified that: the claim was derived from this layout's own Home.tsx,
+ * which never references --text-muted at all, while the SHARED components composed inside
+ * the layout bind it to 11-14px text — the Check-in/Check-out/Guests labels, "Browse all
+ * homes", service-card descriptions and the cookie-banner body copy (see e.g.
+ * `AtlasBookingCalendar.css` .bw-guest-sub 12px, `Homepage_PropertyDetails.css` 11-13.5px).
+ * Do not re-lighten this token on the basis of a layout-local audit: any theme's
+ * --text-muted is reachable by shared small text, so it must be verified against the
+ * shared components, not just the layout's own composition.
  */
 export const coastalDefaultColorTokens: Readonly<Record<string, string>> = {
   "--bg-primary": "#f2fbfd",
@@ -50,7 +64,7 @@ export const coastalDefaultColorTokens: Readonly<Record<string, string>> = {
 
   "--text-primary": "#082f3a",
   "--text-secondary": "#3a6b78",
-  "--text-muted": "#5c8a96",
+  "--text-muted": "#3f7080",
   "--text-body": "#082f3a",
   "--text-on-hero": "#ffffff",
 
