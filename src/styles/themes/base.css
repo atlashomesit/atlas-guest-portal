@@ -63,16 +63,16 @@ html {
      root-caused for `classic`, and that `registry.ts`'s `photoFirst` comment documents for
      jetsetPearl/auroraChampagne.
 
-     Bound ONLY at call sites that actually paint a CTA fill — the arbitrary-value utilities
-     (`bg-[var(--cta-primary)]`, `bg-[color:var(--brand)]`) and plain CSS (`ui.css`'s
-     `.rb-button`, `App.css`'s skip link). The named utilities `bg-cta-primary`/`bg-primary`/
-     `bg-cta-secondary`/`bg-accent-primary` are NOT bound, because they currently render no
-     background at all: `src/index.css`'s `@theme` defines their colors with Tailwind v3's
-     `<alpha-value>` placeholder, which is invalid under v4 and drops the declaration (verified
-     in-browser: `bg-cta-primary` computes to `rgba(0, 0, 0, 0)`). Text at those sites sits on
-     the surface behind it, not on a CTA, so it correctly stays on `--text-contrast`. When that
-     `@theme` bug is fixed those sites gain real fills and must move to this token — see the
-     board task filed alongside this change (atlas-e2e TASK-4949).
+     Bound at call sites that actually paint a CTA fill — the arbitrary-value utilities
+     (`bg-[var(--cta-primary)]`, `bg-[color:var(--brand)]`), plain CSS (`ui.css`'s
+     `.rb-button`, `App.css`'s skip link), AND (UPDATE 2026-07-18, TASK-4949) the named
+     utilities `bg-cta-primary`/`bg-primary`/`bg-cta-secondary`/`bg-accent-primary`. Those named
+     utilities previously rendered no background at all: `src/index.css`'s `@theme` defined
+     their colors with Tailwind v3's `<alpha-value>` placeholder, which is invalid under v4 and
+     dropped the declaration (verified in-browser: `bg-cta-primary` computed to
+     `rgba(0, 0, 0, 0)`). Now that `@theme` uses the valid v4 `rgb(var(--*-rgb))` form, those
+     sites paint a real fill and have been rebound to this token wherever the label sits ON the
+     fill (see `src/themes/__tests__/cta-label-contrast.test.ts`).
 
      Default is #ffffff so every existing theme/preset renders byte-identically to before; a
      palette overrides it ONLY when its own CTA fill can't carry white. Verified white-on-fill

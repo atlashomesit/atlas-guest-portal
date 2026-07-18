@@ -48,7 +48,7 @@ const CallbackRequestForm = ({
           type="button"
           disabled={callbackStatus === "sending"}
           onClick={onSubmit}
-          className="inline-flex flex-1 items-center justify-center rounded-full bg-cta-primary px-4 py-3 text-sm font-semibold text-[var(--text-contrast)] shadow-level1 transition hover:bg-cta-secondary disabled:cursor-not-allowed disabled:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
+          className="inline-flex flex-1 items-center justify-center rounded-full bg-cta-primary px-4 py-3 text-sm font-semibold text-[var(--text-on-cta)] shadow-level1 transition hover:bg-cta-secondary disabled:cursor-not-allowed disabled:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
         >
           {callbackStatus === "sending"
             ? copy.submitLabels.sending

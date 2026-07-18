@@ -212,7 +212,7 @@ const PrivacyPage = () => {
               <button
                 type="button"
                 onClick={handleRevokeConsent}
-                className="px-4 py-3 bg-primary text-[var(--text-contrast)] font-semibold rounded-xl shadow-level1 hover:shadow-level2"
+                className="px-4 py-3 bg-primary text-[var(--text-on-cta)] font-semibold rounded-xl shadow-level1 hover:shadow-level2"
               >
                 Reset my cookie consent
               </button>

@@ -57,7 +57,7 @@ const ShortLinkRedirect = () => {
                     </p>
                     <Link
                         to="/"
-                        className="inline-flex items-center justify-center px-4 py-2 rounded-md bg-cta-primary text-[var(--text-contrast)] hover:bg-cta-secondary transition-colors shadow-level1"
+                        className="inline-flex items-center justify-center px-4 py-2 rounded-md bg-cta-primary text-[var(--text-on-cta)] hover:bg-cta-secondary transition-colors shadow-level1"
                     >
                         Go to Home
                     </Link>
@@ -80,7 +80,7 @@ const ShortLinkRedirect = () => {
                 <button
                     type="button"
                     onClick={() => window.location.replace(targetUrl)}
-                    className="w-full inline-flex items-center justify-center px-4 py-2 rounded-md bg-cta-primary text-[var(--text-contrast)] hover:bg-cta-secondary transition-colors shadow-level1"
+                    className="w-full inline-flex items-center justify-center px-4 py-2 rounded-md bg-cta-primary text-[var(--text-on-cta)] hover:bg-cta-secondary transition-colors shadow-level1"
                 >
                     Continue
                 </button>

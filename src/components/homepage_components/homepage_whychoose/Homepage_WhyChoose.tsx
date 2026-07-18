@@ -98,7 +98,7 @@ const Homepage_WhyChoose = () => {
                                         }`}
                                 >
                                     <div
-                                        className={`p-2 rounded-full ${activeFeature === index ? 'bg-accent-primary text-[var(--text-contrast)]' : 'bg-accent-primary/10 text-accent-primary'
+                                        className={`p-2 rounded-full ${activeFeature === index ? 'bg-accent-primary text-[var(--text-on-cta)]' : 'bg-accent-primary/10 text-accent-primary'
                                             }`}
                                     >
                                         <MdOutlineDone className="text-xl" />

@@ -22,10 +22,12 @@
  * `--text-on-cta` (declared below, defined in `base.css`) and binding the real CTA fills to
  * it, rather than lightening the gold, which would break the nocturnal brief.
  *
- * Scope note: the `bg-cta-primary`-style Tailwind utilities are NOT bound to `--text-on-cta`,
- * because they currently paint no background at all (Tailwind v3 `<alpha-value>` syntax in a
- * v4 `@theme` — atlas-e2e TASK-4949). They must move to it when that is fixed. The rows below
- * describe the token this palette actually declares and the components actually consume.
+ * Scope note (UPDATE 2026-07-18, TASK-4949): the `bg-cta-primary`-style Tailwind utilities
+ * previously painted no background at all (Tailwind v3 `<alpha-value>` syntax surviving into a
+ * v4 `@theme`). That has been fixed — `src/index.css`'s `@theme` block now uses the valid v4
+ * `rgb(var(--*-rgb))` form — and the named-utility call sites that paint a real CTA fill have
+ * been rebound to `--text-on-cta` in the same change. The rows below describe the token this
+ * palette actually declares and the components actually consume.
  *   --text-primary   (#f5f0e6) / --bg-primary   (#0b0d12)  → 17.11:1
  *   --text-secondary (#c9c2b3) / --bg-primary   (#0b0d12)  → 10.97:1
  *   --text-muted     (#9a9282) / --bg-primary   (#0b0d12)  →  6.30:1

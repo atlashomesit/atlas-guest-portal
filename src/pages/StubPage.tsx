@@ -27,7 +27,7 @@ const StubPage = ({ title, description, heading, body, ctaHref, ctaLabel }: Stub
         {ctaHref && ctaLabel && (
           <a
             href={ctaHref}
-            className="inline-flex w-full sm:w-auto justify-center items-center px-5 py-3 rounded-xl bg-cta-primary text-[var(--text-contrast)] font-semibold shadow-level1 hover:shadow-level2 transition"
+            className="inline-flex w-full sm:w-auto justify-center items-center px-5 py-3 rounded-xl bg-cta-primary text-[var(--text-on-cta)] font-semibold shadow-level1 hover:shadow-level2 transition"
           >
             {ctaLabel}
           </a>
