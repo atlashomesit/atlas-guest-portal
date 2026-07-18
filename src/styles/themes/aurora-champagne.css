@@ -6,7 +6,12 @@
 
   /* Text - Dreamy Warmth */
   --text-primary: #3d342f;
-  --text-muted: #8c7e75;
+  /* TASK-4952 — was #8c7e75: 3.62:1 on --bg-muted, 3.92:1 on --bg-surface/white, 3.86:1 on
+     --bg-primary. That single token accounted for all 16 of this preset's axe color-contrast
+     violations — every one a correct --text-muted binding on a too-light value, not a mis-bound
+     component. Darkened, staying in the same warm champagne family: worst case now 4.81:1
+     (on --bg-muted #fbf5ee), 5.21:1 on white. */
+  --text-muted: #786a61;
   --text-body: #5c524b;
   --text-on-hero: #3d342f;
 
