@@ -322,7 +322,7 @@ const Navbar = () => {
               Saved
               {savedCount > 0 ? (
                 <span
-                  className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-cta-primary px-1 text-[10px] font-bold leading-none text-white"
+                  className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-cta-primary px-1 text-[10px] font-bold leading-none text-[var(--text-on-cta)]"
                   data-testid="navbar-saved-count"
                   aria-label={`${savedCount} saved listings`}
                 >
@@ -411,7 +411,7 @@ const Navbar = () => {
             >
               Saved
               {savedCount > 0 ? (
-                <span className="ml-2 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-cta-primary px-1 text-[10px] font-bold text-white">
+                <span className="ml-2 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-cta-primary px-1 text-[10px] font-bold text-[var(--text-on-cta)]">
                   {savedCount > 99 ? '99+' : savedCount}
                 </span>
               ) : null}

@@ -198,7 +198,7 @@ export default function OffersPage() {
             <button
               type="submit"
               disabled={!promoCode.trim() || promoLoading}
-              className="rounded-xl bg-cta-primary px-5 py-2.5 text-sm font-semibold text-[var(--text-contrast)] shadow-level1 hover:shadow-level2 transition disabled:opacity-50"
+              className="rounded-xl bg-cta-primary px-5 py-2.5 text-sm font-semibold text-[var(--text-on-cta)] shadow-level1 hover:shadow-level2 transition disabled:opacity-50"
             >
               {promoLoading ? "Checking…" : "Check"}
             </button>
@@ -236,7 +236,7 @@ export default function OffersPage() {
           </div>
           <a
             href="/apartments"
-            className="inline-flex items-center gap-2 rounded-xl bg-cta-primary px-6 py-3 font-semibold text-[var(--text-contrast)] shadow-level1 hover:shadow-level2 transition text-sm"
+            className="inline-flex items-center gap-2 rounded-xl bg-cta-primary px-6 py-3 font-semibold text-[var(--text-on-cta)] shadow-level1 hover:shadow-level2 transition text-sm"
           >
             View apartments →
           </a>

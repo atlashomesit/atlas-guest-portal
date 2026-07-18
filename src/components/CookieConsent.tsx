@@ -85,7 +85,7 @@ const CookieConsent = () => {
           </button>
           <button
             type="button"
-            className="rounded-lg bg-cta-primary px-4 py-2 text-sm font-semibold text-[var(--text-contrast)] hover:opacity-95"
+            className="rounded-lg bg-cta-primary px-4 py-2 text-sm font-semibold text-[var(--text-on-cta)] hover:opacity-95"
             onClick={() => save("all")}
           >
             Accept all

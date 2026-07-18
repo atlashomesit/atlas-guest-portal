@@ -81,7 +81,7 @@ export default function LongStayCalculator({
               onClick={() => setSelected(nights)}
               className={`flex-1 min-h-11 rounded-lg border px-1 py-2.5 text-center text-xs transition-colors ${
                 selected === nights
-                  ? "border-cta-primary bg-cta-primary text-white"
+                  ? "border-cta-primary bg-cta-primary text-[var(--text-on-cta)]"
                   : "border-border-subtle bg-bg-surface text-text-secondary hover:border-cta-primary"
               }`}
             >

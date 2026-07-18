@@ -211,7 +211,7 @@ const CityLandingPage = ({ citySlug }: CityLandingPageProps) => {
             <button
               type="button"
               onClick={() => navigate("/search")}
-              className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-cta-primary px-5 py-3 text-sm font-semibold text-[var(--text-contrast)] shadow hover:bg-cta-secondary"
+              className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-cta-primary px-5 py-3 text-sm font-semibold text-[var(--text-on-cta)] shadow hover:bg-cta-secondary"
             >
               Open search
             </button>

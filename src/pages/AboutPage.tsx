@@ -207,7 +207,7 @@ const AboutPage = () => {
               There's no distant call center and no cast of department heads here. Every {brandName} home is looked after by the people who actually own it — the same person who checks the linens is the one who'll reply to your message.
             </p>
           </div>
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-cta-primary text-[var(--text-contrast)] font-semibold shadow-level1">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-cta-primary text-[var(--text-on-cta)] font-semibold shadow-level1">
             <Users className="w-4 h-4" />
             Owner-run, not outsourced
           </div>

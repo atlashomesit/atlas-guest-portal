@@ -150,7 +150,7 @@ export default function Amenities() {
           <div className="flex gap-3 flex-shrink-0">
             <Link
               to="/apartments"
-              className="inline-flex items-center gap-2 rounded-xl bg-cta-primary px-5 py-3 font-semibold text-[var(--text-contrast)] shadow-level1 hover:shadow-level2 transition text-sm"
+              className="inline-flex items-center gap-2 rounded-xl bg-cta-primary px-5 py-3 font-semibold text-[var(--text-on-cta)] shadow-level1 hover:shadow-level2 transition text-sm"
             >
               Browse apartments →
             </Link>
