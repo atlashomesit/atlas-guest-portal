@@ -33,6 +33,7 @@
   --brand: #c29b2f;
   --brand-ink: #f0f7f3;
   --brand-contrast: #04120b;
+  --util-bar-text: var(--brand-contrast); /* WCAG AA fix: default gold #cbb89b was 1.77:1 on this light --brand-ink */
   --brand-soft: #112d1e;
 
   /* Borders - Soft Luxury */

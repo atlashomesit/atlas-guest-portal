@@ -6,7 +6,7 @@
 
   /* Text - Warm, Romantic Contrast */
   --text-primary: #3d2e2a;
-  --text-muted: #8c7570;
+  --text-muted: #856F6A; /* WCAG AA fix: was #8c7570 (4.29:1 on editorial-layout white card, needs 4.5:1) */
   --text-body: #524340;
   --text-on-hero: #3d2e2a;
 

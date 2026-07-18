@@ -6,7 +6,7 @@
 
   /* Text - Dreamy Warmth */
   --text-primary: #3d342f;
-  --text-muted: #8c7e75;
+  --text-muted: #7D7169; /* WCAG AA fix: was #8c7e75 (3.92:1 on editorial-layout white card, needs 4.5:1) */
   --text-body: #5c524b;
   --text-on-hero: #3d342f;
 

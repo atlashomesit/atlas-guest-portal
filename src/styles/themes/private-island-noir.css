@@ -33,6 +33,7 @@
   --brand: #0f1117;
   --brand-ink: #f5f1e8;
   --brand-contrast: #0b0c10;
+  --util-bar-text: var(--brand-contrast); /* WCAG AA fix: default gold #cbb89b was 1.71:1 on this light --brand-ink */
   --brand-soft: #161922;
 
   /* Borders */

@@ -6,7 +6,7 @@
 
   /* Text */
   --text-primary: #2a2e32;
-  --text-muted: #7a828c;
+  --text-muted: #6D747D; /* WCAG AA fix: was #7a828c (3.88:1 on editorial-layout white card, needs 4.5:1) */
   --text-body: #3a4046;
   --text-on-hero: #1f2328;
 
