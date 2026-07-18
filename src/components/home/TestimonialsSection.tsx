@@ -17,10 +17,22 @@ const testimonialsBandStyle: CSSProperties = {
 };
 
 const reviewCardBaseClassName =
-  "rounded-2xl bg-white p-6 md:p-8 transition-all duration-[180ms] hover:-translate-y-1.5 min-w-[280px] shadow-[0_2px_8px_rgba(74,53,53,0.05)] hover:shadow-[0_12px_32px_rgba(74,53,53,0.09)]";
+  "rounded-2xl p-6 md:p-8 transition-all duration-[180ms] hover:-translate-y-1.5 min-w-[280px] shadow-[0_2px_8px_rgba(74,53,53,0.05)] hover:shadow-[0_12px_32px_rgba(74,53,53,0.09)]";
 
-/** Alternating hairline borders — coral / lavender / coral, per the mockup row. */
+/**
+ * Alternating hairline borders — coral / lavender / coral, per the mockup row.
+ *
+ * TASK-4952 — `backgroundColor` moved here off a hardcoded `bg-white` utility. The card ground
+ * was white while its contents bind to --text-primary / --text-muted, so the dark noir presets
+ * painted light text on white: 1.08-1.12:1 for the quote and guest name, 1.77-2.57:1 for
+ * "Verified stay". --bg-card with #ffffff as the fallback keeps every light preset
+ * byte-identical while dark palettes get their own card surface; the band behind it already
+ * resolved --bg-secondary the same way. Set as an inline style rather than a
+ * `bg-[var(--bg-card,#ffffff)]` arbitrary utility because this element already carries a style
+ * object, and it keeps the value out of Tailwind's arbitrary-value parsing entirely.
+ */
 const reviewCardBorderStyle = (index: number): CSSProperties => ({
+  backgroundColor: "var(--bg-card, #ffffff)",
   border: `1px solid ${index % 2 === 1 ? "var(--lavender, #c5b4f3)" : "color-mix(in srgb, var(--brand-accent, #f08c71) 70%, #ffffff)"}`,
 });
 
