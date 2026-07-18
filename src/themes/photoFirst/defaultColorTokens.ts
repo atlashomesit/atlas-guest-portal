@@ -12,8 +12,8 @@
  * shape/keys exactly (TASK-4906/4907 precedent) so the same CSS-variable surface every shared
  * component already reads works unchanged for this layout too. Runtime application (painting
  * these onto `document.documentElement` when the resolved layout is `photoFirst` and no preset
- * is active) is TASK-4904's boot-wiring scope, not invented here — same "data only" note as
- * heritage/noir/coastal's files.
+ * is active) is wired in `src/main.tsx`'s boot sequence via `applyLayoutDefaultColorTokens` as
+ * of PR #348 (TASK-4904) — same wiring as heritage/noir/coastal's files.
  *
  * WCAG AA contrast (computed via the standard relative-luminance formula, not eyeballed —
  * TASK-4925's hard bar, epic §3.11/AC14/AC15). Ratios for every text/background pair this

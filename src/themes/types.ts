@@ -57,8 +57,9 @@ export interface LayoutThemeDefinition {
    * Optional: `classic`'s "default" look already lives in `src/styles/themes/default.css`
    * as the `default` color-preset registry entry, so it has no separate palette of its
    * own here. `heritage` (TASK-4914) is the first layout to populate this field — see
-   * `src/themes/heritage/defaultColorTokens.ts` for provenance and the runtime-wiring
-   * note (TASK-4904 scope, not applied by any code in this repo yet).
+   * `src/themes/heritage/defaultColorTokens.ts` for provenance. Runtime application (painting
+   * these onto `document.documentElement` via `applyLayoutDefaultColorTokens`) is wired in
+   * `src/main.tsx`'s boot sequence as of PR #348 (TASK-4904).
    */
   defaultColorTokens?: Readonly<Record<string, string>>;
 }

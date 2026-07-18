@@ -239,7 +239,7 @@ export default function FavoritesPage() {
         {!hasStoredEmail && favorites.length > 0 && reminderState !== "done" && (
           <div className="rounded-2xl border border-brand-primary/30 bg-brand-primary/5 p-4">
             <p className="text-sm font-medium text-text-primary mb-1">Get reminded about these homes</p>
-            <p className="text-xs text-text-secondary mb-3">
+            <p id="reminder-email-description" className="text-xs text-text-secondary mb-3">
               Enter your email and we'll send you a one-time reminder in 7 days if you haven't booked yet.
             </p>
             <form onSubmit={handleReminderSubmit} className="flex gap-2 flex-wrap">
@@ -248,6 +248,8 @@ export default function FavoritesPage() {
                 type="email"
                 required
                 placeholder="your@email.com"
+                aria-label="Reminder email address"
+                aria-describedby="reminder-email-description"
                 value={reminderEmail}
                 onChange={(e) => setReminderEmail(e.target.value)}
                 className="flex-1 min-w-0 rounded-lg border border-border-subtle px-3 py-3 text-base focus:outline-none focus:ring-2 focus:ring-brand-primary"

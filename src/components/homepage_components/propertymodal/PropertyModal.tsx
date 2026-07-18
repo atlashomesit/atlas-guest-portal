@@ -1,7 +1,9 @@
+import { useEffect } from "react";
 import { FaBed, FaShower, FaSwimmingPool, FaCar } from "react-icons/fa";
 import { IoMdClose } from "react-icons/io";
 import { Button } from "../../ui/Button";
 import OptimizedImage from "../../ui/OptimizedImage";
+import { useFocusTrap } from "../../../hooks/useFocusTrap";
 // Define the types for the property amenities
 interface Amenity {
     amenities_type: string;
@@ -24,6 +26,23 @@ interface PropertyModalProps {
 }
 
 const PropertyModal: React.FC<PropertyModalProps> = ({ property, onClose, handleNavigate }) => {
+    const isOpen = property !== null;
+    // TASK-4959: same accessible-dialog pattern as `ui/Modal.tsx` (focus trap + focus
+    // return, WCAG 2.4.3 / 2.1.2).
+    const dialogRef = useFocusTrap<HTMLDivElement>(isOpen);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        document.body.style.overflow = "hidden";
+        const handleEsc = (e: KeyboardEvent) => {
+            if (e.key === "Escape") onClose();
+        };
+        document.addEventListener("keydown", handleEsc);
+        return () => {
+            document.removeEventListener("keydown", handleEsc);
+            document.body.style.overflow = "auto";
+        };
+    }, [isOpen, onClose]);
 
     if (!property) return null;
 
@@ -44,8 +63,19 @@ const PropertyModal: React.FC<PropertyModalProps> = ({ property, onClose, handle
     };
 
     return (
-        <section className="fixed inset-0 flex items-center justify-center w-full bg-[color:color-mix(in_srgb,var(--text-primary)_70%,transparent)] z-[var(--z-modal)]">
-            <div className="relative bg-bg-surface flex flex-col md:flex-row gap-5 rounded-lg shadow-level2 p-6 h-[70vh] md:h-[70vh] w-[80%] overflow-y-auto overflow-x-hidden text-text-primary">
+        <section
+            className="fixed inset-0 flex items-center justify-center w-full bg-[color:color-mix(in_srgb,var(--text-primary)_70%,transparent)] z-[var(--z-modal)]"
+            onClick={onClose}
+            role="presentation"
+        >
+            <div
+                ref={dialogRef}
+                className="relative bg-bg-surface flex flex-col md:flex-row gap-5 rounded-lg shadow-level2 p-6 h-[70vh] md:h-[70vh] w-[80%] overflow-y-auto overflow-x-hidden text-text-primary"
+                onClick={(e) => e.stopPropagation()}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="property-modal-title"
+            >
                 {/* property image  */}
                 <div className="flex-1 h-full min-h-[200px]">
                     <OptimizedImage
@@ -59,10 +89,17 @@ const PropertyModal: React.FC<PropertyModalProps> = ({ property, onClose, handle
                 {/* property details  */}
                 <div className="flex-1 flex flex-col gap-4">
                     {/* modal close button  */}
-                    <span onClick={onClose} className=" fixed right-2 top-2 cursor-pointer z-[var(--z-dropdown)] text-2xl text-[var(--text-contrast)] h-8 w-8 bg-[color:color-mix(in_srgb,var(--text-primary)_40%,transparent)] hover:bg-[color:color-mix(in_srgb,var(--text-primary)_60%,transparent)] flex justify-center items-center"><IoMdClose /></span>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        aria-label="Close property preview"
+                        className="fixed right-2 top-2 cursor-pointer z-[var(--z-dropdown)] text-2xl text-[var(--text-contrast)] h-8 w-8 bg-[color:color-mix(in_srgb,var(--text-primary)_40%,transparent)] hover:bg-[color:color-mix(in_srgb,var(--text-primary)_60%,transparent)] flex justify-center items-center rounded-full"
+                    >
+                        <IoMdClose />
+                    </button>
                     {/* title  */}
                     <div className="flex justify-between items-start">
-                        <h2 className="text-xl font-bold ">{property.property_name}</h2>
+                        <h2 id="property-modal-title" className="text-xl font-bold ">{property.property_name}</h2>
                     </div>
                     <hr />
                     {/* description  */}

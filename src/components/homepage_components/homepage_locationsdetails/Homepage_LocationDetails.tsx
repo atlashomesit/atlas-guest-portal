@@ -316,7 +316,7 @@ const Homepage_LocationDetails = () => {
                                             <span>✔ Pay @ hotel</span>
                                             <span>✔ Couple friendly</span>
                                             {data.additional_cost_note && (
-                                                <span className="text-red-400">⚠ {data.additional_cost_note}</span>
+                                                <span className="text-red-700">⚠ {data.additional_cost_note}</span>
                                             )}
                                         </div>
                                     </div>
