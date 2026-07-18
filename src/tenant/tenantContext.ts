@@ -353,6 +353,16 @@ export async function validateTenant(slug: string): Promise<TenantInfo> {
       : undefined,
     // TASK-4381/4386 / ADR-0068
     isInternal: Boolean(data.isInternal),
+    // TASK-4950: mirrors resolveFromDomain()'s parse (above) so the validateTenant() fallback
+    // path (used when resolveFromDomain returns null) also resolves the tenant's real layout
+    // theme + color preset instead of silently falling back to classic/default. main.tsx's
+    // existing resolution treats `undefined` as "fall back to classic/default" already, so no
+    // further wiring change is needed.
+    effectiveThemeId: typeof data.effectiveThemeId === 'string' ? data.effectiveThemeId : undefined,
+    effectiveColorPresetId:
+      typeof data.effectiveColorPresetId === 'string' || data.effectiveColorPresetId === null
+        ? data.effectiveColorPresetId
+        : undefined,
   };
   return tenantInfo;
 }
