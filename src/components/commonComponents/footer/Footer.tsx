@@ -9,7 +9,6 @@ import { LOGO_URL } from '../../../config/branding';
 import { getTenantContext } from '../../../tenant/tenantContext';
 import { getTenantBrandName } from '../../../tenant/displayBrand';
 import { getTenantOverrides, shouldHideAtlasBranding } from '../../../tenant/tenantOverrides';
-import { CompactThemeSwitcher } from '../../ui/CompactThemeSwitcher';
 import { formatDisplayNumber, getContactEmail, getTelLink, getWhatsAppLink, getContactPhone, getWhatsAppPhone } from '../../../config/contact';
 
 const iconMap = {
@@ -209,10 +208,6 @@ const Footer = () => {
                     <Link to="/privacy" className='hover:text-[var(--footer-link-hover)] transition-colors'>Privacy</Link>
                     <span>|</span>
                     <Link to="/contact" className='hover:text-[var(--footer-link-hover)] transition-colors'>Contact</Link>                </div>
-                <div className='flex items-center'>
-                    <span className='hidden sm:inline mr-2'>|</span>
-                    <CompactThemeSwitcher />
-                </div>
             </div>
 
             {/* TASK-4161: Consumer Protection (E-Commerce) Rules 2020 disclosure — custom-domain

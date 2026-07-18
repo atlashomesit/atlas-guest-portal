@@ -11,6 +11,7 @@
  * `src/main.tsx` are allowed to import from `src/themes/` — see the ESLint boundary
  * rule in `eslint.config.js` and the HARD RULE in `AGENTS.md` ("Theme ≠ integration").
  */
+import type { ThemeName } from "@/styles/theme";
 import type { LayoutThemeDefinition, LayoutThemeId, LayoutThemeModule } from "./types";
 import { heritageDefaultColorTokens } from "./heritage/defaultColorTokens";
 import { noirDefaultColorTokens } from "./noir/defaultColorTokens";
@@ -186,6 +187,36 @@ export function isRegisteredLayoutThemeId(id: string): id is LayoutThemeId {
 export function resolveLayoutThemeId(id?: string | null): LayoutThemeId {
   if (id && isRegisteredLayoutThemeId(id)) return id;
   return DEFAULT_LAYOUT_THEME_ID;
+}
+
+/**
+ * ADR-0081 D5/D6b — a layout's own authored default palette, or `undefined` when it has none
+ * (`classic`, whose "default" look already ships as the `default` color preset's own CSS).
+ */
+export function getLayoutThemeDefaultColorTokens(
+  id: LayoutThemeId,
+): Readonly<Record<string, string>> | undefined {
+  const definition = themeRegistry[id] ?? themeRegistry[DEFAULT_LAYOUT_THEME_ID];
+  return definition.defaultColorTokens;
+}
+
+/**
+ * ADR-0081 D6 — resolves a tenant's chosen color preset against the layout's curated matrix.
+ *
+ * Returns the preset only when this layout declares it in `supportedColorPresets`; otherwise
+ * `null`, meaning "fall back to the layout's own `defaultColorTokens`". A preset that is
+ * absent, unknown, or simply not curated for this layout is a safe no-op — D6's own wording:
+ * "never selectable/renderable for this layout (safe no-op fallback, not an error)".
+ */
+export function resolveColorPresetForLayout(
+  id: LayoutThemeId,
+  colorPresetId?: string | null,
+): ThemeName | null {
+  if (!colorPresetId) return null;
+  const definition = themeRegistry[id] ?? themeRegistry[DEFAULT_LAYOUT_THEME_ID];
+  return definition.supportedColorPresets.includes(colorPresetId as ThemeName)
+    ? (colorPresetId as ThemeName)
+    : null;
 }
 
 /** Lazy-loads a layout theme's page-component module. Falls back to the default on an unregistered id. */
