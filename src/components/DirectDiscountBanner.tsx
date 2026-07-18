@@ -47,6 +47,14 @@ export default function DirectDiscountBanner() {
   }
 
   function handleCopy() {
+    // TASK-4966: the banner claims the code "auto-applies when you tap Book now" —
+    // make that true by setting the same localStorage key UnitBookingWidget reads
+    // from `?promo=` (see UnitBookingWidget.tsx:362-371), not just the clipboard.
+    try {
+      window.localStorage.setItem('atlas_guest_promo_code', PROMO_CODE);
+    } catch {
+      // no-op — clipboard copy below still lets the guest apply it manually
+    }
     navigator.clipboard.writeText(PROMO_CODE).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
