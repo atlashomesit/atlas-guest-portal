@@ -3,12 +3,35 @@
   --bg-primary: #0b0c10;
   --bg-surface: #0f1117;
   --bg-muted: #161922;
+  /* TASK-4952 — this preset previously declared no --bg-secondary/--bg-card, so both fell back
+     to base.css's LIGHT-theme defaults (#fdf2e9 cream / #ffffff white) inside an otherwise
+     all-dark palette. Every card and section built on them painted this preset's light text on
+     a white ground: --text-primary measured 1.02:1 on the cream and 1.12:1 on the white, and
+     --text-muted 1.60:1 / 1.77:1 — 43 of this combo's 57 axe color-contrast violations. Dark
+     surfaces lifted off --bg-primary instead, matching the --bg-surface/--bg-muted ramp above.
+     Against these two: --text-primary 16.31:1 / 15.73:1, --text-body 14.49:1 / 13.98:1,
+     --text-muted 10.36:1 / 9.99:1. */
+  --bg-secondary: #12141c;
+  --bg-card: #151821;
 
   /* Text */
   --text-primary: #f5f1e8;
   --text-muted: #c7c2b8;
   --text-body: #e9e4d8;
   --text-on-hero: #fdfbf7;
+  /* Also absent before TASK-4952 — base.css's #706060 is tuned for light surfaces and measured
+     3.28:1 on --bg-primary here. Warm stone, between --text-body and --text-muted:
+     11.76:1 worst-case across all five surfaces above. */
+  --text-secondary: #d8d3c8;
+
+  /* Small-accent TEXT roles. base.css defaults these to a coral/violet pair chosen for LIGHT
+     surfaces (#a84832 / #6f5aa8) and asks each theme to override with brand-matched values;
+     this preset never did, so they measured 3.04-3.38:1 on its dark grounds. Collapsed onto
+     this preset's gold-and-stone register, the same way noir/defaultColorTokens.ts does:
+       --accent-text   (gold, a lifted --accent-primary) → 10.20:1 worst-case
+       --lavender-text (= --text-secondary)              → 11.76:1 worst-case */
+  --accent-text: #e5c25c;
+  --lavender-text: #d8d3c8;
 
   /* Accent */
   --accent-primary: #d4af37;
@@ -31,9 +54,14 @@
 
   /* Brand */
   --brand: #0f1117;
-  --brand-ink: #f5f1e8;
+  /* TASK-4952 — --brand-ink reads like "ink for the brand surface", and this preset set it
+     light accordingly. But it has exactly ONE consumer in the repo: navbar.css's `.util-bar`,
+     which uses it as the BACKGROUND of a slim strip and pairs it with hardcoded warm-light text
+     (#cbb89b / #ffe8d6). Light-on-light: 1.71:1 and 1.04:1. noir/defaultColorTokens.ts already
+     fixed exactly this for the no-preset case; this preset reintroduced it. Dark now (reusing
+     --bg-surface's hex, keeping the strip lifted off --bg-primary): 9.77:1 and 15.96:1. */
+  --brand-ink: #0f1117;
   --brand-contrast: #0b0c10;
-  --util-bar-text: var(--brand-contrast); /* WCAG AA fix: default gold #cbb89b was 1.71:1 on this light --brand-ink */
   --brand-soft: #161922;
 
   /* Borders */
