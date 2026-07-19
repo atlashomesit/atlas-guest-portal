@@ -24,6 +24,64 @@
   letter-spacing: -0.005em;
 }
 
+/* WCAG AA — dark presets on a designed-light page (gate 9b 2026-07-19).
+   .pp-root hardcodes the cream #fff8e7 ground above, but the two noir presets are
+   dark palettes: their ink tokens (--text-muted #8ba898 etc.) are tuned for the
+   #04120b ground and measured 2.43:1 on cream across ~100 nodes. Founder decision:
+   the listing-detail page stays light for every preset — pin ink/surface tokens to
+   the default.css sandstone values for the dark presets only, so light presets keep
+   their own (AA-green) token-driven inks. A genuinely dark listing page is future work.
+   Both var namespaces must be pinned: inline styles consume the raw tokens (resolved
+   at the element, so this scope wins), while Tailwind v4 utilities consume the
+   @theme --color-* mirrors, whose var() indirection is computed at :root (non-inline
+   @theme) and therefore needs the mirror itself re-declared here with literal values. */
+:root[data-theme="privateIslandNoir"] .pp-root,
+:root[data-theme="emeraldDynasty"] .pp-root {
+  --bg-primary: #fff8e7;
+  --bg-secondary: #fdf2e9;
+  --bg-card: #ffffff;
+  --bg-surface: #ffffff;
+  --bg-muted: #f5ebe0;
+  --text-primary: #4a3535;
+  --text-secondary: #706060;
+  --text-muted: #6b5a55;
+  --text-body: #4a3535;
+  --accent-text: #a84832;
+  --lavender: #c5b4f3;
+  --lavender-soft: #f0eafd;
+  --lavender-deep: #8e7cc3;
+  --lavender-text: #6f5aa8;
+  --border: #f0ddd0;
+  --border-subtle: #f0ddd0;
+  --border-strong: #e5cfc0;
+  --brand-primary: #c45a3f;
+  --accent-primary: #c45a3f;
+  --cta-primary: #c45a3f;
+  --cta-primary-hover: #a84832;
+  --cta-secondary: #8e7cc3;
+  --accent-primary-rgb: 196 90 63;
+  --accent-soft-rgb: 242 225 235;
+  --cta-primary-rgb: 196 90 63;
+  --cta-primary-hover-rgb: 168 72 50;
+  --cta-secondary-rgb: 142 124 195;
+  --color-bg-primary: #fff8e7;
+  --color-bg-secondary: #fdf2e9;
+  --color-bg-surface: #ffffff;
+  --color-bg-muted: #f5ebe0;
+  --color-text-primary: #4a3535;
+  --color-text-secondary: #706060;
+  --color-text-muted: #6b5a55;
+  --color-accent-primary: rgb(196 90 63);
+  --color-accent-soft: rgb(242 225 235);
+  --color-cta-primary: rgb(196 90 63);
+  --color-cta-primary-hover: rgb(168 72 50);
+  --color-cta-secondary: rgb(142 124 195);
+  --color-brand-primary: #c45a3f;
+  --color-border-subtle: #f0ddd0;
+  --color-border-strong: #e5cfc0;
+  --color-primary: rgb(196 90 63);
+}
+
 /* ---------- Atoms -------------------------------------------------------- */
 .pp-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;

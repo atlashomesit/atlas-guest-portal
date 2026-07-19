@@ -1759,7 +1759,11 @@ useEffect(() => {
                     "We keep this home ready ourselves — come in, settle down, and
                     message us any time. We're never more than a WhatsApp away."
                   </blockquote>
-                  <p style={{ marginTop: 10, fontSize: 13, color: 'var(--text-muted, #6b5a55)' }}>
+                  {/* WCAG AA: this panel's background is the fixed lavender-soft surface (not
+                      theme-driven), so it must use --lavender-text (contrast-validated against
+                      #f0eafd at 4.83:1 in default.css), not the per-preset --text-muted — mirrors
+                      the identical host-note fix in Home.tsx (text-muted-inherited-surface-contrast.test.ts). */}
+                  <p style={{ marginTop: 10, fontSize: 13, color: 'var(--lavender-text, #6f5aa8)' }}>
                     — {ppHasRealHost ? `${ppHostDisplayName}, your host` : `The ${ppBrandName} host team`}
                   </p>
                 </div>
