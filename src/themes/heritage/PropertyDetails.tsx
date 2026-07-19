@@ -1738,6 +1738,57 @@ useEffect(() => {
                   </div>
                 </section>
 
+                {/* From your hosts — heritage's own host-note callout (TASK-4987 ruling 2026-07-19).
+                    The E2E theme-preset contrast gate needs every layout's listing detail to paint
+                    ONE canary surface — --lavender-text over --lavender-soft — to corroborate the
+                    page rendered before trusting a zero-violation axe scan. The gate locates it by
+                    role="note" + data-testid="pp-host-note" (the cross-layout contract), NOT by the
+                    coral redesign's copy: heritage words its note its own way, so the AC7
+                    layout-differentiation test (ac7-layout-theme-switch.test.tsx — heritage must
+                    not contain the coral panel's copy) keeps passing. Copy below is deliberately
+                    DIFFERENT from Homepage_PropertyDetails.tsx's panel. */}
+                <div
+                  role="note"
+                  data-testid="pp-host-note"
+                  aria-label="From your hosts"
+                  style={{
+                    margin: '20px 0 4px',
+                    borderRadius: 16,
+                    padding: '22px 26px',
+                    background: 'var(--lavender-soft, #f0eafd)',
+                    borderLeft: '4px solid var(--lavender-deep, #8e7cc3)',
+                  }}
+                >
+                  <p
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 600,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.18em',
+                      color: 'var(--lavender-text, #6f5aa8)',
+                      margin: '0 0 10px',
+                    }}
+                  >
+                    From your hosts
+                  </p>
+                  <blockquote
+                    style={{
+                      fontFamily: 'var(--font-family-display)',
+                      fontSize: 'clamp(18px, 2vw, 22px)',
+                      lineHeight: 1.55,
+                      color: 'var(--text-primary, #4a3535)',
+                      margin: 0,
+                    }}
+                  >
+                    "This home has been in our care for years — walk in, settle down, and
+                    reach out to us whenever you need anything at all."
+                  </blockquote>
+                  {/* WCAG AA: fixed lavender-soft surface — must use --lavender-text
+                      (contrast-validated against #f0eafd), not per-preset --text-muted. */}
+                  <p style={{ marginTop: 10, fontSize: 13, color: 'var(--lavender-text, #6f5aa8)' }}>
+                    — {ppHasRealHost ? `${ppHostDisplayName}, your host` : `The ${ppBrandName} host team`}
+                  </p>
+                </div>
 
                 {/* About this home */}
                 <section className="pp-section" aria-label="About this home">

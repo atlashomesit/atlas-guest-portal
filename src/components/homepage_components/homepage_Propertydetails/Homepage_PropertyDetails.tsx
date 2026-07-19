@@ -1723,9 +1723,16 @@ useEffect(() => {
                   </div>
                 </section>
 
-                {/* A note from your host — lavender callout panel (Theem mockup) */}
+                {/* A note from your host — lavender callout panel (Theem mockup).
+                    data-testid="pp-host-note" is the CROSS-LAYOUT canary contract (TASK-4987
+                    ruling 2026-07-19): the E2E contrast gate locates this panel by
+                    role="note" + this testid — NOT by the coral copy — so every layout's
+                    listing detail must render a host-note landmark carrying this testid on
+                    the --lavender-soft/--lavender-text surface, while each layout stays free
+                    to word it its own way (AC7 layout-differentiation stays intact). */}
                 <div
                   role="note"
+                  data-testid="pp-host-note"
                   aria-label="A note from your host"
                   style={{
                     margin: '20px 0 4px',

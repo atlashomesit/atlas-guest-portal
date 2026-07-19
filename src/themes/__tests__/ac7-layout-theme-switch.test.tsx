@@ -221,6 +221,17 @@ describe("AC7 — classic and heritage PropertyDetails carry genuinely different
     expect(heritageSource).toContain('data-testid="heritage-property-details"');
   });
 
+  it("BOTH layouts carry the cross-layout host-note canary testid, each with its own copy (TASK-4987 ruling)", () => {
+    // TASK-4987 (2026-07-19): the E2E contrast gate locates its painted-page canary by
+    // data-testid="pp-host-note" + role="note", NOT by the coral copy — so heritage renders its
+    // own differently-worded host note (satisfying the contrast gate) while the not.toContain
+    // above keeps proving the layouts differ in composition/copy. If this assertion fails,
+    // the contrast gate's false-clean guard loses its anchor on that layout — do NOT resolve
+    // it by copying the coral panel verbatim into heritage (that re-creates the deadlock).
+    expect(classicSource).toContain('data-testid="pp-host-note"');
+    expect(heritageSource).toContain('data-testid="pp-host-note"');
+  });
+
   it("heritage's PropertyDetails imports the CURRENT shared map-selection logic, not a forked copy", () => {
     expect(heritageSource).toContain(
       "@/components/homepage_components/homepage_Propertydetails/propertyMapMode",
