@@ -1738,52 +1738,6 @@ useEffect(() => {
                   </div>
                 </section>
 
-                {/* A note from your host — lavender callout panel. Mirrors the classic layout's
-                    Homepage_PropertyDetails panel: the theme-preset contrast gate treats this
-                    callout as the painted-page canary (its lavender-soft surface is the one
-                    --lavender-text is contrast-validated against), so every layout's listing
-                    detail must render it. */}
-                <div
-                  role="note"
-                  aria-label="A note from your host"
-                  style={{
-                    margin: '20px 0 4px',
-                    borderRadius: 16,
-                    padding: '22px 26px',
-                    background: 'var(--lavender-soft, #f0eafd)',
-                    borderLeft: '4px solid var(--lavender-deep, #8e7cc3)',
-                  }}
-                >
-                  <p
-                    style={{
-                      fontSize: 12,
-                      fontWeight: 600,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.18em',
-                      color: 'var(--lavender-text, #6f5aa8)',
-                      margin: '0 0 10px',
-                    }}
-                  >
-                    A note from your host
-                  </p>
-                  <blockquote
-                    style={{
-                      fontFamily: 'var(--font-family-display)',
-                      fontSize: 'clamp(18px, 2vw, 22px)',
-                      lineHeight: 1.55,
-                      color: 'var(--text-primary, #4a3535)',
-                      margin: 0,
-                    }}
-                  >
-                    "We keep this home ready ourselves — come in, settle down, and
-                    message us any time. We're never more than a WhatsApp away."
-                  </blockquote>
-                  {/* WCAG AA: fixed lavender-soft surface — must use --lavender-text
-                      (contrast-validated against #f0eafd), not per-preset --text-muted. */}
-                  <p style={{ marginTop: 10, fontSize: 13, color: 'var(--lavender-text, #6f5aa8)' }}>
-                    — {ppHasRealHost ? `${ppHostDisplayName}, your host` : `The ${ppBrandName} host team`}
-                  </p>
-                </div>
 
                 {/* About this home */}
                 <section className="pp-section" aria-label="About this home">
