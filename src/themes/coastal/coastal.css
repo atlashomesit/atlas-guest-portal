@@ -1,0 +1,52 @@
+/**
+ * TASK-4907 — "coastal" layout's scoped CSS. Presentation only, entirely contained within
+ * src/themes/coastal/** (AGENTS.md "Theme ≠ integration" HARD RULE) — no shared CSS files
+ * touched. Uses the existing CSS-variable design-token system so tenant color-preset
+ * overrides (ADR-0081 D5/D6) still apply.
+ */
+
+.coastal-gallery-track {
+  scroll-behavior: smooth;
+}
+
+.coastal-gallery-card {
+  display: flex;
+  flex-direction: column;
+  width: 280px;
+  border-radius: 20px;
+  overflow: hidden;
+  text-decoration: none;
+  box-shadow: var(--shadow-level-1, 0 2px 8px rgba(8, 47, 58, 0.05));
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.coastal-gallery-card:hover,
+.coastal-gallery-card:focus-visible {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-level-2, 0 8px 24px rgba(8, 47, 58, 0.08));
+}
+
+.coastal-gallery-photo-inner {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+}
+
+.coastal-gallery-photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.coastal-gallery-body {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+@media (min-width: 768px) {
+  .coastal-gallery-card {
+    width: 340px;
+  }
+}

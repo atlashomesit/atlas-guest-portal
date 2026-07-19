@@ -126,7 +126,7 @@ const ListingFilters: React.FC<ListingFiltersProps> = ({
             <button
               type="button"
               onClick={onApply}
-              className="min-h-11 flex-1 rounded-lg bg-cta-primary px-4 py-3 text-sm font-semibold text-[var(--text-contrast)] hover:bg-cta-secondary focus:outline-none focus:ring-2 focus:ring-cta-primary"
+              className="min-h-11 flex-1 rounded-lg bg-cta-primary px-4 py-3 text-sm font-semibold text-[var(--text-on-cta)] hover:bg-cta-secondary focus:outline-none focus:ring-2 focus:ring-cta-primary"
             >
               Apply
             </button>

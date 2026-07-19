@@ -546,7 +546,7 @@ export const Apartments = () => {
             <div className="flex flex-wrap gap-4 justify-center">
               <button
                 onClick={fetchData}
-                className="px-6 py-3 bg-cta-primary text-[var(--text-contrast)] rounded-full hover:bg-cta-secondary transition-colors"
+                className="px-6 py-3 bg-cta-primary text-[var(--text-on-cta)] rounded-full hover:bg-cta-secondary transition-colors"
                 disabled={fetchState === "loading"}
               >
                 {fetchState === "loading" ? "Refreshing..." : "Retry loading"}

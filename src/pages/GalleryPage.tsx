@@ -112,7 +112,7 @@ const GalleryPage = () => {
                   onClick={() => setActiveSegment(segment.id)}
                   className={`rounded-full border px-4 py-3 min-h-12 text-base font-semibold transition shadow-sm ${
                     activeSegment === segment.id
-                      ? "bg-primary text-[var(--text-contrast)] border-primary"
+                      ? "bg-primary text-[var(--text-on-cta)] border-primary"
                       : "bg-bg-muted text-text-primary border-border-subtle hover:border-primary"
                   }`}
                   aria-pressed={activeSegment === segment.id}

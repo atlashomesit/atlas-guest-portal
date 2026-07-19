@@ -766,6 +766,24 @@ const GuestDetailsPage: React.FC = () => {
             setPromoOpen(true);
           }
 
+          // TASK-4967: mirror the promo rejection branch above — a referral code that
+          // the server rejects (or silently drops the discount for) must not fail silently.
+          if (typeof serverReferralCode === 'string' && serverReferralCode.trim()) {
+            setAppliedReferralCode(serverReferralCode.trim());
+            setReferralDiscountAmount(Number(serverReferralDiscount) > 0 ? Number(serverReferralDiscount) : 0);
+            if (!(Number(serverReferralDiscount) > 0)) {
+              setReferralMessage(`Referral ${serverReferralCode.trim()} could not be applied`);
+              setReferralOpen(true);
+            }
+          } else if (Number(serverReferralDiscount) > 0) {
+            // discount present without an echoed code — nothing to correct.
+          } else if (appliedReferralCode && referralDiscountAmount > 0) {
+            setReferralDiscountAmount(0);
+            setAppliedReferralCode(null);
+            setReferralMessage(`Referral ${appliedReferralCode} could not be applied`);
+            setReferralOpen(true);
+          }
+
           keyId = respKeyId;
           orderId = respOrderId;
           bookingId = Number(respBookingId);

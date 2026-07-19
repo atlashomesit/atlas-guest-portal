@@ -78,6 +78,32 @@ export interface TenantInfo {
    * staying fully functional. Undefined/false = normal indexable tenant.
    */
   isInternal?: boolean;
+  /**
+   * TASK-4903/4904 (ADR-0081 D2/D3): the tenant's resolved layout-theme id (e.g. "classic",
+   * "heritage"). Undefined until TASK-4904 lands `TenantFromDomainDto.EffectiveThemeId` —
+   * callers must resolve a safe default themselves (see `src/themes/registry.ts`'s
+   * `resolveLayoutThemeId()`), never assume this field is present.
+   */
+  effectiveThemeId?: string;
+  /**
+   * TASK-4903/4904 (ADR-0081 D5/D6a): the tenant's resolved color-preset id (a
+   * `styles/theme.ts` `ThemeName`), or null when no preset is resolved (layout renders its
+   * own authored default + `BrandColor` override, D6b). Undefined until TASK-4904 lands
+   * `TenantFromDomainDto.EffectiveColorPresetId`.
+   */
+  effectiveColorPresetId?: string | null;
+  /**
+   * TASK-4899 (epic `guest-comms-neutral-branding.md` §3.6, backed by TASK-4894's
+   * `TenantProfile.GuestCommsBrandingMode` column): `"Neutral"` for every tenant except
+   * Atlas's own (`TenantId=1`, `"Platform"`) — governs whether an unconfigured-branding
+   * fallback may render an Atlas mark (see `tenant/displayBrand.ts`'s `isNeutralBrandingMode()`).
+   * **Undefined today** — as of this task, `GET /tenants/from-domain` does not yet emit this
+   * field (verified by reading `TenantsController.GetFromDomain`'s `TenantFromDomainDto`
+   * construction; see this task's PR for the exact finding). Every consumer of this field
+   * must treat `undefined` as "not Neutral" (today's rendering), never as "assume Neutral" —
+   * that is the safe direction until the API ships the field.
+   */
+  guestCommsBrandingMode?: 'Platform' | 'Neutral';
 }
 
 /** RA-006 §3.5: legal/contact identity returned by /tenants/from-domain.LegalContactPack. */
@@ -251,6 +277,21 @@ export async function resolveFromDomain(apiBaseUrl: string, domain: string): Pro
         : undefined,
       // TASK-4381/4386 / ADR-0068
       isInternal: Boolean(data.isInternal),
+      // TASK-4903/4904 (ADR-0081): read defensively — undefined until TASK-4904 ships the
+      // DTO fields server-side; the guest portal's theme-resolution wiring (src/main.tsx)
+      // already treats `undefined` as "fall back to classic/default", so no further wiring
+      // change is needed once these are populated.
+      effectiveThemeId: typeof data.effectiveThemeId === 'string' ? data.effectiveThemeId : undefined,
+      effectiveColorPresetId:
+        typeof data.effectiveColorPresetId === 'string' || data.effectiveColorPresetId === null
+          ? data.effectiveColorPresetId
+          : undefined,
+      // TASK-4899: defensive read — absent/unrecognized value stays undefined (never assumed
+      // Neutral) until atlas-api ships TenantFromDomainDto.GuestCommsBrandingMode.
+      guestCommsBrandingMode:
+        data.guestCommsBrandingMode === 'Platform' || data.guestCommsBrandingMode === 'Neutral'
+          ? data.guestCommsBrandingMode
+          : undefined,
     };
     return tenantInfo;
   } catch (error) {
@@ -312,6 +353,16 @@ export async function validateTenant(slug: string): Promise<TenantInfo> {
       : undefined,
     // TASK-4381/4386 / ADR-0068
     isInternal: Boolean(data.isInternal),
+    // TASK-4950: mirrors resolveFromDomain()'s parse (above) so the validateTenant() fallback
+    // path (used when resolveFromDomain returns null) also resolves the tenant's real layout
+    // theme + color preset instead of silently falling back to classic/default. main.tsx's
+    // existing resolution treats `undefined` as "fall back to classic/default" already, so no
+    // further wiring change is needed.
+    effectiveThemeId: typeof data.effectiveThemeId === 'string' ? data.effectiveThemeId : undefined,
+    effectiveColorPresetId:
+      typeof data.effectiveColorPresetId === 'string' || data.effectiveColorPresetId === null
+        ? data.effectiveColorPresetId
+        : undefined,
   };
   return tenantInfo;
 }

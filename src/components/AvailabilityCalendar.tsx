@@ -44,7 +44,9 @@ function daysInMonth(year: number, month: number): number {
 }
 
 function firstWeekday(year: number, month: number): number {
-  return new Date(year, month, 1).getDay(); // 0=Sun
+  // Convert from 0=Sun to 0=Mon for Monday-first week layout
+  const dayOfWeek = new Date(year, month, 1).getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+  return (dayOfWeek + 6) % 7; // Convert to 0=Mon, 1=Tue, ..., 6=Sun
 }
 
 function formatHoldCountdown(remainingMs: number): string {
@@ -55,7 +57,7 @@ function formatHoldCountdown(remainingMs: number): string {
 }
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const DAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+const DAY_LABELS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
 
 export default function AvailabilityCalendar({ listingId, onDateSelect }: Props) {
   const { booking, updateBooking } = useBooking();

@@ -120,7 +120,7 @@ const ContactUs = () => {
                                 <a
                                     href={getWhatsAppLink()}
                                     aria-label={`Contact ${tenantLabel} on WhatsApp at ${formatDisplayNumber()}`}
-                                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-cta-secondary text-[var(--text-contrast)] px-6 py-3 font-semibold shadow-md hover:shadow-lg transition-all duration-250 hover:scale-105"
+                                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-cta-secondary text-[var(--text-on-cta)] px-6 py-3 font-semibold shadow-md hover:shadow-lg transition-all duration-250 hover:scale-105"
                                     target="_blank"
                                     rel="noopener noreferrer"
                                 >
@@ -129,7 +129,7 @@ const ContactUs = () => {
                                 <a
                                     href={getTelLink()}
                                     aria-label={`Call ${tenantLabel} at ${formatDisplayNumber()}`}
-                                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-cta-primary text-[var(--text-contrast)] px-6 py-3 font-semibold shadow-md hover:shadow-lg transition-all duration-250 hover:scale-105"
+                                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-cta-primary text-[var(--text-on-cta)] px-6 py-3 font-semibold shadow-md hover:shadow-lg transition-all duration-250 hover:scale-105"
                                 >
                                     Call {formatDisplayNumber()}
                                 </a>

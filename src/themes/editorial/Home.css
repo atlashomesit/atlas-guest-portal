@@ -1,0 +1,337 @@
+/**
+ * TASK-4924 / ADR-0081 D8 — "editorial" layout theme's Home page styling.
+ *
+ * All colors are CSS-variable driven (`var(--...)`), never hardcoded hex — this file paints
+ * structure/layout only, so the resolved color preset (loversRetreatBlush/auroraChampagne/
+ * jetsetPearl) or this layout's own authored default (`defaultColorTokens.ts`) fully controls
+ * the palette at runtime, per ADR-0081 D6b. Scoped under `.editorial-home`/`.editorial-*` so
+ * nothing here leaks into other layouts (the ESLint theme boundary already prevents the
+ * reverse import direction).
+ *
+ * WCAG AA binding discipline (see `defaultColorTokens.ts`'s header comment for the ratio
+ * table): all normal-size body/heading/caption text below is styled with `color:
+ * var(--text-primary)` (or left to inherit it from `.editorial-home`) — never
+ * `--text-muted`/`--brand-primary`/`--cta-primary`, which this stylesheet reserves for
+ * decorative rules, borders, and background fills only.
+ */
+
+.editorial-home {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.editorial-section-inner {
+  max-width: 68rem;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+
+.editorial-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  color: var(--text-primary);
+  border-bottom: 2px solid var(--brand-primary);
+  padding-bottom: 0.35rem;
+  width: fit-content;
+}
+
+.editorial-h2 {
+  font-family: var(--font-family-display, serif);
+  font-size: clamp(1.5rem, 3.2vw, 2.25rem);
+  line-height: 1.15;
+  color: var(--text-primary);
+  margin-top: 0.75rem;
+}
+
+/* ---- Text-led masthead hero: narrative column + a smaller INSET photo panel (never
+   full-bleed) — the founder's "text-forward composition" brief. ---- */
+.editorial-hero {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2.5rem;
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 4rem 1.5rem 3rem;
+  align-items: center;
+}
+
+@media (min-width: 1024px) {
+  .editorial-hero {
+    grid-template-columns: 1.15fr 0.85fr;
+    padding: 5.5rem 2rem 4rem;
+  }
+}
+
+.editorial-hero-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.editorial-hero-h1 {
+  font-family: var(--font-family-display, serif);
+  font-size: clamp(2.1rem, 4.6vw, 3.4rem);
+  line-height: 1.08;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+  max-width: 34rem;
+}
+
+/* Emphasis via italic only, not color — `--brand-primary` is not guaranteed >=3:1 (the
+   large-text AA threshold) against `--bg-primary` across every curated preset in this
+   layout's matrix (jetsetPearl/auroraChampagne are both pale, low-contrast accents against
+   their own light backgrounds; see `defaultColorTokens.ts`'s header comment). Keeping the
+   emphasized word on `--text-primary` (inherited) avoids that risk entirely while italics
+   still carries the emphasis. */
+.editorial-hero-h1 em {
+  font-style: italic;
+}
+
+.editorial-hero-dek {
+  max-width: 32rem;
+  font-size: 1.1rem;
+  line-height: 1.65;
+  color: var(--text-primary);
+}
+
+.editorial-hero-widget {
+  margin-top: 0.25rem;
+  padding: 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-card);
+  max-width: 34rem;
+}
+
+.editorial-hero-media {
+  border-radius: 1rem;
+  overflow: hidden;
+  box-shadow: var(--shadow-level-2);
+  aspect-ratio: 4 / 5;
+}
+
+.editorial-hero-photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.editorial-hero-photo-fallback {
+  width: 100%;
+  height: 100%;
+}
+
+/* ---- Long-form narrative section + pull-quote callout ---- */
+.editorial-narrative {
+  background: var(--bg-secondary, var(--bg-surface));
+  padding: 4rem 0;
+}
+
+.editorial-narrative-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.editorial-narrative-p {
+  max-width: 42rem;
+  font-size: 1.05rem;
+  line-height: 1.75;
+  color: var(--text-primary);
+}
+
+.editorial-pull-quote {
+  position: relative;
+  max-width: 40rem;
+  margin: 0.5rem 0;
+  padding: 1.5rem 1.75rem 1.5rem 2.5rem;
+  border-left: 3px solid var(--brand-primary);
+  background: var(--bg-card);
+  border-radius: 0 0.5rem 0.5rem 0;
+}
+
+.editorial-pull-quote-mark {
+  position: absolute;
+  top: -0.5rem;
+  left: 0.5rem;
+  font-family: var(--font-family-display, serif);
+  font-size: 3rem;
+  line-height: 1;
+  color: var(--brand-accent, var(--brand-primary));
+  opacity: 0.85;
+}
+
+.editorial-pull-quote-text {
+  font-family: var(--font-family-display, serif);
+  font-style: italic;
+  font-size: 1.25rem;
+  line-height: 1.5;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.editorial-pull-quote-attribution {
+  display: block;
+  margin-top: 0.75rem;
+  font-style: normal;
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+}
+
+/* ---- Story-flow featured stays: vertical, alternating feature spreads ---- */
+.editorial-featured-stays {
+  padding: 4.5rem 0;
+  background: var(--bg-primary);
+}
+
+.editorial-section-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 2.5rem;
+}
+
+.editorial-dek {
+  max-width: 36rem;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--text-primary);
+}
+
+.editorial-chapters {
+  display: flex;
+  flex-direction: column;
+  gap: 3.5rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.editorial-chapter {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  align-items: center;
+}
+
+@media (min-width: 768px) {
+  .editorial-chapter {
+    grid-template-columns: 1fr 1fr;
+    gap: 3rem;
+  }
+
+  .editorial-chapter-reversed .editorial-chapter-media {
+    order: 2;
+  }
+
+  .editorial-chapter-reversed .editorial-chapter-copy {
+    order: 1;
+  }
+}
+
+.editorial-chapter-media {
+  border-radius: 0.75rem;
+  overflow: hidden;
+  aspect-ratio: 4 / 3;
+  box-shadow: var(--shadow-level-1);
+}
+
+.editorial-chapter-photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.editorial-chapter-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* TASK-4908 gate fix: this was the one node in the file that broke the "all copy bound to
+   --text-primary/--text-body only" binding discipline documented at the top of this file.
+   `aria-hidden="true"` does NOT exempt a visually-rendered glyph from the WCAG 1.4.3 contrast
+   requirement (sighted low-vision users still see it; axe's color-contrast rule correctly
+   still flags aria-hidden text) — `--brand-primary` has no override in loversRetreatBlush/
+   auroraChampagne/jetsetPearl, so it fell back to `default.css`'s coral (#c45a3f), which
+   measures 4.05-4.23:1 against this layout's own bg-primary tints (all below the 4.5:1 AA
+   floor for this 13.6px/normal-weight text). Switched to `--text-primary` — verified
+   ≥10.7:1 against every combination this layout can render (its own default and every
+   curated preset; see PR body for the full ratio table) — matching the rest of this file's
+   discipline exactly; no visual restyle beyond this one decorative numeral's color. */
+.editorial-chapter-number {
+  font-family: var(--font-family-display, serif);
+  font-size: 0.85rem;
+  letter-spacing: 0.12em;
+  color: var(--text-primary);
+}
+
+.editorial-chapter-title {
+  font-family: var(--font-family-display, serif);
+  font-size: 1.5rem;
+  color: var(--text-primary);
+}
+
+.editorial-chapter-location {
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.editorial-chapter-description {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--text-primary);
+  max-width: 32rem;
+}
+
+.editorial-chapter-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.editorial-chapter-price {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* Text-link style (no solid fill): a filled button would need a foreground color that
+   passes AA against `--cta-primary` for every declared color preset, but that background
+   ranges from very light (jetsetPearl/auroraChampagne) to quite dark (loversRetreatBlush)
+   across this layout's curated matrix (`registry.ts`), so no single fixed label color
+   (white or dark) clears 4.5:1 against all of them. A text link keeps the label color
+   pinned to `--text-primary` (verified >=4.5:1 across every declared preset and this
+   layout's own default, `defaultColorTokens.ts`) and uses `--brand-primary` only for the
+   decorative underline, which carries no text-contrast requirement. */
+.editorial-chapter-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--text-primary);
+  border-bottom: 1.5px solid var(--brand-primary);
+  padding-bottom: 0.15rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+}
+
+.editorial-chapter-cta:hover,
+.editorial-chapter-cta:focus-visible {
+  border-bottom-color: var(--cta-primary-hover, var(--brand-primary));
+}
+
+.editorial-section {
+  background: var(--bg-primary);
+}

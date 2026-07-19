@@ -146,7 +146,7 @@ const Homepage_LocationDetails = () => {
                         </div>
 
                         {/* Icons */}
-                        <div className="bg-cta-primary text-[var(--text-contrast)] text-center p-4 py-10 rounded-lg my-7 shadow-level1">
+                        <div className="bg-cta-primary text-[var(--text-on-cta)] text-center p-4 py-10 rounded-lg my-7 shadow-level1">
                             <div className="font-semibold text-sm">Excellent sleep & shower</div>
                             <div className="text-xs mb-3"></div>
                             <div className="grid grid-cols-4 gap-4 text-xs">
@@ -281,7 +281,7 @@ const Homepage_LocationDetails = () => {
                                         </div>
 
                                         {/* Location */}
-                                        <div className="text-sm text-accent-primary">{data.property_location}</div>
+                                        <div className="text-sm text-[var(--accent-text)]">{data.property_location}</div>
 
                                         {/* Description */}
                                         {data.property_description && (
@@ -316,7 +316,7 @@ const Homepage_LocationDetails = () => {
                                             <span>✔ Pay @ hotel</span>
                                             <span>✔ Couple friendly</span>
                                             {data.additional_cost_note && (
-                                                <span className="text-red-400">⚠ {data.additional_cost_note}</span>
+                                                <span className="text-red-700">⚠ {data.additional_cost_note}</span>
                                             )}
                                         </div>
                                     </div>

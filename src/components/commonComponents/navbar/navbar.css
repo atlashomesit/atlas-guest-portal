@@ -1,7 +1,11 @@
 /* ---- Utility bar (slim dark strip above main header, Home v2) ---- */
 .util-bar {
   background: var(--brand-ink, #1a1a2e);
-  color: #cbb89b;
+  /* WCAG AA fix: was a hardcoded #cbb89b paired unconditionally with --brand-ink, which several
+     presets (privateIslandNoir, emeraldDynasty, christmas, valentine) set to a color this gold-tan
+     fails against (as low as 1.71:1). --util-bar-text lets each preset override the pairing;
+     #cbb89b stays the default for every theme that didn't need to (unchanged appearance). */
+  color: var(--util-bar-text, #cbb89b);
   font-size: 12.5px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   width: 100%;
@@ -28,7 +32,11 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: #cbb89b;
+  /* WCAG AA fix: was a hardcoded #cbb89b paired unconditionally with --brand-ink, which several
+     presets (privateIslandNoir, emeraldDynasty, christmas, valentine) set to a color this gold-tan
+     fails against (as low as 1.71:1). --util-bar-text lets each preset override the pairing;
+     #cbb89b stays the default for every theme that didn't need to (unchanged appearance). */
+  color: var(--util-bar-text, #cbb89b);
   text-decoration: none;
   transition: color 200ms ease;
 }
@@ -62,7 +70,11 @@
 }
 
 .util-bar-locale {
-  color: #cbb89b;
+  /* WCAG AA fix: was a hardcoded #cbb89b paired unconditionally with --brand-ink, which several
+     presets (privateIslandNoir, emeraldDynasty, christmas, valentine) set to a color this gold-tan
+     fails against (as low as 1.71:1). --util-bar-text lets each preset override the pairing;
+     #cbb89b stays the default for every theme that didn't need to (unchanged appearance). */
+  color: var(--util-bar-text, #cbb89b);
   font-size: 12.5px;
   text-decoration: none;
 }

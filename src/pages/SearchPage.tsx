@@ -922,7 +922,7 @@ const SearchPage = () => {
           <span className="text-sm font-semibold text-text-primary">Filters</span>
           {activeFilterChips.length > 0 ? (
             <span
-              className="inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded-full bg-cta-primary px-2 text-xs font-bold text-white"
+              className="inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded-full bg-cta-primary px-2 text-xs font-bold text-[var(--text-on-cta)]"
               data-testid="search-active-filter-badge"
               aria-label={`${activeFilterChips.length} active filters`}
             >
@@ -1063,7 +1063,7 @@ const SearchPage = () => {
                 onClick={() => toggleAmenity(amenity)}
                 className={`rounded-full px-3 py-1.5 text-sm font-medium min-h-9 ${
                   selectedAmenities.includes(amenity)
-                    ? "bg-cta-primary text-white border border-cta-primary"
+                    ? "bg-cta-primary text-[var(--text-on-cta)] border border-cta-primary"
                     : "bg-bg-muted border border-border-subtle text-text-primary hover:border-cta-primary"
                 }`}
               >
@@ -1112,7 +1112,7 @@ const SearchPage = () => {
               aria-pressed={!mapView}
               onClick={() => updateParam("view", "")}
               className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
-                !mapView ? "bg-cta-primary text-[var(--text-contrast)]" : "text-text-primary hover:bg-bg-muted"
+                !mapView ? "bg-cta-primary text-[var(--text-on-cta)]" : "text-text-primary hover:bg-bg-muted"
               }`}
               data-testid="search-view-list"
             >
@@ -1123,7 +1123,7 @@ const SearchPage = () => {
               aria-pressed={mapView}
               onClick={() => updateParam("view", "map")}
               className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
-                mapView ? "bg-cta-primary text-[var(--text-contrast)]" : "text-text-primary hover:bg-bg-muted"
+                mapView ? "bg-cta-primary text-[var(--text-on-cta)]" : "text-text-primary hover:bg-bg-muted"
               }`}
               data-testid="search-view-map"
             >
@@ -1264,7 +1264,7 @@ const SearchPage = () => {
                   <button
                     type="button"
                     onClick={clearFilters}
-                    className="inline-flex min-h-[44px] w-full max-w-xs items-center justify-center rounded-xl bg-cta-primary px-5 py-3 text-sm font-semibold text-[var(--text-contrast)] shadow hover:bg-cta-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary sm:w-auto"
+                    className="inline-flex min-h-[44px] w-full max-w-xs items-center justify-center rounded-xl bg-cta-primary px-5 py-3 text-sm font-semibold text-[var(--text-on-cta)] shadow hover:bg-cta-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary sm:w-auto"
                     data-testid="search-empty-clear-filters"
                   >
                     Clear filters
@@ -1272,7 +1272,7 @@ const SearchPage = () => {
                 ) : null}
                 <Link
                   to="/search"
-                  className={`inline-flex min-h-[44px] w-full max-w-xs items-center justify-center rounded-xl border border-border-subtle px-5 py-3 text-sm font-semibold text-text-primary shadow-sm hover:bg-bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary sm:w-auto ${hasActiveFilters ? "" : "bg-cta-primary text-[var(--text-contrast)] border-transparent hover:bg-cta-secondary"}`}
+                  className={`inline-flex min-h-[44px] w-full max-w-xs items-center justify-center rounded-xl border border-border-subtle px-5 py-3 text-sm font-semibold text-text-primary shadow-sm hover:bg-bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary sm:w-auto ${hasActiveFilters ? "" : "bg-cta-primary text-[var(--text-on-cta)] border-transparent hover:bg-cta-secondary"}`}
                   data-testid="search-empty-browse-all"
                 >
                   Browse all apartments
@@ -1309,7 +1309,7 @@ const SearchPage = () => {
                         <p className="text-lg font-bold text-text-primary">{formatDisplayCurrency((getDailyListingPricing(unit.numericId)?.actualPrice ?? 0) > 0 ? getDailyListingPricing(unit.numericId)!.actualPrice : unit.pricePerNight)}<span className="text-sm font-normal text-text-muted"> / night</span></p>
                         <Link
                           to={`${unit.canonicalPath}${querySuffix}`}
-                          className="mt-auto inline-flex min-h-[44px] items-center justify-center rounded-xl bg-[var(--cta-primary-hover)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--cta-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
+                          className="mt-auto inline-flex min-h-[44px] items-center justify-center rounded-xl bg-[var(--cta-primary-hover)] px-4 py-2 text-sm font-semibold text-[var(--text-on-cta)] hover:bg-[var(--cta-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
                         >
                           {`View ${unitNoun.singular}`}
                         </Link>
@@ -1573,7 +1573,7 @@ const SearchPage = () => {
                 <button
                   type="button"
                   onClick={() => setVisibleCount((prev) => prev + ITEMS_PER_PAGE)}
-                  className="min-h-[44px] w-full max-w-sm rounded-xl bg-cta-primary px-6 py-3 text-base font-semibold text-[var(--text-contrast)] shadow hover:bg-cta-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary sm:w-auto"
+                  className="min-h-[44px] w-full max-w-sm rounded-xl bg-cta-primary px-6 py-3 text-base font-semibold text-[var(--text-on-cta)] shadow hover:bg-cta-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary sm:w-auto"
                 >
                   Load more
                 </button>

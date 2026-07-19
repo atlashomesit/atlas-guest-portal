@@ -165,4 +165,42 @@ describe("Slider hero search", () => {
     expect(within(trustStrip).getByText(/verified homes/i)).toBeInTheDocument();
     expect(within(trustStrip).getByText(/free cancellation 48h before check-in/i)).toBeInTheDocument();
   });
+
+  describe("TASK-4911: Check availability CTA surfaces inline validation instead of silently no-op-ing", () => {
+    it("clicking Check availability after check-out is cleared shows an inline message and does not navigate", () => {
+      renderSlider();
+      fireEvent.click(screen.getAllByTestId("hero-date-toggle")[0]);
+
+      // Default dates are today/tomorrow (both filled). Clicking a NEW future day while a full
+      // range is already selected starts a fresh check-in selection and clears check-out
+      // (AtlasDateRangePicker's RANGE_SELECTED → CHECK_IN_SELECTED transition) — reproducing the
+      // "check-out left empty" repro state without needing a two-click calendar interaction.
+      const futureDateTestId = `hero-date-${format(addDays(new Date(), 3), "yyyy-MM-dd")}`;
+      fireEvent.click(screen.getByTestId(futureDateTestId));
+
+      const submit = screen.getAllByTestId("hero-search-submit")[0];
+      // TASK-4911: must stay clickable — an html-disabled button is the original silent no-op bug.
+      expect(submit).toBeEnabled();
+
+      fireEvent.click(submit);
+
+      const alerts = screen.getAllByRole("alert");
+      expect(alerts.some((el) => /add a check-out date to continue/i.test(el.textContent ?? ""))).toBe(true);
+      expect(navigateMock).not.toHaveBeenCalled();
+    });
+
+    it("focuses the check-out field when Check availability is clicked with check-out missing", () => {
+      renderSlider();
+      fireEvent.click(screen.getAllByTestId("hero-date-toggle")[0]);
+
+      const futureDateTestId = `hero-date-${format(addDays(new Date(), 3), "yyyy-MM-dd")}`;
+      fireEvent.click(screen.getByTestId(futureDateTestId));
+
+      const submit = screen.getAllByTestId("hero-search-submit")[0];
+      fireEvent.click(submit);
+
+      const checkoutToggle = screen.getAllByTestId("hero-date-toggle-checkout")[0];
+      expect(document.activeElement).toBe(checkoutToggle);
+    });
+  });
 });

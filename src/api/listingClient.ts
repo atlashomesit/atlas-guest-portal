@@ -139,6 +139,13 @@ export type PublicListing = {
    * prefer this over re-deriving hours from cancellationTier client-side.
    */
   cancellationWindowHours?: number;
+  /**
+   * TASK-4405: effective universal "book with confidence" free-cancellation grace window in hours
+   * after booking creation, resolved server-side (Listing → TenantProfile → platform default,
+   * floor-clamped). Undefined/null when `Cancellation:UniversalGraceEnabled` is off — do not show the
+   * grace-window copy or hardcode a fallback hour count client-side in that case.
+   */
+  graceHours?: number | null;
   /** TASK-2552: amenity code strings (e.g. "AC", "Pool", "WiFi") returned by PublicListingDto. */
   amenityCodes?: string[];
   /**
@@ -229,6 +236,9 @@ function normalizePublicListing(payload: Record<string, unknown>): PublicListing
     cancellationWindowHours: typeof payload.cancellationWindowHours === 'number' && payload.cancellationWindowHours > 0
       ? payload.cancellationWindowHours
       : undefined, // TASK-4356
+    graceHours: typeof payload.graceHours === 'number' && payload.graceHours > 0
+      ? payload.graceHours
+      : null, // TASK-4405: null when the flag is off server-side (flag-off parity)
     // TASK-2552: wire amenityCodes from API so nomad/amenity filters and badges work
     amenityCodes: Array.isArray(payload.amenityCodes)
       ? payload.amenityCodes.filter((x): x is string => typeof x === 'string')

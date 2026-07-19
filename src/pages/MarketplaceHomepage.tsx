@@ -262,6 +262,7 @@ export default function MarketplaceHomepage() {
           min={0}
           inputMode="numeric"
           placeholder="Max"
+          aria-label="Max price"
           value={maxPriceInput}
           onChange={(e) => setMaxPriceInput(e.target.value)}
           className="min-h-[40px] w-24 rounded-lg border border-border px-3 py-1.5 text-sm"
@@ -357,7 +358,7 @@ export default function MarketplaceHomepage() {
 
                   {/* TASK-1873: rating row */}
                   {item.rating != null && item.rating > 0 && (
-                    <p className="text-sm font-medium text-accent-primary">
+                    <p className="text-sm font-medium text-[var(--accent-text)]">
                       {'★'.repeat(Math.round(item.rating))}
                       <span className="ml-1 text-text-muted">{item.rating.toFixed(1)}</span>
                       {item.reviewCount != null && item.reviewCount > 0 && (

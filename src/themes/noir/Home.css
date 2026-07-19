@@ -1,0 +1,139 @@
+/**
+ * TASK-4906 / ADR-0081 D8 — "noir" layout theme's Home page styling.
+ *
+ * All colors are CSS-variable driven (`var(--...)`), never hardcoded hex — this file paints
+ * structure/layout only, so the resolved color preset (privateIslandNoir/emeraldDynasty) or
+ * this layout's own authored default (`defaultColorTokens.ts`) fully controls the palette at
+ * runtime, per ADR-0081 D6b. Scoped under `.noir-home` so nothing here leaks into other
+ * layouts (the ESLint theme boundary already prevents the reverse import direction).
+ */
+
+.noir-home {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* Full-bleed hero: a single edge-to-edge photograph with a dark gradient scrim,
+   minimal chrome (no split editorial column, no persistent nav bar treatment) — the
+   founder-specified "high-contrast photography-forward hero, restrained UI chrome". */
+.noir-hero {
+  position: relative;
+  width: 100%;
+  min-height: 88vh;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+  background-color: var(--bg-primary);
+}
+
+.noir-hero-photo {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.noir-hero-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(6, 7, 9, 0.35) 0%,
+    rgba(6, 7, 9, 0.55) 55%,
+    rgba(6, 7, 9, 0.92) 100%
+  );
+}
+
+.noir-hero-content {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 4rem 1.5rem 3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.noir-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: fit-content;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  color: var(--brand-accent, var(--brand-primary));
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 0.35rem 0.9rem;
+  background: rgba(11, 13, 18, 0.4);
+}
+
+.noir-hero-h1 {
+  font-family: var(--font-family-display, serif);
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  line-height: 1.08;
+  letter-spacing: -0.01em;
+  color: var(--text-on-hero);
+  max-width: 40rem;
+}
+
+.noir-hero-h1 em {
+  font-style: normal;
+  color: var(--brand-primary);
+}
+
+.noir-hero-sub {
+  max-width: 34rem;
+  font-size: 1.05rem;
+  line-height: 1.6;
+  color: var(--text-secondary, var(--text-muted));
+}
+
+/* Search widget sits inside a restrained glass card — no persistent search bar chrome
+   above the fold beyond this single card. */
+.noir-hero-widget {
+  margin-top: 0.5rem;
+  padding: 1rem;
+  border-radius: 1rem;
+  border: 1px solid var(--border-strong);
+  background: rgba(11, 13, 18, 0.72);
+  backdrop-filter: blur(6px);
+  max-width: 40rem;
+}
+
+/* Value strip — minimal, no boxed cards; just icon + copy, gold accent glyphs. */
+.noir-value-strip {
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-secondary, var(--bg-surface));
+}
+
+.noir-value-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.noir-value-icon {
+  color: var(--brand-primary);
+}
+
+.noir-value-heading {
+  font-family: var(--font-family-display, serif);
+  color: var(--text-primary);
+  font-size: 1.15rem;
+}
+
+.noir-value-body {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+.noir-section {
+  background: var(--bg-primary);
+}

@@ -1,5 +1,5 @@
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { addDays, format, startOfMonth } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -17,6 +17,7 @@ import { calculateNights, formatDateInTimezone, formatIsoDateInTimezone } from '
 import {
   type CancellationTier,
   computeCancellationDeadline,
+  computeEffectiveCancellationDeadline,
   formatCancellationDeadline,
 } from '@/utils/cancellationPolicy';
 import { doesRangeIntersectBlocked, toISODate } from '@/utils/dateRange';
@@ -159,6 +160,10 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const maxBookingDate = useMemo(() => addDays(today, 365), [today]);
 
   const calendarButtonRef = useRef<HTMLButtonElement | null>(null);
+  // TASK-4911: separate ref for the check-out cell so an incomplete-date Reserve click can
+  // focus whichever field is actually missing.
+  const checkoutCellRef = useRef<HTMLButtonElement | null>(null);
+  const dateErrorId = useId();
 
   const [dateRange, setDateRange] = useState<AtlasDateRangePickerValue>({
     startDate: null,
@@ -217,6 +222,9 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [resolvedCancellationTier, setResolvedCancellationTier] = useState<CancellationTier | null>(null);
   // TASK-4356: server-computed window (hours), source of truth — overrides the local tier→hours map.
   const [resolvedCancellationWindowHours, setResolvedCancellationWindowHours] = useState<number | null>(null);
+  // TASK-4405: server-resolved universal grace-window hours. Null when Cancellation:UniversalGraceEnabled
+  // is off server-side — never hardcode a fallback here (flag-off parity).
+  const [resolvedGraceHours, setResolvedGraceHours] = useState<number | null>(null);
   const minAdvanceDays: number = 0;
 
   useEffect(() => {
@@ -236,11 +244,13 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         setResolvedMinStay(Math.max(1, match?.minStay ?? 1));
         setResolvedCancellationTier(match?.cancellationTier ?? null);
         setResolvedCancellationWindowHours(match?.cancellationWindowHours ?? null);
+        setResolvedGraceHours(match?.graceHours ?? null);
       })
       .catch(() => {
         setResolvedMinStay(1);
         setResolvedCancellationTier(null);
         setResolvedCancellationWindowHours(null);
+        setResolvedGraceHours(null);
       });
     return () => ctrl.abort();
   }, [listingId, minStayNightsProp]);
@@ -1007,13 +1017,18 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     return checkinStatus === 'Blocked' || checkinStatus === 'Hold' || blockedSet.has(checkinISO);
   }, [dateRange.startDate, dateStatusMap, blockedSet]);
 
-  // TASK-4334: recompute the free-cancellation deadline whenever the guest's selected
-  // check-in date or the listing's resolved cancellation tier changes.
+  // TASK-4334/TASK-4405: recompute the free-cancellation deadline whenever the guest's selected
+  // check-in date, the listing's resolved cancellation tier, or the resolved grace hours changes.
+  // Uses "now" as the booking-time estimate (the actual booking doesn't exist yet at this stage) —
+  // same estimate posture the tier-only deadline already used pre-booking.
   const cancellationDeadlineText = useMemo(() => {
     if (!dateRange.startDate) return null;
-    const deadline = computeCancellationDeadline(dateRange.startDate, resolvedCancellationTier, resolvedCancellationWindowHours);
+    const deadline = resolvedGraceHours
+      ? computeEffectiveCancellationDeadline(
+          dateRange.startDate, resolvedCancellationTier, resolvedCancellationWindowHours, new Date(), resolvedGraceHours)
+      : computeCancellationDeadline(dateRange.startDate, resolvedCancellationTier, resolvedCancellationWindowHours);
     return formatCancellationDeadline(deadline);
-  }, [dateRange.startDate, resolvedCancellationTier, resolvedCancellationWindowHours]);
+  }, [dateRange.startDate, resolvedCancellationTier, resolvedCancellationWindowHours, resolvedGraceHours]);
 
   const { loading: dailyPricingLoading, error: _dailyPricingError, getListingPricing } = useDailyPricingSummary();
   const dailyPricing = useMemo(
@@ -1118,9 +1133,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         ? accommodationGstLineAmount(taxableBase, perNightForDisplay)
         : 0;
 
-  // Razorpay charges its 3% fee on the FULL amount it processes (base + GST), not just base.
-  // Sreekar canonical clarification 2026-05-21 (memory: project_guest_booking_pricing_formula).
-  const breakdownConvenienceFee = Math.round((taxableBase + gstLineAmount) * convenienceFeePercent);
+  // TASK-4913 (founder-ruled 2026-07-17, option c): the 3% "Payment processing" fee is charged
+  // on the BASE accommodation amount only — NOT on base+GST. Supersedes the prior base+GST rule
+  // (memory: project_guest_booking_pricing_formula) which overcharged guests relative to the
+  // "no guest service fee / save vs OTA" booking-card copy. Mirrors PricingService.BuildBreakdown.
+  const breakdownConvenienceFee = Math.round(taxableBase * convenienceFeePercent);
 
   // TASK-4322: Total = discount-net base + GST + Service Fee (canonical formula).
   const breakdownFinalTotal = Math.max(1, taxableBase + gstLineAmount + breakdownConvenienceFee);
@@ -1187,8 +1204,19 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     setFormError(null);
 
     // Date validation
+    // TASK-4911: distinguish which field is actually missing (instead of a generic "select
+    // both dates" message) and move focus there, so the guest isn't left guessing why Reserve
+    // didn't proceed.
     if (!dateRange.startDate || !dateRange.endDate) {
-      setDateError('Please select check-in and check-out dates.');
+      const message = !dateRange.startDate
+        ? 'Add a check-in date to continue.'
+        : 'Add a check-out date to continue.';
+      setDateError(message);
+      if (!dateRange.startDate) {
+        calendarButtonRef.current?.focus();
+      } else {
+        checkoutCellRef.current?.focus();
+      }
       return;
     }
     const checkinIst = getIstStartOfDay(dateRange.startDate);
@@ -1474,6 +1502,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             type="button"
             className="lv-date-cell"
             aria-label="Select check-in date"
+            aria-describedby={dateError ? dateErrorId : undefined}
+            aria-invalid={dateError ? true : undefined}
             disabled={isBookingDisabled}
             onClick={(e) => {
               e.preventDefault();
@@ -1489,10 +1519,14 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             }
           </button>
           <button
+            ref={checkoutCellRef}
             type="button"
             className="lv-date-cell"
             aria-label="Select check-out date"
+            aria-describedby={dateError ? dateErrorId : undefined}
+            aria-invalid={dateError ? true : undefined}
             disabled={isBookingDisabled}
+            data-testid="unit-booking-checkout-cell"
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -1760,7 +1794,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       {/* TASK-2612: Add-ons moved to GuestDetailsPage */}
 
       {dateError && (
-        <p role="alert" data-testid="guest-booking-date-error" className="text-sm text-support-error" style={{ marginTop: 4 }}>
+        <p id={dateErrorId} role="alert" data-testid="guest-booking-date-error" className="text-sm text-support-error" style={{ marginTop: 4 }}>
           {dateError}
         </p>
       )}
@@ -1808,10 +1842,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       <Button
         type="submit"
         fullWidth
-        // TASK-4277: do NOT disable on blank dates — keep Reserve clickable so handleReserve
-        // can surface the inline "Please select check-in and check-out dates." validation
-        // instead of the button silently swallowing the click. Genuine blockers (service down,
-        // invalid range) still disable it.
+        // TASK-4277 / TASK-4911: do NOT disable on blank dates — keep Reserve clickable so
+        // handleReserve can surface the inline "Add a check-in/check-out date to continue."
+        // validation (and focus the missing field) instead of the button silently swallowing
+        // the click. Genuine blockers (service down, invalid range) still disable it.
         disabled={
           isSubmitting ||
           isBookingDisabled ||
@@ -1871,6 +1905,19 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             : 'Select check-in dates to see your free cancellation deadline'}
         </span>
       </div>
+
+      {/* TASK-4405: universal "book with confidence" post-booking grace-window disclosure — only
+          shown when the server has resolved a non-null graceHours for this listing (flag-off parity). */}
+      {resolvedGraceHours ? (
+        <div className="lv-booking-cancel bw-trust" data-testid="bw-grace-window-strip">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M20 6L9 17l-5-5"/>
+          </svg>
+          <span data-testid="bw-grace-window-strip-text">
+            {`Free cancellation for ${resolvedGraceHours} hours after you book`}
+          </span>
+        </div>
+      ) : null}
 
       {/* Payment trust logos before Razorpay checkout */}
       <div className="lv-pay-rail" data-testid="bw-payment-trust-logos">

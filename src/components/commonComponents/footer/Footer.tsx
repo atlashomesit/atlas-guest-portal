@@ -9,7 +9,6 @@ import { LOGO_URL } from '../../../config/branding';
 import { getTenantContext } from '../../../tenant/tenantContext';
 import { getTenantBrandName } from '../../../tenant/displayBrand';
 import { getTenantOverrides, shouldHideAtlasBranding } from '../../../tenant/tenantOverrides';
-import { CompactThemeSwitcher } from '../../ui/CompactThemeSwitcher';
 import { formatDisplayNumber, getContactEmail, getTelLink, getWhatsAppLink, getContactPhone, getWhatsAppPhone } from '../../../config/contact';
 
 const iconMap = {
@@ -61,15 +60,17 @@ const Footer = () => {
             content: <span className="text-left">{overrides.contact.address.trim()}</span>,
         });
     }
-    locateRows.push({
-        key: "email",
-        icon: <IoIosMail className="shrink-0 text-lg" aria-hidden />,
-        content: (
-            <a href={`mailto:${email}`} className="break-all text-left hover:text-[var(--footer-link-hover)]">
-                {email}
-            </a>
-        ),
-    });
+    if (email) {
+        locateRows.push({
+            key: "email",
+            icon: <IoIosMail className="shrink-0 text-lg" aria-hidden />,
+            content: (
+                <a href={`mailto:${email}`} className="break-all text-left hover:text-[var(--footer-link-hover)]">
+                    {email}
+                </a>
+            ),
+        });
+    }
     locateRows.push({
         key: "phone",
         icon: <IoIosCall className="shrink-0 text-lg" aria-hidden />,
@@ -114,7 +115,7 @@ const Footer = () => {
                     )}
                     <p className='text-sm leading-relaxed text-[var(--footer-link)]'>{footerTagline}</p>
                     {tenant?.isGstVerified && (
-                        <span className='inline-flex items-center gap-1.5 text-xs font-medium text-emerald-400 border border-emerald-400/40 rounded-full px-2.5 py-0.5' title='This property manager has a verified GSTIN on file'>
+                        <span className='inline-flex items-center gap-1.5 text-xs font-medium text-[var(--support-success-text)] border border-[color:color-mix(in_srgb,var(--support-success-text)_40%,transparent)] rounded-full px-2.5 py-0.5' title='This property manager has a verified GSTIN on file'>
                             <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='currentColor' className='w-3.5 h-3.5' aria-hidden='true'><path fillRule='evenodd' d='M16.403 12.652a3 3 0 0 0 0-5.304 3 3 0 0 0-3.75-3.751 3 3 0 0 0-5.305 0 3 3 0 0 0-3.751 3.751 3 3 0 0 0 0 5.305 3 3 0 0 0 3.751 3.75 3 3 0 0 0 5.305 0 3 3 0 0 0 3.75-3.75Zm-2.546-4.46a.75.75 0 0 0-1.214-.883l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z' clipRule='evenodd'/></svg>
                             GST Verified
                         </span>
@@ -207,10 +208,6 @@ const Footer = () => {
                     <Link to="/privacy" className='hover:text-[var(--footer-link-hover)] transition-colors'>Privacy</Link>
                     <span>|</span>
                     <Link to="/contact" className='hover:text-[var(--footer-link-hover)] transition-colors'>Contact</Link>                </div>
-                <div className='flex items-center'>
-                    <span className='hidden sm:inline mr-2'>|</span>
-                    <CompactThemeSwitcher />
-                </div>
             </div>
 
             {/* TASK-4161: Consumer Protection (E-Commerce) Rules 2020 disclosure — custom-domain

@@ -6,7 +6,7 @@
   
   /* Text - Elegant Contrast */
   --text-primary: #0F172A;       /* Slate-900 */
-  --text-muted: #64748B;         /* Slate-500 */
+  --text-muted: #5F6E84;         /* WCAG AA fix: was #64748B (4.3:1 on classic/coastal layout mutedbg, needs 4.5:1) */
   --text-body: #1E293B;          /* Slate-800 */
   --text-on-hero: #FFFFFF;
   
@@ -46,6 +46,9 @@
   --footer-heading: #FFFFFF;
   --footer-link: #94A3B8;
   --footer-link-hover: #F59E0B;  /* Gold hover */
+  /* TASK-4951 — dark footer; restore the bright emerald-400 the GST-verified badge
+     originally hardcoded (base.css's light-tuned default would fail here). */
+  --support-success-text: #34d399;
   
   /* Shadows - Celebration Sparkle */
   --shadow-level-1: 0 2px 8px rgba(245, 158, 11, 0.08), 0 1px 3px rgba(30, 64, 175, 0.04);

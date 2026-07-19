@@ -97,7 +97,7 @@
   --text-body:     #5C3D2E;
   --text-primary:  #1C0A00;
   --text-secondary:#7A4F35;
-  --text-muted:    #B18A6A;
+  --text-muted:    #84674F; /* WCAG AA fix: was #B18A6A (2.8:1 on --bg-section-alt, needs 4.5:1) */
   --text-on-hero:  #1C0A00;
 
   --border:        rgba(255, 140, 66, 0.22);
@@ -112,7 +112,9 @@
   --footer-bg:        var(--bg-section-alt);
   --footer-text:      #74452F;
   --footer-heading:   #1C0A00;
-  --footer-link:      rgba(122, 79, 53, 0.9);
+  /* TASK-4951 — darkened from rgba(122, 79, 53, 0.9) (measured 4.37:1 against
+     --footer-bg #FFF0E6, failing AA); this composites to ~6.54:1. */
+  --footer-link:      rgba(100, 60, 38, 0.9);
   --footer-link-hover:#1C0A00;
 
   --bg-base-rgb: 255, 248, 243;
@@ -148,7 +150,7 @@
   --text-body:     #023E8A;
   --text-primary:  #03045E;
   --text-secondary:#0369A1;
-  --text-muted:    #64748B;
+  --text-muted:    #5E6D82; /* WCAG AA fix: was #64748B (4.2:1 on --bg-section-alt, needs 4.5:1) */
   --text-on-hero:  #03045E;
 
   --border:        rgba(0, 119, 182, 0.22);
@@ -250,7 +252,7 @@
   --text-body:     #065F46;
   --text-primary:  #022C22;
   --text-secondary:#047857;
-  --text-muted:    #16A34A;
+  --text-muted:    #107D38; /* WCAG AA fix: was #16A34A (3.0:1 on --bg-section-alt, needs 4.5:1) */
   --text-on-hero:  #022C22;
 
   --border:        rgba(5, 150, 105, 0.22);

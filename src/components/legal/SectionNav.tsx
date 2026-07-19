@@ -16,7 +16,7 @@ const SectionNav = ({ sections }: SectionNavProps) => {
           <li key={section.id}>
             <a
               href={`#${section.id}`}
-              className="text-text-muted hover:text-accent-primary font-medium"
+              className="text-text-muted hover:text-[var(--accent-text)] font-medium"
             >
               {section.label}
             </a>

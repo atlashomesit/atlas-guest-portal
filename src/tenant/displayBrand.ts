@@ -14,26 +14,57 @@ const MARKETPLACE_PRIVACY_EMAIL = "privacy@atlastays.com";
 export const DEFAULT_TENANT_BRAND_NAME = MARKETPLACE_BRAND_BASELINE;
 
 /**
+ * TASK-4899: true when the resolved tenant is in `Neutral` guest-comms branding mode
+ * (`TenantProfile.GuestCommsBrandingMode` — every tenant except Atlas's own `TenantId=1`,
+ * per TASK-4894/ADR-0080). This is the axis unconfigured-branding fallbacks must check before
+ * showing an Atlas mark. `undefined` (field not yet resolved, or the API hasn't shipped it —
+ * see `TenantInfo.guestCommsBrandingMode`'s doc comment) is intentionally NOT treated as
+ * Neutral: callers keep today's (Platform-shaped) fallback rather than guessing.
+ */
+export function isNeutralBrandingMode(): boolean {
+  return getTenantContext()?.guestCommsBrandingMode === "Neutral";
+}
+
+/**
+ * TASK-4899: brand-neutral fallback used only for a `Neutral`-mode tenant with zero
+ * configured branding (no `brandName`/`name` at all from the API). Never resolves to an
+ * Atlas mark — contrast with `MARKETPLACE_BRAND_BASELINE`, which remains the correct
+ * fallback for Platform mode (Atlas's own tenant) and for every case where Neutral mode
+ * can't be confirmed.
+ */
+export const NEUTRAL_NO_BRAND_FALLBACK = "Your Stay";
+
+/**
  * Guest-visible contact email: tenant `legalContactPack.contactEmail` when set (white-label),
  * otherwise the marketplace default for support vs privacy flows.
  * RA-006: returns "" on a white-label tenant with no configured email so callers
  * can hide the contact row rather than showing an Atlas platform address.
+ * TASK-4899: also returns "" for a `Neutral`-mode tenant with no configured email, even when
+ * accessed via a non-custom-domain host (e.g. before DNS/subdomain cutover) — the branding
+ * mode is the authoritative "don't leak the platform address" signal going forward.
  */
 export function getTenantContactEmail(kind: "support" | "privacy" = "support"): string {
   const ctx = getTenantContext();
   const fromPack = ctx?.legalContactPack?.contactEmail?.trim();
   if (fromPack) return fromPack;
-  // Never fall back to the Atlas marketplace email on a white-label custom domain.
+  // Never fall back to the Atlas marketplace email on a white-label custom domain,
+  // or on a Neutral-mode tenant regardless of domain shape.
   const isWhiteLabel = Boolean(ctx?.legalContactPack?.isCustomDomain);
-  if (isWhiteLabel) return "";
+  if (isWhiteLabel || isNeutralBrandingMode()) return "";
   return kind === "privacy" ? MARKETPLACE_PRIVACY_EMAIL : MARKETPLACE_SUPPORT_EMAIL;
 }
 
-/** Short brand for headers, SEO, and guest-facing copy (maps to API `brandName` / `TenantInfo.name`). */
+/**
+ * Short brand for headers, SEO, and guest-facing copy (maps to API `brandName` / `TenantInfo.name`).
+ * TASK-4899: a `Neutral`-mode tenant with no `brandName`/`name` configured at all falls back to
+ * `NEUTRAL_NO_BRAND_FALLBACK`, never `MARKETPLACE_BRAND_BASELINE` ("Atlastays") — Platform mode
+ * (and any tenant whose Neutral status can't be confirmed) keeps today's baseline fallback.
+ */
 export function getTenantBrandName(): string {
   const c = getTenantContext();
   const raw = (c?.brandName ?? c?.name ?? "").trim();
-  return raw || MARKETPLACE_BRAND_BASELINE;
+  if (raw) return raw;
+  return isNeutralBrandingMode() ? NEUTRAL_NO_BRAND_FALLBACK : MARKETPLACE_BRAND_BASELINE;
 }
 
 /** Legal-entity style name; falls back to short brand. */

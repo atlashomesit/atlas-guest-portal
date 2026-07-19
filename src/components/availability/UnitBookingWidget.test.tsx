@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import { AxiosError } from 'axios';
+import axios, { AxiosError } from 'axios';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { addDays, nextFriday } from 'date-fns';
@@ -473,7 +473,7 @@ describe('UnitBookingWidget - TASK-4303: first rendered Total equals the settled
     );
     task4303.fetchCalendarPricing.mockImplementation(() => pricingPromise);
     // Server GST for the range: 5% of ₹13,000 = ₹650.
-    task4303.fetchGuestGstBreakdown.mockResolvedValue({ gstPercent: 5, gstAmount: 650, finalAmount: 14060 });
+    task4303.fetchGuestGstBreakdown.mockResolvedValue({ gstPercent: 5, gstAmount: 650, finalAmount: 14040 });
 
     const { default: UnitBookingWidget } = await import('./UnitBookingWidget');
     render(
@@ -503,16 +503,17 @@ describe('UnitBookingWidget - TASK-4303: first rendered Total equals the settled
       await pricingPromise;
     });
 
-    // Settled: base ₹6,500 × 2 = ₹13,000; GST 5% = ₹650; fee 3% × ₹13,650 = ₹410; Total ₹14,060.
+    // Settled: base ₹6,500 × 2 = ₹13,000; GST 5% = ₹650; fee 3% × ₹13,000 = ₹390 (base only,
+    // TASK-4913 founder-ruled 2026-07-17 option c); Total ₹14,040.
     const totalLabel = await screen.findByText('Total');
     const totalValue = totalLabel.parentElement?.querySelector('.lv-num')?.textContent ?? '';
-    expect(totalValue.replace(/[^0-9]/g, '')).toBe('14060');
+    expect(totalValue.replace(/[^0-9]/g, '')).toBe('14040');
     // Headline total matches the breakdown total — the FIRST total ever rendered IS the settled one
     // (the queryByText('Total') assertion above proved nothing rendered earlier).
-    expect(screen.getByTestId('bw-per-night-price').textContent?.replace(/[^0-9]/g, '')).toBe('14060');
+    expect(screen.getByTestId('bw-per-night-price').textContent?.replace(/[^0-9]/g, '')).toBe('14040');
     // Processing fee shows the real 3% amount, never a ₹0 placeholder.
     const feeRow = screen.getByTestId('bw-bd-service-fee-row');
-    expect(feeRow.querySelector('.lv-num')?.textContent?.replace(/[^0-9]/g, '')).toBe('410');
+    expect(feeRow.querySelector('.lv-num')?.textContent?.replace(/[^0-9]/g, '')).toBe('390');
     // Skeletons are gone.
     expect(screen.queryByTestId('bw-price-pending')).toBeNull();
     expect(screen.queryByTestId('bw-breakdown-pending')).toBeNull();
@@ -810,5 +811,179 @@ describe('UnitBookingWidget - TASK-4726: URL-hydrated interior-night overlap dis
       const reserve = screen.getByTestId('guest-booking-submit');
       expect(Boolean(dateError) || reserve.hasAttribute('disabled')).toBe(true);
     });
+  });
+});
+
+describe('UnitBookingWidget - TASK-4911: Reserve CTA surfaces inline validation instead of silently no-op-ing on incomplete dates', () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+    availabilityMock.fetch.mockReset();
+    availabilityMock.fetch.mockImplementation(availabilityOk);
+    task4303.booking.checkIn = null;
+    task4303.booking.checkOut = null;
+  });
+
+  const renderWidget = async () => {
+    const { default: UnitBookingWidget } = await import('./UnitBookingWidget');
+    return render(
+      <MemoryRouter>
+        <UnitBookingWidget
+          listingId={7}
+          propertyId={3}
+          listingName="Atlas 501 PH"
+          propertySlug="atlas501-ph"
+          unitSlug="ph"
+        />
+      </MemoryRouter>,
+    );
+  };
+
+  it('clicking Reserve with no dates selected shows "Add a check-in date to continue." and does not start checkout', async () => {
+    const postSpy = vi.spyOn(axios, 'post').mockResolvedValue({ data: {} });
+
+    await renderWidget();
+
+    const reserve = screen.getByTestId('guest-booking-submit');
+    expect(reserve).toBeEnabled(); // TASK-4277: blank dates must not html-disable the CTA
+
+    await act(async () => {
+      fireEvent.click(reserve);
+    });
+
+    const error = await screen.findByTestId('guest-booking-date-error');
+    expect(error.textContent).toContain('Add a check-in date to continue.');
+    expect(error).toHaveAttribute('role', 'alert');
+
+    // Silence, not just a blocked submit, was the bug — assert the checkout call never fired.
+    expect(postSpy).not.toHaveBeenCalled();
+    // Focus moves to the missing (check-in) field instead of leaving the guest stranded.
+    expect(document.activeElement).toBe(document.getElementById('unit-booking-dates'));
+  });
+
+  it('clicking Reserve with only check-in selected shows "Add a check-out date to continue.", focuses check-out, and does not start checkout', async () => {
+    const postSpy = vi.spyOn(axios, 'post').mockResolvedValue({ data: {} });
+
+    await renderWidget();
+
+    // AtlasBookingCalendar is mocked out for this render suite; the widget also listens for the
+    // atlas:set-checkin window event (used by the bottom AvailabilityCalendar, TASK-2630) — the
+    // only available hook here to land the widget in a check-in-only state for this assertion.
+    const checkin = addDays(getIstStartOfDay(new Date()), 5);
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('atlas:set-checkin', { detail: toISODate(checkin) }));
+    });
+
+    const reserve = screen.getByTestId('guest-booking-submit');
+    expect(reserve).toBeEnabled();
+
+    await act(async () => {
+      fireEvent.click(reserve);
+    });
+
+    const error = await screen.findByTestId('guest-booking-date-error');
+    expect(error.textContent).toContain('Add a check-out date to continue.');
+    expect(error).toHaveAttribute('role', 'alert');
+
+    expect(postSpy).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(screen.getByTestId('unit-booking-checkout-cell'));
+  });
+
+  it('the check-in and check-out date cells are aria-described-by the inline error once shown', async () => {
+    await renderWidget();
+
+    const reserve = screen.getByTestId('guest-booking-submit');
+    await act(async () => {
+      fireEvent.click(reserve);
+    });
+
+    const error = await screen.findByTestId('guest-booking-date-error');
+    const errorId = error.getAttribute('id');
+    expect(errorId).toBeTruthy();
+    expect(document.getElementById('unit-booking-dates')).toHaveAttribute('aria-describedby', errorId);
+    expect(screen.getByTestId('unit-booking-checkout-cell')).toHaveAttribute('aria-describedby', errorId);
+  });
+});
+
+describe('UnitBookingWidget - TASK-4910: no misleading GST-less total in incomplete date selection', () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+    availabilityMock.fetch.mockReset();
+    availabilityMock.fetch.mockImplementation(availabilityOk);
+    task4303.booking.checkIn = null;
+    task4303.booking.checkOut = null;
+  });
+
+  const renderWidget = async () => {
+    const { default: UnitBookingWidget } = await import('./UnitBookingWidget');
+    return render(
+      <MemoryRouter>
+        <UnitBookingWidget
+          listingId={7}
+          propertyId={3}
+          listingName="Atlas 501 PH"
+          propertySlug="atlas501-ph"
+          unitSlug="ph"
+        />
+      </MemoryRouter>,
+    );
+  };
+
+  it('check-in-only selection renders NO Total and no partial breakdown rows — only "Select dates to see total price"', async () => {
+    task4303.fetchCalendarPricing.mockResolvedValue({ dateToPrice: new Map(), convenienceFeePercent: 3 });
+    task4303.fetchGuestGstBreakdown.mockResolvedValue({ gstPercent: 5, gstAmount: 0, finalAmount: 0 });
+
+    await renderWidget();
+
+    // Land the widget in a check-in-only state (same technique as the TASK-4911 suite above —
+    // AtlasBookingCalendar is mocked out, so the atlas:set-checkin window event is the only
+    // available hook to select a check-in without a check-out).
+    const checkin = addDays(getIstStartOfDay(new Date()), 5);
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('atlas:set-checkin', { detail: toISODate(checkin) }));
+    });
+
+    // The card must still say "Select dates to see total price" ...
+    expect(await screen.findByText('Select dates to see total price')).toBeInTheDocument();
+    // ... and must NEVER show a concrete "Total" row, or any of the partial breakdown rows
+    // (Accommodation + Payment processing summing to a total that silently omitted GST) that
+    // the TASK-4910 repro captured alongside that same message.
+    expect(screen.queryByText('Total')).toBeNull();
+    expect(screen.queryByTestId('bw-bd-service-fee-row')).toBeNull();
+    expect(screen.queryByTestId('bw-bd-gst-row')).toBeNull();
+    expect(screen.queryByTestId('bw-bd-subtotal-row price-line-base')).toBeNull();
+    expect(screen.queryByTestId('bw-bd-accommodation-subtotal')).toBeNull();
+    expect(screen.queryByTestId('bw-breakdown-pending')).toBeNull();
+    expect(screen.queryByTestId('bw-price-pending')).toBeNull();
+  });
+
+  it('a complete date range still renders the full breakdown, including the GST line, once selection is valid', async () => {
+    // 1 night ₹6,000 → GST 5% = ₹300; processing fee 3% × 6,000 = ₹180 (base only, TASK-4913
+    // founder-ruled 2026-07-17 option c); Total ₹6,480 — matches the TASK-4910 repro example
+    // (30 Jun→01 Jul) updated to the base-only fee ruling.
+    const checkin = addDays(getIstStartOfDay(new Date()), 5);
+    const checkout = addDays(checkin, 1);
+    const nightIso = toISODate(checkin);
+    task4303.booking.checkIn = toISODate(checkin);
+    task4303.booking.checkOut = toISODate(checkout);
+    task4303.fetchCalendarPricing.mockResolvedValue({
+      dateToPrice: new Map([[nightIso, 6000]]),
+      convenienceFeePercent: 3,
+    });
+    task4303.fetchGuestGstBreakdown.mockResolvedValue({ gstPercent: 5, gstAmount: 300, finalAmount: 6480 });
+
+    await renderWidget();
+
+    const totalLabel = await screen.findByText('Total');
+    const totalValue = totalLabel.parentElement?.querySelector('.lv-num')?.textContent ?? '';
+    expect(totalValue.replace(/[^0-9]/g, '')).toBe('6480');
+
+    const gstRow = screen.getByTestId('bw-bd-gst-row');
+    expect(gstRow.textContent).toContain('GST (5%)');
+    expect(gstRow.querySelector('.lv-num')?.textContent?.replace(/[^0-9]/g, '')).toBe('300');
+
+    const feeRow = screen.getByTestId('bw-bd-service-fee-row');
+    expect(feeRow.querySelector('.lv-num')?.textContent?.replace(/[^0-9]/g, '')).toBe('180');
   });
 });

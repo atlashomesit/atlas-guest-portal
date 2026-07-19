@@ -164,37 +164,44 @@ function getPpRefundSteps(hasOnlinePayment: boolean): Array<{ title: string; des
 
 function getPpCancellationInfo(
   tier: string | null | undefined,
-  opts?: { fallbackText?: string; hasOnlinePayment?: boolean },
+  opts?: { fallbackText?: string; hasOnlinePayment?: boolean; graceHours?: number | null },
 ): PpCancellationInfo {
   const steps = getPpRefundSteps(opts?.hasOnlinePayment !== false);
+  // TASK-4405 (copy-QA rider): the universal grace window applies FIRST, before any tier math below —
+  // append a disclosure so a "Strict — no refund within 7 days" headline never contradicts what the
+  // engine actually refunds during the grace window. Only shown when the server resolved a non-null
+  // graceHours (flag-off parity — no disclosure, no drift, when the flag is off).
+  const graceNote = opts?.graceHours
+    ? ` You can also cancel free within ${opts.graceHours} hours of booking, regardless of this policy.`
+    : '';
   if (tier === 'Flexible') return {
     headline: 'Full refund if cancelled 48 hours before check-in',
-    description: opts?.hasOnlinePayment !== false
+    description: (opts?.hasOnlinePayment !== false
       ? 'Money returns to the exact UPI or card you paid with. No phone calls needed.'
-      : 'Your host arranges the refund directly with you.',
+      : 'Your host arranges the refund directly with you.') + graceNote,
     steps,
   };
   if (tier === 'Moderate') return {
     headline: 'Full refund if cancelled 5 days before check-in',
-    description: 'Partial refund for cancellations after the window. Check your booking for exact terms.',
+    description: 'Partial refund for cancellations after the window. Check your booking for exact terms.' + graceNote,
     steps,
   };
   if (tier === 'Strict') return {
     headline: '50% refund if cancelled 7 days before check-in',
-    description: 'No refund within 7 days of check-in. Check your booking for exact terms.',
+    description: 'No refund within 7 days of check-in. Check your booking for exact terms.' + graceNote,
     steps,
   };
   const fallback = opts?.fallbackText?.trim();
   if (fallback) {
     return {
       headline: 'Cancellation policy',
-      description: fallback,
+      description: fallback + graceNote,
       steps,
     };
   }
   return {
     headline: 'Flexible cancellation — full refund 48+ hours before check-in',
-    description: 'Standard direct-booking policy. See your booking confirmation for exact cut-off times.',
+    description: 'Standard direct-booking policy. See your booking confirmation for exact cut-off times.' + graceNote,
     steps,
   };
 }
@@ -305,6 +312,8 @@ interface Property {
     virtualTourUrl?: string | null;
     /** TASK-1385: Cancellation policy tier from listing — Flexible, Moderate, or Strict. */
     cancellationTier?: 'Flexible' | 'Moderate' | 'Strict' | null;
+    /** TASK-4405: server-resolved universal grace-window hours. Null when the flag is off (flag-off parity). */
+    graceHours?: number | null;
     /** TL-GUEST: from GET /listings/{id} or /listings/public — drives same Google Maps JS path as Location page. */
     latitude?: number | null;
     longitude?: number | null;
@@ -339,6 +348,7 @@ function coerceProperty(item: Partial<Property> & { id?: number | string }): Pro
         property_address: item.property_address,
         virtualTourUrl: item.virtualTourUrl,
         cancellationTier: item.cancellationTier,
+        graceHours: item.graceHours,
         latitude: item.latitude,
         longitude: item.longitude,
     };
@@ -940,6 +950,10 @@ const PropertyDetails = () => {
                             const raw = (apiListing as Record<string, unknown>).cancellationTier ?? pub.cancellationTier;
                             return (raw === 'Flexible' || raw === 'Moderate' || raw === 'Strict') ? raw : null;
                         })(), // TASK-1385
+                        graceHours: (() => {
+                            const raw = (apiListing as Record<string, unknown>).graceHours ?? pub.graceHours;
+                            return typeof raw === 'number' && raw > 0 ? raw : null;
+                        })(), // TASK-4405
                         latitude: (() => {
                             const raw =
                                 (apiListing as Record<string, unknown>).latitude ??
@@ -1286,6 +1300,7 @@ useEffect(() => {
     const ppCancellationInfo = getPpCancellationInfo(data.cancellationTier, {
       fallbackText: _resolvedCancellationText,
       hasOnlinePayment: ppHasOnlinePayment,
+      graceHours: data.graceHours,
     });
     const ppHasLocation =
         (typeof data.latitude === 'number' && Number.isFinite(data.latitude)) ||
@@ -1708,9 +1723,16 @@ useEffect(() => {
                   </div>
                 </section>
 
-                {/* A note from your host — lavender callout panel (Theem mockup) */}
+                {/* A note from your host — lavender callout panel (Theem mockup).
+                    data-testid="pp-host-note" is the CROSS-LAYOUT canary contract (TASK-4987
+                    ruling 2026-07-19): the E2E contrast gate locates this panel by
+                    role="note" + this testid — NOT by the coral copy — so every layout's
+                    listing detail must render a host-note landmark carrying this testid on
+                    the --lavender-soft/--lavender-text surface, while each layout stays free
+                    to word it its own way (AC7 layout-differentiation stays intact). */}
                 <div
                   role="note"
+                  data-testid="pp-host-note"
                   aria-label="A note from your host"
                   style={{
                     margin: '20px 0 4px',
@@ -1744,7 +1766,11 @@ useEffect(() => {
                     "We keep this home ready ourselves — come in, settle down, and
                     message us any time. We're never more than a WhatsApp away."
                   </blockquote>
-                  <p style={{ marginTop: 10, fontSize: 13, color: 'var(--text-muted, #6b5a55)' }}>
+                  {/* WCAG AA: this panel's background is the fixed lavender-soft surface (not
+                      theme-driven), so it must use --lavender-text (contrast-validated against
+                      #f0eafd at 4.83:1 in default.css), not the per-preset --text-muted — mirrors
+                      the identical host-note fix in Home.tsx (text-muted-inherited-surface-contrast.test.ts). */}
+                  <p style={{ marginTop: 10, fontSize: 13, color: 'var(--lavender-text, #6f5aa8)' }}>
                     — {ppHasRealHost ? `${ppHostDisplayName}, your host` : `The ${ppBrandName} host team`}
                   </p>
                 </div>

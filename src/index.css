@@ -11,15 +11,15 @@
   --color-text-primary: var(--text-primary);
   --color-text-secondary: var(--text-secondary);
   --color-text-muted: var(--text-muted);
-  --color-accent-primary: rgb(var(--accent-primary-rgb) / <alpha-value>);
-  --color-accent-soft: rgb(var(--accent-soft-rgb) / <alpha-value>);
-  --color-cta-primary: rgb(var(--cta-primary-rgb) / <alpha-value>);
-  --color-cta-primary-hover: rgb(var(--cta-primary-hover-rgb) / <alpha-value>);
-  --color-cta-secondary: rgb(var(--cta-secondary-rgb) / <alpha-value>);
+  --color-accent-primary: rgb(var(--accent-primary-rgb));
+  --color-accent-soft: rgb(var(--accent-soft-rgb));
+  --color-cta-primary: rgb(var(--cta-primary-rgb));
+  --color-cta-primary-hover: rgb(var(--cta-primary-hover-rgb));
+  --color-cta-secondary: rgb(var(--cta-secondary-rgb));
   --color-brand-primary: var(--brand-primary);
   --color-border-subtle: var(--border-subtle);
   --color-border-strong: var(--border-strong);
-  --color-primary: rgb(var(--cta-primary-rgb) / <alpha-value>);
+  --color-primary: rgb(var(--cta-primary-rgb));
   --color-success: var(--support-success);
   --color-danger: var(--support-danger);
 

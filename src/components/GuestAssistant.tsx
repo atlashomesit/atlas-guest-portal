@@ -254,7 +254,7 @@ export default function GuestAssistant({ listingId }: GuestAssistantProps) {
                         <button
                           type="button"
                           onClick={() => void handleAskAi()}
-                          className="inline-flex min-h-11 items-center rounded-lg bg-cta-primary px-4 py-3 text-sm font-semibold text-white hover:opacity-90 transition"
+                          className="inline-flex min-h-11 items-center rounded-lg bg-cta-primary px-4 py-3 text-sm font-semibold text-[var(--text-on-cta)] hover:opacity-90 transition"
                         >
                           Ask AI →
                         </button>

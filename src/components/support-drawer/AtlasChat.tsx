@@ -89,10 +89,12 @@ const AtlasChat = ({ onClose, listingId = null }: AtlasChatProps) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 w-[300px] h-[320px] bg-white border border-slate-200 rounded-lg shadow-lg flex flex-col z-[999] overflow-hidden">
+    <div className="fixed bottom-4 right-4 w-[300px] h-[320px] bg-bg-surface border border-border-subtle rounded-lg shadow-lg flex flex-col z-[999] overflow-hidden">
 
       {/* Header */}
-      <div className="p-1.5 bg-[#2c5282] text-white flex justify-between items-center border-b border-slate-200">
+      {/* TASK-4969: use the theme tokens every sibling support-drawer component uses
+          (--cta-primary / --text-on-cta / --bg-surface) instead of hardcoded navy. */}
+      <div className="p-1.5 bg-cta-primary text-[var(--text-on-cta)] flex justify-between items-center border-b border-border-subtle">
         <div className="flex items-center gap-2">
           <h2 className="font-medium text-xs">{`${brandName} Concierge`}</h2>
           <span className="text-xs opacity-80">•</span>
@@ -102,14 +104,14 @@ const AtlasChat = ({ onClose, listingId = null }: AtlasChatProps) => {
         {/* ❌ CROSS BUTTON */}
         <button
           onClick={onClose || (() => setIsOpen(false))}
-          className="p-0.5 rounded-full hover:bg-white/20 transition text-white/80 hover:text-white"
+          className="p-0.5 rounded-full hover:bg-[color-mix(in_srgb,var(--text-on-cta)_20%,transparent)] transition text-[color-mix(in_srgb,var(--text-on-cta)_80%,transparent)] hover:text-[var(--text-on-cta)]"
         >
           <X size={16} />
         </button>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-1.5 space-y-1 bg-white text-xs">
+      <div className="flex-1 overflow-y-auto p-1.5 space-y-1 bg-bg-surface text-xs">
         {messages.map((m, i) => (
           <div
             key={i}
@@ -119,8 +121,8 @@ const AtlasChat = ({ onClose, listingId = null }: AtlasChatProps) => {
               className={`max-w-[92%] px-2 py-0.5 rounded text-xs leading-tight shadow-xs
                 ${
                   m.role === 'user'
-                    ? 'bg-[#2c5282] text-white'
-                    : 'bg-slate-50 text-slate-800 border border-slate-100'
+                    ? 'bg-cta-primary text-[var(--text-on-cta)]'
+                    : 'bg-bg-muted text-text-primary border border-border-subtle'
                 }`}
             >
               <ReactMarkdown>{m.content}</ReactMarkdown>
@@ -131,11 +133,11 @@ const AtlasChat = ({ onClose, listingId = null }: AtlasChatProps) => {
       </div>
 
       {/* Input */}
-      <div className="p-1.5 bg-white border-t border-slate-100 flex items-center gap-1">
+      <div className="p-1.5 bg-bg-surface border-t border-border-subtle flex items-center gap-1">
         <button
           onClick={startSpeechToText}
           className={`p-1 rounded-full text-[11px] ${
-            isListening ? 'bg-red-500 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+            isListening ? 'bg-[var(--support-error)] text-[var(--text-on-cta)]' : 'bg-bg-muted text-text-muted hover:bg-[color-mix(in_srgb,var(--bg-muted)_60%,var(--text-muted)_10%)]'
           }`}
         >
           <Mic size={18} />
@@ -146,12 +148,12 @@ const AtlasChat = ({ onClose, listingId = null }: AtlasChatProps) => {
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleSend()}
           placeholder="Type your message..."
-          className="flex-1 bg-white border border-slate-200 rounded text-[11px] px-2 py-1 text-slate-800 outline-none focus:border-blue-300"
+          className="flex-1 bg-bg-surface border border-border-subtle rounded text-[11px] px-2 py-1 text-text-primary outline-none focus:border-accent-primary"
         />
 
         <button
           onClick={() => handleSend()}
-          className="p-1 rounded-full bg-[#2c5282] text-white text-[11px]"
+          className="p-1 rounded-full bg-cta-primary text-[var(--text-on-cta)] text-[11px]"
         >
           <Send size={18} />
         </button>

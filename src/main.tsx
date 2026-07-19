@@ -3,7 +3,7 @@ import 'react-date-range/dist/styles.css'
 import 'react-date-range/dist/theme/default.css'
 import './index.css'
 import 'react-toastify/dist/ReactToastify.css'
-import { DEFAULT_THEME, applyTheme } from './styles/theme'
+import { DEFAULT_THEME, applyLayoutDefaultColorTokens, applyTheme } from './styles/theme'
 import App from './App.tsx'
 import ErrorBoundary from './components/ErrorBoundary'
 import ApiConfigGuard from './components/ApiConfigGuard'
@@ -19,6 +19,15 @@ import { applyTenantBranding } from './tenant/tenantBranding'
 import { ConfigLoadingScreen } from './runtime-config/ConfigLoadingScreen'
 import { ConfigErrorScreen } from './runtime-config/ConfigErrorScreen'
 import TenantJsonLd from './components/TenantJsonLd'
+// TASK-4903 (ADR-0081): boot-time layout-theme resolution + prefetch. `src/App.tsx` is the
+// only other mount point allowed to import `src/themes/registry` (ESLint boundary rule).
+import {
+  getLayoutThemeDefaultColorTokens,
+  loadLayoutTheme,
+  resolveColorPresetForLayout,
+  resolveLayoutThemeId,
+  setCurrentLayoutThemeId,
+} from './themes/registry'
 
 // Suppress chrome extension module loading errors in console (non-critical, expected in dev).
 // ErrorEvent.message is typed `string` but is nullish for some cross-origin / platform error
@@ -57,6 +66,18 @@ function activateMarketplaceSurface(
   ) {
     setMarketplaceMode(true)
   }
+}
+
+/**
+ * DEV-only layout override (`?layout=coastal`). TASK-4904's server-side `WebsiteThemeId` is the
+ * real selection mechanism and there is deliberately no prod-facing layout picker (see the AC7
+ * test's own note) — but until TASK-4904 lands there is otherwise NO way to exercise a
+ * non-classic layout, or its baked `defaultColorTokens`, in a browser at all. Stripped from
+ * production builds by the `import.meta.env.DEV` guard.
+ */
+const getDevLayoutThemeOverride = (): string | undefined => {
+  if (!import.meta.env.DEV || typeof window === 'undefined') return undefined
+  return new URLSearchParams(window.location.search).get('layout') ?? undefined
 }
 
 const bootstrapApp = async () => {
@@ -136,6 +157,30 @@ const bootstrapApp = async () => {
       applyTenantBranding(resolved);
     }
 
+    // TASK-4903 (ADR-0081 D2/D3/D5/D6a): resolve the layout-theme + color-preset axes once
+    // tenant resolution completes. `resolved.effectiveThemeId`/`effectiveColorPresetId` are
+    // undefined until TASK-4904 lands the server-side DTO fields — resolving here already
+    // stubs "classic"/"default" in that case, so this wiring needs no further change once
+    // TASK-4904 ships. Marketplace apex skips this — it isn't a single resolved tenant and
+    // already renders with the boot-time DEFAULT_THEME applied above.
+    const effectiveThemeId = resolveLayoutThemeId(getDevLayoutThemeOverride() ?? resolved?.effectiveThemeId)
+    setCurrentLayoutThemeId(effectiveThemeId)
+    let effectiveColorPreset = DEFAULT_THEME
+    if (!(isMarketplaceMode() && isAtlastaysMarketplaceSurface())) {
+      // ADR-0081 D5/D6b: install the layout's baked palette FIRST, then let `applyTheme()`
+      // arbitrate — a preset this layout curates (D6) overrides the palette; no preset, or
+      // one it does not curate, falls back to it. Before this wiring the layouts' authored
+      // `defaultColorTokens` were dead data and every non-classic layout silently rendered
+      // with classic's coral palette from `default.css`.
+      //
+      // Deliberately NOT gated on `resolved` being non-null: the palette is a property of the
+      // resolved LAYOUT, not of the tenant record. Only the preset lookup below needs a tenant.
+      applyLayoutDefaultColorTokens(effectiveThemeId, getLayoutThemeDefaultColorTokens(effectiveThemeId))
+      effectiveColorPreset =
+        resolveColorPresetForLayout(effectiveThemeId, resolved?.effectiveColorPresetId) ?? DEFAULT_THEME
+      applyTheme(effectiveColorPreset)
+    }
+
     // TASK-2400: `/` uses React.lazy (Home or MarketplaceHomepage). Under slow CDN or
     // parallel E2E load, the route chunk can still be loading after domcontentloaded —
     // body text stays tiny (Suspense fallback) and a11y/homepage tests flake. Prefetch
@@ -144,7 +189,9 @@ const bootstrapApp = async () => {
       if (isMarketplaceMode() && isAtlastaysMarketplaceSurface()) {
         void import('./pages/MarketplaceHomepage');
       } else {
-        void import('./pages/home/Home');
+        // TASK-4903: prefetch the resolved layout theme's package (contains Home) instead
+        // of the page file directly — Home now ships inside its theme's chunk.
+        void loadLayoutTheme(effectiveThemeId);
       }
     }
 
@@ -152,8 +199,11 @@ const bootstrapApp = async () => {
     // This ensures the correct tenant branding is applied before the app renders
     await new Promise(resolve => setTimeout(resolve, 100));
 
+    // ThemeProvider is seeded with the boot-resolved preset rather than a bare DEFAULT_THEME:
+    // its mount effect re-runs applyTheme(initialTheme), which would otherwise stand the
+    // layout's baked palette back up on top of an active color preset.
     root.render(
-      <ThemeProvider initialTheme={DEFAULT_THEME} enableDevSwitcher>
+      <ThemeProvider initialTheme={effectiveColorPreset} enableDevSwitcher>
         <ErrorBoundary name="app-shell">
           <TenantJsonLd />
           <ApiConfigGuard>
