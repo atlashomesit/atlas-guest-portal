@@ -903,9 +903,10 @@ const PropertyDetails = () => {
                         property_nearplaces: Array.isArray((apiListing as Record<string, unknown>).property_nearplaces) ? (apiListing as Record<string, unknown>).property_nearplaces as string[] : [],
                         property_mapSrc: (apiListing as Record<string, unknown>).property_mapSrc as string ?? '',
                         property_policy_details: Array.isArray((apiListing as Record<string, unknown>).property_policy_details) ? (apiListing as Record<string, unknown>).property_policy_details as PropertyDetail[] : [],
-                        property_rating: Number((apiListing as Record<string, unknown>).property_rating) || 0,
-                        property_reviews: Number((apiListing as Record<string, unknown>).property_reviews) || 0,
-                        property_price: Number((apiListing as Record<string, unknown>).property_price) || 0,
+                        // TASK-5196: public listing DTO uses baseNightlyRate / propertyRating / reviewCount
+                        property_rating: Number(apiListing.propertyRating ?? (apiListing as Record<string, unknown>).property_rating) || 0,
+                        property_reviews: Number(apiListing.reviewCount ?? (apiListing as Record<string, unknown>).property_reviews) || 0,
+                        property_price: Number(apiListing.baseNightlyRate ?? (apiListing as Record<string, unknown>).property_price) || 0,
                         timezoneId: (apiListing as Record<string, unknown>).timezoneId as string | undefined,
                         maxGuests: parseMaxGuestsFromPayload(apiListing as Record<string, unknown>),
                         checkInTime: pub.checkInTime?.trim() || undefined,
