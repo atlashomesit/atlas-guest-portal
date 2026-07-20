@@ -143,8 +143,6 @@ const PRE_ARRIVAL_STRINGS: Record<string, {
   heading: string; intro: string; checkinLabel: string; addressLabel: string;
   hostLabel: string; hostDesc: string; chatBtn: string; wifiLabel: string;
   landmarksLabel: string; viewListing: string; t1Hint: (date: string) => string; t1Fallback: string;
-  t1PreviewSummary: string;
-  t1PreviewDisclaimer: string;
 }> = {
   en: {
     heading: "Before you arrive", intro: "You are checking in soon. Here is a quick reference for your stay — save this page or add to calendar below.",
@@ -153,8 +151,6 @@ const PRE_ARRIVAL_STRINGS: Record<string, {
     wifiLabel: "WiFi", landmarksLabel: "Nearby landmarks", viewListing: "View full listing & photos",
     t1Hint: (d) => `🏠 We'll remind you on ${d} with check-in details by email.`,
     t1Fallback: "🏠 We'll remind you the day before your stay with check-in details.",
-    t1PreviewSummary: "Preview the day-before reminder message",
-    t1PreviewDisclaimer: "The exact wording may vary; your host may personalize the message before it is sent.",
   },
   hi: {
     heading: "आगमन से पहले", intro: "आप जल्द ही चेक-इन कर रहे हैं। यहाँ आपके प्रवास का त्वरित संदर्भ है — यह पृष्ठ सहेजें या नीचे कैलेंडर में जोड़ें।",
@@ -163,8 +159,6 @@ const PRE_ARRIVAL_STRINGS: Record<string, {
     wifiLabel: "WiFi", landmarksLabel: "नज़दीकी स्थान", viewListing: "पूरी लिस्टिंग और फ़ोटो देखें",
     t1Hint: (d) => `🏠 हम आपको ${d} को ईमेल द्वारा चेक-इन विवरण के साथ याद दिलाएंगे।`,
     t1Fallback: "🏠 हम आपके प्रवास के एक दिन पहले चेक-इन विवरण के साथ याद दिलाएंगे।",
-    t1PreviewSummary: "एक दिन पहले भेजे जाने वाले संदेश का पूर्वावलोकन",
-    t1PreviewDisclaimer: "वास्तविक शब्द भिन्न हो सकते हैं; आपका होस्ट भेजने से पहले संदेश को अनुकूलित कर सकता है।",
   },
   te: {
     heading: "రాక ముందు", intro: "మీరు త్వరలో చెక్-ఇన్ చేస్తున్నారు. ఇది మీ వసతికి త్వరిత సూచన — ఈ పేజీని సేవ్ చేయండి లేదా క్రింద క్యాలెండర్‌కు జోడించండి।",
@@ -173,61 +167,8 @@ const PRE_ARRIVAL_STRINGS: Record<string, {
     wifiLabel: "WiFi", landmarksLabel: "సమీప ప్రదేశాలు", viewListing: "పూర్తి లిస్టింగ్ & ఫోటోలు చూడండి",
     t1Hint: (d) => `🏠 మేము ${d}న ఇమెయిల్ ద్వారా చెక్-ఇన్ వివరాలతో మీకు గుర్తు చేస్తాము.`,
     t1Fallback: "🏠 మేము మీ వసతికి ముందు రోజు చెక్-ఇన్ వివరాలతో గుర్తు చేస్తాము.",
-    t1PreviewSummary: "ముందురోజు సందేశ పూర్వావలోకనం",
-    t1PreviewDisclaimer: "నిజమైన పదాలు మారవచ్చు; పంపే ముందు మీ హోస్ట్ సందేశాన్ని సవరించవచ్చు.",
   },
 };
-
-/** TASK-1680: sample body for T-1 reminder (not server-rendered template). */
-function truncateForPreview(s: string, max: number): string {
-  const t = s.trim();
-  if (t.length <= max) return t;
-  return `${t.slice(0, max - 1)}…`;
-}
-
-function buildTMinus1WhatsAppPreviewBody(booking: BookingSummary): string {
-  const guest = booking.guestName?.trim() || "Guest";
-  const place = (booking.listingName || booking.propertyName || "your stay").trim();
-  const cin = booking.checkInTime?.trim();
-  const cout = booking.checkOutTime?.trim();
-  let checkinLine: string;
-  try {
-    const d = new Date(booking.checkinDate);
-    const datePretty = !isNaN(d.getTime())
-      ? d.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "short", year: "numeric" })
-      : booking.checkinDate;
-    if (cin && cout) checkinLine = `${cin} – ${cout} (${datePretty})`;
-    else if (cin) checkinLine = `${cin} (${datePretty})`;
-    else checkinLine = datePretty;
-  } catch {
-    checkinLine = booking.checkinDate;
-  }
-
-  const lines: string[] = [];
-  lines.push(`Hi ${guest},`);
-  lines.push("");
-  lines.push(`We're looking forward to welcoming you tomorrow at ${place}.`);
-  lines.push("");
-  lines.push(`Check-in: ${checkinLine}`);
-  if (booking.propertyAddress?.trim()) {
-    lines.push(`Address: ${booking.propertyAddress.trim()}`);
-  }
-  const ins = (booking.checkinInstructions || "").trim();
-  if (ins) {
-    lines.push(`Directions / access: ${truncateForPreview(ins, 320)}`);
-  }
-  if (booking.wifiVisible && booking.wifiName?.trim()) {
-    lines.push(
-      booking.wifiPassword?.trim()
-        ? `Wi-Fi: ${booking.wifiName.trim()} · Password: ${booking.wifiPassword.trim()}`
-        : `Wi-Fi network: ${booking.wifiName.trim()}`,
-    );
-  }
-  lines.push("");
-  lines.push("—");
-  lines.push("(Sample preview — your host sends the final message.)");
-  return lines.join("\n");
-}
 
 interface ListingAddOnPublic {
   addOnServiceId: number;
@@ -1424,19 +1365,6 @@ export default function BookingConfirmationPage() {
                   return pa.t1Fallback;
                 })()}
               </p>
-              {/* TASK-1680: collapsible sample of day-before WhatsApp reminder */}
-              <details
-                className="rounded-xl border border-border-subtle bg-bg-muted/50 px-3 py-2"
-                data-testid="confirmation-t-minus-1-preview"
-              >
-                <summary className="cursor-pointer text-xs font-semibold text-text-primary select-none">
-                  {pa.t1PreviewSummary}
-                </summary>
-                <p className="mt-2 text-xs text-text-muted leading-relaxed">{pa.t1PreviewDisclaimer}</p>
-                <pre className="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap break-words rounded-lg bg-bg-surface border border-border-subtle p-3 font-sans text-xs text-text-secondary leading-relaxed">
-                  {buildTMinus1WhatsAppPreviewBody(booking)}
-                </pre>
-              </details>
               <p>
                 {hasWhatsAppContact ? (
                   <>
