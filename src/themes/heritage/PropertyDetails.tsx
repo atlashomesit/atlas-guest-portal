@@ -2153,51 +2153,6 @@ useEffect(() => {
                   </section>
                 )}
 
-                {/* TASK-4014: Nearby attractions section — static placeholder for now */}
-                <section className="pp-section" aria-label="Nearby attractions and things to do">
-                  <div className="pp-section-head">
-                    <h2>Nearby attractions & things to do</h2>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 16 }}>
-                    {(() => {
-                      // TODO: Replace with real API data from GET /api/listings/{id}/nearby when available
-                      const SAMPLE_ATTRACTIONS = [
-                        { name: 'Local Market', distance: '0.5 km', type: 'Shopping', icon: '🛍️' },
-                        { name: 'Waterfall Trail', distance: '2 km', type: 'Nature', icon: '🏞️' },
-                        { name: 'Town Square', distance: '1 km', type: 'Landmark', icon: '📍' },
-                      ];
-                      return SAMPLE_ATTRACTIONS.map((attraction, idx) => (
-                        <div
-                          key={`attraction-${idx}`}
-                          style={{
-                            borderRadius: 12,
-                            border: '1px solid #f0e6dc',
-                            padding: 12,
-                            textAlign: 'center',
-                            background: '#fff',
-                            transition: 'box-shadow 0.2s',
-                          }}
-                          onMouseEnter={(e) => (e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)')}
-                          onMouseLeave={(e) => (e.currentTarget.style.boxShadow = 'none')}
-                        >
-                          <div style={{ fontSize: 28, marginBottom: 8 }} aria-hidden="true">{attraction.icon}</div>
-                          <p style={{ fontWeight: 600, color: '#1a1a2e', fontSize: 13, margin: '0 0 4px', minHeight: '2em' }}>
-                            {attraction.name}
-                          </p>
-                          <p style={{ fontSize: 11, color: '#64748b', margin: '0 0 6px' }}>
-                            {attraction.distance}
-                          </p>
-                          {/* WCAG AA: #6b5138 on #f0e6dc ≈ 5.9:1 (was #94755b at 3.44:1 — axe color-contrast failure) */}
-                          <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: '#f0e6dc', color: '#6b5138' }}>
-                            {attraction.type}
-                          </span>
-                        </div>
-                      ));
-                    })()}
-                  </div>
-                </section>
-
-
               </div>
               {/* ===== END LEFT COLUMN ===== */}
 
