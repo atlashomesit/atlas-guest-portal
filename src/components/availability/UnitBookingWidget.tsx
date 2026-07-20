@@ -1361,6 +1361,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           currency: 'INR',
           touristTaxAmount: resolvedTouristTax,
         },
+        holdCancellationTier: resolvedCancellationTier,
+        holdCancellationWindowHours: resolvedCancellationWindowHours,
+        holdGraceHours: resolvedGraceHours,
         // Forward dates/guests into context for the details page
         checkIn: checkinIst.toISOString(),
         checkOut: checkoutIst.toISOString(),
@@ -1392,6 +1395,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     isSubmitting, isBookingDisabled, availabilityFailed, dateRange, dateStatusMap, blockedSet, today,
     listingId, guests, propertySlug, unitSlug, listingName, breakdownPrice, breakdownConvenienceFee,
     breakdownFinalTotal, finalTotal, updateBooking, navigate,
+    resolvedCancellationTier, resolvedCancellationWindowHours, resolvedGraceHours,
   ]);
 
   if (providerBlocked) {

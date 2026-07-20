@@ -38,6 +38,10 @@ import { track } from '@/lib/events';
 import { mapRazorpayFailureCode } from '@/utils/razorpayGuestErrors';
 import { formatDisplayNumber, getContactEmail, getTelLink, getWhatsAppLink } from '@/config/contact';
 import { computeCheckoutTotal } from '@/utils/guestPriceEstimate';
+import {
+  computeEffectiveCancellationDeadline,
+  formatCancellationDeadline,
+} from '@/utils/cancellationPolicy';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 /** TASK-5183: fire-and-forget hard-delete of PaymentPending draft when checkout is abandoned. */
@@ -158,6 +162,9 @@ type CheckoutHoldCache = {
   holdUnitSlug?: string | null;
   holdListingName?: string | null;
   holdPriceBreakdown?: BookingPriceBreakdown | null;
+  holdCancellationTier?: 'Flexible' | 'Moderate' | 'Strict' | null;
+  holdCancellationWindowHours?: number | null;
+  holdGraceHours?: number | null;
   checkIn?: string | null;
   checkOut?: string | null;
   guests?: number;
@@ -279,6 +286,9 @@ const GuestDetailsPage: React.FC = () => {
           holdUnitSlug: cached.holdUnitSlug ?? null,
           holdListingName: cached.holdListingName ?? null,
           holdPriceBreakdown: cached.holdPriceBreakdown ?? null,
+          holdCancellationTier: cached.holdCancellationTier ?? null,
+          holdCancellationWindowHours: cached.holdCancellationWindowHours ?? null,
+          holdGraceHours: cached.holdGraceHours ?? null,
           checkIn: cached.checkIn ?? null,
           checkOut: cached.checkOut ?? null,
           guests: cached.guests ?? booking.guests,
@@ -382,6 +392,9 @@ const GuestDetailsPage: React.FC = () => {
       holdUnitSlug: booking.holdUnitSlug ?? unitSlug ?? null,
       holdListingName: booking.holdListingName ?? null,
       holdPriceBreakdown: priceBreakdown ?? null,
+      holdCancellationTier: booking.holdCancellationTier ?? null,
+      holdCancellationWindowHours: booking.holdCancellationWindowHours ?? null,
+      holdGraceHours: booking.holdGraceHours ?? null,
       checkIn: booking.checkIn ?? null,
       checkOut: booking.checkOut ?? null,
       guests: booking.guests,
@@ -392,6 +405,7 @@ const GuestDetailsPage: React.FC = () => {
   }, [
     holdId, holdToken, holdExpiresAt, holdListingId, priceBreakdown, booking.checkIn, booking.checkOut,
     booking.guests, booking.holdPropertySlug, booking.holdUnitSlug, booking.holdListingName,
+    booking.holdCancellationTier, booking.holdCancellationWindowHours, booking.holdGraceHours,
     propertySlug, unitSlug,
   ]);
 
@@ -503,12 +517,24 @@ const GuestDetailsPage: React.FC = () => {
   const unitName = booking.holdListingName?.trim()
     || (unitSlug && /\D/.test(unitSlug) ? unitSlug.replace(/-/g, ' ') : unitSlug ?? '');
 
-  // Free cancellation date = 48h before check-in
+  // TASK-5179: free-cancellation deadline from resolved listing policy (not a hardcoded 48h).
   const freeCancelDisplay = useMemo(() => {
     if (!booking.checkIn) return null;
-    const d = new Date(new Date(booking.checkIn).getTime() - 48 * 60 * 60 * 1000);
-    return formatDateInTimezone(d, 'Asia/Kolkata');
-  }, [booking.checkIn]);
+    const checkInDate = new Date(booking.checkIn);
+    const deadline = computeEffectiveCancellationDeadline(
+      checkInDate,
+      booking.holdCancellationTier,
+      booking.holdCancellationWindowHours,
+      new Date(),
+      booking.holdGraceHours,
+    );
+    return formatCancellationDeadline(deadline);
+  }, [
+    booking.checkIn,
+    booking.holdCancellationTier,
+    booking.holdCancellationWindowHours,
+    booking.holdGraceHours,
+  ]);
 
   // ── Submit state ──────────────────────────────────────────────────────────
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -933,7 +959,9 @@ const GuestDetailsPage: React.FC = () => {
                       updateBooking({
                         holdId: null, holdExpiresAt: null, holdPropertySlug: null,
                         holdUnitSlug: null, holdPriceBreakdown: null, holdListingId: null,
-                        holdListingName: null, paymentHoldBookingId: null, paymentHoldToken: null,
+                        holdListingName: null, holdCancellationTier: null,
+                        holdCancellationWindowHours: null, holdGraceHours: null,
+                        paymentHoldBookingId: null, paymentHoldToken: null,
                       });
                       const token = pendingBookingTokenRef.current;
                       navigate(
@@ -1158,6 +1186,7 @@ const GuestDetailsPage: React.FC = () => {
     updateBooking({
       holdId: null, holdExpiresAt: null, holdPropertySlug: null,
       holdUnitSlug: null, holdPriceBreakdown: null, holdListingId: null, holdListingName: null,
+      holdCancellationTier: null, holdCancellationWindowHours: null, holdGraceHours: null,
     });
     navigate(propertySlug && unitSlug ? `/homes/${propertySlug}/${unitSlug}` : '/', { replace: true });
   }, [updateBooking, navigate, propertySlug, unitSlug, holdId, holdToken]);
@@ -2006,7 +2035,7 @@ const TrustBand: React.FC<TrustBandProps> = ({ freeCancelDisplay, brandName, wha
       <IconCheck size={14}/>
       <span>
         <b>Free cancellation</b>
-        {freeCancelDisplay ? ` until ${freeCancelDisplay} — 48 hours before check-in.` : ' policy applies.'}
+        {freeCancelDisplay ? ` until ${freeCancelDisplay}.` : ' policy applies.'}
       </span>
     </div>
     <div className="gd-trust-row">

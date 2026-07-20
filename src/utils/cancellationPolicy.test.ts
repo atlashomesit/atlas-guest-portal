@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   computeCancellationDeadline,
+  computeEffectiveCancellationDeadline,
   formatCancellationDeadline,
   FREE_CANCELLATION_WINDOW_HOURS,
 } from './cancellationPolicy';
@@ -86,5 +87,30 @@ describe('formatCancellationDeadline', () => {
     // 18:30 UTC == 00:00 IST next day
     const deadline = new Date('2026-07-09T18:30:00Z');
     expect(formatCancellationDeadline(deadline)).toBe('12:00 AM, 10 Jul');
+  });
+});
+
+describe('computeEffectiveCancellationDeadline', () => {
+  const checkIn = new Date('2026-07-12T00:00:00+05:30');
+  const bookingCreatedAt = new Date('2026-06-01T12:00:00+05:30');
+
+  it('defaults to 168h when tier is null (TASK-5179)', () => {
+    const deadline = computeEffectiveCancellationDeadline(checkIn, null, null, bookingCreatedAt, null);
+    expect(deadline.toISOString()).toBe(new Date('2026-07-05T00:00:00+05:30').toISOString());
+  });
+
+  it('uses 48h for Flexible tier', () => {
+    const deadline = computeEffectiveCancellationDeadline(checkIn, 'Flexible', null, bookingCreatedAt, null);
+    expect(deadline.toISOString()).toBe(new Date('2026-07-10T00:00:00+05:30').toISOString());
+  });
+
+  it('uses 168h for Strict tier', () => {
+    const deadline = computeEffectiveCancellationDeadline(checkIn, 'Strict', null, bookingCreatedAt, null);
+    expect(deadline.toISOString()).toBe(new Date('2026-07-05T00:00:00+05:30').toISOString());
+  });
+
+  it('prefers server windowHoursOverride over tier map', () => {
+    const deadline = computeEffectiveCancellationDeadline(checkIn, 'Flexible', 168, bookingCreatedAt, null);
+    expect(deadline.toISOString()).toBe(new Date('2026-07-05T00:00:00+05:30').toISOString());
   });
 });
