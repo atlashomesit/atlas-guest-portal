@@ -1649,18 +1649,13 @@ useEffect(() => {
               {/* ===== LEFT COLUMN ===== */}
               <div>
 
-                {/* Host strip + verified panel */}
+                {/* Host strip + trust panel */}
                 <section className="pp-section" style={{ paddingTop: 28 }} aria-label="About the host">
                   <div className="pp-host">
                     <div className="pp-host-avatar" aria-hidden="true">{ppHostInitial}</div>
                     <div>
                       <div className="pp-host-name">
                         {ppHostDisplayName}
-                        {ppHasRealHost && (
-                          <span className="pp-verified-badge">
-                            <PpCheckIcon size={10} /> Verified
-                          </span>
-                        )}
                       </div>
                       <div className="pp-host-sub">
                         Hosted directly · Responds on WhatsApp · Direct booking
