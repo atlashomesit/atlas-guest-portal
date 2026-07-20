@@ -293,6 +293,7 @@ describe('UnitBookingWidget - TASK-4331: GST slab sourced from server, not a pre
     expect(content).toContain('fetchGuestGstBreakdown');
     expect(content).toContain('serverGstPercent');
     expect(content).toContain('serverGstAmount');
+    expect(content).toContain('serverFinalAmount');
   });
 
   it('gstSlabPercent prefers the server value when it matches the current selection', () => {
@@ -310,6 +311,13 @@ describe('UnitBookingWidget - TASK-4331: GST slab sourced from server, not a pre
     const content = readFileSync(filePath, 'utf-8');
     expect(content).toMatch(
       /const gstLineAmount =\s*\n\s*serverGstMatchesSelection && serverGstAmount != null/,
+    );
+  });
+
+  it('finalTotal prefers server FinalAmount when it matches the current selection (TASK-5184)', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    expect(content).toMatch(
+      /const finalTotal =\s*\n\s*serverGstMatchesSelection && typeof serverFinalAmount === 'number' && serverFinalAmount > 0/,
     );
   });
 });
