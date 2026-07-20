@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import type { CancellationTier } from '@/utils/cancellationPolicy';
 
 /** Price breakdown forwarded from the widget to GuestDetailsPage (session-only, not persisted). */
 export type BookingPriceBreakdown = {
@@ -49,6 +50,10 @@ type BookingState = {
   holdListingId: number | null;
   /** Human-readable listing/unit name forwarded from the widget (session-only; not persisted). */
   holdListingName: string | null;
+  /** TASK-5179: resolved cancellation policy forwarded from UnitBookingWidget (session-only). */
+  holdCancellationTier: CancellationTier | null;
+  holdCancellationWindowHours: number | null;
+  holdGraceHours: number | null;
 };
 
 type BookingContextValue = {
@@ -81,6 +86,9 @@ const defaultState: BookingState = {
   holdPriceBreakdown: null,
   holdListingId: null,
   holdListingName: null,
+  holdCancellationTier: null,
+  holdCancellationWindowHours: null,
+  holdGraceHours: null,
 };
 
 // eslint-disable-next-line react-refresh/only-export-components -- context co-located with provider
@@ -116,6 +124,9 @@ const loadState = (): BookingState => {
       holdPriceBreakdown: null,
       holdListingId: null,
       holdListingName: null,
+      holdCancellationTier: null,
+      holdCancellationWindowHours: null,
+      holdGraceHours: null,
     };
   } catch (error) {
     console.warn('[BookingContext] Failed to load persisted booking state', error);
