@@ -312,8 +312,12 @@ interface Property {
     virtualTourUrl?: string | null;
     /** TASK-1385: Cancellation policy tier from listing — Flexible, Moderate, or Strict. */
     cancellationTier?: 'Flexible' | 'Moderate' | 'Strict' | null;
+    /** TASK-4356: free-cancellation window hours before check-in (server-resolved). */
+    cancellationWindowHours?: number | null;
     /** TASK-4405: server-resolved universal grace-window hours. Null when the flag is off (flag-off parity). */
     graceHours?: number | null;
+    /** TASK-5205 / TASK-956: minimum stay nights from listing payload. */
+    minStay?: number | null;
     /** TL-GUEST: from GET /listings/{id} or /listings/public — drives same Google Maps JS path as Location page. */
     latitude?: number | null;
     longitude?: number | null;
@@ -348,7 +352,9 @@ function coerceProperty(item: Partial<Property> & { id?: number | string }): Pro
         property_address: item.property_address,
         virtualTourUrl: item.virtualTourUrl,
         cancellationTier: item.cancellationTier,
+        cancellationWindowHours: item.cancellationWindowHours,
         graceHours: item.graceHours,
+        minStay: item.minStay,
         latitude: item.latitude,
         longitude: item.longitude,
     };
@@ -951,10 +957,21 @@ const PropertyDetails = () => {
                             const raw = (apiListing as Record<string, unknown>).cancellationTier ?? pub.cancellationTier;
                             return (raw === 'Flexible' || raw === 'Moderate' || raw === 'Strict') ? raw : null;
                         })(), // TASK-1385
+                        cancellationWindowHours: (() => {
+                            const raw =
+                                (apiListing as Record<string, unknown>).cancellationWindowHours ??
+                                pub.cancellationWindowHours;
+                            return typeof raw === 'number' && raw > 0 ? raw : null;
+                        })(), // TASK-4356 / TASK-5205
                         graceHours: (() => {
                             const raw = (apiListing as Record<string, unknown>).graceHours ?? pub.graceHours;
                             return typeof raw === 'number' && raw > 0 ? raw : null;
                         })(), // TASK-4405
+                        minStay: (() => {
+                            const raw = (apiListing as Record<string, unknown>).minStay ?? pub.minStay;
+                            const n = raw == null || raw === '' ? NaN : Number(raw);
+                            return Number.isFinite(n) && n > 0 ? n : null;
+                        })(), // TASK-5205
                         latitude: (() => {
                             const raw =
                                 (apiListing as Record<string, unknown>).latitude ??
@@ -2231,6 +2248,14 @@ useEffect(() => {
                         unitSlug={unitSlugParam}
                         reviewRating={ppHasApiReviews ? ppApiReviews!.averageRating : undefined}
                         reviewCount={ppHasApiReviews ? ppApiReviews!.totalCount : undefined}
+                        minStayNights={
+                          data.minStay != null && Number.isFinite(data.minStay) && data.minStay > 0
+                            ? data.minStay
+                            : 1
+                        }
+                        cancellationTier={data.cancellationTier ?? null}
+                        cancellationWindowHours={data.cancellationWindowHours ?? null}
+                        graceHours={data.graceHours ?? null}
                       />
                     </Suspense>
 
