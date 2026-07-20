@@ -23,7 +23,6 @@ import {
 import { doesRangeIntersectBlocked, toISODate } from '@/utils/dateRange';
 import { formatCurrency } from '@/utils/formatting';
 import { HelpCircle } from 'lucide-react';
-import { calculateNightlyPrice, inferUnitType } from '@/utils/pricing';
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
 import { fetchCalendarPricing, fetchGuestGstBreakdown } from '@/api/pricingClient';
 import { fetchPublicListings } from '@/api/listingClient';
@@ -946,11 +945,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 };
 
 
-  const calculatePrice = () => {
-    const unitType = inferUnitType({ id: propertyId, property_name: listingName });
-    const includedGuests = 2;
-    
-    // Nights: IST-normalized; 0 if partial range or same-day / invalid (never default to 1 — that enabled submit on bad state).
+  // TASK-5206: only nights are consumed downstream — do not invent client money totals.
+  const priceDetails = useMemo(() => {
     const nights =
       dateRange.startDate && dateRange.endDate
         ? (() => {
@@ -960,44 +956,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             return calculateNights(s, e);
           })()
         : 0;
-    
-    // Calculate extra guests
-    const extraGuests = Math.max(0, guests - includedGuests);
-    
-    // Calculate pricing using the utility function for a single night
-    const {
-      baseNightlyPrice,
-      finalNightlyPrice,
-      extraGuestFee,
-      appliedDiscountPercent,
-      hasSpecialDateMultiplier
-    } = calculateNightlyPrice({
-      unitType,
-      checkInDate: dateRange.startDate || new Date(),
-      guests: guests || includedGuests
-    });
-    
-    // Calculate totals for the entire stay
-    const basePrice = baseNightlyPrice * nights;
-    const total = finalNightlyPrice * nights;
-    const extraGuestsFee = extraGuestFee * nights;
-    const subtotal = basePrice + extraGuestsFee;
-    const discount = appliedDiscountPercent > 0 ? (subtotal * appliedDiscountPercent) / 100 : 0;
-    
-    return {
-      basePrice,
-      extraGuestsFee,
-      subtotal,
-      discount: Math.round(discount),
-      total: Math.round(total),
-      nights,
-      extraGuests,
-      hasSpecialDateMultiplier,
-      appliedDiscountPercent,
-    };
-  };
-
-  const priceDetails = calculatePrice();
+    return { nights };
+  }, [dateRange.startDate, dateRange.endDate]);
 
   const invalidIstStayRange = useMemo(() => {
     if (!dateRange.startDate || !dateRange.endDate) return false;
