@@ -1306,7 +1306,26 @@ const SearchPage = () => {
                       <div className="flex flex-1 flex-col gap-2 p-4">
                         <h4 className="line-clamp-2 text-base font-semibold text-text-primary">{unit.title}</h4>
                         <p className="text-sm text-text-muted">{unit.location}</p>
-                        <p className="text-lg font-bold text-text-primary">{formatDisplayCurrency((getDailyListingPricing(unit.numericId)?.actualPrice ?? 0) > 0 ? getDailyListingPricing(unit.numericId)!.actualPrice : unit.pricePerNight)}<span className="text-sm font-normal text-text-muted"> / night</span></p>
+                        <p className="text-lg font-bold text-text-primary">
+                          {formatDisplayCurrency(
+                            (getDailyListingPricing(unit.numericId)?.actualPrice ?? 0) > 0
+                              ? getDailyListingPricing(unit.numericId)!.actualPrice
+                              : unit.pricePerNight,
+                          )}
+                          <span className="text-sm font-normal text-text-muted"> / night</span>
+                        </p>
+                        {/* TASK-5199: match main card — show est. total incl. GST when nights known */}
+                        <p className="text-xs text-text-muted">
+                          {formatEstTotalInclGst(
+                            (getDailyListingPricing(unit.numericId)?.actualPrice ?? 0) > 0
+                              ? getDailyListingPricing(unit.numericId)!.actualPrice
+                              : unit.pricePerNight,
+                            estimateNights,
+                            formatDisplayCurrency,
+                            3,
+                            unit.isGstRegistered,
+                          )}
+                        </p>
                         <Link
                           to={`${unit.canonicalPath}${querySuffix}`}
                           className="mt-auto inline-flex min-h-[44px] items-center justify-center rounded-xl bg-[var(--cta-primary-hover)] px-4 py-2 text-sm font-semibold text-[var(--text-on-cta)] hover:bg-[var(--cta-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
@@ -1391,7 +1410,14 @@ const SearchPage = () => {
                   </div>
                   {/* TASK-2574: text-sm for readability on 360px Android */}
                   <p className="line-clamp-2 text-sm font-medium text-text-primary">{unit.title}</p>
-                  <p className="text-xs font-semibold text-cta-primary">{formatDisplayCurrency(unit.pricePerNight)}</p>
+                  {/* TASK-5199: use same displayedPrice as list cards (not raw base rate) */}
+                  <p className="text-xs font-semibold text-cta-primary">
+                    {formatDisplayCurrency(
+                      (getDailyListingPricing(unit.numericId)?.actualPrice ?? 0) > 0
+                        ? getDailyListingPricing(unit.numericId)!.actualPrice
+                        : unit.pricePerNight,
+                    )}
+                  </p>
                 </Link>
               ))}
             </div>
