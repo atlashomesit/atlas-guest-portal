@@ -1,5 +1,6 @@
 /**
  * TASK-2891 / TASK-2892: normalize API amenity codes for filters and card labels.
+ * TASK-5195: category match is exact (normalized tokens + synonym map) — no substring includes.
  */
 
 /** Human-readable label from a raw API / catalog code. Returns empty string for unrecognizable codes. */
@@ -20,23 +21,36 @@ export function formatAmenityName(value: string): string {
     .join(' ');
 }
 
-/** Filter-chip key → tokens that may appear in API `amenityCodes` / `amenities_icon`. */
-const AMENITY_CATEGORY_TOKENS: Record<string, string[]> = {
-  ac: ['ac', 'aircon', 'air_condition', 'air-conditioning', 'air conditioning', 'airconditioner'],
-  parking: ['parking', 'garage', 'car_park', 'carpark'],
-  pool: ['pool', 'swimming', 'swim_pool', 'swimming_pool'],
-  wifi: ['wifi', 'wi_fi', 'wireless', 'internet', 'wlan'],
-  'pet-friendly': ['pet', 'pets', 'dog', 'cat', 'pet_friendly', 'pet-friendly'],
+/** Strip separators so `air_conditioning` and `air-conditioning` share a token. */
+export function normalizeAmenityToken(raw: string): string {
+  return raw.trim().toLowerCase().replace(/[\s_\-/\\|.,()[\]{}]+/g, '');
+}
+
+/** Filter-chip key → synonym tokens (already normalized where possible). */
+const AMENITY_CATEGORY_SYNONYMS: Record<string, string[]> = {
+  ac: ['ac', 'aircon', 'aircondition', 'airconditioning', 'airconditioner'],
+  parking: ['parking', 'garage', 'carpark'],
+  pool: ['pool', 'swimming', 'swimpool', 'swimmingpool'],
+  wifi: ['wifi', 'wireless', 'internet', 'wlan'],
+  'pet-friendly': ['pet', 'pets', 'dog', 'cat', 'petfriendly'],
   balcony: ['balcony', 'terrace', 'patio', 'deck', 'balconies'],
-  workspace: ['workspace', 'work_desk', 'desk', 'study', 'work_area', 'coworking', 'work space'],
+  workspace: ['workspace', 'workdesk', 'desk', 'study', 'workarea', 'coworking', 'workspace'],
 };
 
-/** Whether a raw amenity code matches a search filter chip category. */
+const CATEGORY_TOKEN_SETS: Record<string, Set<string>> = Object.fromEntries(
+  Object.entries(AMENITY_CATEGORY_SYNONYMS).map(([k, syns]) => [
+    k,
+    new Set(syns.map(normalizeAmenityToken)),
+  ]),
+);
+
+/** Whether a raw amenity code matches a search filter chip category (exact token / synonym only). */
 export function amenityCodeMatchesCategory(rawCode: string, category: string): boolean {
-  const code = rawCode.trim().toLowerCase();
-  if (!code) return false;
-  const tokens = AMENITY_CATEGORY_TOKENS[category.toLowerCase()] ?? [];
-  return tokens.some((t) => code === t || code.includes(t) || t.includes(code));
+  const token = normalizeAmenityToken(rawCode);
+  if (!token) return false;
+  const allowed = CATEGORY_TOKEN_SETS[category.toLowerCase()];
+  if (!allowed || allowed.size === 0) return false;
+  return allowed.has(token);
 }
 
 /** Resolve a display label for cards and chips. Returns null when the code is unrecognizable so callers can skip it. */
