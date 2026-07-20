@@ -887,8 +887,12 @@ export default function BookingConfirmationPage() {
         )}
 
         {paymentStatus === "pending" && (
-          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-1" data-testid="payment-polling-status">
-            <p className="text-sm text-amber-800 font-medium">Checking payment... attempt {paymentPollAttempt}/150</p>
+          <div
+            className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-1"
+            data-testid="payment-polling-status"
+            data-poll-attempt={paymentPollAttempt}
+          >
+            <p className="text-sm text-amber-800 font-medium">Confirming your payment…</p>
             {paymentPollExhausted && (
               <>
                 <p className="text-sm text-amber-800">
@@ -1203,7 +1207,7 @@ export default function BookingConfirmationPage() {
         {!isCancelled && !booking.wifiVisible && (
           <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5">
             <h2 className="text-sm font-semibold text-text-primary mb-1">📶 WiFi</h2>
-            <p className="text-sm text-text-secondary">WiFi details will be available here 48 hours before check-in.</p>
+            <p className="text-sm text-text-secondary">WiFi details will appear here closer to your check-in date.</p>
           </div>
         )}
 
