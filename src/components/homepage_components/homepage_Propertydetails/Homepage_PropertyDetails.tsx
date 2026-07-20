@@ -2294,7 +2294,7 @@ useEffect(() => {
                     white-label tenant with no configured number (cross-tenant data leak). */}
                 {ppHasHostPhone && (
                   <div style={{ marginTop: 12 }}>
-                    {ppIsDraft ? (
+                    {!ppIsBookable ? (
                       <>
                         <p className="pp-host-sub" style={{ marginBottom: 8 }}>
                           This home is not open for booking yet. You can still ask a question.
@@ -2381,9 +2381,9 @@ useEffect(() => {
           </div>
           {/* ===== END pp-shell ===== */}
 
-          {/* Mobile sticky CTA — TASK-2739-v1: Draft listings show a "not yet available" notice
-              instead of the reserve bar (no booking surface until published). */}
-          {ppIsDraft ? (
+          {/* Mobile sticky CTA — TASK-5192: any non-bookable status (Draft/Archived/Unlisted)
+              shows a notice instead of price + Reserve (sidebar already uses ppIsBookable). */}
+          {!ppIsBookable ? (
             <div
               className="pp-m-sticky"
               aria-label="Listing not yet available for booking"
