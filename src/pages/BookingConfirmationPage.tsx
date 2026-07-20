@@ -1477,8 +1477,8 @@ export default function BookingConfirmationPage() {
           </div>
         )}
 
-        {/* TASK-1376: Add-on upsell — only when listing has active add-ons and booking is not cancelled */}
-        {!isCancelled && addOns.length > 0 && (
+        {/* TASK-1376 / TASK-5178: Add-on upsell needs WhatsApp — never re-parse whatsappUrl (crashes when empty) */}
+        {!isCancelled && addOns.length > 0 && hasWhatsAppContact && (
           <div className="rounded-2xl border border-brand-primary/30 bg-brand-primary/5 p-5">
             <h2 className="text-sm font-semibold text-text-primary mb-1">Make your stay even better</h2>
             <p className="text-xs text-text-secondary mb-3">Our team will confirm via WhatsApp after you send a request.</p>
@@ -1490,7 +1490,7 @@ export default function BookingConfirmationPage() {
                 const addOnText = encodeURIComponent(
                   `Hi, I just booked #${booking!.bookingId} and I'd like to add: ${addOn.name} (${booking!.currency} ${addOn.price}${priceLabel}). Please confirm.`
                 );
-                const addOnWhatsapp = `https://wa.me/${whatsappUrl.split('/')[3].split('?')[0]}?text=${addOnText}`;
+                const addOnWhatsapp = `https://wa.me/${whatsappDigits}?text=${addOnText}`;
                 return (
                   <div key={addOn.addOnServiceId} className="flex items-center justify-between gap-3 bg-bg-surface rounded-xl border border-border-subtle px-4 py-3">
                     <div className="min-w-0">

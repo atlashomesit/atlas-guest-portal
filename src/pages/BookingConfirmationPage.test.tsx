@@ -6,6 +6,11 @@ import BookingConfirmationPage from "./BookingConfirmationPage";
 vi.mock("../lib/events", () => ({ track: vi.fn() }));
 vi.mock("../components/SEO", () => ({ default: () => null }));
 vi.mock("../components/WeatherWidget", () => ({ default: () => null }));
+vi.mock("../config/contact", () => ({
+  getContactEmail: () => "",
+  getContactPhone: () => "",
+  hasHostContact: () => false,
+}));
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -139,5 +144,40 @@ describe("BookingConfirmationPage payment polling", () => {
     expect(await screen.findByTestId("booking-confirmation-page")).toBeInTheDocument();
     expect(paymentStatusCalls).toBe(0);
     expect(screen.queryByTestId("payment-polling-status")).not.toBeInTheDocument();
+  });
+});
+
+describe("BookingConfirmationPage TASK-5178 add-on upsell", () => {
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  test("renders without crash when add-ons exist but tenant has no WhatsApp number", async () => {
+    window.sessionStorage.setItem("booking_101_payment_status", "success");
+    vi.mocked(global.fetch).mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes("/api/guest/bookings/101/summary")) {
+        return jsonResponse({ ...summaryBody, propertyPhone: "" });
+      }
+      if (url.includes("/api/public/bookings/101/modification-requests")) return jsonResponse([]);
+      if (url.includes("/listings/777/add-ons")) {
+        return jsonResponse([
+          {
+            addOnServiceId: 1,
+            name: "Airport pickup",
+            description: "Sedan",
+            price: 800,
+            priceType: "fixed",
+            currency: "INR",
+          },
+        ]);
+      }
+      return jsonResponse({});
+    });
+
+    renderPage();
+    expect(await screen.findByTestId("booking-confirmation-page")).toBeInTheDocument();
+    expect(screen.queryByText(/Make your stay even better/i)).not.toBeInTheDocument();
   });
 });
