@@ -67,6 +67,10 @@ interface UnitBookingWidgetProps {
   reviewCount?: number;
   /** TASK-956: minimum nights required — shown before the calendar opens. */
   minStayNights?: number;
+  /** TASK-5205: when parent already has listing policy, skip fetchPublicListings scan. */
+  cancellationTier?: CancellationTier | null;
+  cancellationWindowHours?: number | null;
+  graceHours?: number | null;
 }
 
 /** Detect network/connection failures (timeout, offline, ECONNREFUSED, etc.). */
@@ -133,6 +137,9 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   reviewRating,
   reviewCount,
   minStayNights: minStayNightsProp,
+  cancellationTier: cancellationTierProp,
+  cancellationWindowHours: cancellationWindowHoursProp,
+  graceHours: graceHoursProp,
 }) => {
   if (import.meta.env.DEV) {
     console.assert(Boolean(propertyId), '[UnitBookingWidget] propertyId is required for unit mode');
@@ -229,32 +236,69 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const minAdvanceDays: number = 0;
 
   useEffect(() => {
-    if (minStayNightsProp != null && Number.isFinite(minStayNightsProp) && minStayNightsProp > 0) {
-      setResolvedMinStay(Math.max(1, Math.floor(minStayNightsProp)));
-      return;
+    // TASK-5205: parent (property details) already loaded the listing — apply props and skip
+    // the linear scan of every public listing (Azure F1 latency killer).
+    const hasMinStayProp =
+      minStayNightsProp != null && Number.isFinite(minStayNightsProp) && minStayNightsProp > 0;
+    const policyFromParent =
+      cancellationTierProp !== undefined ||
+      cancellationWindowHoursProp !== undefined ||
+      graceHoursProp !== undefined;
+
+    if (hasMinStayProp) {
+      setResolvedMinStay(Math.max(1, Math.floor(minStayNightsProp!)));
     }
+    if (policyFromParent) {
+      setResolvedCancellationTier(cancellationTierProp ?? null);
+      setResolvedCancellationWindowHours(
+        cancellationWindowHoursProp != null &&
+          Number.isFinite(cancellationWindowHoursProp) &&
+          cancellationWindowHoursProp > 0
+          ? cancellationWindowHoursProp
+          : null,
+      );
+      setResolvedGraceHours(
+        graceHoursProp != null && Number.isFinite(graceHoursProp) && graceHoursProp > 0
+          ? graceHoursProp
+          : null,
+      );
+    }
+    if (hasMinStayProp && policyFromParent) return;
+
     const id = listingId != null ? Number(listingId) : NaN;
     if (!Number.isFinite(id) || id <= 0) {
-      setResolvedMinStay(1);
+      if (!hasMinStayProp) setResolvedMinStay(1);
       return;
     }
     const ctrl = new AbortController();
     fetchPublicListings(ctrl.signal)
       .then((listings) => {
         const match = listings.find((l) => l.id === id);
-        setResolvedMinStay(Math.max(1, match?.minStay ?? 1));
-        setResolvedCancellationTier(match?.cancellationTier ?? null);
-        setResolvedCancellationWindowHours(match?.cancellationWindowHours ?? null);
-        setResolvedGraceHours(match?.graceHours ?? null);
+        if (!hasMinStayProp) {
+          setResolvedMinStay(Math.max(1, match?.minStay ?? 1));
+        }
+        if (!policyFromParent) {
+          setResolvedCancellationTier(match?.cancellationTier ?? null);
+          setResolvedCancellationWindowHours(match?.cancellationWindowHours ?? null);
+          setResolvedGraceHours(match?.graceHours ?? null);
+        }
       })
       .catch(() => {
-        setResolvedMinStay(1);
-        setResolvedCancellationTier(null);
-        setResolvedCancellationWindowHours(null);
-        setResolvedGraceHours(null);
+        if (!hasMinStayProp) setResolvedMinStay(1);
+        if (!policyFromParent) {
+          setResolvedCancellationTier(null);
+          setResolvedCancellationWindowHours(null);
+          setResolvedGraceHours(null);
+        }
       });
     return () => ctrl.abort();
-  }, [listingId, minStayNightsProp]);
+  }, [
+    listingId,
+    minStayNightsProp,
+    cancellationTierProp,
+    cancellationWindowHoursProp,
+    graceHoursProp,
+  ]);
 
   const minStayNights = resolvedMinStay;
   const effectiveMaxGuests = maxGuests;
