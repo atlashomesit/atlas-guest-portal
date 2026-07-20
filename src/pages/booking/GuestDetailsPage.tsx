@@ -449,6 +449,10 @@ const GuestDetailsPage: React.FC = () => {
     typeof priceBreakdown?.finalAmount === 'number' && priceBreakdown.finalAmount > 0
       ? priceBreakdown.finalAmount
       : null;
+  const touristTaxAmount =
+    typeof priceBreakdown?.touristTaxAmount === 'number' && priceBreakdown.touristTaxAmount > 0
+      ? priceBreakdown.touristTaxAmount
+      : 0;
   const { perNight, gstSlabPercent, gstLineAmount, displayTotal } =
     computeCheckoutTotal({
       baseAmount,
@@ -456,6 +460,7 @@ const GuestDetailsPage: React.FC = () => {
       convenienceFeeAmount,
       nights,
       serverFinalAmount,
+      touristTaxAmount,
       addOnsTotal,
       promoDiscountAmount,
       referralDiscountAmount,
@@ -1845,6 +1850,12 @@ const GuestDetailsPage: React.FC = () => {
                   <span>GST {gstSlabPercent}%</span>
                 </div>
                 <span className="num">{displayPrice(gstLineAmount)}</span>
+              </div>
+            )}
+            {touristTaxAmount > 0 && (
+              <div className="gd-price-row" data-testid="tourist-tax-row">
+                <span>Tourist tax</span>
+                <span className="num">{displayPrice(touristTaxAmount)}</span>
               </div>
             )}
             {convenienceFeeAmount > 0 && (

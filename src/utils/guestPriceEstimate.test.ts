@@ -141,6 +141,32 @@ describe('computeCheckoutTotal — TASK-4831 prefers server finalAmount over cli
     expect(result.gstSlabPercent).toBe(5);
   });
 
+  it('TASK-5185: tourist tax is not folded into the GST line or percent', () => {
+    // Goa-style: 5% GST + 5% tourist tax on base 10_000, plus 3% convenience on base.
+    const baseAmount = 10_000;
+    const gstAmount = 500;
+    const touristTaxAmount = 500;
+    const convenienceFeeAmount = 300;
+    const serverFinalAmount = baseAmount + gstAmount + touristTaxAmount + convenienceFeeAmount;
+
+    const result = computeCheckoutTotal({
+      baseAmount,
+      globalDiscountAmount: 0,
+      convenienceFeeAmount,
+      nights: 2,
+      serverFinalAmount,
+      touristTaxAmount,
+      addOnsTotal: 0,
+      promoDiscountAmount: 0,
+      referralDiscountAmount: 0,
+    });
+
+    expect(result.displayTotal).toBe(serverFinalAmount);
+    expect(result.gstLineAmount).toBe(500);
+    expect(result.gstSlabPercent).toBe(5);
+    expect(result.touristTaxAmount).toBe(500);
+  });
+
   it('layers add-ons, promo, and referral on top of the server finalAmount', () => {
     const serverFinalAmount = 16_224;
     const result = computeCheckoutTotal({

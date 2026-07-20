@@ -1319,10 +1319,19 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         baseAmount: serverBaseAmount,
         convenienceFeeAmount: serverConvFee,
         finalAmount: serverFinalAmount,
+        touristTaxAmount: serverTouristTax,
+        TouristTaxAmount: serverTouristTaxPascal,
       } = response.data ?? {};
       if (!holdId || !holdExpiresAt) {
         throw new Error('Hold could not be created. Please try again.');
       }
+
+      const resolvedTouristTax =
+        typeof serverTouristTax === 'number' && serverTouristTax > 0
+          ? serverTouristTax
+          : typeof serverTouristTaxPascal === 'number' && serverTouristTaxPascal > 0
+            ? serverTouristTaxPascal
+            : 0;
 
       // Store hold state in context and navigate to details page
       updateBooking({
@@ -1346,6 +1355,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           finalAmount: typeof serverFinalAmount === 'number' && serverFinalAmount > 0 ? serverFinalAmount : (finalTotal > 0 ? finalTotal : breakdownFinalTotal),
           nights: stayNights,
           currency: 'INR',
+          touristTaxAmount: resolvedTouristTax,
         },
         // Forward dates/guests into context for the details page
         checkIn: checkinIst.toISOString(),
