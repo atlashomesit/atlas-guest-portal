@@ -70,6 +70,7 @@ function toListingCardModel(listing: PublicListing) {
     hasWifi: (listing.wifiSpeedMbps ?? 0) > 0,
     hasParking: false,
     petFriendly: false,
+    amenityCodes: listing.amenityCodes ?? [],
     lastBookedAt: listing.lastBookedAt ?? undefined,
     losDiscountMinNights: listing.losDiscountMinNights ?? undefined,
     losDiscountPercent: listing.losDiscountPercent ?? undefined,
@@ -241,6 +242,7 @@ const CityLandingPage = ({ citySlug }: CityLandingPageProps) => {
                 hasWifi={c.hasWifi}
                 hasParking={c.hasParking}
                 petFriendly={c.petFriendly}
+                amenityCodes={c.amenityCodes}
                 lastBookedAt={c.lastBookedAt}
                 losDiscountMinNights={c.losDiscountMinNights ?? null}
                 losDiscountPercent={c.losDiscountPercent ?? null}

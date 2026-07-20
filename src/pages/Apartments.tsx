@@ -70,6 +70,8 @@ type CombinedListing = {
   hasWifi: boolean;
   hasParking: boolean;
   petFriendly: boolean;
+  /** TASK-5198: amenity codes for ListingCard (from property amenities or API). */
+  amenityCodes: string[];
   image: string;
   property: PropertyRecord;
   /** TASK-1360: ISO date of most recent checkout within 30 days. */
@@ -358,6 +360,9 @@ export const Apartments = () => {
             hasWifi: deriveAmenityFlag(property, "wifi"),
             hasParking: deriveAmenityFlag(property, "park"),
             petFriendly: derivePetFriendly(property),
+            amenityCodes: (property.property_amenities ?? [])
+              .map((a) => a.amenities_icon)
+              .filter((c): c is string => typeof c === "string" && c.trim().length > 0),
             image: images?.[0] ?? (getTenantOverrides(getTenantContext()?.slug).hideLogo ? "" : LOGO_URL),
             property,
             lastBookedAt: property.lastBookedAt ?? null, // TASK-1360
@@ -626,6 +631,7 @@ export const Apartments = () => {
                   hasWifi={listing.hasWifi}
                   hasParking={listing.hasParking}
                   petFriendly={listing.petFriendly}
+                  amenityCodes={listing.amenityCodes}
                   lastBookedAt={listing.lastBookedAt ?? undefined}
                   losDiscountMinNights={listing.losDiscountMinNights}
                   losDiscountPercent={listing.losDiscountPercent}
