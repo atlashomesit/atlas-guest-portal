@@ -40,6 +40,28 @@ import { formatDisplayNumber, getContactEmail, getTelLink, getWhatsAppLink } fro
 import { computeCheckoutTotal } from '@/utils/guestPriceEstimate';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 
+/** TASK-5183: fire-and-forget hard-delete of PaymentPending draft when checkout is abandoned. */
+function abandonPaymentPendingCheckout(
+  bookingId: number | null | undefined,
+  token: string | null | undefined,
+): void {
+  if (!bookingId || bookingId <= 0) return;
+  const t = typeof token === 'string' ? token.trim() : '';
+  if (!t) return;
+  const url = buildApiUrl(
+    `/api/guest/bookings/${bookingId}/abandon-checkout?t=${encodeURIComponent(t)}`,
+  );
+  try {
+    void fetch(url, {
+      method: 'POST',
+      headers: getApiHeaders(),
+      keepalive: true,
+    });
+  } catch {
+    /* fire-and-forget — TTL worker is the backstop */
+  }
+}
+
 // ── Types ────────────────────────────────────────────────────────────────────
 
 interface AddOnService {
@@ -449,6 +471,10 @@ const GuestDetailsPage: React.FC = () => {
     typeof priceBreakdown?.finalAmount === 'number' && priceBreakdown.finalAmount > 0
       ? priceBreakdown.finalAmount
       : null;
+  const touristTaxAmount =
+    typeof priceBreakdown?.touristTaxAmount === 'number' && priceBreakdown.touristTaxAmount > 0
+      ? priceBreakdown.touristTaxAmount
+      : 0;
   const { perNight, gstSlabPercent, gstLineAmount, displayTotal } =
     computeCheckoutTotal({
       baseAmount,
@@ -456,6 +482,7 @@ const GuestDetailsPage: React.FC = () => {
       convenienceFeeAmount,
       nights,
       serverFinalAmount,
+      touristTaxAmount,
       addOnsTotal,
       promoDiscountAmount,
       referralDiscountAmount,
@@ -822,6 +849,8 @@ const GuestDetailsPage: React.FC = () => {
               const handleClose = () => {
                 if (paymentCompleted) return;
                 paymentCompleted = true;
+                // TASK-5183: release inventory when the guest dismisses Razorpay without paying.
+                abandonPaymentPendingCheckout(bookingId, bookingToken ?? pendingBookingTokenRef.current);
                 setIsSubmitting(false);
                 setPaymentCancelled(true);
                 setRazorpayOrderId(null);
@@ -1014,6 +1043,9 @@ const GuestDetailsPage: React.FC = () => {
                 const code = String(fr?.error?.code ?? '');
                 const desc = String(fr?.error?.description ?? '');
 
+                // Do NOT abandon-checkout here: the guest may tap Pay again on the same hold
+                // (TASK-2906 resume / re-order). Inventory is released on modal dismiss (handleClose)
+                // or back-to-property. TTL worker remains the backstop if they leave mid-failure.
                 setOrderError(`No money was taken. ${mapRazorpayFailureCode(code, desc)}`);
                 // TASK-2906: Store the order ID and amount so the "Resume payment" button can retry
                 setRazorpayOrderId(orderId);
@@ -1120,13 +1152,15 @@ const GuestDetailsPage: React.FC = () => {
   const isChargedUnconfirmed = orderError && orderError.startsWith('Payment received but we could not confirm');
 
   const handleBackToProperty = useCallback(() => {
+    // TASK-5183: leaving the details step must free the init-hold inventory.
+    abandonPaymentPendingCheckout(holdId, holdToken ?? pendingBookingTokenRef.current);
     try { window.sessionStorage.removeItem(CHECKOUT_HOLD_KEY); } catch { /* ignore */ }
     updateBooking({
       holdId: null, holdExpiresAt: null, holdPropertySlug: null,
       holdUnitSlug: null, holdPriceBreakdown: null, holdListingId: null, holdListingName: null,
     });
     navigate(propertySlug && unitSlug ? `/homes/${propertySlug}/${unitSlug}` : '/', { replace: true });
-  }, [updateBooking, navigate, propertySlug, unitSlug]);
+  }, [updateBooking, navigate, propertySlug, unitSlug, holdId, holdToken]);
 
   // ── Render ────────────────────────────────────────────────────────────────
   if (!holdHydrationDone) {
@@ -1845,6 +1879,12 @@ const GuestDetailsPage: React.FC = () => {
                   <span>GST {gstSlabPercent}%</span>
                 </div>
                 <span className="num">{displayPrice(gstLineAmount)}</span>
+              </div>
+            )}
+            {touristTaxAmount > 0 && (
+              <div className="gd-price-row" data-testid="tourist-tax-row">
+                <span>Tourist tax</span>
+                <span className="num">{displayPrice(touristTaxAmount)}</span>
               </div>
             )}
             {convenienceFeeAmount > 0 && (

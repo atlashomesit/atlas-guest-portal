@@ -188,6 +188,8 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   // preferred over the client-derived slab below when available.
   const [serverGstPercent, setServerGstPercent] = useState<number | null>(null);
   const [serverGstAmount, setServerGstAmount] = useState<number | null>(null);
+  // TASK-5184: server FinalAmount includes tourist tax; client recomputes omit it.
+  const [serverFinalAmount, setServerFinalAmount] = useState<number | null>(null);
   const [guests, setGuests] = useState(2);
   const [guestsOpen, setGuestsOpen] = useState(false);
   const [_bookedDates, setBookedDates] = useState<Date[]>([]);
@@ -764,11 +766,13 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     if (!listingId || String(listingId).trim() === '') {
       setServerGstPercent(null);
       setServerGstAmount(null);
+      setServerFinalAmount(null);
       return;
     }
     if (!gstRangeStartIso || !gstRangeEndIso) {
       setServerGstPercent(null);
       setServerGstAmount(null);
+      setServerFinalAmount(null);
       return;
     }
     const controller = new AbortController();
@@ -776,10 +780,12 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
       .then((b) => {
         setServerGstPercent(b.gstPercent);
         setServerGstAmount(b.gstAmount);
+        setServerFinalAmount(b.finalAmount);
       })
       .catch(() => {
         setServerGstPercent(null);
         setServerGstAmount(null);
+        setServerFinalAmount(null);
       });
     return () => controller.abort();
   }, [listingId, gstRangeStartIso, gstRangeEndIso]);
@@ -1140,14 +1146,17 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   const breakdownConvenienceFee = Math.round(taxableBase * convenienceFeePercent);
 
   // TASK-4322: Total = discount-net base + GST + Service Fee (canonical formula).
+  // Offline fallback only — TASK-5184 prefers server FinalAmount (includes tourist tax).
   const breakdownFinalTotal = Math.max(1, taxableBase + gstLineAmount + breakdownConvenienceFee);
 
   const finalTotal =
-    hasSelectedRange && selectedRangeTotalFromCalendar != null
-      ? breakdownFinalTotal
-      : effectiveDailyPricing != null
+    serverGstMatchesSelection && typeof serverFinalAmount === 'number' && serverFinalAmount > 0
+      ? serverFinalAmount
+      : hasSelectedRange && selectedRangeTotalFromCalendar != null
         ? breakdownFinalTotal
-        : 0;
+        : effectiveDailyPricing != null
+          ? breakdownFinalTotal
+          : 0;
 
   // TASK-4629: keep last settled headline; while calendar-open pricing refetch is pending,
   // never expose a lower recomputed total (fee/GST flash under F1).
@@ -1310,10 +1319,19 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         baseAmount: serverBaseAmount,
         convenienceFeeAmount: serverConvFee,
         finalAmount: serverFinalAmount,
+        touristTaxAmount: serverTouristTax,
+        TouristTaxAmount: serverTouristTaxPascal,
       } = response.data ?? {};
       if (!holdId || !holdExpiresAt) {
         throw new Error('Hold could not be created. Please try again.');
       }
+
+      const resolvedTouristTax =
+        typeof serverTouristTax === 'number' && serverTouristTax > 0
+          ? serverTouristTax
+          : typeof serverTouristTaxPascal === 'number' && serverTouristTaxPascal > 0
+            ? serverTouristTaxPascal
+            : 0;
 
       // Store hold state in context and navigate to details page
       updateBooking({
@@ -1337,6 +1355,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           finalAmount: typeof serverFinalAmount === 'number' && serverFinalAmount > 0 ? serverFinalAmount : (finalTotal > 0 ? finalTotal : breakdownFinalTotal),
           nights: stayNights,
           currency: 'INR',
+          touristTaxAmount: resolvedTouristTax,
         },
         // Forward dates/guests into context for the details page
         checkIn: checkinIst.toISOString(),
