@@ -2,6 +2,7 @@
 // Replaces the earlier stub (which threw in PROD and showed fake booking IDs).
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { buildHomeUnitPath } from '../../../utils/navigation';
 
 interface BookingCardProps {
   propertyId?: number;
@@ -32,7 +33,8 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
       guests: String(guests),
     });
     if (propertyId) {
-      navigate(`/homes/${propertyId}?${params.toString()}`);
+      // TASK-5193/5203: always use two-segment canonical path (never /homes/:id alone).
+      navigate(`${buildHomeUnitPath('listing', propertyId)}?${params.toString()}`);
     } else {
       navigate(`/?${params.toString()}#our-homes`);
     }
