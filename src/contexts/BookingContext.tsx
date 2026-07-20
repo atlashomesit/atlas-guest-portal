@@ -8,6 +8,8 @@ export type BookingPriceBreakdown = {
   finalAmount: number;
   nights: number;
   currency: string;
+  /** TASK-5185: tourism tax included in finalAmount; render as its own line, not as GST. */
+  touristTaxAmount?: number;
 };
 
 type BookingState = {

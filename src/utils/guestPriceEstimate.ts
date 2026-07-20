@@ -41,6 +41,8 @@ export type CheckoutTotalInput = {
   nights: number;
   /** Server-authoritative base-stay total from the hold breakdown; null/≤0 when unavailable. */
   serverFinalAmount: number | null;
+  /** TASK-5185: tourism tax already inside serverFinalAmount — must not be folded into GST. */
+  touristTaxAmount?: number;
   addOnsTotal: number;
   promoDiscountAmount: number;
   referralDiscountAmount: number;
@@ -51,7 +53,8 @@ export type CheckoutTotalBreakdown = {
   perNight: number;
   gstSlabPercent: number | null;
   gstLineAmount: number;
-  /** base − discount + GST + convenience fee (server `finalAmount` when available). */
+  touristTaxAmount: number;
+  /** base − discount + GST + convenience fee + tourist tax (server `finalAmount` when available). */
   baseStayTotal: number;
   displayTotal: number;
 };
@@ -63,6 +66,7 @@ export function computeCheckoutTotal(input: CheckoutTotalInput): CheckoutTotalBr
     convenienceFeeAmount,
     nights,
     serverFinalAmount,
+    touristTaxAmount: touristTaxInput = 0,
     addOnsTotal,
     promoDiscountAmount,
     referralDiscountAmount,
@@ -71,6 +75,7 @@ export function computeCheckoutTotal(input: CheckoutTotalInput): CheckoutTotalBr
   // TASK-4421: global discount applies before GST; per-night slab decision uses the post-discount base.
   const discountedSubtotal = Math.max(0, baseAmount - globalDiscountAmount);
   const perNight = nights > 0 ? Math.round(discountedSubtotal / nights) : 0;
+  const touristTaxAmount = Math.max(0, Number(touristTaxInput) || 0);
 
   const clientSlabPercent = accommodationGstSlabPercent(perNight);
   const clientGstLineAmount =
@@ -80,12 +85,16 @@ export function computeCheckoutTotal(input: CheckoutTotalInput): CheckoutTotalBr
 
   const hasServerFinal = typeof serverFinalAmount === 'number' && serverFinalAmount > 0;
 
-  // Back the GST line out of the authoritative finalAmount so base + GST + convenience fee == finalAmount.
+  // Back the GST line out of the authoritative finalAmount so
+  // base + GST + convenience fee + tourist tax == finalAmount.
   // Guard the legacy path (TASK-4286) where convenienceFeeAmount is a client fallback not baked into
   // finalAmount, which would make the backed-out GST negative — there, keep the client slab estimate for
   // the line while the total still prefers finalAmount.
+  // TASK-5185: subtract tourist tax before attributing the remainder to GST (else Goa 5%+5% shows as "GST 10%").
   const derivedGst = hasServerFinal
-    ? Math.round((serverFinalAmount as number) - discountedSubtotal - convenienceFeeAmount)
+    ? Math.round(
+        (serverFinalAmount as number) - discountedSubtotal - convenienceFeeAmount - touristTaxAmount,
+      )
     : null;
   const useServerGst = derivedGst != null && derivedGst >= 0;
 
@@ -97,14 +106,22 @@ export function computeCheckoutTotal(input: CheckoutTotalInput): CheckoutTotalBr
 
   const baseStayTotal = hasServerFinal
     ? (serverFinalAmount as number)
-    : discountedSubtotal + clientGstLineAmount + convenienceFeeAmount;
+    : discountedSubtotal + clientGstLineAmount + convenienceFeeAmount + touristTaxAmount;
 
   const displayTotal = Math.max(
     1,
     baseStayTotal + addOnsTotal - promoDiscountAmount - referralDiscountAmount,
   );
 
-  return { discountedSubtotal, perNight, gstSlabPercent, gstLineAmount, baseStayTotal, displayTotal };
+  return {
+    discountedSubtotal,
+    perNight,
+    gstSlabPercent,
+    gstLineAmount,
+    touristTaxAmount,
+    baseStayTotal,
+    displayTotal,
+  };
 }
 
 export function estimateStayNights(checkIn: Date | null, checkOut: Date | null): number {
