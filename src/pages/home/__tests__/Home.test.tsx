@@ -46,7 +46,7 @@ describe("Home", () => {
     // BannerSecondary removed in Home v2 — replaced by inline why-direct section
     expect(screen.getByText(/We verify every home/i)).toBeInTheDocument();
     expect(screen.getByText(/You pay the host directly/i)).toBeInTheDocument();
-    expect(screen.getByText(/Free cancellation 48h before/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Free cancellation 48h before/i)).not.toBeInTheDocument();
     expect(screen.getByText(/Discover Our Exclusive Services/i)).toBeInTheDocument();
     expect(screen.getByText(/Hear What Our Happy Guests Are Saying/i)).toBeInTheDocument();
   });

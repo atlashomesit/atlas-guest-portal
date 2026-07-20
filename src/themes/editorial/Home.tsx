@@ -311,8 +311,7 @@ const EditorialHome = () => {
                             attribution={showAtlasContent ? `${schemaBrandName}, on booking direct` : undefined}
                         />
                         <p className="editorial-narrative-p">
-                            Free cancellation up to 48 hours before check-in, a full refund with no questions asked,
-                            and a host who answers the phone. That's the whole pitch — the rest is in the rooms
+                            A host who answers the phone. That&apos;s the whole pitch — the rest is in the rooms
                             themselves, below.
                         </p>
                     </div>
