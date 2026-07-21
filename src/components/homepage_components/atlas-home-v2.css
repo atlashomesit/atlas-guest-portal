@@ -13,7 +13,7 @@
   --ahv2-ivory: var(--bg-primary, #fff8e7);
   --ahv2-card: var(--bg-card, #ffffff);
   --ahv2-muted: var(--bg-secondary, #fdf2e9);
-  --ahv2-coral: var(--cta-primary, #c45a3f);
+  --ahv2-coral: var(--cta-primary, #b8472f);
   --ahv2-coral-hover: var(--cta-primary-hover, #a84832);
   /* Text-safe coral (>=4.5:1 on white/ivory) for small coral TEXT — decorative
      surfaces keep --ahv2-coral. Mirrors the AA-safe --ahv2-muted pattern below. */

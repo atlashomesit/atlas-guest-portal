@@ -921,7 +921,7 @@ const GuestDetailsPage: React.FC = () => {
                     preferences: { show_default_blocks: true },
                   },
                 },
-                theme: { color: '#c45a3f' },
+                theme: { color: '#b8472f' },
                 modal: { ondismiss: handleClose },
                 handler: async (res: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => {
                   paymentCompleted = true;
@@ -2145,7 +2145,7 @@ const gdStyles = `
   --gd-peach: #ffe4d6;
   --gd-line: #f0ddd0;
   --gd-line-strong: #e5cfc0;
-  --gd-coral: #c45a3f;
+  --gd-coral: #b8472f;
   --gd-coral-dark: #a84832;
   --gd-amber: #f08c71;
   --gd-success: #157046;

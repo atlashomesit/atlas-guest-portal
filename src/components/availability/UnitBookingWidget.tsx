@@ -1471,7 +1471,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         )}
         {reviewCount != null && reviewCount > 0 && reviewRating != null && (
           <div className="bw-rating" data-testid="bw-rating-block" style={{ marginTop: 6 }}>
-            <svg viewBox="0 0 24 24" width="13" height="13" fill="#c45a3f" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="#b8472f" aria-hidden="true">
               <path d="M12 2l2.9 6.9 7.1.6-5.4 4.7 1.6 7.3-6.2-3.8-6.2 3.8 1.6-7.3L2 9.5l7.1-.6L12 2z"/>
             </svg>
             <span className="bw-rating-num">{reviewRating.toFixed(1)}</span>
