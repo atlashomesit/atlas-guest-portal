@@ -1709,13 +1709,6 @@ useEffect(() => {
                       <li>
                         <PpCheckIcon size={16} />
                         <span>
-                          <b>Photos and basic details reviewed.</b>
-                          <span className="pp-meta">Listings are reviewed for photos and basic details before going live.</span>
-                        </span>
-                      </li>
-                      <li>
-                        <PpCheckIcon size={16} />
-                        <span>
                           <b>Direct booking — no middlemen.</b>
                           <span className="pp-meta">You pay the host directly via Razorpay.</span>
                         </span>
@@ -1724,8 +1717,7 @@ useEffect(() => {
                         <li>
                           <PpCheckIcon size={16} />
                           <span>
-                            <b>Listed at the address on the map.</b>
-                            <span className="pp-meta">The location pin matches the address shown on this page.</span>
+                            <b>Map location provided by the host.</b>
                           </span>
                         </li>
                       ) : null}
@@ -2227,10 +2219,7 @@ useEffect(() => {
                     <ShieldCheck className="pp-trust-ic" size={18} aria-hidden="true" />
                     <div>
                       <div className="pp-trust-t">
-                        {ppHasOnlinePayment ? `Verified home · Instant book` : `Verified home · Host-confirmed booking`}
-                      </div>
-                      <div className="pp-trust-s">
-                        Listing details and photos reviewed by {ppBrandName} before going live.
+                        {ppHasOnlinePayment ? `Instant book` : `Host-confirmed booking`}
                       </div>
                     </div>
                   </div>

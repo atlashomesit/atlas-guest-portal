@@ -91,6 +91,13 @@ const HeritageHome = () => {
     const primaryOgImage = room101Cover ?? (!overrides.hideLogo ? LOGO_URL : undefined);
     const penthouseCover = sanitizeGuestImageUrl(penthouse?.property_img?.[0]) ?? (!overrides.hideLogo ? LOGO_URL : undefined);
     const effectiveDiscountPercent = getEffectiveDiscountPercent();
+    /** TASK-5194: white-label tenants must not assert Atlas-performed verification. */
+    const whyDirectItems = useMemo(
+        () => (hideAtlasBranding
+            ? WHY_DIRECT_ITEMS.filter((item) => item.heading !== "We verify every home")
+            : WHY_DIRECT_ITEMS),
+        [hideAtlasBranding],
+    );
     /** TASK-1293 / TASK-1944: direct-booking strip lives in Slider (below hero search), not above the hero. */
     const penthouseOfferPrice = Math.round(
         pricingConfig.baseNightlyPriceByUnitType.penthouse *
@@ -298,7 +305,7 @@ const HeritageHome = () => {
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
                         <h2 id="why-direct-heading" className="sr-only">Why book direct</h2>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                            {WHY_DIRECT_ITEMS.map((item) => (
+                            {whyDirectItems.map((item) => (
                                 <div key={item.heading} className="flex flex-col gap-3">
                                     <span
                                         className="inline-flex items-center justify-center w-11 h-11 rounded-xl border border-border-subtle"

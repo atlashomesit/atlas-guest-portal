@@ -2,7 +2,7 @@ import React from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { Link } from "react-router-dom";
 import { buildApiUrl, getApiHeaders } from "@/api/client";
-import { getContactEmail, getWhatsAppLink } from "@/config/contact";
+import { formatDisplayNumber, getContactEmail, getWhatsAppLink } from "@/config/contact";
 import SEO from "@/components/SEO";
 import { getTenantBrandName } from "@/tenant/displayBrand";
 import { messageFromApiResponse } from "@/utils/serverErrorFromResponse";
@@ -181,7 +181,7 @@ export default function CommunicationPreferences() {
             rel="noopener noreferrer"
             className="text-brand-primary underline underline-offset-2"
           >
-            {getWhatsAppLink().replace('https://wa.me/', '+91-')}
+            {formatDisplayNumber()}
           </a>{' '}
           or email{' '}
           <a href={`mailto:${getContactEmail()}`} className="text-brand-primary underline underline-offset-2">

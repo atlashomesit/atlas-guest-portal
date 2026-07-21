@@ -269,7 +269,7 @@ const EditorialHome = () => {
                         <p className="editorial-hero-dek">
                             {showAtlasContent
                                 ? 'Owner-run homes in KPHB, Hyderabad — read the space, the neighbourhood, and what to expect, then book direct in the same breath.'
-                                : `Direct from the owner — no platform fee, verified addresses, and responsive support from ${schemaBrandName}.`}
+                                : `Direct from the owner — no platform fee and responsive support from ${schemaBrandName}.`}
                         </p>
                         <div id="search-form" data-testid="hero-widget" className="editorial-hero-widget">
                             <SearchAvailabilityWidget />
@@ -304,7 +304,7 @@ const EditorialHome = () => {
                         <p className="editorial-narrative-p">
                             {showAtlasContent
                                 ? "Every address on this page is one we own and operate ourselves — nothing staged, nothing borrowed, no third-party listing dressed up for a photograph. The rooms you see are the rooms you'll walk into, and the price on this page is the price you pay: no platform mark-up, no hidden convenience fee."
-                                : `Every address on this page is verified and owner-run. The price on this page is the price you pay, with no platform mark-up — booked directly with ${schemaBrandName}.`}
+                                : `Book directly with ${schemaBrandName}. The price on this page is the price you pay, with no platform mark-up.`}
                         </p>
                         <EditorialPullQuote
                             quote="No platform mark-up, no third-party fee. The price on this page is the price you pay."
