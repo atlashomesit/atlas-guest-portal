@@ -548,6 +548,10 @@ const GuestDetailsPage: React.FC = () => {
   const currentAttemptIdempotencyKeyRef = useRef<string | null>(null);
   // TASK-4537: Track the poll timer so we can clear it on unmount.
   const pollTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const chargedUnconfirmedPollTriesRef = useRef(0);
+  const [chargedUnconfirmedPollExhausted, setChargedUnconfirmedPollExhausted] = useState(false);
+  const [chargedUnconfirmedChecking, setChargedUnconfirmedChecking] = useState(false);
+  const chargedUnconfirmedBookingRef = useRef<{ bookingId: number; pollToken: string | null } | null>(null);
   /** TASK-2875: when server total differs from the client quote, require a second Pay tap before Razorpay opens. */
   const [serverTotalConfirmRequired, setServerTotalConfirmRequired] = useState(false);
   const pendingRazorpayLaunchRef = useRef<{
@@ -677,19 +681,24 @@ const GuestDetailsPage: React.FC = () => {
 
   const handleReferralBlur = useCallback(() => {
     const code = referralCode.trim();
-    if (!code) { setReferralMessage(null); setAppliedReferralCode(null); return; }
+    if (!code) {
+      setReferralMessage(null);
+      if (referralDiscountAmount <= 0) setAppliedReferralCode(null);
+      return;
+    }
     setReferralValidating(true);
     setTimeout(() => {
       if (/^[A-Z0-9]{1,32}$/.test(code)) {
-        setAppliedReferralCode(code);
-        setReferralMessage('Referral code saved — we\'ll apply any eligible reward automatically at checkout.');
+        // TASK-5201: format-only check — server validates eligibility at checkout; no fake "Applied" state.
+        if (referralDiscountAmount <= 0) setAppliedReferralCode(null);
+        setReferralMessage('We\'ll verify this code when you pay.');
       } else {
         setAppliedReferralCode(null);
         setReferralMessage('Referral codes must be letters and numbers only (no spaces or symbols).');
       }
       setReferralValidating(false);
     }, 300);
-  }, [referralCode]);
+  }, [referralCode, referralDiscountAmount]);
 
   // ── Submit ────────────────────────────────────────────────────────────────
   const handleSubmit = useCallback(
@@ -979,18 +988,18 @@ const GuestDetailsPage: React.FC = () => {
                     const waText = encodeURIComponent(
                       `Hi, my payment succeeded but booking verification failed. Payment ID: ${paymentId}. Booking ID: ${bookingId}.`,
                     );
-                    // TASK-4537: Poll runs for ~1m45s (15s delay + 3×30s retries = 4 total tries).
-                    // Copy must accurately reflect the actual poll window, not aspirational "10 minutes".
+                    // TASK-5207: Poll booking-summary for up to ~5 minutes; offer manual re-check when exhausted.
+                    setChargedUnconfirmedPollExhausted(false);
+                    chargedUnconfirmedPollTriesRef.current = 0;
+                    chargedUnconfirmedBookingRef.current = { bookingId, pollToken: pendingBookingTokenRef.current };
                     setOrderError(
                       `Payment received but we could not confirm your booking yet. Payment ID: ${paymentId} · Booking #${bookingId}. ` +
-                        `We will retry automatically for about 2 minutes — if your stay is not confirmed by then, contact us on WhatsApp (${getWhatsAppLink()}?text=${waText}) ` +
+                        `We will retry automatically for about 5 minutes — if your stay is not confirmed by then, tap "Check again" below or contact us on WhatsApp (${getWhatsAppLink()}?text=${waText}) ` +
                         `or email ${getContactEmail()}. No need to pay again.`,
                     );
-                    // Poll booking-summary endpoint; navigate automatically when server confirms
                     const pollToken = pendingBookingTokenRef.current;
-                    let pollTries = 0;
                     const pollStatus = async () => {
-                      pollTries++;
+                      chargedUnconfirmedPollTriesRef.current += 1;
                       try {
                         const r = await fetch(
                           buildApiUrl(`/api/guest/bookings/${bookingId}/summary?t=${encodeURIComponent(pollToken ?? '')}`),
@@ -1001,6 +1010,7 @@ const GuestDetailsPage: React.FC = () => {
                           const s = d?.status;
                           if (s === 'Confirmed' || s === 'CheckedIn' || s === 'PaymentReceived') {
                             pollTimerRef.current = null;
+                            setChargedUnconfirmedPollExhausted(false);
                             navigate(
                               pollToken ? `/booking/${bookingId}?t=${encodeURIComponent(pollToken)}` : `/booking/${bookingId}`,
                               { replace: true },
@@ -1009,10 +1019,11 @@ const GuestDetailsPage: React.FC = () => {
                           }
                         }
                       } catch { /* ignore, keep polling */ }
-                      if (pollTries < 4) {
-                        pollTimerRef.current = setTimeout(pollStatus, 30000);
+                      if (chargedUnconfirmedPollTriesRef.current < 20) {
+                        pollTimerRef.current = setTimeout(pollStatus, 15000);
                       } else {
                         pollTimerRef.current = null;
+                        setChargedUnconfirmedPollExhausted(true);
                       }
                     };
                     pollTimerRef.current = setTimeout(pollStatus, 15000);
@@ -1166,6 +1177,37 @@ const GuestDetailsPage: React.FC = () => {
     // The key is preserved in currentAttemptIdempotencyKeyRef and will be reused on the next Pay tap.
   }, []);
 
+  const handleChargedUnconfirmedRecheck = useCallback(async () => {
+    const ctx = chargedUnconfirmedBookingRef.current;
+    if (!ctx || chargedUnconfirmedChecking) return;
+    setChargedUnconfirmedChecking(true);
+    try {
+      const r = await fetch(
+        buildApiUrl(`/api/guest/bookings/${ctx.bookingId}/summary?t=${encodeURIComponent(ctx.pollToken ?? '')}`),
+        { headers: { Accept: 'application/json', ...getApiHeaders() } },
+      );
+      if (r.ok) {
+        const d: { status?: string } = await r.json();
+        const s = d?.status;
+        if (s === 'Confirmed' || s === 'CheckedIn' || s === 'PaymentReceived') {
+          setChargedUnconfirmedPollExhausted(false);
+          navigate(
+            ctx.pollToken
+              ? `/booking/${ctx.bookingId}?t=${encodeURIComponent(ctx.pollToken)}`
+              : `/booking/${ctx.bookingId}`,
+            { replace: true },
+          );
+          return;
+        }
+      }
+      setChargedUnconfirmedPollExhausted(true);
+    } catch {
+      setChargedUnconfirmedPollExhausted(true);
+    } finally {
+      setChargedUnconfirmedChecking(false);
+    }
+  }, [chargedUnconfirmedChecking, navigate]);
+
   // Mobile: the sticky Pay bar can't show the desktop "tick consent" microcopy, so tapping
   // it while consent is unchecked scrolls the consent box into view and flashes it.
   const scrollToConsent = useCallback(() => {
@@ -1308,7 +1350,10 @@ const GuestDetailsPage: React.FC = () => {
           </div>
 
           <h1 className="gd-page-title">Almost there — just your details.</h1>
-          <p className="gd-page-sub">Two quick minutes. We'll WhatsApp your confirmation as soon as payment goes through.</p>
+          <p className="gd-page-sub">
+            Two quick minutes. You&apos;ll get an email confirmation once payment goes through
+            {whatsappOptIn ? ', and WhatsApp updates when messaging is enabled for your stay' : ''}.
+          </p>
 
           {/* Stay recap card */}
           <div className="gd-recap" data-testid="booking-recap">
@@ -1425,7 +1470,11 @@ const GuestDetailsPage: React.FC = () => {
                     data-testid="guest-booking-phone"
                   />
                 </div>
-                <div id="gd-phone-help" className="gd-input-help">We'll WhatsApp you check-in details</div>
+                <div id="gd-phone-help" className="gd-input-help">
+                  {whatsappOptIn
+                    ? 'Used for booking updates and check-in details when WhatsApp messaging is enabled'
+                    : 'Used for booking updates and check-in details'}
+                </div>
                 {formErrors.phone && <div id="gd-phone-error" className="gd-input-help error" role="alert">{formErrors.phone}</div>}
               </div>
 
@@ -1542,7 +1591,7 @@ const GuestDetailsPage: React.FC = () => {
                         type="text"
                         aria-label="Referral code"
                         aria-describedby={!referralValidating && referralMessage ? 'gd-referral-message' : undefined}
-                        aria-invalid={!referralValidating && referralMessage && !appliedReferralCode ? true : undefined}
+                        aria-invalid={!referralValidating && referralMessage && referralMessage.includes('must be') ? true : undefined}
                         placeholder="Enter referral code"
                         value={referralCode}
                         onChange={(e) => {
@@ -1557,12 +1606,16 @@ const GuestDetailsPage: React.FC = () => {
                         data-testid="guest-booking-referral"
                       />
                       <button type="button" onClick={handleReferralBlur} disabled={referralValidating}>
-                        {appliedReferralCode ? 'Applied' : 'Apply'}
+                        {referralDiscountAmount > 0 ? 'Applied' : 'Apply'}
                       </button>
                     </div>
                     {referralValidating && <div className="gd-input-help">Validating…</div>}
                     {!referralValidating && referralMessage && (
-                      <div id="gd-referral-message" className={`gd-input-help${appliedReferralCode ? '' : ' error'}`} role={appliedReferralCode ? undefined : 'alert'}>
+                      <div
+                        id="gd-referral-message"
+                        className={`gd-input-help${referralMessage.includes('must be') ? ' error' : ''}`}
+                        role={referralMessage.includes('must be') ? 'alert' : undefined}
+                      >
                         {referralMessage}
                       </div>
                     )}
@@ -1763,9 +1816,24 @@ const GuestDetailsPage: React.FC = () => {
                   {(orderError.startsWith('No money was taken') || isChargedUnconfirmed) && (
                     <div style={{ marginTop: 12 }} data-testid="payment-failed-support">
                       <p style={{ margin: '0 0 8px', fontSize: 14 }}>
-                        {isChargedUnconfirmed ? 'We\'ll contact you shortly.' : 'Need help finishing your booking?'}
+                        {isChargedUnconfirmed
+                          ? chargedUnconfirmedPollExhausted
+                            ? 'Automatic checks have paused — tap Check again or reach out if you need help.'
+                            : 'We\'re still checking automatically — no need to pay again.'
+                          : 'Need help finishing your booking?'}
                       </p>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px 16px', alignItems: 'center' }}>
+                        {isChargedUnconfirmed && (
+                          <button
+                            type="button"
+                            className="gd-resume-btn"
+                            onClick={() => { void handleChargedUnconfirmedRecheck(); }}
+                            disabled={chargedUnconfirmedChecking}
+                            data-testid="charged-unconfirmed-recheck"
+                          >
+                            {chargedUnconfirmedChecking ? 'Checking…' : 'Check again'}
+                          </button>
+                        )}
                         {!isChargedUnconfirmed && razorpayOrderId && (
                           <button type="button" className="gd-resume-btn" onClick={handleResume}>
                             Resume payment

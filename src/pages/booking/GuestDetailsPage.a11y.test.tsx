@@ -76,7 +76,7 @@ describe("GuestDetailsPage form a11y", () => {
 
     // persistent hints stay linked
     expect(email).toHaveAccessibleDescription(/booking confirmation goes here/i);
-    expect(phone).toHaveAccessibleDescription(/whatsapp you check-in details/i);
+    expect(phone).toHaveAccessibleDescription(/booking updates and check-in details/i);
   });
 
   test("promo and referral inputs have accessible names", async () => {
