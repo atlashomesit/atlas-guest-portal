@@ -149,24 +149,24 @@ const PRE_ARRIVAL_STRINGS: Record<string, {
     checkinLabel: "Check-in & check-out times", addressLabel: "Address", hostLabel: "Host contact",
     hostDesc: "Questions before you arrive? Message the property team.", chatBtn: "Send message",
     wifiLabel: "WiFi", landmarksLabel: "Nearby landmarks", viewListing: "View full listing & photos",
-    t1Hint: (d) => `🏠 We'll remind you on ${d} with check-in details by email.`,
-    t1Fallback: "🏠 We'll remind you the day before your stay with check-in details.",
+    t1Hint: (d) => `🏠 If you've opted in to stay reminders, we'll remind you on ${d} with check-in details by email.`,
+    t1Fallback: "🏠 If you've opted in to stay reminders, we'll remind you the day before your stay with check-in details.",
   },
   hi: {
     heading: "आगमन से पहले", intro: "आप जल्द ही चेक-इन कर रहे हैं। यहाँ आपके प्रवास का त्वरित संदर्भ है — यह पृष्ठ सहेजें या नीचे कैलेंडर में जोड़ें।",
     checkinLabel: "चेक-इन और चेक-आउट का समय", addressLabel: "पता", hostLabel: "होस्ट से संपर्क करें",
     hostDesc: "आगमन से पहले प्रश्न हैं? संपत्ति टीम को संदेश करें।", chatBtn: "संदेश भेजें",
     wifiLabel: "WiFi", landmarksLabel: "नज़दीकी स्थान", viewListing: "पूरी लिस्टिंग और फ़ोटो देखें",
-    t1Hint: (d) => `🏠 हम आपको ${d} को ईमेल द्वारा चेक-इन विवरण के साथ याद दिलाएंगे।`,
-    t1Fallback: "🏠 हम आपके प्रवास के एक दिन पहले चेक-इन विवरण के साथ याद दिलाएंगे।",
+    t1Hint: (d) => `🏠 यदि आपने स्टे रिमाइंडर ऑप्ट-इन किया है, तो हम आपको ${d} को ईमेल द्वारा चेक-इन विवरण के साथ याद दिलाएंगे।`,
+    t1Fallback: "🏠 यदि आपने स्टे रिमाइंडर ऑप्ट-इन किया है, तो हम आपके प्रवास के एक दिन पहले चेक-इन विवरण के साथ याद दिलाएंगे।",
   },
   te: {
     heading: "రాక ముందు", intro: "మీరు త్వరలో చెక్-ఇన్ చేస్తున్నారు. ఇది మీ వసతికి త్వరిత సూచన — ఈ పేజీని సేవ్ చేయండి లేదా క్రింద క్యాలెండర్‌కు జోడించండి।",
     checkinLabel: "చెక్-ఇన్ మరియు చెక్-అవుట్ సమయాలు", addressLabel: "చిరునామా", hostLabel: "హోస్ట్ సంపర్కం",
     hostDesc: "రాకముందు ప్రశ్నలు ఉన్నాయా? ఆస్తి బృందాన్ని సందేశించండి।", chatBtn: "సందేశం పంపండి",
     wifiLabel: "WiFi", landmarksLabel: "సమీప ప్రదేశాలు", viewListing: "పూర్తి లిస్టింగ్ & ఫోటోలు చూడండి",
-    t1Hint: (d) => `🏠 మేము ${d}న ఇమెయిల్ ద్వారా చెక్-ఇన్ వివరాలతో మీకు గుర్తు చేస్తాము.`,
-    t1Fallback: "🏠 మేము మీ వసతికి ముందు రోజు చెక్-ఇన్ వివరాలతో గుర్తు చేస్తాము.",
+    t1Hint: (d) => `🏠 మీరు స్టే రిమైండర్‌లకు ఆప్ట్-ఇన్ చేసినట్లయితే, మేము ${d}న ఇమెయిల్ ద్వారా చెక్-ఇన్ వివరాలతో మీకు గుర్తు చేస్తాము.`,
+    t1Fallback: "🏠 మీరు స్టే రిమైండర్‌లకు ఆప్ట్-ఇన్ చేసినట్లయితే, మేము మీ వసతికి ముందు రోజు చెక్-ఇన్ వివరాలతో గుర్తు చేస్తాము.",
   },
 };
 
@@ -1327,13 +1327,13 @@ export default function BookingConfirmationPage() {
                 <>
                   <p data-testid="booking-confirmed-affirmation">✅ Booking confirmed now.</p>
                   <p>
-                    📱 SMS and WhatsApp confirmation should arrive shortly
+                    📧 Email confirmation should arrive shortly
                     {confirmationNotifyPhone ? (
                       <> at <span className="font-medium text-text-primary">{confirmationNotifyPhone}</span></>
                     ) : (
-                      <> on the phone number you entered at checkout</>
+                      <> on the email you entered at checkout</>
                     )}
-                    .
+                    . SMS and WhatsApp when messaging is enabled for your stay.
                   </p>
                 </>
               ) : paymentStatus === "pending" ? (
