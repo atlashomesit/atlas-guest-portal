@@ -101,6 +101,13 @@ const NoirHome = () => {
     // hidden for white-label tenants pending a per-tenant heroImageUrl (RA-006, same rule
     // Slider follows).
     const showAtlasContent = !hideAtlasBranding;
+    /** TASK-5194: white-label tenants must not assert Atlas-performed verification. */
+    const noirValueItems = useMemo(
+        () => (hideAtlasBranding
+            ? NOIR_VALUE_ITEMS.filter((item) => item.heading !== 'Every address, verified')
+            : NOIR_VALUE_ITEMS),
+        [hideAtlasBranding],
+    );
     const heroImageUrl = showAtlasContent ? HERO_IMAGE_URL : '';
     const hasHeroPhoto = Boolean(heroImageUrl.trim());
     const heroPhotoAriaLabel = showAtlasContent
@@ -302,7 +309,7 @@ const NoirHome = () => {
                         <p className="noir-hero-sub">
                             {showAtlasContent
                                 ? 'Owner-run homes in KPHB, kept immaculate and always ready — book direct, arrive to a home that is genuinely yours for the night.'
-                                : `Direct from the owner — no platform fee, verified addresses, and responsive support from ${schemaBrandName}.`}
+                                : `Direct from the owner — no platform fee and responsive support from ${schemaBrandName}.`}
                         </p>
                         <div id="search-form" data-testid="hero-widget" className="noir-hero-widget">
                             <SearchAvailabilityWidget />
@@ -319,7 +326,7 @@ const NoirHome = () => {
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
                         <h2 id="noir-why-direct-heading" className="sr-only">Why book direct</h2>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                            {NOIR_VALUE_ITEMS.map((item) => (
+                            {noirValueItems.map((item) => (
                                 <div key={item.heading} className="noir-value-item">
                                     <span className="noir-value-icon" aria-hidden="true">{item.icon}</span>
                                     <h3 className="noir-value-heading">{item.heading}</h3>

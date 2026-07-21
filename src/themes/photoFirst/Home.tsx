@@ -277,7 +277,7 @@ const PhotoFirstHome = () => {
                         <p className="photofirst-hero-sub">
                             {showAtlasContent
                                 ? 'Owner-run homes in KPHB, shown exactly as they are — scroll to see every room, book direct any time.'
-                                : `Direct from the owner — verified addresses, no platform fee. Scroll to see every room at ${schemaBrandName}.`}
+                                : `Direct from the owner — no platform fee. Scroll to see every room at ${schemaBrandName}.`}
                         </p>
                     </div>
                 </div>

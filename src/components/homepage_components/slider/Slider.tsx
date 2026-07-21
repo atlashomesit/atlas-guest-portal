@@ -65,7 +65,7 @@ const Slider = () => {
         <p className="ahv2-hero-sub">
           {showAtlasContent
             ? 'Seven owner-run homes in KPHB. Same hands clean them, restock them, answer the door.'
-            : 'Direct from the owner — no platform fee, verified addresses, and WhatsApp-first support from a team that lives down the street.'}
+            : 'Direct from the owner — no platform fee and WhatsApp-first support from a team that lives down the street.'}
         </p>
 
         {/* Floating search card — the real, functional availability widget */}
