@@ -6,19 +6,27 @@ import SEO from "../components/SEO";
 import { LoadingState } from "../components/LoadingState";
 import { fetchPublicListings } from "../api/listingClient";
 import { clearRecentlyViewed, getRecentlyViewed, isFavorite, toggleFavorite } from "../utils/guestHistory";
-import { formatCurrency } from "../utils/formatting";
 import { getTenantBrandName } from "../tenant/displayBrand";
+import { useCurrency } from "../contexts/CurrencyContext";
+import { estimateStayNights, formatEstTotalInclGst } from "../utils/guestPriceEstimate";
+
+type LiveListingPrice = {
+  rate: number;
+  isGstRegistered: boolean;
+};
 
 export default function RecentlyViewedPage() {
   const brandName = getTenantBrandName();
+  const { format: formatDisplayCurrency } = useCurrency();
+  const estimateNights = estimateStayNights(null, null);
   const [items, setItems] = useState(() => getRecentlyViewed());
   const [favEpoch, setFavEpoch] = useState(0);
-  const [liveNightlyByListingId, setLiveNightlyByListingId] = useState<Record<number, number>>({});
+  const [liveByListingId, setLiveByListingId] = useState<Record<number, LiveListingPrice>>({});
   const [livePricesLoading, setLivePricesLoading] = useState(() => getRecentlyViewed().length > 0);
 
   useEffect(() => {
     if (items.length === 0) {
-      setLiveNightlyByListingId({});
+      setLiveByListingId({});
       setLivePricesLoading(false);
       return;
     }
@@ -26,17 +34,20 @@ export default function RecentlyViewedPage() {
     setLivePricesLoading(true);
     fetchPublicListings(ac.signal)
       .then((list) => {
-        const next: Record<number, number> = {};
+        const next: Record<number, LiveListingPrice> = {};
         for (const row of list) {
           const rate = row.baseNightlyRate;
           if (rate != null && Number.isFinite(rate) && rate > 0) {
-            next[row.id] = rate;
+            next[row.id] = {
+              rate,
+              isGstRegistered: Boolean(row.isGstRegistered),
+            };
           }
         }
-        setLiveNightlyByListingId(next);
+        setLiveByListingId(next);
       })
       .catch(() => {
-        /* keep cards; chips hidden without live prices */
+        /* keep cards; fall back to stored viewed prices */
       })
       .finally(() => {
         if (!ac.signal.aborted) setLivePricesLoading(false);
@@ -58,7 +69,7 @@ export default function RecentlyViewedPage() {
               onClick={() => {
                 clearRecentlyViewed();
                 setItems([]);
-                setLiveNightlyByListingId({});
+                setLiveByListingId({});
                 setLivePricesLoading(false);
               }}
             >
@@ -92,7 +103,9 @@ export default function RecentlyViewedPage() {
           >
             {items.map((it) => {
               const stored = it.pricePerNight;
-              const current = liveNightlyByListingId[it.listingId];
+              const live = liveByListingId[it.listingId];
+              const current = live?.rate;
+              const headlinePrice = current ?? stored;
               const hasCompare =
                 stored != null &&
                 stored > 0 &&
@@ -101,6 +114,13 @@ export default function RecentlyViewedPage() {
                 Number.isFinite(stored) &&
                 Number.isFinite(current);
               const delta = hasCompare ? current - stored : null;
+              const showWasPrice =
+                !livePricesLoading &&
+                current != null &&
+                stored != null &&
+                stored > 0 &&
+                delta != null &&
+                delta !== 0;
 
               const saved = isFavorite(it.listingId);
               return (
@@ -138,28 +158,45 @@ export default function RecentlyViewedPage() {
                     <div className="p-4 pb-2">
                       <p className="font-semibold text-text-primary">{it.name ?? `Listing ${it.listingId}`}</p>
                       <p className="text-sm text-text-secondary">{it.location ?? ""}</p>
-                      {stored != null && stored > 0 ? (
-                        <p className="text-sm text-text-primary mt-1">
-                          <span className="font-semibold">₹{stored.toLocaleString("en-IN")}</span>
-                          <span className="text-text-secondary">
-                            {!livePricesLoading && delta === null ? " / night (viewed price)" : " / night"}
-                          </span>
-                        </p>
+                      {livePricesLoading && current == null && stored != null && stored > 0 ? (
+                        <div className="mt-1.5 space-y-1.5" aria-hidden>
+                          <div className="h-5 w-28 rounded bg-bg-muted animate-pulse" />
+                          <div className="h-4 w-40 rounded bg-bg-muted animate-pulse" />
+                        </div>
+                      ) : headlinePrice != null && headlinePrice > 0 ? (
+                        <div className="mt-1 space-y-0.5">
+                          <p className="text-sm text-text-primary">
+                            <span className="font-semibold">{formatDisplayCurrency(headlinePrice)}</span>
+                            <span className="text-text-secondary">
+                              {current == null && !livePricesLoading ? " / night (viewed price)" : " / night"}
+                            </span>
+                          </p>
+                          <p className="text-xs text-text-muted">
+                            {formatEstTotalInclGst(
+                              headlinePrice,
+                              estimateNights,
+                              formatDisplayCurrency,
+                              3,
+                              live?.isGstRegistered ?? true,
+                            )}
+                          </p>
+                          {showWasPrice ? (
+                            <p
+                              className="text-xs text-text-muted mt-0.5"
+                              data-testid={`recently-viewed-price-was-${it.listingId}`}
+                            >
+                              Was {formatDisplayCurrency(stored!)}
+                              {delta != null && delta < 0
+                                ? ` · ↓ ${formatDisplayCurrency(Math.round(Math.abs(delta)))} lower`
+                                : delta != null && delta > 0
+                                  ? ` · ↑ ${formatDisplayCurrency(Math.round(delta))} higher`
+                                  : ""}
+                            </p>
+                          ) : (
+                            <div className="mt-0.5 h-4" aria-hidden />
+                          )}
+                        </div>
                       ) : null}
-                      {livePricesLoading && stored != null && stored > 0 ? (
-                        <div className="mt-1.5 h-4 w-36 rounded bg-bg-muted animate-pulse" aria-hidden />
-                      ) : delta != null && delta !== 0 ? (
-                        <p
-                          className={`text-xs font-semibold mt-1.5 ${delta < 0 ? "text-emerald-600 dark:text-emerald-400" : "text-amber-700 dark:text-amber-400"}`}
-                          data-testid={`recently-viewed-price-delta-${it.listingId}`}
-                        >
-                          {delta < 0
-                            ? `↓ Price dropped ${formatCurrency(Math.round(Math.abs(delta)), { maximumFractionDigits: 0 })}`
-                            : `↑ Price went up ${formatCurrency(Math.round(delta), { maximumFractionDigits: 0 })}`}
-                        </p>
-                      ) : (
-                        <div className="mt-1.5 h-4" aria-hidden />
-                      )}
                       <p className="text-xs text-text-muted mt-1">
                         Viewed {new Date(it.viewedAtUtc).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
                       </p>

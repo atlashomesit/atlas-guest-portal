@@ -8,9 +8,15 @@ import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 import { buildApiUrl, getApiHeaders } from "../api/client";
 import { getTenantBrandName } from "../tenant/displayBrand";
 import { LoadingState } from "../components/LoadingState";
+import { useCurrency } from "../contexts/CurrencyContext";
+import { useDailyPricingSummary } from "../hooks/useDailyPricingSummary";
+import { estimateStayNights, formatEstTotalInclGst } from "../utils/guestPriceEstimate";
 
 export default function FavoritesPage() {
   const brandName = getTenantBrandName();
+  const { format: formatDisplayCurrency, formatINR, isConverted } = useCurrency();
+  const { getListingPricing: getDailyListingPricing } = useDailyPricingSummary();
+  const estimateNights = estimateStayNights(null, null);
   const [all, setAll] = useState<PublicListing[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -286,6 +292,11 @@ export default function FavoritesPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {favorites.map((l) => {
             const path = listingPath(l);
+            const dailyBreakdown = getDailyListingPricing(l.id);
+            const displayedPrice =
+              (dailyBreakdown?.actualPrice ?? 0) > 0
+                ? dailyBreakdown!.actualPrice
+                : (l.baseNightlyRate ?? 0);
             return (
               <div
                 key={l.id}
@@ -320,11 +331,25 @@ export default function FavoritesPage() {
                 <Link to={path} className="block p-4 pb-2">
                   <p className="font-semibold text-text-primary">{l.name ?? l.propertyName ?? `Listing ${l.id}`}</p>
                   <p className="text-sm text-text-secondary">{l.propertyAddress ?? ""}</p>
-                  {l.baseNightlyRate != null && l.baseNightlyRate > 0 ? (
-                    <p className="text-sm text-text-primary mt-1">
-                      <span className="font-semibold">₹{l.baseNightlyRate.toLocaleString("en-IN")}</span>
-                      <span className="text-text-secondary"> / night</span>
-                    </p>
+                  {displayedPrice > 0 ? (
+                    <div className="mt-1 space-y-0.5">
+                      <p className="text-sm text-text-primary">
+                        <span className="font-semibold">{formatDisplayCurrency(displayedPrice)}</span>
+                        <span className="text-text-secondary"> / night</span>
+                      </p>
+                      {isConverted && (
+                        <p className="text-xs text-text-muted">{formatINR(displayedPrice)} on payment</p>
+                      )}
+                      <p className="text-xs text-text-muted">
+                        {formatEstTotalInclGst(
+                          displayedPrice,
+                          estimateNights,
+                          formatDisplayCurrency,
+                          3,
+                          l.isGstRegistered,
+                        )}
+                      </p>
+                    </div>
                   ) : null}
                 </Link>
                 <div className="px-4 pb-4 space-y-2">
