@@ -48,7 +48,7 @@ const BlogPostPage = React.lazy(() => import("./pages/blog/BlogPostPage"))
 const SearchPage = React.lazy(() => import("./pages/SearchPage"))
 const MarketplaceHomepage = React.lazy(() => import("./pages/MarketplaceHomepage"))
 const ShortLinkRedirect = React.lazy(() => import("./components/ShortLinkRedirect"))
-const HomeDetails = React.lazy(() => import("./pages/home/HomeDetails"))
+const LegacyHomeRoomRedirect = React.lazy(() => import("./pages/home/LegacyHomeRoomRedirect"))
 const SupportWidget = React.lazy(() => import("./components/support/SupportWidget"))
 const Reserve = React.lazy(() => import("./pages/Reserve"))
 const BecomeHost = React.lazy(() => import("./pages/BecomeHost"))
@@ -207,7 +207,7 @@ function AppWrapper() {
           <Route path="/terms" element={withBoundary(<Suspense fallback={<LazyFallback />}><Terms /></Suspense>, "terms-route")} />
           <Route path="/terms-and-conditions" element={withBoundary(<Suspense fallback={<LazyFallback />}><Terms /></Suspense>, "terms-legacy-route")} />
           <Route path="/homes/:propertySlug/:unitSlug" element={withBoundary(<Suspense fallback={<PropertyDetailsLazyFallback />}><Homepage_PropertyDetails /></Suspense>, "property-details-home-route")} />
-          <Route path="/homes/:roomNo" element={withBoundary(<Suspense fallback={<LazyFallback />}><HomeDetails /></Suspense>, "home-details-route")} />
+          <Route path="/homes/:roomNo" element={withBoundary(<Suspense fallback={<LazyFallback />}><LegacyHomeRoomRedirect /></Suspense>, "home-details-route")} />
           <Route path="/property_details/:id" element={withBoundary(<Suspense fallback={<PropertyDetailsLazyFallback />}><LegacyPropertyRedirect /></Suspense>, "property-details-legacy-route")} />
           <Route path="/properties/:id" element={withBoundary(<Suspense fallback={<PropertyDetailsLazyFallback />}><LegacyPropertyRedirect /></Suspense>, "property-details-modern-redirect-route")} />
           <Route path="/reserve" element={withBoundary(<Suspense fallback={<LazyFallback />}><Reserve /></Suspense>, "reserve-route")} />

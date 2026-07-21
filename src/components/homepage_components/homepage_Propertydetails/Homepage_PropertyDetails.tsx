@@ -312,8 +312,12 @@ interface Property {
     virtualTourUrl?: string | null;
     /** TASK-1385: Cancellation policy tier from listing — Flexible, Moderate, or Strict. */
     cancellationTier?: 'Flexible' | 'Moderate' | 'Strict' | null;
+    /** TASK-4356: free-cancellation window hours before check-in (server-resolved). */
+    cancellationWindowHours?: number | null;
     /** TASK-4405: server-resolved universal grace-window hours. Null when the flag is off (flag-off parity). */
     graceHours?: number | null;
+    /** TASK-5205 / TASK-956: minimum stay nights from listing payload. */
+    minStay?: number | null;
     /** TL-GUEST: from GET /listings/{id} or /listings/public — drives same Google Maps JS path as Location page. */
     latitude?: number | null;
     longitude?: number | null;
@@ -348,7 +352,9 @@ function coerceProperty(item: Partial<Property> & { id?: number | string }): Pro
         property_address: item.property_address,
         virtualTourUrl: item.virtualTourUrl,
         cancellationTier: item.cancellationTier,
+        cancellationWindowHours: item.cancellationWindowHours,
         graceHours: item.graceHours,
+        minStay: item.minStay,
         latitude: item.latitude,
         longitude: item.longitude,
     };
@@ -903,9 +909,10 @@ const PropertyDetails = () => {
                         property_nearplaces: Array.isArray((apiListing as Record<string, unknown>).property_nearplaces) ? (apiListing as Record<string, unknown>).property_nearplaces as string[] : [],
                         property_mapSrc: (apiListing as Record<string, unknown>).property_mapSrc as string ?? '',
                         property_policy_details: Array.isArray((apiListing as Record<string, unknown>).property_policy_details) ? (apiListing as Record<string, unknown>).property_policy_details as PropertyDetail[] : [],
-                        property_rating: Number((apiListing as Record<string, unknown>).property_rating) || 0,
-                        property_reviews: Number((apiListing as Record<string, unknown>).property_reviews) || 0,
-                        property_price: Number((apiListing as Record<string, unknown>).property_price) || 0,
+                        // TASK-5196: public listing DTO uses baseNightlyRate / propertyRating / reviewCount
+                        property_rating: Number(apiListing.propertyRating ?? (apiListing as Record<string, unknown>).property_rating) || 0,
+                        property_reviews: Number(apiListing.reviewCount ?? (apiListing as Record<string, unknown>).property_reviews) || 0,
+                        property_price: Number(apiListing.baseNightlyRate ?? (apiListing as Record<string, unknown>).property_price) || 0,
                         timezoneId: (apiListing as Record<string, unknown>).timezoneId as string | undefined,
                         maxGuests: parseMaxGuestsFromPayload(apiListing as Record<string, unknown>),
                         checkInTime: pub.checkInTime?.trim() || undefined,
@@ -950,10 +957,21 @@ const PropertyDetails = () => {
                             const raw = (apiListing as Record<string, unknown>).cancellationTier ?? pub.cancellationTier;
                             return (raw === 'Flexible' || raw === 'Moderate' || raw === 'Strict') ? raw : null;
                         })(), // TASK-1385
+                        cancellationWindowHours: (() => {
+                            const raw =
+                                (apiListing as Record<string, unknown>).cancellationWindowHours ??
+                                pub.cancellationWindowHours;
+                            return typeof raw === 'number' && raw > 0 ? raw : null;
+                        })(), // TASK-4356 / TASK-5205
                         graceHours: (() => {
                             const raw = (apiListing as Record<string, unknown>).graceHours ?? pub.graceHours;
                             return typeof raw === 'number' && raw > 0 ? raw : null;
                         })(), // TASK-4405
+                        minStay: (() => {
+                            const raw = (apiListing as Record<string, unknown>).minStay ?? pub.minStay;
+                            const n = raw == null || raw === '' ? NaN : Number(raw);
+                            return Number.isFinite(n) && n > 0 ? n : null;
+                        })(), // TASK-5205
                         latitude: (() => {
                             const raw =
                                 (apiListing as Record<string, unknown>).latitude ??
@@ -1634,18 +1652,13 @@ useEffect(() => {
               {/* ===== LEFT COLUMN ===== */}
               <div>
 
-                {/* Host strip + verified panel */}
+                {/* Host strip + trust panel */}
                 <section className="pp-section" style={{ paddingTop: 28 }} aria-label="About the host">
                   <div className="pp-host">
                     <div className="pp-host-avatar" aria-hidden="true">{ppHostInitial}</div>
                     <div>
                       <div className="pp-host-name">
                         {ppHostDisplayName}
-                        {ppHasRealHost && (
-                          <span className="pp-verified-badge">
-                            <PpCheckIcon size={10} /> Verified
-                          </span>
-                        )}
                       </div>
                       <div className="pp-host-sub">
                         Hosted directly · Responds on WhatsApp · Direct booking
@@ -2138,51 +2151,6 @@ useEffect(() => {
                   </section>
                 )}
 
-                {/* TASK-4014: Nearby attractions section — static placeholder for now */}
-                <section className="pp-section" aria-label="Nearby attractions and things to do">
-                  <div className="pp-section-head">
-                    <h2>Nearby attractions & things to do</h2>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 16 }}>
-                    {(() => {
-                      // TODO: Replace with real API data from GET /api/listings/{id}/nearby when available
-                      const SAMPLE_ATTRACTIONS = [
-                        { name: 'Local Market', distance: '0.5 km', type: 'Shopping', icon: '🛍️' },
-                        { name: 'Waterfall Trail', distance: '2 km', type: 'Nature', icon: '🏞️' },
-                        { name: 'Town Square', distance: '1 km', type: 'Landmark', icon: '📍' },
-                      ];
-                      return SAMPLE_ATTRACTIONS.map((attraction, idx) => (
-                        <div
-                          key={`attraction-${idx}`}
-                          style={{
-                            borderRadius: 12,
-                            border: '1px solid #f0ddd0',
-                            padding: 12,
-                            textAlign: 'center',
-                            background: '#fff',
-                            transition: 'box-shadow 0.2s',
-                          }}
-                          onMouseEnter={(e) => (e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)')}
-                          onMouseLeave={(e) => (e.currentTarget.style.boxShadow = 'none')}
-                        >
-                          <div style={{ fontSize: 28, marginBottom: 8 }} aria-hidden="true">{attraction.icon}</div>
-                          <p style={{ fontWeight: 600, color: '#4a3535', fontSize: 13, margin: '0 0 4px', minHeight: '2em' }}>
-                            {attraction.name}
-                          </p>
-                          <p style={{ fontSize: 11, color: 'var(--text-muted, #6b5a55)', margin: '0 0 6px' }}>
-                            {attraction.distance}
-                          </p>
-                          {/* WCAG AA: #6b5138 on #f0ddd0 ≈ 5.9:1 (was #94755b at 3.44:1 — axe color-contrast failure) */}
-                          <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: '#f0ddd0', color: '#6b5138' }}>
-                            {attraction.type}
-                          </span>
-                        </div>
-                      ));
-                    })()}
-                  </div>
-                </section>
-
-
               </div>
               {/* ===== END LEFT COLUMN ===== */}
 
@@ -2230,6 +2198,14 @@ useEffect(() => {
                         unitSlug={unitSlugParam}
                         reviewRating={ppHasApiReviews ? ppApiReviews!.averageRating : undefined}
                         reviewCount={ppHasApiReviews ? ppApiReviews!.totalCount : undefined}
+                        minStayNights={
+                          data.minStay != null && Number.isFinite(data.minStay) && data.minStay > 0
+                            ? data.minStay
+                            : 1
+                        }
+                        cancellationTier={data.cancellationTier ?? null}
+                        cancellationWindowHours={data.cancellationWindowHours ?? null}
+                        graceHours={data.graceHours ?? null}
                       />
                     </Suspense>
 
@@ -2294,7 +2270,7 @@ useEffect(() => {
                     white-label tenant with no configured number (cross-tenant data leak). */}
                 {ppHasHostPhone && (
                   <div style={{ marginTop: 12 }}>
-                    {ppIsDraft ? (
+                    {!ppIsBookable ? (
                       <>
                         <p className="pp-host-sub" style={{ marginBottom: 8 }}>
                           This home is not open for booking yet. You can still ask a question.
@@ -2381,9 +2357,9 @@ useEffect(() => {
           </div>
           {/* ===== END pp-shell ===== */}
 
-          {/* Mobile sticky CTA — TASK-2739-v1: Draft listings show a "not yet available" notice
-              instead of the reserve bar (no booking surface until published). */}
-          {ppIsDraft ? (
+          {/* Mobile sticky CTA — TASK-5192: any non-bookable status (Draft/Archived/Unlisted)
+              shows a notice instead of price + Reserve (sidebar already uses ppIsBookable). */}
+          {!ppIsBookable ? (
             <div
               className="pp-m-sticky"
               aria-label="Listing not yet available for booking"

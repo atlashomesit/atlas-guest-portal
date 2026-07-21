@@ -65,16 +65,6 @@ const NOIR_VALUE_ITEMS = [
         heading: 'Pay the host, directly',
         body: 'No platform mark-up, no third-party fee. The price on this page is the price you pay.',
     },
-    {
-        icon: (
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <rect x="3" y="5" width="18" height="16" rx="2" />
-                <path d="M3 10h18M8 3v4M16 3v4" />
-            </svg>
-        ),
-        heading: 'Free cancellation, 48h out',
-        body: 'Plans change. Cancel up to 48 hours before check-in for a full, no-questions refund.',
-    },
 ] as const;
 
 const ATLAS_SOCIAL_SAME_AS = [
@@ -328,7 +318,7 @@ const NoirHome = () => {
                 <section className="noir-value-strip" aria-labelledby="noir-why-direct-heading">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
                         <h2 id="noir-why-direct-heading" className="sr-only">Why book direct</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                             {NOIR_VALUE_ITEMS.map((item) => (
                                 <div key={item.heading} className="noir-value-item">
                                     <span className="noir-value-icon" aria-hidden="true">{item.icon}</span>

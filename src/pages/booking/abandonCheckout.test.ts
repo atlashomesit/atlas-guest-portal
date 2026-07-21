@@ -32,3 +32,15 @@ describe('GuestDetailsPage TASK-5183 abandon-checkout wiring', () => {
     expect(content).not.toMatch(/payment\.failed[\s\S]{0,500}abandonPaymentPendingCheckout/);
   });
 });
+
+describe('GuestDetailsPage TASK-5179 cancellation deadline wiring', () => {
+  const filePath = resolve(__dirname, './GuestDetailsPage.tsx');
+  const content = readFileSync(filePath, 'utf-8');
+
+  it('uses computeEffectiveCancellationDeadline instead of a hardcoded 48h offset', () => {
+    expect(content).toContain('computeEffectiveCancellationDeadline');
+    expect(content).toContain('formatCancellationDeadline');
+    expect(content).not.toMatch(/48 \* 60 \* 60 \* 1000/);
+    expect(content).not.toContain('48 hours before check-in');
+  });
+});

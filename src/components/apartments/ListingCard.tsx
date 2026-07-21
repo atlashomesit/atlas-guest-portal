@@ -8,6 +8,7 @@ import { useCurrency } from "../../contexts/CurrencyContext";
 import { useBooking } from "../../contexts/BookingContext";
 import { estTotalInclGst, estimateStayNights, formatEstTotalInclGst } from "../../utils/guestPriceEstimate";
 import { getPropertyDesignImage } from "../../config/branding";
+import { resolveAmenityLabel } from "../../utils/amenityCodes";
 
 type ListingCardProps = {
   id: string;
@@ -27,6 +28,8 @@ type ListingCardProps = {
   hasWifi?: boolean;
   hasParking?: boolean;
   petFriendly: boolean;
+  /** TASK-5198: real amenity codes from the listing payload (replaces hardcoded room map). */
+  amenityCodes?: string[];
   /** TASK-1360: ISO date of most recent checkout within 30 days for social-proof badge. */
   lastBookedAt?: string | null;
   /** TASK-1695: LOS auto-discount tier 1 — minimum nights required. */
@@ -66,6 +69,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
   hasWifi,
   hasParking,
   petFriendly,
+  amenityCodes,
   lastBookedAt,
   losDiscountMinNights,
   losDiscountPercent,
@@ -119,20 +123,20 @@ const ListingCard: React.FC<ListingCardProps> = ({
       ? priceDisplayConfig.discount.primaryBadgeLabel
       : specialPricingLabel;
 
-  const AMENITY_MAP: Record<string, string[]> = useMemo(
-    () => ({
-      "501": ["Wi-Fi", "Air conditioning", "Private bath"],
-      "201": ["Wi-Fi", "Air conditioning"],
-      "202": ["Wi-Fi", "Air conditioning"],
-      "301": ["Wi-Fi", "Air conditioning"],
-      "101": ["Wi-Fi", "Air conditioning"],
-      "102": ["Wi-Fi", "Air conditioning"],
-      "302": ["Wi-Fi", "Air conditioning"],
-    }),
-    [],
-  );
-
-  const amenities = AMENITY_MAP[String(id)] ?? [];
+  const amenities = useMemo(() => {
+    if (!amenityCodes?.length) return [] as string[];
+    const labels: string[] = [];
+    const seen = new Set<string>();
+    for (const code of amenityCodes) {
+      const label = resolveAmenityLabel(code);
+      if (!label) continue;
+      const key = label.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      labels.push(label);
+    }
+    return labels;
+  }, [amenityCodes]);
 
   const quickFacts = [
     {
@@ -333,18 +337,25 @@ const ListingCard: React.FC<ListingCardProps> = ({
 
               {amenities.length > 0 && (
                 <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-text-primary">
-                  {amenities.slice(0, 3).map((amenity: string) => (
-                    <span key={amenity} className="inline-flex items-center gap-1">
-                      {amenity.toLowerCase().includes("wi-fi") ? (
-                        <Wifi className="h-4 w-4" aria-hidden />
-                      ) : amenity.toLowerCase().includes("air") ? (
-                        <Snowflake className="h-4 w-4" aria-hidden />
-                      ) : (
-                        <Bath className="h-4 w-4" aria-hidden />
-                      )}
-                      <span className="truncate max-w-[140px]">{amenity}</span>
-                    </span>
-                  ))}
+                  {amenities.slice(0, 3).map((amenity: string) => {
+                    const lower = amenity.toLowerCase();
+                    const Icon =
+                      lower.includes("wi-fi") || lower.includes("wifi")
+                        ? Wifi
+                        : lower.includes("air") || lower.includes("ac")
+                          ? Snowflake
+                          : lower.includes("park")
+                            ? Car
+                            : lower.includes("pet")
+                              ? PawPrint
+                              : Bath;
+                    return (
+                      <span key={amenity} className="inline-flex items-center gap-1">
+                        <Icon className="h-4 w-4" aria-hidden />
+                        <span className="truncate max-w-[140px]">{amenity}</span>
+                      </span>
+                    );
+                  })}
                 </div>
               )}
             </div>

@@ -40,7 +40,7 @@ import pricingConfig from "../../config/pricing.config";
 import { getEffectiveDiscountPercent } from "../../utils/pricing";
 import { getPublicSiteOrigin } from "../../config/siteOrigin";
 
-/* ---- Why-direct 3-pillar strip — heritage's original bordered/icon-chip presentation ---- */
+/* ---- Why-direct 2-pillar strip — heritage's original bordered/icon-chip presentation ---- */
 const WHY_DIRECT_ITEMS = [
     {
         icon: (
@@ -61,16 +61,6 @@ const WHY_DIRECT_ITEMS = [
         ),
         heading: "You pay the host directly",
         body: "No platform mark-up, no third-party booking fee. The price you see is the price you pay.",
-    },
-    {
-        icon: (
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <rect x="3" y="5" width="18" height="16" rx="2"/>
-                <path d="M3 10h18M8 3v4M16 3v4"/>
-            </svg>
-        ),
-        heading: "Free cancellation 48h before",
-        body: "Plans change. Cancel up to 48 hours before check-in and we'll refund the full amount, no questions.",
     },
 ] as const;
 
@@ -299,7 +289,7 @@ const HeritageHome = () => {
                 </div>
                 <AtlasNeighbourhoodRibbon variant="closer" />
 
-                {/* Why-direct 3-pillar strip — heritage's original bordered icon-chip presentation */}
+                {/* Why-direct 2-pillar strip — heritage's original bordered icon-chip presentation */}
                 <section
                     className="border-t border-b border-border-subtle mt-0"
                     style={{ background: 'var(--bg-secondary, #f9f6f2)' }}
@@ -307,7 +297,7 @@ const HeritageHome = () => {
                 >
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
                         <h2 id="why-direct-heading" className="sr-only">Why book direct</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                             {WHY_DIRECT_ITEMS.map((item) => (
                                 <div key={item.heading} className="flex flex-col gap-3">
                                     <span
