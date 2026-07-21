@@ -206,7 +206,7 @@ function getPpCancellationInfo(
   };
 }
 
-const PP_REVIEW_BG_COLORS = ['#4a3535', '#f08c71', '#c45a3f', '#94755b', '#e9f5ef'];
+const PP_REVIEW_BG_COLORS = ['#4a3535', '#f08c71', '#b8472f', '#94755b', '#e9f5ef'];
 const PP_REVIEW_TEXT_COLORS = ['#fff8e7', '#4a3535', '#fff8e7', '#fff8e7', '#157046'];
 
 /** Shown while listing data is resolving (incl. API fallback). Matches loaded page layout for perceived performance. */
@@ -2149,7 +2149,7 @@ useEffect(() => {
               {/* ===== RIGHT COLUMN — sticky booking ===== */}
               <aside className="pp-booking-col" aria-label="Booking">
                 {galleryUrls.length > 0 && (
-                  <p style={{ fontSize: 13, color: 'var(--text-muted, #6b5a55)', marginBottom: 8 }} aria-label="Photo count">
+                  <p style={{ fontSize: 13, color: 'var(--text-muted, #6b5a55)', marginBottom: 8 }}>
                     {galleryUrls.length} photo{galleryUrls.length !== 1 ? 's' : ''}
                   </p>
                 )}

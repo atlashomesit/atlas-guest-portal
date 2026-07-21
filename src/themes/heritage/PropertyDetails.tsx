@@ -2146,7 +2146,7 @@ useEffect(() => {
               {/* ===== RIGHT COLUMN — sticky booking ===== */}
               <aside className="pp-booking-col" aria-label="Booking">
                 {galleryUrls.length > 0 && (
-                  <p style={{ fontSize: 13, color: '#64748b', marginBottom: 8 }} aria-label="Photo count">
+                  <p style={{ fontSize: 13, color: '#64748b', marginBottom: 8 }}>
                     {galleryUrls.length} photo{galleryUrls.length !== 1 ? 's' : ''}
                   </p>
                 )}
