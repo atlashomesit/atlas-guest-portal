@@ -39,6 +39,10 @@ import { mapRazorpayFailureCode } from '@/utils/razorpayGuestErrors';
 import { formatDisplayNumber, getContactEmail, getTelLink, getWhatsAppLink } from '@/config/contact';
 import { computeCheckoutTotal } from '@/utils/guestPriceEstimate';
 import {
+  buildRazorpayCheckoutDisplayConfig,
+  isMobileCheckoutUserAgent,
+} from '@/utils/razorpayCheckoutOptions';
+import {
   computeEffectiveCancellationDeadline,
   formatCancellationDeadline,
 } from '@/utils/cancellationPolicy';
@@ -489,6 +493,10 @@ const GuestDetailsPage: React.FC = () => {
     typeof priceBreakdown?.touristTaxAmount === 'number' && priceBreakdown.touristTaxAmount > 0
       ? priceBreakdown.touristTaxAmount
       : 0;
+  // TASK-5204: client-side promo validate is advisory only — subtract from the total once
+  // `/api/Razorpay/order` echoes the authoritative discount (`serverPromoLocked`).
+  const confirmedPromoDiscount = serverPromoLocked ? promoDiscountAmount : 0;
+
   const { perNight, gstSlabPercent, gstLineAmount, displayTotal } =
     computeCheckoutTotal({
       baseAmount,
@@ -498,7 +506,7 @@ const GuestDetailsPage: React.FC = () => {
       serverFinalAmount,
       touristTaxAmount,
       addOnsTotal,
-      promoDiscountAmount,
+      promoDiscountAmount: confirmedPromoDiscount,
       referralDiscountAmount,
     });
 
@@ -881,6 +889,11 @@ const GuestDetailsPage: React.FC = () => {
               let lastUpiVpa = '';
               try { lastUpiVpa = localStorage.getItem(LAST_UPI_VPA_KEY)?.trim() ?? ''; } catch { /* ignore */ }
 
+              const isMobileCheckout = isMobileCheckoutUserAgent(
+                typeof navigator !== 'undefined' ? navigator.userAgent : '',
+              );
+              const checkoutDisplay = buildRazorpayCheckoutDisplayConfig(lastUpiVpa, isMobileCheckout);
+
               const handleClose = () => {
                 if (paymentCompleted) return;
                 paymentCompleted = true;
@@ -905,22 +918,10 @@ const GuestDetailsPage: React.FC = () => {
                     phoneDialCode,
                     clampNationalDigits(formData.phone, dial.maxDigits),
                   ),
-                  method: 'upi',
-                  ...(lastUpiVpa ? { vpa: lastUpiVpa } : {}),
+                  ...checkoutDisplay.prefillExtras,
                 },
-                ...(lastUpiVpa ? { upi: { vpa: lastUpiVpa } } : {}),
-                config: {
-                  display: {
-                    blocks: {
-                      upi_block: {
-                        name: 'Pay using UPI',
-                        instruments: [{ method: 'upi' }],
-                      },
-                    },
-                    sequence: ['block.upi_block', 'block.card', 'block.netbanking', 'block.wallet'],
-                    preferences: { show_default_blocks: true },
-                  },
-                },
+                ...(checkoutDisplay.upi ? { upi: checkoutDisplay.upi } : {}),
+                config: checkoutDisplay.config,
                 theme: { color: '#b8472f' },
                 modal: { ondismiss: handleClose },
                 handler: async (res: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => {
@@ -1519,8 +1520,14 @@ const GuestDetailsPage: React.FC = () => {
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
                       <span style={{ color: 'var(--gd-coral)' }}><IconTag size={14}/></span>
                       Promo code
-                      {appliedPromoCode && promoDiscountAmount > 0 && (
-                        <span className="gd-pill">Est. −{displayPrice(promoDiscountAmount)}</span>
+                      {promoValidating && (
+                        <span className="gd-pill">Checking code…</span>
+                      )}
+                      {!promoValidating && serverPromoLocked && promoDiscountAmount > 0 && (
+                        <span className="gd-pill">−{displayPrice(promoDiscountAmount)}</span>
+                      )}
+                      {!promoValidating && !serverPromoLocked && appliedPromoCode && promoDiscountAmount > 0 && (
+                        <span className="gd-pill">Pending confirmation</span>
                       )}
                     </span>
                     <span className="gd-disc-side">
@@ -1551,7 +1558,7 @@ const GuestDetailsPage: React.FC = () => {
                         {appliedPromoCode ? 'Applied' : 'Apply'}
                       </button>
                     </div>
-                    {promoValidating && <div className="gd-input-help">Validating…</div>}
+                    {promoValidating && <div className="gd-input-help">Checking code…</div>}
                     {!promoValidating && promoMessage && (
                       <div id="gd-promo-message" className={`gd-input-help${appliedPromoCode ? ' success' : ' error'}`} role={appliedPromoCode ? undefined : 'alert'}>
                         {promoMessage}
@@ -1955,13 +1962,10 @@ const GuestDetailsPage: React.FC = () => {
                 <span className="num">{displayPrice(addOnsTotal)}</span>
               </div>
             )}
-            {promoDiscountAmount > 0 && (
-              <div className="gd-price-row save">
-                <span>
-                  Promo{appliedPromoCode ? ` · ${appliedPromoCode}` : ''}
-                  {serverPromoLocked ? '' : ' (estimated)'}
-                </span>
-                <span className="num">−{displayPrice(promoDiscountAmount)}</span>
+            {confirmedPromoDiscount > 0 && (
+              <div className="gd-price-row save" data-testid="promo-confirmed-row">
+                <span>Promo{appliedPromoCode ? ` · ${appliedPromoCode}` : ''}</span>
+                <span className="num">−{displayPrice(confirmedPromoDiscount)}</span>
               </div>
             )}
             {referralDiscountAmount > 0 && (
