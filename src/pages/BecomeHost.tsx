@@ -588,7 +588,7 @@ const BecomeHost = () => {
             onChange={(e) => setEstimatorRooms(Number(e.target.value))}
             aria-label="Number of rooms"
             aria-valuetext={`${estimatorRooms} ${estimatorRooms === 1 ? "room" : "rooms"}`}
-            className="w-full accent-[#c45a3f]"
+            className="w-full accent-[#b8472f]"
           />
           <div
             className="flex justify-between text-base mt-1 mb-4"

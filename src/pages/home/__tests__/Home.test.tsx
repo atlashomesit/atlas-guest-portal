@@ -5,6 +5,10 @@ import { describe, it, expect, vi } from "vitest";
 import { BookingProvider } from "../../../contexts/BookingContext";
 import Home from "../Home";
 
+vi.mock("../../../tenant/tenantContext", () => ({
+  getTenantContext: vi.fn(() => ({ slug: "atlas", isMarketplaceRoot: true })),
+}));
+
 vi.mock("../../../components/homepage_components/slider/Slider", () => ({
   __esModule: true,
   default: () => <div>Hero Slider</div>,

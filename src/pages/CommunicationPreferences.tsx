@@ -2,7 +2,7 @@ import React from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { Link } from "react-router-dom";
 import { buildApiUrl, getApiHeaders } from "@/api/client";
-import { getContactEmail, getWhatsAppLink } from "@/config/contact";
+import { formatDisplayNumber, getContactEmail, getWhatsAppLink } from "@/config/contact";
 import SEO from "@/components/SEO";
 import { getTenantBrandName } from "@/tenant/displayBrand";
 import { messageFromApiResponse } from "@/utils/serverErrorFromResponse";
@@ -80,6 +80,14 @@ export default function CommunicationPreferences() {
   };
 
   if (unsubscribed === "1") {
+    const channelLabel =
+      channel === "whatsapp"
+        ? "WhatsApp"
+        : channel === "sms"
+          ? "SMS"
+          : channel === "email"
+            ? "email"
+            : channel ?? "";
     return (
       <>
       <SEO title={`Preferences updated | ${brandName}`} description={`Marketing preferences for ${brandName} guests.`} />
@@ -88,8 +96,13 @@ export default function CommunicationPreferences() {
           <h1 className="text-xl font-bold text-text-primary mb-3">Preferences updated</h1>
           <p className="text-text-secondary leading-relaxed">
             You have been unsubscribed from marketing messages
-            {channel ? ` on ${channel}` : ""}. Transactional messages about your bookings may still be sent where required.
+            {channelLabel ? ` on ${channelLabel}` : ""}. Transactional messages about your bookings may still be sent where required.
           </p>
+          {channel === "whatsapp" && (
+            <p className="text-text-muted text-sm mt-3 leading-relaxed">
+              This also stops promotional WhatsApp messages and post-stay review requests on WhatsApp.
+            </p>
+          )}
         </div>
       </div>
       </>
@@ -122,23 +135,34 @@ export default function CommunicationPreferences() {
                 />
                 <span>Check-in/check-out reminders</span>
               </label>
-              <label className="flex items-center gap-3 min-h-11 cursor-pointer text-sm text-text-secondary py-1 -my-1">
+              <label className="flex items-start gap-3 min-h-11 cursor-pointer text-sm text-text-secondary py-1 -my-1">
                 <input
                   type="checkbox"
                   checked={form.postStayReviewRequest}
                   onChange={(e) => setForm((f) => ({ ...f, postStayReviewRequest: e.target.checked }))}
-                  className="h-5 w-5 min-h-[24px] min-w-[24px] shrink-0 accent-[color:var(--cta-primary)]"
+                  className="h-5 w-5 min-h-[24px] min-w-[24px] shrink-0 accent-[color:var(--cta-primary)] mt-0.5"
+                  data-testid="whatsapp-messages-toggle"
                 />
-                <span>Post-stay review requests</span>
+                <span>
+                  WhatsApp messages
+                  <span className="block text-text-muted text-xs mt-0.5 leading-snug">
+                    Post-stay review requests and promotional offers on WhatsApp. Turn off to stop all marketing WhatsApp from {brandName}.
+                  </span>
+                </span>
               </label>
-              <label className="flex items-center gap-3 min-h-11 cursor-pointer text-sm text-text-secondary py-1 -my-1">
+              <label className="flex items-start gap-3 min-h-11 cursor-pointer text-sm text-text-secondary py-1 -my-1">
                 <input
                   type="checkbox"
                   checked={form.promotionalOffers}
                   onChange={(e) => setForm((f) => ({ ...f, promotionalOffers: e.target.checked }))}
-                  className="h-5 w-5 min-h-[24px] min-w-[24px] shrink-0 accent-[color:var(--cta-primary)]"
+                  className="h-5 w-5 min-h-[24px] min-w-[24px] shrink-0 accent-[color:var(--cta-primary)] mt-0.5"
                 />
-                <span>Promotional offers</span>
+                <span>
+                  Promotional offers (email &amp; SMS)
+                  <span className="block text-text-muted text-xs mt-0.5 leading-snug">
+                    Deals and seasonal offers by email and SMS. WhatsApp marketing is controlled by the WhatsApp toggle above.
+                  </span>
+                </span>
               </label>
               <button
                 onClick={onSave}
@@ -181,7 +205,7 @@ export default function CommunicationPreferences() {
             rel="noopener noreferrer"
             className="text-brand-primary underline underline-offset-2"
           >
-            {getWhatsAppLink().replace('https://wa.me/', '+91-')}
+            {formatDisplayNumber()}
           </a>{' '}
           or email{' '}
           <a href={`mailto:${getContactEmail()}`} className="text-brand-primary underline underline-offset-2">

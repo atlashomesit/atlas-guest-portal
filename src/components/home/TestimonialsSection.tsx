@@ -45,9 +45,10 @@ const avatarStyle = (index: number): CSSProperties => ({
 });
 
 const StarRow = ({ stars, label }: { stars: number; label?: string }) => (
-  <p
+  <div
     className="flex items-center gap-1 text-lg leading-none"
     style={{ color: "var(--brand-accent, #f08c71)" }}
+    role="img"
     aria-label={label ?? `${stars} out of 5 stars`}
   >
     <span aria-hidden>{"★".repeat(stars)}</span>
@@ -56,7 +57,7 @@ const StarRow = ({ stars, label }: { stars: number; label?: string }) => (
         {"★".repeat(5 - stars)}
       </span>
     ) : null}
-  </p>
+  </div>
 );
 
 const KindWordsHeader = ({ ratingLine, headline }: { ratingLine?: string; headline?: string }) => (

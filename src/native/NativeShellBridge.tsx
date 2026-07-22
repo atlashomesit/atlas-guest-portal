@@ -38,7 +38,7 @@ export default function NativeShellBridge({ authLoading }: NativeShellBridgeProp
 
     void StatusBar.setOverlaysWebView({ overlay: true }).catch(() => {});
     void StatusBar.setStyle({ style: Style.Light }).catch(() => {});
-    void StatusBar.setBackgroundColor({ color: '#c45a3f' }).catch(() => {});
+    void StatusBar.setBackgroundColor({ color: '#b8472f' }).catch(() => {});
   }, []);
 
   useEffect(() => {

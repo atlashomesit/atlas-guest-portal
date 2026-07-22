@@ -39,9 +39,8 @@ import { useBooking } from '../../contexts/BookingContext';
 import { useLocation } from 'react-router-dom';
 import { SearchAvailabilityWidget } from '../../components/availability/SearchAvailabilityWidget';
 import FaqHighlights from '../../components/faq/FaqHighlights';
-import pricingConfig from '../../config/pricing.config';
-import { getEffectiveDiscountPercent } from '../../utils/pricing';
 import { getPublicSiteOrigin } from '../../config/siteOrigin';
+import { buildHomepageJsonLd } from '../../pages/home/homepageJsonLd';
 
 /* ---- Value strip — noir's minimal icon+copy presentation (no bordered card chrome) ---- */
 const NOIR_VALUE_ITEMS = [
@@ -67,16 +66,6 @@ const NOIR_VALUE_ITEMS = [
     },
 ] as const;
 
-const ATLAS_SOCIAL_SAME_AS = [
-    'https://www.facebook.com/profile.php?id=100040632723189',
-    // eslint-disable-next-line atlas-brand/no-atlas-string-leak -- Atlas platform social; guarded by hideAtlasBranding above
-    'https://www.instagram.com/atlashomeskphb/',
-    // eslint-disable-next-line atlas-brand/no-atlas-string-leak -- Atlas platform social; guarded by hideAtlasBranding above
-    'https://x.com/atlashomeskphb',
-    // eslint-disable-next-line atlas-brand/no-atlas-string-leak -- Atlas platform social; guarded by hideAtlasBranding above
-    'https://www.youtube.com/@atlashomestays',
-];
-
 const NoirHome = () => {
     const { pendingScrollTarget, setPendingScrollTarget } = useBooking();
     const location = useLocation();
@@ -87,20 +76,22 @@ const NoirHome = () => {
     const schemaBrandName = getTenantBrandName();
     const schemaLogo = overrides.hideLogo ? undefined : sanitizeGuestImageUrl(overrides.logoUrl ?? tenant?.logoUrl) ?? LOGO_URL;
     const contactEmail = getContactEmail();
-    const penthouse = propertyData.find((property) => property.id === 501);
     const room101Cover = sanitizeGuestImageUrl(propertyData.find((property) => property.id === 101)?.property_img?.[0]);
     const primaryOgImage = room101Cover ?? (!overrides.hideLogo ? LOGO_URL : undefined);
-    const penthouseCover = sanitizeGuestImageUrl(penthouse?.property_img?.[0]) ?? (!overrides.hideLogo ? LOGO_URL : undefined);
-    const effectiveDiscountPercent = getEffectiveDiscountPercent();
-    const penthouseOfferPrice = Math.round(
-        pricingConfig.baseNightlyPriceByUnitType.penthouse * (1 - effectiveDiscountPercent / 100),
-    );
+    const listingAddress = propertyData.find((property) => property.property_location?.trim())?.property_location?.trim();
 
     // Full-bleed hero photo: the same allowlisted, public-read listing photo used by
     // `classic`'s `Slider` — reused verbatim (ADR-0081 D1: never fork imagery/data sourcing),
     // hidden for white-label tenants pending a per-tenant heroImageUrl (RA-006, same rule
     // Slider follows).
     const showAtlasContent = !hideAtlasBranding;
+    /** TASK-5194: white-label tenants must not assert Atlas-performed verification. */
+    const noirValueItems = useMemo(
+        () => (hideAtlasBranding
+            ? NOIR_VALUE_ITEMS.filter((item) => item.heading !== 'Every address, verified')
+            : NOIR_VALUE_ITEMS),
+        [hideAtlasBranding],
+    );
     const heroImageUrl = showAtlasContent ? HERO_IMAGE_URL : '';
     const hasHeroPhoto = Boolean(heroImageUrl.trim());
     const heroPhotoAriaLabel = showAtlasContent
@@ -109,130 +100,19 @@ const NoirHome = () => {
 
     const faqHighlights = getFaqHighlights();
     const canonicalUrl = `${getPublicSiteOrigin()}/`;
-    const homepageJsonLd = useMemo(() => {
-        const organization = {
-            '@context': 'https://schema.org',
-            '@type': 'Organization',
-            name: schemaBrandName,
-            url: canonicalUrl,
-            ...(schemaLogo ? { logo: schemaLogo } : {}),
-            description: hideAtlasBranding
-                ? `Book your stay with ${schemaBrandName}.`
-                : 'Serviced apartments in Hyderabad designed for business travel, family trips, and extended stays.',
-            ...(hideAtlasBranding ? {} : { sameAs: ATLAS_SOCIAL_SAME_AS }),
-            contactPoint: [
-                {
-                    '@type': 'ContactPoint',
-                    telephone: `+91-${CONTACT.business.phone}`,
-                    contactType: 'customer service',
-                    areaServed: 'IN',
-                    availableLanguage: ['English'],
-                },
-            ],
-        };
-
-        const lodgingBusiness = hideAtlasBranding
-            ? null
-            : {
-                '@context': 'https://schema.org',
-                '@type': ['LodgingBusiness', 'Hotel'],
-                name: schemaBrandName,
-                url: canonicalUrl,
-                ...(schemaLogo ? { logo: schemaLogo } : {}),
-                description:
-                    'Serviced apartments in KPHB, Hyderabad with Wi-Fi, parking, and responsive support for business and family stays.',
-                slogan: 'Best price on our website',
-                telephone: `+91-${CONTACT.business.phone}`,
-                email: contactEmail,
-                address: {
-                    '@type': 'PostalAddress',
-                    streetAddress: 'KPHB, Kukatpally',
-                    addressLocality: 'Hyderabad',
-                    addressRegion: 'Telangana',
-                    addressCountry: 'IN',
-                },
-                amenityFeature: [
-                    { '@type': 'LocationFeatureSpecification', name: 'High-speed Wi-Fi', value: true },
-                    { '@type': 'LocationFeatureSpecification', name: 'On-site parking', value: true },
-                    { '@type': 'LocationFeatureSpecification', name: 'Air conditioning', value: true },
-                    { '@type': 'LocationFeatureSpecification', name: 'Work-friendly desks', value: true },
-                ],
-                checkinTime: '14:00',
-                checkoutTime: '11:00',
-                ...(penthouse ? {
-                    makesOffer: {
-                        '@type': 'Offer',
-                        name: 'Best price on our website',
-                        priceCurrency: 'INR',
-                        price: penthouseOfferPrice,
-                        availability: 'https://schema.org/InStock',
-                        url: canonicalUrl,
-                        itemOffered: {
-                            '@type': 'Apartment',
-                            name: `${schemaBrandName} | Penthouse Suite 501`,
-                            description: penthouse.property_description,
-                            ...(penthouseCover ? { image: penthouseCover } : {}),
-                            address: {
-                                '@type': 'PostalAddress',
-                                streetAddress: penthouse.property_location ?? 'KPHB, Kukatpally',
-                                addressLocality: 'Hyderabad',
-                                addressRegion: 'Telangana',
-                                addressCountry: 'IN',
-                            },
-                            occupancy: { '@type': 'QuantitativeValue', maxValue: 6, unitCode: 'C62' },
-                            amenityFeature: [
-                                { '@type': 'LocationFeatureSpecification', name: 'Wi-Fi', value: true },
-                                { '@type': 'LocationFeatureSpecification', name: 'Air conditioning', value: true },
-                                { '@type': 'LocationFeatureSpecification', name: 'Full kitchen', value: true },
-                                { '@type': 'LocationFeatureSpecification', name: 'Workspace', value: true },
-                                { '@type': 'LocationFeatureSpecification', name: 'Swimming pool access', value: true },
-                            ],
-                            offers: {
-                                '@type': 'Offer',
-                                name: `${schemaBrandName} | Penthouse Suite 501 direct offer`,
-                                priceCurrency: 'INR',
-                                price: penthouseOfferPrice,
-                                availability: 'https://schema.org/InStock',
-                                validFrom: new Date().toISOString(),
-                                url: canonicalUrl,
-                                availableAtOrFrom: {
-                                    '@type': 'Place',
-                                    address: {
-                                        '@type': 'PostalAddress',
-                                        streetAddress: penthouse.property_location ?? 'KPHB, Kukatpally',
-                                        addressLocality: 'Hyderabad',
-                                        addressRegion: 'Telangana',
-                                        addressCountry: 'IN',
-                                    },
-                                },
-                            },
-                        },
-                    },
-                } : {}),
-            };
-
-        const faqPage = {
-            '@context': 'https://schema.org',
-            '@type': 'FAQPage',
-            mainEntity: faqHighlights.map((item) => ({
-                '@type': 'Question',
-                name: item.question,
-                acceptedAnswer: { '@type': 'Answer', text: item.answer },
-            })),
-        };
-
-        return lodgingBusiness ? [organization, lodgingBusiness, faqPage] : [organization, faqPage];
-    }, [
-        contactEmail,
-        faqHighlights,
-        penthouse,
-        penthouseCover,
-        penthouseOfferPrice,
-        schemaBrandName,
-        schemaLogo,
-        canonicalUrl,
-        hideAtlasBranding,
-    ]);
+    const homepageJsonLd = useMemo(
+        () =>
+            buildHomepageJsonLd({
+                schemaBrandName,
+                schemaLogo,
+                canonicalUrl,
+                contactEmail,
+                hideAtlasBranding,
+                faqHighlights,
+                listingAddress,
+            }),
+        [schemaBrandName, schemaLogo, canonicalUrl, contactEmail, hideAtlasBranding, faqHighlights, listingAddress],
+    );
 
     useEffect(() => {
         trackEvent('home_view', { surface: 'home', listings: propertyData.length });
@@ -302,7 +182,7 @@ const NoirHome = () => {
                         <p className="noir-hero-sub">
                             {showAtlasContent
                                 ? 'Owner-run homes in KPHB, kept immaculate and always ready — book direct, arrive to a home that is genuinely yours for the night.'
-                                : `Direct from the owner — no platform fee, verified addresses, and responsive support from ${schemaBrandName}.`}
+                                : `Direct from the owner — no platform fee and responsive support from ${schemaBrandName}.`}
                         </p>
                         <div id="search-form" data-testid="hero-widget" className="noir-hero-widget">
                             <SearchAvailabilityWidget />
@@ -319,7 +199,7 @@ const NoirHome = () => {
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
                         <h2 id="noir-why-direct-heading" className="sr-only">Why book direct</h2>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                            {NOIR_VALUE_ITEMS.map((item) => (
+                            {noirValueItems.map((item) => (
                                 <div key={item.heading} className="noir-value-item">
                                     <span className="noir-value-icon" aria-hidden="true">{item.icon}</span>
                                     <h3 className="noir-value-heading">{item.heading}</h3>

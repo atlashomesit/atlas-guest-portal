@@ -31,14 +31,14 @@
   white-space: nowrap;
 }
 .bc-chip:hover {
-  border-color: var(--brand-primary, #c45a3f);
-  color: var(--brand-primary, #c45a3f);
+  border-color: var(--brand-primary, #b8472f);
+  color: var(--brand-primary, #b8472f);
   background: var(--bg-primary, #fff8e7);
 }
 .bc-chip-active {
   background: var(--brand-soft, #ffe4d6);
   border-color: var(--brand-soft, #ffe4d6);
-  color: var(--brand-primary, #c45a3f);
+  color: var(--brand-primary, #b8472f);
 }
 
 /* Nav header */
@@ -63,8 +63,8 @@
   transition: all 160ms ease;
 }
 .bc-nav-btn:hover:not(:disabled) {
-  border-color: var(--brand-primary, #c45a3f);
-  color: var(--brand-primary, #c45a3f);
+  border-color: var(--brand-primary, #b8472f);
+  color: var(--brand-primary, #b8472f);
 }
 .bc-nav-btn:disabled {
   opacity: 0.35;
@@ -145,7 +145,7 @@
   bottom: 4px;
   left: 4px;
   right: 4px;
-  background: var(--brand-primary, #c45a3f);
+  background: var(--brand-primary, #b8472f);
   border-radius: 14px;
   z-index: 1;
   box-shadow: 0 4px 10px rgba(196, 90, 63, 0.22);
@@ -218,7 +218,7 @@
   width: 4px;
   height: 4px;
   border-radius: 50%;
-  background: var(--brand-primary, #c45a3f);
+  background: var(--brand-primary, #b8472f);
 }
 
 /* Turnover — subtle amber dot top-right */
@@ -305,7 +305,7 @@
     var(--hatch-ink, rgba(26, 26, 46, 0.06)) 4px);
   border-color: var(--border-subtle, #f0ddd0);
 }
-.bc-sw-selected { background: var(--brand-primary, #c45a3f); }
+.bc-sw-selected { background: var(--brand-primary, #b8472f); }
 
 /* === Popover wrapper =================================================== */
 .bc-popover-overlay {
@@ -368,7 +368,7 @@
   font-family: inherit;
   transition: border 160ms ease;
 }
-.bw-guests-trigger:hover { border-color: var(--brand-primary, #c45a3f); }
+.bw-guests-trigger:hover { border-color: var(--brand-primary, #b8472f); }
 .bw-guests-label {
   font-size: 12px;
   font-weight: 500;
@@ -427,8 +427,8 @@
   transition: all 140ms ease;
 }
 .bw-counter-btn:hover:not(:disabled) {
-  border-color: var(--brand-primary, #c45a3f);
-  color: var(--brand-primary, #c45a3f);
+  border-color: var(--brand-primary, #b8472f);
+  color: var(--brand-primary, #b8472f);
 }
 .bw-counter-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 .bw-counter-val {

@@ -206,7 +206,7 @@ function getPpCancellationInfo(
   };
 }
 
-const PP_REVIEW_BG_COLORS = ['#4a3535', '#f08c71', '#c45a3f', '#94755b', '#e9f5ef'];
+const PP_REVIEW_BG_COLORS = ['#4a3535', '#f08c71', '#b8472f', '#94755b', '#e9f5ef'];
 const PP_REVIEW_TEXT_COLORS = ['#fff8e7', '#4a3535', '#fff8e7', '#fff8e7', '#157046'];
 
 /** Shown while listing data is resolving (incl. API fallback). Matches loaded page layout for perceived performance. */
@@ -1712,13 +1712,6 @@ useEffect(() => {
                       <li>
                         <PpCheckIcon size={16} />
                         <span>
-                          <b>Photos and basic details reviewed.</b>
-                          <span className="pp-meta">Listings are reviewed for photos and basic details before going live.</span>
-                        </span>
-                      </li>
-                      <li>
-                        <PpCheckIcon size={16} />
-                        <span>
                           <b>Direct booking — no middlemen.</b>
                           <span className="pp-meta">You pay the host directly via Razorpay.</span>
                         </span>
@@ -1727,8 +1720,7 @@ useEffect(() => {
                         <li>
                           <PpCheckIcon size={16} />
                           <span>
-                            <b>Listed at the address on the map.</b>
-                            <span className="pp-meta">The location pin matches the address shown on this page.</span>
+                            <b>Map location provided by the host.</b>
                           </span>
                         </li>
                       ) : null}
@@ -2157,7 +2149,7 @@ useEffect(() => {
               {/* ===== RIGHT COLUMN — sticky booking ===== */}
               <aside className="pp-booking-col" aria-label="Booking">
                 {galleryUrls.length > 0 && (
-                  <p style={{ fontSize: 13, color: 'var(--text-muted, #6b5a55)', marginBottom: 8 }} aria-label="Photo count">
+                  <p style={{ fontSize: 13, color: 'var(--text-muted, #6b5a55)', marginBottom: 8 }}>
                     {galleryUrls.length} photo{galleryUrls.length !== 1 ? 's' : ''}
                   </p>
                 )}
@@ -2238,10 +2230,7 @@ useEffect(() => {
                     <ShieldCheck className="pp-trust-ic" size={18} aria-hidden="true" />
                     <div>
                       <div className="pp-trust-t">
-                        {ppHasOnlinePayment ? `Verified home · Instant book` : `Verified home · Host-confirmed booking`}
-                      </div>
-                      <div className="pp-trust-s">
-                        Listing details and photos reviewed by {ppBrandName} before going live.
+                        {ppHasOnlinePayment ? `Instant book` : `Host-confirmed booking`}
                       </div>
                     </div>
                   </div>
