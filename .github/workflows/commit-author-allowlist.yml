@@ -3,9 +3,9 @@
 # Founder-approved 2026-07-08 (interactive session). GHA-COST-APPROVED: 360
 name: Author email allowlist
 
+# Trigger scope aligned to the 2026-07-20 cost review (PR-only; the push run
+# re-checked commits the PR run had already cleared at a 1-min billed minimum).
 on:
-  push:
-    branches: [dev]
   pull_request:
     branches: [dev, main]
 
@@ -21,7 +21,15 @@ jobs:
       - uses: actions/github-script@v7
         with:
           script: |
-            const ALLOW = /^(sreekaratla81|sreekar\.atla|atlashomesit|noreply|150553417\+sreekaratla81|udaykumar\.ragipindi)@.*$/;
+            // atlashomesit is the org-owner / PR-merge service account. Its role is
+            // MERGING, never authoring: allowed on PRs into main (dev->main promotion
+            // carries dev history incl. its merge commits) but denied on PRs into dev —
+            // authored work must be attributable to a person (TASK-5348; 8
+            // mis-attributed feature commits landed 2026-07-10..22 under it).
+            // \d+\+atlashomesit covers its noreply form once email privacy is on.
+            const ALLOW = /^(sreekaratla81|sreekar\.atla|noreply|150553417\+sreekaratla81|udaykumar\.ragipindi|sidharthyennawar|\d+\+atlashomesit)@.*$/;
+            const SHARED_OWNER = /^atlashomesit@/;
+            const baseRef = context.payload.pull_request?.base?.ref || '';
             let commits = [];
             if (context.eventName === 'pull_request') {
               commits = await github.paginate(github.rest.pulls.listCommits, {
@@ -52,6 +60,11 @@ jobs:
                 const email = c.commit?.[who]?.email || '';
                 // GitHub's web-flow committer signs merge/squash commits made in the UI
                 if (email === 'noreply@github.com') continue;
+                if (SHARED_OWNER.test(email)) {
+                  if (baseRef === 'main') continue; // dev->main promotion: merge-role sanctioned (founder 2026-07-24)
+                  denied.push(`SHARED-ACCOUNT-DENIED: ${c.sha} ${who}=${email} — atlashomesit never authors; set your own git identity (atlas-e2e/docs/governance/COMMIT-IDENTITY.md)`);
+                  continue;
+                }
                 if (!ALLOW.test(email)) denied.push(`AUTHOR-DENIED: ${c.sha} ${who}=${email}`);
               }
             }
