@@ -41,7 +41,6 @@ import SinglePinGoogleMap from '../../map/SinglePinGoogleMap';
 import { selectPropertyMapMode } from './propertyMapMode';
 import { buildApiUrl, getApiHeaders } from '../../../api/client';
 import { addRecentlyViewed, isFavorite, toggleFavorite } from '../../../utils/guestHistory';
-import { formatCurrency } from '../../../utils/formatting';
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
 import SkeletonCard from '../../apartments/SkeletonCard';
 import PropertyMobileStickyBar from '@/components/property/PropertyMobileStickyBar';

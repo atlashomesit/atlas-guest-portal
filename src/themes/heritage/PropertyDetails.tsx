@@ -57,7 +57,6 @@ import SinglePinGoogleMap from '@/components/map/SinglePinGoogleMap';
 import { selectPropertyMapMode } from '@/components/homepage_components/homepage_Propertydetails/propertyMapMode';
 import { buildApiUrl, getApiHeaders } from '@/api/client';
 import { addRecentlyViewed, isFavorite, toggleFavorite } from '@/utils/guestHistory';
-import { formatCurrency } from '@/utils/formatting';
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
 import SkeletonCard from '@/components/apartments/SkeletonCard';
 import PropertyMobileStickyBar from '@/components/property/PropertyMobileStickyBar';
