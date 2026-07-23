@@ -44,6 +44,8 @@ import { addRecentlyViewed, isFavorite, toggleFavorite } from '../../../utils/gu
 import { formatCurrency } from '../../../utils/formatting';
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
 import SkeletonCard from '../../apartments/SkeletonCard';
+import PropertyMobileStickyBar from '@/components/property/PropertyMobileStickyBar';
+import type { BookingStickySummary } from '@/components/availability/UnitBookingWidget';
 
 const UnitBookingWidget = lazy(() => import('../../availability/UnitBookingWidget'));
 const AvailabilityCalendar = lazy(() => import('../../AvailabilityCalendar'));
@@ -304,6 +306,7 @@ interface Property {
     hostPhone?: string | null;
     /** TASK-2907: property owner / host display name from listing API */
     hostName?: string | null;
+    hostAbout?: string | null;
     /** Street-level address from API (TASK-1896); may be null if host chose not to expose pre-booking */
     propertyAddress?: string | null;
     /** Legacy / alternate JSON key for same */
@@ -464,6 +467,7 @@ const PropertyDetails = () => {
     const [showAmenitiesModal, setShowAmenitiesModal] = useState(false);
     const [showAboutMore, setShowAboutMore] = useState(false);
     const [showAllReviews, setShowAllReviews] = useState(false);
+    const [stickyBookingSummary, setStickyBookingSummary] = useState<BookingStickySummary | null>(null);
     const unitType = inferUnitType({ id: data?.id, property_name: data?.property_name });
     const { setProperty, updateBooking } = useBooking();
     const [searchParams] = useSearchParams();
@@ -936,6 +940,10 @@ const PropertyDetails = () => {
                             const raw = (apiListing as Record<string, unknown>).hostName ?? (apiListing as Record<string, unknown>).HostName;
                             return typeof raw === 'string' && raw.trim() ? raw.trim() : null;
                         })(),
+                        hostAbout: (() => {
+                            const raw = (apiListing as Record<string, unknown>).hostAbout ?? (apiListing as Record<string, unknown>).HostAbout;
+                            return typeof raw === 'string' && raw.trim() ? raw.trim() : null;
+                        })(),
                         amenityCodes: (() => {
                             const raw = (apiListing as Record<string, unknown>).amenityCodes;
                             if (Array.isArray(raw)) return raw.filter((c): c is string => typeof c === 'string');
@@ -1307,6 +1315,7 @@ useEffect(() => {
     const ppHideAtlasBranding = shouldHideAtlasBranding(ppTenantCtx, ppTenantOverrides);
     const ppBrandName = getTenantBrandName();
     const ppHasRealHost = !!data.hostName?.trim();
+    const ppHostAbout = data.hostAbout?.trim() ?? '';
     // TASK-4311: On the marketplace, check for ?tenant=TenantName query param to show the actual listing's tenant
     const tenantNameFromUrl = searchParams.get('tenant')?.trim();
     const ppHostDisplayName = ppHasRealHost
@@ -1768,16 +1777,15 @@ useEffect(() => {
                       margin: 0,
                     }}
                   >
-                    "We keep this home ready ourselves — come in, settle down, and
-                    message us any time. We're never more than a WhatsApp away."
+                    {ppHostAbout
+                      ? ppHostAbout
+                      : 'Your host has not added a personal note for this listing yet.'}
                   </blockquote>
-                  {/* WCAG AA: this panel's background is the fixed lavender-soft surface (not
-                      theme-driven), so it must use --lavender-text (contrast-validated against
-                      #f0eafd at 4.83:1 in default.css), not the per-preset --text-muted — mirrors
-                      the identical host-note fix in Home.tsx (text-muted-inherited-surface-contrast.test.ts). */}
-                  <p style={{ marginTop: 10, fontSize: 13, color: 'var(--lavender-text, #6f5aa8)' }}>
-                    — {ppHasRealHost ? `${ppHostDisplayName}, your host` : `The ${ppBrandName} host team`}
-                  </p>
+                  {ppHostAbout && ppHasRealHost ? (
+                    <p style={{ marginTop: 10, fontSize: 13, color: 'var(--lavender-text, #6f5aa8)' }}>
+                      — {ppHostDisplayName}, your host
+                    </p>
+                  ) : null}
                 </div>
 
                 {/* About this home */}
@@ -2198,6 +2206,7 @@ useEffect(() => {
                         cancellationTier={data.cancellationTier ?? null}
                         cancellationWindowHours={data.cancellationWindowHours ?? null}
                         graceHours={data.graceHours ?? null}
+                        onStickySummaryChange={setStickyBookingSummary}
                       />
                     </Suspense>
 
@@ -2212,7 +2221,7 @@ useEffect(() => {
                       }} data-testid="save-vs-ota-delta">
                         <div style={{ fontSize: 14, fontWeight: 600, color: '#157046', display: 'flex', alignItems: 'center', gap: 6 }}>
                           <span>💰</span>
-                          <span>Save ~₹{Math.round(data.property_price * 2 * 0.15).toLocaleString('en-IN')} by booking directly</span>
+                          <span>Save ~₹{Math.round(data.property_price * 2 * 0.155).toLocaleString('en-IN')} by booking directly</span>
                         </div>
                         <div style={{ fontSize: 12, color: '#157046', marginTop: 4 }}>
                           vs OTA platforms that charge 15–18%
@@ -2348,37 +2357,16 @@ useEffect(() => {
 
           {/* Mobile sticky CTA — TASK-5192: any non-bookable status (Draft/Archived/Unlisted)
               shows a notice instead of price + Reserve (sidebar already uses ppIsBookable). */}
-          {!ppIsBookable ? (
-            <div
-              className="pp-m-sticky"
-              aria-label="Listing not yet available for booking"
-              data-testid="mobile-draft-notice"
-            >
-              <div className="pp-m-sticky-price" style={{ color: 'var(--text-muted, #6b5a55)' }}>
-                <b style={{ fontWeight: 600 }}>Not yet available</b>
-                <span>for booking</span>
-              </div>
-            </div>
-          ) : (
-            <div className="pp-m-sticky" aria-label="Book this property" data-testid="mobile-reserve-bar">
-              <div className="pp-m-sticky-price">
-                <b>{directBookingNightlyIsSynthetic ? 'from ' : ''}{formatCurrency(ppStickyNightly, { maximumFractionDigits: 0 })}</b>
-                <span>/ night</span>
-                <span className="pp-m-sticky-taxes">+ taxes &amp; fees</span>
-              </div>
-              <button
-                type="button"
-                className="pp-btn pp-btn-primary pp-m-sticky-cta"
-                onClick={() => {
-                  const widget = document.querySelector('[data-testid="guest-booking-form"]');
-                  widget?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }}
-                aria-label="Scroll to booking form"
-              >
-                Reserve
-              </button>
-            </div>
-          )}
+          <PropertyMobileStickyBar
+            bookable={ppIsBookable}
+            nightlyFallback={ppStickyNightly}
+            nightlyIsSynthetic={directBookingNightlyIsSynthetic}
+            summary={stickyBookingSummary}
+            onReserveClick={() => {
+              const widget = document.querySelector('[data-testid="guest-booking-form"]');
+              widget?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }}
+          />
 
         </div>
         {/* ===== END pp-root ===== */}

@@ -208,9 +208,13 @@ export default function MyBookingsPage() {
             secondaryActions={hasHostContact() ? [{ label: "Call us to find a booking", href: getTelLink() }] : []}
           />
         ) : filteredBookings.length === 0 ? (
-          <div className="rounded-xl border border-border-subtle bg-bg-muted/40 px-4 py-6 text-center text-sm text-text-secondary">
-            No {tab === "upcoming" ? "upcoming" : tab === "past" ? "past" : "cancelled"} bookings in this view.
-          </div>
+          <StateMessage
+            data-testid="my-bookings-filter-empty"
+            icon="🔍"
+            title={`No ${tab === "upcoming" ? "upcoming" : tab === "past" ? "past" : "cancelled"} bookings`}
+            message="Try another tab to see bookings in a different stage."
+            primaryAction={{ label: tab === "upcoming" ? "View past stays" : "View upcoming", onClick: () => setTab(tab === "upcoming" ? "past" : "upcoming") }}
+          />
         ) : (
           <div className="space-y-3">
             {filteredBookings.map((b) => {

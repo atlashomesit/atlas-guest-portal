@@ -7,6 +7,14 @@ Approved workflows are listed in `atlas-e2e/docs/governance/APPROVED-WORKFLOWS.m
 If a task needs a new workflow, stop — add it to MANUAL-DEVELOPER-BACKLOG.md and wait
 for Sreekar's approval. Violations will be reverted.
 
+## HARD RULE — Shift-left (amended 2026-07-22) / Verification (HARD RULE 13 + 6)
+
+> **Shift-left (HARD RULE 13, amended 2026-07-22):** Any new or materially changed user-facing behavior (endpoint, page, or interaction: gesture, scroll-load, drag) requires E2E coverage in the same push, exercising every input modality the surface supports. This applies to every route into `dev` — PR or direct push.
+>
+> **Verification (HARD RULE 6, amended):** "Verified live" must exercise the input modality the change targets.
+
+Mechanical enforcement: `atlas-e2e/interaction-surfaces.json` + `atlas-e2e/scripts/check-surface-test-delta.mjs` (ADR-0087).
+
 ## HARD RULE — Theme ≠ integration (Sreekar-approved 2026-07-17, canonical for ALL changes to this repo)
 
 **A theme change changes theme content only — never the Atlas PMS integration.** Two directions, both binding:

@@ -12,6 +12,10 @@ cd atlas-e2e; npm run release-gate
 
 This is the **single pre-commit gate** for all repos. It runs lint, build, unit tests, integration tests, migrations, smoke curls, and Playwright E2E across all four repos. See [atlas-e2e/docs/PROD_READINESS_CHECKLIST.md](../atlas-e2e/docs/PROD_READINESS_CHECKLIST.md) for the full 16-gate DevSecOps mapping.
 
+## Shift-left (HARD RULE 13 + 6, amended 2026-07-22)
+
+Any new or materially changed user-facing behavior requires E2E coverage in the same push, exercising every input modality the surface supports. Full rule text: [`AGENTS.md`](./AGENTS.md) · [`atlas-e2e/interaction-surfaces.json`](../atlas-e2e/interaction-surfaces.json) (ADR-0087).
+
 ## Branching Model
 - **Branch from `dev`**, not `main`. `main` is the prod-deploy branch and may only receive commits via a PR from `dev`. See [workspace branch policy](../atlas-e2e/docs/POLICY-BRANCH-AND-DEPLOY.md).
 - Create feature branches from `dev` using the convention `feature/<short-description>`. Use `fix/`, `docs/`, or `chore/` prefixes for bug fixes, documentation updates, and tooling work.

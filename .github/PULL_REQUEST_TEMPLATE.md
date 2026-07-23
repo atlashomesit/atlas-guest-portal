@@ -16,6 +16,7 @@
 - [ ] Lint, build, and tests pass locally (`npm run lint`, `npm run build`, `npm test`)
 - [ ] **CI** workflow (`.github/workflows/ci.yml`) must pass before merge
 - [ ] See [CONTRIBUTING.md](CONTRIBUTING.md) for the full PR checklist
+- [ ] **Irreversible step?** Migrations / financial backfills / tenant archival → state **irreversible: yes/no** + rollback plan in the PR description.
 - [ ] No secrets or env files committed
 
 ---

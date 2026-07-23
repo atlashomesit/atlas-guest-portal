@@ -10,6 +10,7 @@ import { buildWaLink, defaultPrefill } from "../utils/whatsapp";
 import { resetCookieConsent } from "../utils/cookieConsent";
 import { MARKETPLACE_BRAND_BASELINE, getTenantBrandName } from "../tenant/displayBrand";
 import { getTenantContext } from "../tenant/tenantContext";
+import { buildApiUrl, getApiHeaders } from "../api/client";
 
 /**
  * RA-006 §3.5: substitute the baseline notice's marketplace brand / "atlashomestays.com" /
@@ -31,6 +32,12 @@ const PrivacyPage = () => {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [revoked, setRevoked] = useState(false);
+  const [grievanceCategory, setGrievanceCategory] = useState("access");
+  const [grievanceEmail, setGrievanceEmail] = useState("");
+  const [grievanceDescription, setGrievanceDescription] = useState("");
+  const [grievanceSubmitting, setGrievanceSubmitting] = useState(false);
+  const [grievanceTicket, setGrievanceTicket] = useState<string | null>(null);
+  const [grievanceError, setGrievanceError] = useState<string | null>(null);
 
   // Build the active legal pack from server-provided values, falling back to the
   // Baseline notice names MARKETPLACE_BRAND_BASELINE. Empty/missing fields can't be
@@ -85,6 +92,38 @@ const PrivacyPage = () => {
     resetCookieConsent();
     setRevoked(true);
     setTimeout(() => setRevoked(false), 4000);
+  };
+
+  const handleSubmitGrievance = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setGrievanceError(null);
+    setGrievanceTicket(null);
+    if (!grievanceEmail.trim() || !grievanceDescription.trim()) {
+      setGrievanceError("Please enter your email and a description of your grievance.");
+      return;
+    }
+    setGrievanceSubmitting(true);
+    try {
+      const res = await fetch(buildApiUrl("/api/grievances"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json", ...getApiHeaders() },
+        body: JSON.stringify({
+          category: grievanceCategory,
+          submitterEmail: grievanceEmail.trim(),
+          description: grievanceDescription.trim(),
+        }),
+      });
+      const data = (await res.json()) as { ticketReference?: string; error?: string };
+      if (!res.ok) {
+        throw new Error(data.error ?? "Could not submit grievance.");
+      }
+      setGrievanceTicket(data.ticketReference ?? "Submitted");
+      setGrievanceDescription("");
+    } catch (err) {
+      setGrievanceError(err instanceof Error ? err.message : "Could not submit grievance.");
+    } finally {
+      setGrievanceSubmitting(false);
+    }
   };
 
   const sectionNav = filteredSections.map((section) => ({ id: section.id, label: section.title }));
@@ -268,30 +307,96 @@ const PrivacyPage = () => {
           </div>
 
           <div className="bg-gradient-to-r from-primary/90 to-primary text-[var(--text-contrast)] rounded-2xl p-6 shadow-level2">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex flex-col gap-6">
               <div>
-                <h3 className="text-xl font-bold">Have a privacy question?</h3>
-                <p className="text-[color-mix(in_srgb,var(--text-contrast)_90%,transparent)]">
-                  Contact our Grievance Officer — we respond within 72 hours.
+                <h3 className="text-xl font-bold">File a data protection grievance</h3>
+                <p className="text-[color-mix(in_srgb,var(--text-contrast)_90%,transparent)] mt-1">
+                  We acknowledge grievances within 72 hours and aim to resolve them within 90 days under the DPDP Act.
+                  You will receive a ticket reference immediately after submitting this form.
                 </p>
               </div>
-              <div className="flex flex-wrap gap-3">
-                <a
-                  href={`mailto:${pack.contactEmail}`}
-                  aria-label={`Email ${pack.legalName} Grievance Officer at ${pack.contactEmail}`}
-                  className="inline-flex min-h-11 items-center gap-2 px-4 py-3 bg-bg-surface text-primary font-semibold rounded-xl shadow-level1 hover:shadow-level2"
-                >
-                  Email Grievance Officer
-                </a>
-                <a
-                  href={whatsappLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={`Contact ${pack.legalName} on WhatsApp`}
-                  className="inline-flex min-h-11 items-center gap-2 px-4 py-3 bg-bg-surface text-primary font-semibold rounded-xl shadow-level1 hover:shadow-level2"
-                >
-                  Message on WhatsApp
-                </a>
+              <form onSubmit={handleSubmitGrievance} className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-bg-surface/10 rounded-xl p-4">
+                <label className="flex flex-col gap-1 text-sm">
+                  <span className="font-semibold text-[var(--text-contrast)]">Category</span>
+                  <select
+                    value={grievanceCategory}
+                    onChange={(e) => setGrievanceCategory(e.target.value)}
+                    className="min-h-11 rounded-xl border border-border-subtle px-3 text-text-primary bg-bg-surface"
+                  >
+                    <option value="access">Access my data</option>
+                    <option value="correction">Correct my data</option>
+                    <option value="erasure">Erase my data</option>
+                    <option value="consent">Consent / marketing</option>
+                    <option value="other">Other</option>
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1 text-sm">
+                  <span className="font-semibold text-[var(--text-contrast)]">Your email</span>
+                  <input
+                    type="email"
+                    required
+                    value={grievanceEmail}
+                    onChange={(e) => setGrievanceEmail(e.target.value)}
+                    className="min-h-11 rounded-xl border border-border-subtle px-3 text-text-primary bg-bg-surface"
+                    placeholder="you@example.com"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-sm md:col-span-2">
+                  <span className="font-semibold text-[var(--text-contrast)]">Describe your grievance</span>
+                  <textarea
+                    required
+                    rows={4}
+                    value={grievanceDescription}
+                    onChange={(e) => setGrievanceDescription(e.target.value)}
+                    className="rounded-xl border border-border-subtle px-3 py-2 text-text-primary bg-bg-surface"
+                    placeholder="Tell us what happened and what you need us to do."
+                  />
+                </label>
+                <div className="md:col-span-2 flex flex-wrap items-center gap-3">
+                  <button
+                    type="submit"
+                    disabled={grievanceSubmitting}
+                    className="inline-flex min-h-11 items-center px-4 py-3 bg-bg-surface text-primary font-semibold rounded-xl shadow-level1 hover:shadow-level2 disabled:opacity-60"
+                  >
+                    {grievanceSubmitting ? "Submitting…" : "Submit grievance"}
+                  </button>
+                  {grievanceTicket && (
+                    <span className="text-sm font-semibold" role="status" aria-live="polite">
+                      Ticket reference: {grievanceTicket}
+                    </span>
+                  )}
+                  {grievanceError && (
+                    <span className="text-sm font-semibold text-red-100" role="alert">
+                      {grievanceError}
+                    </span>
+                  )}
+                </div>
+              </form>
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-t border-[color-mix(in_srgb,var(--text-contrast)_25%,transparent)] pt-4">
+                <div>
+                  <h4 className="text-lg font-bold">Prefer email or WhatsApp?</h4>
+                  <p className="text-[color-mix(in_srgb,var(--text-contrast)_90%,transparent)] text-sm">
+                    You can still reach our Grievance Officer directly — acknowledgement within 72 hours.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  <a
+                    href={`mailto:${pack.contactEmail}`}
+                    aria-label={`Email ${pack.legalName} Grievance Officer at ${pack.contactEmail}`}
+                    className="inline-flex min-h-11 items-center gap-2 px-4 py-3 bg-bg-surface text-primary font-semibold rounded-xl shadow-level1 hover:shadow-level2"
+                  >
+                    Email Grievance Officer
+                  </a>
+                  <a
+                    href={whatsappLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`Contact ${pack.legalName} on WhatsApp`}
+                    className="inline-flex min-h-11 items-center gap-2 px-4 py-3 bg-bg-surface text-primary font-semibold rounded-xl shadow-level1 hover:shadow-level2"
+                  >
+                    Message on WhatsApp
+                  </a>
+                </div>
               </div>
             </div>
           </div>
