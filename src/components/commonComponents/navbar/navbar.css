@@ -386,8 +386,8 @@
   max-width: 320px;
   padding: 0.55rem 1rem;
   border-radius: 999px;
-  border: 1px solid rgba(220, 210, 200, 0.55);
-  background: rgba(255, 250, 245, 0.95);
+  border: 1px solid var(--navbar-search-pill-border, rgba(220, 210, 200, 0.55));
+  background: var(--navbar-search-pill-bg, rgba(255, 250, 245, 0.95));
   text-decoration: none;
   color: inherit;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
