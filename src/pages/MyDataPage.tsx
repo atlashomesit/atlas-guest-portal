@@ -61,7 +61,7 @@ export default function MyDataPage() {
     }
   };
 
-  if (loading) return <LoadingState message="Loading your data…" />;
+  if (loading) return <LoadingState kind="spinner" message="Loading your data…" />;
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
