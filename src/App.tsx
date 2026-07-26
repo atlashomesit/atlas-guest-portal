@@ -56,11 +56,11 @@ const BookingConfirmationPage = React.lazy(() => import("./pages/BookingConfirma
 const SelfCheckIn = React.lazy(() => import("./pages/SelfCheckIn")) // TASK-1254
 const ReviewSubmitPage = React.lazy(() => import("./pages/ReviewSubmitPage"))
 const CommunicationPreferences = React.lazy(() => import("./pages/CommunicationPreferences"))
+const MyDataPage = React.lazy(() => import("./pages/MyDataPage"))
 const ProfilePage = React.lazy(() => import("./pages/ProfilePage"))
 const MyBookingsPage = React.lazy(() => import("./pages/MyBookingsPage"))
 const FavoritesPage = React.lazy(() => import("./pages/FavoritesPage"))
 const RecentlyViewedPage = React.lazy(() => import("./pages/RecentlyViewedPage"))
-const PrivacyPolicyPage = React.lazy(() => import("./pages/PrivacyPolicyPage"))
 const CookieConsentBanner = React.lazy(() => import("./components/CookieConsentBanner"))
 const PageNotFound = React.lazy(() => import("./pages/pagenotfound/PageNotFound"))
 const CityLandingPage = React.lazy(() => import("./pages/CityLandingPage"))
@@ -202,8 +202,8 @@ function AppWrapper() {
           <Route path="/blog/:category" element={withBoundary(<Suspense fallback={<LazyFallback />}><BlogCategory /></Suspense>, "blog-category-route")} />
           <Route path="/blog/:category/:slug" element={withBoundary(<Suspense fallback={<LazyFallback />}><BlogPostPage /></Suspense>, "blog-post-route")} />
           <Route path="/policies" element={withBoundary(<Suspense fallback={<LazyFallback />}><Policies /></Suspense>, "policies-route")} />
-          <Route path="/privacy" element={withBoundary(<Suspense fallback={<LazyFallback />}><PrivacyPolicyPage /></Suspense>, "privacy-route")} />
-          <Route path="/privacy-policy" element={withBoundary(<Suspense fallback={<LazyFallback />}><PrivacyPage /></Suspense>, "privacy-policy-legacy-route")} />
+          <Route path="/privacy" element={withBoundary(<Suspense fallback={<LazyFallback />}><PrivacyPage /></Suspense>, "privacy-route")} />
+          <Route path="/privacy-policy" element={withBoundary(<Navigate to="/privacy" replace />, "privacy-policy-redirect-route")} />
           <Route path="/terms" element={withBoundary(<Suspense fallback={<LazyFallback />}><Terms /></Suspense>, "terms-route")} />
           <Route path="/terms-and-conditions" element={withBoundary(<Suspense fallback={<LazyFallback />}><Terms /></Suspense>, "terms-legacy-route")} />
           <Route path="/homes/:propertySlug/:unitSlug" element={withBoundary(<Suspense fallback={<PropertyDetailsLazyFallback />}><Homepage_PropertyDetails /></Suspense>, "property-details-home-route")} />
@@ -217,6 +217,7 @@ function AppWrapper() {
           <Route path="/review/:bookingId" element={withBoundary(<Suspense fallback={<LazyFallback />}><ReviewSubmitPage /></Suspense>, "review-submit-route")} />
           <Route path="/communication-preferences" element={withBoundary(<Suspense fallback={<LazyFallback />}><CommunicationPreferences /></Suspense>, "communication-preferences-route")} />
           <Route path="/preferences/:guestToken" element={withBoundary(<Suspense fallback={<LazyFallback />}><CommunicationPreferences /></Suspense>, "communication-preferences-token-route")} />
+          <Route path="/my-data/:guestToken" element={withBoundary(<Suspense fallback={<LazyFallback />}><MyDataPage /></Suspense>, "my-data-route")} />
           <Route path="/profile" element={withBoundary(<Suspense fallback={<LazyFallback />}><ProfilePage /></Suspense>, "profile-route")} />
           <Route path="/my-bookings" element={withBoundary(<Suspense fallback={<LazyFallback />}><MyBookingsPage /></Suspense>, "my-bookings-route")} />
           {/* TASK-4283: /bookings used to hit the catch-all "Link not found" — alias it to /my-bookings. */}

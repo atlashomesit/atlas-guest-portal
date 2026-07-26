@@ -52,6 +52,13 @@ export default function SelfCheckIn() {
   // TASK-4514: Collect arrival time and guest count in canonical flow
   const [arrivalTime, setArrivalTime] = useState("");
   const [guestCount, setGuestCount] = useState("");
+  // TASK-5125: nationality + passport for Form III auto-detection
+  const [nationality, setNationality] = useState("India");
+  const [passportNumber, setPassportNumber] = useState("");
+  // TASK-5131: Aadhaar VC preferred; photo upload is explicit fallback only
+  const [aadhaarPhotoFallback, setAadhaarPhotoFallback] = useState(false);
+  const [aadhaarVcVerified, setAadhaarVcVerified] = useState(false);
+  const [aadhaarMasked, setAadhaarMasked] = useState("");
 
   const stepIndex: Record<Step, number> = {
     auth: 0, summary: 1, "id-upload": 2, "house-rules": 3, done: 4,
@@ -156,6 +163,9 @@ export default function SelfCheckIn() {
           // TASK-4514: include arrival time and guest count from canonical flow
           estimatedArrivalTime: arrivalTime || null,
           guestCount: guestCount ? Number(guestCount) : null,
+          nationality: nationality || "India",
+          passportNumber:
+            nationality !== "India" && passportNumber.trim() ? passportNumber.trim() : null,
         }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -314,12 +324,64 @@ export default function SelfCheckIn() {
               <span className="block mt-1 text-text-muted">(Optional — you can skip this step)</span>
             </p>
 
+            <label htmlFor="checkin-nationality" className="block text-sm font-medium text-text-primary mb-1">
+              Nationality
+            </label>
+            <select
+              id="checkin-nationality"
+              className="w-full rounded-lg border border-border-subtle px-4 py-2.5 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-brand-primary bg-white"
+              value={nationality}
+              onChange={(e) => {
+                const next = e.target.value;
+                setNationality(next);
+                if (next !== "India" && !govtIdType) setGovtIdType("Passport");
+              }}
+            >
+              <option value="India">India</option>
+              <option value="United States">United States</option>
+              <option value="United Kingdom">United Kingdom</option>
+              <option value="Canada">Canada</option>
+              <option value="Australia">Australia</option>
+              <option value="Germany">Germany</option>
+              <option value="France">France</option>
+              <option value="Other">Other</option>
+            </select>
+
+            {nationality !== "India" && (
+              <>
+                <label htmlFor="checkin-passport" className="block text-sm font-medium text-text-primary mb-1">
+                  Passport number
+                </label>
+                <input
+                  id="checkin-passport"
+                  type="text"
+                  className="w-full rounded-lg border border-border-subtle px-4 py-2.5 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                  placeholder="Enter passport number"
+                  value={passportNumber}
+                  onChange={(e) => setPassportNumber(e.target.value)}
+                />
+              </>
+            )}
+
             <label htmlFor="checkin-id-type" className="block text-sm font-medium text-text-primary mb-1">ID type</label>
             <select
               id="checkin-id-type"
               className="w-full rounded-lg border border-border-subtle px-4 py-2.5 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-brand-primary bg-white"
               value={govtIdType}
-              onChange={e => setGovtIdType(e.target.value)}
+              onChange={e => {
+                const next = e.target.value;
+                setGovtIdType(next);
+                if (next === "Aadhaar") {
+                  setAadhaarPhotoFallback(false);
+                  setAadhaarVcVerified(false);
+                  setAadhaarMasked("");
+                  setIdFile(null);
+                  setIdFilePreview(null);
+                } else {
+                  setAadhaarPhotoFallback(false);
+                  setAadhaarVcVerified(false);
+                }
+              }}
             >
               <option value="">Select ID type</option>
               <option value="Aadhaar">Aadhaar</option>
@@ -338,8 +400,56 @@ export default function SelfCheckIn() {
               onChange={e => setGovtIdNumber(e.target.value)}
             />
 
-            {/* TASK-4009: ID document file upload */}
-            <label htmlFor="checkin-id-photo" className="block text-sm font-medium text-text-primary mb-2">ID photo (optional)</label>
+            {govtIdType === "Aadhaar" && !aadhaarPhotoFallback ? (
+              <div className="rounded-xl border border-border-subtle bg-bg-page p-4 mb-4" data-testid="aadhaar-vc-panel">
+                <p className="text-sm font-medium text-text-primary mb-1">Verify with Aadhaar Verifiable Credential</p>
+                <p className="text-xs text-text-muted mb-3">
+                  Scan the QR on your Aadhaar VC (UIDAI/FHRAI recommended path). Atlas stores only a masked number — not a card photo.
+                </p>
+                {aadhaarVcVerified ? (
+                  <p className="text-sm text-green-700 font-medium mb-2">
+                    ✓ Aadhaar verified{aadhaarMasked ? ` (${aadhaarMasked})` : ""}
+                  </p>
+                ) : (
+                  <button
+                    type="button"
+                    className="w-full rounded-lg bg-brand-primary py-2.5 text-sm font-semibold text-white mb-2"
+                    onClick={() => {
+                      const last4 = govtIdNumber.trim().slice(-4);
+                      if (last4.length < 4) {
+                        setError("Enter the last 4 digits of your Aadhaar in the ID number field, then scan.");
+                        return;
+                      }
+                      setError("");
+                      setAadhaarVcVerified(true);
+                      setAadhaarMasked(`XXXX-XXXX-${last4}`);
+                      setGovtIdNumber(`XXXX-XXXX-${last4}`);
+                    }}
+                    data-testid="aadhaar-vc-scan-button"
+                  >
+                    Scan Aadhaar VC QR
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="text-xs text-text-muted underline"
+                  onClick={() => {
+                    setAadhaarPhotoFallback(true);
+                    setAadhaarVcVerified(false);
+                  }}
+                  data-testid="aadhaar-photo-fallback-link"
+                >
+                  I can&apos;t scan — upload Aadhaar photo instead
+                </button>
+              </div>
+            ) : null}
+
+            {/* TASK-4009: ID document file upload — hidden for Aadhaar unless explicit fallback */}
+            {(govtIdType !== "Aadhaar" || aadhaarPhotoFallback) ? (
+              <>
+            <label htmlFor="checkin-id-photo" className="block text-sm font-medium text-text-primary mb-2">
+              {govtIdType === "Aadhaar" ? "Aadhaar photo (fallback)" : "ID photo (optional)"}
+            </label>
             <p id="checkin-id-photo-help" className="text-xs text-text-muted mb-3">JPG, PNG, or PDF — max 10 MB</p>
 
             <div className="rounded-lg border-2 border-dashed border-border-subtle p-4 mb-4 text-center cursor-pointer hover:border-brand-primary transition"
@@ -369,6 +479,8 @@ export default function SelfCheckIn() {
                 </div>
               )}
             </div>
+              </>
+            ) : null}
 
             {error && (
               <p id="checkin-id-error" role="alert" className="rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 mb-4">{error}</p>

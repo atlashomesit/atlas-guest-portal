@@ -71,7 +71,16 @@ interface UnitBookingWidgetProps {
   cancellationTier?: CancellationTier | null;
   cancellationWindowHours?: number | null;
   graceHours?: number | null;
+  /** DESIGN-003: live total + free-cancel deadline for the mobile sticky bar. */
+  onStickySummaryChange?: (summary: BookingStickySummary) => void;
 }
+
+export type BookingStickySummary = {
+  hasCompleteDates: boolean;
+  totalAmount: number | null;
+  pricingPending: boolean;
+  freeCancelUntil: string | null;
+};
 
 /** Detect network/connection failures (timeout, offline, ECONNREFUSED, etc.). */
 function isNetworkError(error: unknown): boolean {
@@ -140,6 +149,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   cancellationTier: cancellationTierProp,
   cancellationWindowHours: cancellationWindowHoursProp,
   graceHours: graceHoursProp,
+  onStickySummaryChange,
 }) => {
   if (import.meta.env.DEV) {
     console.assert(Boolean(propertyId), '[UnitBookingWidget] propertyId is required for unit mode');
@@ -1174,6 +1184,22 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     calendarOpenPricingPending && lastSettledHeadlineRef.current > 1
       ? lastSettledHeadlineRef.current
       : finalTotal;
+
+  useEffect(() => {
+    onStickySummaryChange?.({
+      hasCompleteDates: hasSelectedRange,
+      totalAmount: hasSelectedRange && displayFinalTotal > 0 ? displayFinalTotal : null,
+      pricingPending: rangePricingPending || calendarOpenPricingPending,
+      freeCancelUntil: cancellationDeadlineText,
+    });
+  }, [
+    onStickySummaryChange,
+    hasSelectedRange,
+    displayFinalTotal,
+    rangePricingPending,
+    calendarOpenPricingPending,
+    cancellationDeadlineText,
+  ]);
 
   /** Format price; show ₹0 when 0 (e.g. when API not loaded or API returned 0). */
   const displayPrice = (n: number) =>

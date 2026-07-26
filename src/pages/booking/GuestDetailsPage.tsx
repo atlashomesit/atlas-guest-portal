@@ -369,7 +369,8 @@ const GuestDetailsPage: React.FC = () => {
   const [consentError, setConsentError] = useState('');
   const [consentFlash, setConsentFlash] = useState(false);
   const consentRowRef = useRef<HTMLDivElement>(null);
-  const [whatsappOptIn, setWhatsappOptIn] = useState(true); // pre-checked per spec
+  const [whatsappOptIn, setWhatsappOptIn] = useState(true); // transactional_whatsapp — pre-checked per spec
+  const [marketingOptIn, setMarketingOptIn] = useState(false);
 
   // Persist guest PII to sessionStorage so a hard reload / Back nav doesn't lose it.
   // Consent is intentionally NOT persisted — DPDP consent must be actively given each session.
@@ -738,7 +739,12 @@ const GuestDetailsPage: React.FC = () => {
         // TASK-4354: prove ownership of the hold — server rejects a guessed holdId without this token.
         holdToken: holdToken ?? undefined,
         currency: 'INR',
-        guestConsentAccepted: true,
+        guestConsentAccepted: consentAccepted,
+        guestPurposeConsents: {
+          booking_contact: consentAccepted,
+          transactional_whatsapp: whatsappOptIn,
+          marketing: marketingOptIn,
+        },
         securityDepositAccepted: false,
         guestInfo: {
           name: formData.name.trim(),
@@ -1164,7 +1170,7 @@ const GuestDetailsPage: React.FC = () => {
     },
     [
       isSubmitting, holdExpired, validateForm, holdId, holdToken, phoneDialCode, formData,
-      availableAddOns, selectedAddOns, referralCode, promoCode, whatsappOptIn,
+      availableAddOns, selectedAddOns, referralCode, promoCode, whatsappOptIn, marketingOptIn, consentAccepted,
       holdListingId, updateBooking, navigate, booking.checkIn, booking.checkOut, displayTotal,
       checkInDisplay, checkOutDisplay, brandName,
     ],
@@ -1753,11 +1759,11 @@ const GuestDetailsPage: React.FC = () => {
                   <IconCheck size={14}/>
                 </span>
                 <div className="gd-consent-body">
-                  I agree to <b>{consentEntityName}</b> contacting me about this booking, and to its{' '}
+                  I consent to <b>{consentEntityName}</b> collecting and using my name, phone, and email to process this booking and send booking-related communications.{' '}
                   <Link to="/privacy" className="gd-consent-link" onClick={(e) => e.stopPropagation()}>Privacy Policy</Link>
                   {' '}&amp;{' '}
                   <Link to="/terms" className="gd-consent-link" onClick={(e) => e.stopPropagation()}>Guest Terms</Link>.
-                  <span className="gd-consent-tag">Required · DPDP Act, 2023</span>
+                  <span className="gd-consent-tag">Required · booking &amp; contact · DPDP Act, 2023</span>
                   {/* Hidden native checkbox for testid compatibility */}
                   <input
                     type="checkbox"
@@ -1786,7 +1792,26 @@ const GuestDetailsPage: React.FC = () => {
                 </span>
                 <div className="gd-consent-body">
                   Send my booking updates on <b>WhatsApp</b> — confirmations, directions, host messages.{' '}
-                  <span style={{ color: 'var(--gd-faint)' }}>(Optional, you can opt out anytime.)</span>
+                  <span style={{ color: 'var(--gd-faint)' }}>(Optional — transactional WhatsApp.)</span>
+                </div>
+              </div>
+
+              {/* Marketing opt-in — optional, separate purpose (TASK-5137) */}
+              <div
+                className={`gd-consent-row${marketingOptIn ? ' checked' : ''}`}
+                onClick={() => setMarketingOptIn((v) => !v)}
+                role="checkbox"
+                aria-checked={marketingOptIn}
+                tabIndex={0}
+                onKeyDown={(e) => e.key === ' ' && setMarketingOptIn((v) => !v)}
+                data-testid="guest-booking-marketing-consent-row"
+              >
+                <span className={`gd-check${marketingOptIn ? ' checked' : ''}`}>
+                  <IconCheck size={14}/>
+                </span>
+                <div className="gd-consent-body">
+                  Send me promotional offers and deals from <b>{consentEntityName}</b>.{' '}
+                  <span style={{ color: 'var(--gd-faint)' }}>(Optional — you can withdraw anytime from your preferences link.)</span>
                 </div>
               </div>
             </div>

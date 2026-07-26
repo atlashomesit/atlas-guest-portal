@@ -27,6 +27,7 @@ const Navbar = () => {
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [tripsMenuOpen, setTripsMenuOpen] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [langMenuOpen, setLangMenuOpen] = useState(false);
   const [ctaStatus, setCtaStatus] = useState<'idle' | 'navigating' | 'scrolling'>('idle');
   const [savedCount, setSavedCount] = useState(0);
@@ -245,6 +246,13 @@ const Navbar = () => {
         </div>
 
         {/* CENTER - Desktop Navigation: Stays | Hyderabad | Trips | Help */}
+        <div className="hidden lg:flex items-center flex-1 justify-center">
+          <Link to="/search" className="navbar-search-pill" data-testid="navbar-search-pill">
+            <span className="navbar-search-pill__label">Where to?</span>
+            <span className="navbar-search-pill__hint">Search stays</span>
+          </Link>
+        </div>
+
         <div className="hidden lg:flex items-center">
           <div className="navbar-center flex gap-6">
             {visibleNavItems.map((item) => (
@@ -290,29 +298,8 @@ const Navbar = () => {
           </div>
         </div>
 
-        {/* RIGHT - Desktop Actions: Saved | Book Now only (utility bar has phone/login/currency) */}
-        <div className="hidden lg:flex items-center gap-6">
-          <NavLink
-            to="/amenities"
-            className={navLinkClass}
-            data-testid="navbar-amenities-link"
-          >
-            Amenities
-          </NavLink>
-          <NavLink
-            to="/my-bookings"
-            className={navLinkClass}
-            data-testid="navbar-my-bookings-link"
-          >
-            My bookings
-          </NavLink>
-          <NavLink
-            to="/profile"
-            className={navLinkClass}
-            data-testid="navbar-profile-link"
-          >
-            Account
-          </NavLink>
+        {/* RIGHT - Desktop: Saved badge + account menu + Book Now (DESIGN-009) */}
+        <div className="hidden lg:flex items-center gap-4">
           <NavLink
             to="/favorites"
             className={navLinkClass}
@@ -331,6 +318,56 @@ const Navbar = () => {
               ) : null}
             </span>
           </NavLink>
+
+          <div className="relative">
+            <button
+              type="button"
+              className="navbar-account-avatar"
+              aria-expanded={accountMenuOpen}
+              aria-haspopup="true"
+              aria-label="Account menu"
+              data-testid="navbar-account-menu-trigger"
+              onClick={() => setAccountMenuOpen((o) => !o)}
+              onBlur={() => window.setTimeout(() => setAccountMenuOpen(false), 150)}
+            >
+              <span aria-hidden="true">☺</span>
+            </button>
+            {accountMenuOpen && (
+              <div
+                className="absolute right-0 top-full z-50 mt-2 min-w-[12rem] rounded-lg border border-border-subtle bg-bg-surface py-2 shadow-lg"
+                role="menu"
+                data-testid="navbar-account-menu"
+              >
+                {tripsMenuNav.map((item) => (
+                  <Link
+                    key={item.to}
+                    to={item.to}
+                    role="menuitem"
+                    className="block px-4 py-2 text-sm text-text-primary hover:bg-brand-primary/10"
+                    onClick={() => setAccountMenuOpen(false)}
+                  >
+                    {item.label}
+                  </Link>
+                ))}
+                <Link
+                  to="/favorites"
+                  role="menuitem"
+                  className="block px-4 py-2 text-sm text-text-primary hover:bg-brand-primary/10"
+                  onClick={() => setAccountMenuOpen(false)}
+                >
+                  Wishlists
+                </Link>
+                <Link
+                  to="/contact"
+                  role="menuitem"
+                  className="block px-4 py-2 text-sm text-text-primary hover:bg-brand-primary/10"
+                  onClick={() => setAccountMenuOpen(false)}
+                >
+                  Help
+                </Link>
+              </div>
+            )}
+          </div>
 
           <button
             type="button"
@@ -365,6 +402,9 @@ const Navbar = () => {
               {item.label}
             </NavLink>
           ))}
+          <NavLink to="/search" onClick={closeMobile} className="block py-2 font-semibold" data-testid="navbar-search-pill-mobile">
+            Search stays
+          </NavLink>
           <p className="py-2 text-xs font-semibold uppercase tracking-wide text-text-muted">Trips</p>
           {tripsMenuNav.map((item) => (
             <NavLink
@@ -377,36 +417,23 @@ const Navbar = () => {
             </NavLink>
           ))}
 
-          {/* MOBILE ACTIONS */}
+          {/* MOBILE ACTIONS — account links grouped (DESIGN-009) */}
           <div className="mt-2 flex flex-col gap-3">
-            <NavLink
-              to="/amenities"
-              onClick={closeMobile}
-              className="block py-2 font-semibold"
-              data-testid="navbar-amenities-link-mobile"
-            >
-              Amenities
-            </NavLink>
-            <NavLink
-              to="/my-bookings"
-              onClick={closeMobile}
-              className="block py-2 font-semibold"
-              data-testid="navbar-my-bookings-link-mobile"
-            >
-              My bookings
-            </NavLink>
-            <NavLink
-              to="/profile"
-              onClick={closeMobile}
-              className="block py-2 font-semibold"
-              data-testid="navbar-profile-link-mobile"
-            >
-              Account
-            </NavLink>
+            <p className="py-1 text-xs font-semibold uppercase tracking-wide text-text-muted">Account</p>
+            {tripsMenuNav.map((item) => (
+              <NavLink
+                key={item.to}
+                onClick={closeMobile}
+                to={item.to}
+                className="block py-2 pl-2 font-semibold"
+              >
+                {item.label}
+              </NavLink>
+            ))}
             <NavLink
               to="/favorites"
               onClick={closeMobile}
-              className="block py-2 font-semibold"
+              className="block py-2 pl-2 font-semibold"
               data-testid="navbar-saved-link-mobile"
             >
               Saved
@@ -415,6 +442,13 @@ const Navbar = () => {
                   {savedCount > 99 ? '99+' : savedCount}
                 </span>
               ) : null}
+            </NavLink>
+            <NavLink
+              to="/contact"
+              onClick={closeMobile}
+              className="block py-2 pl-2 font-semibold"
+            >
+              Help
             </NavLink>
 
             <button

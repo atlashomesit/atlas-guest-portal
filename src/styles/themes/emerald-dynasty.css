@@ -32,6 +32,9 @@
        --lavender-text (= --text-secondary)              → 8.99:1 worst-case */
   --accent-text: #e5c25c;
   --lavender-text: #b8cfc3;
+  --util-bar-text: #cbb89b;
+  --navbar-search-pill-bg: var(--bg-muted);
+  --navbar-search-pill-border: var(--border-subtle);
 
   /* Accent - Gold Concierge */
   --accent-primary: #d4af37;
