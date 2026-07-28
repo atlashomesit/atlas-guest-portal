@@ -8,7 +8,7 @@ import { messageFromApiResponse } from "../utils/serverErrorFromResponse";
 import { getContactEmail, getTelLink, hasHostContact } from "../config/contact";
 import { getTenantBrandName } from "../tenant/displayBrand";
 import { useGuestAuth } from "../contexts/GuestAuthContext";
-import { formatCurrency } from "../utils/formatting";
+import { formatCurrency, parseDate } from "../utils/formatting";
 
 /**
  * TASK-6056: a signed-in guest whose JWT had merely expired was shown "Bookings not found" —
@@ -55,17 +55,27 @@ const STATUS_COLORS: Record<string, string> = {
 
 type BookingsTab = "upcoming" | "past" | "cancelled";
 
-function startOfTodayUtc(): Date {
+// TASK-6061: this was previously named `startOfTodayUtc` despite computing LOCAL midnight
+// (`setHours` is local-time) — the name lied, and the mismatch against the *actually* UTC-parsed
+// `parseBookingDate` below was the tab-bucketing half of the bug (a same-day checkout could land
+// on the wrong side of "today" for a guest west of UTC). Renamed to say what it does.
+function startOfTodayLocal(): Date {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
   return d;
 }
 
+// TASK-6061: booking dates are date-only (`YYYY-MM-DD`) calendar days, not instants — normalize
+// to the date-only prefix exactly as before (kept in case the API ever sends a fuller timestamp),
+// then delegate to `parseDate` (utils/formatting.ts), which constructs date-only values as LOCAL
+// midnight so this always lands on the same side of `startOfTodayLocal()`'s boundary as the guest
+// actually sees the date. The previous implementation here parsed the same prefix via
+// `new Date(iso)` (UTC midnight per spec), which disagreed with the local-midnight `today` used
+// below for any guest west of UTC — the tab-bucketing half of this bug.
 function parseBookingDate(s: string): Date {
   const t = s.trim();
-  const iso = /^\d{4}-\d{2}-\d{2}/.test(t) ? t.slice(0, 10) : t;
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? new Date(0) : d;
+  const dateOnly = /^\d{4}-\d{2}-\d{2}/.test(t) ? t.slice(0, 10) : t;
+  return parseDate(dateOnly) ?? new Date(0);
 }
 
 export default function MyBookingsPage() {
@@ -177,7 +187,7 @@ export default function MyBookingsPage() {
   }, [guestId, token, auth.isAuthenticated, auth.token, authLoading, retryCount]);
 
   const filteredBookings = useMemo(() => {
-    const today = startOfTodayUtc();
+    const today = startOfTodayLocal();
     const isCancelled = (b: BookingItem) => b.status?.toLowerCase() === "cancelled";
     if (tab === "cancelled") return bookings.filter(isCancelled);
     return bookings.filter((b) => {

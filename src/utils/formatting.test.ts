@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { formatCurrency, formatDateForDisplay, formatDateForInput, formatHumanDate, parseDate } from './formatting';
 
 describe('parseDate', () => {
@@ -51,6 +51,58 @@ describe('formatHumanDate', () => {
 
   it('respects the fallback for null values', () => {
     expect(formatHumanDate(null, { fallback: 'Missing' })).toBe('Missing');
+  });
+});
+
+// TASK-6061: a booking's check-in/check-out is a date-only YYYY-MM-DD calendar day, not an
+// instant. `new Date("2026-08-03")` parses as UTC midnight per spec; reading it back (or
+// formatting it) with the browser's LOCAL time zone shifts the rendered day backward for any
+// viewer west of UTC. IST/European `TZ`s never surface this (UTC midnight is still the same
+// calendar day locally), which is exactly how it shipped unnoticed — so these tests force a
+// western `TZ` the way no pre-existing test in this file did.
+describe('date-only parsing is time-zone invariant (TASK-6061)', () => {
+  const originalTz = process.env.TZ;
+
+  afterEach(() => {
+    process.env.TZ = originalTz;
+  });
+
+  it('renders the same calendar day in America/Los_Angeles (UTC-7/8) as in UTC', () => {
+    process.env.TZ = 'America/Los_Angeles';
+    expect(formatHumanDate('2026-08-03')).toBe('03 Aug 2026');
+    expect(formatDateForDisplay('2026-08-03')).toBe('03-08-2026');
+
+    process.env.TZ = 'UTC';
+    expect(formatHumanDate('2026-08-03')).toBe('03 Aug 2026');
+    expect(formatDateForDisplay('2026-08-03')).toBe('03-08-2026');
+  });
+
+  it('renders the same calendar day in Pacific/Kiritimati (UTC+14, east of UTC) as in UTC', () => {
+    process.env.TZ = 'Pacific/Kiritimati';
+    expect(formatHumanDate('2026-08-03')).toBe('03 Aug 2026');
+
+    process.env.TZ = 'UTC';
+    expect(formatHumanDate('2026-08-03')).toBe('03 Aug 2026');
+  });
+
+  it('parseDate itself yields the same year/month/date fields regardless of TZ', () => {
+    process.env.TZ = 'America/Los_Angeles';
+    const laDate = parseDate('2026-08-03');
+    expect(laDate?.getFullYear()).toBe(2026);
+    expect(laDate?.getMonth()).toBe(7); // August, 0-indexed
+    expect(laDate?.getDate()).toBe(3);
+
+    process.env.TZ = 'Pacific/Kiritimati';
+    const kiritimatiDate = parseDate('2026-08-03');
+    expect(kiritimatiDate?.getFullYear()).toBe(2026);
+    expect(kiritimatiDate?.getMonth()).toBe(7);
+    expect(kiritimatiDate?.getDate()).toBe(3);
+  });
+
+  it('still rejects an impossible calendar date under a western TZ', () => {
+    process.env.TZ = 'America/Los_Angeles';
+    expect(parseDate('2026-02-30')).toBeNull();
+    expect(formatDateForDisplay('2026-02-30', 'Invalid')).toBe('Invalid');
   });
 });
 
