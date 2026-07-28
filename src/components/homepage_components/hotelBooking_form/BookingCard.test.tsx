@@ -1,5 +1,5 @@
 import { describe, expect, vi, beforeEach, afterEach, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { act, ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import BookingCard from './BookingCard';
@@ -140,6 +140,42 @@ describe('BookingCard (date search strip)', () => {
     expect(screen.getByText('Guests')).toBeInTheDocument();
     expect(document.querySelectorAll('input[type="date"]').length).toBe(2);
     expect(screen.getByRole('button', { name: /^search$/i })).toBeInTheDocument();
+  });
+
+  // The guest count must survive being CLEARED. A controlled numeric input whose onChange
+  // coerces empty back to a number (this field used to do Math.max(1, parseInt(v) || 1))
+  // cannot be edited on a mobile keyboard at all: backspacing to empty is instantly undone,
+  // so the default "1" can only be appended to ("13"), never replaced. Desktop hides this
+  // behind the spinner arrows. Same defect class as the admin-portal guest-count bug.
+  describe('guest count is editable on mobile', () => {
+    it('can be cleared instead of snapping back to 1', async () => {
+      await renderCard();
+      const guests = screen.getByRole('spinbutton');
+
+      fireEvent.change(guests, { target: { value: '' } });
+
+      expect(guests).toHaveValue(null);
+    });
+
+    it('accepts a value typed after clearing', async () => {
+      await renderCard();
+      const guests = screen.getByRole('spinbutton');
+
+      fireEvent.change(guests, { target: { value: '' } });
+      fireEvent.change(guests, { target: { value: '3' } });
+
+      expect(guests).toHaveValue(3);
+    });
+
+    it('clamps back to 1 on blur when left empty', async () => {
+      await renderCard();
+      const guests = screen.getByRole('spinbutton');
+
+      fireEvent.change(guests, { target: { value: '' } });
+      fireEvent.blur(guests);
+
+      expect(guests).toHaveValue(1);
+    });
   });
 
   it('Search button is enabled with default dates', async () => {

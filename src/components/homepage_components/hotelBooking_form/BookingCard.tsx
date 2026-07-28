@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { buildHomeUnitPath } from '../../../utils/navigation';
+import { toEditableInt, clampMin } from '../../../utils/numericInput';
 
 interface BookingCardProps {
   propertyId?: number;
@@ -24,13 +25,15 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
   const navigate = useNavigate();
   const [checkin, setCheckin] = useState(today());
   const [checkout, setCheckout] = useState(tomorrow());
-  const [guests, setGuests] = useState(1);
+  // Holds '' while the user is mid-edit so the field can be cleared on a mobile keyboard;
+  // clamped on blur and again below, so the search URL always carries a real count.
+  const [guests, setGuests] = useState<number | ''>(1);
 
   const handleSearch = () => {
     const params = new URLSearchParams({
       checkin,
       checkout,
-      guests: String(guests),
+      guests: String(clampMin(guests, 1)),
     });
     if (propertyId) {
       // TASK-5193/5203: always use two-segment canonical path (never /homes/:id alone).
@@ -75,7 +78,9 @@ const BookingCard: React.FC<BookingCardProps> = ({ propertyId, supportPadding = 
             value={guests}
             min={1}
             max={10}
-            onChange={(e) => setGuests(Math.max(1, parseInt(e.target.value) || 1))}
+            inputMode="numeric"
+            onChange={(e) => setGuests(toEditableInt(e.target.value))}
+            onBlur={() => setGuests((prev) => clampMin(prev, 1))}
             className="w-full p-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
         </div>
