@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import SEO from "../components/SEO";
-import StateMessage from "../components/StateMessage";
+import StateMessage, { type StateAction } from "../components/StateMessage";
 import { LoadingState } from "../components/LoadingState";
 import { buildApiUrl, getApiHeaders } from "../api/client";
 import { messageFromApiResponse } from "../utils/serverErrorFromResponse";
@@ -9,6 +9,27 @@ import { getContactEmail, getTelLink, hasHostContact } from "../config/contact";
 import { getTenantBrandName } from "../tenant/displayBrand";
 import { useGuestAuth } from "../contexts/GuestAuthContext";
 import { formatCurrency } from "../utils/formatting";
+
+/**
+ * TASK-6056: a signed-in guest whose JWT had merely expired was shown "Bookings not found" —
+ * indistinguishable from an actually-empty account — because the error UI picked its headline
+ * from `auth.isAuthenticated` (still `true` for a dead token) instead of from *why* the load
+ * failed. Every failure mode below is a distinct, named state so the headline can never imply
+ * the guest's bookings don't exist when the real cause is a session/network/server problem.
+ *
+ * `link-invalid` covers the magic-link (`?guestId=&t=`) 404 for the same reason: an unrecognized
+ * or mistyped link is not proof the underlying booking doesn't exist.
+ */
+type BookingsErrorKind = "unauthenticated" | "session-expired" | "load-failed" | "link-invalid";
+
+class BookingsLoadError extends Error {
+  readonly kind: BookingsErrorKind;
+  constructor(kind: BookingsErrorKind, message: string) {
+    super(message);
+    this.name = "BookingsLoadError";
+    this.kind = kind;
+  }
+}
 
 interface BookingItem {
   id: number;
@@ -57,6 +78,8 @@ export default function MyBookingsPage() {
   const [bookings, setBookings] = useState<BookingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [errorKind, setErrorKind] = useState<BookingsErrorKind | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const [tab, setTab] = useState<BookingsTab>("upcoming");
 
   useEffect(() => {
@@ -69,8 +92,15 @@ export default function MyBookingsPage() {
         `/api/guest/bookings?guestId=${encodeURIComponent(guestId!)}&t=${encodeURIComponent(token!)}`
       );
       const res = await fetch(url, { headers: { Accept: "application/json", ...getApiHeaders() } });
-      if (res.status === 404) throw new Error("No bookings found. Please use the link from your booking confirmation.");
-      if (!res.ok) throw new Error(await messageFromApiResponse(res));
+      if (res.status === 404) {
+        // TASK-6056: an unrecognized/mistyped link is not proof the booking doesn't exist —
+        // never assert absence from an error response.
+        throw new BookingsLoadError(
+          "link-invalid",
+          "This link didn't match a booking. Please use the link from your booking confirmation email, or contact support if you think this is a mistake.",
+        );
+      }
+      if (!res.ok) throw new BookingsLoadError("load-failed", await messageFromApiResponse(res));
       return res.json() as Promise<BookingItem[]>;
     };
 
@@ -83,20 +113,32 @@ export default function MyBookingsPage() {
           ...getApiHeaders(),
         },
       });
-      if (res.status === 401) throw new Error("Your session expired. Please log in again.");
-      if (res.status === 404) throw new Error("No bookings found for your account.");
-      if (!res.ok) throw new Error(await messageFromApiResponse(res));
+      if (res.status === 401) {
+        throw new BookingsLoadError("session-expired", "Your session expired. Please log in again.");
+      }
+      if (res.status === 404) {
+        // TASK-6056: same principle as the magic-link 404 above — a signed-in guest getting a
+        // 404 from their own bookings endpoint is a load failure, not confirmation they have
+        // zero bookings. Absence is only ever claimed from a successful empty response (below).
+        throw new BookingsLoadError(
+          "load-failed",
+          "We couldn't load your bookings right now. Please try again, or contact support if this keeps happening.",
+        );
+      }
+      if (!res.ok) throw new BookingsLoadError("load-failed", await messageFromApiResponse(res));
       return res.json() as Promise<BookingItem[]>;
     };
 
     const load = async () => {
       setLoading(true);
       setError(null);
+      setErrorKind(null);
       try {
         const hasMagicLink = Boolean(guestId && token);
         const hasJwt = Boolean(auth.isAuthenticated && auth.token);
 
         if (!hasMagicLink && !hasJwt) {
+          setErrorKind("unauthenticated");
           setError("Sign in to view your trips, or use the link from your booking confirmation email.");
           setBookings([]);
           return;
@@ -109,7 +151,19 @@ export default function MyBookingsPage() {
       } catch (err: unknown) {
         console.error(err);
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "We couldn't load your bookings — please try again.");
+          if (err instanceof BookingsLoadError) {
+            // NOTE: deliberately NOT calling `logout()` here even though the token is
+            // confirmedly dead — `auth.isAuthenticated` is an effect dependency below, so
+            // flipping it inside this same catch would re-run the effect immediately, fall into
+            // the generic "unauthenticated" branch, and silently overwrite this more specific
+            // "Your session expired" message before the guest ever sees it. The "Log in again"
+            // CTA below sends them through the normal login flow regardless.
+            setErrorKind(err.kind);
+            setError(err.message);
+          } else {
+            setErrorKind("load-failed");
+            setError(err instanceof Error ? err.message : "We couldn't load your bookings — please try again.");
+          }
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -120,7 +174,7 @@ export default function MyBookingsPage() {
     return () => {
       cancelled = true;
     };
-  }, [guestId, token, auth.isAuthenticated, auth.token, authLoading]);
+  }, [guestId, token, auth.isAuthenticated, auth.token, authLoading, retryCount]);
 
   const filteredBookings = useMemo(() => {
     const today = startOfTodayUtc();
@@ -145,18 +199,34 @@ export default function MyBookingsPage() {
   }
 
   if (error) {
+    // TASK-6056: headline + primary action are chosen by *why* the load failed, never by
+    // `auth.isAuthenticated` alone (that flag stays `true` for a guest whose token just expired,
+    // which is exactly how "Bookings not found" got shown to a paying guest with a live booking).
+    const title =
+      errorKind === "session-expired"
+        ? "Your session expired"
+        : errorKind === "unauthenticated"
+          ? "Sign in to view your bookings"
+          : errorKind === "link-invalid"
+            ? "We couldn't find that booking"
+            : "We couldn't load your bookings";
+
+    const primaryAction: StateAction =
+      errorKind === "session-expired"
+        ? { label: "Log in again", to: "/login" }
+        : errorKind === "unauthenticated"
+          ? { label: "Log in", to: "/login" }
+          : errorKind === "load-failed"
+            ? { label: "Try again", onClick: () => setRetryCount((n) => n + 1) }
+            : { label: "Browse homes", to: "/" };
+
     return (
       <StateMessage
         data-testid="my-bookings-error-state"
         icon="📋"
-        // TASK-4280: a logged-out guest must not read "Bookings not found" (reads as "your
-        // booking was lost"). Show a sign-in prompt instead; the CTA below already routes to login.
-        title={auth.isAuthenticated ? "Bookings not found" : "Sign in to view your bookings"}
+        title={title}
         message={error}
-        primaryAction={{
-          label: auth.isAuthenticated ? "Browse homes" : "Log in",
-          ...(auth.isAuthenticated ? { to: "/" } : { to: "/login" }),
-        }}
+        primaryAction={primaryAction}
         secondaryActions={[
           {
             label: "Email support",
