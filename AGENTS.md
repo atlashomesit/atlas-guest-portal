@@ -9,7 +9,7 @@ for Sreekar's approval. Violations will be reverted.
 
 ## HARD RULE — Shift-left (amended 2026-07-22) / Verification (HARD RULE 13 + 6)
 
-> **Shift-left (HARD RULE 13, amended 2026-07-22):** Any new or materially changed user-facing behavior (endpoint, page, or interaction: gesture, scroll-load, drag) requires E2E coverage in the same push, exercising every input modality the surface supports. This applies to every route into `dev` — PR or direct push.
+> **Shift-left (HARD RULE 13, amended 2026-07-22):** Any new or materially changed user-facing behavior (endpoint, page, or interaction: gesture, scroll-load, drag) requires E2E coverage AUTHORED in the same push (validated via tsc + `npx playwright test <spec> --list` — legal from any branch), exercising every input modality the surface supports. This applies to every route into `dev` — PR or direct push. The spec EXECUTES post-merge on dev; E2E execution never gates the dev merge (MERGE-FAST 2026-07-29).
 >
 > **Verification (HARD RULE 6, amended):** "Verified live" must exercise the input modality the change targets.
 
