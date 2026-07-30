@@ -221,15 +221,49 @@ describe("AC7 — classic and heritage PropertyDetails carry genuinely different
     expect(heritageSource).toContain('data-testid="heritage-property-details"');
   });
 
-  it("BOTH layouts carry the cross-layout host-note canary testid, each with its own copy (TASK-4987 ruling)", () => {
-    // TASK-4987 (2026-07-19): the E2E contrast gate locates its painted-page canary by
-    // data-testid="pp-host-note" + role="note", NOT by the coral copy — so heritage renders its
-    // own differently-worded host note (satisfying the contrast gate) while the not.toContain
-    // above keeps proving the layouts differ in composition/copy. If this assertion fails,
-    // the contrast gate's false-clean guard loses its anchor on that layout — do NOT resolve
-    // it by copying the coral panel verbatim into heritage (that re-creates the deadlock).
+  it("BOTH layouts carry the cross-layout contrast-gate canary testid on their always-rendered verified panel (TASK-5181 re-point)", () => {
+    // TASK-4987 (2026-07-19) originally located the E2E contrast gate's painted-page canary by
+    // data-testid="pp-host-note" + role="note" on the (then-fabricated) host-quote panel, NOT by
+    // its copy, so each layout could word that panel differently. TASK-5181 (2026-07-30 founder
+    // ruling) found that panel was inventing first-person host quotes and signing them with a
+    // real host's name — a trust defect — and fixed it by gating that panel on a real per-listing
+    // field (data.hostAbout) that is routinely empty. A canary anchored to content that is
+    // routinely absent is not a reliable "the page painted" signal, so the SAME testid/role
+    // contract moved to each layout's "What verified means" panel instead: real, unconditional,
+    // non-fabricated platform copy. If this assertion fails, the contrast gate's false-clean
+    // guard loses its anchor on that layout — do NOT resolve it by re-anchoring the canary back
+    // onto the (now-conditional) host-note panel; that recreates the TASK-5181 defect.
     expect(classicSource).toContain('data-testid="pp-host-note"');
     expect(heritageSource).toContain('data-testid="pp-host-note"');
+
+    // Pin WHERE the canary now lives: on the pp-verified-panel div, not floating loose or still
+    // attached to the host-quote panel. Checked positionally — the testid must appear inside the
+    // verified-panel's own opening tag (between its className and the following .pp-verified-panel-head
+    // child), not merely somewhere in the file.
+    for (const [label, source] of [["classic", classicSource], ["heritage", heritageSource]] as const) {
+      const panelStart = source.indexOf('className="pp-verified-panel"');
+      expect(panelStart, `${label}: pp-verified-panel not found`).toBeGreaterThan(-1);
+      const headStart = source.indexOf('pp-verified-panel-head', panelStart);
+      const opening = source.slice(panelStart, headStart);
+      expect(opening, `${label}: canary testid must sit on the verified-panel's own opening tag`).toContain(
+        'data-testid="pp-host-note"',
+      );
+      expect(opening, `${label}: canary role must sit on the verified-panel's own opening tag`).toContain(
+        'role="note"',
+      );
+    }
+  });
+
+  it("neither layout fabricates host-note copy anymore — both gate on HostAboutNote, and the old synthetic fallback sentence is gone (TASK-5181)", () => {
+    // The defect: a hardcoded quote (and later a hardcoded fallback sentence) rendered for EVERY
+    // listing regardless of whether any host wrote it, sometimes signed with the real host's
+    // name. Fix: both layouts now delegate to the shared HostAboutNote component, which renders
+    // nothing unless a real, non-empty data.hostAbout is present — no fallback string anywhere in
+    // either page's source.
+    expect(classicSource).toContain("@/components/property/HostAboutNote");
+    expect(heritageSource).toContain("@/components/property/HostAboutNote");
+    expect(classicSource).not.toContain("Your host has not added a personal note");
+    expect(heritageSource).not.toContain("Your host has not added a personal note");
   });
 
   it("heritage's PropertyDetails imports the CURRENT shared map-selection logic, not a forked copy", () => {
