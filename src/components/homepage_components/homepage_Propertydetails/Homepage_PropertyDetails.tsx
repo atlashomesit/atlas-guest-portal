@@ -44,6 +44,7 @@ import { addRecentlyViewed, isFavorite, toggleFavorite } from '../../../utils/gu
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
 import SkeletonCard from '../../apartments/SkeletonCard';
 import PropertyMobileStickyBar from '@/components/property/PropertyMobileStickyBar';
+import HostAboutNote from '@/components/property/HostAboutNote';
 import type { BookingStickySummary } from '@/components/availability/UnitBookingWidget';
 
 const UnitBookingWidget = lazy(() => import('../../availability/UnitBookingWidget'));
@@ -1707,13 +1708,32 @@ useEffect(() => {
                     </div>
                   </div>
 
-                  {/* "What verified means" panel */}
-                  <div className="pp-verified-panel">
+                  {/* "What verified means" panel — TASK-5181: also the CROSS-LAYOUT canary
+                      contract (role="note" + data-testid="pp-host-note") that used to live on the
+                      fabricated "A note from your host" quote panel below. TASK-4987's E2E
+                      contrast gate needs ONE always-rendered --lavender-soft/--lavender-text
+                      surface per layout to corroborate the page actually painted before trusting a
+                      zero-violation axe scan. That panel's content is now gated on a real
+                      per-listing field (data.hostAbout) and correctly does not render when that
+                      field is empty, so it can no longer anchor an unconditional canary. This
+                      panel is real, always-rendered, non-fabricated platform copy — founder ruling
+                      2026-07-30 re-points the gate here, resolving the TASK-4987 deadlock without
+                      depending on content that may legitimately be absent. */}
+                  <div
+                    className="pp-verified-panel"
+                    role="note"
+                    data-testid="pp-host-note"
+                    aria-label="What verified means"
+                    style={{
+                      background: 'var(--lavender-soft, #f0eafd)',
+                      borderLeft: '4px solid var(--lavender-deep, #8e7cc3)',
+                    }}
+                  >
                     <div className="pp-verified-panel-head">
                       <span className="pp-shield" aria-hidden="true"><PpShieldIcon size={22} /></span>
                       <h3>
                         What &ldquo;verified&rdquo; means at {ppBrandName}
-                        <small>This isn&rsquo;t a badge we hand out. Here&rsquo;s what we actually checked.</small>
+                        <small style={{ color: 'var(--lavender-text, #6f5aa8)' }}>This isn&rsquo;t a badge we hand out. Here&rsquo;s what we actually checked.</small>
                       </h3>
                     </div>
                     <ul className="pp-verified-list">
@@ -1736,56 +1756,21 @@ useEffect(() => {
                   </div>
                 </section>
 
-                {/* A note from your host — lavender callout panel (Theem mockup).
-                    data-testid="pp-host-note" is the CROSS-LAYOUT canary contract (TASK-4987
-                    ruling 2026-07-19): the E2E contrast gate locates this panel by
-                    role="note" + this testid — NOT by the coral copy — so every layout's
-                    listing detail must render a host-note landmark carrying this testid on
-                    the --lavender-soft/--lavender-text surface, while each layout stays free
-                    to word it its own way (AC7 layout-differentiation stays intact). */}
-                <div
-                  role="note"
-                  data-testid="pp-host-note"
-                  aria-label="A note from your host"
-                  style={{
-                    margin: '20px 0 4px',
-                    borderRadius: 16,
-                    padding: '22px 26px',
-                    background: 'var(--lavender-soft, #f0eafd)',
-                    borderLeft: '4px solid var(--lavender-deep, #8e7cc3)',
-                  }}
-                >
-                  <p
-                    style={{
-                      fontSize: 12,
-                      fontWeight: 600,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.18em',
-                      color: 'var(--lavender-text, #6f5aa8)',
-                      margin: '0 0 10px',
-                    }}
-                  >
-                    A note from your host
-                  </p>
-                  <blockquote
-                    style={{
-                      fontFamily: 'var(--font-family-display)',
-                      fontSize: 'clamp(18px, 2vw, 22px)',
-                      lineHeight: 1.55,
-                      color: 'var(--text-primary, #4a3535)',
-                      margin: 0,
-                    }}
-                  >
-                    {ppHostAbout
-                      ? ppHostAbout
-                      : 'Your host has not added a personal note for this listing yet.'}
-                  </blockquote>
-                  {ppHostAbout && ppHasRealHost ? (
-                    <p style={{ marginTop: 10, fontSize: 13, color: 'var(--lavender-text, #6f5aa8)' }}>
-                      — {ppHostDisplayName}, your host
-                    </p>
-                  ) : null}
-                </div>
+                {/* A note from your host — TASK-5181: renders ONLY when the listing has a real,
+                    host-authored note (data.hostAbout). No fallback string, no default copy — an
+                    absent/empty field means nothing renders here at all (previously a fabricated
+                    first-person quote rendered for every listing, sometimes signed with the real
+                    host's name — that fabrication is the defect this task fixes). This panel no
+                    longer carries the cross-layout contrast-gate canary; see the "What verified
+                    means" panel above for that contract, and HostAboutNote.tsx for the gating
+                    rule shared by both layouts. */}
+                <HostAboutNote
+                  hostAbout={ppHostAbout}
+                  hasRealHost={ppHasRealHost}
+                  hostDisplayName={ppHostDisplayName}
+                  heading="A note from your host"
+                  ariaLabel="A note from your host"
+                />
 
                 {/* About this home */}
                 <section className="pp-section" aria-label="About this home">
