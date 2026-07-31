@@ -1,3 +1,4 @@
+import { REFUND_POLICY_TIMELINE_SENTENCE } from "../../config/refundPolicyTimelines";
 import { MARKETPLACE_BRAND_BASELINE } from "../../tenant/displayBrand";
 import { termsSections } from "./terms";
 
@@ -27,7 +28,7 @@ export const policySections: PolicySection[] = [
       "100% refund (minus non-recoverable processing fees) for cancellations received more than 15 days before check-in, where stated.",
       "50% refund or equivalent credit for cancellations received 7–15 days before check-in, if applicable to your rate plan.",
       "Within 7 days of arrival, cancellations, no-shows, and early departures are typically non-refundable once the stay start date has begun unless required by law.",
-      "Refunds (when applicable) are initiated to the original payment method within 7–10 business days after confirmation.",
+      REFUND_POLICY_TIMELINE_SENTENCE,
     ],
     termsRefs: ["cancellations-refunds", "booking-payments"],
   },

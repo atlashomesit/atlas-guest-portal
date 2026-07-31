@@ -22,6 +22,7 @@ import { getTenantContext as _getTenantCtx } from '@/tenant/tenantContext';
 import { getTenantOverrides, shouldHideAtlasBranding } from '@/tenant/tenantOverrides';
 import { getTenantBrandName } from '@/tenant/displayBrand';
 import { getWhatsAppPhone } from '@/config/contact';
+import { REFUND_INITIATED_STEP_DESC, REFUND_SETTLEMENT_STEP_DESC } from '@/config/refundPolicyTimelines';
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { FaBed, FaShower, FaSwimmingPool, FaCar, FaWifi, FaTv, FaDumbbell } from "react-icons/fa";
 import { TbAirConditioning } from "react-icons/tb";
@@ -157,8 +158,8 @@ function PpGridIcon({ size = 14 }: { size?: number }) {
 
 const PP_REFUND_STEPS = [
   { title: 'Cancel from your booking', desc: 'One tap from your booking confirmation. No reason needed.' },
-  { title: 'Refund initiated', desc: 'Atlas approves and initiates your refund within 24 hours. Reference number sent to you.' },
-  { title: 'Money in your account', desc: 'Funds reach your account in 7–10 business days. Timing depends on your bank.' },
+  { title: 'Refund initiated', desc: REFUND_INITIATED_STEP_DESC },
+  { title: 'Money in your account', desc: REFUND_SETTLEMENT_STEP_DESC },
   { title: 'Confirmation', desc: 'SMS and WhatsApp when the refund clears. Both.' },
 ];
 
