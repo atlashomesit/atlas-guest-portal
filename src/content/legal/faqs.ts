@@ -1,4 +1,5 @@
 import { policySections } from "./policies";
+import { REFUND_POLICY_TIMELINE_SENTENCE } from "../../config/refundPolicyTimelines";
 import { termsSections } from "./terms";
 
 type PolicyRef = (typeof policySections)[number]["id"];
@@ -32,8 +33,7 @@ export const faqItems: FaqItem[] = [
     id: "refund-timelines",
     category: "Cancellations & Refunds",
     question: "How long do refunds take if I cancel?",
-    answer:
-      "Where refunds are applicable, Atlas approves and initiates the refund within 24 hours of your cancellation request. The funds then reach your account within 7–10 business days (via your original payment method).",
+    answer: REFUND_POLICY_TIMELINE_SENTENCE,
     linksTo: [
       { type: "policy", id: "cancellation-refunds" },
       { type: "terms", id: "cancellations-refunds" },
