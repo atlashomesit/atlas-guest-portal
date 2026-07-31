@@ -2,7 +2,7 @@
  * TASK-5370: Updated for international E.164 support with libphonenumber-js validation.
  */
 
-import { isValidPhoneNumber } from "libphonenumber-js";
+import { isValidPhoneNumber, type CountryCode } from "libphonenumber-js";
 
 export type GuestDialOption = {
   /** E.164 prefix including + */
@@ -15,7 +15,7 @@ export type GuestDialOption = {
   validate: (nationalDigits: string) => boolean;
   invalidMessage: string;
   /** TASK-5370: ISO country code for libphonenumber validation */
-  countryCode: string;
+  countryCode: CountryCode;
 };
 
 const genericLocalInvalid = "Enter 7–12 digits (spaces and dashes are ignored)";
@@ -41,7 +41,7 @@ const createGenericOption = (
   maxDigits: number,
   placeholder: string,
   hint: string,
-  countryCode: string
+  countryCode: CountryCode
 ): GuestDialOption => ({
   code,
   label: `${flag} ${code}`,
