@@ -6,6 +6,7 @@ import StateMessage from "../components/StateMessage";
 import { buildApiUrl, getApiHeaders } from "../api/client";
 import { toast } from "react-toastify";
 import { messageFromApiResponse } from "../utils/serverErrorFromResponse";
+import { isValidPhoneNumber } from "libphonenumber-js";
 
 interface GuestProfile {
   id: number;
@@ -15,7 +16,18 @@ interface GuestProfile {
   photoUrl?: string | null;
 }
 
-const PHONE_RE = /^[6-9]\d{9}$/;
+/**
+ * TASK-5370 / ADR-0088: widened from the India-only /^[6-9]\d{9}$/ block to any E.164-valid
+ * number, with bare digits still defaulting to India — mirrors the server contract in
+ * GuestPhoneNormalizer and the checkout picker's libphonenumber-js validation.
+ */
+function isValidGuestPhone(raw: string): boolean {
+  const trimmed = raw.trim();
+  if (!trimmed) return false;
+  return trimmed.startsWith("+")
+    ? isValidPhoneNumber(trimmed)
+    : isValidPhoneNumber(trimmed, "IN");
+}
 const MAX_AVATAR_BYTES = 512_000;
 
 function initialsFromName(name: string): string {
@@ -141,8 +153,8 @@ export default function ProfilePage() {
     setPhoneError("");
 
     const trimPhone = phone.trim();
-    if (trimPhone && !PHONE_RE.test(trimPhone)) {
-      setPhoneError("Enter a valid 10-digit Indian mobile number starting with 6–9.");
+    if (trimPhone && !isValidGuestPhone(trimPhone)) {
+      setPhoneError("Enter a valid phone number (include + and country code for non-Indian numbers).");
       return;
     }
 
@@ -302,9 +314,9 @@ export default function ProfilePage() {
               type="tel"
               value={phone}
               onChange={(e) => { setPhone(e.target.value); setPhoneError(""); }}
-              maxLength={10}
-              inputMode="numeric"
-              placeholder="10-digit Indian mobile"
+              maxLength={20}
+              inputMode="tel"
+              placeholder="9876543210 or +7 916 123 4567"
               className={`w-full rounded-xl border bg-bg-surface px-4 py-3 text-base text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary ${phoneError ? "border-red-400" : "border-border-subtle"}`}
             />
             {phoneError && <p className="text-xs text-red-600">{phoneError}</p>}
