@@ -19,7 +19,6 @@
  * per-listing field which is routinely empty is not a reliable "the page painted" signal. See the
  * comment above the `pp-verified-panel` div in each layout file for the re-pointed contract.
  */
-import React from 'react';
 
 export interface HostAboutNoteProps {
   /** Real, per-listing, host-authored note. Absent/empty/whitespace-only -> renders null. */
