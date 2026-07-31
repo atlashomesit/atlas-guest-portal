@@ -33,7 +33,7 @@ export const faqItems: FaqItem[] = [
     category: "Cancellations & Refunds",
     question: "How long do refunds take if I cancel?",
     answer:
-      "Where refunds are applicable, we initiate them to the original payment method within 7–10 business days after confirming the cancellation.",
+      "Where refunds are applicable, Atlas approves and initiates the refund within 24 hours of your cancellation request. The funds then reach your account within 7–10 business days (via your original payment method).",
     linksTo: [
       { type: "policy", id: "cancellation-refunds" },
       { type: "terms", id: "cancellations-refunds" },

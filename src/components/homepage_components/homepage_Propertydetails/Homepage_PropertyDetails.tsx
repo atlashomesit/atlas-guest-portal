@@ -141,8 +141,8 @@ function PpGridIcon({ size = 14 }: { size?: number }) {
 
 const PP_REFUND_STEPS = [
   { title: 'Cancel from your booking', desc: 'One tap from your booking confirmation. No reason needed.' },
-  { title: 'Refund initiated', desc: 'Automatic within 24 hours. Reference number sent to you.' },
-  { title: 'Money in your account', desc: 'UPI: same day. Cards & netbanking: 3–5 working days.' },
+  { title: 'Refund approved', desc: 'Atlas approves and initiates your refund within 24 hours. Reference number sent to you.' },
+  { title: 'Money in your account', desc: 'Funds reach your account within 7–10 business days (UPI, cards, or netbanking).' },
   { title: 'Confirmation', desc: 'SMS and WhatsApp when the refund clears. Both.' },
 ];
 
