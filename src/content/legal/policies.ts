@@ -27,7 +27,7 @@ export const policySections: PolicySection[] = [
       "100% refund (minus non-recoverable processing fees) for cancellations received more than 15 days before check-in, where stated.",
       "50% refund or equivalent credit for cancellations received 7–15 days before check-in, if applicable to your rate plan.",
       "Within 7 days of arrival, cancellations, no-shows, and early departures are typically non-refundable once the stay start date has begun unless required by law.",
-      "Refunds (when applicable) are initiated to the original payment method within 7–10 business days after confirmation.",
+      "Refund approval: Atlas approves and initiates the refund within 24 hours of your cancellation request. Funds reach your account within 7–10 business days (via your original payment method).",
     ],
     termsRefs: ["cancellations-refunds", "booking-payments"],
   },

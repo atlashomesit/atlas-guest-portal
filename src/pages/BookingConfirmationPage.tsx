@@ -1633,7 +1633,7 @@ export default function BookingConfirmationPage() {
               <Link to="/policies#cancellation-refunds" className="font-semibold text-red-900 underline underline-offset-2">
                 cancellation &amp; refund policy
               </Link>
-              . Submitting a request does not automatically cancel your booking — our team will review it and contact you within 24 hours.
+              . Submitting a request starts your refund — Atlas will approve and initiate it within 24 hours, and funds will reach your account within 7–10 business days.
             </p>
             {!showCancelConfirm ? (
               <button
