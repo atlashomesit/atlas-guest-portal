@@ -36,7 +36,7 @@ jobs:
       # Matches only `<<<<<<<` / `>>>>>>>` at line start — NOT a bare `=======`, which is a valid
       # Markdown setext H1 underline. Every real conflict carries all three, so the two unambiguous
       # markers are sufficient and the docs false-positive class is eliminated.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Unresolved conflict markers
         run: |
           if git grep -nIE '^(<{7}|>{7})( |$)' -- . ':(exclude).github/workflows/*'; then
