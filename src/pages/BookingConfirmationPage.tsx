@@ -11,6 +11,10 @@ import { getRuntimeConfig, hasRuntimeConfig } from "../runtime-config";
 import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 import { messageFromApiResponse } from "../utils/serverErrorFromResponse";
 import { getContactEmail, getContactPhone, hasHostContact } from "../config/contact";
+import {
+  REFUND_CANCELLATION_RECEIVED_MESSAGE,
+  REFUND_CANCELLATION_REQUEST_DISCLOSURE,
+} from "../config/refundPolicyTimelines";
 import { useGuestBookingQrToken } from "../hooks/useGuestBookingQrToken";
 import { formatCurrency } from "../utils/formatting";
 import GuestMessageThread from "../components/messaging/GuestMessageThread";
@@ -1633,7 +1637,7 @@ export default function BookingConfirmationPage() {
               <Link to="/policies#cancellation-refunds" className="font-semibold text-red-900 underline underline-offset-2">
                 cancellation &amp; refund policy
               </Link>
-              . Submitting a request does not automatically cancel your booking — our team will review it and contact you within 24 hours.
+              . {REFUND_CANCELLATION_REQUEST_DISCLOSURE}
             </p>
             {!showCancelConfirm ? (
               <button
@@ -1695,7 +1699,7 @@ export default function BookingConfirmationPage() {
         )}
         {cancelRequested && (
           <div className="rounded-2xl border border-green-200 bg-green-50/60 p-4 text-base text-green-800 space-y-2" role="status" aria-live="polite">
-            <p>✅ Cancellation request received. We&apos;ll contact you within 24 hours.</p>
+            <p>✅ {REFUND_CANCELLATION_RECEIVED_MESSAGE}</p>
             <Link
               to="/policies#cancellation-refunds"
               className="inline-block text-brand-primary font-medium underline underline-offset-2 text-base py-1"

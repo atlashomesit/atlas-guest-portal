@@ -400,7 +400,17 @@
 }
 .pp-verified-list li svg { color: #157046; margin-top: 2px; flex-shrink: 0; }
 .pp-verified-list li b { font-weight: 600; }
-.pp-verified-list li .pp-meta { display: block; font-size: 12.5px; color: var(--text-muted, #6b5a55); margin-top: 1px; }
+/* TASK-4923 pattern, applied to listing-detail (TASK-5361). This panel paints
+   `var(--lavender-soft, #f0eafd)` inline, but `--lavender-soft` is defined ONLY in
+   default.css, so every other preset falls through to that hardcoded lavender — a surface
+   their own `--text-muted` was never tuned against (each is tuned to `--bg-section-alt`).
+   Measured on gate 9b: sunriseCoral 4.43, oceanLuxury 4.48, emeraldOasis 4.45, newYear 4.41,
+   auroraChampagne and heritage likewise — all just under the 4.5:1 AA threshold, 36 axe
+   violations in total and all against #f0eafd. `--lavender-text` is the token that IS
+   contrast-validated against this surface (default.css documents 4.83:1 on #f0eafd) and the
+   homepage's equivalent panel already binds to it; listing-detail was simply never migrated.
+   Same fix, same token — not a new colour decision. */
+.pp-verified-list li .pp-meta { display: block; font-size: 12.5px; color: var(--lavender-text, #6f5aa8); margin-top: 1px; }
 
 /* ---------- About / Prose ------------------------------------------------ */
 .pp-prose {

@@ -1,4 +1,5 @@
 import { policySections } from "./policies";
+import { REFUND_POLICY_TIMELINE_SENTENCE } from "../../config/refundPolicyTimelines";
 import { termsSections } from "./terms";
 
 type PolicyRef = (typeof policySections)[number]["id"];
@@ -32,8 +33,7 @@ export const faqItems: FaqItem[] = [
     id: "refund-timelines",
     category: "Cancellations & Refunds",
     question: "How long do refunds take if I cancel?",
-    answer:
-      "Where refunds are applicable, we initiate them to the original payment method within 7–10 business days after confirming the cancellation.",
+    answer: REFUND_POLICY_TIMELINE_SENTENCE,
     linksTo: [
       { type: "policy", id: "cancellation-refunds" },
       { type: "terms", id: "cancellations-refunds" },

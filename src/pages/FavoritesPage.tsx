@@ -297,6 +297,11 @@ export default function FavoritesPage() {
               (dailyBreakdown?.actualPrice ?? 0) > 0
                 ? dailyBreakdown!.actualPrice
                 : (l.baseNightlyRate ?? 0);
+            // TASK-7011: GST slab must be selected off the PUBLISHED (pre-discount) rate,
+            // matching the server — see accommodationGstSlabPercentForPublishedRate's doc
+            // comment. `l.baseNightlyRate` is itself already a published rate, so the fallback
+            // stays correct with no discount data at all.
+            const publishedPrice = dailyBreakdown?.baseAmount ?? (l.baseNightlyRate ?? 0);
             return (
               <div
                 key={l.id}
@@ -347,6 +352,7 @@ export default function FavoritesPage() {
                           formatDisplayCurrency,
                           3,
                           l.isGstRegistered,
+                          publishedPrice,
                         )}
                       </p>
                     </div>

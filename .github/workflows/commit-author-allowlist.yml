@@ -3,11 +3,20 @@
 # Founder-approved 2026-07-08 (interactive session). GHA-COST-APPROVED: 360
 name: Author email allowlist
 
-# Trigger scope aligned to the 2026-07-20 cost review (PR-only; the push run
-# re-checked commits the PR run had already cleared at a 1-min billed minimum).
+# Trigger scope: `pull_request` AND `push: [dev]`.
+# HISTORY: `push` was removed 2026-07-20 on the premise that "nothing reaches dev except via PR".
+# That premise was FALSE — HARD RULE 2 (MERGE-FAST) explicitly permits single-repo non-guardrail
+# work to push dev DIRECT. On 2026-07-30 two contributors pushed straight to dev; six
+# locally-authored `atlashomesit` commits across four repos were never checked because no PR
+# existed, and one of those pushes also left dev unbuildable. Restored 2026-07-31 with founder
+# approval, accepting the ~1 billed min/push (the 2026-07-20 saving assumed duplicate PR+push
+# runs; for a direct push this run is the ONLY run, not a duplicate).
+# GHA-COST-APPROVED: 360 (unchanged — same single job, one added step, no new job).
 on:
   pull_request:
     branches: [dev, main]
+  push:
+    branches: [dev]
 
 permissions:
   contents: read
@@ -18,6 +27,26 @@ jobs:
     name: Author email allowlist
     runs-on: ubuntu-latest
     steps:
+      # Unresolved merge-conflict markers. 2026-07-30: atlas-admin-portal dev shipped 28 literal
+      # conflict blocks across 5 files (merge 5689cacf); `npm run build` died on `Unexpected "<<"`
+      # and dev was unbuildable for ~4h for every consumer incl. the scheduled fleet. `git add -A`
+      # after a conflict clears the unmerged flag WITHOUT removing the marker text, so git commits
+      # it happily. Same job as the identity check by design: GitHub bills a 1-min minimum PER JOB,
+      # so an extra step here is effectively free where a second job would not be.
+      # Matches only `<<<<<<<` / `>>>>>>>` at line start — NOT a bare `=======`, which is a valid
+      # Markdown setext H1 underline. Every real conflict carries all three, so the two unambiguous
+      # markers are sufficient and the docs false-positive class is eliminated.
+      - uses: actions/checkout@v4
+      - name: Unresolved conflict markers
+        run: |
+          if git grep -nIE '^(<{7}|>{7})( |$)' -- . ':(exclude).github/workflows/*'; then
+            echo ""
+            echo "BLOCKED: unresolved merge-conflict markers present in tracked files (listed above)."
+            echo "Resolve each block (keep the correct merged result, delete the <<<<<<< /"
+            echo "======= / >>>>>>> lines), rebuild, and push again."
+            exit 1
+          fi
+          echo "No unresolved conflict markers."
       - uses: actions/github-script@v7
         with:
           script: |

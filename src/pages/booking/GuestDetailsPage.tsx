@@ -1498,7 +1498,7 @@ const GuestDetailsPage: React.FC = () => {
                   >
                     {['India','Australia','Bangladesh','Bhutan','Canada','China','France','Germany',
                       'Indonesia','Japan','Malaysia','Maldives','Nepal','Pakistan','Philippines',
-                      'Singapore','South Korea','Sri Lanka','Thailand','UAE','UK','USA','Vietnam','Other'
+                      'Russia','Singapore','South Korea','Sri Lanka','Thailand','UAE','UK','USA','Vietnam','Other'
                     ].map((n) => <option key={n} value={n}>{n}</option>)}
                   </select>
                 </div>

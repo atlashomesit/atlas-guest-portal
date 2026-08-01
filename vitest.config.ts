@@ -1,7 +1,7 @@
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import path from "path";
-import { globSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 
 // ---------------------------------------------------------------------------
 // isolate:false partition (2026-07-07) — ported from atlas-admin-portal
@@ -55,11 +55,26 @@ const exclude = [
 // Scan roots: src/ plus tests/. A test file added under a NEW top-level
 // directory must be added here or vitest will not see it (the old config used
 // vitest's default include, which scanned everything).
-const testFiles = globSync(
-  ["src", "tests"].map((d) => `${d}/**/*.{test,spec}.{ts,tsx,js,jsx,cjs,mjs}`),
-  { cwd: __dirname }
-)
-  .map((f) => f.replace(/\\/g, "/"))
+// NOTE: enumerated with readdirSync({recursive:true}), NOT fs.globSync. globSync landed in Node 22
+// and this repo's .nvmrc does pin 22 — but the release gate runs all five repos under whatever Node
+// is active on the machine, and atlas-admin-portal pins 20. Under Node 20 the named import is a hard
+// SyntaxError ("does not provide an export named 'globSync'") the moment vite bundles this config,
+// taking the whole vitest run — and gate STEP 1 — down before a single test executes. readdirSync's
+// recursive option exists on 18.17/20.1+ AND 22, so this config no longer cares which is active.
+// Same defect was live in atlas-admin-portal's config; see TASK-7044.
+const TEST_FILE_RE = /\.(test|spec)\.(ts|tsx|js|jsx|cjs|mjs)$/;
+const testFiles = ["src", "tests"]
+  .flatMap((d) => {
+    let entries: unknown[];
+    try {
+      entries = readdirSync(path.resolve(__dirname, d), { recursive: true });
+    } catch {
+      return []; // scan root absent — same as globSync matching nothing
+    }
+    return entries
+      .map((f) => `${d}/${String(f).replace(/\\/g, "/")}`)
+      .filter((f) => TEST_FILE_RE.test(f));
+  })
   .filter((f) => !heavyRouteSmokes.includes(f))
   .sort();
 const usesModuleMocks = new Set(

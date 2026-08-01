@@ -1306,26 +1306,33 @@ const SearchPage = () => {
                       <div className="flex flex-1 flex-col gap-2 p-4">
                         <h4 className="line-clamp-2 text-base font-semibold text-text-primary">{unit.title}</h4>
                         <p className="text-sm text-text-muted">{unit.location}</p>
-                        <p className="text-lg font-bold text-text-primary">
-                          {formatDisplayCurrency(
-                            (getDailyListingPricing(unit.numericId)?.actualPrice ?? 0) > 0
-                              ? getDailyListingPricing(unit.numericId)!.actualPrice
-                              : unit.pricePerNight,
-                          )}
-                          <span className="text-sm font-normal text-text-muted"> / night</span>
-                        </p>
-                        {/* TASK-5199: match main card — show est. total incl. GST when nights known */}
-                        <p className="text-xs text-text-muted">
-                          {formatEstTotalInclGst(
-                            (getDailyListingPricing(unit.numericId)?.actualPrice ?? 0) > 0
-                              ? getDailyListingPricing(unit.numericId)!.actualPrice
-                              : unit.pricePerNight,
-                            estimateNights,
-                            formatDisplayCurrency,
-                            3,
-                            unit.isGstRegistered,
-                          )}
-                        </p>
+                        {(() => {
+                          const suggestBreakdown = getDailyListingPricing(unit.numericId);
+                          const suggestDisplayedPrice =
+                            (suggestBreakdown?.actualPrice ?? 0) > 0 ? suggestBreakdown!.actualPrice : unit.pricePerNight;
+                          // TASK-7011: GST slab must be selected off the PUBLISHED (pre-discount)
+                          // rate, matching the server — see accommodationGstSlabPercentForPublishedRate.
+                          const suggestPublishedPrice = suggestBreakdown?.baseAmount ?? unit.pricePerNight;
+                          return (
+                            <>
+                              <p className="text-lg font-bold text-text-primary">
+                                {formatDisplayCurrency(suggestDisplayedPrice)}
+                                <span className="text-sm font-normal text-text-muted"> / night</span>
+                              </p>
+                              {/* TASK-5199: match main card — show est. total incl. GST when nights known */}
+                              <p className="text-xs text-text-muted">
+                                {formatEstTotalInclGst(
+                                  suggestDisplayedPrice,
+                                  estimateNights,
+                                  formatDisplayCurrency,
+                                  3,
+                                  unit.isGstRegistered,
+                                  suggestPublishedPrice,
+                                )}
+                              </p>
+                            </>
+                          );
+                        })()}
                         <Link
                           to={`${unit.canonicalPath}${querySuffix}`}
                           className="mt-auto inline-flex min-h-[44px] items-center justify-center rounded-xl bg-[var(--cta-primary-hover)] px-4 py-2 text-sm font-semibold text-[var(--text-on-cta)] hover:bg-[var(--cta-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
@@ -1475,6 +1482,11 @@ const SearchPage = () => {
               const dailyBreakdown = getDailyListingPricing(unit.numericId);
               const displayedPrice =
                 (dailyBreakdown?.actualPrice ?? 0) > 0 ? dailyBreakdown!.actualPrice : unit.pricePerNight;
+              // TASK-7011: GST slab must be selected off the PUBLISHED (pre-discount) rate,
+              // matching the server — see accommodationGstSlabPercentForPublishedRate's doc
+              // comment. `unit.pricePerNight` is itself already a published rate (l.baseNightlyRate
+              // above) so the fallback stays correct with no discount data at all.
+              const publishedPrice = dailyBreakdown?.baseAmount ?? unit.pricePerNight;
 
               return (
               <article key={unit.id} data-testid="guest-listing-card" className="search-card">
@@ -1574,7 +1586,7 @@ const SearchPage = () => {
                       )}
                       <p className="mt-0.5 text-sm text-text-muted">per night</p>
                       <p className="text-xs text-text-muted">
-                        {formatEstTotalInclGst(displayedPrice, estimateNights, formatDisplayCurrency, 3, unit.isGstRegistered)}
+                        {formatEstTotalInclGst(displayedPrice, estimateNights, formatDisplayCurrency, 3, unit.isGstRegistered, publishedPrice)}
                       </p>
                       {longStay && (
                         <LongStayCalculator

@@ -1,31 +1,43 @@
 const isValidDate = (date: Date) => Number.isFinite(date.getTime());
 
-const isExactIsoDate = (value: string, date: Date): boolean => {
-  const isoPattern = /^\d{4}-\d{2}-\d{2}$/;
-  if (!isoPattern.test(value)) return true;
+const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
+/**
+ * TASK-6061: a bare `YYYY-MM-DD` (a booking's check-in/check-out) is a *calendar date*, not an
+ * instant — Atlas's operational day is IST, and the same date-only value must render as the same
+ * day for every viewer regardless of their browser's time zone. `new Date("2026-08-03")` parses
+ * as UTC midnight per the ECMAScript spec; every consumer that then reads it back with LOCAL
+ * getters (`getDate()`/`getMonth()`/`getFullYear()`) or formats via `toLocaleDateString` with no
+ * explicit `timeZone` silently shifts the calendar day backward for any viewer west of UTC (e.g.
+ * `2026-08-03` rendered as `02 Aug 2026` in `America/Los_Angeles`) — this is what put a wrong
+ * check-in date on the pre-payment Reserve screen.
+ *
+ * Fix: construct date-only values with the LOCAL Date constructor instead. The Date's local
+ * representation then already IS the intended calendar day, so every existing local-getter/
+ * `toLocaleDateString`-based consumer (this file's own `formatDateForDisplay`/`formatHumanDate`,
+ * and any other caller of `parseDate`) renders correctly with no further changes, in every time
+ * zone — construction and read-back happen in the same local zone, so they can never disagree.
+ */
+const parseDateOnly = (value: string): Date | null => {
   const [year, month, day] = value.split('-').map(Number);
-  const utcDate = new Date(Date.UTC(year, month - 1, day));
-
-  return (
-    utcDate.getUTCFullYear() === year &&
-    utcDate.getUTCMonth() === month - 1 &&
-    utcDate.getUTCDate() === day &&
-    isValidDate(date)
-  );
+  const local = new Date(year, month - 1, day);
+  const isValidCalendarDate =
+    local.getFullYear() === year && local.getMonth() === month - 1 && local.getDate() === day;
+  return isValidCalendarDate ? local : null;
 };
 
 export const parseDate = (value: string | Date | null | undefined): Date | null => {
   if (!value) return null;
 
-  const candidate = value instanceof Date ? new Date(value.getTime()) : new Date(value);
-  if (!isValidDate(candidate)) return null;
-
-  if (typeof value === 'string' && !isExactIsoDate(value, candidate)) {
-    return null;
+  if (typeof value === 'string' && DATE_ONLY_PATTERN.test(value)) {
+    return parseDateOnly(value);
   }
 
-  return candidate;
+  // Anything else (a full ISO datetime, a Date instance, ...) already carries explicit time/zone
+  // information, so native parsing is fine as-is — this whole-day ambiguity only exists for a
+  // bare date.
+  const candidate = value instanceof Date ? new Date(value.getTime()) : new Date(value);
+  return isValidDate(candidate) ? candidate : null;
 };
 
 export const formatDateForInput = (date: Date): string => {

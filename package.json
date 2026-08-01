@@ -62,6 +62,7 @@
     "date-fns": "^4.4.0",
     "framer-motion": "^12.42.2",
     "leaflet": "^1.9.4",
+    "libphonenumber-js": "^1.13.10",
     "lucide-react": "^1.23.0",
     "luxon": "^3.5.0",
     "pannellum": "^2.5.7",

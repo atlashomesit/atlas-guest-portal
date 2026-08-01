@@ -327,7 +327,11 @@
 }
 .pp-verified-list li svg { color: #157046; margin-top: 2px; flex-shrink: 0; }
 .pp-verified-list li b { font-weight: 600; }
-.pp-verified-list li .pp-meta { display: block; font-size: 12.5px; color: #64748b; margin-top: 1px; }
+/* TASK-5361 / TASK-4923 pattern: this panel is painted `var(--lavender-soft, #f0eafd)`
+   inline by the layout, and #64748b measured 4.41-4.48:1 against that lavender on gate 9b —
+   under the 4.5:1 AA threshold. `--lavender-text` is contrast-validated for this exact
+   surface (default.css documents 4.83:1 on #f0eafd), and the homepage panel already uses it. */
+.pp-verified-list li .pp-meta { display: block; font-size: 12.5px; color: var(--lavender-text, #6f5aa8); margin-top: 1px; }
 
 /* ---------- About / Prose ------------------------------------------------ */
 .pp-prose {
