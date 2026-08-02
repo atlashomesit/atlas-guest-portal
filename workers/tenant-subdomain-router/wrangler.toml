@@ -1,0 +1,18 @@
+# TASK-7170 / ADR-0096: standalone Worker (own deploy, independent of the Pages project above
+# it in this repo). Serves `*.atlastays.com` by proxying to the atlas-guest-portal Pages
+# origin — see src/index.ts. Deploy is a FOUNDER/ops action (Cloudflare dashboard creds);
+# the agent never deploys this. One-time setup steps live in
+# atlas-e2e/docs/operations/runbooks/custom-domain-onboarding.md.
+name = "tenant-subdomain-router"
+account_id = "268fbc55e5364fe69a2bd0e9a4764f68"
+main = "src/index.ts"
+compatibility_date = "2026-08-03"
+workers_dev = false
+
+# Attaching this route is what turns the wildcard on; `wrangler deploy` from this directory
+# creates/attaches it in the same action. Universal SSL already covers the first-level
+# wildcard (`*.atlastays.com`) at zero cost; the route is inert until the founder also adds
+# the wildcard DNS record (proxied AAAA `100::` discard record — dashboard step in the runbook).
+routes = [
+  { pattern = "*.atlastays.com/*", zone_name = "atlastays.com" },
+]
