@@ -181,45 +181,48 @@ function getPpRefundSteps(hasOnlinePayment: boolean): Array<{ title: string; des
   return PP_REFUND_STEPS;
 }
 
+// TASK-7012 (founder ruling, 2026-08-03): mirrors Homepage_PropertyDetails.tsx — this panel
+// deliberately says NOTHING about the universal grace window and takes no `graceHours`. It renders
+// with no selected check-in date, so there is nothing to void against, and atlas-api VOIDS the grace
+// window when check-in falls inside it from booking time
+// (`CancellationPolicyWindow.ComputeEffectiveFreeCancellationDeadlineUtc`): a same-day or next-day
+// booker gets NO grace refund. A listing-level `graceHours` means the FEATURE is enabled for that
+// listing, not that this guest's dates qualify. The grace window is disclosed ONLY by the booking
+// widget's grace strip, which gates on `resolveApplicableGraceHours` once real dates are picked.
+// Do not re-add a grace sentence here without a date-gated value to compute it from.
 function getPpCancellationInfo(
   tier: string | null | undefined,
-  opts?: { fallbackText?: string; hasOnlinePayment?: boolean; graceHours?: number | null },
+  opts?: { fallbackText?: string; hasOnlinePayment?: boolean },
 ): PpCancellationInfo {
   const steps = getPpRefundSteps(opts?.hasOnlinePayment !== false);
-  // TASK-4405 (copy-QA rider): mirrors Homepage_PropertyDetails.tsx — the universal grace window
-  // applies FIRST, so a tier headline must not silently contradict what the engine actually refunds
-  // during the grace window. Only shown when the server resolved a non-null graceHours.
-  const graceNote = opts?.graceHours
-    ? ` You can also cancel free within ${opts.graceHours} hours of booking, regardless of this policy.`
-    : '';
   if (tier === 'Flexible') return {
     headline: 'Full refund if cancelled 48 hours before check-in',
-    description: (opts?.hasOnlinePayment !== false
+    description: opts?.hasOnlinePayment !== false
       ? 'Money returns to the exact UPI or card you paid with. No phone calls needed.'
-      : 'Your host arranges the refund directly with you.') + graceNote,
+      : 'Your host arranges the refund directly with you.',
     steps,
   };
   if (tier === 'Moderate') return {
     headline: 'Full refund if cancelled 5 days before check-in',
-    description: 'Partial refund for cancellations after the window. Check your booking for exact terms.' + graceNote,
+    description: 'Partial refund for cancellations after the window. Check your booking for exact terms.',
     steps,
   };
   if (tier === 'Strict') return {
     headline: '50% refund if cancelled 7 days before check-in',
-    description: 'No refund within 7 days of check-in. Check your booking for exact terms.' + graceNote,
+    description: 'No refund within 7 days of check-in. Check your booking for exact terms.',
     steps,
   };
   const fallback = opts?.fallbackText?.trim();
   if (fallback) {
     return {
       headline: 'Cancellation policy',
-      description: fallback + graceNote,
+      description: fallback,
       steps,
     };
   }
   return {
     headline: 'Flexible cancellation — full refund 48+ hours before check-in',
-    description: 'Standard direct-booking policy. See your booking confirmation for exact cut-off times.' + graceNote,
+    description: 'Standard direct-booking policy. See your booking confirmation for exact cut-off times.',
     steps,
   };
 }
@@ -1325,7 +1328,6 @@ useEffect(() => {
     const ppCancellationInfo = getPpCancellationInfo(data.cancellationTier, {
       fallbackText: _resolvedCancellationText,
       hasOnlinePayment: ppHasOnlinePayment,
-      graceHours: data.graceHours,
     });
     const ppHasLocation =
         (typeof data.latitude === 'number' && Number.isFinite(data.latitude)) ||
