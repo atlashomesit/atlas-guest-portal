@@ -86,6 +86,34 @@ export function formatCancellationDeadline(deadline: Date): string {
 }
 
 /**
+ * TASK-7012: the grace hours that ACTUALLY apply to this booking, or null when none do — the single
+ * source of truth for "may we disclose the grace window to this guest?".
+ *
+ * Mirrors the server's void carve-out in
+ * `CancellationPolicyWindow.ComputeEffectiveFreeCancellationDeadlineUtc` (founder ruling 2026-07-16):
+ * the grace candidate is VOIDED when check-in falls inside the grace window measured from booking
+ * time (`checkInLocalMidnight - graceHours < bookingCreatedAt`). A voided window is one the server
+ * will NOT honour on cancellation, so no surface may advertise it — disclosing "free cancellation for
+ * N hours after you book" in that case is a direct over-promise against
+ * `CancellationRefundCalculator`.
+ *
+ * Returns null both when grace is voided and when no grace is configured (flag-off parity: the server
+ * omits `graceHours` when `Cancellation:UniversalGraceEnabled` is off), because callers must stay
+ * silent in both cases.
+ */
+export function resolveApplicableGraceHours(
+  checkInDate: Date,
+  bookingCreatedAt: Date,
+  graceHours: number | null | undefined,
+): number | null {
+  if (typeof graceHours !== 'number' || graceHours <= 0) return null;
+  const checkInIstMidnight = DateTime.fromJSDate(checkInDate).setZone('Asia/Kolkata').startOf('day');
+  const graceVoided =
+    checkInIstMidnight.minus({ hours: graceHours }) < DateTime.fromJSDate(bookingCreatedAt);
+  return graceVoided ? null : graceHours;
+}
+
+/**
  * TASK-4405: the effective free-cancellation deadline including the universal "book with confidence"
  * post-booking grace window — mirrors `CancellationPolicyWindow.ComputeEffectiveFreeCancellationDeadlineUtc`
  * in atlas-api (later-of the tier deadline and the possibly-voided grace deadline). `graceHours` MUST come
@@ -102,18 +130,14 @@ export function computeEffectiveCancellationDeadline(
 ): Date {
   const tierDeadline = computeCancellationDeadline(checkInDate, tier, windowHoursOverride);
 
-  if (typeof graceHours !== 'number' || graceHours <= 0) {
+  const applicableGraceHours = resolveApplicableGraceHours(checkInDate, bookingCreatedAt, graceHours);
+  if (applicableGraceHours == null) {
     return tierDeadline;
   }
 
-  const checkInIstMidnight = DateTime.fromJSDate(checkInDate).setZone('Asia/Kolkata').startOf('day');
-  const bookingCreatedAtDt = DateTime.fromJSDate(bookingCreatedAt);
-  const graceVoided = checkInIstMidnight.minus({ hours: graceHours }) < bookingCreatedAtDt;
-  if (graceVoided) {
-    return tierDeadline;
-  }
-
-  const graceDeadline = bookingCreatedAtDt.plus({ hours: graceHours }).toJSDate();
+  const graceDeadline = DateTime.fromJSDate(bookingCreatedAt)
+    .plus({ hours: applicableGraceHours })
+    .toJSDate();
   return graceDeadline.getTime() > tierDeadline.getTime() ? graceDeadline : tierDeadline;
 }
 
@@ -124,16 +148,28 @@ export function isFreeCancellationDeadlineActive(deadline: Date, now: Date = new
 
 /** TASK-7012: guest-facing trust-strip / pay-microcopy for free cancellation. */
 export type FreeCancellationTrustCopy = {
-  /** Full trust-strip sentence, or null when grace-window strip alone covers the case. */
+  /** Full trust-strip sentence, or null when the grace-window strip alone covers the case. */
   trustMessage: string | null;
   /** Formatted deadline when still active — for hold payload / microcopy suffix. */
   deadlineFormatted: string | null;
+  /**
+   * TASK-7012: grace hours safe to DISCLOSE for this selection — null when the server would void the
+   * grace window (or none is configured). Surfaces must gate their grace-window copy on this, never on
+   * the raw listing `graceHours`: a listing-level grace value says the feature is on, not that this
+   * guest's dates qualify for it.
+   */
+  applicableGraceHours: number | null;
 };
 
 /**
- * TASK-7012: never render "Free cancellation until \<past date\>" as a benefit. When the tier
- * deadline has already passed at booking time, suppress the misleading claim (grace-window strip
- * handles the compensating UI when `graceHours` is set) or replace with accurate policy copy.
+ * TASK-7012: never render "Free cancellation until \<past date\>" as a benefit. When the deadline has
+ * already passed at booking time, replace it with accurate policy copy rather than a lapsed promise.
+ *
+ * The one case where `trustMessage` is null is a still-active grace window with a lapsed tier deadline:
+ * there the caller's grace-window strip carries the (true) claim, so a second sentence would be
+ * redundant. When grace is VOIDED we fall through to the standard-policy sentence instead — the guest
+ * has no free cancellation left, and `applicableGraceHours` is null so the caller's grace strip stays
+ * hidden too.
  */
 export function resolveFreeCancellationTrustCopy(input: {
   checkInDate: Date;
@@ -145,31 +181,35 @@ export function resolveFreeCancellationTrustCopy(input: {
 }): FreeCancellationTrustCopy {
   const now = input.now ?? new Date();
   const bookingCreatedAt = input.bookingCreatedAt ?? now;
-  const deadline =
-    typeof input.graceHours === 'number' && input.graceHours > 0
-      ? computeEffectiveCancellationDeadline(
-          input.checkInDate,
-          input.tier,
-          input.windowHoursOverride,
-          bookingCreatedAt,
-          input.graceHours,
-        )
-      : computeCancellationDeadline(input.checkInDate, input.tier, input.windowHoursOverride);
+  const applicableGraceHours = resolveApplicableGraceHours(
+    input.checkInDate,
+    bookingCreatedAt,
+    input.graceHours,
+  );
+  const deadline = computeEffectiveCancellationDeadline(
+    input.checkInDate,
+    input.tier,
+    input.windowHoursOverride,
+    bookingCreatedAt,
+    applicableGraceHours,
+  );
 
   if (isFreeCancellationDeadlineActive(deadline, now)) {
     const formatted = formatCancellationDeadline(deadline);
     return {
       trustMessage: `Free cancellation until ${formatted}`,
       deadlineFormatted: formatted,
+      applicableGraceHours,
     };
   }
 
-  if (typeof input.graceHours === 'number' && input.graceHours > 0) {
-    return { trustMessage: null, deadlineFormatted: null };
+  if (applicableGraceHours != null) {
+    return { trustMessage: null, deadlineFormatted: null, applicableGraceHours };
   }
 
   return {
     trustMessage: 'Standard cancellation policy applies for this stay.',
     deadlineFormatted: null,
+    applicableGraceHours: null,
   };
 }

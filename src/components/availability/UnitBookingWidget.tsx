@@ -1043,6 +1043,20 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     });
   }, [dateRange.startDate, resolvedCancellationTier, resolvedCancellationWindowHours, resolvedGraceHours]);
 
+  // TASK-7012: trust-strip sentence, or null when there is nothing truthful to say (a still-active
+  // grace window with a lapsed tier deadline — the grace strip below carries that claim instead).
+  const cancellationTrustText =
+    freeCancellationCopy?.trustMessage
+    ?? (!dateRange.startDate ? 'Select check-in dates to see your free cancellation deadline' : null);
+
+  // TASK-7012: grace hours we may DISCLOSE. Once a check-in date is picked we know whether the server
+  // would void the grace window for these dates, so gate on the resolved value — `resolvedGraceHours`
+  // only says the feature is on for this listing, not that this guest's dates qualify. Before a date
+  // is picked there is nothing to void against, so the listing-level value carries generic copy.
+  const disclosableGraceHours = dateRange.startDate
+    ? freeCancellationCopy?.applicableGraceHours ?? null
+    : resolvedGraceHours;
+
   const { loading: dailyPricingLoading, error: _dailyPricingError, getListingPricing } = useDailyPricingSummary();
   const dailyPricing = useMemo(
     () => (listingId != null && String(listingId).trim() !== '' ? getListingPricing(listingId) : null),
@@ -1962,28 +1976,28 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       )}
 
       {/* TASK-2623/TASK-4334: Trust strip — free cancellation, actual computed deadline
-          when a check-in date is selected; generic fallback copy otherwise. */}
-      <div className="lv-booking-cancel bw-trust" data-testid="bw-trust-strip">
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M20 6L9 17l-5-5"/>
-        </svg>
-        <span data-testid="bw-trust-strip-text">
-          {freeCancellationCopy?.trustMessage
-            ?? (!dateRange.startDate
-              ? 'Select check-in dates to see your free cancellation deadline'
-              : '\u00a0')}
-        </span>
-      </div>
+          when a check-in date is selected; generic fallback copy otherwise. TASK-7012: rendered only
+          when there is a truthful claim to make — never as a bare check icon with blank text. */}
+      {cancellationTrustText ? (
+        <div className="lv-booking-cancel bw-trust" data-testid="bw-trust-strip">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M20 6L9 17l-5-5"/>
+          </svg>
+          <span data-testid="bw-trust-strip-text">{cancellationTrustText}</span>
+        </div>
+      ) : null}
 
       {/* TASK-4405: universal "book with confidence" post-booking grace-window disclosure — only
-          shown when the server has resolved a non-null graceHours for this listing (flag-off parity). */}
-      {resolvedGraceHours ? (
+          shown when the server has resolved a non-null graceHours for this listing (flag-off parity).
+          TASK-7012: and only when the selected dates do not VOID that window — the server will not
+          honour a voided grace window, so advertising it would over-promise the refund. */}
+      {disclosableGraceHours ? (
         <div className="lv-booking-cancel bw-trust" data-testid="bw-grace-window-strip">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M20 6L9 17l-5-5"/>
           </svg>
           <span data-testid="bw-grace-window-strip-text">
-            {`Free cancellation for ${resolvedGraceHours} hours after you book`}
+            {`Free cancellation for ${disclosableGraceHours} hours after you book`}
           </span>
         </div>
       ) : null}

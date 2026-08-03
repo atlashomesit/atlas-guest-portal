@@ -2065,6 +2065,12 @@ const GuestDetailsPage: React.FC = () => {
               {freeCancellationCopy?.trustMessage
                 && !freeCancellationCopy.deadlineFormatted
                 && ` ${freeCancellationCopy.trustMessage}`}
+              {/* TASK-7012: lapsed tier deadline but a live grace window — state the window that is
+                  actually honoured instead of leaving the charge line with no cancellation terms. */}
+              {!freeCancellationCopy?.deadlineFormatted
+                && !freeCancellationCopy?.trustMessage
+                && freeCancellationCopy?.applicableGraceHours
+                && ` Free cancellation for ${freeCancellationCopy.applicableGraceHours} hours after you book.`}
               {/* TASK-4410: INR charge disclosure for non-INR shoppers */}
               {currency !== 'INR' && (
                 <div style={{ marginTop: 8, fontSize: '0.85em', color: '#64748b' }}>
@@ -2140,7 +2146,18 @@ const TrustBand: React.FC<TrustBandProps> = ({ freeCancellationCopy, brandName, 
           </>
         ) : freeCancellationCopy?.trustMessage ? (
           freeCancellationCopy.trustMessage
+        ) : freeCancellationCopy?.applicableGraceHours ? (
+          // TASK-7012: tier deadline has lapsed but the universal grace window still applies —
+          // disclose the window that IS honoured rather than an unqualified "policy applies".
+          <>
+            <b>Free cancellation</b>
+            {` for ${freeCancellationCopy.applicableGraceHours} hours after you book.`}
+          </>
         ) : (
+          // TASK-7012: only reachable before a check-in date is known (no booking context to resolve
+          // a policy against). Once dates ARE known, `resolveFreeCancellationTrustCopy` always returns
+          // either a live deadline or the standard-policy sentence — never this unqualified claim,
+          // which would over-promise a refund the server will not issue on a lapsed policy.
           <>
             <b>Free cancellation</b>
             {' policy applies.'}

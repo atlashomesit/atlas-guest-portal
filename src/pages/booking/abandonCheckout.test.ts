@@ -37,10 +37,21 @@ describe('GuestDetailsPage TASK-5179 cancellation deadline wiring', () => {
   const filePath = resolve(__dirname, './GuestDetailsPage.tsx');
   const content = readFileSync(filePath, 'utf-8');
 
-  it('uses computeEffectiveCancellationDeadline instead of a hardcoded 48h offset', () => {
-    expect(content).toContain('computeEffectiveCancellationDeadline');
-    expect(content).toContain('formatCancellationDeadline');
+  it('resolves the deadline from the shared policy helper instead of a hardcoded 48h offset', () => {
+    // TASK-7012: the page delegates to `resolveFreeCancellationTrustCopy`, which internally calls
+    // `computeEffectiveCancellationDeadline`/`formatCancellationDeadline` AND applies the server's
+    // grace-void rule. Asserting the low-level names here would force the page back off the helper.
+    expect(content).toContain('resolveFreeCancellationTrustCopy');
     expect(content).not.toMatch(/48 \* 60 \* 60 \* 1000/);
     expect(content).not.toContain('48 hours before check-in');
+  });
+
+  it('never renders an unqualified free-cancellation claim once a check-in date is known (TASK-7012)', () => {
+    // The bare "Free cancellation policy applies." fallback is legitimate ONLY with no booking
+    // context. With dates in scope the helper always yields either a live deadline, the
+    // standard-policy sentence, or an applicable grace window — all three must be rendered.
+    expect(content).toContain('applicableGraceHours');
+    expect(content).toMatch(/freeCancellationCopy\?\.trustMessage/);
+    expect(content).toMatch(/freeCancellationCopy\?\.deadlineFormatted/);
   });
 });

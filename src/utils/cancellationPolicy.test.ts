@@ -4,6 +4,7 @@ import {
   computeEffectiveCancellationDeadline,
   formatCancellationDeadline,
   FREE_CANCELLATION_WINDOW_HOURS,
+  resolveApplicableGraceHours,
   resolveFreeCancellationTrustCopy,
 } from './cancellationPolicy';
 
@@ -141,9 +142,16 @@ describe('resolveFreeCancellationTrustCopy (TASK-7012)', () => {
     expect(copy.trustMessage).toBe('Standard cancellation policy applies for this stay.');
   });
 
-  it('suppresses tier deadline copy when grace window covers the case', () => {
+  /**
+   * TASK-7012 regression: a VOIDED grace window is not a benefit. Booking within `graceHours` of
+   * check-in voids the window server-side (`CancellationPolicyWindow`), so when the tier deadline has
+   * also lapsed the guest has NO free cancellation — the copy must say so, and must not hand callers
+   * a null message that leaves a "free cancellation for N hours after you book" strip as the only
+   * cancellation text on the page.
+   */
+  it('states the standard policy (not silence) when the grace window is VOIDED and the tier deadline has lapsed', () => {
     const checkIn = new Date('2026-07-28T00:00:00+05:30');
-    const now = new Date('2026-07-28T10:00:00+05:30');
+    const now = new Date('2026-07-28T10:00:00+05:30'); // booked same-day → grace voided
     const copy = resolveFreeCancellationTrustCopy({
       checkInDate: checkIn,
       tier: 'Strict',
@@ -151,7 +159,92 @@ describe('resolveFreeCancellationTrustCopy (TASK-7012)', () => {
       bookingCreatedAt: now,
       now,
     });
+    expect(copy.applicableGraceHours).toBeNull();
+    expect(copy.deadlineFormatted).toBeNull();
+    expect(copy.trustMessage).toBe('Standard cancellation policy applies for this stay.');
+    // Whatever we say, it must never read as a free-cancellation promise.
+    expect(copy.trustMessage).not.toMatch(/free cancellation/i);
+  });
+
+  it('extends the deadline into the grace window when grace is NOT voided (tier deadline already lapsed)', () => {
+    const checkIn = new Date('2026-08-01T00:00:00+05:30');
+    const now = new Date('2026-07-30T12:00:00+05:30');
+    // Strict tier deadline = 25 Jul (lapsed); grace not voided (check-in is >24h out).
+    const copy = resolveFreeCancellationTrustCopy({
+      checkInDate: checkIn,
+      tier: 'Strict',
+      graceHours: 24,
+      bookingCreatedAt: now,
+      now,
+    });
+    expect(copy.applicableGraceHours).toBe(24);
+    expect(copy.deadlineFormatted).toBe('12:00 PM, 31 Jul');
+    expect(copy.trustMessage).toBe('Free cancellation until 12:00 PM, 31 Jul');
+  });
+
+  it('suppresses tier deadline copy only when a live grace window carries the claim', () => {
+    // An existing booking re-rendered after its grace window elapsed but while grace still "applied"
+    // (not voided at booking time): nothing truthful left to say here, so the caller's grace strip owns it.
+    const copy = resolveFreeCancellationTrustCopy({
+      checkInDate: new Date('2026-08-05T00:00:00+05:30'),
+      tier: 'Strict',
+      graceHours: 24,
+      bookingCreatedAt: new Date('2026-07-30T12:00:00+05:30'),
+      now: new Date('2026-08-01T12:00:00+05:30'),
+    });
     expect(copy.trustMessage).toBeNull();
     expect(copy.deadlineFormatted).toBeNull();
+    expect(copy.applicableGraceHours).toBe(24);
+  });
+
+  it('never advertises a deadline that has already passed', () => {
+    const now = new Date('2026-07-28T10:00:00+05:30');
+    for (const graceHours of [null, undefined, 0, 24, 48]) {
+      const copy = resolveFreeCancellationTrustCopy({
+        checkInDate: new Date('2026-07-28T00:00:00+05:30'),
+        tier: 'Strict',
+        graceHours,
+        bookingCreatedAt: now,
+        now,
+      });
+      expect(copy.deadlineFormatted, `graceHours=${graceHours}`).toBeNull();
+      expect(copy.trustMessage ?? '', `graceHours=${graceHours}`).not.toMatch(/until/i);
+    }
+  });
+});
+
+/**
+ * TASK-7012: mirrors `CancellationPolicyWindow.ComputeEffectiveFreeCancellationDeadlineUtc`'s void
+ * carve-out. Drift here means the guest portal advertises a grace window the API refuses to honour.
+ */
+describe('resolveApplicableGraceHours', () => {
+  const checkIn = new Date('2026-07-28T00:00:00+05:30');
+
+  it('returns null when no grace window is configured (flag-off parity)', () => {
+    const bookedAt = new Date('2026-07-01T12:00:00+05:30');
+    expect(resolveApplicableGraceHours(checkIn, bookedAt, null)).toBeNull();
+    expect(resolveApplicableGraceHours(checkIn, bookedAt, undefined)).toBeNull();
+    expect(resolveApplicableGraceHours(checkIn, bookedAt, 0)).toBeNull();
+    expect(resolveApplicableGraceHours(checkIn, bookedAt, -5)).toBeNull();
+  });
+
+  it('returns the grace hours when check-in is outside the window from booking time', () => {
+    // Booked 27 Jul 00:00 IST, check-in 28 Jul 00:00 IST → exactly 24h out, not voided.
+    expect(resolveApplicableGraceHours(checkIn, new Date('2026-07-27T00:00:00+05:30'), 24)).toBe(24);
+    expect(resolveApplicableGraceHours(checkIn, new Date('2026-07-01T12:00:00+05:30'), 24)).toBe(24);
+  });
+
+  it('VOIDS the window when check-in falls inside it from booking time', () => {
+    // One minute later than the boundary above → check-in is now inside the 24h window.
+    expect(resolveApplicableGraceHours(checkIn, new Date('2026-07-27T00:01:00+05:30'), 24)).toBeNull();
+    // Same-day booking is the canonical voided case.
+    expect(resolveApplicableGraceHours(checkIn, new Date('2026-07-28T10:00:00+05:30'), 24)).toBeNull();
+  });
+
+  it('voids on a wider configured window that a 24h window would have allowed', () => {
+    const bookedAt = new Date('2026-07-26T12:00:00+05:30');
+    expect(resolveApplicableGraceHours(checkIn, bookedAt, 24)).toBe(24);
+    // 48h window: check-in − 48h = 26 Jul 00:00 IST, which is before booking → voided.
+    expect(resolveApplicableGraceHours(checkIn, bookedAt, 48)).toBeNull();
   });
 });
