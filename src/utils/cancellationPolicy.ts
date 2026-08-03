@@ -116,3 +116,60 @@ export function computeEffectiveCancellationDeadline(
   const graceDeadline = bookingCreatedAtDt.plus({ hours: graceHours }).toJSDate();
   return graceDeadline.getTime() > tierDeadline.getTime() ? graceDeadline : tierDeadline;
 }
+
+/** TASK-7012: true when the computed free-cancellation deadline is still in the future. */
+export function isFreeCancellationDeadlineActive(deadline: Date, now: Date = new Date()): boolean {
+  return deadline.getTime() > now.getTime();
+}
+
+/** TASK-7012: guest-facing trust-strip / pay-microcopy for free cancellation. */
+export type FreeCancellationTrustCopy = {
+  /** Full trust-strip sentence, or null when grace-window strip alone covers the case. */
+  trustMessage: string | null;
+  /** Formatted deadline when still active — for hold payload / microcopy suffix. */
+  deadlineFormatted: string | null;
+};
+
+/**
+ * TASK-7012: never render "Free cancellation until \<past date\>" as a benefit. When the tier
+ * deadline has already passed at booking time, suppress the misleading claim (grace-window strip
+ * handles the compensating UI when `graceHours` is set) or replace with accurate policy copy.
+ */
+export function resolveFreeCancellationTrustCopy(input: {
+  checkInDate: Date;
+  tier: CancellationTier | string | null | undefined;
+  windowHoursOverride?: number | null;
+  bookingCreatedAt?: Date;
+  graceHours?: number | null;
+  now?: Date;
+}): FreeCancellationTrustCopy {
+  const now = input.now ?? new Date();
+  const bookingCreatedAt = input.bookingCreatedAt ?? now;
+  const deadline =
+    typeof input.graceHours === 'number' && input.graceHours > 0
+      ? computeEffectiveCancellationDeadline(
+          input.checkInDate,
+          input.tier,
+          input.windowHoursOverride,
+          bookingCreatedAt,
+          input.graceHours,
+        )
+      : computeCancellationDeadline(input.checkInDate, input.tier, input.windowHoursOverride);
+
+  if (isFreeCancellationDeadlineActive(deadline, now)) {
+    const formatted = formatCancellationDeadline(deadline);
+    return {
+      trustMessage: `Free cancellation until ${formatted}`,
+      deadlineFormatted: formatted,
+    };
+  }
+
+  if (typeof input.graceHours === 'number' && input.graceHours > 0) {
+    return { trustMessage: null, deadlineFormatted: null };
+  }
+
+  return {
+    trustMessage: 'Standard cancellation policy applies for this stay.',
+    deadlineFormatted: null,
+  };
+}

@@ -4,6 +4,7 @@ import {
   computeEffectiveCancellationDeadline,
   formatCancellationDeadline,
   FREE_CANCELLATION_WINDOW_HOURS,
+  resolveFreeCancellationTrustCopy,
 } from './cancellationPolicy';
 
 // TASK-4334: guest-facing cancellation deadline computation/formatting.
@@ -112,5 +113,45 @@ describe('computeEffectiveCancellationDeadline', () => {
   it('prefers server windowHoursOverride over tier map', () => {
     const deadline = computeEffectiveCancellationDeadline(checkIn, 'Flexible', 168, bookingCreatedAt, null);
     expect(deadline.toISOString()).toBe(new Date('2026-07-05T00:00:00+05:30').toISOString());
+  });
+});
+
+describe('resolveFreeCancellationTrustCopy (TASK-7012)', () => {
+  it('returns active free-cancellation copy when deadline is in the future', () => {
+    const checkIn = new Date('2026-08-15T00:00:00+05:30');
+    const now = new Date('2026-07-01T12:00:00+05:30');
+    const copy = resolveFreeCancellationTrustCopy({
+      checkInDate: checkIn,
+      tier: 'Flexible',
+      now,
+    });
+    expect(copy.trustMessage).toMatch(/^Free cancellation until /);
+    expect(copy.deadlineFormatted).toBe('12:00 AM, 13 Aug');
+  });
+
+  it('does not advertise a past deadline as a benefit for near-term check-in', () => {
+    const checkIn = new Date('2026-07-28T00:00:00+05:30');
+    const now = new Date('2026-07-28T10:00:00+05:30');
+    const copy = resolveFreeCancellationTrustCopy({
+      checkInDate: checkIn,
+      tier: 'Strict',
+      now,
+    });
+    expect(copy.deadlineFormatted).toBeNull();
+    expect(copy.trustMessage).toBe('Standard cancellation policy applies for this stay.');
+  });
+
+  it('suppresses tier deadline copy when grace window covers the case', () => {
+    const checkIn = new Date('2026-07-28T00:00:00+05:30');
+    const now = new Date('2026-07-28T10:00:00+05:30');
+    const copy = resolveFreeCancellationTrustCopy({
+      checkInDate: checkIn,
+      tier: 'Strict',
+      graceHours: 24,
+      bookingCreatedAt: now,
+      now,
+    });
+    expect(copy.trustMessage).toBeNull();
+    expect(copy.deadlineFormatted).toBeNull();
   });
 });

@@ -43,8 +43,8 @@ import {
   isMobileCheckoutUserAgent,
 } from '@/utils/razorpayCheckoutOptions';
 import {
-  computeEffectiveCancellationDeadline,
-  formatCancellationDeadline,
+  resolveFreeCancellationTrustCopy,
+  type FreeCancellationTrustCopy,
 } from '@/utils/cancellationPolicy';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 
@@ -527,17 +527,15 @@ const GuestDetailsPage: React.FC = () => {
     || (unitSlug && /\D/.test(unitSlug) ? unitSlug.replace(/-/g, ' ') : unitSlug ?? '');
 
   // TASK-5179: free-cancellation deadline from resolved listing policy (not a hardcoded 48h).
-  const freeCancelDisplay = useMemo(() => {
+  const freeCancellationCopy = useMemo(() => {
     if (!booking.checkIn) return null;
-    const checkInDate = new Date(booking.checkIn);
-    const deadline = computeEffectiveCancellationDeadline(
-      checkInDate,
-      booking.holdCancellationTier,
-      booking.holdCancellationWindowHours,
-      new Date(),
-      booking.holdGraceHours,
-    );
-    return formatCancellationDeadline(deadline);
+    return resolveFreeCancellationTrustCopy({
+      checkInDate: new Date(booking.checkIn),
+      tier: booking.holdCancellationTier,
+      windowHoursOverride: booking.holdCancellationWindowHours,
+      bookingCreatedAt: new Date(),
+      graceHours: booking.holdGraceHours,
+    });
   }, [
     booking.checkIn,
     booking.holdCancellationTier,
@@ -1932,7 +1930,7 @@ const GuestDetailsPage: React.FC = () => {
 
           {/* Trust band (mobile only — desktop in aside) */}
           <TrustBand
-            freeCancelDisplay={freeCancelDisplay}
+            freeCancellationCopy={freeCancellationCopy}
             brandName={brandName}
             whatsappNumber={whatsappNumber}
             className="gd-trust--mobile"
@@ -2062,7 +2060,11 @@ const GuestDetailsPage: React.FC = () => {
           {consentAccepted && (
             <div className="gd-pay-microcopy">
               You'll be charged <b>{displayPrice(chargeInr)}</b> now to confirm.
-              {freeCancelDisplay && ` Free cancellation until ${freeCancelDisplay}.`}
+              {freeCancellationCopy?.deadlineFormatted
+                && ` Free cancellation until ${freeCancellationCopy.deadlineFormatted}.`}
+              {freeCancellationCopy?.trustMessage
+                && !freeCancellationCopy.deadlineFormatted
+                && ` ${freeCancellationCopy.trustMessage}`}
               {/* TASK-4410: INR charge disclosure for non-INR shoppers */}
               {currency !== 'INR' && (
                 <div style={{ marginTop: 8, fontSize: '0.85em', color: '#64748b' }}>
@@ -2084,7 +2086,7 @@ const GuestDetailsPage: React.FC = () => {
 
           {/* Trust band (desktop) */}
           <TrustBand
-            freeCancelDisplay={freeCancelDisplay}
+            freeCancellationCopy={freeCancellationCopy}
             brandName={brandName}
             whatsappNumber={whatsappNumber}
           />
@@ -2121,18 +2123,29 @@ const GuestDetailsPage: React.FC = () => {
 
 // ── TrustBand atom ────────────────────────────────────────────────────────────
 interface TrustBandProps {
-  freeCancelDisplay: string | null;
+  freeCancellationCopy: FreeCancellationTrustCopy | null;
   brandName: string;
   whatsappNumber: string;
   className?: string;
 }
-const TrustBand: React.FC<TrustBandProps> = ({ freeCancelDisplay, brandName, whatsappNumber, className }) => (
+const TrustBand: React.FC<TrustBandProps> = ({ freeCancellationCopy, brandName, whatsappNumber, className }) => (
   <div className={`gd-trust${className ? ` ${className}` : ''}`}>
     <div className="gd-trust-row">
       <IconCheck size={14}/>
       <span>
-        <b>Free cancellation</b>
-        {freeCancelDisplay ? ` until ${freeCancelDisplay}.` : ' policy applies.'}
+        {freeCancellationCopy?.deadlineFormatted ? (
+          <>
+            <b>Free cancellation</b>
+            {` until ${freeCancellationCopy.deadlineFormatted}.`}
+          </>
+        ) : freeCancellationCopy?.trustMessage ? (
+          freeCancellationCopy.trustMessage
+        ) : (
+          <>
+            <b>Free cancellation</b>
+            {' policy applies.'}
+          </>
+        )}
       </span>
     </div>
     <div className="gd-trust-row">
