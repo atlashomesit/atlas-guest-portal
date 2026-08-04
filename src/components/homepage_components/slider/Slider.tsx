@@ -116,7 +116,9 @@ const Slider = () => {
 
         {/* Trust strip — no hour counts here (TASK-7201): hero has no listing/booking context,
             so inventing 48h/24h over-promises vs per-listing tier + graceHours. Point guests
-            at /policies; widget/checkout disclose the server-resolved windows. */}
+            at /policies; widget/checkout disclose the server-resolved windows.
+            TASK-7432 AC4: "Instant confirmation" / "Verified homes" are marketplace marketing
+            claims (not tenant-derived); keep them as static copy, not API-backed badges. */}
         <ul className="ahv2-chip-row" role="list" aria-label="Booking guarantees">
           <li role="listitem" className="ahv2-chip">
             <span className="ahv2-tick" aria-hidden="true">
