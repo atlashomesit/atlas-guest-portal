@@ -1,6 +1,6 @@
 import { formatDisplayNumber } from '../config/contact';
 import { getTenantContext } from '../tenant/tenantContext';
-import { getTenantOverrides } from '../tenant/tenantOverrides'; // TASK-1878
+import { getTenantOverrides, shouldHideAtlasBranding } from '../tenant/tenantOverrides'; // TASK-1878
 
 export type FaqHighlight = {
   id: string;
@@ -21,7 +21,8 @@ export function getFaqHighlights(): FaqHighlight[] {
     return overrides.faq;
   }
 
-  // Atlas-Penthouse defaults
+  const tenant = getTenantContext();
+  const hideAtlasBranding = shouldHideAtlasBranding(tenant, overrides);
   const businessPhone = formatDisplayNumber("business");
   const ownerPhone = formatDisplayNumber("owner");
 
@@ -29,8 +30,9 @@ export function getFaqHighlights(): FaqHighlight[] {
     {
       id: "checkin-checkout",
       question: "How do check-in and check-out work?",
-      answer:
-        "Standard check-in is 2:00 PM (3:00 PM for the penthouse) and check-out is 11:00 AM (12:00 PM for the penthouse). Self check-in with ID is supported, and early/late slots depend on availability.",
+      answer: hideAtlasBranding
+        ? "Standard check-in is 2:00 PM and check-out is 11:00 AM. Self check-in with ID is supported, and early/late slots depend on availability."
+        : "Standard check-in is 2:00 PM (3:00 PM for the penthouse) and check-out is 11:00 AM (12:00 PM for the penthouse). Self check-in with ID is supported, and early/late slots depend on availability.",
     },
     {
       id: "changes-cancellations",
@@ -41,8 +43,9 @@ export function getFaqHighlights(): FaqHighlight[] {
     {
       id: "extra-guests-fees",
       question: "Can I add extra guests or pay additional fees?",
-      answer:
-        "Base occupancy covers two guests (four in the penthouse). Extra adults are allowed within the max capacity and incur a per-guest nightly fee as shown during checkout.",
+      answer: hideAtlasBranding
+        ? "Base occupancy covers the guests listed for your unit. Extra adults are allowed within the max capacity and incur a per-guest nightly fee as shown during checkout."
+        : "Base occupancy covers two guests (four in the penthouse). Extra adults are allowed within the max capacity and incur a per-guest nightly fee as shown during checkout.",
     },
     {
       id: "wifi-parking",

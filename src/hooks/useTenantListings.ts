@@ -70,7 +70,7 @@ const inferUnitTypeFromName = (name: string | undefined | null): string => {
   return (name ?? "").toLowerCase().includes("penthouse") ? "penthouse" : "1bhk";
 };
 
-const mapDtoToProperty = (dto: PublicListing): TenantPropertyRecord => {
+export const mapDtoToProperty = (dto: PublicListing): TenantPropertyRecord => {
   const local = localPropertyByListingId.get(dto.id);
   const propertyNumber =
     local?.id ??
@@ -95,7 +95,8 @@ const mapDtoToProperty = (dto: PublicListing): TenantPropertyRecord => {
       local?.property_description ??
       // TASK-4313: singular "1 guest" when capacity is 1.
       `Comfortable stay for up to ${dto.maxGuests || local?.maxGuests || 2} guest${(dto.maxGuests || local?.maxGuests || 2) === 1 ? '' : 's'}.`,
-    property_location: local?.property_location ?? dto.propertyAddress ?? "Hyderabad",
+    // TASK-7194: never default to Atlas's city — omit location when API/property data is absent.
+    property_location: local?.property_location ?? dto.propertyAddress ?? "",
     property_neighborhoods: local?.property_neighborhoods ?? [],
     property_reviews: dto.reviewCount ?? local?.property_reviews ?? 0,
     property_rating: dto.propertyRating ?? local?.property_rating ?? 0,

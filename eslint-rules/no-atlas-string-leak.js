@@ -30,6 +30,12 @@ const BANNED_PATTERNS = [
   /atlashomeskphb/i,
   // Atlas host/admin portal — must not appear on white-label guest sites (TASK-7434)
   /app\.atlaspms\.in/i,
+  // TASK-7194: Atlas demo neighbourhood / unit copy — must not leak onto white-label sites
+  /\bKPHB\b/i,
+  /\bKukatpally\b/i,
+  /\bPenthouse 501\b/i,
+  /\bHITECity\b/i,
+  /\bJubilee Hills\b/i,
 ];
 
 /** Check a raw string value — returns true when it contains a banned pattern. */

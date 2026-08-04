@@ -3,6 +3,7 @@ import {
   buildSitemapXml,
   listingPathSlug,
   resolveSitemapTenantSlug,
+  SHARED_SITEMAP_PATHS,
   SITEMAP_PATHS,
 } from './sitemap.xml';
 import { _resetTenantSlugCacheForTests } from './_lib/tenantSlug';
@@ -12,7 +13,13 @@ describe('sitemap.xml', () => {
     _resetTenantSlugCacheForTests();
   });
 
-  it('includes city landing pages for all city slugs', () => {
+  // TASK-7430 / TASK-7194: white-label hosts must not advertise Atlas SEO city guides in sitemap.xml
+  it('TASK-7194: SHARED_SITEMAP_PATHS omits Atlas city landing pages', () => {
+    expect(SHARED_SITEMAP_PATHS).not.toContain('/homestays-in-hyderabad');
+    expect(SITEMAP_PATHS).toContain('/homestays-in-hyderabad');
+  });
+
+  it('includes city landing pages for all city slugs in the full marketplace sitemap', () => {
     const cityLandingSlugs = ["goa", "coorg", "hyderabad", "manali"];
     const expectedPaths = cityLandingSlugs.map((slug) => `/homestays-in-${slug}`);
 

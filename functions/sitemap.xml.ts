@@ -8,10 +8,12 @@ interface Env {
   ATLAS_WORKER_PROXY_SECRET?: string;
 }
 
-// TASK-4414: city landing pages for SEO acquisition
+// TASK-4414: city landing pages for SEO acquisition (Atlas marketplace surfaces only — TASK-7194)
 const CITY_LANDING_SLUGS = ["goa", "coorg", "hyderabad", "manali"] as const;
 
-const CORE_PATHS = [
+const ATLAS_CITY_PATHS = CITY_LANDING_SLUGS.map((slug) => `/homestays-in-${slug}`);
+
+const SHARED_CORE_PATHS = [
   "/",
   "/amenities",
   "/location",
@@ -25,11 +27,14 @@ const CORE_PATHS = [
   "/about",
   "/faq",
   "/terms",
-  // City landing pages (TASK-4414)
-  ...CITY_LANDING_SLUGS.map((slug) => `/homestays-in-${slug}`),
 ];
 
-// Backward-compatible export used by tests; includes static (always-on) sitemap paths.
+const CORE_PATHS = [...SHARED_CORE_PATHS, ...ATLAS_CITY_PATHS];
+
+/** Paths every tenant sitemap includes (no Atlas SEO city guides). */
+export const SHARED_SITEMAP_PATHS = SHARED_CORE_PATHS;
+
+/** Full marketplace sitemap paths (includes Atlas city landing pages). */
 export const SITEMAP_PATHS = CORE_PATHS;
 
 export function buildSitemapXml(baseUrl: string, paths: string[]): string {
@@ -150,6 +155,13 @@ export const onRequestGet = async ({ request, env }: { request: Request; env?: E
     envTenantKey,
   );
 
+  const isAtlasHost =
+    isMarketplaceHost(host) ||
+    isAtlasDirectBookingHost(host) ||
+    host.endsWith(".localhost");
+
+  const corePaths = isAtlasHost ? CORE_PATHS : SHARED_CORE_PATHS;
+
   const listingPaths: string[] = [];
   if (apiBase && tenantSlug) {
     try {
@@ -176,7 +188,7 @@ export const onRequestGet = async ({ request, env }: { request: Request; env?: E
     }
   }
 
-  const paths = Array.from(new Set([...CORE_PATHS, ...listingPaths]));
+  const paths = Array.from(new Set([...corePaths, ...listingPaths]));
   const sitemapXml = buildSitemapXml(origin, paths);
 
   return new Response(sitemapXml, {

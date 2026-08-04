@@ -63,7 +63,7 @@ const FavoritesPage = React.lazy(() => import("./pages/FavoritesPage"))
 const RecentlyViewedPage = React.lazy(() => import("./pages/RecentlyViewedPage"))
 const CookieConsentBanner = React.lazy(() => import("./components/CookieConsentBanner"))
 const PageNotFound = React.lazy(() => import("./pages/pagenotfound/PageNotFound"))
-const CityLandingPage = React.lazy(() => import("./pages/CityLandingPage"))
+const AtlasOnlyCityLanding = React.lazy(() => import("./pages/AtlasOnlyCityLanding"))
 // TASK-2612: Two-step booking flow — guest details step after Reserve
 const GuestDetailsPage = React.lazy(() => import("./pages/booking/GuestDetailsPage"))
 // TASK-4017: Guest OTP login
@@ -188,7 +188,7 @@ function AppWrapper() {
               path={`/homestays-in-${citySlug}`}
               element={withBoundary(
                 <Suspense fallback={<LazyFallback />}>
-                  <CityLandingPage citySlug={citySlug} />
+                  <AtlasOnlyCityLanding citySlug={citySlug} />
                 </Suspense>,
                 `city-landing-${citySlug}-route`,
               )}
