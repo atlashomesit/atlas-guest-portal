@@ -8,6 +8,7 @@ vi.mock("../tenant/tenantOverrides", () => ({ getTenantOverrides: vi.fn() }));
 import {
   getContactPhone,
   getWhatsAppPhone,
+  getGuestFacingPhone,
   getContactEmail,
   getTelLink,
   getWhatsAppLink,
@@ -239,5 +240,33 @@ describe("TASK-4899: Neutral-mode tenant on a non-custom-domain host — no Atla
     ctx.mockReturnValue(tenant({ slug: "atlas" }));
     expect(isWhiteLabelTenant()).toBe(false);
     expect(getContactPhone("business")).toBe(ATLAS_DEFAULT);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// TASK-7192: guest-facing phone — WhatsApp booking number wins; contactPhone is fallback
+// ---------------------------------------------------------------------------
+describe("TASK-7192: getGuestFacingPhone precedence", () => {
+  it("WhatsApp booking number wins over contactPhone", () => {
+    ovr.mockReturnValue({});
+    ctx.mockReturnValue(
+      tenant({
+        whatsappBookingPhone: "919860554555",
+        legalContactPack: { contactPhone: "7620184596", showAtlasFooterCredit: false },
+      }),
+    );
+    expect(getGuestFacingPhone("business")).toBe("9860554555");
+    expect(getGuestFacingPhone("business")).not.toBe("7620184596");
+  });
+
+  it("falls back to contactPhone when WhatsApp booking number is unset", () => {
+    ovr.mockReturnValue({});
+    ctx.mockReturnValue(
+      tenant({
+        legalContactPack: { contactPhone: "7620184596", showAtlasFooterCredit: false },
+      }),
+    );
+    expect(getWhatsAppPhone("business")).toBe("7620184596");
+    expect(getGuestFacingPhone("business")).toBe("7620184596");
   });
 });

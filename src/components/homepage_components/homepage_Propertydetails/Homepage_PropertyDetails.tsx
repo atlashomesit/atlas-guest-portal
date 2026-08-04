@@ -5,7 +5,7 @@ import { getListingDisplayName } from '@/lib/listingDisplayName';
 import { getTenantContext as _getTenantCtx } from '@/tenant/tenantContext';
 import { getTenantOverrides, shouldHideAtlasBranding } from '@/tenant/tenantOverrides';
 import { getTenantBrandName } from '@/tenant/displayBrand';
-import { getWhatsAppPhone } from '@/config/contact';
+import { getGuestFacingPhone } from '@/config/contact';
 import { REFUND_INITIATED_STEP_DESC, REFUND_SETTLEMENT_STEP_DESC } from '@/config/refundPolicyTimelines';
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { FaBed, FaShower, FaSwimmingPool, FaCar, FaWifi, FaTv, FaDumbbell } from "react-icons/fa";
@@ -1398,10 +1398,13 @@ useEffect(() => {
         mapSrcTrimmed.length > 0 ||
         useMultiPin ||
         (mapLocation != null && typeof mapLocation.lat === 'number' && Number.isFinite(mapLocation.lat));
-    const ppHostPhone = (data.hostPhone?.replace(/\D/g, '') || '').trim() || getWhatsAppPhone('business');
+    // TASK-7192: guest-facing phone precedence — WhatsApp/booking number wins over listing hostPhone.
+    const listingHostDigits = (data.hostPhone?.replace(/\D/g, '') || '').trim();
+    const ppHostPhone = getGuestFacingPhone('business') || listingHostDigits;
     const ppHasHostPhone = ppHostPhone.length > 0;
-    const ppWaBookingUrl = ppHasHostPhone ? `https://wa.me/${ppHostPhone}?text=${encodeURIComponent(`Hi, I'm interested in booking ${data.property_name}`)}` : '';
-    const ppWaAskUrl = ppHasHostPhone ? `https://wa.me/${ppHostPhone}?text=${encodeURIComponent(`Hi, I have a question about ${data.property_name}`)}` : '';
+    const ppWaDigits = ppHostPhone.length === 10 ? `91${ppHostPhone}` : ppHostPhone;
+    const ppWaBookingUrl = ppHasHostPhone ? `https://wa.me/${ppWaDigits}?text=${encodeURIComponent(`Hi, I'm interested in booking ${data.property_name}`)}` : '';
+    const ppWaAskUrl = ppHasHostPhone ? `https://wa.me/${ppWaDigits}?text=${encodeURIComponent(`Hi, I have a question about ${data.property_name}`)}` : '';
     const ppShowRegRow = (ppTenantOverrides.gstin != null) ||
         (ppTenantOverrides.tourismRegNumbers != null && ppTenantOverrides.tourismRegNumbers.length > 0);
 
