@@ -70,7 +70,7 @@ export const whyChooseHighlights = [
   },
   {
     title: "Prime Locations",
-    description: "Homes near Hitech City, KPHB, and commute-friendly hubs around Hyderabad.",
+    description: "Homes in well-connected neighbourhoods with easy access to work and leisure hubs.",
   },
   {
     title: "Value for Money",
@@ -84,7 +84,7 @@ export const whyChooseHighlights = [
 
 export const whyChooseStatsBadges = [
   "4.8+ avg rating",
-  "Near Hitech City / KPHB",
+  "Well-connected locations",
   "Fast support on WhatsApp",
 ];
 

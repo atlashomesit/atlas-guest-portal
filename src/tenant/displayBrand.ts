@@ -55,13 +55,24 @@ export function getTenantContactEmail(kind: "support" | "privacy" = "support"): 
 }
 
 /**
- * Short brand for headers, SEO, and guest-facing copy (maps to API `brandName` / `TenantInfo.name`).
- * TASK-4899: a `Neutral`-mode tenant with no `brandName`/`name` configured at all falls back to
- * `NEUTRAL_NO_BRAND_FALLBACK`, never `MARKETPLACE_BRAND_BASELINE` ("Atlastays") — Platform mode
- * (and any tenant whose Neutral status can't be confirmed) keeps today's baseline fallback.
+ * Short brand for headers, SEO, and guest-facing copy.
+ *
+ * TASK-7431 precedence (business name first):
+ *  1. `legalContactPack.displayName` — host-configured business display name
+ *  2. `brandNameLong` — legal/property-style long brand when no business display name
+ *  3. `brandName` / `name` — short API brand only when neither of the above is set
+ *  4. Neutral → `NEUTRAL_NO_BRAND_FALLBACK`; otherwise `MARKETPLACE_BRAND_BASELINE`
+ *
+ * TASK-4899: a `Neutral`-mode tenant with nothing configured falls back to
+ * `NEUTRAL_NO_BRAND_FALLBACK`, never `MARKETPLACE_BRAND_BASELINE` ("Atlastays").
  */
 export function getTenantBrandName(): string {
   const c = getTenantContext();
+  // Prefer the host's business display name over short API brand / marketplace defaults.
+  const businessDisplay = (c?.legalContactPack?.displayName ?? "").trim();
+  if (businessDisplay) return businessDisplay;
+  const longBrand = (c?.brandNameLong ?? "").trim();
+  if (longBrand) return longBrand;
   const raw = (c?.brandName ?? c?.name ?? "").trim();
   if (raw) return raw;
   return isNeutralBrandingMode() ? NEUTRAL_NO_BRAND_FALLBACK : MARKETPLACE_BRAND_BASELINE;

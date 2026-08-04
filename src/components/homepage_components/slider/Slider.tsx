@@ -9,7 +9,6 @@ import {
   resolveDirectBookingPromo,
 } from '../../../utils/directBookingPromo';
 import { SearchAvailabilityWidget } from '../../availability/SearchAvailabilityWidget';
-import { PLATFORM_DEFAULT_GRACE_HOURS } from '../../../utils/cancellationPolicy';
 import '../atlas-home-v2.css';
 
 // Ivory seam (left 120px) + a soft 8% coral wash over the hero photo. Kept as a
@@ -33,6 +32,10 @@ const Slider = () => {
   // the same canonical check the "Our Homes" grid uses for its Atlas eyebrow.
   const showAtlasContent = !shouldHideAtlasBranding(tenant, overrides);
   const brandName = getTenantBrandName();
+  // TASK-7194: never hardcode Hyderabad on white-label — use tenant legal city when present.
+  const heroCity = showAtlasContent
+    ? 'Hyderabad'
+    : (tenant?.legalContactPack?.city?.trim() || null);
   const heroImageUrl = showAtlasContent ? HERO_IMAGE_URL : '';
   const hasHeroPhoto = Boolean(heroImageUrl.trim());
   const heroPhotoAriaLabel = showAtlasContent
@@ -59,7 +62,11 @@ const Slider = () => {
 
         <h1 className="ahv2-hero-h1">
           Thoughtfully curated{' '}
-          <span className="ahv2-city">stays in Hyderabad</span>
+          {heroCity ? (
+            <span className="ahv2-city">stays in {heroCity}</span>
+          ) : (
+            <span className="ahv2-city">stays</span>
+          )}
         </h1>
 
         <p className="ahv2-hero-sub">
@@ -107,7 +114,11 @@ const Slider = () => {
           </div>
         ) : null}
 
-        {/* Trust strip — three soft-amber chips (one canonical line) */}
+        {/* Trust strip — no hour counts here (TASK-7201): hero has no listing/booking context,
+            so inventing 48h/24h over-promises vs per-listing tier + graceHours. Point guests
+            at /policies; widget/checkout disclose the server-resolved windows.
+            TASK-7432 AC4: "Instant confirmation" / "Verified homes" are marketplace marketing
+            claims (not tenant-derived); keep them as static copy, not API-backed badges. */}
         <ul className="ahv2-chip-row" role="list" aria-label="Booking guarantees">
           <li role="listitem" className="ahv2-chip">
             <span className="ahv2-tick" aria-hidden="true">
@@ -125,16 +136,9 @@ const Slider = () => {
             <span className="ahv2-tick" aria-hidden="true">
               <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
             </span>
-            Free cancellation 48h before check-in
-          </li>
-          {/* TASK-4405: universal "book with confidence" grace window — generic pre-search marketing
-              copy (no listing/booking is in scope on the homepage hero). The per-listing/per-booking
-              surfaces (booking widget, checkout) show the server-resolved exact hour count instead. */}
-          <li role="listitem" className="ahv2-chip">
-            <span className="ahv2-tick" aria-hidden="true">
-              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-            </span>
-            Free cancellation within {PLATFORM_DEFAULT_GRACE_HOURS}h of booking
+            <Link to="/policies" className="underline-offset-2 hover:underline">
+              See cancellation policy
+            </Link>
           </li>
         </ul>
       </div>

@@ -33,7 +33,7 @@ import { useListingPhotosFromApi } from '@/contexts/ListingPhotosContext';
 import OptimizedImage from '@/components/ui/OptimizedImage';
 import FomoBar from '@/components/FomoBar';
 import { track } from '@/lib/events'; // TASK-1480
-// getTenantContext removed — widget no longer needs it (TASK-2612 stripped form)
+import { getTenantContext } from '@/tenant/tenantContext';
 import {
   ILLUSTRATIVE_OTA_GUEST_FEE_PERCENT,
 } from '@/utils/directBookingPromo';
@@ -1120,8 +1120,16 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         : effectiveDailyPricing != null
           ? Math.round(effectiveDailyPricing.actualPrice * (hasSelectedRange ? priceDetails.nights : 1))
           : 0;
-  const convenienceFeePercent =
-    serverGstMatchesSelection && serverPriceBreakdown && serverPriceBreakdown.convenienceFeePercent > 0
+  // TASK-7428: hide Razorpay processing fee + pay rail when no online provider (or WhatsApp handoff).
+  // Booking-engine MOR footer elsewhere is intentionally left alone.
+  const tenantPaymentCtx = getTenantContext();
+  const showOnlinePaymentProcessing =
+    Boolean((tenantPaymentCtx?.paymentProvider ?? '').trim()) &&
+    tenantPaymentCtx?.bookingMode !== 'WHATSAPP';
+
+  const convenienceFeePercent = !showOnlinePaymentProcessing
+    ? 0
+    : serverGstMatchesSelection && serverPriceBreakdown && serverPriceBreakdown.convenienceFeePercent > 0
       ? serverPriceBreakdown.convenienceFeePercent / 100
       : calendarConvenienceFeePercent != null
         ? calendarConvenienceFeePercent / 100
@@ -1183,17 +1191,22 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   // on the BASE accommodation amount only — NOT on base+GST. Supersedes the prior base+GST rule
   // (memory: project_guest_booking_pricing_formula) which overcharged guests relative to the
   // "no guest service fee / save vs OTA" booking-card copy. Mirrors PricingService.BuildBreakdown.
-  const breakdownConvenienceFee =
-    serverGstMatchesSelection && serverPriceBreakdown && serverPriceBreakdown.convenienceFeeAmount > 0
+  const breakdownConvenienceFee = !showOnlinePaymentProcessing
+    ? 0
+    : serverGstMatchesSelection && serverPriceBreakdown && serverPriceBreakdown.convenienceFeeAmount > 0
       ? Math.round(serverPriceBreakdown.convenienceFeeAmount)
       : Math.round(taxableBase * convenienceFeePercent);
 
   // TASK-4322: Total = discount-net base + GST + Service Fee (canonical formula).
   // Offline fallback only — TASK-5184 prefers server FinalAmount (includes tourist tax).
+  // TASK-7428: when online payment is off, never fold a server FinalAmount that still includes the gateway fee.
   const breakdownFinalTotal = Math.max(1, taxableBase + gstLineAmount + breakdownConvenienceFee);
 
   const finalTotal =
-    serverGstMatchesSelection && typeof serverFinalAmount === 'number' && serverFinalAmount > 0
+    showOnlinePaymentProcessing &&
+    serverGstMatchesSelection &&
+    typeof serverFinalAmount === 'number' &&
+    serverFinalAmount > 0
       ? serverFinalAmount
       : hasSelectedRange && selectedRangeTotalFromCalendar != null
         ? breakdownFinalTotal
@@ -1832,6 +1845,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               TASK-571 wires real LOS data through (see the fetchCalendarPricing / disabled
               LOS-fetch-effect comments above). */}
 
+          {showOnlinePaymentProcessing && (
           <div className="lv-price-row" data-testid="bw-bd-service-fee-row">
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
               Payment processing{convenienceFeePctLabel > 0 ? ` (${convenienceFeePctLabel}%)` : ''}
@@ -1842,6 +1856,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             </span>
             <span className="lv-num">{displayPrice(breakdownConvenienceFee)}</span>
           </div>
+          )}
 
           {referralDiscountApplied > 0 && (
             <div className="lv-price-row">
@@ -2002,7 +2017,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         </div>
       ) : null}
 
-      {/* Payment trust logos before Razorpay checkout */}
+      {/* TASK-7428: Razorpay pay rail only when an online payment provider is configured */}
+      {showOnlinePaymentProcessing && (
       <div className="lv-pay-rail" data-testid="bw-payment-trust-logos">
         <span className="lv-pay-label">Pay with</span>
         <img src="/icons/upi.svg" alt="UPI" className="lv-pay-icon lv-pay-icon-upi" loading="lazy" decoding="async" width={32} height={20} />
@@ -2010,6 +2026,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         <img src="/icons/rupay.svg" alt="RuPay" className="lv-pay-icon" loading="lazy" decoding="async" width={32} height={20} />
         <span className="lv-pay-secure">Secured by Razorpay</span>
       </div>
+      )}
     </form>
     </>
   );

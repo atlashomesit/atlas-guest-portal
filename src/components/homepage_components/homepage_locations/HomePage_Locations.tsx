@@ -324,7 +324,9 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
             <Heading title={`Our ${unitNoun.capitalPlural}`} id="our-homes" />
           </div>
           <p className="text-sm text-text-muted max-w-xs sm:text-right leading-relaxed">
-            {sortedListings.length} owner-run {sortedListings.length === 1 ? unitNoun.singular : unitNoun.plural} in KPHB, Kukatpally. Same hands clean them, restock them, and answer the door.
+            {hideAtlasBranding
+              ? `${sortedListings.length} owner-run ${sortedListings.length === 1 ? unitNoun.singular : unitNoun.plural}. Same hands clean them, restock them, and answer the door.`
+              : `${sortedListings.length} owner-run ${sortedListings.length === 1 ? unitNoun.singular : unitNoun.plural} in KPHB, Kukatpally. Same hands clean them, restock them, and answer the door.`}
           </p>
         </div>
 
@@ -336,11 +338,15 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
             const activeIndex = (activeImageIndex[model.listing.id] ?? 0) % Math.max(photos.length, 1);
             const imageSrc = photos[activeIndex] ?? model.images[0] ?? "";
             const cardTitle = getListingDisplayName(model.listing.id, model.listing.title);
-            const descriptor =
-              getHomeDescriptor(model.listing.id) ??
-              model.listing.subtitle ??
-              model.property?.property_description ??
-              "A calm, owner-run home in KPHB 7th Phase.";
+            // TASK-7194: Atlas unit descriptors + KPHB fallback must not leak on white-label.
+            const descriptor = hideAtlasBranding
+              ? (model.listing.subtitle ??
+                model.property?.property_description ??
+                `A calm, owner-run ${unitNoun.singular}.`)
+              : (getHomeDescriptor(model.listing.id) ??
+                model.listing.subtitle ??
+                model.property?.property_description ??
+                "A calm, owner-run home in KPHB 7th Phase.");
 
             return (
               <Link

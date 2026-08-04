@@ -111,6 +111,43 @@ describe("TASK-4899: isNeutralBrandingMode / brand-name+email fallbacks", () => 
       } as ReturnType<typeof getTenantContext>);
       expect(getTenantBrandName()).toBe(MARKETPLACE_BRAND_BASELINE);
     });
+
+    // TASK-7431: business display name outranks short brandName/name
+    it("TASK-7431: prefers legalContactPack.displayName over brandName/name", () => {
+      vi.mocked(getTenantContext).mockReturnValue({
+        slug: "sunrise",
+        name: "Sunrise Short",
+        brandName: "Sunrise Short",
+        legalContactPack: {
+          displayName: "Sunrise Villas Business",
+          showAtlasFooterCredit: false,
+          isCustomDomain: true,
+        },
+        guestCommsBrandingMode: "Neutral",
+      } as ReturnType<typeof getTenantContext>);
+      expect(getTenantBrandName()).toBe("Sunrise Villas Business");
+    });
+
+    it("TASK-7431: prefers brandNameLong when displayName is absent", () => {
+      vi.mocked(getTenantContext).mockReturnValue({
+        slug: "sunrise",
+        name: "Sunrise Short",
+        brandName: "Sunrise Short",
+        brandNameLong: "Sunrise Villas Pvt Ltd",
+        guestCommsBrandingMode: "Neutral",
+      } as ReturnType<typeof getTenantContext>);
+      expect(getTenantBrandName()).toBe("Sunrise Villas Pvt Ltd");
+    });
+
+    it("TASK-7431: uses brandName/name only when no business display name or long brand", () => {
+      vi.mocked(getTenantContext).mockReturnValue({
+        slug: "sunrise",
+        name: "Sunrise Short",
+        brandName: "Sunrise Short",
+        guestCommsBrandingMode: "Neutral",
+      } as ReturnType<typeof getTenantContext>);
+      expect(getTenantBrandName()).toBe("Sunrise Short");
+    });
   });
 
   describe("getTenantContactEmail", () => {

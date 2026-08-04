@@ -48,14 +48,22 @@ describe("buildMetaRewriteValues (TASK-4905 / ADR-0018 amendment)", () => {
     canonicalUrl: "https://gauravsguesthouse.com/",
   };
 
-  it("uses every field verbatim when the payload is fully populated", () => {
-    const values = buildMetaRewriteValues(fullMeta, "https://gauravsguesthouse.com/homes/1");
+  it("uses every field verbatim when the payload is fully populated (root path)", () => {
+    const values = buildMetaRewriteValues(fullMeta, "https://gauravsguesthouse.com/");
 
     expect(values.title).toBe("Gaurav's Lake View Villa");
     expect(values.description).toBe("Stay lakeside at Gaurav's Lake View Villa.");
     expect(values.image).toBe("https://cdn.example.com/gaurav-cover.jpg");
     expect(values.url).toBe("https://gauravsguesthouse.com/");
     expect(values.canonical).toBe("https://gauravsguesthouse.com/");
+  });
+
+  // TASK-7430: non-root pages must keep a path-correct canonical (not collapse to site root).
+  it("TASK-7430: preserves request path in canonical/og:url for non-root pages", () => {
+    const values = buildMetaRewriteValues(fullMeta, "https://gauravsguesthouse.com/homes/1");
+
+    expect(values.canonical).toBe("https://gauravsguesthouse.com/homes/1");
+    expect(values.url).toBe("https://gauravsguesthouse.com/homes/1");
   });
 
   it("falls back to a generated description when description is missing", () => {

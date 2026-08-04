@@ -8,9 +8,8 @@
  * Penthouse 501, Studio 301/302, Suite 201/202, Studio 101/102.
  *
  * Two lookup strategies:
- * 1. By numeric property ID (101, 201, 301, 501 — the stable floor/unit numbers used in
- *    propertyData.ts and HomePage_Locations.tsx).
- * 2. By SKU string (Atlas301, Atlas501_PH — as returned by the API for the detail page).
+ * 1. By SKU string (Atlas301, Atlas501_PH — as returned by the API for the detail page).
+ * 2. By numeric property ID (101, 201, 301, 501) — Atlas marketplace only (TASK-7194).
  *
  * Falls back to the raw name string if no mapping exists — preserves backward compat
  * for any future listings not yet in this map.
@@ -18,6 +17,9 @@
  * Long-term: this mapping should move to a `displayName` field on the API DTO.
  * TODO: wire `displayName` from atlas-api PublicListingDto when available.
  */
+
+import { getTenantContext } from '../tenant/tenantContext';
+import { getTenantOverrides, shouldHideAtlasBranding } from '../tenant/tenantOverrides';
 
 const DISPLAY_NAME_BY_PROPERTY_ID: Record<number, string> = {
   101: 'Studio 101',
@@ -52,7 +54,7 @@ function displayNameFromSku(sku: string): string | null {
  * Priority:
  * 1. Atlas SKU → friendly. Gated to names containing "atlas" so cross-tenant marketplace /
  *    search names (e.g. "Sea View 501") are NEVER remapped onto Atlas's unit names.
- * 2. Numeric floor/unit id lookup (101, 201, 301, 501) for callers that pass a real number.
+ * 2. Numeric floor/unit id lookup (101, 201, 301, 501) for Atlas marketplace only.
  * 3. Fall back to rawName as-is (already-friendly names and unknown listings).
  */
 export function getListingDisplayName(
@@ -65,11 +67,19 @@ export function getListingDisplayName(
     if (fromSku) return fromSku;
   }
 
-  // Strategy 2: numeric property/floor ID lookup.
-  const id = Number(propertyId);
-  if (Number.isFinite(id) && id > 0) {
-    const byId = DISPLAY_NAME_BY_PROPERTY_ID[id];
-    if (byId) return byId;
+  // Strategy 2: numeric floor/unit ID lookup — Atlas marketplace only.
+  // When tenant context is unresolved (null slug), keep marketplace behavior for boot/tests.
+  // Once a white-label slug is known, never remap colliding ids onto Atlas unit names (TASK-7194).
+  const tenant = getTenantContext();
+  const slug = tenant?.slug?.trim();
+  const allowAtlasUnitMap =
+    !slug || !shouldHideAtlasBranding(tenant, getTenantOverrides(slug));
+  if (allowAtlasUnitMap) {
+    const id = Number(propertyId);
+    if (Number.isFinite(id) && id > 0) {
+      const byId = DISPLAY_NAME_BY_PROPERTY_ID[id];
+      if (byId) return byId;
+    }
   }
 
   // Strategy 3: raw fallback.

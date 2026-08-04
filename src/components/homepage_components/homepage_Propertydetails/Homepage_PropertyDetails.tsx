@@ -793,6 +793,22 @@ const PropertyDetails = () => {
         const normalizedPropertySlug = normalizeSlug(propertySlug);
         const normalizedPropertySlugStripped = stripHyphens(normalizedPropertySlug);
 
+        // TASK-7430: URL property slug must match the listing's canonical property slug (404 otherwise).
+        const urlPropertySlugMatches = (item: { property_name?: string; id?: string | number }) => {
+            if (!normalizedPropertySlug) return true;
+            const expected = normalizeSlug(
+                getPropertySlug({
+                    property_name: item.property_name,
+                    name: item.property_name,
+                    id: item.id,
+                }),
+            );
+            return (
+                expected === normalizedPropertySlug ||
+                stripHyphens(expected) === normalizedPropertySlugStripped
+            );
+        };
+
         // 1) Match by listingId (PK from DB/API) — IDs 1–7 etc.
         const foundByListingId = listingIdParam && Number.isFinite(listingId) && listingId > 0
             ? apiProperties.find((item) => Number(item.listingId) === listingId)
@@ -803,8 +819,26 @@ const PropertyDetails = () => {
             console.debug('[PropertyDetails] route params:', { propertySlug, unitSlug: listingIdParam, listingId }, 'foundByListingId:', !!foundByListingId);
         }
 
+        if (foundByListingId) {
+            if (!urlPropertySlugMatches(foundByListingId)) {
+                setNotFound(true);
+                return;
+            }
+            setData(coerceProperty({
+                ...foundByListingId,
+                property_neighborhoods: Array.isArray(foundByListingId.property_neighborhoods)
+                    ? foundByListingId.property_neighborhoods
+                    : [],
+                property_img: foundByListingId.property_img || [],
+                maxGuests:
+                    resolveStaticMaxGuests(foundByListingId as unknown as Record<string, unknown>) ??
+                    foundByListingId.maxGuests,
+            }));
+            return;
+        }
+
         // 2) Match by unit slug / property name (legacy URLs)
-        const foundByUnitSlug = foundByListingId ?? apiProperties.find((item) => {
+        const foundByUnitSlug = apiProperties.find((item) => {
             const idSlug = normalizeSlug(item.id);
             const nameSlug = normalizeSlug(item.property_name);
             const unitMatches = normalizedUnitSlug && (idSlug === normalizedUnitSlug || nameSlug === normalizedUnitSlug);
@@ -813,7 +847,8 @@ const PropertyDetails = () => {
                 nameSlug === normalizedPropertySlug ||
                 nameSlug.includes(normalizedPropertySlug) ||
                 stripHyphens(nameSlug) === normalizedPropertySlugStripped ||
-                stripHyphens(nameSlug).includes(normalizedPropertySlugStripped);
+                stripHyphens(nameSlug).includes(normalizedPropertySlugStripped) ||
+                urlPropertySlugMatches(item);
 
             return unitMatches && propertySlugMatches;
         });
@@ -837,6 +872,10 @@ const PropertyDetails = () => {
         if (propertyId) {
             const foundById = apiProperties.find((item) => String(item.id) === String(propertyId));
             if (foundById) {
+                if (!urlPropertySlugMatches(foundById)) {
+                    setNotFound(true);
+                    return;
+                }
                 setData(coerceProperty({
                     ...foundById,
                     property_neighborhoods: Array.isArray(foundById.property_neighborhoods)
@@ -886,6 +925,23 @@ const PropertyDetails = () => {
                              
                             console.debug('[PropertyDetails] API returned no listing for:', listingIdParam);
                         }
+                        if (!cancelled) setNotFound(true);
+                        return;
+                    }
+                    // TASK-7430: reject when the URL property slug does not match this listing.
+                    const apiPropertyName =
+                        (typeof (apiListing as Record<string, unknown>).propertyName === 'string'
+                            ? ((apiListing as Record<string, unknown>).propertyName as string)
+                            : null) ||
+                        (typeof apiListing.name === 'string' ? apiListing.name : '') ||
+                        '';
+                    if (
+                        normalizedPropertySlug &&
+                        !urlPropertySlugMatches({
+                            property_name: apiPropertyName,
+                            id: apiListing.id,
+                        })
+                    ) {
                         if (!cancelled) setNotFound(true);
                         return;
                     }

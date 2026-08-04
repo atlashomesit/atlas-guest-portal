@@ -11,6 +11,10 @@ export interface GuestSendOtpRequest {
 
 export interface GuestSendOtpResponse {
   message: string;
+  /** TASK-7429: support/reference id when delivery is uncertain or for recovery. */
+  correlationId?: string;
+  /** TASK-7429: optional hint about delivery status (e.g. delayed / check spam). */
+  deliveryHint?: string;
 }
 
 export interface GuestVerifyOtpRequest {
