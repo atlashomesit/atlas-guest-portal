@@ -19,6 +19,7 @@ import React from 'react';
 import { toast } from 'react-toastify'; // TASK-4288: share fallback feedback
 import { getListingDisplayName } from '@/lib/listingDisplayName';
 import { getTenantContext as _getTenantCtx } from '@/tenant/tenantContext';
+import { hasOnlinePaymentRail } from '@/tenant/paymentRail';
 import { getTenantOverrides, shouldHideAtlasBranding } from '@/tenant/tenantOverrides';
 import { getTenantBrandName } from '@/tenant/displayBrand';
 import { getGuestFacingPhone } from '@/config/contact';
@@ -1384,8 +1385,9 @@ useEffect(() => {
       ? data.hostName!.trim()
       : tenantNameFromUrl ? `Listed by ${tenantNameFromUrl}` : `Listed by ${ppBrandName}`;
     const ppHostInitial = ppHostDisplayName.charAt(0).toUpperCase();
-    const ppHasOnlinePayment =
-      typeof _getTenantCtx()?.paymentProvider === 'string' && _getTenantCtx()?.paymentProvider !== 'MANUAL';
+    // TASK-7428: one shared predicate for "an online gateway will actually charge this guest" —
+    // drives both the cancellation copy and the Razorpay payment-rail claim below.
+    const ppHasOnlinePayment = hasOnlinePaymentRail(ppTenantCtx);
     const ppCancellationInfo = getPpCancellationInfo(data.cancellationTier, {
       fallbackText: _resolvedCancellationText,
       hasOnlinePayment: ppHasOnlinePayment,
@@ -1808,7 +1810,12 @@ useEffect(() => {
                         <PpCheckIcon size={16} />
                         <span>
                           <b>Direct booking — no middlemen.</b>
-                          <span className="pp-meta">You pay the host directly via Razorpay.</span>
+                          {/* TASK-7428: only claim the Razorpay rail when a gateway will actually
+                              take the payment. On a WhatsApp-handoff / pay-on-arrival tenant no
+                              payment is taken on this site at all. */}
+                          {ppHasOnlinePayment && (
+                            <span className="pp-meta">You pay the host directly via Razorpay.</span>
+                          )}
                         </span>
                       </li>
                       {ppHasMapCoordinates ? (
