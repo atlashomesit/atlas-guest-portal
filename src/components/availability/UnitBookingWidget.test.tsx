@@ -30,6 +30,19 @@ vi.mock('@/runtime-config', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   hasRuntimeConfig: () => true,
 }));
+// TASK-7428: default to an online Razorpay tenant so existing fee/total suites keep asserting
+// the processing-fee row; the null-provider suite below overrides this.
+const tenantCtxMock = vi.hoisted(() => ({
+  getTenantContext: vi.fn(() => ({
+    slug: 'atlas',
+    name: 'Atlastays',
+    paymentProvider: 'RAZORPAY',
+    bookingMode: 'ONLINE' as const,
+  })),
+}));
+vi.mock('@/tenant/tenantContext', () => ({
+  getTenantContext: (...args: unknown[]) => tenantCtxMock.getTenantContext(...args),
+}));
 vi.mock('@/api/client', () => ({
   buildApiUrl: (path: string) => `http://localhost:5120${path}`,
   getApiHeaders: () => ({}),
@@ -333,7 +346,7 @@ describe('UnitBookingWidget - TASK-4331: GST slab sourced from server, not a pre
   it('finalTotal prefers server FinalAmount when it matches the current selection (TASK-5184)', () => {
     const content = readFileSync(filePath, 'utf-8');
     expect(content).toMatch(
-      /const finalTotal =\s*\n\s*serverGstMatchesSelection && typeof serverFinalAmount === 'number' && serverFinalAmount > 0/,
+      /const finalTotal =\s*\n\s*showOnlinePaymentProcessing &&\s*\n\s*serverGstMatchesSelection &&\s*\n\s*typeof serverFinalAmount === 'number' &&\s*\n\s*serverFinalAmount > 0/,
     );
   });
 });
@@ -1009,6 +1022,73 @@ describe('UnitBookingWidget - TASK-4910: no misleading GST-less total in incompl
 
     const feeRow = screen.getByTestId('bw-bd-service-fee-row');
     expect(feeRow.querySelector('.lv-num')?.textContent?.replace(/[^0-9]/g, '')).toBe('180');
+  });
+});
+
+describe('UnitBookingWidget - TASK-7428: hide payment processing when no online provider', () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+    tenantCtxMock.getTenantContext.mockReset();
+    tenantCtxMock.getTenantContext.mockReturnValue({
+      slug: 'atlas',
+      name: 'Atlastays',
+      paymentProvider: 'RAZORPAY',
+      bookingMode: 'ONLINE' as const,
+    });
+    availabilityMock.fetch.mockReset();
+    availabilityMock.fetch.mockImplementation(availabilityOk);
+    task4303.booking.checkIn = null;
+    task4303.booking.checkOut = null;
+  });
+
+  it('paymentProvider null → no processing fee row, no Razorpay rail, total excludes fee', async () => {
+    tenantCtxMock.getTenantContext.mockReturnValue({
+      slug: 'sunrise',
+      name: 'Sunrise Villas',
+      paymentProvider: null,
+      bookingMode: 'WHATSAPP' as const,
+    });
+
+    const checkin = addDays(getIstStartOfDay(new Date()), 5);
+    const checkout = addDays(checkin, 1);
+    const nightIso = toISODate(checkin);
+    task4303.booking.checkIn = toISODate(checkin);
+    task4303.booking.checkOut = toISODate(checkout);
+    task4303.fetchCalendarPricing.mockResolvedValue({
+      dateToPrice: new Map([[nightIso, 6000]]),
+      convenienceFeePercent: 3,
+    });
+    task4303.fetchGuestGstBreakdown.mockResolvedValue({ gstPercent: 5, gstAmount: 300, finalAmount: 6480 });
+
+    const { default: UnitBookingWidget } = await import('./UnitBookingWidget');
+    render(
+      <MemoryRouter>
+        <UnitBookingWidget
+          listingId={7}
+          propertyId={3}
+          listingName="Sunrise Villa"
+          propertySlug="sunrise-villa"
+          unitSlug="villa"
+        />
+      </MemoryRouter>,
+    );
+
+    const totalLabel = await screen.findByText('Total');
+    const totalValue = totalLabel.parentElement?.querySelector('.lv-num')?.textContent ?? '';
+    // Base ₹6,000 + GST ₹300 = ₹6,300 — no 3% processing fee.
+    expect(totalValue.replace(/[^0-9]/g, '')).toBe('6300');
+    expect(screen.queryByTestId('bw-bd-service-fee-row')).toBeNull();
+    expect(screen.queryByTestId('bw-payment-trust-logos')).toBeNull();
+    expect(screen.queryByText(/Secured by Razorpay/i)).toBeNull();
+    expect(screen.queryByText(/Payment processing/i)).toBeNull();
+  });
+
+  it('source: gates fee row + pay rail on showOnlinePaymentProcessing', () => {
+    const content = readFileSync(resolve(__dirname, './UnitBookingWidget.tsx'), 'utf-8');
+    expect(content).toContain('showOnlinePaymentProcessing');
+    expect(content).toContain("bookingMode !== 'WHATSAPP'");
+    expect(content).toContain('{showOnlinePaymentProcessing && (');
   });
 });
 
