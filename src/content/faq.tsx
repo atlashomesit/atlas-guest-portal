@@ -222,8 +222,8 @@ export function buildRetailFaqSections(brandName: string): FaqSection[] {
         question: "Do you provide GST invoices?",
         answer: (
           <p>
-            Yes, GST invoices can be issued for eligible stays. Share your GST details during booking
-            so we can prepare the invoice correctly.
+            Yes, GST invoices can be issued for eligible stays. After your booking is confirmed, contact
+            the property with your GSTIN and billing details so they can prepare the invoice correctly.
           </p>
         ),
         tags: ["gst", "invoice", "business"],
