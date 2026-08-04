@@ -2167,7 +2167,7 @@ const TrustBand: React.FC<TrustBandProps> = ({ freeCancellationCopy, brandName, 
     </div>
     <div className="gd-trust-row">
       <IconLock size={14}/>
-      <span>Direct booking · secure payment via Razorpay · <b>no OTA fee</b></span>
+      <span>Direct booking · secure payment via Razorpay · <b>no OTA fee</b> · 3% payment processing at checkout</span>
     </div>
     {whatsappNumber && (
       <div className="gd-trust-row">

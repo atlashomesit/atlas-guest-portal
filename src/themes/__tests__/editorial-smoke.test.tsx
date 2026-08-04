@@ -152,7 +152,7 @@ describe("AC5/AC13 — editorial's Home renders the founder-specified text-forwa
     // Pull-quote-style callout — the founder-specified "pull-quote-style callouts".
     expect(screen.getByTestId("editorial-pull-quote")).toBeInTheDocument();
     expect(
-      screen.getByText(/No platform mark-up, no third-party fee/i),
+      screen.getByText(/Book direct.*host keeps more/i),
     ).toBeInTheDocument();
 
     // Story-flow featured stays — the layout's largest structural divergence (vertical,

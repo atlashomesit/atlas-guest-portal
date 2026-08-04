@@ -184,7 +184,7 @@ export default function MarketplaceHomepage() {
       {/* TASK-1876: SEO meta for marketplace homepage */}
       <SEO
         title="Atlastays Marketplace — Verified homes & rooms across India"
-        description="Discover homes and rooms across verified hosts on Atlastays. Direct booking, no platform fee."
+        description="Discover homes and rooms across verified hosts on Atlastays. Direct booking from the owner."
       />
       <h1 className="text-3xl font-bold text-text-primary">Atlastays Marketplace</h1>
       <p className="mt-2 text-text-body">Discover homes and rooms across verified hosts.</p>
@@ -199,9 +199,9 @@ export default function MarketplaceHomepage() {
           <span aria-hidden>·</span>
           <span>{items.length} listings</span>
           <span aria-hidden>·</span>
-          <span className="font-medium text-emerald-700">0% Platform commission</span>
+          <span className="font-medium text-emerald-700">Book direct from the owner</span>
           <span aria-hidden>·</span>
-          <span>GST-inclusive pricing shown upfront · book direct</span>
+          <span>Price shown: room + GST + 3% payment-processing fee</span>
         </div>
       )}
 

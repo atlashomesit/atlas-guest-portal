@@ -142,7 +142,7 @@ const EditorialHome = () => {
                         <p className="editorial-hero-dek">
                             {showAtlasContent
                                 ? 'Owner-run homes in KPHB, Hyderabad — read the space, the neighbourhood, and what to expect, then book direct in the same breath.'
-                                : `Direct from the owner — no platform fee and responsive support from ${schemaBrandName}.`}
+                                : `Direct from the owner — responsive support from ${schemaBrandName}.`}
                         </p>
                         <div id="search-form" data-testid="hero-widget" className="editorial-hero-widget">
                             <SearchAvailabilityWidget />
@@ -176,12 +176,12 @@ const EditorialHome = () => {
                         </h2>
                         <p className="editorial-narrative-p">
                             {showAtlasContent
-                                ? "Every address on this page is one we own and operate ourselves — nothing staged, nothing borrowed, no third-party listing dressed up for a photograph. The rooms you see are the rooms you'll walk into, and the price on this page is the price you pay: no platform mark-up, no hidden convenience fee."
-                                : `Book directly with ${schemaBrandName}. The price on this page is the price you pay, with no platform mark-up.`}
+                                ? "Every address on this page is one we own and operate ourselves — nothing staged, nothing borrowed, no third-party listing dressed up for a photograph. The rooms you see are the rooms you'll walk into. Price shown is what you pay: room rate, GST, and a 3% payment-processing fee — no hidden charges."
+                                : `Book directly with ${schemaBrandName}. Price shown is what you pay: room rate, GST, and a 3% payment-processing fee.`}
                         </p>
                         <EditorialPullQuote
-                            quote="No platform mark-up, no third-party fee. The price on this page is the price you pay."
-                            attribution={showAtlasContent ? `${schemaBrandName}, on booking direct` : undefined}
+                            quote="Book direct — the host keeps more. Price shown is what you pay: room rate, GST, and a 3% payment-processing fee."
+                            attribution={showAtlasContent ? `${schemaBrandName}, on transparent pricing` : undefined}
                         />
                         <p className="editorial-narrative-p">
                             A host who answers the phone. That&apos;s the whole pitch — the rest is in the rooms

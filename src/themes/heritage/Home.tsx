@@ -59,7 +59,7 @@ const WHY_DIRECT_ITEMS = [
             </svg>
         ),
         heading: "You pay the host directly",
-        body: "No platform mark-up, no third-party booking fee. The price you see is the price you pay.",
+        body: "The host keeps more when you book direct. Price shown includes room rate, GST, and a 3% payment-processing fee.",
     },
 ] as const;
 
