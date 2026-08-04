@@ -36,7 +36,7 @@ jobs:
       # Matches only `<<<<<<<` / `>>>>>>>` at line start — NOT a bare `=======`, which is a valid
       # Markdown setext H1 underline. Every real conflict carries all three, so the two unambiguous
       # markers are sufficient and the docs false-positive class is eliminated.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Unresolved conflict markers
         run: |
           if git grep -nIE '^(<{7}|>{7})( |$)' -- . ':(exclude).github/workflows/*'; then
@@ -47,7 +47,7 @@ jobs:
             exit 1
           fi
           echo "No unresolved conflict markers."
-      - uses: actions/github-script@v7
+      - uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         with:
           script: |
             // atlashomesit is the org-owner / PR-merge service account. Its role is
@@ -56,8 +56,19 @@ jobs:
             // authored work must be attributable to a person (TASK-5348; 8
             // mis-attributed feature commits landed 2026-07-10..22 under it).
             // \d+\+atlashomesit covers its noreply form once email privacy is on.
-            const ALLOW = /^(sreekaratla81|sreekar\.atla|noreply|150553417\+sreekaratla81|udaykumar\.ragipindi|sidharthyennawar|234134092\+ragameghanagongati|\d+\+atlashomesit)@.*$/;
+            // Meghana Kandulapuram ratified 2026-07-30: both forms, matching
+            // docs/governance/COMMIT-IDENTITY.md and .githooks/pre-commit exactly. Her
+            // noreply id is pinned (not \d+) because the account id is known — pinning
+            // stops a same-username different-account address from passing.
+            const ALLOW = /^(sreekaratla81|sreekar\.atla|noreply|150553417\+sreekaratla81|udaykumar\.ragipindi|sidharthyennawar|ragameghanagongati1905|234134092\+ragameghanagongati|\d+\+atlashomesit)@.*$/;
             const SHARED_OWNER = /^atlashomesit@/;
+            // Platform automation. Bot commits are made through the GitHub API and never touch
+            // local hooks, so COMMIT-IDENTITY.md declares these three unaffected — but that
+            // exemption lived only in the hook, never here, so CI denied every dependabot PR
+            // (two on atlas-pms-landing, 2026-08-01). The numeric-id prefix is optional because
+            // GitHub emits both `dependabot[bot]@` and `NNN+dependabot[bot]@`. Anchored at both
+            // ends so `dependabot[bot]@users.noreply.github.com.evil.tld` does not match.
+            const BOT = /^(\d+\+)?(dependabot|github-actions)\[bot\]@users\.noreply\.github\.com$|^actions@github\.com$/;
             // A MERGE commit is the merge role, not authored work. HARD RULE 2 routes every
             // guardrail / cross-repo change to dev via PR, and gh here authenticates as
             // atlashomesit, so each such merge necessarily lands an atlashomesit-authored
@@ -99,6 +110,7 @@ jobs:
                 const email = c.commit?.[who]?.email || '';
                 // GitHub's web-flow committer signs merge/squash commits made in the UI
                 if (email === 'noreply@github.com') continue;
+                if (BOT.test(email)) continue;
                 if (SHARED_OWNER.test(email)) {
                   if (baseRef === 'main') continue; // dev->main promotion: merge-role sanctioned (founder 2026-07-24)
                   if (isMergeCommit(c)) continue;   // merge role, not authored work (2026-08-04)
