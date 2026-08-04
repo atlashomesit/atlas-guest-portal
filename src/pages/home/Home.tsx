@@ -26,7 +26,7 @@ import { getPublicSiteOrigin } from "../../config/siteOrigin";
 import { buildHomepageJsonLd } from "./homepageJsonLd";
 
 /* ---- Why-direct 2-pillar strip — Home v2 design §5 ---- */
-const WHY_DIRECT_ITEMS = [
+const WHY_DIRECT_ITEMS_ATLAS = [
     {
         icon: (
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -49,6 +49,20 @@ const WHY_DIRECT_ITEMS = [
     },
 ] as const;
 
+/** TASK-7194: white-label tenants must not inherit Atlas operator-voice copy. */
+const WHY_DIRECT_ITEMS_TENANT = [
+    {
+        icon: WHY_DIRECT_ITEMS_ATLAS[0].icon,
+        heading: "Verified stays",
+        body: "Photos on this page match the rooms you'll walk into. Book with confidence.",
+    },
+    {
+        icon: WHY_DIRECT_ITEMS_ATLAS[1].icon,
+        heading: "You pay the host directly",
+        body: "Price shown includes room rate, GST, and a 3% payment-processing fee.",
+    },
+] as const;
+
 const Home = () => {
     const { pendingScrollTarget, setPendingScrollTarget } = useBooking();
     const location = useLocation();
@@ -63,11 +77,9 @@ const Home = () => {
     const room101Cover = sanitizeGuestImageUrl(propertyData.find((property) => property.id === 101)?.property_img?.[0]);
     const primaryOgImage = room101Cover ?? (!overrides.hideLogo ? LOGO_URL : undefined);
     const listingAddress = propertyData.find((property) => property.property_location?.trim())?.property_location?.trim();
-    /** TASK-5194: white-label tenants must not assert Atlas-performed verification. */
+    /** TASK-5194 / TASK-7194: white-label tenants must not assert Atlas operator copy. */
     const whyDirectItems = useMemo(
-        () => (hideAtlasBranding
-            ? WHY_DIRECT_ITEMS.filter((item) => item.heading !== "We verify every home")
-            : WHY_DIRECT_ITEMS),
+        () => (hideAtlasBranding ? WHY_DIRECT_ITEMS_TENANT : WHY_DIRECT_ITEMS_ATLAS),
         [hideAtlasBranding],
     );
     const faqHighlights = getFaqHighlights();
@@ -168,9 +180,9 @@ const Home = () => {
                             className="text-xl md:text-2xl leading-relaxed text-text-primary"
                             style={{ fontFamily: 'var(--font-family-display)' }}
                         >
-                            "Every home on this page is one we clean, restock, and hand over
-                            ourselves. Arrive, settle in, and let us take care of the rest —
-                            we're just down the street if you need us."
+                            {hideAtlasBranding
+                                ? `"Welcome to ${schemaBrandName}. Arrive, settle in, and let us take care of the rest — reach out any time if you need us."`
+                                : `"Every home on this page is one we clean, restock, and hand over ourselves. Arrive, settle in, and let us take care of the rest — we're just down the street if you need us."`}
                         </blockquote>
                         {/* TASK-4923 pattern — bound to the panel's own lavender text role, not
                             `--text-muted`. This panel paints `var(--lavender-soft, #f0eafd)`, but

@@ -156,7 +156,8 @@ High-speed Wi-Fi (150 Mbps, multiple ISPs), air-conditioning in the bedroom, a f
             { type: "Smoking", value: "Permitted only in designated areas/balcony" },
             { type: "Music", value: "No loud music after 10 PM" },
             { type: "Parties/Decorations", value: "No parties or decorations without prior approval" },
-            { type: "Cancellation Policy", value: "Non-refundable bookings. Free cancellation up to 24 hours before check-in." }
+            // TASK-7201: do not invent hour counts that disagree with listing tier /policies.
+            { type: "Cancellation Policy", value: "Cancellation terms are confirmed at checkout for this listing." }
         ],
     },
     {

@@ -170,9 +170,13 @@ const EditorialHome = () => {
                     section flow the founder's brief calls for, ahead of the listings. */}
                 <section className="editorial-narrative" aria-labelledby="editorial-narrative-heading">
                     <div className="editorial-section-inner editorial-narrative-inner">
-                        <span className="editorial-eyebrow">Notes from the neighbourhood</span>
+                        <span className="editorial-eyebrow">
+                            {showAtlasContent ? 'Notes from the neighbourhood' : 'Notes from your host'}
+                        </span>
                         <h2 id="editorial-narrative-heading" className="editorial-h2">
-                            Why guests keep coming back to KPHB
+                            {showAtlasContent
+                                ? 'Why guests keep coming back to KPHB'
+                                : `Why guests keep coming back to ${schemaBrandName}`}
                         </h2>
                         <p className="editorial-narrative-p">
                             {showAtlasContent

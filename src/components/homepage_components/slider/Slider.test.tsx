@@ -84,6 +84,21 @@ vi.mock("../../../contexts/BookingContext", () => ({
 import Slider from "./Slider";
 import * as analytics from "../../../utils/analytics";
 import { BookingProvider } from "../../../contexts/BookingContext";
+import { getTenantContext } from "../../../tenant/tenantContext";
+
+vi.mock("../../../tenant/tenantContext", async () => {
+  const actual = await vi.importActual<typeof import("../../../tenant/tenantContext")>(
+    "../../../tenant/tenantContext",
+  );
+  return {
+    ...actual,
+    getTenantContext: vi.fn(() => ({
+      name: "Atlas Homestays",
+      slug: "atlas",
+      isMarketplaceRoot: true,
+    })),
+  };
+});
 
 const renderSlider = () =>
   render(
@@ -104,6 +119,11 @@ const _renderSliderAtWidth = (width: number) => {
 describe("Slider hero search", () => {
   beforeEach(() => {
     navigateMock.mockReset();
+    vi.mocked(getTenantContext).mockReturnValue({
+      name: "Atlas Homestays",
+      slug: "atlas",
+      isMarketplaceRoot: true,
+    });
     fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => ({}) });
     vi.stubGlobal("fetch", fetchMock);
     vi.useFakeTimers({ shouldAdvanceTime: true });
@@ -154,16 +174,32 @@ describe("Slider hero search", () => {
     expect(screen.getByRole("status")).toHaveTextContent(/hero form ready/i);
   });
 
-  it("shows the inline trust strip with three canonical guarantees (Home v2)", () => {
+  it("shows the inline trust strip without inventing free-cancellation hour counts (TASK-7201)", () => {
     renderSlider();
     // Home v2: trust badges section replaced with inline strip inside the hero.
-    // Three items: Instant confirmation, Verified homes, Free cancellation 48h before check-in.
+    // TASK-7201: hero has no listing context — link to /policies instead of 48h/24h claims.
     const trustStrip = screen.getByRole("list", { name: /booking guarantees/i });
     expect(trustStrip).toBeInTheDocument();
-    // Scope to the trust strip to avoid false matches from SearchAvailabilityWidget
     expect(within(trustStrip).getByText(/instant confirmation/i)).toBeInTheDocument();
     expect(within(trustStrip).getByText(/verified homes/i)).toBeInTheDocument();
-    expect(within(trustStrip).getByText(/free cancellation 48h before check-in/i)).toBeInTheDocument();
+    expect(within(trustStrip).getByRole("link", { name: /see cancellation policy/i })).toHaveAttribute(
+      "href",
+      "/policies",
+    );
+    expect(within(trustStrip).queryByText(/free cancellation/i)).toBeNull();
+    expect(within(trustStrip).queryByText(/48h|24h/i)).toBeNull();
+  });
+
+  it("does not hardcode Hyderabad/KPHB copy on white-label tenants (TASK-7194)", () => {
+    vi.mocked(getTenantContext).mockReturnValue({
+      name: "Stay by City Focus",
+      slug: "staybycf",
+      isMarketplaceRoot: false,
+    });
+    renderSlider();
+    expect(screen.queryByText(/Hyderabad/i)).toBeNull();
+    expect(screen.queryByText(/KPHB/i)).toBeNull();
+    expect(screen.getByRole("heading", { name: /Thoughtfully curated stays/i })).toBeInTheDocument();
   });
 
   describe("TASK-4911: Check availability CTA surfaces inline validation instead of silently no-op-ing", () => {

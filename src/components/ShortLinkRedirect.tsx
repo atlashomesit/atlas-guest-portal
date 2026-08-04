@@ -66,7 +66,8 @@ const ShortLinkRedirect = () => {
         );
     }
 
-    const label = normalizedCode === "penthouse" ? "Penthouse 501" : `Room ${normalizedCode.toUpperCase()}`;
+    // TASK-7194: do not hardcode Atlas unit "501" — short-code label stays generic.
+    const label = normalizedCode === "penthouse" ? "Penthouse" : `Room ${normalizedCode.toUpperCase()}`;
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-bg-muted px-6">

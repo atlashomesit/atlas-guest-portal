@@ -1,7 +1,23 @@
-import { describe, it, expect } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { getListingDisplayName } from './listingDisplayName';
 
+vi.mock('../tenant/tenantContext', async () => {
+  const actual = await vi.importActual<typeof import('../tenant/tenantContext')>(
+    '../tenant/tenantContext',
+  );
+  return {
+    ...actual,
+    getTenantContext: vi.fn(() => null),
+  };
+});
+
+import { getTenantContext } from '../tenant/tenantContext';
+
 describe('getListingDisplayName — TASK-2635 stability + cross-tenant safety', () => {
+  beforeEach(() => {
+    vi.mocked(getTenantContext).mockReturnValue(null);
+  });
+
   it('maps an Atlas SKU to its friendly name', () => {
     expect(getListingDisplayName(5, 'Atlas501_PH')).toBe('Penthouse 501');
     expect(getListingDisplayName(undefined, 'atlas301')).toBe('Studio 301');
@@ -30,8 +46,18 @@ describe('getListingDisplayName — TASK-2635 stability + cross-tenant safety', 
     expect(getListingDisplayName(7, 'Penthouse 501')).toBe('Penthouse 501');
   });
 
-  it('falls back to a floor-number id lookup when no Atlas SKU is present', () => {
+  it('falls back to a floor-number id lookup on Atlas marketplace when no Atlas SKU is present', () => {
     expect(getListingDisplayName(201, 'Some Room')).toBe('Suite 201');
+  });
+
+  it('does not remap numeric ids onto Atlas unit names for white-label tenants (TASK-7194)', () => {
+    vi.mocked(getTenantContext).mockReturnValue({
+      name: 'Stay by City Focus',
+      slug: 'staybycf',
+      isMarketplaceRoot: false,
+    });
+    expect(getListingDisplayName(501, 'Garden Suite')).toBe('Garden Suite');
+    expect(getListingDisplayName(201, 'Some Room')).toBe('Some Room');
   });
 
   it('falls back to the raw name for unknown listings', () => {
