@@ -9,6 +9,7 @@ import {
   resolveDirectBookingPromo,
 } from '../../../utils/directBookingPromo';
 import { SearchAvailabilityWidget } from '../../availability/SearchAvailabilityWidget';
+import { useTenantListings } from '../../../hooks/useTenantListings';
 import '../atlas-home-v2.css';
 
 // Ivory seam (left 120px) + a soft 8% coral wash over the hero photo. Kept as a
@@ -32,6 +33,8 @@ const Slider = () => {
   // the same canonical check the "Our Homes" grid uses for its Atlas eyebrow.
   const showAtlasContent = !shouldHideAtlasBranding(tenant, overrides);
   const brandName = getTenantBrandName();
+  const { properties: heroListings } = useTenantListings();
+  const listingCount = heroListings.length;
   // TASK-7194: never hardcode Hyderabad on white-label — use tenant legal city when present.
   const heroCity = showAtlasContent
     ? 'Hyderabad'
@@ -41,6 +44,11 @@ const Slider = () => {
   const heroPhotoAriaLabel = showAtlasContent
     ? `A warm, owner-run ${brandName} living room in KPHB`
     : `Welcome to ${brandName}`;
+  // TASK-7194 #4: Atlas subcopy uses the live listing count, not a hardcoded "Seven".
+  const atlasHeroSub =
+    listingCount > 0
+      ? `${listingCount} owner-run home${listingCount === 1 ? '' : 's'} in KPHB. Same hands clean them, restock them, answer the door.`
+      : 'Owner-run homes in KPHB. Same hands clean them, restock them, answer the door.';
 
   // CSS-driven animations replace the manual headlineIn state
   // All entrance animations are now in atlas-home-v2.css
@@ -71,7 +79,7 @@ const Slider = () => {
 
         <p className="ahv2-hero-sub">
           {showAtlasContent
-            ? 'Seven owner-run homes in KPHB. Same hands clean them, restock them, answer the door.'
+            ? atlasHeroSub
             : 'Direct from the owner — WhatsApp-first support from a team that lives down the street.'}
         </p>
 
@@ -132,6 +140,7 @@ const Slider = () => {
             </span>
             Verified homes
           </li>
+          {/* TASK-7432: one cancellation affordance only — never invent 48h + 24h. */}
           <li role="listitem" className="ahv2-chip">
             <span className="ahv2-tick" aria-hidden="true">
               <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>

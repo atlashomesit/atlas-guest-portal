@@ -254,7 +254,13 @@ const Footer = () => {
                             </span>
                         )}
                     </p>
-                    <p>Booking engine by <strong>Atlas PMS</strong> · Payments secured by <strong>Razorpay</strong></p>
+                    {/* TASK-7428: keep Atlas PMS MOR credit; gate Razorpay rail copy on a real payment provider. */}
+                    <p>
+                        Booking engine by <strong>Atlas PMS</strong>
+                        {Boolean((tenant.paymentProvider ?? '').trim()) && (
+                            <> · Payments secured by <strong>Razorpay</strong></>
+                        )}
+                    </p>
                 </div>
             )}
 

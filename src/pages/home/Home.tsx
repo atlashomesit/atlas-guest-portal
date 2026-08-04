@@ -49,7 +49,8 @@ const WHY_DIRECT_ITEMS_ATLAS = [
     },
 ] as const;
 
-/** TASK-7194: white-label tenants must not inherit Atlas operator-voice copy. */
+/** TASK-7194 / TASK-7428: white-label copy must not invent Atlas operator voice or a 3% fee
+ *  (WhatsApp tenants have no payment provider — fee only belongs on online checkout). */
 const WHY_DIRECT_ITEMS_TENANT = [
     {
         icon: WHY_DIRECT_ITEMS_ATLAS[0].icon,
@@ -59,7 +60,7 @@ const WHY_DIRECT_ITEMS_TENANT = [
     {
         icon: WHY_DIRECT_ITEMS_ATLAS[1].icon,
         heading: "You pay the host directly",
-        body: "Price shown includes room rate, GST, and a 3% payment-processing fee.",
+        body: "Book direct with the host. The total shown at checkout is what you pay — no surprise OTA markups.",
     },
 ] as const;
 

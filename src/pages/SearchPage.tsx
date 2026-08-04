@@ -101,7 +101,7 @@ function buildStaticListings(allowedIds?: Set<number>): NormalizedListing[] {
         id: `${propertySlug}-${id}`,
         numericId: id,
         title: getListingDisplayName(id, property.property_name),
-        location: property.property_location ?? "Hyderabad",
+        location: property.property_location ?? "",
         pricePerNight: property.property_price ?? 0,
         maxGuests: property.maxCapacity ?? 4,
         imageUrl:
@@ -134,7 +134,7 @@ function apiToNormalized(listings: PublicListing[]): NormalizedListing[] {
         id: `api-${l.id}`,
         numericId: l.id,
         title: getListingDisplayName(l.id, l.name || l.propertyName),
-        location: l.propertyAddress ?? "Hyderabad",
+        location: l.propertyAddress ?? "",
         pricePerNight: l.baseNightlyRate ?? 0,
         maxGuests: l.maxGuests,
         imageUrl:

@@ -78,13 +78,20 @@ const CoastalHome = () => {
     const room101Cover = sanitizeGuestImageUrl(propertyData.find((property) => property.id === 101)?.property_img?.[0]);
     const primaryOgImage = room101Cover ?? (!overrides.hideLogo ? LOGO_URL : undefined);
     const listingAddress = propertyData.find((property) => property.property_location?.trim())?.property_location?.trim();
-    /** TASK-5194: white-label tenants must not assert Atlas-performed verification. */
-    const whyDirectItems = useMemo(
-        () => (hideAtlasBranding
-            ? WHY_DIRECT_ITEMS.filter((item) => item.heading !== "We verify every home")
-            : WHY_DIRECT_ITEMS),
-        [hideAtlasBranding],
-    );
+    /** TASK-5194 / TASK-7428: white-label — no Atlas verification claim, no invented 3% fee. */
+    const whyDirectItems = useMemo(() => {
+        if (!hideAtlasBranding) return [...WHY_DIRECT_ITEMS];
+        return WHY_DIRECT_ITEMS
+            .filter((item) => item.heading !== "We verify every home")
+            .map((item) =>
+                item.heading === "You pay the host directly"
+                    ? {
+                        ...item,
+                        body: "Book direct with the host. The total shown at checkout is what you pay — no surprise OTA markups.",
+                    }
+                    : item,
+            );
+    }, [hideAtlasBranding]);
 
     const faqHighlights = getFaqHighlights();
     // CPO-007: derive canonical from the actual host (or VITE_PUBLIC_SITE_ORIGIN for SSR) so tenant

@@ -182,6 +182,7 @@ function AppWrapper() {
           <Route path="/offers" element={withBoundary(<Suspense fallback={<LazyFallback />}><OffersPage /></Suspense>, "offers-route")} />
           <Route path="/about" element={withBoundary(<Suspense fallback={<LazyFallback />}><AboutPage /></Suspense>, "about-route")} />
           <Route path="/faq" element={withBoundary(<Suspense fallback={<LazyFallback />}><FaqPage /></Suspense>, "faq-route")} />
+          {/* TASK-7194: city SEO landings are Atlas-only (AtlasOnlyCityLanding gates white-label). */}
           {CITY_LANDING_SLUGS.map((citySlug) => (
             <Route
               key={citySlug}

@@ -6,7 +6,7 @@ import { getTenantContext } from "../tenant/tenantContext";
 import { getTenantOverrides, shouldHideAtlasBranding } from "../tenant/tenantOverrides";
 
 // TASK-4308: human-readable sitemap page. Mirrors functions/sitemap.xml.ts's
-// CORE_PATHS list so the two don't silently drift — if you add a path here,
+// static core paths so the two don't silently drift — if you add a path here,
 // add it there too (and vice versa). The XML sitemap at /sitemap.xml stays
 // live for crawlers; this page is for people.
 const SHARED_SITEMAP_LINKS: { label: string; path: string }[] = [
@@ -35,6 +35,7 @@ const SitemapPage = () => {
   const tenant = getTenantContext();
   const overrides = getTenantOverrides(tenant?.slug);
   const hideAtlasBranding = shouldHideAtlasBranding(tenant, overrides);
+  // TASK-7194: city landings only on Atlas marketplace surfaces.
   const sitemapLinks = hideAtlasBranding
     ? SHARED_SITEMAP_LINKS
     : [...SHARED_SITEMAP_LINKS, ...ATLAS_CITY_LINKS];

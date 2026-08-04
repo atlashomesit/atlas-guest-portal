@@ -85,13 +85,20 @@ const NoirHome = () => {
     // hidden for white-label tenants pending a per-tenant heroImageUrl (RA-006, same rule
     // Slider follows).
     const showAtlasContent = !hideAtlasBranding;
-    /** TASK-5194: white-label tenants must not assert Atlas-performed verification. */
-    const noirValueItems = useMemo(
-        () => (hideAtlasBranding
-            ? NOIR_VALUE_ITEMS.filter((item) => item.heading !== 'Every address, verified')
-            : NOIR_VALUE_ITEMS),
-        [hideAtlasBranding],
-    );
+    /** TASK-5194 / TASK-7428: white-label — no Atlas verification claim, no invented 3% fee. */
+    const noirValueItems = useMemo(() => {
+        if (!hideAtlasBranding) return [...NOIR_VALUE_ITEMS];
+        return NOIR_VALUE_ITEMS
+            .filter((item) => item.heading !== 'Every address, verified')
+            .map((item) =>
+                item.heading === 'Pay the host, directly'
+                    ? {
+                        ...item,
+                        body: 'Book direct with the host. The total shown at checkout is what you pay — no surprise OTA markups.',
+                    }
+                    : item,
+            );
+    }, [hideAtlasBranding]);
     const heroImageUrl = showAtlasContent ? HERO_IMAGE_URL : '';
     const hasHeroPhoto = Boolean(heroImageUrl.trim());
     const heroPhotoAriaLabel = showAtlasContent

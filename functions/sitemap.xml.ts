@@ -160,6 +160,7 @@ export const onRequestGet = async ({ request, env }: { request: Request; env?: E
     isAtlasDirectBookingHost(host) ||
     host.endsWith(".localhost");
 
+  // TASK-7194: omit /homestays-in-* from white-label tenant sitemaps.
   const corePaths = isAtlasHost ? CORE_PATHS : SHARED_CORE_PATHS;
 
   const listingPaths: string[] = [];

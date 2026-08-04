@@ -324,9 +324,16 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
             <Heading title={`Our ${unitNoun.capitalPlural}`} id="our-homes" />
           </div>
           <p className="text-sm text-text-muted max-w-xs sm:text-right leading-relaxed">
-            {hideAtlasBranding
-              ? `${sortedListings.length} owner-run ${sortedListings.length === 1 ? unitNoun.singular : unitNoun.plural}. Same hands clean them, restock them, and answer the door.`
-              : `${sortedListings.length} owner-run ${sortedListings.length === 1 ? unitNoun.singular : unitNoun.plural} in KPHB, Kukatpally. Same hands clean them, restock them, and answer the door.`}
+            {(() => {
+              // TASK-7194: white-label uses the tenant's own city when known — never invent Hyderabad/KPHB.
+              const noun =
+                sortedListings.length === 1 ? unitNoun.singular : unitNoun.plural;
+              const city = tenant?.legalContactPack?.city?.trim();
+              if (hideAtlasBranding) {
+                return `${sortedListings.length} owner-run ${noun}${city ? ` in ${city}` : ''}. Same hands clean them, restock them, and answer the door.`;
+              }
+              return `${sortedListings.length} owner-run ${noun} in KPHB, Kukatpally. Same hands clean them, restock them, and answer the door.`;
+            })()}
           </p>
         </div>
 

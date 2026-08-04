@@ -190,7 +190,7 @@ const sanitizeProperties = (propertiesInput: unknown): PropertyRecord[] => {
       const safeProperty: PropertyRecord = {
         id: String(baseProperty.id || ""),
         property_name: baseProperty?.property_name || `Property ${baseProperty?.id || ""}`,
-        property_location: baseProperty?.property_location || "Hyderabad",
+        property_location: baseProperty?.property_location || "",
         property_neighborhoods: Array.isArray(baseProperty?.property_neighborhoods)
           ? baseProperty.property_neighborhoods
           : [],
@@ -360,7 +360,7 @@ export const Apartments = () => {
           ) || {
             id: listing.id,
             property_name: listing.title,
-            property_location: 'Hyderabad',
+            property_location: '',
             property_neighborhoods: [],
             property_price: 0,
             property_rating: 0,
@@ -372,7 +372,7 @@ export const Apartments = () => {
           // Ensure we have a valid image URL
           const images = property.property_img || [];
           const name = property.property_name || listing.title || `Property ${listing.id}`;
-          const location = property.property_location || listing.subtitle || "Hyderabad";
+          const location = property.property_location || listing.subtitle || "";
           const neighborhoods = property.property_neighborhoods ?? [];
           const pricing = computeNightlyPrice(property);
           const price = pricing?.finalNightlyPrice ?? 0;
@@ -568,7 +568,7 @@ export const Apartments = () => {
       <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 md:px-8">
         <header className="space-y-2">
           <p className="text-sm font-semibold uppercase tracking-wide text-primary">{brandName}</p>
-          <h1 className="text-3xl font-bold text-text-primary sm:text-4xl">Hyderabad serviced apartments</h1>
+          <h1 className="text-3xl font-bold text-text-primary sm:text-4xl">Serviced apartments</h1>
           <p className="max-w-3xl text-base text-text-muted">
             Discover beautifully furnished homes tailored for extended stays, business travel, and weekend getaways.
             Browse {brandName}&apos;s curated apartments and penthouses, complete with clear pricing and trusted ratings.

@@ -95,7 +95,7 @@ export const mapDtoToProperty = (dto: PublicListing): TenantPropertyRecord => {
       local?.property_description ??
       // TASK-4313: singular "1 guest" when capacity is 1.
       `Comfortable stay for up to ${dto.maxGuests || local?.maxGuests || 2} guest${(dto.maxGuests || local?.maxGuests || 2) === 1 ? '' : 's'}.`,
-    // TASK-7194: never default to Atlas's city — omit location when API/property data is absent.
+    // TASK-7194: never invent a city — empty when the tenant has no address.
     property_location: local?.property_location ?? dto.propertyAddress ?? "",
     property_neighborhoods: local?.property_neighborhoods ?? [],
     property_reviews: dto.reviewCount ?? local?.property_reviews ?? 0,

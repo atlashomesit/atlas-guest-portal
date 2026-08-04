@@ -13,7 +13,7 @@ const PLACEHOLDER_CLASS =
  * multi-width srcset against blob URLs is decorative and ships full-resolution bytes on every
  * viewport. Option (c): no srcset unless the origin can honour resize params (transform CDN).
  */
-function shouldBuildResponsiveSrcSet(src: string): boolean {
+export function shouldBuildResponsiveSrcSet(src: string): boolean {
   try {
     const base = typeof window !== "undefined" ? window.location.origin : "https://example.invalid";
     const url = new URL(src, base);
@@ -26,7 +26,7 @@ function shouldBuildResponsiveSrcSet(src: string): boolean {
   }
 }
 
-const buildResponsiveSrcSet = (src: string, widths: number[] = RESPONSIVE_WIDTHS) => {
+export const buildResponsiveSrcSet = (src: string, widths: number[] = RESPONSIVE_WIDTHS) => {
   try {
     if (!shouldBuildResponsiveSrcSet(src)) return undefined;
     const base = typeof window !== "undefined" ? window.location.origin : "https://example.invalid";

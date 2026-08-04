@@ -1244,7 +1244,7 @@ useEffect(() => {
                 url: pageUrlForLd,
                 address: {
                     '@type': 'PostalAddress',
-                    addressLocality: data.property_location || 'Hyderabad',
+                    addressLocality: data.property_location || undefined,
                     addressRegion: 'Telangana',
                     addressCountry: 'IN',
                 },
@@ -1448,7 +1448,7 @@ useEffect(() => {
         {data && (
             <SEO
                 title={`${getListingDisplayName(data.id, data.property_name)} | ${getTenantBrandName()}`}
-                description={data.property_description?.slice(0, 160) || `Book ${getListingDisplayName(data.id, data.property_name)} in ${data.property_location || 'Hyderabad'} on ${getTenantBrandName()}.`}
+                description={data.property_description?.slice(0, 160) || `Book ${getListingDisplayName(data.id, data.property_name)}${data.property_location ? ` in ${data.property_location}` : ''} on ${getTenantBrandName()}.`}
                 image={primaryImage}
                 url={pageUrl}
                 type="lodgingBusiness"
