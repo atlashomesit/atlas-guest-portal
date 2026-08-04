@@ -58,6 +58,16 @@ jobs:
             // \d+\+atlashomesit covers its noreply form once email privacy is on.
             const ALLOW = /^(sreekaratla81|sreekar\.atla|noreply|150553417\+sreekaratla81|udaykumar\.ragipindi|sidharthyennawar|234134092\+ragameghanagongati|\d+\+atlashomesit)@.*$/;
             const SHARED_OWNER = /^atlashomesit@/;
+            // A MERGE commit is the merge role, not authored work. HARD RULE 2 routes every
+            // guardrail / cross-repo change to dev via PR, and gh here authenticates as
+            // atlashomesit, so each such merge necessarily lands an atlashomesit-authored
+            // merge commit on dev. 2026-08-04: without this, every one of them redded the
+            // push-event run — on a push there is no pull_request payload, so baseRef is ''
+            // and the main-promotion exemption below can never fire. Single-parent commits
+            // it authors are still denied, so the 2026-07-24 ruling is intact. The merge's
+            // content still gets checked: its parents are in the compare range. `parents` is
+            // absent only on the new-branch payload fallback, where this is false (fail closed).
+            const isMergeCommit = (c) => (c.parents?.length ?? 0) > 1;
             const baseRef = context.payload.pull_request?.base?.ref || '';
             let commits = [];
             if (context.eventName === 'pull_request') {
@@ -91,6 +101,7 @@ jobs:
                 if (email === 'noreply@github.com') continue;
                 if (SHARED_OWNER.test(email)) {
                   if (baseRef === 'main') continue; // dev->main promotion: merge-role sanctioned (founder 2026-07-24)
+                  if (isMergeCommit(c)) continue;   // merge role, not authored work (2026-08-04)
                   denied.push(`SHARED-ACCOUNT-DENIED: ${c.sha} ${who}=${email} — atlashomesit never authors; set your own git identity (atlas-e2e/docs/governance/COMMIT-IDENTITY.md)`);
                   continue;
                 }
