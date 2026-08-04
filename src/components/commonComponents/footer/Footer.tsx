@@ -219,11 +219,18 @@ const Footer = () => {
                     className='mt-8 pt-6 border-t border-white/10 text-xs text-[var(--footer-link)] text-center space-y-1'
                 >
                     <p>
+                        Trade name:{' '}
+                        <strong>{tenant.legalContactPack.displayName ?? footerBrand}</strong>
+                        {' · '}
+                        Legal name:{' '}
+                        <strong>{tenant.legalContactPack.legalName ?? footerBrand}</strong>.
+                    </p>
+                    <p>
                         Bookings on this site are fulfilled by{' '}
                         <strong>{tenant.legalContactPack.legalName ?? footerBrand}</strong>.
                         {(tenant.legalContactPack.contactEmail || tenant.legalContactPack.contactPhone) && (
                             <span>
-                                {' '}Grievance contact:{' '}
+                                {' '}Contact:{' '}
                                 {tenant.legalContactPack.contactEmail && (
                                     <a
                                         href={`mailto:${encodeURIComponent(tenant.legalContactPack.contactEmail)}`}
