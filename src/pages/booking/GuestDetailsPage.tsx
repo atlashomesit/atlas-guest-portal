@@ -23,7 +23,7 @@ import axios from 'axios';
 import { useBooking, type BookingPriceBreakdown } from '@/contexts/BookingContext';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { buildApiUrl, getApiHeaders, getOrderRequestHeaders } from '@/api/client';
-import { normalizePromoCodeInput, normalizePromoCodeSubmit } from '@/utils/promoCodeInput';
+import { normalizePromoCodeInput } from '@/utils/promoCodeInput';
 import {
   clampNationalDigits,
   getGuestDialOption,
