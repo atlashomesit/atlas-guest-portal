@@ -392,6 +392,9 @@ const Navbar = () => {
       {/* MOBILE MENU */}
       {isMenuOpen && (
         <div className="mobile-menu lg:hidden open" id="mobile-menu-panel">
+          {/* TASK-7088: each destination once. Help comes from primaryNav (visibleNavItems);
+              Search stays / My bookings / Recently viewed / My profile come from tripsMenuNav
+              under a single Account group. Do not re-render tripsMenuNav or a second Help link. */}
           {visibleNavItems.map((item) => (
             <NavLink
               key={item.label}
@@ -402,22 +405,8 @@ const Navbar = () => {
               {item.label}
             </NavLink>
           ))}
-          <NavLink to="/search" onClick={closeMobile} className="block py-2 font-semibold" data-testid="navbar-search-pill-mobile">
-            Search stays
-          </NavLink>
-          <p className="py-2 text-xs font-semibold uppercase tracking-wide text-text-muted">Trips</p>
-          {tripsMenuNav.map((item) => (
-            <NavLink
-              key={item.to}
-              onClick={closeMobile}
-              to={item.to}
-              className="block py-2 pl-2"
-            >
-              {item.label}
-            </NavLink>
-          ))}
 
-          {/* MOBILE ACTIONS — account links grouped (DESIGN-009) */}
+          {/* MOBILE ACTIONS — account links grouped (DESIGN-009 / TASK-7088) */}
           <div className="mt-2 flex flex-col gap-3">
             <p className="py-1 text-xs font-semibold uppercase tracking-wide text-text-muted">Account</p>
             {tripsMenuNav.map((item) => (
@@ -426,6 +415,7 @@ const Navbar = () => {
                 onClick={closeMobile}
                 to={item.to}
                 className="block py-2 pl-2 font-semibold"
+                data-testid={item.to === '/search' ? 'navbar-search-pill-mobile' : undefined}
               >
                 {item.label}
               </NavLink>
@@ -442,13 +432,6 @@ const Navbar = () => {
                   {savedCount > 99 ? '99+' : savedCount}
                 </span>
               ) : null}
-            </NavLink>
-            <NavLink
-              to="/contact"
-              onClick={closeMobile}
-              className="block py-2 pl-2 font-semibold"
-            >
-              Help
             </NavLink>
 
             <button

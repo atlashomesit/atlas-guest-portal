@@ -17,6 +17,7 @@
  */
 
 import { TtlCache } from "./ttlCache";
+import { normalizeHostForDomainLookup } from "./normalizeHostForDomainLookup";
 
 /** Matches `_middleware.ts`'s SITE_META_TTL_MS (ADR-0018 amendment: "a short TTL, e.g. 5 minutes"). */
 const TENANT_SLUG_TTL_MS = 5 * 60 * 1000;
@@ -46,7 +47,7 @@ export async function resolveTenantSlugFromDomain(
   now: number = Date.now(),
 ): Promise<string | null> {
   const apiBase = (apiBaseUrl ?? "").trim().replace(/\/+$/, "");
-  const hostname = (host ?? "").trim().toLowerCase();
+  const hostname = normalizeHostForDomainLookup(host ?? "");
   if (!apiBase || !hostname) return null;
 
   const cached = slugCache.get(hostname, now);
