@@ -658,13 +658,16 @@ const PropertyDetails = () => {
         };
     }, [listingIdParam, data?.listingId]);
 
+    // Public /listings only Includes cover + SortOrder==1, so catalog property_img is incomplete.
+    // Hydrate full photoUrls from GET /listings/{id} once per listing for "View gallery".
+    const detailPhotosHydratedRef = React.useRef<number | null>(null);
     useEffect(() => {
         const lid = Number(resolvedListingId ?? data?.listingId ?? NaN);
         if (!data || !Number.isFinite(lid) || lid <= 0) return;
         const hasMaxGuests = typeof data.maxGuests === 'number' && data.maxGuests >= 1;
-        const hasGalleryImages = filterGuestImageUrls(data.property_img ?? []).length > 0;
         const hasHostPhone = typeof data.hostPhone === 'string' && data.hostPhone.trim().length > 0;
-        if (hasMaxGuests && hasGalleryImages && hasHostPhone) return;
+        const photosHydrated = detailPhotosHydratedRef.current === lid;
+        if (hasMaxGuests && hasHostPhone && photosHydrated) return;
 
         const ac = new AbortController();
         void fetchListingById(lid, ac.signal)
@@ -685,6 +688,7 @@ const PropertyDetails = () => {
                     typeof d.coverPhotoUrl === 'string' ? d.coverPhotoUrl : undefined,
                 );
                 const hydratedImages = photoUrls.length > 0 ? photoUrls : (coverUrl ? [coverUrl] : []);
+                detailPhotosHydratedRef.current = lid;
 
                 setData((prev) => {
                     if (!prev) return prev;
@@ -697,7 +701,8 @@ const PropertyDetails = () => {
                     if (phone !== null && !prev.hostPhone) {
                         updates.hostPhone = phone;
                     }
-                    if (filterGuestImageUrls(prev.property_img ?? []).length === 0 && hydratedImages.length > 0) {
+                    const prevGallery = filterGuestImageUrls(prev.property_img ?? []);
+                    if (hydratedImages.length > prevGallery.length) {
                         updates.property_img = hydratedImages;
                     }
                     return Object.keys(updates).length > 0 ? { ...prev, ...updates } : prev;
@@ -1563,7 +1568,10 @@ useEffect(() => {
                 aria-label="View all photos"
                 onClick={() => {
                   if (galleryUrls.length === 0) return;
-                  import('@fancyapps/ui').then(({ Fancybox }) => {
+                  Promise.all([
+                    import('@fancyapps/ui'),
+                    import('@fancyapps/ui/dist/fancybox/fancybox.css'),
+                  ]).then(([{ Fancybox }]) => {
                     (Fancybox as { show: (items: object[]) => void }).show(
                       galleryUrls.map((u) => ({ src: u, type: 'image' })),
                     );
