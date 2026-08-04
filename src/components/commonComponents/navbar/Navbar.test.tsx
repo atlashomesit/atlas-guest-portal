@@ -20,8 +20,24 @@ vi.mock("../../../utils/analytics", async () => {
   };
 });
 
+vi.mock("../../../tenant/tenantContext", () => ({
+  getTenantContext: vi.fn(() => null),
+}));
+
+vi.mock("../../../tenant/tenantOverrides", async () => {
+  const actual = await vi.importActual<typeof import("../../../tenant/tenantOverrides")>(
+    "../../../tenant/tenantOverrides",
+  );
+  return {
+    ...actual,
+    getTenantOverrides: vi.fn(() => ({})),
+  };
+});
+
 import Navbar from "./Navbar";
 import { trackEvent } from "../../../utils/analytics";
+import { getTenantContext } from "../../../tenant/tenantContext";
+import { getTenantOverrides } from "../../../tenant/tenantOverrides";
 import { BookingProvider } from "../../../contexts/BookingContext";
 import { CurrencyProvider } from "../../../contexts/CurrencyContext";
 
@@ -137,6 +153,28 @@ describe("Navbar CTA", () => {
     expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
     expect(focus).toHaveBeenCalled();
     expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it("TASK-7434: hides Atlas host-acquisition CTAs for white-label tenants", () => {
+    vi.mocked(getTenantContext).mockReturnValue({ slug: "staybycf", name: "Stay by CF" });
+    vi.mocked(getTenantOverrides).mockReturnValue({});
+
+    renderNavbar();
+
+    expect(screen.queryByText("List your property")).toBeNull();
+    expect(screen.queryByText("Host login")).toBeNull();
+    expect(screen.queryByTestId("navbar-list-property")).toBeNull();
+    expect(screen.queryByTestId("navbar-host-login")).toBeNull();
+  });
+
+  it("TASK-7434: shows host-acquisition CTAs on the atlas marketplace tenant", () => {
+    vi.mocked(getTenantContext).mockReturnValue({ slug: "atlas", name: "Atlas Homes" });
+    vi.mocked(getTenantOverrides).mockReturnValue({});
+
+    renderNavbar();
+
+    expect(screen.getByTestId("navbar-list-property")).toHaveTextContent("List your property");
+    expect(screen.getByTestId("navbar-host-login")).toHaveTextContent("Host login");
   });
 
   it("TASK-7088: mobile menu has no duplicate destinations", () => {

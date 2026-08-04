@@ -47,6 +47,21 @@ function toNationalDigits(raw?: string | null): string | null {
   return d.length === 10 ? d : null;
 }
 
+/**
+ * TASK-7192: single guest-facing phone precedence for tel: and WhatsApp surfaces.
+ * WhatsApp booking number wins when configured so voice CTAs match the booking handoff.
+ * 1. Override whatsappPhone → API whatsappBookingPhone
+ * 2. Override businessPhone → API contactPhone
+ * 3. Atlas marketplace default (non-white-label only)
+ */
+export function getGuestFacingPhone(channel: ContactChannel = "business"): string {
+  if (channel === "business") {
+    const whatsapp = getWhatsAppPhone(channel);
+    if (whatsapp) return whatsapp;
+  }
+  return getContactPhone(channel);
+}
+
 export function getContactPhone(channel: ContactChannel = "business"): string {
   const overrides = tenantContact();
   if (channel === "owner") {
@@ -90,7 +105,7 @@ export function getContactEmail(): string {
  * override) and the CTA should be hidden rather than pointing to a blank wa.me link.
  */
 export function hasHostContact(channel: ContactChannel = "business"): boolean {
-  return getContactPhone(channel).length > 0;
+  return getGuestFacingPhone(channel).length > 0;
 }
 
 /**
@@ -100,15 +115,17 @@ export function hasHostContact(channel: ContactChannel = "business"): boolean {
  */
 export const CONTACT = {
   get business() {
+    const phone = getGuestFacingPhone("business");
     return {
-      phone: getContactPhone("business"),
+      phone,
       whatsapp: getWhatsAppPhone("business"),
       label: "Business contact",
     };
   },
   get owner() {
+    const phone = getGuestFacingPhone("owner");
     return {
-      phone: getContactPhone("owner"),
+      phone,
       whatsapp: getWhatsAppPhone("owner"),
       label: "Owner (escalation only)",
     };
@@ -118,7 +135,7 @@ export const CONTACT = {
 export const DEFAULT_CONTACT_CHANNEL: ContactChannel = "business";
 
 export function getTelLink(channel: ContactChannel = DEFAULT_CONTACT_CHANNEL) {
-  const p = getContactPhone(channel);
+  const p = getGuestFacingPhone(channel);
   return p ? `tel:+91${p}` : "";
 }
 
@@ -131,6 +148,6 @@ export function getWhatsAppLink(channel: ContactChannel = DEFAULT_CONTACT_CHANNE
 }
 
 export function formatDisplayNumber(channel: ContactChannel = DEFAULT_CONTACT_CHANNEL) {
-  const p = getContactPhone(channel);
+  const p = getGuestFacingPhone(channel);
   return p ? `+91-${p}` : "";
 }

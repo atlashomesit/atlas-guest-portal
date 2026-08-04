@@ -171,6 +171,19 @@ export type FreeCancellationTrustCopy = {
  * has no free cancellation left, and `applicableGraceHours` is null so the caller's grace strip stays
  * hidden too.
  */
+/**
+ * TASK-7432: homepage hero has no listing/check-in context, so it cannot invent 48h+24h badges.
+ * When a default tier is known, return one short policy chip; otherwise omit (callers link to /policies).
+ */
+export function resolveHomepageCancellationChip(input: {
+  tier: CancellationTier | string | null | undefined;
+}): string | null {
+  const tier = (input.tier ?? '').toString().trim();
+  if (!tier) return null;
+  // Single statement — never pair contradictory hour windows on the hero.
+  return 'See cancellation policy';
+}
+
 export function resolveFreeCancellationTrustCopy(input: {
   checkInDate: Date;
   tier: CancellationTier | string | null | undefined;

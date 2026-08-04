@@ -139,7 +139,7 @@ describe("TASK-4899: isNeutralBrandingMode / brand-name+email fallbacks", () => 
       expect(getTenantBrandName()).toBe("Sunrise Villas Pvt Ltd");
     });
 
-    it("TASK-7431: uses brandName/name only when no business display name or long brand", () => {
+    it("TASK-7431: Neutral uses tenant name when no business display name or long brand", () => {
       vi.mocked(getTenantContext).mockReturnValue({
         slug: "sunrise",
         name: "Sunrise Short",
@@ -147,6 +147,32 @@ describe("TASK-4899: isNeutralBrandingMode / brand-name+email fallbacks", () => 
         guestCommsBrandingMode: "Neutral",
       } as ReturnType<typeof getTenantContext>);
       expect(getTenantBrandName()).toBe("Sunrise Short");
+    });
+
+    it("TASK-7431: Neutral never falls back to a personal brandName", () => {
+      vi.mocked(getTenantContext).mockReturnValue({
+        slug: "millionairesmansion",
+        name: "",
+        brandName: "mahesh wagh",
+        legalContactPack: {
+          displayName: "Millionaresmansion",
+          legalName: "Millionaresmansion",
+          showAtlasFooterCredit: false,
+          isCustomDomain: false,
+        },
+        guestCommsBrandingMode: "Neutral",
+      } as ReturnType<typeof getTenantContext>);
+      expect(getTenantBrandName()).toBe("Millionaresmansion");
+    });
+
+    it("TASK-7431: Neutral with only personal brandName uses neutral fallback", () => {
+      vi.mocked(getTenantContext).mockReturnValue({
+        slug: "solo-host",
+        name: "",
+        brandName: "mahesh wagh",
+        guestCommsBrandingMode: "Neutral",
+      } as ReturnType<typeof getTenantContext>);
+      expect(getTenantBrandName()).toBe(NEUTRAL_NO_BRAND_FALLBACK);
     });
   });
 

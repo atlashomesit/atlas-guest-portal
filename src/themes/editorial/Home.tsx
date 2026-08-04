@@ -181,10 +181,14 @@ const EditorialHome = () => {
                         <p className="editorial-narrative-p">
                             {showAtlasContent
                                 ? "Every address on this page is one we own and operate ourselves — nothing staged, nothing borrowed, no third-party listing dressed up for a photograph. The rooms you see are the rooms you'll walk into. Price shown is what you pay: room rate, GST, and a 3% payment-processing fee — no hidden charges."
-                                : `Book directly with ${schemaBrandName}. Price shown is what you pay: room rate, GST, and a 3% payment-processing fee.`}
+                                : `Book directly with ${schemaBrandName}. The total shown at checkout is what you pay — no surprise OTA markups.`}
                         </p>
                         <EditorialPullQuote
-                            quote="Book direct — the host keeps more. Price shown is what you pay: room rate, GST, and a 3% payment-processing fee."
+                            quote={
+                              showAtlasContent
+                                ? "Book direct — the host keeps more. Price shown is what you pay: room rate, GST, and a 3% payment-processing fee."
+                                : `Book direct with ${schemaBrandName}. The total shown at checkout is what you pay.`
+                            }
                             attribution={showAtlasContent ? `${schemaBrandName}, on transparent pricing` : undefined}
                         />
                         <p className="editorial-narrative-p">

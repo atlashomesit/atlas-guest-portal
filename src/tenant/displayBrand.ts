@@ -54,28 +54,48 @@ export function getTenantContactEmail(kind: "support" | "privacy" = "support"): 
   return kind === "privacy" ? MARKETPLACE_PRIVACY_EMAIL : MARKETPLACE_SUPPORT_EMAIL;
 }
 
+type BrandNameSource = {
+  brandName?: string | null;
+  brandNameLong?: string | null;
+  name?: string | null;
+  guestCommsBrandingMode?: string | null;
+  legalContactPack?: { displayName?: string | null; legalName?: string | null } | null;
+} | null | undefined;
+
 /**
  * Short brand for headers, SEO, and guest-facing copy.
  *
  * TASK-7431 precedence (business name first):
  *  1. `legalContactPack.displayName` — host-configured business display name
  *  2. `brandNameLong` — legal/property-style long brand when no business display name
- *  3. `brandName` / `name` — short API brand only when neither of the above is set
- *  4. Neutral → `NEUTRAL_NO_BRAND_FALLBACK`; otherwise `MARKETPLACE_BRAND_BASELINE`
+ *  3. `legalContactPack.legalName` — legal entity name
+ *  4. Platform: `brandName` / `name`. Neutral: `name` only (skip `brandName` — often a person's name)
+ *  5. Neutral → `NEUTRAL_NO_BRAND_FALLBACK`; otherwise `MARKETPLACE_BRAND_BASELINE`
  *
  * TASK-4899: a `Neutral`-mode tenant with nothing configured falls back to
  * `NEUTRAL_NO_BRAND_FALLBACK`, never `MARKETPLACE_BRAND_BASELINE` ("Atlastays").
  */
-export function getTenantBrandName(): string {
-  const c = getTenantContext();
-  // Prefer the host's business display name over short API brand / marketplace defaults.
+export function resolveTenantBrandName(c: BrandNameSource): string {
   const businessDisplay = (c?.legalContactPack?.displayName ?? "").trim();
   if (businessDisplay) return businessDisplay;
   const longBrand = (c?.brandNameLong ?? "").trim();
   if (longBrand) return longBrand;
+  const legalName = (c?.legalContactPack?.legalName ?? "").trim();
+  if (legalName) return legalName;
+  const isNeutral = c?.guestCommsBrandingMode === "Neutral";
+  if (isNeutral) {
+    // Never publish brandName on Neutral white-label — it frequently holds a host's personal name (TASK-7431).
+    const tenantName = (c?.name ?? "").trim();
+    if (tenantName) return tenantName;
+    return NEUTRAL_NO_BRAND_FALLBACK;
+  }
   const raw = (c?.brandName ?? c?.name ?? "").trim();
   if (raw) return raw;
-  return isNeutralBrandingMode() ? NEUTRAL_NO_BRAND_FALLBACK : MARKETPLACE_BRAND_BASELINE;
+  return MARKETPLACE_BRAND_BASELINE;
+}
+
+export function getTenantBrandName(): string {
+  return resolveTenantBrandName(getTenantContext());
 }
 
 /** Legal-entity style name; falls back to short brand. */

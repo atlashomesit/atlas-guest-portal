@@ -9,7 +9,7 @@ import { LOGO_URL } from '../../../config/branding';
 import { getTenantContext } from '../../../tenant/tenantContext';
 import { getTenantBrandName } from '../../../tenant/displayBrand';
 import { getTenantOverrides, shouldHideAtlasBranding } from '../../../tenant/tenantOverrides';
-import { formatDisplayNumber, getContactEmail, getTelLink, getWhatsAppLink, getContactPhone, getWhatsAppPhone } from '../../../config/contact';
+import { formatDisplayNumber, getContactEmail, getTelLink, getWhatsAppLink, getGuestFacingPhone, getWhatsAppPhone } from '../../../config/contact';
 
 const iconMap = {
     ImGithub,
@@ -46,9 +46,10 @@ const Footer = () => {
 
     const socialLinks = Array.isArray(footerData?.socialLinks) ? footerData.socialLinks : [];
 
-    const businessPhone = getContactPhone("business");
+    // TASK-7192: single guest-facing phone so tel: matches the WhatsApp booking handoff.
+    const businessPhone = getGuestFacingPhone("business");
     const whatsappDigits = getWhatsAppPhone("business");
-    const showWhatsAppRow = whatsappDigits !== businessPhone;
+    const showWhatsAppRow = Boolean(whatsappDigits) && whatsappDigits !== businessPhone;
     const email = getContactEmail();
 
     type LocateRow = { key: string; icon: ReactNode; content: ReactNode };
@@ -71,15 +72,17 @@ const Footer = () => {
             ),
         });
     }
-    locateRows.push({
-        key: "phone",
-        icon: <IoIosCall className="shrink-0 text-lg" aria-hidden />,
-        content: (
-            <a href={getTelLink()} className="text-left hover:text-[var(--footer-link-hover)]">
-                {formatDisplayNumber()}
-            </a>
-        ),
-    });
+    if (businessPhone) {
+        locateRows.push({
+            key: "phone",
+            icon: <IoIosCall className="shrink-0 text-lg" aria-hidden />,
+            content: (
+                <a href={getTelLink()} className="text-left hover:text-[var(--footer-link-hover)]">
+                    {formatDisplayNumber()}
+                </a>
+            ),
+        });
+    }
     if (showWhatsAppRow) {
         locateRows.push({
             key: "whatsapp",
@@ -228,7 +231,7 @@ const Footer = () => {
                     <p>
                         Bookings on this site are fulfilled by{' '}
                         <strong>{tenant.legalContactPack.legalName ?? footerBrand}</strong>.
-                        {(tenant.legalContactPack.contactEmail || tenant.legalContactPack.contactPhone) && (
+                        {(tenant.legalContactPack.contactEmail || businessPhone) && (
                             <span>
                                 {' '}Contact:{' '}
                                 {tenant.legalContactPack.contactEmail && (
@@ -239,19 +242,25 @@ const Footer = () => {
                                         {tenant.legalContactPack.contactEmail}
                                     </a>
                                 )}
-                                {tenant.legalContactPack.contactEmail && tenant.legalContactPack.contactPhone && ' · '}
-                                {tenant.legalContactPack.contactPhone && (
+                                {tenant.legalContactPack.contactEmail && businessPhone && ' · '}
+                                {businessPhone && (
                                     <a
-                                        href={`tel:${tenant.legalContactPack.contactPhone}`}
+                                        href={getTelLink()}
                                         className='hover:text-[var(--footer-link-hover)] transition-colors'
                                     >
-                                        {tenant.legalContactPack.contactPhone}
+                                        {formatDisplayNumber()}
                                     </a>
                                 )}
                             </span>
                         )}
                     </p>
-                    <p>Booking engine by <strong>Atlas PMS</strong> · Payments secured by <strong>Razorpay</strong></p>
+                    {/* TASK-7428: keep Atlas PMS MOR credit; gate Razorpay rail copy on a real payment provider. */}
+                    <p>
+                        Booking engine by <strong>Atlas PMS</strong>
+                        {Boolean((tenant.paymentProvider ?? '').trim()) && (
+                            <> · Payments secured by <strong>Razorpay</strong></>
+                        )}
+                    </p>
                 </div>
             )}
 

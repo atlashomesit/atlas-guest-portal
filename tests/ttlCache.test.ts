@@ -45,4 +45,17 @@ describe("TtlCache (TASK-4905)", () => {
 
     expect(cache.get("host-a", 1500)).toBe("second");
   });
+
+  it("evicts oldest entries once maxEntries is reached (TASK-7207)", () => {
+    const cache = new TtlCache<string>(60_000, 3);
+    cache.set("a", "1", 0);
+    cache.set("b", "2", 0);
+    cache.set("c", "3", 0);
+    expect(cache.size()).toBe(3);
+
+    cache.set("d", "4", 0);
+    expect(cache.size()).toBe(3);
+    expect(cache.get("a", 0)).toBeUndefined();
+    expect(cache.get("d", 0)).toBe("4");
+  });
 });

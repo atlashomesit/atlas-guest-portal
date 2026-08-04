@@ -59,6 +59,8 @@ export default function SelfCheckIn() {
   const [aadhaarPhotoFallback, setAadhaarPhotoFallback] = useState(false);
   const [aadhaarVcVerified, setAadhaarVcVerified] = useState(false);
   const [aadhaarMasked, setAadhaarMasked] = useState("");
+  // TASK-5346: auditable skip when ID was collected through another channel
+  const [idCollectedElsewhere, setIdCollectedElsewhere] = useState(false);
 
   const stepIndex: Record<Step, number> = {
     auth: 0, summary: 1, "id-upload": 2, "house-rules": 3, done: 4,
@@ -166,6 +168,7 @@ export default function SelfCheckIn() {
           nationality: nationality || "India",
           passportNumber:
             nationality !== "India" && passportNumber.trim() ? passportNumber.trim() : null,
+          idCollectedElsewhere,
         }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -485,6 +488,19 @@ export default function SelfCheckIn() {
             {error && (
               <p id="checkin-id-error" role="alert" className="rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 mb-4">{error}</p>
             )}
+
+            <label className="flex items-start gap-3 cursor-pointer mb-4">
+              <input
+                type="checkbox"
+                checked={idCollectedElsewhere}
+                onChange={(e) => setIdCollectedElsewhere(e.target.checked)}
+                className="mt-0.5 h-4 w-4 accent-brand-primary"
+                data-testid="checkin-id-collected-elsewhere"
+              />
+              <span className="text-sm text-text-secondary">
+                ID collected through another channel (WhatsApp, front desk, etc.)
+              </span>
+            </label>
 
             <div className="flex gap-3">
               <button

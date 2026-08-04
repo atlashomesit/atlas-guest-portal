@@ -67,10 +67,13 @@ describe("tenant-subdomain-router Worker — host conveyance (ADR-0096 loop guar
   it("conveys the public host via X-Forwarded-Host and X-Public-Origin", async () => {
     const captured = stubFetchCapturingRequests();
 
-    await worker.fetch(new Request("https://starguesthouse.atlastays.com/homes/12"));
+    await worker.fetch(new Request("https://starguesthouse.atlastays.com/homes/12"), {
+      ATLAS_WORKER_PROXY_SECRET: "proxy-secret",
+    });
 
     expect(captured[0].headers.get("x-forwarded-host")).toBe("starguesthouse.atlastays.com");
     expect(captured[0].headers.get("x-public-origin")).toBe("https://starguesthouse.atlastays.com");
+    expect(captured[0].headers.get("x-atlas-worker-proxy")).toBe("proxy-secret");
   });
 
   it("never forwards the public host as the Host header (the zone would loop back to the Worker)", async () => {

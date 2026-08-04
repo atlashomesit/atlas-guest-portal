@@ -13,28 +13,41 @@ const resolveApiBaseUrl = (): string | null => {
   }
 };
 
+/** Platform tenant used for marketplace-apex guest auth and other tenant-scoped APIs (TASK-7440). */
+const PLATFORM_TENANT_SLUG = 'atlas';
+
+/** Normalize a resolved slug into a real API tenant — never the "marketplace" sentinel. */
+function toResolvableTenantSlug(slug: string | null | undefined): string | null {
+  const trimmed = slug?.trim();
+  if (!trimmed) return null;
+  if (trimmed.toLowerCase() === 'marketplace') return PLATFORM_TENANT_SLUG;
+  return trimmed;
+}
+
 /** Headers to attach to Atlas API requests when contract requires tenant (e.g. X-Tenant-Slug). */
 export const getApiHeaders = (): Record<string, string> => {
   // Marketplace detail pages pass ?tenant=<slug> so cross-host listings resolve the correct host tenant.
   if (typeof window !== 'undefined') {
-    const urlTenant = new URLSearchParams(window.location.search).get('tenant')?.trim();
+    const urlTenant = toResolvableTenantSlug(
+      new URLSearchParams(window.location.search).get('tenant'),
+    );
     if (urlTenant) {
       return { 'X-Tenant-Slug': urlTenant };
     }
   }
 
-  // Marketplace apex: never send the sentinel slug "marketplace" as X-Tenant-Slug — it triggers
-  // cross-tenant /listings/public mode and hits /tenants/marketplace/* instead of real tenant APIs.
-  // Detail pages pass ?tenant=<slug> which is handled above.
+  // TASK-7440: marketplace apex must still send a resolvable tenant (platform "atlas").
+  // Omitting the header made send-otp silently no-op with a fake 200. Never send the
+  // sentinel slug "marketplace" — map it to the platform tenant instead.
   if (isMarketplaceMode()) {
-    return {};
+    return { 'X-Tenant-Slug': PLATFORM_TENANT_SLUG };
   }
 
   // Priority matches tenantResolver: domain-resolved slug first, runtime config tenantKey only as
   // fallback. This lets a single deploy serve multiple tenants by hostname while still allowing
   // dev/staging to force a slug via ATLAS_TENANT_KEY when the hostname can't be resolved.
   const fallbackSlug = hasRuntimeConfig() ? getRuntimeConfig().tenantKey?.trim() : undefined;
-  const slug = getTenantSlug({ fallbackSlug });
+  const slug = toResolvableTenantSlug(getTenantSlug({ fallbackSlug }));
   if (!slug) return {};
   return { 'X-Tenant-Slug': slug };
 };

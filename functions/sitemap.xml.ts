@@ -4,12 +4,16 @@ import { isAtlasDirectBookingHost, isMarketplaceHost } from "./_lib/tenantSiteMe
 interface Env {
   ATLAS_API_BASE_URL?: string;
   ATLAS_TENANT_KEY?: string;
+  /** TASK-7207: must match Worker `ATLAS_WORKER_PROXY_SECRET` to trust X-Forwarded-Host. */
+  ATLAS_WORKER_PROXY_SECRET?: string;
 }
 
-// TASK-4414: city landing pages for SEO acquisition
+// TASK-4414: city landing pages for SEO acquisition (Atlas marketplace surfaces only — TASK-7194)
 const CITY_LANDING_SLUGS = ["goa", "coorg", "hyderabad", "manali"] as const;
 
-const CORE_PATHS = [
+const ATLAS_CITY_PATHS = CITY_LANDING_SLUGS.map((slug) => `/homestays-in-${slug}`);
+
+const SHARED_CORE_PATHS = [
   "/",
   "/amenities",
   "/location",
@@ -23,11 +27,14 @@ const CORE_PATHS = [
   "/about",
   "/faq",
   "/terms",
-  // City landing pages (TASK-4414)
-  ...CITY_LANDING_SLUGS.map((slug) => `/homestays-in-${slug}`),
 ];
 
-// Backward-compatible export used by tests; includes static (always-on) sitemap paths.
+const CORE_PATHS = [...SHARED_CORE_PATHS, ...ATLAS_CITY_PATHS];
+
+/** Paths every tenant sitemap includes (no Atlas SEO city guides). */
+export const SHARED_SITEMAP_PATHS = SHARED_CORE_PATHS;
+
+/** Full marketplace sitemap paths (includes Atlas city landing pages). */
 export const SITEMAP_PATHS = CORE_PATHS;
 
 export function buildSitemapXml(baseUrl: string, paths: string[]): string {
@@ -128,9 +135,16 @@ export const onRequestGet = async ({ request, env }: { request: Request; env?: E
   const apiBase = (runtimeEnv.ATLAS_API_BASE_URL ?? "").trim().replace(/\/+$/, "");
   const envTenantKey = (runtimeEnv.ATLAS_TENANT_KEY ?? "").trim();
 
-  // TASK-7170: through tenant-subdomain-router the public host is in X-Forwarded-Host on .pages.dev.
+  // TASK-7170 + TASK-7207: trust X-Forwarded-Host only with Worker proxy provenance.
   const isWorkerProxiedOrigin = url.hostname.toLowerCase().endsWith(".pages.dev");
-  const forwardedHost = isWorkerProxiedOrigin
+  const configuredSecret = (runtimeEnv.ATLAS_WORKER_PROXY_SECRET ?? "").trim();
+  const presentedSecret = (request.headers.get("x-atlas-worker-proxy") ?? "").trim();
+  const proxyProvenanceOk =
+    isWorkerProxiedOrigin &&
+    configuredSecret.length > 0 &&
+    presentedSecret.length > 0 &&
+    presentedSecret === configuredSecret;
+  const forwardedHost = proxyProvenanceOk
     ? (request.headers.get("x-forwarded-host") ?? "").trim().toLowerCase()
     : "";
   const host = forwardedHost || url.hostname.toLowerCase();
@@ -140,6 +154,14 @@ export const onRequestGet = async ({ request, env }: { request: Request; env?: E
     apiBase,
     envTenantKey,
   );
+
+  const isAtlasHost =
+    isMarketplaceHost(host) ||
+    isAtlasDirectBookingHost(host) ||
+    host.endsWith(".localhost");
+
+  // TASK-7194: omit /homestays-in-* from white-label tenant sitemaps.
+  const corePaths = isAtlasHost ? CORE_PATHS : SHARED_CORE_PATHS;
 
   const listingPaths: string[] = [];
   if (apiBase && tenantSlug) {
@@ -167,7 +189,7 @@ export const onRequestGet = async ({ request, env }: { request: Request; env?: E
     }
   }
 
-  const paths = Array.from(new Set([...CORE_PATHS, ...listingPaths]));
+  const paths = Array.from(new Set([...corePaths, ...listingPaths]));
   const sitemapXml = buildSitemapXml(origin, paths);
 
   return new Response(sitemapXml, {

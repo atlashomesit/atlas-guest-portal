@@ -6,7 +6,8 @@ import { primaryNav, ctaNav, tripsMenuNav } from '../../../config/navigation';
 import { LOGO_URL } from '../../../config/branding';
 import { getTenantContext } from '../../../tenant/tenantContext';
 import { getTenantBrandName } from '../../../tenant/displayBrand';
-import { getTenantOverrides } from '../../../tenant/tenantOverrides';
+import { getTenantOverrides, shouldShowHostAcquisitionCtas } from '../../../tenant/tenantOverrides';
+import { getAdminPortalLoginUrl } from '../../../config/adminPortal';
 import { formatDisplayNumber, getTelLink } from '../../../config/contact';
 import { trackEvent } from '../../../utils/analytics';
 import { getFavoriteIds } from '../../../utils/guestHistory';
@@ -23,7 +24,7 @@ const Navbar = () => {
   // RA-006 §3.5: prefer tenant name everywhere; only fall back to "Home" on the Atlas root.
   const brandName = getTenantBrandName();
   const showLogo = !overrides.hideLogo;
-  const showListProperty = !overrides.hideListProperty;
+  const showHostAcquisition = shouldShowHostAcquisitionCtas(tenant, overrides);
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [tripsMenuOpen, setTripsMenuOpen] = useState(false);
@@ -148,15 +149,20 @@ const Navbar = () => {
       <div className="util-bar" aria-hidden="false">
         <div className="util-bar-inner">
           <div className="util-bar-left">
-            {showListProperty && (
-              <a href="/become-a-host">List your property</a>
-            )}
-            <a
-              href={`${(import.meta.env.VITE_ADMIN_PORTAL_URL as string | undefined)?.trim() || 'https://app.atlaspms.in'}/login`}
-              rel="noopener noreferrer"
-            >
-              Host login
-            </a>
+            {showHostAcquisition ? (
+              <>
+                <a href="/become-a-host" data-testid="navbar-list-property">
+                  List your property
+                </a>
+                <a
+                  href={getAdminPortalLoginUrl()}
+                  rel="noopener noreferrer"
+                  data-testid="navbar-host-login"
+                >
+                  Host login
+                </a>
+              </>
+            ) : null}
           </div>
           <div className="util-bar-right">
             <a className="util-bar-phone" href={telLink}>{formatDisplayNumber()}</a>

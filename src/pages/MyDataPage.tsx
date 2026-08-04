@@ -1,5 +1,5 @@
 import React from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { buildApiUrl, getApiHeaders } from "@/api/client";
 import SEO from "@/components/SEO";
 import { LoadingState } from "@/components/LoadingState";
@@ -41,6 +41,17 @@ export default function MyDataPage() {
     })();
   }, [guestToken]);
 
+  const downloadJson = () => {
+    if (!exportData) return;
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `my-data-${guestToken ?? "export"}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const submitCorrection = async () => {
     if (!guestToken) return;
     setSubmitting(true);
@@ -73,18 +84,71 @@ export default function MyDataPage() {
       {error && <p className="text-red-600 mb-4" role="alert">{error}</p>}
       {exportData && (
         <section className="mb-8 rounded border p-4 bg-white" data-testid="my-data-export">
-          <h2 className="font-semibold mb-2">Profile</h2>
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
+            <h2 className="font-semibold">Profile</h2>
+            <button
+              type="button"
+              className="border px-3 py-1.5 rounded text-sm font-semibold"
+              data-testid="my-data-download"
+              onClick={downloadJson}
+            >
+              Download all my data (JSON)
+            </button>
+          </div>
           <p>Name: {exportData.guest.name ?? "—"}</p>
           <p>Email: {exportData.guest.email ?? "—"}</p>
           <p>Phone: {exportData.guest.phone ?? "—"}</p>
-          <h3 className="font-semibold mt-4 mb-1">Bookings ({exportData.bookings.length})</h3>
+
+          <h3 className="font-semibold mt-4 mb-1" data-testid="my-data-bookings">
+            Bookings ({exportData.bookings.length})
+          </h3>
           <ul className="text-sm space-y-1">
             {exportData.bookings.map((b) => (
-              <li key={b.id}>#{b.id} · {b.checkinDate} → {b.checkoutDate} · {b.bookingStatus}</li>
+              <li key={b.id}>
+                #{b.id} · {b.checkinDate} → {b.checkoutDate} · {b.bookingStatus}
+              </li>
+            ))}
+          </ul>
+
+          <h3 className="font-semibold mt-4 mb-1" data-testid="my-data-communication-logs">
+            Communication logs ({exportData.communicationLogs.length})
+          </h3>
+          <ul className="text-sm space-y-1">
+            {exportData.communicationLogs.map((log, i) => (
+              <li key={`${log.channel}-${log.eventType}-${log.createdAtUtc}-${i}`}>
+                {log.channel} · {log.eventType} · {log.createdAtUtc}
+              </li>
+            ))}
+          </ul>
+
+          <h3 className="font-semibold mt-4 mb-1" data-testid="my-data-reviews">
+            Reviews ({exportData.reviews.length})
+          </h3>
+          <ul className="text-sm space-y-1">
+            {exportData.reviews.map((r) => (
+              <li key={r.id}>
+                #{r.id} · {r.rating}/5{r.title ? ` · ${r.title}` : ""}
+              </li>
             ))}
           </ul>
         </section>
       )}
+
+      <section className="mb-8 rounded border p-4 bg-white" data-testid="my-data-erasure">
+        <h2 className="font-semibold mb-2">Right to erasure</h2>
+        <p className="text-sm text-gray-600">
+          To ask us to delete your personal data (DPDP Section 12), email{" "}
+          <a className="underline" href="mailto:privacy@atlastays.com">
+            privacy@atlastays.com
+          </a>
+          . See our{" "}
+          <Link className="underline" to="/privacy">
+            Privacy Policy
+          </Link>{" "}
+          for retention limits and how we respond.
+        </p>
+      </section>
+
       <section className="rounded border p-4 bg-white" data-testid="my-data-correction-form">
         <h2 className="font-semibold mb-2">Request a correction</h2>
         <p className="text-sm text-gray-600 mb-3">Describe what should be updated. A host will review before changes are applied.</p>

@@ -88,7 +88,12 @@ export type TenantOverrides = {
   faviconUrl?: string;
   /** Hide default marketplace / parent-brand copy where we show a listing brand row. */ // TODO(CPO-001-followup): align naming with displayBrand helpers
   hideAtlasHomesBranding?: boolean;
-  /** Hide the "List your property" CTA in the header (desktop + mobile). */
+  /**
+   * TASK-7434: explicit opt-in to show Atlas host-acquisition CTAs ("List your property",
+   * "Host login") on a white-label tenant. Default is hidden for all non-marketplace tenants.
+   */
+  showHostAcquisition?: boolean;
+  /** @deprecated TASK-7434 — use `showHostAcquisition` opt-in instead; kept for backwards compat. */
   hideListProperty?: boolean;
   /**
    * When true, search and listing surfaces use only the public listings API — no bundled
@@ -284,6 +289,23 @@ export function getTenantOverrides(slug?: string | null): TenantOverrides {
  * `tenantHint` accepts the minimum shape we need (slug + isMarketplaceRoot) so
  * callers don't need to import the full TenantInfo type.
  */
+/**
+ * TASK-7434: whether Atlas host-acquisition CTAs render in the guest-portal header.
+ * Default: hidden for every tenant except the marketplace root (`atlas` slug / isMarketplaceRoot).
+ * White-label tenants may opt in via `showHostAcquisition: true`.
+ */
+export function shouldShowHostAcquisitionCtas(
+  tenantHint: { slug?: string | null; isMarketplaceRoot?: boolean | null } | null | undefined,
+  overrides: TenantOverrides,
+): boolean {
+  if (overrides.showHostAcquisition === true) return true;
+  if (overrides.hideListProperty === true) return false;
+  if (overrides.hideListProperty === false) return true;
+  const slug = (tenantHint?.slug ?? "").trim().toLowerCase();
+  if (slug === "atlas") return true;
+  return Boolean(tenantHint?.isMarketplaceRoot);
+}
+
 export function shouldHideAtlasBranding(
   tenantHint: { slug?: string | null; isMarketplaceRoot?: boolean | null } | null | undefined,
   overrides: TenantOverrides,

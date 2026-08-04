@@ -3,6 +3,7 @@ import {
   buildSitemapXml,
   listingPathSlug,
   resolveSitemapTenantSlug,
+  SHARED_SITEMAP_PATHS,
   SITEMAP_PATHS,
 } from './sitemap.xml';
 import { _resetTenantSlugCacheForTests } from './_lib/tenantSlug';
@@ -12,7 +13,13 @@ describe('sitemap.xml', () => {
     _resetTenantSlugCacheForTests();
   });
 
-  it('includes city landing pages for all city slugs', () => {
+  // TASK-7430 / TASK-7194: white-label hosts must not advertise Atlas SEO city guides in sitemap.xml
+  it('TASK-7194: SHARED_SITEMAP_PATHS omits Atlas city landing pages', () => {
+    expect(SHARED_SITEMAP_PATHS).not.toContain('/homestays-in-hyderabad');
+    expect(SITEMAP_PATHS).toContain('/homestays-in-hyderabad');
+  });
+
+  it('includes city landing pages for all city slugs in the full marketplace sitemap', () => {
     const cityLandingSlugs = ["goa", "coorg", "hyderabad", "manali"];
     const expectedPaths = cityLandingSlugs.map((slug) => `/homestays-in-${slug}`);
 
@@ -61,5 +68,31 @@ describe('sitemap.xml', () => {
     expect(result.tenantSlug).toBe('sunrise');
     expect(result.allowAtlasHomesFallback).toBe(false);
     expect(String(fetchSpy.mock.calls[0]?.[0])).toContain('/tenants/from-domain');
+  });
+
+  it('TASK-7430: tenant sitemap paths are exactly the N real listing URLs (no atlas-homes)', () => {
+    const listings = [
+      { id: 180, propertyName: 'Stay by City Focus' },
+      { id: 191, propertyName: 'Elsiya loft' },
+      { id: 62, propertySlug: 'stay-by-city-focus' },
+    ];
+    const listingPaths = listings.map((l) => {
+      const slug = listingPathSlug(l, { allowAtlasHomesFallback: false });
+      return `/homes/${slug}/${l.id}`;
+    });
+
+    expect(listingPaths).toHaveLength(3);
+    expect(listingPaths).toEqual([
+      '/homes/stay-by-city-focus/180',
+      '/homes/elsiya-loft/191',
+      '/homes/stay-by-city-focus/62',
+    ]);
+    expect(listingPaths.every((p) => !p.includes('atlas-homes'))).toBe(true);
+
+    const xml = buildSitemapXml('https://staybycf.atlastays.com', listingPaths);
+    for (const path of listingPaths) {
+      expect(xml).toContain(`<loc>https://staybycf.atlastays.com${path}</loc>`);
+    }
+    expect(xml).not.toContain('atlas-homes');
   });
 });

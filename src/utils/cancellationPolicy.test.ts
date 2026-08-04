@@ -117,6 +117,18 @@ describe('computeEffectiveCancellationDeadline', () => {
   });
 });
 
+describe('resolveHomepageCancellationChip (TASK-7432)', () => {
+  it('never invents dual 48h/24h promises', async () => {
+    const { resolveHomepageCancellationChip } = await import('./cancellationPolicy');
+    expect(resolveHomepageCancellationChip({ tier: null })).toBeNull();
+    const chip = resolveHomepageCancellationChip({ tier: 'Flexible' });
+    expect(chip).toBeTruthy();
+    expect(chip).not.toMatch(/48h/);
+    expect(chip).not.toMatch(/24h/);
+    expect(chip).not.toMatch(/Free cancellation within/i);
+  });
+});
+
 describe('resolveFreeCancellationTrustCopy (TASK-7012)', () => {
   it('returns active free-cancellation copy when deadline is in the future', () => {
     const checkIn = new Date('2026-08-15T00:00:00+05:30');

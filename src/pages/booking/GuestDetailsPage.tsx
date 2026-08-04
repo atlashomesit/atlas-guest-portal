@@ -23,6 +23,7 @@ import axios from 'axios';
 import { useBooking, type BookingPriceBreakdown } from '@/contexts/BookingContext';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { buildApiUrl, getApiHeaders, getOrderRequestHeaders } from '@/api/client';
+import { normalizePromoCodeInput, normalizePromoCodeSubmit } from '@/utils/promoCodeInput';
 import {
   clampNationalDigits,
   getGuestDialOption,
@@ -1550,7 +1551,7 @@ const GuestDetailsPage: React.FC = () => {
                         placeholder="Enter code"
                         value={promoCode}
                         onChange={(e) => {
-                          setPromoCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 32));
+                          setPromoCode(normalizePromoCodeInput(e.target.value));
                           setPromoMessage(null);
                           setAppliedPromoCode(null);
                           setPromoDiscountAmount(0);
@@ -2167,7 +2168,12 @@ const TrustBand: React.FC<TrustBandProps> = ({ freeCancellationCopy, brandName, 
     </div>
     <div className="gd-trust-row">
       <IconLock size={14}/>
-      <span>Direct booking · secure payment via Razorpay · <b>no OTA fee</b> · 3% payment processing at checkout</span>
+      {/* TASK-7428: Razorpay / 3% copy only when an online payment provider is configured. */}
+      <span>
+        {(tenantCtx?.paymentProvider ?? '').trim() && tenantCtx?.bookingMode !== 'WHATSAPP'
+          ? <>Direct booking · secure payment via Razorpay · <b>no OTA fee</b> · 3% payment processing at checkout</>
+          : <>Direct booking with the host · <b>no OTA fee</b></>}
+      </span>
     </div>
     {whatsappNumber && (
       <div className="gd-trust-row">

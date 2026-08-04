@@ -81,6 +81,9 @@ vi.mock("../../../contexts/BookingContext", () => ({
   }),
   BookingProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
+vi.mock("../../../hooks/useTenantListings", () => ({
+  useTenantListings: () => ({ properties: [{ id: 1 }, { id: 2 }, { id: 3 }], loading: false, error: null }),
+}));
 import Slider from "./Slider";
 import * as analytics from "../../../utils/analytics";
 import { BookingProvider } from "../../../contexts/BookingContext";

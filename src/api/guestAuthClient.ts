@@ -41,7 +41,15 @@ export const guestAuthClient = {
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to send OTP: ${response.statusText}`);
+      // TASK-7440: missing tenant (and similar misconfig) must surface — not look like success.
+      let detail = response.statusText || `HTTP ${response.status}`;
+      try {
+        const body = (await response.json()) as { error?: string; message?: string };
+        detail = body.error || body.message || detail;
+      } catch {
+        /* keep statusText */
+      }
+      throw new Error(`Failed to send OTP: ${detail}`);
     }
 
     return response.json() as Promise<GuestSendOtpResponse>;
