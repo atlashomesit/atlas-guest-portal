@@ -85,11 +85,22 @@ export const onRequest = async (context: {
     const url = new URL(context.request.url);
     // TASK-7170 / ADR-0096 (additive): through the `tenant-subdomain-router` Worker the request
     // URL is the Pages origin (atlas-guest-portal.pages.dev) and the public tenant host arrives
-    // via `X-Forwarded-Host`. Prefer it when present so the eligibility check + tenant-meta
-    // lookup stay tenant-correct through the proxy. Direct Pages traffic (marketplace apex,
-    // custom domains) never traverses the Worker and carries no such header, so the URL-host
-    // path below is byte-identical to the pre-TASK-7170 behavior. Fail-open semantics unchanged.
-    const forwardedHost = (context.request.headers.get("x-forwarded-host") ?? "").trim().toLowerCase();
+    // via `X-Forwarded-Host`. Prefer it there so the eligibility check + tenant-meta lookup stay
+    // tenant-correct through the proxy.
+    //
+    // The header is trusted ONLY on that proxied path. The Worker fetches the Pages origin and
+    // sets the header itself (`headers.set`, overwriting whatever the client sent), so a
+    // `.pages.dev` request URL is what makes the value ours rather than the caller's. Requests
+    // that arrive DIRECTLY on Pages — the marketplace apex and every tenant custom domain —
+    // never traverse the Worker, so any `X-Forwarded-Host` on those is client-supplied. The
+    // original TASK-7170 comment asserted such requests "carry no such header"; that is true of
+    // well-behaved clients only, and honouring an arbitrary one lets any caller choose which
+    // tenant's title/description/og:image/canonical gets rewritten into another tenant's page.
+    // Ignoring it on the direct path restores byte-identical pre-TASK-7170 behavior there.
+    const isWorkerProxiedOrigin = url.hostname.toLowerCase().endsWith(".pages.dev");
+    const forwardedHost = isWorkerProxiedOrigin
+      ? (context.request.headers.get("x-forwarded-host") ?? "").trim().toLowerCase()
+      : "";
     const host = forwardedHost || url.hostname.toLowerCase();
 
     // Atlas first-party hosts (marketplace apex + Atlas direct-booking domains) keep their

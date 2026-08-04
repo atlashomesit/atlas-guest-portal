@@ -52,11 +52,13 @@ describe("Navbar CTA", () => {
     expect(helpLink).toHaveAttribute("href", "/contact");
   });
 
-  it("renders simplified center nav: Stays, Hyderabad, Trips menu, Help — no duplicates of utility bar", () => {
+  it("renders simplified center nav: Stays, Location, Trips menu, Help — no duplicates of utility bar", () => {
     renderNavbar();
 
     expect(screen.getByRole("link", { name: /^Stays$/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /^Hyderabad$/i })).toBeInTheDocument();
+    // Label is the tenant-neutral 'Location' since e1a68c3c replaced the hardcoded
+    // 'Hyderabad' in src/config/navigation.ts (guest portal is multi-tenant).
+    expect(screen.getByRole("link", { name: /^Location$/i })).toBeInTheDocument();
     expect(screen.getByTestId("navbar-trips-menu")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("navbar-trips-menu"));
     expect(screen.getByRole("menuitem", { name: /my bookings/i })).toBeInTheDocument();

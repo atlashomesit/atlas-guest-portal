@@ -82,3 +82,27 @@ describe('TASK-7012: listing-detail panels never advertise the grace window', ()
     expect(heritage).toContain('<UnitBookingWidget');
   });
 });
+
+/**
+ * Public /listings only returns cover (+ SortOrder==1). Property details must still hydrate the
+ * full photoUrls list from GET /listings/{id} so "View gallery" shows every photo — not skip
+ * hydration just because a cover image already exists.
+ */
+describe('Property details hydrates full gallery from listing detail', () => {
+  const SURFACES: Array<{ label: string; path: string }> = [
+    { label: 'default', path: resolve(__dirname, './Homepage_PropertyDetails.tsx') },
+    { label: 'heritage', path: resolve(__dirname, '../../../themes/heritage/PropertyDetails.tsx') },
+  ];
+
+  for (const { label, path } of SURFACES) {
+    it(`${label}: upgrades property_img when detail returns more photos`, () => {
+      const content = readFileSync(path, 'utf-8');
+      expect(content).toContain('detailPhotosHydratedRef');
+      expect(content).toContain('hydratedImages.length > prevGallery.length');
+      expect(content).not.toContain('hasGalleryImages && hasHostPhone');
+      expect(content).not.toMatch(
+        /filterGuestImageUrls\(prev\.property_img \?\? \[\]\)\.length === 0 && hydratedImages\.length > 0/,
+      );
+    });
+  }
+});
