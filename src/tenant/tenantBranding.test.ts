@@ -2,7 +2,7 @@
  * Per-tenant brand-asset scoping (Stay by City Focus).
  *
  * Repo-shipped artwork in TENANT_OVERRIDES[slug] must apply ONLY to that slug:
- * the devstaybycf branded subdomain gets its logo/favicon, while every other
+ * the staybycf branded subdomain gets its logo/favicon, while every other
  * tenant (incl. the atlastays.com marketplace apex) keeps API values or the
  * brand-neutral defaults.
  */
@@ -43,8 +43,8 @@ describe('applyTenantBranding — per-tenant brand assets', () => {
     vi.unstubAllGlobals();
   });
 
-  it('applies the Stay by City Focus logo + favicon for the devstaybycf slug only', () => {
-    applyTenantBranding(makeTenant({ slug: 'devstaybycf', name: 'Stay by City Focus' }));
+  it('applies the Stay by City Focus logo + favicon for the staybycf slug only', () => {
+    applyTenantBranding(makeTenant({ slug: 'staybycf', name: 'Stay by City Focus' }));
 
     expect(faviconHref()).toBe(STAYBYCF_LOGO);
     expect(document.documentElement.style.getPropertyValue('--brand-logo-url')).toContain(
@@ -59,7 +59,7 @@ describe('applyTenantBranding — per-tenant brand assets', () => {
     expect(document.documentElement.style.getPropertyValue('--brand-logo-url')).toBe('');
   });
 
-  it('leaves the atlas marketplace tenant untouched by the devstaybycf artwork', () => {
+  it('leaves the atlas marketplace tenant untouched by the staybycf artwork', () => {
     applyTenantBranding(makeTenant({ slug: 'atlas', name: 'Atlastays', isCustomDomain: false }));
 
     expect(faviconHref()).toBe(STATIC_FAVICON);

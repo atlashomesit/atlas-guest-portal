@@ -43,8 +43,8 @@ import {
   isMobileCheckoutUserAgent,
 } from '@/utils/razorpayCheckoutOptions';
 import {
-  computeEffectiveCancellationDeadline,
-  formatCancellationDeadline,
+  resolveFreeCancellationTrustCopy,
+  type FreeCancellationTrustCopy,
 } from '@/utils/cancellationPolicy';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 
@@ -527,17 +527,15 @@ const GuestDetailsPage: React.FC = () => {
     || (unitSlug && /\D/.test(unitSlug) ? unitSlug.replace(/-/g, ' ') : unitSlug ?? '');
 
   // TASK-5179: free-cancellation deadline from resolved listing policy (not a hardcoded 48h).
-  const freeCancelDisplay = useMemo(() => {
+  const freeCancellationCopy = useMemo(() => {
     if (!booking.checkIn) return null;
-    const checkInDate = new Date(booking.checkIn);
-    const deadline = computeEffectiveCancellationDeadline(
-      checkInDate,
-      booking.holdCancellationTier,
-      booking.holdCancellationWindowHours,
-      new Date(),
-      booking.holdGraceHours,
-    );
-    return formatCancellationDeadline(deadline);
+    return resolveFreeCancellationTrustCopy({
+      checkInDate: new Date(booking.checkIn),
+      tier: booking.holdCancellationTier,
+      windowHoursOverride: booking.holdCancellationWindowHours,
+      bookingCreatedAt: new Date(),
+      graceHours: booking.holdGraceHours,
+    });
   }, [
     booking.checkIn,
     booking.holdCancellationTier,
@@ -1932,7 +1930,7 @@ const GuestDetailsPage: React.FC = () => {
 
           {/* Trust band (mobile only — desktop in aside) */}
           <TrustBand
-            freeCancelDisplay={freeCancelDisplay}
+            freeCancellationCopy={freeCancellationCopy}
             brandName={brandName}
             whatsappNumber={whatsappNumber}
             className="gd-trust--mobile"
@@ -2062,7 +2060,17 @@ const GuestDetailsPage: React.FC = () => {
           {consentAccepted && (
             <div className="gd-pay-microcopy">
               You'll be charged <b>{displayPrice(chargeInr)}</b> now to confirm.
-              {freeCancelDisplay && ` Free cancellation until ${freeCancelDisplay}.`}
+              {freeCancellationCopy?.deadlineFormatted
+                && ` Free cancellation until ${freeCancellationCopy.deadlineFormatted}.`}
+              {freeCancellationCopy?.trustMessage
+                && !freeCancellationCopy.deadlineFormatted
+                && ` ${freeCancellationCopy.trustMessage}`}
+              {/* TASK-7012: lapsed tier deadline but a live grace window — state the window that is
+                  actually honoured instead of leaving the charge line with no cancellation terms. */}
+              {!freeCancellationCopy?.deadlineFormatted
+                && !freeCancellationCopy?.trustMessage
+                && freeCancellationCopy?.applicableGraceHours
+                && ` Free cancellation for ${freeCancellationCopy.applicableGraceHours} hours after you book.`}
               {/* TASK-4410: INR charge disclosure for non-INR shoppers */}
               {currency !== 'INR' && (
                 <div style={{ marginTop: 8, fontSize: '0.85em', color: '#64748b' }}>
@@ -2084,7 +2092,7 @@ const GuestDetailsPage: React.FC = () => {
 
           {/* Trust band (desktop) */}
           <TrustBand
-            freeCancelDisplay={freeCancelDisplay}
+            freeCancellationCopy={freeCancellationCopy}
             brandName={brandName}
             whatsappNumber={whatsappNumber}
           />
@@ -2121,23 +2129,45 @@ const GuestDetailsPage: React.FC = () => {
 
 // ── TrustBand atom ────────────────────────────────────────────────────────────
 interface TrustBandProps {
-  freeCancelDisplay: string | null;
+  freeCancellationCopy: FreeCancellationTrustCopy | null;
   brandName: string;
   whatsappNumber: string;
   className?: string;
 }
-const TrustBand: React.FC<TrustBandProps> = ({ freeCancelDisplay, brandName, whatsappNumber, className }) => (
+const TrustBand: React.FC<TrustBandProps> = ({ freeCancellationCopy, brandName, whatsappNumber, className }) => (
   <div className={`gd-trust${className ? ` ${className}` : ''}`}>
     <div className="gd-trust-row">
       <IconCheck size={14}/>
       <span>
-        <b>Free cancellation</b>
-        {freeCancelDisplay ? ` until ${freeCancelDisplay}.` : ' policy applies.'}
+        {freeCancellationCopy?.deadlineFormatted ? (
+          <>
+            <b>Free cancellation</b>
+            {` until ${freeCancellationCopy.deadlineFormatted}.`}
+          </>
+        ) : freeCancellationCopy?.trustMessage ? (
+          freeCancellationCopy.trustMessage
+        ) : freeCancellationCopy?.applicableGraceHours ? (
+          // TASK-7012: tier deadline has lapsed but the universal grace window still applies —
+          // disclose the window that IS honoured rather than an unqualified "policy applies".
+          <>
+            <b>Free cancellation</b>
+            {` for ${freeCancellationCopy.applicableGraceHours} hours after you book.`}
+          </>
+        ) : (
+          // TASK-7012: only reachable before a check-in date is known (no booking context to resolve
+          // a policy against). Once dates ARE known, `resolveFreeCancellationTrustCopy` always returns
+          // either a live deadline or the standard-policy sentence — never this unqualified claim,
+          // which would over-promise a refund the server will not issue on a lapsed policy.
+          <>
+            <b>Free cancellation</b>
+            {' policy applies.'}
+          </>
+        )}
       </span>
     </div>
     <div className="gd-trust-row">
       <IconLock size={14}/>
-      <span>Direct booking · secure payment via Razorpay · <b>no OTA fee</b></span>
+      <span>Direct booking · secure payment via Razorpay · <b>no OTA fee</b> · 3% payment processing at checkout</span>
     </div>
     {whatsappNumber && (
       <div className="gd-trust-row">

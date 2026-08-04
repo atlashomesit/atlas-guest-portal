@@ -83,7 +83,14 @@ export const onRequest = async (context: {
     if (!contentType.toLowerCase().includes("text/html")) return response;
 
     const url = new URL(context.request.url);
-    const host = url.hostname.toLowerCase();
+    // TASK-7170 / ADR-0096 (additive): through the `tenant-subdomain-router` Worker the request
+    // URL is the Pages origin (atlas-guest-portal.pages.dev) and the public tenant host arrives
+    // via `X-Forwarded-Host`. Prefer it when present so the eligibility check + tenant-meta
+    // lookup stay tenant-correct through the proxy. Direct Pages traffic (marketplace apex,
+    // custom domains) never traverses the Worker and carries no such header, so the URL-host
+    // path below is byte-identical to the pre-TASK-7170 behavior. Fail-open semantics unchanged.
+    const forwardedHost = (context.request.headers.get("x-forwarded-host") ?? "").trim().toLowerCase();
+    const host = forwardedHost || url.hostname.toLowerCase();
 
     // Atlas first-party hosts (marketplace apex + Atlas direct-booking domains) keep their
     // existing static/runtime OG tags — no API call, no rewrite.

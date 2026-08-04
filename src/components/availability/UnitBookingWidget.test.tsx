@@ -171,10 +171,26 @@ describe('UnitBookingWidget - TASK-2623: .bw-* design header, price labels, trus
   it('has a computed-deadline trust strip (TASK-4334 — no hardcoded "48 hours")', () => {
     content = readFileSync(filePath, 'utf-8');
     expect(content).toContain('bw-trust');
-    expect(content).toContain('Free cancellation until ${cancellationDeadlineText}');
     expect(content).toContain('Select check-in dates to see your free cancellation deadline');
-    // The old hardcoded claim must not reappear as a static string.
+    // TASK-7012: the deadline sentence is built by the shared policy helper (which applies the
+    // server's grace-void rule), not assembled here — so assert delegation, not a local template.
+    expect(content).toContain('resolveFreeCancellationTrustCopy');
+    expect(content).toContain('freeCancellationCopy?.trustMessage');
+    // The old hardcoded claim must not reappear as a static string, and no window may be
+    // recomputed inline from an hour literal.
     expect(content).not.toContain('Free cancellation until 48 hours before check-in');
+    expect(content).not.toMatch(/48 \* 60 \* 60 \* 1000/);
+    expect(content).not.toMatch(/(?:Free cancellation|cancellation deadline)[^\n]*\b48\b/);
+  });
+
+  it('gates the grace-window strip on the void-aware resolved hours, not the raw listing value (TASK-7012)', () => {
+    content = readFileSync(filePath, 'utf-8');
+    // The server VOIDS the universal grace window when check-in falls inside it from booking time.
+    // Rendering the strip off `resolvedGraceHours` advertises a refund the API will not issue.
+    expect(content).toContain('disclosableGraceHours');
+    expect(content).toContain('applicableGraceHours');
+    expect(content).toMatch(/\{disclosableGraceHours \?/);
+    expect(content).not.toMatch(/\{resolvedGraceHours \?\s*\(/);
   });
 
   it('passes holdListingName to updateBooking in handleReserve', () => {
@@ -993,5 +1009,92 @@ describe('UnitBookingWidget - TASK-4910: no misleading GST-less total in incompl
 
     const feeRow = screen.getByTestId('bw-bd-service-fee-row');
     expect(feeRow.querySelector('.lv-num')?.textContent?.replace(/[^0-9]/g, '')).toBe('180');
+  });
+});
+
+/**
+ * TASK-7012 (render): the guest-visible cancellation copy must match the policy the API will
+ * actually honour. `CancellationPolicyWindow` VOIDS the universal grace window when check-in falls
+ * inside it from booking time, so a listing with graceHours set is NOT a guarantee this guest's
+ * dates qualify. These assert the rendered DOM, not the source text.
+ */
+describe('UnitBookingWidget - TASK-7012: rendered cancellation copy matches the honoured policy', () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+    availabilityMock.fetch.mockReset();
+    availabilityMock.fetch.mockImplementation(availabilityOk);
+    task4303.booking.checkIn = null;
+    task4303.booking.checkOut = null;
+  });
+
+  // Policy passed as props so the widget short-circuits its listing fetch (TASK-5205).
+  const renderWidget = async () => {
+    const { default: UnitBookingWidget } = await import('./UnitBookingWidget');
+    return render(
+      <MemoryRouter>
+        <UnitBookingWidget
+          listingId={7}
+          propertyId={3}
+          listingName="Atlas 501 PH"
+          propertySlug="atlas501-ph"
+          unitSlug="ph"
+          minStayNights={1}
+          cancellationTier="Strict"
+          cancellationWindowHours={168}
+          graceHours={24}
+        />
+      </MemoryRouter>,
+    );
+  };
+
+  const setCheckin = async (daysOut: number) => {
+    const checkin = addDays(getIstStartOfDay(new Date()), daysOut);
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('atlas:set-checkin', { detail: toISODate(checkin) }));
+    });
+  };
+
+  it('before any date is picked: prompts for dates and may show the generic grace disclosure', async () => {
+    await renderWidget();
+    const strip = await screen.findByTestId('bw-trust-strip-text');
+    expect(strip.textContent).toContain('Select check-in dates');
+    // Nothing to void against yet, so the listing-level disclosure is legitimate here.
+    expect(screen.getByTestId('bw-grace-window-strip-text').textContent)
+      .toContain('Free cancellation for 24 hours after you book');
+  });
+
+  it('far-out check-in: shows the computed deadline AND the grace disclosure (both true)', async () => {
+    await renderWidget();
+    await setCheckin(40);
+
+    const strip = await screen.findByTestId('bw-trust-strip-text');
+    // Strict = 168h before check-in, so ~33 days out — a real date, never "48 hours".
+    expect(strip.textContent).toMatch(/^Free cancellation until \d{1,2}:\d{2} (?:AM|PM), \d{1,2} \w{3}$/);
+    expect(strip.textContent).not.toContain('48');
+    expect(screen.getByTestId('bw-grace-window-strip')).toBeInTheDocument();
+  });
+
+  it('same-day check-in (grace VOIDED, tier deadline lapsed): states the standard policy and hides the grace strip', async () => {
+    await renderWidget();
+    await setCheckin(0);
+
+    const strip = await screen.findByTestId('bw-trust-strip-text');
+    // The refund the server would actually issue here is nil — the copy must not promise otherwise.
+    expect(strip.textContent).toBe('Standard cancellation policy applies for this stay.');
+    expect(strip.textContent).not.toMatch(/free cancellation/i);
+    // The grace window is voided for these dates, so advertising it would over-promise the refund.
+    expect(screen.queryByTestId('bw-grace-window-strip')).toBeNull();
+  });
+
+  it('never renders an empty trust strip (a bare check icon with blank text)', async () => {
+    await renderWidget();
+    for (const daysOut of [0, 1, 40]) {
+      await setCheckin(daysOut);
+      const strip = screen.queryByTestId('bw-trust-strip-text');
+      if (strip) {
+        expect(strip.textContent?.trim(), `daysOut=${daysOut}`).not.toBe('');
+      }
+    }
   });
 });

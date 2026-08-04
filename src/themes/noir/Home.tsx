@@ -62,7 +62,7 @@ const NOIR_VALUE_ITEMS = [
             </svg>
         ),
         heading: 'Pay the host, directly',
-        body: 'No platform mark-up, no third-party fee. The price on this page is the price you pay.',
+        body: 'The host keeps more when you book direct. Price shown includes room rate, GST, and a 3% payment-processing fee.',
     },
 ] as const;
 
@@ -182,7 +182,7 @@ const NoirHome = () => {
                         <p className="noir-hero-sub">
                             {showAtlasContent
                                 ? 'Owner-run homes in KPHB, kept immaculate and always ready — book direct, arrive to a home that is genuinely yours for the night.'
-                                : `Direct from the owner — no platform fee and responsive support from ${schemaBrandName}.`}
+                                : `Direct from the owner — responsive support from ${schemaBrandName}.`}
                         </p>
                         <div id="search-form" data-testid="hero-widget" className="noir-hero-widget">
                             <SearchAvailabilityWidget />

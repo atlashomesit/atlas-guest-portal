@@ -87,6 +87,81 @@ export type GuestGstBreakdown = {
   finalAmount: number | null;
 };
 
+/** TASK-4331 / TASK-7016: full server quote from GET /pricing/guest-breakdown — the charge engine
+ * (PricingService.GetPublicBreakdownAsync), not the display-only calendar breakdown. */
+export type GuestPriceBreakdown = {
+  baseAmount: number;
+  discountAmount: number;
+  losDiscountAmount: number;
+  lastMinuteDiscountAmount: number;
+  repeatGuestDiscountAmount: number;
+  longStayDiscountAmount: number;
+  convenienceFeeAmount: number;
+  convenienceFeePercent: number;
+  touristTaxAmount: number;
+  gstPercent: number | null;
+  gstAmount: number | null;
+  finalAmount: number | null;
+};
+
+/** Room fare after all server-side rule adjustments, before GST/fees/tax. */
+export function netChargeableRoomFare(b: GuestPriceBreakdown): number {
+  return Math.max(
+    0,
+    b.baseAmount -
+      b.discountAmount -
+      b.losDiscountAmount -
+      b.lastMinuteDiscountAmount -
+      b.repeatGuestDiscountAmount -
+      b.longStayDiscountAmount,
+  );
+}
+
+/**
+ * GET /pricing/guest-breakdown?listingId=&checkIn=&checkOut= — authoritative pre-checkout quote.
+ * TASK-7016: widget totals must derive from this, not from GET /pricing/breakdown calendar rows.
+ */
+export async function fetchGuestPriceBreakdown(
+  listingId: string | number,
+  checkIn: string,
+  checkOut: string,
+  signal?: AbortSignal,
+): Promise<GuestPriceBreakdown> {
+  const url = new URL(buildApiUrl(GUEST_BREAKDOWN_ENDPOINT));
+  url.searchParams.set('listingId', String(listingId));
+  url.searchParams.set('checkIn', checkIn);
+  url.searchParams.set('checkOut', checkOut);
+
+  const response = await fetch(url.toString(), { signal, headers: getApiHeaders() });
+  if (!response.ok) {
+    throw new Error(await messageFromApiResponse(response));
+  }
+
+  const raw = (await response.json()) as Record<string, unknown>;
+  const num = (camel: string, pascal: string) => {
+    const v = raw[camel] ?? raw[pascal];
+    return v !== undefined && v !== null ? Number(v) : 0;
+  };
+  const gstPercent = raw.gstPercent ?? raw.GstPercent;
+  const gstAmount = raw.gstAmount ?? raw.GstAmount;
+  const finalAmount = raw.finalAmount ?? raw.FinalAmount;
+
+  return {
+    baseAmount: num('baseAmount', 'BaseAmount'),
+    discountAmount: num('discountAmount', 'DiscountAmount'),
+    losDiscountAmount: num('losDiscountAmount', 'LosDiscountAmount'),
+    lastMinuteDiscountAmount: num('lastMinuteDiscountAmount', 'LastMinuteDiscountAmount'),
+    repeatGuestDiscountAmount: num('repeatGuestDiscountAmount', 'RepeatGuestDiscountAmount'),
+    longStayDiscountAmount: num('longStayDiscountAmount', 'LongStayDiscountAmount'),
+    convenienceFeeAmount: num('convenienceFeeAmount', 'ConvenienceFeeAmount'),
+    convenienceFeePercent: num('convenienceFeePercent', 'ConvenienceFeePercent'),
+    touristTaxAmount: num('touristTaxAmount', 'TouristTaxAmount'),
+    gstPercent: gstPercent !== undefined && gstPercent !== null ? Number(gstPercent) : null,
+    gstAmount: gstAmount !== undefined && gstAmount !== null ? Number(gstAmount) : null,
+    finalAmount: finalAmount !== undefined && finalAmount !== null ? Number(finalAmount) : null,
+  };
+}
+
 /**
  * GET /pricing/guest-breakdown?listingId=&checkIn=&checkOut= — server-computed GST slab/amount
  * for a check-in/check-out range. TASK-4331: use this instead of re-deriving the 5%/18% slab
@@ -99,28 +174,11 @@ export async function fetchGuestGstBreakdown(
   checkOut: string,
   signal?: AbortSignal,
 ): Promise<GuestGstBreakdown> {
-  const url = new URL(buildApiUrl(GUEST_BREAKDOWN_ENDPOINT));
-  url.searchParams.set('listingId', String(listingId));
-  url.searchParams.set('checkIn', checkIn);
-  url.searchParams.set('checkOut', checkOut);
-
-  const response = await fetch(url.toString(), { signal, headers: getApiHeaders() });
-  if (!response.ok) {
-    throw new Error(await messageFromApiResponse(response));
-  }
-
-  const raw = (await response.json()) as {
-    gstPercent?: number; GstPercent?: number;
-    gstAmount?: number; GstAmount?: number;
-    finalAmount?: number; FinalAmount?: number;
-  };
-  const gstPercent = raw.gstPercent ?? raw.GstPercent;
-  const gstAmount = raw.gstAmount ?? raw.GstAmount;
-  const finalAmount = raw.finalAmount ?? raw.FinalAmount;
+  const b = await fetchGuestPriceBreakdown(listingId, checkIn, checkOut, signal);
   return {
-    gstPercent: gstPercent !== undefined && gstPercent !== null ? Number(gstPercent) : null,
-    gstAmount: gstAmount !== undefined && gstAmount !== null ? Number(gstAmount) : null,
-    finalAmount: finalAmount !== undefined && finalAmount !== null ? Number(finalAmount) : null,
+    gstPercent: b.gstPercent,
+    gstAmount: b.gstAmount,
+    finalAmount: b.finalAmount,
   };
 }
 

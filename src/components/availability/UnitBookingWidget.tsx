@@ -16,15 +16,18 @@ import { getIstStartOfDay } from '@/utils/date';
 import { calculateNights, formatDateInTimezone, formatIsoDateInTimezone } from '@/utils/dateHelpers';
 import {
   type CancellationTier,
-  computeCancellationDeadline,
-  computeEffectiveCancellationDeadline,
-  formatCancellationDeadline,
+  resolveFreeCancellationTrustCopy,
 } from '@/utils/cancellationPolicy';
 import { doesRangeIntersectBlocked, toISODate } from '@/utils/dateRange';
 import { formatCurrency } from '@/utils/formatting';
 import { HelpCircle } from 'lucide-react';
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
-import { fetchCalendarPricing, fetchGuestGstBreakdown } from '@/api/pricingClient';
+import {
+  fetchCalendarPricing,
+  fetchGuestPriceBreakdown,
+  netChargeableRoomFare,
+  type GuestPriceBreakdown,
+} from '@/api/pricingClient';
 import { fetchPublicListings } from '@/api/listingClient';
 import { useListingPhotosFromApi } from '@/contexts/ListingPhotosContext';
 import OptimizedImage from '@/components/ui/OptimizedImage';
@@ -200,12 +203,8 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   // TASK-4303: pricing fetch terminally failed (network/API error, not an abort). Only then do
   // we degrade to the base-rate fallback estimate instead of holding the loading skeleton.
   const [calendarPricingFailed, setCalendarPricingFailed] = useState(false);
-  // TASK-4331: server-computed GST slab/amount (post-LOS/last-minute/min-floor basis),
-  // preferred over the client-derived slab below when available.
-  const [serverGstPercent, setServerGstPercent] = useState<number | null>(null);
-  const [serverGstAmount, setServerGstAmount] = useState<number | null>(null);
-  // TASK-5184: server FinalAmount includes tourist tax; client recomputes omit it.
-  const [serverFinalAmount, setServerFinalAmount] = useState<number | null>(null);
+  // TASK-4331 / TASK-7016: authoritative server quote (charge engine, not calendar display engine).
+  const [serverPriceBreakdown, setServerPriceBreakdown] = useState<GuestPriceBreakdown | null>(null);
   const [guests, setGuests] = useState(2);
   const [guestsOpen, setGuestsOpen] = useState(false);
   const [_bookedDates, setBookedDates] = useState<Date[]>([]);
@@ -817,28 +816,20 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   // a fallback while this request is in flight or if it fails.
   useEffect(() => {
     if (!listingId || String(listingId).trim() === '') {
-      setServerGstPercent(null);
-      setServerGstAmount(null);
-      setServerFinalAmount(null);
+      setServerPriceBreakdown(null);
       return;
     }
     if (!gstRangeStartIso || !gstRangeEndIso) {
-      setServerGstPercent(null);
-      setServerGstAmount(null);
-      setServerFinalAmount(null);
+      setServerPriceBreakdown(null);
       return;
     }
     const controller = new AbortController();
-    fetchGuestGstBreakdown(listingId, gstRangeStartIso, gstRangeEndIso, controller.signal)
+    fetchGuestPriceBreakdown(listingId, gstRangeStartIso, gstRangeEndIso, controller.signal)
       .then((b) => {
-        setServerGstPercent(b.gstPercent);
-        setServerGstAmount(b.gstAmount);
-        setServerFinalAmount(b.finalAmount);
+        setServerPriceBreakdown(b);
       })
       .catch(() => {
-        setServerGstPercent(null);
-        setServerGstAmount(null);
-        setServerFinalAmount(null);
+        setServerPriceBreakdown(null);
       });
     return () => controller.abort();
   }, [listingId, gstRangeStartIso, gstRangeEndIso]);
@@ -1041,14 +1032,30 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   // check-in date, the listing's resolved cancellation tier, or the resolved grace hours changes.
   // Uses "now" as the booking-time estimate (the actual booking doesn't exist yet at this stage) —
   // same estimate posture the tier-only deadline already used pre-booking.
-  const cancellationDeadlineText = useMemo(() => {
+  const freeCancellationCopy = useMemo(() => {
     if (!dateRange.startDate) return null;
-    const deadline = resolvedGraceHours
-      ? computeEffectiveCancellationDeadline(
-          dateRange.startDate, resolvedCancellationTier, resolvedCancellationWindowHours, new Date(), resolvedGraceHours)
-      : computeCancellationDeadline(dateRange.startDate, resolvedCancellationTier, resolvedCancellationWindowHours);
-    return formatCancellationDeadline(deadline);
+    return resolveFreeCancellationTrustCopy({
+      checkInDate: dateRange.startDate,
+      tier: resolvedCancellationTier,
+      windowHoursOverride: resolvedCancellationWindowHours,
+      bookingCreatedAt: new Date(),
+      graceHours: resolvedGraceHours,
+    });
   }, [dateRange.startDate, resolvedCancellationTier, resolvedCancellationWindowHours, resolvedGraceHours]);
+
+  // TASK-7012: trust-strip sentence, or null when there is nothing truthful to say (a still-active
+  // grace window with a lapsed tier deadline — the grace strip below carries that claim instead).
+  const cancellationTrustText =
+    freeCancellationCopy?.trustMessage
+    ?? (!dateRange.startDate ? 'Select check-in dates to see your free cancellation deadline' : null);
+
+  // TASK-7012: grace hours we may DISCLOSE. Once a check-in date is picked we know whether the server
+  // would void the grace window for these dates, so gate on the resolved value — `resolvedGraceHours`
+  // only says the feature is on for this listing, not that this guest's dates qualify. Before a date
+  // is picked there is nothing to void against, so the listing-level value carries generic copy.
+  const disclosableGraceHours = dateRange.startDate
+    ? freeCancellationCopy?.applicableGraceHours ?? null
+    : resolvedGraceHours;
 
   const { loading: dailyPricingLoading, error: _dailyPricingError, getListingPricing } = useDailyPricingSummary();
   const dailyPricing = useMemo(
@@ -1089,27 +1096,46 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   // estimate (graceful offline UX) — matching the widget's existing degradation pattern.
   const rangePricingPending =
     hasSelectedRange && !invalidIstStayRange && !selectedRangeNightsPriced && !calendarPricingFailed;
+  const serverGstMatchesSelection =
+    hasSelectedRange && gstRangeStartIso === toISODate(dateRange.startDate!) && gstRangeEndIso === toISODate(dateRange.endDate!);
+
+  const serverGstPercent =
+    serverGstMatchesSelection && serverPriceBreakdown ? serverPriceBreakdown.gstPercent : null;
+  const serverGstAmount =
+    serverGstMatchesSelection && serverPriceBreakdown ? serverPriceBreakdown.gstAmount : null;
+  const serverFinalAmount =
+    serverGstMatchesSelection && serverPriceBreakdown ? serverPriceBreakdown.finalAmount : null;
+
+  /** TASK-7016: prefer charge-engine room fare over calendar display-engine sum when loaded. */
+  const serverChargeableBase =
+    serverGstMatchesSelection && serverPriceBreakdown
+      ? netChargeableRoomFare(serverPriceBreakdown)
+      : null;
+
   const breakdownPrice =
-    hasSelectedRange && selectedRangeTotalFromCalendar != null
-      ? selectedRangeTotalFromCalendar
-      : effectiveDailyPricing != null
-        ? Math.round(effectiveDailyPricing.actualPrice * (hasSelectedRange ? priceDetails.nights : 1))
+    serverChargeableBase != null
+      ? serverChargeableBase
+      : hasSelectedRange && selectedRangeTotalFromCalendar != null
+        ? selectedRangeTotalFromCalendar
+        : effectiveDailyPricing != null
+          ? Math.round(effectiveDailyPricing.actualPrice * (hasSelectedRange ? priceDetails.nights : 1))
+          : 0;
+  const convenienceFeePercent =
+    serverGstMatchesSelection && serverPriceBreakdown && serverPriceBreakdown.convenienceFeePercent > 0
+      ? serverPriceBreakdown.convenienceFeePercent / 100
+      : calendarConvenienceFeePercent != null
+        ? calendarConvenienceFeePercent / 100
         : 0;
-  const convenienceFeePercent = calendarConvenienceFeePercent != null ? calendarConvenienceFeePercent / 100 : 0;
 
   // Per-night: when API has loaded use API/calendar data; when API not loaded show 0.
   const perNightForDisplay =
-    hasSelectedRange && selectedRangeTotalFromCalendar != null && priceDetails.nights > 0
-      ? Math.round(selectedRangeTotalFromCalendar / priceDetails.nights)
-      : effectiveDailyPricing != null
-        ? effectiveDailyPricing.actualPrice
-        : 0;
-
-  // TASK-4331: does the in-flight/loaded server GST fetch match the CURRENTLY selected range?
-  // Guards against a stale serverGstPercent (from a prior selection) being applied to a new
-  // one for one render before the effect above re-fires.
-  const serverGstMatchesSelection =
-    hasSelectedRange && gstRangeStartIso === toISODate(dateRange.startDate!) && gstRangeEndIso === toISODate(dateRange.endDate!);
+    serverChargeableBase != null && priceDetails.nights > 0
+      ? Math.round(serverChargeableBase / priceDetails.nights)
+      : hasSelectedRange && selectedRangeTotalFromCalendar != null && priceDetails.nights > 0
+        ? Math.round(selectedRangeTotalFromCalendar / priceDetails.nights)
+        : effectiveDailyPricing != null
+          ? effectiveDailyPricing.actualPrice
+          : 0;
 
   /**
    * TASK-4331: GST slab basis divergence fix. The client-derived slab below (from
@@ -1157,7 +1183,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   // on the BASE accommodation amount only — NOT on base+GST. Supersedes the prior base+GST rule
   // (memory: project_guest_booking_pricing_formula) which overcharged guests relative to the
   // "no guest service fee / save vs OTA" booking-card copy. Mirrors PricingService.BuildBreakdown.
-  const breakdownConvenienceFee = Math.round(taxableBase * convenienceFeePercent);
+  const breakdownConvenienceFee =
+    serverGstMatchesSelection && serverPriceBreakdown && serverPriceBreakdown.convenienceFeeAmount > 0
+      ? Math.round(serverPriceBreakdown.convenienceFeeAmount)
+      : Math.round(taxableBase * convenienceFeePercent);
 
   // TASK-4322: Total = discount-net base + GST + Service Fee (canonical formula).
   // Offline fallback only — TASK-5184 prefers server FinalAmount (includes tourist tax).
@@ -1190,7 +1219,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       hasCompleteDates: hasSelectedRange,
       totalAmount: hasSelectedRange && displayFinalTotal > 0 ? displayFinalTotal : null,
       pricingPending: rangePricingPending || calendarOpenPricingPending,
-      freeCancelUntil: cancellationDeadlineText,
+      freeCancelUntil: freeCancellationCopy?.deadlineFormatted ?? null,
     });
   }, [
     onStickySummaryChange,
@@ -1198,7 +1227,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     displayFinalTotal,
     rangePricingPending,
     calendarOpenPricingPending,
-    cancellationDeadlineText,
+    freeCancellationCopy?.deadlineFormatted,
   ]);
 
   /** Format price; show ₹0 when 0 (e.g. when API not loaded or API returned 0). */
@@ -1947,27 +1976,28 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       )}
 
       {/* TASK-2623/TASK-4334: Trust strip — free cancellation, actual computed deadline
-          when a check-in date is selected; generic fallback copy otherwise. */}
-      <div className="lv-booking-cancel bw-trust" data-testid="bw-trust-strip">
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M20 6L9 17l-5-5"/>
-        </svg>
-        <span data-testid="bw-trust-strip-text">
-          {cancellationDeadlineText
-            ? `Free cancellation until ${cancellationDeadlineText}`
-            : 'Select check-in dates to see your free cancellation deadline'}
-        </span>
-      </div>
+          when a check-in date is selected; generic fallback copy otherwise. TASK-7012: rendered only
+          when there is a truthful claim to make — never as a bare check icon with blank text. */}
+      {cancellationTrustText ? (
+        <div className="lv-booking-cancel bw-trust" data-testid="bw-trust-strip">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M20 6L9 17l-5-5"/>
+          </svg>
+          <span data-testid="bw-trust-strip-text">{cancellationTrustText}</span>
+        </div>
+      ) : null}
 
       {/* TASK-4405: universal "book with confidence" post-booking grace-window disclosure — only
-          shown when the server has resolved a non-null graceHours for this listing (flag-off parity). */}
-      {resolvedGraceHours ? (
+          shown when the server has resolved a non-null graceHours for this listing (flag-off parity).
+          TASK-7012: and only when the selected dates do not VOID that window — the server will not
+          honour a voided grace window, so advertising it would over-promise the refund. */}
+      {disclosableGraceHours ? (
         <div className="lv-booking-cancel bw-trust" data-testid="bw-grace-window-strip">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M20 6L9 17l-5-5"/>
           </svg>
           <span data-testid="bw-grace-window-strip-text">
-            {`Free cancellation for ${resolvedGraceHours} hours after you book`}
+            {`Free cancellation for ${disclosableGraceHours} hours after you book`}
           </span>
         </div>
       ) : null}

@@ -30,4 +30,9 @@ export class TtlCache<T> {
   size(): number {
     return this.store.size;
   }
+
+  /** Test-only: drop every entry (module-scope caches outlive test files under isolate:false). */
+  clear(): void {
+    this.store.clear();
+  }
 }

@@ -124,7 +124,7 @@ export const TenantJsonLd: React.FC = () => {
           name: `Is there a booking fee at ${brandName}?`,
           acceptedAnswer: {
             '@type': 'Answer',
-            text: `No booking fees. Direct booking means zero commission and zero platform fees. You pay only the nightly rate plus applicable GST.`,
+            text: `Direct booking — no OTA commission. You pay the nightly rate, applicable GST, and a 3% Razorpay payment-processing fee shown at checkout.`,
           },
         },
         {

@@ -39,6 +39,16 @@ const ATLAS_DIRECT_BOOKING_HOSTS = new Set<string>([
   "127.0.0.1",
 ]);
 
+/** True for the marketplace apex hosts (`atlastays.com` family). */
+export function isMarketplaceHost(hostname: string | null | undefined): boolean {
+  return MARKETPLACE_HOSTS.has((hostname ?? "").trim().toLowerCase());
+}
+
+/** True for Atlas's own direct-booking hosts (`atlashomestays.com` family + loopback). */
+export function isAtlasDirectBookingHost(hostname: string | null | undefined): boolean {
+  return ATLAS_DIRECT_BOOKING_HOSTS.has((hostname ?? "").trim().toLowerCase());
+}
+
 /**
  * True when `hostname` should get the pre-JS OG rewrite (a tenant subdomain/custom domain).
  * False for every Atlas first-party host (marketplace apex + Atlas direct-booking domains) —
@@ -48,8 +58,8 @@ const ATLAS_DIRECT_BOOKING_HOSTS = new Set<string>([
 export function isRewriteEligibleHost(hostname: string | null | undefined): boolean {
   const host = (hostname ?? "").trim().toLowerCase();
   if (!host) return false;
-  if (MARKETPLACE_HOSTS.has(host)) return false;
-  if (ATLAS_DIRECT_BOOKING_HOSTS.has(host)) return false;
+  if (isMarketplaceHost(host)) return false;
+  if (isAtlasDirectBookingHost(host)) return false;
   return true;
 }
 

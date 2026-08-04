@@ -178,6 +178,7 @@ export default function RecentlyViewedPage() {
                               formatDisplayCurrency,
                               3,
                               live?.isGstRegistered ?? true,
+                              hasCompare && stored != null && stored > headlinePrice ? stored : headlinePrice,
                             )}
                           </p>
                           {showWasPrice ? (

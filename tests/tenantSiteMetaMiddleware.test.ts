@@ -66,9 +66,10 @@ function makeContext(overrides: {
   url: string;
   next: () => Promise<Response>;
   env?: { ATLAS_API_BASE_URL?: string };
+  headers?: Record<string, string>;
 }) {
   return {
-    request: new Request(overrides.url),
+    request: new Request(overrides.url, { headers: overrides.headers }),
     env: overrides.env ?? { ATLAS_API_BASE_URL: "https://api.example.com" },
     next: overrides.next,
   };
@@ -172,6 +173,87 @@ describe("_middleware onRequest — happy path (tenant host, HTML response, meta
 
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     expect(fetchSpy.mock.calls[0][0]).toContain(encodeURIComponent(uniqueHost));
+  });
+});
+
+describe("_middleware onRequest — X-Forwarded-Host preference (TASK-7170 / ADR-0096)", () => {
+  // Through the `tenant-subdomain-router` Worker the Pages Function sees the Pages-origin URL
+  // (atlas-guest-portal.pages.dev); the public tenant host arrives via X-Forwarded-Host. The
+  // middleware must key eligibility + the tenant-meta lookup off that header when present, so
+  // crawler meta stays tenant-correct through the proxy. Direct Pages traffic (marketplace apex,
+  // custom domains) carries no such header and behaves exactly as before — the suites above pin
+  // that Host-keyed path.
+  it("keys the tenant-meta lookup off X-Forwarded-Host when present (Worker passthrough)", async () => {
+    vi.stubGlobal("HTMLRewriter", FakeHTMLRewriter);
+    const fetchSpy = vi.fn(async () => new Response(JSON.stringify(tenantMetaPayload), { status: 200 }));
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const forwardedTenantHost = `fwd-${Date.now()}.atlastays.com`;
+    const result = await onRequest(
+      makeContext({
+        url: "https://atlas-guest-portal.pages.dev/",
+        headers: { "x-forwarded-host": forwardedTenantHost },
+        next: async () => makeHtmlResponse(),
+      }),
+    );
+
+    expect(result.headers.get("x-fake-rewritten")).toBe("true"); // rewrite ran, not fail-open
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(fetchSpy.mock.calls[0][0]).toContain(encodeURIComponent(forwardedTenantHost));
+  });
+
+  it("applies the Atlas first-party exclusion to X-Forwarded-Host (forwarded apex → no rewrite, no API call)", async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    vi.stubGlobal("HTMLRewriter", FakeHTMLRewriter);
+
+    const html = makeHtmlResponse();
+    const result = await onRequest(
+      makeContext({
+        url: "https://atlas-guest-portal.pages.dev/",
+        headers: { "x-forwarded-host": "atlastays.com" },
+        next: async () => html,
+      }),
+    );
+
+    expect(result).toBe(html);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("normalizes case + surrounding whitespace on X-Forwarded-Host before keying", async () => {
+    vi.stubGlobal("HTMLRewriter", FakeHTMLRewriter);
+    const fetchSpy = vi.fn(async () => new Response(JSON.stringify(tenantMetaPayload), { status: 200 }));
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const forwardedTenantHost = `fwd-case-${Date.now()}.atlastays.com`;
+    const result = await onRequest(
+      makeContext({
+        url: "https://atlas-guest-portal.pages.dev/",
+        headers: { "x-forwarded-host": `  ${forwardedTenantHost.toUpperCase()}  ` },
+        next: async () => makeHtmlResponse(),
+      }),
+    );
+
+    expect(result.headers.get("x-fake-rewritten")).toBe("true");
+    expect(fetchSpy.mock.calls[0][0]).toContain(encodeURIComponent(forwardedTenantHost));
+  });
+
+  it("ignores an empty X-Forwarded-Host and falls back to the URL host (additive, never worse than direct)", async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    vi.stubGlobal("HTMLRewriter", FakeHTMLRewriter);
+
+    const html = makeHtmlResponse();
+    const result = await onRequest(
+      makeContext({
+        url: "https://atlastays.com/",
+        headers: { "x-forwarded-host": "   " },
+        next: async () => html,
+      }),
+    );
+
+    expect(result).toBe(html); // marketplace apex via URL host — untouched
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });
 

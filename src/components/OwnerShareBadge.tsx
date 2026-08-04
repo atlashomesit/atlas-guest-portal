@@ -37,12 +37,12 @@ export default function OwnerShareBadge({ nightlyPrice, className = "" }: OwnerS
 
   const label = hostAmount != null
     ? `${formatINR(hostAmount)} to host (0% OTA commission)`
-    : "0% commission — book direct";
+    : "Book direct — host keeps more";
 
   const tooltip =
     `Booking direct via ${brandName} means your host keeps significantly more. ` +
     "OTA platforms (marketplaces) typically charge 15–20% commission. " +
-    "Direct bookings have 0% platform commission — only a small payment-processing fee.";
+    "Direct bookings have 0% platform commission — only a 3% payment-processing fee (Razorpay pass-through).";
 
   return (
     <span

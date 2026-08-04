@@ -175,11 +175,14 @@ export function getUnitNoun(overrides: TenantOverrides): {
 }
 
 const TENANT_OVERRIDES: Record<string, TenantOverrides> = {
-  // Stay by City Focus — dev branded subdomain devstaybycf.atlastays.com
+  // Stay by City Focus — prod branded subdomain staybycf.atlastays.com
   // (subdomain label == tenant slug, TenantsController from-domain resolution).
+  // Renamed from `devstaybycf` 2026-08-03: the prod tenant (id 45) was re-slugged
+  // gaurav-upreti -> staybycf to serve the customer site, so the old key no longer
+  // matched and the brand mark/favicon silently fell back to the API logo.
   // Logo artwork ships same-origin in public/images; scoped here so no other
   // tenant (incl. the atlastays.com marketplace apex) ever renders this mark.
-  devstaybycf: {
+  staybycf: {
     logoUrl: '/images/stay-bycityfocus-logo.png',
     faviconUrl: '/images/stay-bycityfocus-logo.png',
   },
