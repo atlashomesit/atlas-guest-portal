@@ -255,6 +255,47 @@ describe("_middleware onRequest — X-Forwarded-Host preference (TASK-7170 / ADR
     expect(result).toBe(html); // marketplace apex via URL host — untouched
     expect(fetchSpy).not.toHaveBeenCalled();
   });
+
+  // Custom-domain hardening (2026-08-04): a tenant custom domain is bound DIRECTLY to the Pages
+  // project, so it never traverses the router Worker and any X-Forwarded-Host on it is supplied
+  // by the caller. Trusting it would let anyone rewrite one tenant's title/OG/canonical into
+  // another tenant's page. The header is honoured only when the request URL is the Pages origin.
+  it("ignores a client-supplied X-Forwarded-Host on a custom domain (direct-to-Pages path)", async () => {
+    vi.stubGlobal("HTMLRewriter", FakeHTMLRewriter);
+    const fetchSpy = vi.fn(async () => new Response(JSON.stringify(tenantMetaPayload), { status: 200 }));
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const customDomain = `direct-${Date.now()}.staybycityfocus-test.com`;
+    await onRequest(
+      makeContext({
+        url: `https://${customDomain}/`,
+        headers: { "x-forwarded-host": "victim-tenant.atlastays.com" },
+        next: async () => makeHtmlResponse(),
+      }),
+    );
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(fetchSpy.mock.calls[0][0]).toContain(encodeURIComponent(customDomain));
+    expect(fetchSpy.mock.calls[0][0]).not.toContain(encodeURIComponent("victim-tenant.atlastays.com"));
+  });
+
+  it("ignores a forged X-Forwarded-Host that would re-enable a rewrite on the marketplace apex", async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    vi.stubGlobal("HTMLRewriter", FakeHTMLRewriter);
+
+    const html = makeHtmlResponse();
+    const result = await onRequest(
+      makeContext({
+        url: "https://atlastays.com/",
+        headers: { "x-forwarded-host": "some-tenant.atlastays.com" },
+        next: async () => html,
+      }),
+    );
+
+    expect(result).toBe(html); // still the untouched first-party response
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
 });
 
 describe("_middleware onRequest — FAIL-OPEN CONTRACT", () => {
