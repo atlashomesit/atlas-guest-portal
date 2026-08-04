@@ -4,6 +4,8 @@ import { isAtlasDirectBookingHost, isMarketplaceHost } from "./_lib/tenantSiteMe
 interface Env {
   ATLAS_API_BASE_URL?: string;
   ATLAS_TENANT_KEY?: string;
+  /** TASK-7207: must match Worker `ATLAS_WORKER_PROXY_SECRET` to trust X-Forwarded-Host. */
+  ATLAS_WORKER_PROXY_SECRET?: string;
 }
 
 // TASK-4414: city landing pages for SEO acquisition
@@ -128,9 +130,16 @@ export const onRequestGet = async ({ request, env }: { request: Request; env?: E
   const apiBase = (runtimeEnv.ATLAS_API_BASE_URL ?? "").trim().replace(/\/+$/, "");
   const envTenantKey = (runtimeEnv.ATLAS_TENANT_KEY ?? "").trim();
 
-  // TASK-7170: through tenant-subdomain-router the public host is in X-Forwarded-Host on .pages.dev.
+  // TASK-7170 + TASK-7207: trust X-Forwarded-Host only with Worker proxy provenance.
   const isWorkerProxiedOrigin = url.hostname.toLowerCase().endsWith(".pages.dev");
-  const forwardedHost = isWorkerProxiedOrigin
+  const configuredSecret = (runtimeEnv.ATLAS_WORKER_PROXY_SECRET ?? "").trim();
+  const presentedSecret = (request.headers.get("x-atlas-worker-proxy") ?? "").trim();
+  const proxyProvenanceOk =
+    isWorkerProxiedOrigin &&
+    configuredSecret.length > 0 &&
+    presentedSecret.length > 0 &&
+    presentedSecret === configuredSecret;
+  const forwardedHost = proxyProvenanceOk
     ? (request.headers.get("x-forwarded-host") ?? "").trim().toLowerCase()
     : "";
   const host = forwardedHost || url.hostname.toLowerCase();
