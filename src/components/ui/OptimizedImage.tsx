@@ -9,16 +9,15 @@ const PLACEHOLDER_CLASS =
   "bg-bg-muted bg-[linear-gradient(135deg,color-mix(in_srgb,var(--border-subtle)_55%,transparent)_0%,color-mix(in_srgb,var(--bg-muted)_92%,transparent)_100%)]";
 
 /**
- * TASK-4513: Enable responsive srcset for Azure blob storage (Option a).
- * Query params like ?w=480 are safe for Azure blobs and ignored if not supported.
- * This degrades gracefully: if the host doesn't resize, the full image still loads.
+ * TASK-7433: Azure Blob Storage ignores imgix-style ?w= / ?auto=format params — emitting a
+ * multi-width srcset against blob URLs is decorative and ships full-resolution bytes on every
+ * viewport. Option (c): no srcset unless the origin can honour resize params (transform CDN).
  */
 function shouldBuildResponsiveSrcSet(src: string): boolean {
   try {
     const base = typeof window !== "undefined" ? window.location.origin : "https://example.invalid";
     const url = new URL(src, base);
-    // Allow Azure blob URLs (TASK-4513 Option a)
-    if (url.hostname.includes("blob.core.windows.net")) return true;
+    if (url.hostname.includes("blob.core.windows.net")) return false;
     if (url.hostname === "localhost" || url.hostname === "127.0.0.1") return false;
     if (url.pathname.includes("/uploads/")) return false;
     return true;

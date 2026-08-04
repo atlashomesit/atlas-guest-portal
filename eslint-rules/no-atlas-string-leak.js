@@ -28,6 +28,8 @@ const BANNED_PATTERNS = [
   /privacy@atlastays\.com/i,
   // Social handle
   /atlashomeskphb/i,
+  // Atlas host/admin portal — must not appear on white-label guest sites (TASK-7434)
+  /app\.atlaspms\.in/i,
 ];
 
 /** Check a raw string value — returns true when it contains a banned pattern. */

@@ -148,14 +148,16 @@ export default function GuestLoginPage() {
           <form onSubmit={step === 'email' ? handleSendOtp : handleVerifyOtp}>
             {step === 'email' ? (
               <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                <label htmlFor="guest-login-email" style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
                   Email Address
                 </label>
                 <input
+                  id="guest-login-email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="your@email.com"
+                  autoComplete="email"
                   disabled={isLoading}
                   style={{
                     width: '100%',
@@ -188,14 +190,17 @@ export default function GuestLoginPage() {
               </div>
             ) : (
               <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                <label htmlFor="guest-login-otp" style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
                   One-Time Password
                 </label>
                 <input
+                  id="guest-login-otp"
                   type="text"
+                  inputMode="numeric"
                   value={otp}
                   onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
                   placeholder="000000"
+                  autoComplete="one-time-code"
                   maxLength={6}
                   disabled={isLoading}
                   style={{
