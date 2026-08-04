@@ -19,6 +19,22 @@ describe('Homepage_PropertyDetails - TASK-1185: notFound heading', () => {
   });
 });
 
+describe('TASK-7430: URL property slug must match listing property slug', () => {
+  const SURFACES: Array<{ label: string; path: string }> = [
+    { label: 'default', path: resolve(__dirname, './Homepage_PropertyDetails.tsx') },
+    { label: 'heritage', path: resolve(__dirname, '../../../themes/heritage/PropertyDetails.tsx') },
+  ];
+
+  for (const { label, path } of SURFACES) {
+    it(`${label}: enforces urlPropertySlugMatches before rendering a listing-id match`, () => {
+      const content = readFileSync(path, 'utf-8');
+      expect(content).toContain('urlPropertySlugMatches');
+      expect(content).toContain('TASK-7430');
+      expect(content).toMatch(/if \(foundByListingId\) \{\s*\n\s*if \(!urlPropertySlugMatches\(foundByListingId\)\)/);
+    });
+  }
+});
+
 /**
  * TASK-7012 (founder ruling, 2026-08-03): the listing-detail cancellation panel must NOT disclose the
  * universal post-booking grace window. It renders before the guest picks dates, so there is nothing to

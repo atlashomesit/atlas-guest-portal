@@ -80,6 +80,11 @@ export interface MetaRewriteValues {
  * `photoUrl` — the API contract requires `propertyName`/`canonicalUrl` to always be non-empty, but
  * this function never trusts that and always produces a usable value, so a malformed upstream
  * response degrades gracefully instead of injecting blank/broken meta tags.
+ *
+ * TASK-7430: do NOT collapse every page's canonical/og:url to the site root. The API's
+ * `canonicalUrl` is the tenant origin (often `/`); for non-root request paths, preserve the
+ * request pathname (+ search) on that origin so listing/detail pages keep a path-correct
+ * canonical.
  */
 export function buildMetaRewriteValues(meta: TenantSiteMeta, requestUrl: string): MetaRewriteValues {
   const propertyName = (meta.propertyName ?? "").trim() || (meta.tenantSlug ?? "").trim() || "Atlastays";
@@ -90,7 +95,19 @@ export function buildMetaRewriteValues(meta: TenantSiteMeta, requestUrl: string)
 
   const image = (meta.photoUrl ?? "").trim() || FALLBACK_OG_IMAGE;
 
-  const canonical = (meta.canonicalUrl ?? "").trim() || requestUrl;
+  const metaCanonical = (meta.canonicalUrl ?? "").trim();
+  let canonical = metaCanonical || requestUrl;
+
+  try {
+    const req = new URL(requestUrl);
+    const path = req.pathname || "/";
+    if (path !== "/") {
+      const origin = metaCanonical ? new URL(metaCanonical).origin : req.origin;
+      canonical = `${origin}${path}${req.search}`;
+    }
+  } catch {
+    // keep metaCanonical / requestUrl fallback above
+  }
 
   return {
     title: propertyName,
