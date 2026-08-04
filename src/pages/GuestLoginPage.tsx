@@ -1,14 +1,33 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { guestAuthClient } from '@/api/guestAuthClient';
+import { guestAuthClient, type GuestSendOtpResponse } from '@/api/guestAuthClient';
 import { useGuestAuth } from '@/contexts/GuestAuthContext';
+import { getTelLink, getWhatsAppLink } from '@/config/contact';
 import { toast } from 'react-toastify';
 
 /**
  * TASK-4017: Guest email/OTP login flow
  * Step 1: Enter email → send OTP
  * Step 2: Enter 6-digit OTP → verify and login
+ *
+ * TASK-7429: OTP recovery — resend with client cooldown, correlation reference, contact fallback.
  */
+
+const RESEND_COOLDOWN_SECONDS = 30;
+
+function toastForOtpSend(response: GuestSendOtpResponse): void {
+  // Soft copy when the API returns a correlation id / delivery hint — do not claim absolute delivery.
+  const hasRecoverySignal = Boolean(response.correlationId?.trim()) || Boolean(response.deliveryHint?.trim());
+  if (hasRecoverySignal) {
+    const hint = response.deliveryHint?.trim();
+    toast.info(
+      hint ||
+        'We requested an OTP for your email. If it does not arrive shortly, check spam or use the reference below when contacting us.',
+    );
+    return;
+  }
+  toast.success(response.message?.trim() || 'OTP sent to your email');
+}
 
 export default function GuestLoginPage() {
   const navigate = useNavigate();
@@ -19,6 +38,24 @@ export default function GuestLoginPage() {
   const [otp, setOtp] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [correlationId, setCorrelationId] = useState<string | null>(null);
+  const [deliveryHint, setDeliveryHint] = useState<string | null>(null);
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const t = window.setTimeout(() => setResendCooldown((s) => Math.max(0, s - 1)), 1000);
+    return () => window.clearTimeout(t);
+  }, [resendCooldown]);
+
+  const applySendResponse = useCallback((response: GuestSendOtpResponse) => {
+    const corr = response.correlationId?.trim() || null;
+    const hint = response.deliveryHint?.trim() || null;
+    setCorrelationId(corr);
+    setDeliveryHint(hint);
+    setResendCooldown(RESEND_COOLDOWN_SECONDS);
+    toastForOtpSend(response);
+  }, []);
 
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,11 +68,27 @@ export default function GuestLoginPage() {
         return;
       }
 
-      await guestAuthClient.sendOtp(email);
+      const response = await guestAuthClient.sendOtp(email);
       setStep('otp');
-      toast.success('OTP sent to your email');
+      applySendResponse(response);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to send OTP. Please try again.';
+      setError(message);
+      toast.error(message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (isLoading || resendCooldown > 0) return;
+    setError(null);
+    setIsLoading(true);
+    try {
+      const response = await guestAuthClient.sendOtp(email);
+      applySendResponse(response);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to resend OTP. Please try again.';
       setError(message);
       toast.error(message);
     } finally {
@@ -70,6 +123,10 @@ export default function GuestLoginPage() {
       setIsLoading(false);
     }
   };
+
+  const whatsappLink = getWhatsAppLink();
+  const telLink = getTelLink();
+  const contactHref = whatsappLink || telLink;
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f9fafb' }}>
@@ -154,6 +211,22 @@ export default function GuestLoginPage() {
                   }}
                   required
                 />
+                {deliveryHint && (
+                  <p
+                    data-testid="otp-delivery-hint"
+                    style={{ color: '#6b7280', fontSize: '0.875rem', marginBottom: '0.75rem', textAlign: 'center' }}
+                  >
+                    {deliveryHint}
+                  </p>
+                )}
+                {correlationId && (
+                  <p
+                    data-testid="otp-correlation-id"
+                    style={{ color: '#6b7280', fontSize: '0.875rem', marginBottom: '0.75rem', textAlign: 'center' }}
+                  >
+                    Reference: {correlationId}
+                  </p>
+                )}
                 <button
                   type="submit"
                   disabled={isLoading || otp.length !== 6}
@@ -173,10 +246,44 @@ export default function GuestLoginPage() {
                 </button>
                 <button
                   type="button"
+                  onClick={handleResendOtp}
+                  disabled={isLoading || resendCooldown > 0}
+                  data-testid="otp-resend-button"
+                  style={{
+                    width: '100%',
+                    marginTop: '0.75rem',
+                    padding: '0.75rem',
+                    backgroundColor: 'transparent',
+                    color: isLoading || resendCooldown > 0 ? '#9ca3af' : 'var(--cta-primary, #b8472f)',
+                    border: '1px solid var(--cta-primary, #b8472f)',
+                    borderRadius: '6px',
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    cursor: isLoading || resendCooldown > 0 ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : 'Resend code'}
+                </button>
+                {contactHref ? (
+                  <p
+                    style={{ marginTop: '0.75rem', textAlign: 'center', fontSize: '0.875rem', color: '#6b7280' }}
+                    data-testid="otp-contact-fallback"
+                  >
+                    Still nothing?{' '}
+                    <a href={contactHref} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--cta-primary, #b8472f)', fontWeight: 600 }}>
+                      Contact us
+                    </a>
+                  </p>
+                ) : null}
+                <button
+                  type="button"
                   onClick={() => {
                     setStep('email');
                     setOtp('');
                     setError(null);
+                    setCorrelationId(null);
+                    setDeliveryHint(null);
+                    setResendCooldown(0);
                   }}
                   disabled={isLoading}
                   style={{
