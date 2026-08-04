@@ -16,3 +16,8 @@ workers_dev = false
 routes = [
   { pattern = "*.atlastays.com/*", zone_name = "atlastays.com" },
 ]
+
+# TASK-7207: shared with Pages `ATLAS_WORKER_PROXY_SECRET`. Set via `wrangler secret put`
+# (never commit the value). Middleware trusts X-Forwarded-Host only when this header matches.
+# [vars] placeholder documents the key name for ops; production uses a secret binding.
+# ATLAS_WORKER_PROXY_SECRET = "<set via wrangler secret>"

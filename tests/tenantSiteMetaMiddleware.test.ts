@@ -62,17 +62,27 @@ function makeHtmlResponse(): Response {
   });
 }
 
+const WORKER_PROXY_SECRET = "test-worker-proxy-secret";
+
 function makeContext(overrides: {
   url: string;
   next: () => Promise<Response>;
-  env?: { ATLAS_API_BASE_URL?: string };
+  env?: { ATLAS_API_BASE_URL?: string; ATLAS_WORKER_PROXY_SECRET?: string };
   headers?: Record<string, string>;
 }) {
   return {
     request: new Request(overrides.url, { headers: overrides.headers }),
-    env: overrides.env ?? { ATLAS_API_BASE_URL: "https://api.example.com" },
+    env: overrides.env ?? {
+      ATLAS_API_BASE_URL: "https://api.example.com",
+      ATLAS_WORKER_PROXY_SECRET: WORKER_PROXY_SECRET,
+    },
     next: overrides.next,
   };
+}
+
+/** TASK-7207: Worker-provenance headers required before X-Forwarded-Host is trusted. */
+function workerProxyHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  return { "x-atlas-worker-proxy": WORKER_PROXY_SECRET, ...extra };
 }
 
 const tenantMetaPayload = {
@@ -183,7 +193,7 @@ describe("_middleware onRequest — X-Forwarded-Host preference (TASK-7170 / ADR
   // crawler meta stays tenant-correct through the proxy. Direct Pages traffic (marketplace apex,
   // custom domains) carries no such header and behaves exactly as before — the suites above pin
   // that Host-keyed path.
-  it("keys the tenant-meta lookup off X-Forwarded-Host when present (Worker passthrough)", async () => {
+  it("keys the tenant-meta lookup off X-Forwarded-Host when Worker provenance is present", async () => {
     vi.stubGlobal("HTMLRewriter", FakeHTMLRewriter);
     const fetchSpy = vi.fn(async () => new Response(JSON.stringify(tenantMetaPayload), { status: 200 }));
     vi.stubGlobal("fetch", fetchSpy);
@@ -192,7 +202,7 @@ describe("_middleware onRequest — X-Forwarded-Host preference (TASK-7170 / ADR
     const result = await onRequest(
       makeContext({
         url: "https://atlas-guest-portal.pages.dev/",
-        headers: { "x-forwarded-host": forwardedTenantHost },
+        headers: workerProxyHeaders({ "x-forwarded-host": forwardedTenantHost }),
         next: async () => makeHtmlResponse(),
       }),
     );
@@ -211,7 +221,7 @@ describe("_middleware onRequest — X-Forwarded-Host preference (TASK-7170 / ADR
     const result = await onRequest(
       makeContext({
         url: "https://atlas-guest-portal.pages.dev/",
-        headers: { "x-forwarded-host": "atlastays.com" },
+        headers: workerProxyHeaders({ "x-forwarded-host": "atlastays.com" }),
         next: async () => html,
       }),
     );
@@ -229,13 +239,55 @@ describe("_middleware onRequest — X-Forwarded-Host preference (TASK-7170 / ADR
     const result = await onRequest(
       makeContext({
         url: "https://atlas-guest-portal.pages.dev/",
-        headers: { "x-forwarded-host": `  ${forwardedTenantHost.toUpperCase()}  ` },
+        headers: workerProxyHeaders({ "x-forwarded-host": `  ${forwardedTenantHost.toUpperCase()}  ` }),
         next: async () => makeHtmlResponse(),
       }),
     );
 
     expect(result.headers.get("x-fake-rewritten")).toBe("true");
     expect(fetchSpy.mock.calls[0][0]).toContain(encodeURIComponent(forwardedTenantHost));
+  });
+
+  it("ignores a spoofed X-Forwarded-Host on a unique *.pages.dev host without the Worker secret (TASK-7207)", async () => {
+    vi.stubGlobal("HTMLRewriter", FakeHTMLRewriter);
+    const fetchSpy = vi.fn(async () => new Response(JSON.stringify(tenantMetaPayload), { status: 200 }));
+    vi.stubGlobal("fetch", fetchSpy);
+
+    // Unique pages.dev host avoids module-scope TtlCache bleed across isolate:false tests.
+    const pagesHost = `spoof-${Date.now()}-${Math.random().toString(36).slice(2)}.pages.dev`;
+    await onRequest(
+      makeContext({
+        url: `https://${pagesHost}/`,
+        headers: { "x-forwarded-host": "victim-tenant.atlastays.com" },
+        next: async () => makeHtmlResponse(),
+      }),
+    );
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(fetchSpy.mock.calls[0][0]).toContain(encodeURIComponent(pagesHost));
+    expect(fetchSpy.mock.calls[0][0]).not.toContain(encodeURIComponent("victim-tenant.atlastays.com"));
+  });
+
+  it("ignores X-Forwarded-Host when X-Atlas-Worker-Proxy secret mismatches (TASK-7207)", async () => {
+    vi.stubGlobal("HTMLRewriter", FakeHTMLRewriter);
+    const fetchSpy = vi.fn(async () => new Response(JSON.stringify(tenantMetaPayload), { status: 200 }));
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const pagesHost = `mismatch-${Date.now()}-${Math.random().toString(36).slice(2)}.pages.dev`;
+    await onRequest(
+      makeContext({
+        url: `https://${pagesHost}/`,
+        headers: {
+          "x-forwarded-host": "victim-tenant.atlastays.com",
+          "x-atlas-worker-proxy": "wrong-secret",
+        },
+        next: async () => makeHtmlResponse(),
+      }),
+    );
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(fetchSpy.mock.calls[0][0]).toContain(encodeURIComponent(pagesHost));
+    expect(fetchSpy.mock.calls[0][0]).not.toContain(encodeURIComponent("victim-tenant.atlastays.com"));
   });
 
   it("ignores an empty X-Forwarded-Host and falls back to the URL host (additive, never worse than direct)", async () => {

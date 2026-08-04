@@ -28,8 +28,12 @@
 // atlastays.com wildcard route.
 const PAGES_ORIGIN = "https://atlas-guest-portal.pages.dev";
 
+type WorkerEnv = {
+  ATLAS_WORKER_PROXY_SECRET?: string;
+};
+
 export default {
-  async fetch(request: Request): Promise<Response> {
+  async fetch(request: Request, env?: WorkerEnv): Promise<Response> {
     const incoming = new URL(request.url);
     const publicHost = incoming.host;
 
@@ -39,6 +43,11 @@ export default {
     headers.delete("host"); // loop guard — never let the public Host reach the origin fetch
     headers.set("X-Forwarded-Host", publicHost);
     headers.set("X-Public-Origin", `${incoming.protocol}//${publicHost}`);
+    // TASK-7207 / ADR-0096: provenance for Pages middleware — not a well-known proxy header.
+    const proxySecret = (env?.ATLAS_WORKER_PROXY_SECRET ?? "").trim();
+    if (proxySecret) {
+      headers.set("X-Atlas-Worker-Proxy", proxySecret);
+    }
 
     // Explicit init instead of the canonical `new Request(originUrl, request)` shortcut:
     // Request-as-init propagation is runtime-dependent (workerd preserves method/body; the

@@ -6,11 +6,18 @@
  * hit-rate optimization, not a correctness guarantee (a cold/recycled isolate just re-fetches,
  * same as a cache miss). No Cloudflare-specific API (Cache/KV) — kept dependency-free and
  * trivially unit-testable under plain Node/vitest.
+ *
+ * TASK-7207: `maxEntries` caps isolate memory against a spoofed-host flood.
  */
 export class TtlCache<T> {
   private readonly store = new Map<string, { value: T; expiresAt: number }>();
+  private readonly ttlMs: number;
+  private readonly maxEntries: number;
 
-  constructor(private readonly ttlMs: number) {}
+  constructor(ttlMs: number, maxEntries = 256) {
+    this.ttlMs = ttlMs;
+    this.maxEntries = Math.max(1, maxEntries);
+  }
 
   get(key: string, now: number = Date.now()): T | undefined {
     const entry = this.store.get(key);
@@ -23,6 +30,16 @@ export class TtlCache<T> {
   }
 
   set(key: string, value: T, now: number = Date.now()): void {
+    if (!this.store.has(key) && this.store.size >= this.maxEntries) {
+      for (const [k, entry] of this.store) {
+        if (entry.expiresAt <= now) this.store.delete(k);
+      }
+      while (this.store.size >= this.maxEntries) {
+        const oldest = this.store.keys().next().value;
+        if (oldest === undefined) break;
+        this.store.delete(oldest);
+      }
+    }
     this.store.set(key, { value, expiresAt: now + this.ttlMs });
   }
 

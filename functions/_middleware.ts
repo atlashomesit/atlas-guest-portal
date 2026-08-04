@@ -23,6 +23,8 @@ import { TtlCache } from "./_lib/ttlCache";
 
 interface Env {
   ATLAS_API_BASE_URL?: string;
+  /** TASK-7207 / ADR-0096: shared secret the Worker sends as X-Atlas-Worker-Proxy. */
+  ATLAS_WORKER_PROXY_SECRET?: string;
 }
 
 // Minimal local typing for the Cloudflare Workers runtime's HTMLRewriter global — deliberately
@@ -83,22 +85,19 @@ export const onRequest = async (context: {
     if (!contentType.toLowerCase().includes("text/html")) return response;
 
     const url = new URL(context.request.url);
-    // TASK-7170 / ADR-0096 (additive): through the `tenant-subdomain-router` Worker the request
+    // TASK-7170 / TASK-7207 / ADR-0096: through the `tenant-subdomain-router` Worker the request
     // URL is the Pages origin (atlas-guest-portal.pages.dev) and the public tenant host arrives
-    // via `X-Forwarded-Host`. Prefer it there so the eligibility check + tenant-meta lookup stay
-    // tenant-correct through the proxy.
-    //
-    // The header is trusted ONLY on that proxied path. The Worker fetches the Pages origin and
-    // sets the header itself (`headers.set`, overwriting whatever the client sent), so a
-    // `.pages.dev` request URL is what makes the value ours rather than the caller's. Requests
-    // that arrive DIRECTLY on Pages — the marketplace apex and every tenant custom domain —
-    // never traverse the Worker, so any `X-Forwarded-Host` on those is client-supplied. The
-    // original TASK-7170 comment asserted such requests "carry no such header"; that is true of
-    // well-behaved clients only, and honouring an arbitrary one lets any caller choose which
-    // tenant's title/description/og:image/canonical gets rewritten into another tenant's page.
-    // Ignoring it on the direct path restores byte-identical pre-TASK-7170 behavior there.
+    // via `X-Forwarded-Host`. Prefer it ONLY when provenance is proven:
+    //   1. URL host is the Pages origin the Worker fetches (`*.pages.dev`), AND
+    //   2. `X-Atlas-Worker-Proxy` equals `ATLAS_WORKER_PROXY_SECRET` (not a well-known proxy header).
+    // Absent/mismatched secret → ignore `X-Forwarded-Host` (byte-identical to pre-TASK-7170).
+    // Direct custom-domain / apex traffic never traverses the Worker and must not honour the header.
     const isWorkerProxiedOrigin = url.hostname.toLowerCase().endsWith(".pages.dev");
-    const forwardedHost = isWorkerProxiedOrigin
+    const expectedSecret = (context.env.ATLAS_WORKER_PROXY_SECRET ?? "").trim();
+    const proxyHeader = (context.request.headers.get("x-atlas-worker-proxy") ?? "").trim();
+    const workerProvenanceOk =
+      isWorkerProxiedOrigin && expectedSecret.length > 0 && proxyHeader === expectedSecret;
+    const forwardedHost = workerProvenanceOk
       ? (context.request.headers.get("x-forwarded-host") ?? "").trim().toLowerCase()
       : "";
     const host = forwardedHost || url.hostname.toLowerCase();
