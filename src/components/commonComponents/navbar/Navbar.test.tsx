@@ -138,4 +138,20 @@ describe("Navbar CTA", () => {
     expect(focus).toHaveBeenCalled();
     expect(mockNavigate).not.toHaveBeenCalled();
   });
+
+  it("TASK-7088: mobile menu has no duplicate destinations", () => {
+    Object.defineProperty(window, "innerWidth", { writable: true, configurable: true, value: 375 });
+    renderNavbar();
+
+    const hamburger = screen.getByRole("button", { name: /toggle navigation/i });
+    fireEvent.click(hamburger);
+
+    const panel = document.getElementById("mobile-menu-panel");
+    expect(panel).toBeTruthy();
+    const hrefs = Array.from(panel!.querySelectorAll("a[href]")).map(
+      (a) => (a as HTMLAnchorElement).getAttribute("href"),
+    );
+    const duplicates = hrefs.filter((h, i) => hrefs.indexOf(h) !== i);
+    expect(duplicates).toEqual([]);
+  });
 });
