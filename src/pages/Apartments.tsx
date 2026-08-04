@@ -20,6 +20,7 @@ import {
   type NightlyPriceBreakdown,
 } from "../utils/pricing";
 import { estimateStayNights } from "../utils/guestPriceEstimate";
+import { clampMin } from "../utils/numericInput";
 import type { UnitType } from "../config/pricing.config";
 
 type PropertyMetadata = {
@@ -248,7 +249,7 @@ export const Apartments = () => {
   const safeListings = React.useMemo(() => sanitizeListings(listingsSource), [listingsSource]);
   const safeProperties = React.useMemo(() => sanitizeProperties(propertiesSource), [propertiesSource]);
 
-  const [guests, setGuests] = React.useState(2);
+  const [guests, setGuests] = React.useState<number | "">(2);
   const [checkIn, setCheckIn] = React.useState<string | null>(null);
   const [checkOut, setCheckOut] = React.useState<string | null>(null);
   const [propertyType, setPropertyType] = React.useState("all");
@@ -265,7 +266,7 @@ export const Apartments = () => {
         return calculateNightlyPrice({
           unitType,
           checkInDate,
-          guests,
+          guests: clampMin(guests, 1),
         });
       } catch (error) {
         console.warn("Unable to calculate price for listing", property.id, error);
@@ -305,12 +306,44 @@ export const Apartments = () => {
     }
   }, [computeNightlyPrice, safeProperties]);
 
-  const [minPrice, setMinPrice] = React.useState(priceBounds.min);
-  const [maxPrice, setMaxPrice] = React.useState(priceBounds.max);
+  const [minPrice, setMinPrice] = React.useState<number | "">(priceBounds.min);
+  const [maxPrice, setMaxPrice] = React.useState<number | "">(priceBounds.max);
+
+  const effectiveGuests = clampMin(guests, 1);
+  const effectiveMinPrice =
+    minPrice === ""
+      ? priceBounds.min
+      : Math.max(priceBounds.min, Math.min(minPrice, maxPrice === "" ? priceBounds.max : maxPrice));
+  const effectiveMaxPrice =
+    maxPrice === ""
+      ? priceBounds.max
+      : Math.min(priceBounds.max, Math.max(maxPrice, minPrice === "" ? priceBounds.min : minPrice));
+
+  const clampMinPrice = React.useCallback(() => {
+    setMinPrice((current) =>
+      current === ""
+        ? priceBounds.min
+        : Math.max(priceBounds.min, Math.min(current, maxPrice === "" ? priceBounds.max : maxPrice)),
+    );
+  }, [maxPrice, priceBounds.max, priceBounds.min]);
+
+  const clampMaxPrice = React.useCallback(() => {
+    setMaxPrice((current) =>
+      current === ""
+        ? priceBounds.max
+        : Math.min(priceBounds.max, Math.max(current, minPrice === "" ? priceBounds.min : minPrice)),
+    );
+  }, [minPrice, priceBounds.max, priceBounds.min]);
 
   React.useEffect(() => {
-    setMinPrice((current) => Math.max(priceBounds.min, Math.min(current, priceBounds.max)));
-    setMaxPrice((current) => Math.min(priceBounds.max, Math.max(current, priceBounds.min)));
+    setMinPrice((current) => {
+      const n = current === "" ? priceBounds.min : current;
+      return Math.max(priceBounds.min, Math.min(n, priceBounds.max));
+    });
+    setMaxPrice((current) => {
+      const n = current === "" ? priceBounds.max : current;
+      return Math.min(priceBounds.max, Math.max(n, priceBounds.min));
+    });
   }, [priceBounds.max, priceBounds.min]);
 
   const listings = React.useMemo<CombinedListing[]>(() => {
@@ -388,9 +421,9 @@ export const Apartments = () => {
   const filteredListings = React.useMemo(() => {
     let result = listings.filter(
       (listing) =>
-        listing.price >= minPrice &&
-        listing.price <= maxPrice &&
-        listing.guests >= guests &&
+        listing.price >= effectiveMinPrice &&
+        listing.price <= effectiveMaxPrice &&
+        listing.guests >= effectiveGuests &&
         (propertyType === "all" || listing.propertyType === propertyType) &&
         (!petFriendlyOnly || listing.petFriendly)
     );
@@ -406,7 +439,7 @@ export const Apartments = () => {
     }
 
     return result;
-  }, [guests, listings, maxPrice, minPrice, petFriendlyOnly, propertyType, sortBy]);
+  }, [effectiveGuests, effectiveMaxPrice, effectiveMinPrice, listings, petFriendlyOnly, propertyType, sortBy]);
 
   const resetFilters = React.useCallback(() => {
     setMinPrice(priceBounds.min);
@@ -476,17 +509,17 @@ export const Apartments = () => {
         surface: "apartments",
         total: filteredListings.length,
         sortBy,
-        guests,
+        guests: effectiveGuests,
         checkIn,
         checkOut,
-        minPrice,
-        maxPrice,
+        minPrice: effectiveMinPrice,
+        maxPrice: effectiveMaxPrice,
         propertyType,
         petFriendlyOnly,
       },
       { route: "/#our-homes" },
     );
-  }, [filteredListings.length, sortBy, guests, minPrice, maxPrice, propertyType, petFriendlyOnly, checkIn, checkOut]);
+  }, [filteredListings.length, sortBy, effectiveGuests, effectiveMinPrice, effectiveMaxPrice, propertyType, petFriendlyOnly, checkIn, checkOut]);
 
   const formattedDates = React.useMemo(() => {
     const formatter = new Intl.DateTimeFormat("en-GB", {
@@ -570,7 +603,7 @@ export const Apartments = () => {
               <p className="text-base font-semibold text-text-primary">Trip details</p>
               <p className="mt-1 flex flex-wrap gap-2">
                 <span className="rounded-full bg-bg-muted px-3 py-1.5 text-sm font-semibold uppercase tracking-wide text-text-primary">
-                  Guests: {guests}
+                  Guests: {effectiveGuests}
                 </span>
                 {formattedDates.displayCheckIn && (
                   <span className="rounded-full bg-bg-muted px-3 py-1.5 text-sm font-semibold uppercase tracking-wide text-text-primary">
@@ -599,12 +632,15 @@ export const Apartments = () => {
               sortBy={sortBy}
               onPriceChange={(field, value) => {
                 if (field === "min") {
-                  setMinPrice(Math.max(priceBounds.min, Math.min(value, maxPrice)));
+                  setMinPrice(value);
                 } else {
-                  setMaxPrice(Math.min(priceBounds.max, Math.max(value, minPrice)));
+                  setMaxPrice(value);
                 }
               }}
-              onGuestsChange={(value) => setGuests(Math.max(1, value))}
+              onGuestsChange={setGuests}
+              onMinPriceBlur={clampMinPrice}
+              onMaxPriceBlur={clampMaxPrice}
+              onGuestsBlur={() => setGuests((v) => clampMin(v, 1))}
               onPropertyTypeChange={setPropertyType}
               onPetFriendlyChange={setPetFriendlyOnly}
               onSortChange={setSortBy}

@@ -1,16 +1,20 @@
 import React from "react";
+import { toEditableInt } from "@/utils/numericInput";
 
 type ListingFiltersProps = {
   priceMin: number;
   priceMax: number;
-  selectedMinPrice: number;
-  selectedMaxPrice: number;
-  guests: number;
+  selectedMinPrice: number | "";
+  selectedMaxPrice: number | "";
+  guests: number | "";
   propertyType: string;
   petFriendlyOnly: boolean;
   sortBy: string;
-  onPriceChange: (field: "min" | "max", value: number) => void;
-  onGuestsChange: (value: number) => void;
+  onPriceChange: (field: "min" | "max", value: number | "") => void;
+  onGuestsChange: (value: number | "") => void;
+  onMinPriceBlur?: () => void;
+  onMaxPriceBlur?: () => void;
+  onGuestsBlur?: () => void;
   onPropertyTypeChange: (value: string) => void;
   onPetFriendlyChange: (value: boolean) => void;
   onSortChange: (value: string) => void;
@@ -29,6 +33,9 @@ const ListingFilters: React.FC<ListingFiltersProps> = ({
   sortBy,
   onPriceChange,
   onGuestsChange,
+  onMinPriceBlur,
+  onMaxPriceBlur,
+  onGuestsBlur,
   onPropertyTypeChange,
   onPetFriendlyChange,
   onSortChange,
@@ -42,9 +49,10 @@ const ListingFilters: React.FC<ListingFiltersProps> = ({
         <input
           type="number"
           min={priceMin}
-          max={selectedMaxPrice}
+          max={selectedMaxPrice === "" ? priceMax : selectedMaxPrice}
           value={selectedMinPrice}
-          onChange={(event) => onPriceChange("min", Number(event.target.value) || priceMin)}
+          onChange={(event) => onPriceChange("min", toEditableInt(event.target.value))}
+          onBlur={onMinPriceBlur}
           className="w-full rounded-lg border border-border-subtle px-3 py-2 text-base bg-bg-surface text-text-primary focus:border-cta-primary focus:outline-none focus:ring-1 focus:ring-cta-primary"
         />
       </label>
@@ -53,10 +61,11 @@ const ListingFilters: React.FC<ListingFiltersProps> = ({
         Max price (₹)
         <input
           type="number"
-          min={selectedMinPrice}
+          min={selectedMinPrice === "" ? priceMin : selectedMinPrice}
           max={priceMax}
           value={selectedMaxPrice}
-          onChange={(event) => onPriceChange("max", Number(event.target.value) || priceMax)}
+          onChange={(event) => onPriceChange("max", toEditableInt(event.target.value))}
+          onBlur={onMaxPriceBlur}
           className="w-full rounded-lg border border-border-subtle px-3 py-2 text-base bg-bg-surface text-text-primary focus:border-cta-primary focus:outline-none focus:ring-1 focus:ring-cta-primary"
         />
       </label>
@@ -68,7 +77,8 @@ const ListingFilters: React.FC<ListingFiltersProps> = ({
           min={1}
           max={8}
           value={guests}
-          onChange={(event) => onGuestsChange(Number(event.target.value) || 1)}
+          onChange={(event) => onGuestsChange(toEditableInt(event.target.value))}
+          onBlur={onGuestsBlur}
           className="w-full rounded-lg border border-border-subtle px-3 py-2 text-base bg-bg-surface text-text-primary focus:border-cta-primary focus:outline-none focus:ring-1 focus:ring-cta-primary"
         />
       </label>

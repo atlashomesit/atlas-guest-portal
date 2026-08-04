@@ -23,6 +23,7 @@ import axios from 'axios';
 import { useBooking, type BookingPriceBreakdown } from '@/contexts/BookingContext';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { buildApiUrl, getApiHeaders, getOrderRequestHeaders } from '@/api/client';
+import { normalizePromoCodeInput, normalizePromoCodeSubmit } from '@/utils/promoCodeInput';
 import {
   clampNationalDigits,
   getGuestDialOption,
@@ -1550,7 +1551,7 @@ const GuestDetailsPage: React.FC = () => {
                         placeholder="Enter code"
                         value={promoCode}
                         onChange={(e) => {
-                          setPromoCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 32));
+                          setPromoCode(normalizePromoCodeInput(e.target.value));
                           setPromoMessage(null);
                           setAppliedPromoCode(null);
                           setPromoDiscountAmount(0);

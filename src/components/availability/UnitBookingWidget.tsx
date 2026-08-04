@@ -18,7 +18,7 @@ import {
   type CancellationTier,
   resolveFreeCancellationTrustCopy,
 } from '@/utils/cancellationPolicy';
-import { doesRangeIntersectBlocked, toISODate } from '@/utils/dateRange';
+import { normalizePromoCodeSubmit } from '@/utils/promoCodeInput';
 import { formatCurrency } from '@/utils/formatting';
 import { HelpCircle } from 'lucide-react';
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
@@ -417,7 +417,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   useEffect(() => {
     try {
       const url = new URL(window.location.href);
-      const promo = (url.searchParams.get('promo') || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 32);
+      const promo = normalizePromoCodeSubmit(url.searchParams.get('promo') || '');
       if (promo) window.localStorage.setItem('atlas_guest_promo_code', promo);
     } catch {
       // no-op

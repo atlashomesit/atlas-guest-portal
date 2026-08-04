@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import SEO from "../components/SEO";
 import { Button } from "../components/ui/Button";
 import { buildApiUrl } from "@/api/client";
+import { normalizePromoCodeInput, normalizePromoCodeSubmit } from "@/utils/promoCodeInput";
 import { useTenantListings, type TenantPropertyRecord } from "@/hooks/useTenantListings";
 import { getTenantBrandName } from "@/tenant/displayBrand";
 
@@ -58,7 +59,7 @@ export default function OffersPage() {
 
   async function handleValidate(e: React.FormEvent) {
     e.preventDefault();
-    const code = promoCode.trim().toUpperCase();
+    const code = normalizePromoCodeSubmit(promoCode);
     if (!code) return;
     setPromoLoading(true);
     setPromoResult(null);
@@ -189,7 +190,7 @@ export default function OffersPage() {
               ref={inputRef}
               type="text"
               value={promoCode}
-              onChange={(e) => setPromoCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 32))}
+              onChange={(e) => setPromoCode(normalizePromoCodeInput(e.target.value))}
               placeholder="e.g. SUMMER25"
               className="flex-1 rounded-xl border border-border-subtle bg-white px-4 py-2.5 text-sm font-mono uppercase tracking-widest text-text-primary placeholder:normal-case placeholder:tracking-normal focus:outline-none focus:ring-2 focus:ring-brand-primary"
               aria-label="Promo code"
