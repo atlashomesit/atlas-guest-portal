@@ -56,7 +56,7 @@ jobs:
             // authored work must be attributable to a person (TASK-5348; 8
             // mis-attributed feature commits landed 2026-07-10..22 under it).
             // \d+\+atlashomesit covers its noreply form once email privacy is on.
-            const ALLOW = /^(sreekaratla81|sreekar\.atla|noreply|150553417\+sreekaratla81|udaykumar\.ragipindi|sidharthyennawar|\d+\+atlashomesit)@.*$/;
+            const ALLOW = /^(sreekaratla81|sreekar\.atla|noreply|150553417\+sreekaratla81|udaykumar\.ragipindi|sidharthyennawar|234134092\+ragameghanagongati|\d+\+atlashomesit)@.*$/;
             const SHARED_OWNER = /^atlashomesit@/;
             const baseRef = context.payload.pull_request?.base?.ref || '';
             let commits = [];
