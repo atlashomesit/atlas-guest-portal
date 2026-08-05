@@ -16,6 +16,15 @@ export type TenantPropertyRecord = {
   listingId?: number;
   maxGuests?: number;
   unitType?: string;
+  /**
+   * TASK-7448: the CANONICAL property name (`dto.propertyName`), e.g. "Stay by City Focus".
+   * Distinct from `property_name` below, which — despite its name — holds the UNIT name
+   * (`dto.name`, e.g. "Aurelia Loft - 623"). The `/homes/:propertySlug/...` segment is built from
+   * THIS field by every link builder, so the route guard must match against it. Dropping it here
+   * is what made the TASK-7430 slug guard 404 every listing page on every tenant.
+   */
+  propertyName?: string | null;
+  /** Unit/listing name (`dto.name`). Historically misnamed — NOT the property name. */
   property_name?: string;
   property_description?: string;
   property_location?: string;
@@ -86,6 +95,12 @@ export const mapDtoToProperty = (dto: PublicListing): TenantPropertyRecord => {
     listingId: dto.id,
     maxGuests: dto.maxGuests || local?.maxGuests || 2,
     unitType: local?.unitType ?? inferUnitTypeFromName(dto.name ?? dto.propertyName),
+    // TASK-7448: preserve the canonical property name so the route slug guard can match the URL
+    // segment that link builders actually emit. Falls back to the local catalog for static data.
+    propertyName:
+      (dto.propertyName?.trim() ? dto.propertyName : null) ??
+      local?.property_name ??
+      null,
     property_name:
       (dto.name?.trim() ? dto.name : null) ??
       (dto.propertyName?.trim() ? dto.propertyName : null) ??
