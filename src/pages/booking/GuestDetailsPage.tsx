@@ -23,7 +23,7 @@ import axios from 'axios';
 import { useBooking, type BookingPriceBreakdown } from '@/contexts/BookingContext';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { buildApiUrl, getApiHeaders, getOrderRequestHeaders } from '@/api/client';
-import { normalizePromoCodeInput, normalizePromoCodeSubmit } from '@/utils/promoCodeInput';
+import { normalizePromoCodeInput } from '@/utils/promoCodeInput';
 import {
   clampNationalDigits,
   getGuestDialOption,
@@ -2170,7 +2170,7 @@ const TrustBand: React.FC<TrustBandProps> = ({ freeCancellationCopy, brandName, 
       <IconLock size={14}/>
       {/* TASK-7428: Razorpay / 3% copy only when an online payment provider is configured. */}
       <span>
-        {(tenantCtx?.paymentProvider ?? '').trim() && tenantCtx?.bookingMode !== 'WHATSAPP'
+        {(getTenantContext()?.paymentProvider ?? '').trim() && getTenantContext()?.bookingMode !== 'WHATSAPP'
           ? <>Direct booking · secure payment via Razorpay · <b>no OTA fee</b> · 3% payment processing at checkout</>
           : <>Direct booking with the host · <b>no OTA fee</b></>}
       </span>
