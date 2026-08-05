@@ -107,6 +107,8 @@ export const mapDtoToProperty = (dto: PublicListing): TenantPropertyRecord => {
       local?.property_name ??
       `Listing ${dto.id}`,
     property_description:
+      dto.seoDescription?.trim() ||
+      dto.metaDescription?.trim() ||
       local?.property_description ??
       // TASK-4313: singular "1 guest" when capacity is 1.
       `Comfortable stay for up to ${dto.maxGuests || local?.maxGuests || 2} guest${(dto.maxGuests || local?.maxGuests || 2) === 1 ? '' : 's'}.`,

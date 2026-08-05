@@ -148,6 +148,10 @@ export type PublicListing = {
   graceHours?: number | null;
   /** TASK-2552: amenity code strings (e.g. "AC", "Pool", "WiFi") returned by PublicListingDto. */
   amenityCodes?: string[];
+  /** TASK-7193: admin-editable SEO description for share previews. */
+  seoDescription?: string | null;
+  /** TASK-1936: SEO meta description fallback. */
+  metaDescription?: string | null;
   /**
    * TASK-2739-v1: publish state ("Draft" | "Published"). Discovery lists only ever contain
    * "Published" rows; on a detail fetch a "Draft" value drives noindex + the "not yet available
