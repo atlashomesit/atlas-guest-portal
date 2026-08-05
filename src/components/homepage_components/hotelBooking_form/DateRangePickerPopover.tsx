@@ -3,8 +3,8 @@ import { createPortal } from 'react-dom';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 interface DateRangePickerPopoverProps {
-  anchorRef: React.RefObject<HTMLElement>;
-  calendarRef: React.RefObject<HTMLDivElement>;
+  anchorRef: React.RefObject<HTMLElement | null>;
+  calendarRef: React.RefObject<HTMLDivElement | null>;
   contentId: string;
   heading: string;
   instructionText?: string;
