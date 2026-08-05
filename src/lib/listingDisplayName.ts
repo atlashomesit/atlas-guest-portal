@@ -53,7 +53,12 @@ function displayNameFromSku(sku: string): string | null {
  *
  * Priority:
  * 1. Atlas SKU → friendly. Gated to names containing "atlas" so cross-tenant marketplace /
- *    search names (e.g. "Sea View 501") are NEVER remapped onto Atlas's unit names.
+ *    search names (e.g. "Sea View 501") are NEVER remapped onto Atlas's unit names. Also
+ *    gated to Atlas marketplace tenants only (TASK-7194) — see Strategy 2's comment. Without
+ *    this gate, a white-label tenant whose upstream listing name happens to be an Atlas SKU
+ *    string (the API's raw, pre-friendly-name format) would still get Atlas's own unit name
+ *    rendered on their guest-facing site, even though Strategy 2 below was closed for exactly
+ *    this reason.
  * 2. Numeric floor/unit id lookup (101, 201, 301, 501) for Atlas marketplace only.
  * 3. Fall back to rawName as-is (already-friendly names and unknown listings).
  */
@@ -61,19 +66,22 @@ export function getListingDisplayName(
   propertyId: number | string | undefined | null,
   rawName?: string,
 ): string {
+  // Resolve once whether Atlas's own unit-name map may be applied for this tenant.
+  // When tenant context is unresolved (null slug), keep marketplace behavior for boot/tests.
+  // Once a white-label slug is known, never remap onto Atlas unit names (TASK-7194) — this
+  // gate covers BOTH lookup strategies below, not just the numeric one.
+  const tenant = getTenantContext();
+  const slug = tenant?.slug?.trim();
+  const allowAtlasUnitMap =
+    !slug || !shouldHideAtlasBranding(tenant, getTenantOverrides(slug));
+
   // Strategy 1: Atlas SKU extraction (only for Atlas-owned SKU-style names).
-  if (rawName && /atlas/i.test(rawName)) {
+  if (allowAtlasUnitMap && rawName && /atlas/i.test(rawName)) {
     const fromSku = displayNameFromSku(rawName);
     if (fromSku) return fromSku;
   }
 
   // Strategy 2: numeric floor/unit ID lookup — Atlas marketplace only.
-  // When tenant context is unresolved (null slug), keep marketplace behavior for boot/tests.
-  // Once a white-label slug is known, never remap colliding ids onto Atlas unit names (TASK-7194).
-  const tenant = getTenantContext();
-  const slug = tenant?.slug?.trim();
-  const allowAtlasUnitMap =
-    !slug || !shouldHideAtlasBranding(tenant, getTenantOverrides(slug));
   if (allowAtlasUnitMap) {
     const id = Number(propertyId);
     if (Number.isFinite(id) && id > 0) {
