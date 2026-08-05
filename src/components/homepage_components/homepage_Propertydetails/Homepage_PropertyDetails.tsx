@@ -25,6 +25,7 @@ import { trackEvent } from '../../../utils/analytics';
 import { Button } from '../../ui/Button';
 import { calculateNightlyPrice, inferUnitType } from '../../../utils/pricing';
 import { buildHomeUnitPath, getPropertySlug } from '../../../utils/navigation';
+import { propertySlugMatchesListing } from '../../../utils/propertySlugMatch';
 import { useBooking } from '../../../contexts/BookingContext';
 import { resolveListing } from '../../../utils/listingResolver';
 import { filterGuestImageUrls, sanitizeGuestImageUrl } from '../../../utils/guestImageUrl';
@@ -794,20 +795,15 @@ const PropertyDetails = () => {
         const normalizedPropertySlugStripped = stripHyphens(normalizedPropertySlug);
 
         // TASK-7430: URL property slug must match the listing's canonical property slug (404 otherwise).
-        const urlPropertySlugMatches = (item: { property_name?: string; id?: string | number }) => {
-            if (!normalizedPropertySlug) return true;
-            const expected = normalizeSlug(
-                getPropertySlug({
-                    property_name: item.property_name,
-                    name: item.property_name,
-                    id: item.id,
-                }),
-            );
-            return (
-                expected === normalizedPropertySlug ||
-                stripHyphens(expected) === normalizedPropertySlugStripped
-            );
-        };
+        // TASK-7448 (P0 fix): match against the PROPERTY name (`propertyName`) as well as the unit
+        // name (`property_name`). The original guard only used `property_name`, which on a
+        // TenantPropertyRecord holds the UNIT name — so it rejected the very URLs the link builders
+        // generate and 404'd every listing page on every tenant. See utils/propertySlugMatch.ts.
+        const urlPropertySlugMatches = (item: {
+            propertyName?: string | null;
+            property_name?: string;
+            id?: string | number;
+        }) => propertySlugMatchesListing(normalizedPropertySlug, item);
 
         // 1) Match by listingId (PK from DB/API) — IDs 1–7 etc.
         const foundByListingId = listingIdParam && Number.isFinite(listingId) && listingId > 0
@@ -938,7 +934,11 @@ const PropertyDetails = () => {
                     if (
                         normalizedPropertySlug &&
                         !urlPropertySlugMatches({
-                            property_name: apiPropertyName,
+                            // TASK-7448: pass BOTH names — the URL may carry the property slug
+                            // (canonical, what links emit) or the unit slug (legacy deep links).
+                            propertyName: apiPropertyName,
+                            property_name:
+                                typeof apiListing.name === 'string' ? apiListing.name : undefined,
                             id: apiListing.id,
                         })
                     ) {
