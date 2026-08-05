@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom';
 import { helpNav, moreNav, primaryNav } from '../../../config/navigation';
 import { LOGO_URL } from '../../../config/branding';
 import { getTenantContext } from '../../../tenant/tenantContext';
+import { hasOnlinePaymentRail } from '../../../tenant/paymentRail';
 import { getTenantBrandName } from '../../../tenant/displayBrand';
 import { getTenantOverrides, shouldHideAtlasBranding } from '../../../tenant/tenantOverrides';
 import { formatDisplayNumber, getContactEmail, getTelLink, getWhatsAppLink, getGuestFacingPhone, getWhatsAppPhone } from '../../../config/contact';
@@ -32,6 +33,8 @@ const Footer = () => {
         FaYoutube: `Visit ${brandName} on YouTube`,
         ImGithub: `Visit ${brandName} on GitHub`,
     };
+    // TASK-7428: gate only the payment-processor half of the TASK-4161 MOR disclosure.
+    const showPaymentProcessorCredit = hasOnlinePaymentRail(tenant);
     const overrides = getTenantOverrides(tenant?.slug);
     const hideAtlasBranding = shouldHideAtlasBranding(tenant, overrides);
     const logoSrc = overrides.hideLogo ? "" : (overrides.logoUrl ?? tenant?.logoUrl ?? LOGO_URL);
@@ -254,10 +257,16 @@ const Footer = () => {
                             </span>
                         )}
                     </p>
-                    {/* TASK-7428: keep Atlas PMS MOR credit; gate Razorpay rail copy on a real payment provider. */}
+                    {/* TASK-4161 disclosure, TASK-7428 partial gate: the booking-engine credit is
+                        unconditional (Atlas PMS runs this site either way). The payment-processor
+                        credit is a statement about how the guest's money moves, so it renders only
+                        when an online gateway actually takes the payment — on a WhatsApp-handoff /
+                        pay-on-arrival tenant no payment is processed on this site, and naming a
+                        processor there is itself a misleading representation rather than a
+                        required disclosure. */}
                     <p>
                         Booking engine by <strong>Atlas PMS</strong>
-                        {Boolean((tenant.paymentProvider ?? '').trim()) && (
+                        {showPaymentProcessorCredit && (
                             <> · Payments secured by <strong>Razorpay</strong></>
                         )}
                     </p>

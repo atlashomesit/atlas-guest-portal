@@ -34,7 +34,7 @@ import { useListingPhotosFromApi } from '@/contexts/ListingPhotosContext';
 import OptimizedImage from '@/components/ui/OptimizedImage';
 import FomoBar from '@/components/FomoBar';
 import { track } from '@/lib/events'; // TASK-1480
-import { getTenantContext } from '@/tenant/tenantContext';
+import { hasOnlinePaymentRail } from '@/tenant/paymentRail';
 import {
   ILLUSTRATIVE_OTA_GUEST_FEE_PERCENT,
 } from '@/utils/directBookingPromo';
@@ -1121,12 +1121,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         : effectiveDailyPricing != null
           ? Math.round(effectiveDailyPricing.actualPrice * (hasSelectedRange ? priceDetails.nights : 1))
           : 0;
-  // TASK-7428: hide Razorpay processing fee + pay rail when no online provider (or WhatsApp handoff).
-  // Booking-engine MOR footer elsewhere is intentionally left alone.
-  const tenantPaymentCtx = getTenantContext();
-  const showOnlinePaymentProcessing =
-    Boolean((tenantPaymentCtx?.paymentProvider ?? '').trim()) &&
-    tenantPaymentCtx?.bookingMode !== 'WHATSAPP';
+  // TASK-7428: hide Razorpay processing fee + pay rail when no online gateway will charge the
+  // guest. Delegated to `hasOnlinePaymentRail` so this widget, the property-details trust list and
+  // the footer MOR disclosure cannot drift apart again; that helper also treats MANUAL
+  // (pay-on-arrival) as no-gateway, which the previous inline predicate missed.
+  const showOnlinePaymentProcessing = hasOnlinePaymentRail();
 
   const convenienceFeePercent = !showOnlinePaymentProcessing
     ? 0
