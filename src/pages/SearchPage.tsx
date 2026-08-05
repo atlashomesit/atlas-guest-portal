@@ -14,6 +14,7 @@ import { getTenantContext } from "../tenant/tenantContext";
 import { getTenantBrandName } from "../tenant/displayBrand";
 import { getTenantOverrides, getTenantPublicListingIdAllowlist, getUnitNoun, shouldHideAtlasBranding } from "../tenant/tenantOverrides";
 import { LoadingState } from "../components/LoadingState";
+import ErrorBanner from "../components/ErrorBanner"; // TASK-7195
 import SEO from "../components/SEO"; // TASK-4290
 import OptimizedImage from "../components/ui/OptimizedImage";
 import OwnerShareBadge from "../components/OwnerShareBadge"; // TASK-1705
@@ -234,6 +235,12 @@ const SearchPage = () => {
   // TASK-1867: track real API errors separately; null apiListings on 0-listing response is not an error
   const [apiError, setApiError] = useState(false);
   const [loadingTimeoutReached, setLoadingTimeoutReached] = useState(false);
+  // TASK-7195: bumping this re-runs the load effect below — same "Try again" pattern as
+  // MyBookingsPage. Needed because `apiError` used to be tracked but never gated the empty-state
+  // copy (see showEmptyState/showErrorState): a marketplace or onlyApiListings tenant whose
+  // primary listings fetch failed on first load was told "No <homes> match your filters" with no
+  // way to retry, indistinguishable from a real zero-result search.
+  const [retryCount, setRetryCount] = useState(0);
 
   const checkInParam = searchParams.get("checkIn");
   const checkOutParam = searchParams.get("checkOut");
@@ -306,7 +313,7 @@ const SearchPage = () => {
       controller.abort();
       clearTimeout(fallbackTimer);
     };
-  }, [isMarketplaceSearch, loadFromApi, loadFromMarketplace]);
+  }, [isMarketplaceSearch, loadFromApi, loadFromMarketplace, retryCount]);
 
   const minPriceParam = searchParams.get("minPrice");
   const maxPriceParam = searchParams.get("maxPrice");
@@ -836,8 +843,16 @@ const SearchPage = () => {
   const dateAvailCheckFailed =
     explicitDateSearch && !dateAvailLoading && dateAvailableIds === null && !hasInvalidDates;
   const showTonightProbeBanner = availableNow && tonightProbeLoading;
+  // TASK-7195: a failed primary listings fetch must never be told apart from a genuine
+  // zero-result search. For most tenants a static fallback keeps `sortedUnits` non-empty on
+  // failure (see the `listings` memo above), but marketplace search and `onlyApiListings`
+  // tenants clear listings to `[]` in the same catch that sets `apiError` — before this, that
+  // combination fell straight into showEmptyState's "No <homes> match your filters" copy, with
+  // no retry.
+  const showErrorState =
+    !isLoading && !hasInvalidDates && apiError && sortedUnits.length === 0 && !showTonightProbeBanner;
   const showEmptyState =
-    !isLoading && !hasInvalidDates && sortedUnits.length === 0 && !showTonightProbeBanner;
+    !isLoading && !hasInvalidDates && !apiError && sortedUnits.length === 0 && !showTonightProbeBanner;
   /** TASK-1648: skeleton while public availability resolves for selected dates (list view). */
   const showDateAvailabilitySkeleton =
     explicitDateSearch && !hasInvalidDates && dateAvailLoading && !isLoading && !mapView;
@@ -1224,6 +1239,15 @@ const SearchPage = () => {
           </div>
         )}
 
+        {showErrorState && !mapView && (
+          <div data-testid="search-load-error" className="mb-6">
+            <ErrorBanner
+              message={`We couldn't load ${unitNoun.marketingPlural}. Check your connection and try again.`}
+              onRetry={() => setRetryCount((n) => n + 1)}
+            />
+          </div>
+        )}
+
         {showEmptyState && !mapView && (
           <div className="flex flex-col gap-8">
             <div
@@ -1371,6 +1395,14 @@ const SearchPage = () => {
         {!isLoading && !(explicitDateSearch && dateAvailLoading) && !hasInvalidDates && mapView && (
           <div className="flex flex-col gap-3">
             <div className="relative">
+              {showErrorState && (
+                <div data-testid="search-load-error" className="absolute inset-x-0 top-4 z-10 mx-auto w-fit max-w-sm px-4">
+                  <ErrorBanner
+                    message={`We couldn't load ${unitNoun.marketingPlural}. Try again.`}
+                    onRetry={() => setRetryCount((n) => n + 1)}
+                  />
+                </div>
+              )}
               {showEmptyState && (
                 <div className="absolute inset-x-0 top-4 z-10 mx-auto w-fit rounded-xl border border-border-subtle bg-bg-surface/95 px-4 py-3 text-sm text-text-secondary shadow-md text-center">
                   No matches in this area — try wider search or clear filters
@@ -1462,7 +1494,7 @@ const SearchPage = () => {
           </section>
         )}
 
-        {!isLoading && !showDateAvailabilitySkeleton && !showEmptyState && !hasInvalidDates && !mapView && (
+        {!isLoading && !showDateAvailabilitySkeleton && !showEmptyState && !showErrorState && !hasInvalidDates && !mapView && (
           <section
             className="search-results-grid"
             data-testid="guest-search-results"
