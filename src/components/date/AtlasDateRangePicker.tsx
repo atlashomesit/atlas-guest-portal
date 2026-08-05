@@ -23,7 +23,7 @@ export interface AtlasDateRangePickerValue {
 }
 
 interface AtlasDateRangePickerProps {
-  anchorRef: React.RefObject<HTMLElement>;
+  anchorRef: React.RefObject<HTMLElement | null>;
   open: boolean;
   onClose: () => void;
   value: AtlasDateRangePickerValue;
@@ -42,7 +42,7 @@ interface AtlasDateRangePickerProps {
   onShownDateChange?: (date: Date) => void;
   dayContentRenderer?: (date: Date) => React.ReactNode;
   rangeColors?: string[];
-  calendarRef?: React.RefObject<HTMLDivElement>;
+  calendarRef?: React.RefObject<HTMLDivElement | null>;
   dateRangeProps?: Partial<React.ComponentProps<typeof DateRange>>;
   afterCalendar?: React.ReactNode;
   activeField?: 'checkin' | 'checkout' | null;
