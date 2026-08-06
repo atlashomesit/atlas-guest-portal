@@ -473,6 +473,10 @@ const PropertyDetails = () => {
     const listingId = listingIdParam ? Number(listingIdParam) : NaN;
     const [data, setData] = useState<Property | null>(null);
     const [notFound, setNotFound] = useState(false);
+    // TASK-7195 four-state rule: a FAILED listing fetch used to call setNotFound(true), so a
+    // network/5xx error rendered "Home not found — please check the link" and told a guest the
+    // property does not exist. Absent and unreachable are different states; keep them apart.
+    const [loadFailed, setLoadFailed] = useState(false);
     const [listingPropertyId, setListingPropertyId] = useState<string | number | null>(null);
     const [resolvedListingId, setResolvedListingId] = useState<string | number | null>(null);
     // TASK-2739-v1: "Draft" | "Published" (undefined on legacy payloads = treated as live).
@@ -785,6 +789,7 @@ const PropertyDetails = () => {
 
     useEffect(() => {
         setNotFound(false);
+        setLoadFailed(false); // TASK-7195: clear the failure state on every re-resolve, like notFound.
         setData(null);
 
         if (listingIdParam && !Number.isNaN(listingId) && listingId <= 0) {
@@ -1065,7 +1070,8 @@ const PropertyDetails = () => {
                     setData({ ...mapped, property_img: images });
                 })
                 .catch(() => {
-                    if (!cancelled) setNotFound(true);
+                    // TASK-7195: the fetch failed — we do NOT know the listing is absent.
+                    if (!cancelled) setLoadFailed(true);
                 });
             return () => {
                 cancelled = true;
@@ -1303,6 +1309,21 @@ useEffect(() => {
     ]);
 
     if (!data) {
+        // TASK-7195 four-state rule: check the FAILURE state before the absent state. A load that
+        // errored tells us nothing about whether this home exists, so saying "not found" (and
+        // telling the guest to check their link) is an authoritative claim we have not earned.
+        if (loadFailed) {
+            return (
+                <StateMessage
+                    data-testid="listing-load-failed-homepage"
+                    icon="⚠️"
+                    title="We couldn't load this home"
+                    message="Something went wrong on our side — the home is probably still there. Please try again in a moment."
+                    primaryAction={{ label: "Try again", onClick: () => window.location.reload() }}
+                    secondaryActions={[{ label: "Browse available homes", to: "/" }]}
+                />
+            );
+        }
         if (notFound) {
             return (
                 <StateMessage
