@@ -360,7 +360,8 @@ describe('UnitBookingWidget - TASK-4326: checkout-day off-by-one on back-to-back
     // — only ever exempted a 1-night stay. Must be gone from disabledDay.
     const disabledDaySection = content.slice(
       content.indexOf('const disabledDay = useCallback'),
-      content.indexOf('}, [blockedSet, dateStatusMap, today, dateRange.startDate]);'),
+      // TASK-7491: dependency array grew a `dateBookabilityMap` entry (no-usable-rate gate).
+      content.indexOf('}, [blockedSet, dateStatusMap, dateBookabilityMap, today, dateRange.startDate]);'),
     );
     expect(disabledDaySection).toContain('doesRangeIntersectBlocked');
     expect(disabledDaySection).not.toContain('const nextDay = addDays(dateRange.startDate, 1)');
@@ -370,7 +371,8 @@ describe('UnitBookingWidget - TASK-4326: checkout-day off-by-one on back-to-back
     const content = readFileSync(filePath, 'utf-8');
     const disabledDaySection = content.slice(
       content.indexOf('const disabledDay = useCallback'),
-      content.indexOf('}, [blockedSet, dateStatusMap, today, dateRange.startDate]);'),
+      // TASK-7491: dependency array grew a `dateBookabilityMap` entry (no-usable-rate gate).
+      content.indexOf('}, [blockedSet, dateStatusMap, dateBookabilityMap, today, dateRange.startDate]);'),
     );
     // The checkout exemption is gated behind `dateRange.startDate &&` — without a startDate
     // selected, a blocked/hold candidate must fall through to `return true`.
@@ -413,7 +415,8 @@ describe('UnitBookingWidget - TASK-4293: Reserve button disabled when the select
     const content = readFileSync(filePath, 'utf-8');
     const memoSection = content.slice(
       content.indexOf('const checkinUnavailable = useMemo('),
-      content.indexOf('}, [dateRange.startDate, dateStatusMap, blockedSet]);'),
+      // TASK-7491: dependency array grew a `dateBookabilityMap` entry (no-usable-rate gate).
+      content.indexOf('}, [dateRange.startDate, dateStatusMap, blockedSet, dateBookabilityMap]);'),
     );
     expect(memoSection).toBeTruthy();
     // Mirrors handleReserve's guard exactly so the button state can never disagree with the submit path.
