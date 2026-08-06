@@ -6,6 +6,7 @@ import tseslint from 'typescript-eslint'
 import noAtlasStringLeak from './eslint-rules/no-atlas-string-leak.js'
 import noCoerceNumericOnchange from './eslint-rules/no-coerce-numeric-onchange.cjs'
 import noUtcToday from './eslint-rules/no-utc-today.cjs'
+import requireErrorBeforeEmptyState from './eslint-rules/require-error-before-empty-state.cjs'
 
 export default tseslint.config(
   { ignores: ['dist', 'be-src', '**/be-src/**', '.wrangler/**', 'android', 'android/**', '.claude/worktrees/**'] },
@@ -25,6 +26,7 @@ export default tseslint.config(
         rules: {
           'no-coerce-numeric-onchange': noCoerceNumericOnchange,
           'no-utc-today': noUtcToday,
+          'require-error-before-empty-state': requireErrorBeforeEmptyState,
         },
       },
     },
@@ -33,6 +35,9 @@ export default tseslint.config(
       'atlas-brand/no-atlas-string-leak': 'warn',
       'atlas/no-coerce-numeric-onchange': 'error',
       'atlas/no-utc-today': 'error',
+      // TASK-7195 done-when #4: the four-state rule (loading | error | empty | populated)
+      // enforced mechanically, not by convention — see eslint-rules/require-error-before-empty-state.cjs.
+      'atlas/require-error-before-empty-state': 'error',
       ...reactHooks.configs.recommended.rules,
       // react-hooks@7.x added React Compiler rules not yet enforced in this codebase
       'react-hooks/static-components': 'off',
@@ -69,6 +74,7 @@ export default tseslint.config(
     rules: {
       'atlas/no-coerce-numeric-onchange': 'off',
       'atlas/no-utc-today': 'off',
+      'atlas/require-error-before-empty-state': 'off',
     },
   },
   {

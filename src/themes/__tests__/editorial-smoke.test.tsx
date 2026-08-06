@@ -53,6 +53,21 @@ vi.mock("@/utils/pricing", () => ({
   inferUnitType: vi.fn(() => "1bhk"),
   getEffectiveDiscountPercent: vi.fn(() => 0),
 }));
+// `Home.tsx`'s pull-quote/narrative copy has two variants (Atlas marketplace vs white-label,
+// `showAtlasContent` = `!shouldHideAtlasBranding(tenant, overrides)`). `shouldHideAtlasBranding()`
+// defaults an UNRESOLVED tenant (the `getTenantContext()` -> null this test would otherwise get,
+// since nothing here ever calls `resolveFromDomain`/`validateTenant`) to hidden/white-label —
+// `b2f267c8d` "feat(brand): white-label by default", 2026-05-05, predates this layout (TASK-4924,
+// 2026-07-17) by over two months, so this is an established, deliberate safe-default, not
+// something to work around structurally. `src/pages/home/Home.tsx` (classic) gates its own
+// "why book direct" copy through the exact same `shouldHideAtlasBranding` call, and its own test
+// (`src/pages/home/__tests__/Home.test.tsx`) already mocks tenant context the same way for the
+// same reason — pin the Atlas marketplace tenant explicitly so this test asserts the
+// marketplace-branded copy it's actually named for, rather than depending on an ambient module
+// default it never controls.
+vi.mock("@/tenant/tenantContext", () => ({
+  getTenantContext: vi.fn(() => ({ slug: "atlas", isMarketplaceRoot: true })),
+}));
 vi.mock("@/contexts/BookingContext", () => ({
   useBooking: () => ({
     booking: { propertyId: null, checkIn: null, checkOut: null, guests: 2 },

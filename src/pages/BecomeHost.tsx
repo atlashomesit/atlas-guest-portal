@@ -585,7 +585,7 @@ const BecomeHost = () => {
             min={1}
             max={10}
             value={estimatorRooms}
-            onChange={(e) => setEstimatorRooms(Number(e.target.value))}
+            onChange={(e) => setEstimatorRooms(e.target.valueAsNumber)}
             aria-label="Number of rooms"
             aria-valuetext={`${estimatorRooms} ${estimatorRooms === 1 ? "room" : "rooms"}`}
             className="w-full accent-[#b8472f]"

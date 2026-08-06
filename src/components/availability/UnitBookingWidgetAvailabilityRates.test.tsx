@@ -1,0 +1,224 @@
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import { addDays, format } from 'date-fns';
+import { toISODate } from '@/utils/dateRange';
+import { getIstStartOfDay } from '@/utils/date';
+
+/**
+ * TASK-7491 (Rate Sync Authority opt-out — guest-portal slice): verifies the guest booking
+ * calendar fails closed on a `bookable:false` day from GET /api/pricing/availability-rates —
+ * rendered unavailable, unselectable, no price — while a `carried_forward` (bookable:true) day
+ * and a normal `channel_inbound` day keep rendering exactly as before (unchanged behavior;
+ * `bookable` gates rendering, not `priceSource`).
+ *
+ * Deliberately its own file: UnitBookingWidget.test.tsx mocks `./AtlasBookingCalendar` to
+ * `() => null` module-wide (vi.mock is hoisted and file-scoped in Vitest — it cannot be
+ * selectively un-mocked for one describe block within that file), so it can never observe real
+ * day-cell DOM. This file leaves AtlasBookingCalendar UNMOCKED so the assertions below exercise
+ * the actual rendered calendar, matching how a guest would see it.
+ */
+
+const mocks = vi.hoisted(() => ({
+  fetchCalendarPricing: vi.fn(),
+  fetchGuestGstBreakdown: vi.fn(),
+  fetchAvailabilityRatesForMonths: vi.fn(),
+  booking: { checkIn: null as string | null, checkOut: null as string | null, guests: 2 },
+}));
+
+const availabilityCalendarMock = vi.hoisted(() => ({ fetch: vi.fn() }));
+
+const availabilityCalendarOk = () =>
+  new Response(JSON.stringify([]), { status: 200, headers: { 'content-type': 'application/json' } });
+
+vi.mock('@/runtime-config', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  hasRuntimeConfig: () => true,
+}));
+vi.mock('@/tenant/tenantContext', () => ({
+  getTenantContext: () => ({
+    slug: 'atlas',
+    name: 'Atlastays',
+    paymentProvider: 'RAZORPAY',
+    bookingMode: 'ONLINE' as const,
+  }),
+}));
+vi.mock('@/api/client', () => ({
+  buildApiUrl: (path: string) => `http://localhost:5120${path}`,
+  getApiHeaders: () => ({}),
+  getOrderRequestHeaders: () => ({}),
+}));
+vi.mock('@/api/availabilityCalendarClient', () => ({
+  dedupedAvailabilityCalendarFetch: (...args: unknown[]) => availabilityCalendarMock.fetch(...args),
+}));
+availabilityCalendarMock.fetch.mockImplementation(availabilityCalendarOk);
+vi.mock('@/api/pricingClient', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  fetchCalendarPricing: mocks.fetchCalendarPricing,
+  fetchGuestGstBreakdown: mocks.fetchGuestGstBreakdown,
+}));
+vi.mock('@/api/availabilityRatesClient', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  fetchAvailabilityRatesForMonths: mocks.fetchAvailabilityRatesForMonths,
+}));
+vi.mock('@/api/listingClient', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  fetchPublicListings: async () => [],
+}));
+vi.mock('@/contexts/BookingContext', () => ({
+  useBooking: () => ({ booking: mocks.booking, updateBooking: vi.fn() }),
+}));
+vi.mock('@/contexts/ListingPhotosContext', () => ({
+  useListingPhotosFromApi: () => ({ getUrlsForListingId: () => undefined }),
+}));
+vi.mock('@/hooks/useDailyPricingSummary', () => ({
+  useDailyPricingSummary: () => ({
+    data: null,
+    loading: false,
+    error: null,
+    getListingPricing: () => ({ baseAmount: 6000, actualPrice: 6000, globalDiscountPercent: 0 }),
+  }),
+}));
+vi.mock('@/components/FomoBar', () => ({ default: () => null }));
+vi.mock('@/lib/events', () => ({ track: vi.fn() }));
+
+describe('UnitBookingWidget - TASK-7491: availability-rates bookable gate (render)', () => {
+  const today = getIstStartOfDay();
+  const unusableDate = addDays(today, 4);
+  const carriedForwardDate = addDays(today, 5);
+  const normalDate = addDays(today, 6);
+  const unusableIso = toISODate(unusableDate);
+  const carriedForwardIso = toISODate(carriedForwardDate);
+  const normalIso = toISODate(normalDate);
+  // Deliberately < 10000 so AtlasBookingCalendar's formatINR uses plain "₹N,NNN" (not the "₹N.NK"
+  // form it switches to at >= 10000) — irrelevant to the assertions below, which strip non-digits.
+  const CARRIED_FORWARD_PRICE = 4200;
+  const NORMAL_PRICE = 5100;
+  // The breakdown/pricing mock deliberately DOES supply a price for the unusable date — proves
+  // the day renders no price because of the bookable gate, not merely because no price exists.
+  const INVENTED_PRICE_IF_BUG = 9999;
+
+  beforeEach(() => {
+    availabilityCalendarMock.fetch.mockReset();
+    availabilityCalendarMock.fetch.mockImplementation(availabilityCalendarOk);
+    mocks.fetchCalendarPricing.mockResolvedValue({
+      dateToPrice: new Map([
+        [unusableIso, INVENTED_PRICE_IF_BUG],
+        [carriedForwardIso, CARRIED_FORWARD_PRICE],
+        [normalIso, NORMAL_PRICE],
+      ]),
+      convenienceFeePercent: 3,
+    });
+    mocks.fetchGuestGstBreakdown.mockResolvedValue({ gstPercent: 5, gstAmount: 0, finalAmount: 0 });
+    mocks.fetchAvailabilityRatesForMonths.mockResolvedValue([
+      {
+        date: unusableIso,
+        nightlyRate: 0,
+        roomsAvailable: 0,
+        isAvailable: false,
+        bookable: false,
+        reason: 'no_usable_rate',
+        priceSource: null,
+      },
+      {
+        date: carriedForwardIso,
+        nightlyRate: CARRIED_FORWARD_PRICE,
+        roomsAvailable: 1,
+        isAvailable: true,
+        bookable: true,
+        reason: null,
+        priceSource: 'carried_forward',
+      },
+      {
+        date: normalIso,
+        nightlyRate: NORMAL_PRICE,
+        roomsAvailable: 1,
+        isAvailable: true,
+        bookable: true,
+        reason: null,
+        priceSource: 'channel_inbound',
+      },
+    ]);
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+    mocks.booking.checkIn = null;
+    mocks.booking.checkOut = null;
+  });
+
+  const renderWidgetAndOpenCalendar = async () => {
+    const { default: UnitBookingWidget } = await import('./UnitBookingWidget');
+    render(
+      <MemoryRouter>
+        <UnitBookingWidget
+          listingId={7}
+          propertyId={3}
+          listingName="Atlas 501 PH"
+          propertySlug="atlas501-ph"
+          unitSlug="ph"
+        />
+      </MemoryRouter>,
+    );
+    const trigger = await screen.findByLabelText('Select check-in date');
+    await act(async () => {
+      fireEvent.click(trigger);
+    });
+    await screen.findByRole('dialog', { name: 'Select dates' });
+  };
+
+  const findDayCell = async (date: Date): Promise<HTMLElement> => {
+    const label = format(date, 'd MMMM');
+    // aria-label is `${d MMMM}` optionally followed by `, ₹price` (DayCell in
+    // AtlasBookingCalendar.tsx) — match the date prefix regardless of the price suffix.
+    const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return screen.findByRole('gridcell', { name: new RegExp(`^${escaped}(,|$)`) });
+  };
+
+  it('renders a bookable:false day unavailable: disabled, unselectable, no price ever shown', async () => {
+    await renderWidgetAndOpenCalendar();
+
+    const cell = await findDayCell(unusableDate);
+    await waitFor(() => {
+      expect(cell).toBeDisabled();
+    });
+    expect(cell.className).toContain('bc-unavail');
+    // No price span at all for this cell — never a guessed/invented price.
+    expect(cell.querySelector('.bc-price')).toBeNull();
+    // The breakdown mock DID supply a price (₹9,999) for this exact date; it must never surface.
+    expect(screen.queryByText('₹9,999')).toBeNull();
+    expect(screen.queryByText(String(INVENTED_PRICE_IF_BUG))).toBeNull();
+
+    // Unselectable: a click must not be able to pick it as check-in — the trigger still shows
+    // the empty placeholder, never the clicked (unusable) date.
+    fireEvent.click(cell);
+    expect(screen.getByLabelText('Select check-in date').textContent).toContain('Add date');
+  });
+
+  it('a carried_forward day (bookable:true) stays selectable and keeps showing its carried price (unchanged)', async () => {
+    await renderWidgetAndOpenCalendar();
+
+    const cell = await findDayCell(carriedForwardDate);
+    await waitFor(() => {
+      expect(cell.querySelector('.bc-price')).not.toBeNull();
+    });
+    expect(cell).not.toBeDisabled();
+    expect(cell.className).not.toContain('bc-unavail');
+    const priceText = cell.querySelector('.bc-price')?.textContent?.replace(/[^0-9]/g, '');
+    expect(priceText).toBe(String(CARRIED_FORWARD_PRICE));
+  });
+
+  it('a normal channel_inbound day (bookable:true) is unchanged: selectable, shows its price', async () => {
+    await renderWidgetAndOpenCalendar();
+
+    const cell = await findDayCell(normalDate);
+    await waitFor(() => {
+      expect(cell.querySelector('.bc-price')).not.toBeNull();
+    });
+    expect(cell).not.toBeDisabled();
+    expect(cell.className).not.toContain('bc-unavail');
+    const priceText = cell.querySelector('.bc-price')?.textContent?.replace(/[^0-9]/g, '');
+    expect(priceText).toBe(String(NORMAL_PRICE));
+  });
+});

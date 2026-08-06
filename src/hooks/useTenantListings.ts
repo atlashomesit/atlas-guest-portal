@@ -109,9 +109,18 @@ export const mapDtoToProperty = (dto: PublicListing): TenantPropertyRecord => {
     property_description:
       dto.seoDescription?.trim() ||
       dto.metaDescription?.trim() ||
-      local?.property_description ??
-      // TASK-4313: singular "1 guest" when capacity is 1.
-      `Comfortable stay for up to ${dto.maxGuests || local?.maxGuests || 2} guest${(dto.maxGuests || local?.maxGuests || 2) === 1 ? '' : 's'}.`,
+      // TASK-7502: the parentheses are load-bearing, not style. `a || b || c ?? d` is a hard
+      // SyntaxError ("Cannot use '??' with '||' without parentheses") — it does not merely warn,
+      // the module fails to parse and every importer dies with it. TASK-7193 introduced the mix by
+      // prepending the two `||` clauses above onto what was already `c ?? d`. Grouped as
+      // `a || b || (c ?? d)` so BOTH intents survive: the two new `.trim()` clauses keep `||`
+      // fall-through (an empty string must fall through, which is the whole point of trimming),
+      // while the original nullish-coalescing default is preserved exactly as TASK-4313 wrote it.
+      // Do NOT "simplify" to `(a || b || c) ?? d` — that returns "" for a tenant whose stored
+      // description is blank, printing an empty description instead of the generated fallback.
+      (local?.property_description ??
+        // TASK-4313: singular "1 guest" when capacity is 1.
+        `Comfortable stay for up to ${dto.maxGuests || local?.maxGuests || 2} guest${(dto.maxGuests || local?.maxGuests || 2) === 1 ? '' : 's'}.`),
     // TASK-7194: never invent a city — empty when the tenant has no address.
     property_location: local?.property_location ?? dto.propertyAddress ?? "",
     property_neighborhoods: local?.property_neighborhoods ?? [],
