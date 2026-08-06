@@ -12,6 +12,24 @@ updates:
       npm-minor-and-patch:
         patterns: ["*"]
         update-types: ["minor", "patch"]
+    ignore:
+      # typescript-eslint's peer range is `>=4.8.4 <6.1.0`, and its guard throws at MODULE-IMPORT
+      # time — so an out-of-range TS breaks every rule in eslint.config.js at once, not one rule.
+      # This is not hypothetical here: dc3bd1ac bumped TS 6.0.2 -> 7.0.2 and took lint out entirely,
+      # failing the release gate at STEP 1/9 (the guest-portal step runs lint FIRST). 622e8337
+      # reverted it and pinned "~6.0.3".
+      # NOTE the ceiling is 6.1.0, not 7.0.0: a *minor* bump to TS 6.1 breaks lint just as hard as
+      # a major, and would otherwise arrive silently inside the grouped npm-minor-and-patch PR
+      # above (patterns: ["*"]). Hence minor is ignored here too — major alone is NOT sufficient.
+      # The "~6.0.3" pin in package.json does NOT make this redundant: it constrains `npm install`,
+      # not Dependabot, which REWRITES the declared range when it bumps (dc3bd1ac rewrote "^6.0.2"
+      # to "^7.0.2" even though the caret already excluded 7.x). The pin and this rule cover two
+      # different paths; both are needed.
+      # Lift only once typescript-eslint ships TS 7 support —
+      # see https://github.com/typescript-eslint/typescript-eslint/issues/10940
+      - dependency-name: "typescript"
+        update-types:
+          ["version-update:semver-major", "version-update:semver-minor"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
