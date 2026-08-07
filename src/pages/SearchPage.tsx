@@ -1221,15 +1221,12 @@ const SearchPage = () => {
         )}
 
         {!isLoading && apiError && listings.length > 0 && (
-          <div className="flex items-center gap-3 rounded-xl border border-support-warning/40 bg-support-warning/10 px-4 py-3 text-support-warning">
-            <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
-            <span>
-              Live listing refresh failed. Showing cached results — call{" "}
-              <a href={`tel:+91${CONTACT.business.phone}`} className="font-semibold underline underline-offset-2">
-                +91-{CONTACT.business.phone}
-              </a>{" "}
-              to confirm before booking.
-            </span>
+          <div data-testid="search-load-error" className="mb-2">
+            <ErrorBanner
+              severity="warning"
+              message={`Live listing refresh failed. Showing cached results — call +91-${CONTACT.business.phone} to confirm before booking.`}
+              onRetry={() => setRetryCount((n) => n + 1)}
+            />
           </div>
         )}
 

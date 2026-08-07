@@ -822,21 +822,22 @@ const PropertyDetails = () => {
         }
 
         if (foundByListingId) {
-            if (!urlPropertySlugMatches(foundByListingId)) {
-                setNotFound(true);
+            if (urlPropertySlugMatches(foundByListingId)) {
+                setData(coerceProperty({
+                    ...foundByListingId,
+                    property_neighborhoods: Array.isArray(foundByListingId.property_neighborhoods)
+                        ? foundByListingId.property_neighborhoods
+                        : [],
+                    property_img: foundByListingId.property_img || [],
+                    maxGuests:
+                        resolveStaticMaxGuests(foundByListingId as unknown as Record<string, unknown>) ??
+                        foundByListingId.maxGuests,
+                }));
                 return;
             }
-            setData(coerceProperty({
-                ...foundByListingId,
-                property_neighborhoods: Array.isArray(foundByListingId.property_neighborhoods)
-                    ? foundByListingId.property_neighborhoods
-                    : [],
-                property_img: foundByListingId.property_img || [],
-                maxGuests:
-                    resolveStaticMaxGuests(foundByListingId as unknown as Record<string, unknown>) ??
-                    foundByListingId.maxGuests,
-            }));
-            return;
+            // TASK-7448 / whitelabel E2E: bundled catalog listingId 1–7 can collide with real
+            // tenant listing PKs (e.g. e2e-wa-only fixture id=1). Slug mismatch must NOT 404
+            // here — fall through to GET /listings/{id} which is tenant-scoped.
         }
 
         // 2) Match by unit slug / property name (legacy URLs)
@@ -873,11 +874,7 @@ const PropertyDetails = () => {
         const propertyId = normalizedUnitSlug || undefined;
         if (propertyId) {
             const foundById = apiProperties.find((item) => String(item.id) === String(propertyId));
-            if (foundById) {
-                if (!urlPropertySlugMatches(foundById)) {
-                    setNotFound(true);
-                    return;
-                }
+            if (foundById && urlPropertySlugMatches(foundById)) {
                 setData(coerceProperty({
                     ...foundById,
                     property_neighborhoods: Array.isArray(foundById.property_neighborhoods)
@@ -889,6 +886,7 @@ const PropertyDetails = () => {
                 }));
                 return;
             }
+            // Slug mismatch (or id collision with bundled catalog) — fall through to API resolve.
         }
         // If still not found, try to get from location state
         if (location.state?.property) {
@@ -931,17 +929,15 @@ const PropertyDetails = () => {
                         return;
                     }
                     // TASK-7430: reject when the URL property slug does not match this listing.
+                    // TASK-7448: keep property vs unit names distinct — never stuff unit name into
+                    // propertyName (that made slug guards accept the wrong candidate).
                     const apiPropertyName =
-                        (typeof (apiListing as Record<string, unknown>).propertyName === 'string'
+                        typeof (apiListing as Record<string, unknown>).propertyName === 'string'
                             ? ((apiListing as Record<string, unknown>).propertyName as string)
-                            : null) ||
-                        (typeof apiListing.name === 'string' ? apiListing.name : '') ||
-                        '';
+                            : null;
                     if (
                         normalizedPropertySlug &&
                         !urlPropertySlugMatches({
-                            // TASK-7448: pass BOTH names — the URL may carry the property slug
-                            // (canonical, what links emit) or the unit slug (legacy deep links).
                             propertyName: apiPropertyName,
                             property_name:
                                 typeof apiListing.name === 'string' ? apiListing.name : undefined,
