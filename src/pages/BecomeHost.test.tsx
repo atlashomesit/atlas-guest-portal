@@ -152,5 +152,33 @@ describe("BecomeHost — Airbnb prefill (TASK-7490)", () => {
     expect(toast.success).not.toHaveBeenCalled();
     // No propertyType (or any other) row was extracted, so the field list must be empty.
     expect(screen.queryByText("property Type")).toBeNull();
+    // Done-when 3: empty prefill says so, and API warnings are surfaced.
+    expect(toast.info).toHaveBeenCalledWith(
+      expect.stringContaining("Could not extract listing details"),
+    );
+    expect(toast.info).toHaveBeenCalledWith(
+      expect.stringContaining("Could not detect a structured property type"),
+    );
+  });
+
+  it("surfaces API warnings alongside a successful propertyType prefill", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          ...realApiResponseWithPropertyType(),
+          warnings: ["Photos were skipped — paste the listing text for richer import"],
+        }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderAtImportStep();
+    fireEvent.change(screen.getByLabelText("Airbnb listing URL"), { target: { value: AIRBNB_URL } });
+    fireEvent.click(screen.getByRole("button", { name: "Import listing" }));
+
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Listing details imported!"));
+    expect(toast.info).toHaveBeenCalledWith(
+      "Photos were skipped — paste the listing text for richer import",
+    );
   });
 });

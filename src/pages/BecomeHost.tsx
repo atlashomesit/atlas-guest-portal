@@ -386,14 +386,25 @@ const BecomeHost = () => {
       const data = await res.json();
       const prefilled: Partial<PropertyInfo> = {};
       if (data.propertyType) prefilled.propertyType = data.propertyType;
+      const warnings: string[] = Array.isArray(data.warnings)
+        ? data.warnings.filter((w: unknown): w is string => typeof w === "string" && w.trim().length > 0)
+        : [];
 
       setAirbnb((prev) => ({ ...prev, prefilled, loading: false }));
       setProperty((prev) => ({ ...prev, ...prefilled }));
       // TASK-7490: only celebrate an import that actually prefilled something — a 200 response
       // with no usable fields (e.g. an unparseable listing) is not a success from the host's
-      // point of view.
+      // point of view. Surface API warnings either way so hosts see why extraction was thin.
       if (Object.keys(prefilled).length > 0) {
         toast.success("Listing details imported!");
+        for (const w of warnings) toast.info(w);
+      } else {
+        const warnText = warnings.length > 0 ? warnings.join(" ") : "";
+        toast.info(
+          warnText
+            ? `Could not extract listing details. ${warnText} You can still fill in details manually.`
+            : "Could not extract listing details from that input. You can still fill in details manually.",
+        );
       }
       logUserAction("onboarding_airbnb_prefill", { status: "success", feature: "become-host" });
     } catch (err) {
