@@ -1331,9 +1331,10 @@ const SearchPage = () => {
                           const suggestBreakdown = getDailyListingPricing(unit.numericId);
                           const suggestDisplayedPrice =
                             (suggestBreakdown?.actualPrice ?? 0) > 0 ? suggestBreakdown!.actualPrice : unit.pricePerNight;
-                          // TASK-7011: GST slab must be selected off the PUBLISHED (pre-discount)
-                          // rate, matching the server — see accommodationGstSlabPercentForPublishedRate.
-                          const suggestPublishedPrice = suggestBreakdown?.baseAmount ?? unit.pricePerNight;
+                          // TASK-7543: GST slab is selected off the CHARGED (discounted) per-night
+                          // rate, matching the server — see accommodationGstSlabPercentForChargedRate's
+                          // doc comment. `suggestDisplayedPrice` is already that charged value, so the
+                          // default (no override) banding basis is correct here.
                           return (
                             <>
                               <p className="text-lg font-bold text-text-primary">
@@ -1348,7 +1349,6 @@ const SearchPage = () => {
                                   formatDisplayCurrency,
                                   3,
                                   unit.isGstRegistered,
-                                  suggestPublishedPrice,
                                 )}
                               </p>
                             </>
@@ -1511,11 +1511,10 @@ const SearchPage = () => {
               const dailyBreakdown = getDailyListingPricing(unit.numericId);
               const displayedPrice =
                 (dailyBreakdown?.actualPrice ?? 0) > 0 ? dailyBreakdown!.actualPrice : unit.pricePerNight;
-              // TASK-7011: GST slab must be selected off the PUBLISHED (pre-discount) rate,
-              // matching the server — see accommodationGstSlabPercentForPublishedRate's doc
-              // comment. `unit.pricePerNight` is itself already a published rate (l.baseNightlyRate
-              // above) so the fallback stays correct with no discount data at all.
-              const publishedPrice = dailyBreakdown?.baseAmount ?? unit.pricePerNight;
+              // TASK-7543: GST slab is selected off the CHARGED (discounted) rate, matching the
+              // server — see accommodationGstSlabPercentForChargedRate's doc comment.
+              // `displayedPrice` is already that charged value, so the default (no override)
+              // banding basis below is correct.
 
               return (
               <article key={unit.id} data-testid="guest-listing-card" className="search-card">
@@ -1615,7 +1614,7 @@ const SearchPage = () => {
                       )}
                       <p className="mt-0.5 text-sm text-text-muted">per night</p>
                       <p className="text-xs text-text-muted">
-                        {formatEstTotalInclGst(displayedPrice, estimateNights, formatDisplayCurrency, 3, unit.isGstRegistered, publishedPrice)}
+                        {formatEstTotalInclGst(displayedPrice, estimateNights, formatDisplayCurrency, 3, unit.isGstRegistered)}
                       </p>
                       {longStay && (
                         <LongStayCalculator

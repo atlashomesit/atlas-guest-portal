@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   accommodationGstLineAmount,
   accommodationGstSlabPercent,
-  accommodationGstSlabPercentForPublishedRate,
+  accommodationGstSlabPercentForChargedRate,
   estTotalInclGst,
   computeCheckoutTotal,
   formatEstTotalInclGst,
@@ -112,27 +112,28 @@ describe('guestPriceEstimate GST slab (TASK-2870/2871)', () => {
   });
 });
 
-describe('accommodationGstSlabPercentForPublishedRate — TASK-7011 mirrors the server three-band table', () => {
+describe('accommodationGstSlabPercentForChargedRate — TASK-7011/TASK-7543 mirrors the server three-band table', () => {
   it('mirrors GstInvoiceConstants.cs exactly: 0% <=1,000, 5% 1,001-7,500, 18% >7,500', () => {
-    expect(accommodationGstSlabPercentForPublishedRate(600)).toBe(0);
-    expect(accommodationGstSlabPercentForPublishedRate(1000)).toBe(0); // boundary: inclusive exempt
-    expect(accommodationGstSlabPercentForPublishedRate(1001)).toBe(5); // boundary: first rupee into 5%
-    expect(accommodationGstSlabPercentForPublishedRate(7500)).toBe(5); // boundary: inclusive lower slab
-    expect(accommodationGstSlabPercentForPublishedRate(7501)).toBe(18); // boundary: first rupee into 18%
-    expect(accommodationGstSlabPercentForPublishedRate(0)).toBeNull();
-    expect(accommodationGstSlabPercentForPublishedRate(-100)).toBeNull();
+    expect(accommodationGstSlabPercentForChargedRate(600)).toBe(0);
+    expect(accommodationGstSlabPercentForChargedRate(1000)).toBe(0); // boundary: inclusive exempt
+    expect(accommodationGstSlabPercentForChargedRate(1001)).toBe(5); // boundary: first rupee into 5%
+    expect(accommodationGstSlabPercentForChargedRate(7500)).toBe(5); // boundary: inclusive lower slab
+    expect(accommodationGstSlabPercentForChargedRate(7501)).toBe(18); // boundary: first rupee into 18%
+    expect(accommodationGstSlabPercentForChargedRate(0)).toBeNull();
+    expect(accommodationGstSlabPercentForChargedRate(-100)).toBeNull();
   });
 
-  it('the old two-band accommodationGstSlabPercent still has NO exempt band (left unchanged for its other callers)', () => {
+  it('the old two-band accommodationGstSlabPercent still has NO exempt band (separate, still-open gap)', () => {
     // Guards the deliberate choice to leave the 2-band function alone (UnitBookingWidget's/
     // computeCheckoutTotal's client-fallback contract) rather than mutate its behavior in place —
-    // it still (wrongly, for a nil-rated stay, but unchanged on purpose) returns 5%, not 0%.
+    // it still (wrongly, for a nil-rated stay, but unchanged on purpose) returns 5%, not 0%. This
+    // gap is orthogonal to the published-vs-charged basis fixed by TASK-7540.
     expect(accommodationGstSlabPercent(600)).toBe(5);
-    expect(accommodationGstSlabPercentForPublishedRate(600)).toBe(0);
+    expect(accommodationGstSlabPercentForChargedRate(600)).toBe(0);
   });
 });
 
-describe('estTotalInclGst / formatEstTotalInclGst — TASK-7011 search-card estimator agrees with the server', () => {
+describe('estTotalInclGst / formatEstTotalInclGst — TASK-7543 search-card estimator bands off the CHARGED rate, agreeing with the server', () => {
   it('a nil-rated (<=1,000/night) stay is never labelled "incl. 5% GST"', () => {
     const label = formatEstTotalInclGst(600, 1, (n) => `₹${n}`);
     expect(label).not.toContain('GST');
@@ -140,31 +141,25 @@ describe('estTotalInclGst / formatEstTotalInclGst — TASK-7011 search-card esti
     expect(estTotalInclGst(600, 1)).toBe(618);
   });
 
-  it("TASK-7011 four-listing repro table: post-fix client estimate matches what the server actually charges", () => {
-    // Listing 252 (₹600/nt, no discount, 1 night): server charged ₹618, gstPercent 0.
-    expect(estTotalInclGst(600, 1, 3, true, 600)).toBe(618);
-
-    // Listing 253 (₹750/nt, no discount, 1 night): server gstPercent 0, final ₹772.50 (server keeps
-    // paise; the card estimator has always rounded to whole rupees, matching within ₹1 rounding).
-    expect(estTotalInclGst(750, 1, 3, true, 750)).toBe(773);
-
-    // Listing 255 (₹5,625/nt, no discount, 1 night): server charged ₹6,075 at 5% — already agreed
-    // pre-fix; must still agree post-fix (non-regression).
-    expect(estTotalInclGst(5625, 1, 3, true, 5625)).toBe(6075);
-
-    // Listing 256: card showed a post-discount ₹6,000/night, but the listing's PUBLISHED
-    // (pre-discount) rate is above ₹7,500 (the server bands off the published rate, not the
-    // discounted one it actually charges) — server applied 18%: ₹6,000 + GST(18%) ₹1,080 +
-    // 3% fee ₹180 = ₹7,260. Passing perNight=6,000 (what's charged) with publishedPerNight=8,000
-    // (what's advertised) reproduces the server's actual band choice.
-    expect(estTotalInclGst(6000, 1, 3, true, 8000)).toBe(7260);
-    // Sanity: without the published-rate distinction, 6,000 alone picks the 5% band and
-    // reproduces the exact pre-fix bug's reported total (₹6,480) — proves publishedPerNight, not
-    // perNight, is what must drive the band.
+  it('TASK-7543: GST band follows the CHARGED (post-discount) rate, not the published/sticker rate', () => {
+    // Listing 256 repro (TASK-7011/TASK-7540): published at ₹8,000/night (18% under the old,
+    // now-superseded published-rate convention) but a discount brings the actually-charged rate
+    // down to ₹6,000/night. The server now bands off the CHARGED ₹6,000 → 5%
+    // (GstInvoiceCalculation.ResolveCheckoutAccommodationGstPercentForChargedBase). A caller must
+    // no longer pass the published rate as the override — omitting it (equivalent to passing the
+    // same charged value) is what agrees with the server.
+    // 6,000 * 1.05 = 6,300 + 3% of 6,000 (180) = 6,480.
+    expect(estTotalInclGst(6000, 1, 3, true)).toBe(6480);
     expect(estTotalInclGst(6000, 1, 3, true, 6000)).toBe(6480);
+
+    // Sanity: if a caller regressed to passing the published rate (8,000) as the override, it
+    // would wrongly land in the 18% band (7,260) — confirm the correct (no-override) call does
+    // NOT reproduce that figure, guarding against the TASK-7540 bug reappearing.
+    expect(estTotalInclGst(6000, 1, 3, true, 8000)).toBe(7260);
+    expect(estTotalInclGst(6000, 1, 3, true)).not.toBe(estTotalInclGst(6000, 1, 3, true, 8000));
   });
 
-  it('defaults publishedPerNight to perNight for callers with no separate published-rate figure (backward compatible)', () => {
+  it('defaults chargedPerNight to perNight for callers with no separate override (backward compatible)', () => {
     // Same numeric result as always passing perNight for both when no discount info exists.
     expect(estTotalInclGst(8000, 2, 3, true)).toBe(estTotalInclGst(8000, 2, 3, true, 8000));
     expect(formatEstTotalInclGst(8000, 2, (n) => `₹${n}`)).toBe(
@@ -172,16 +167,44 @@ describe('estTotalInclGst / formatEstTotalInclGst — TASK-7011 search-card esti
     );
   });
 
-  it('a discount that crosses the exempt boundary downward does not exempt a listing published above it', () => {
-    // Published ₹1,200/night (5% band) discounted down to ₹900 actually charged — the guest pays
-    // 5% on the discounted ₹900, not 0%, because the PUBLISHED rate (₹1,200) is what selects the
-    // band, exactly mirroring the server's convention.
-    const total = estTotalInclGst(900, 1, 3, true, 1200);
-    const label = formatEstTotalInclGst(900, 1, (n) => `₹${n}`, 3, true, 1200);
-    expect(label).toContain('5% GST');
-    expect(label).not.toContain('incl. 0%');
-    // 900 * 1.05 = 945, + 3% of 900 (27) = 972.
-    expect(total).toBe(972);
+  it('TASK-7540: a discount that crosses the exempt boundary downward now DOES exempt the charged rate (inverts the old TASK-7011 expectation)', () => {
+    // A listing published at ₹1,200/night (5% band under the old, now-superseded published-rate
+    // convention) discounted down to a ₹900 charged rate is now GST-EXEMPT (0%), because the
+    // server bands off the CHARGED ₹900, not the ₹1,200 published/sticker rate. The published rate
+    // must not be passed as the override anymore.
+    const total = estTotalInclGst(900, 1, 3, true);
+    const label = formatEstTotalInclGst(900, 1, (n) => `₹${n}`, 3, true);
+    expect(label).not.toContain('GST');
+    // 900 + 3% of 900 (27) = 927, no GST line (exempt).
+    expect(total).toBe(927);
+  });
+
+  it('TASK-7540: a discount pushing the charged value across the ₹1,000 exempt boundary changes the displayed GST%', () => {
+    // No discount: charged stays at ₹1,050/night → 5% GST shown.
+    const beforeDiscount = formatEstTotalInclGst(1050, 1, (n) => `₹${n}`, 3, true);
+    expect(beforeDiscount).toContain('5% GST');
+
+    // A discount brings the charged rate down to ₹950/night, crossing below the ₹1,000 exempt
+    // threshold — the displayed GST% must change: exempt, no GST line at all.
+    const afterDiscount = formatEstTotalInclGst(950, 1, (n) => `₹${n}`, 3, true);
+    expect(afterDiscount).not.toContain('GST');
+  });
+
+  it('TASK-7540: a discount pushing the charged value across the ₹7,500 slab boundary changes the displayed GST%', () => {
+    // No discount: charged stays at ₹7,600/night → 18% GST shown.
+    const beforeDiscount = formatEstTotalInclGst(7600, 1, (n) => `₹${n}`, 3, true);
+    expect(beforeDiscount).toContain('18% GST');
+
+    // A discount brings the charged rate down to ₹7,400/night, crossing below the ₹7,500 slab
+    // threshold — the displayed GST% must change from 18% to 5%.
+    const afterDiscount = formatEstTotalInclGst(7400, 1, (n) => `₹${n}`, 3, true);
+    expect(afterDiscount).toContain('5% GST');
+
+    // Same boundary, exercised via a listing whose published rate (₹9,000) would have kept it at
+    // 18% under the old convention — a discount landing the CHARGED rate exactly at ₹7,500 must
+    // show 5%, matching ResolveCheckoutAccommodationGstPercentForChargedBase.
+    const dropsIntoLowerSlab = formatEstTotalInclGst(7500, 1, (n) => `₹${n}`, 3, true);
+    expect(dropsIntoLowerSlab).toContain('5% GST');
   });
 });
 
