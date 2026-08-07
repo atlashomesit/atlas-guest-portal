@@ -29,12 +29,13 @@ import {
   netChargeableRoomFare,
   type GuestPriceBreakdown,
 } from '@/api/pricingClient';
+import { fetchAvailabilityRatesForMonths } from '@/api/availabilityRatesClient';
 import { fetchPublicListings } from '@/api/listingClient';
 import { useListingPhotosFromApi } from '@/contexts/ListingPhotosContext';
 import OptimizedImage from '@/components/ui/OptimizedImage';
 import FomoBar from '@/components/FomoBar';
 import { track } from '@/lib/events'; // TASK-1480
-import { getTenantContext } from '@/tenant/tenantContext';
+import { hasOnlinePaymentRail } from '@/tenant/paymentRail';
 import {
   ILLUSTRATIVE_OTA_GUEST_FEE_PERCENT,
 } from '@/utils/directBookingPromo';
@@ -211,6 +212,14 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [_bookedDates, setBookedDates] = useState<Date[]>([]);
   const [blockedSet, setBlockedSet] = useState<Set<string>>(new Set());
   const [dateStatusMap, setDateStatusMap] = useState<Map<string, ListingCalendarDayStatus>>(new Map());
+  // TASK-7491 (Rate Sync Authority opt-out): per-date `bookable` flag from GET
+  // /api/pricing/availability-rates. `false` = fail-closed — no usable inbound rate for that
+  // date (beyond the carry-forward cap, or none at all) — never render a price or allow
+  // selection. A Map (not a Set) so a later fetch's value for a date always overwrites an
+  // earlier one; see the merge note on the fetch effects below for why a plain accumulating
+  // Set would be wrong here. Additive/empty for every tenant that never opts out (zero
+  // behaviour change — nothing in this Map, every read below is a no-op `=== false` miss).
+  const [dateBookabilityMap, setDateBookabilityMap] = useState<Map<string, boolean>>(new Map());
   // Availability fetch must NOT gate Reserve (TASK-4277 / 2026-07-12 hosted-dev: a prior
   // `isLoading` flag left Reserve disabled during F1 availability latency after check-in-only).
   //
@@ -792,6 +801,67 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     return () => controller.abort();
   }, [listingId, selectedStartMonthIso, dateRange.endDate, selectedRangeNightsPriced, shownMonthIso]);
 
+  // TASK-7491: fetch per-day `bookable` (rate-sync-authority opt-out) so the calendar can fail
+  // closed on a date with no usable inbound rate — never a guessed price. Three effects mirror
+  // the three fetchCalendarPricing effects above exactly (same mount/open/hydrated-range
+  // triggers, same 3-month window) but are a FULLY SEPARATE fetch/state pair, not merged into
+  // an existing one: two independent async sources writing the same state race (see
+  // `fetchBlockedDates` above, which REPLACES blockedSet wholesale on every resolve — adding a
+  // second writer there would silently clobber whichever effect settles last). This endpoint is
+  // pricing-shaped like `/pricing/breakdown`, so on fetch failure it stays best-effort (leaves
+  // whatever's already known in place) rather than fail-closing Reserve the way TASK-4830's
+  // availability-calendar failure does — that flag is reserved for the booking-CONFLICT source
+  // of truth, not this rate-usability signal.
+  const mergeAvailabilityRates = useCallback((days: { date: string; bookable: boolean }[]) => {
+    if (days.length === 0) return;
+    setDateBookabilityMap((prev) => {
+      const next = new Map(prev);
+      for (const day of days) next.set(day.date, day.bookable);
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!listingId || String(listingId).trim() === '') return;
+    const controller = new AbortController();
+    fetchAvailabilityRatesForMonths(listingId, shownMonthIso, 3, controller.signal)
+      .then(mergeAvailabilityRates)
+      .catch((error: unknown) => {
+        if ((error as Error)?.name !== 'AbortError') {
+          console.error('Error fetching availability-rates:', error);
+        }
+      });
+    return () => controller.abort();
+  }, [listingId, shownMonthIso, mergeAvailabilityRates]);
+
+  useEffect(() => {
+    if (!openCalendar) return;
+    if (!listingId || String(listingId).trim() === '') return;
+    if (!dateRange.startDate || !dateRange.endDate) return;
+    const selectedMonthIso = toISODate(startOfMonth(dateRange.startDate));
+    if (selectedMonthIso === shownMonthIso) return; // already covered by the effect above
+    const controller = new AbortController();
+    fetchAvailabilityRatesForMonths(listingId, selectedMonthIso, 3, controller.signal)
+      .then(mergeAvailabilityRates)
+      .catch(() => {
+        // Best-effort; leave whatever's already known in dateBookabilityMap in place.
+      });
+    return () => controller.abort();
+  }, [openCalendar, listingId, dateRange.startDate, dateRange.endDate, shownMonthIso, mergeAvailabilityRates]);
+
+  useEffect(() => {
+    if (!listingId || String(listingId).trim() === '') return;
+    if (!selectedStartMonthIso || !dateRange.endDate) return;
+    if (selectedStartMonthIso === shownMonthIso) return; // covered by the mount/month effect above
+    const controller = new AbortController();
+    fetchAvailabilityRatesForMonths(listingId, selectedStartMonthIso, 3, controller.signal)
+      .then(mergeAvailabilityRates)
+      .catch(() => {
+        // Best-effort; leave whatever's already known in dateBookabilityMap in place.
+      });
+    return () => controller.abort();
+  }, [listingId, selectedStartMonthIso, dateRange.endDate, shownMonthIso, mergeAvailabilityRates]);
+
   // TASK-4322: previously fetched a "LOS discount" here via the calendar breakdown client and
   // rendered it as a "Long-stay discount" row — but that value was actually the summed
   // per-day tenant GLOBAL discount (CalendarPricingDayDto has no genuine LOS field), and
@@ -846,7 +916,11 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   
   // Also check blockedSet for backward compatibility
   if (blockedSet.has(iso)) return false; // blocked dates never check-in
-  
+
+  // TASK-7491: a date with no usable inbound rate is never a valid check-in — fail closed on
+  // price, same posture as a Blocked/Hold date.
+  if (dateBookabilityMap.get(iso) === false) return false;
+
   // Allow check-in if previous date is blocked or it's today
   const prevDayISO = toISODate(addDays(date, -1));
   const prevStatus = dateStatusMap.get(prevDayISO);
@@ -863,6 +937,14 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   if (normalized.getTime() < today.getTime()) return true;
 
   const iso = toISODate(normalized);
+
+  // TASK-7491: a date with no usable inbound rate (beyond the carry-forward cap, or no prior
+  // rate at all) is never selectable — fail closed on price, unconditionally (no checkout
+  // exemption like the Blocked/Hold branch below: this isn't a booking conflict, it's "Atlas
+  // does not know what to charge for this night"). MonthGrid reads this same disabledDay to
+  // suppress the day's price display too (state becomes 'unavailable' — see
+  // AtlasBookingCalendar.tsx MonthGrid: price is only shown for non-past, non-unavailable cells).
+  if (dateBookabilityMap.get(iso) === false) return true;
 
   // Get status from dateStatusMap (from GET API response)
   const status = dateStatusMap.get(iso);
@@ -888,7 +970,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   }
 
   return true; // disable blocked/hold dates otherwise (including as a check-in candidate)
-}, [blockedSet, dateStatusMap, today, dateRange.startDate]);
+}, [blockedSet, dateStatusMap, dateBookabilityMap, today, dateRange.startDate]);
 
 // Helper function to check if a date range has interior-night overlaps with blocked/hold dates.
 // Used by URL hydration, handleRangeChange, and handleReserve to ensure consistent validation.
@@ -900,7 +982,11 @@ const checkInteriorNightOverlap = (startDate: Date, endDate: Date): boolean => {
   while (cursor.getTime() < endIST.getTime()) {
     const dayISO = toISODate(cursor);
     const status = dateStatusMap.get(dayISO);
-    if (blockedSet.has(dayISO) || status === 'Blocked' || status === 'Hold') {
+    // TASK-7491: a no-usable-rate NIGHT blocks the range exactly like a Blocked/Hold night —
+    // fail closed on price. The checkout date itself is exclusive (this loop stops BEFORE
+    // endIST), so a no-usable-rate checkout day alone does not block the range, matching the
+    // same "guest is never charged for the checkout night" semantics as the Blocked/Hold case.
+    if (blockedSet.has(dayISO) || status === 'Blocked' || status === 'Hold' || dateBookabilityMap.get(dayISO) === false) {
       return true;
     }
     // TASK-4628: re-normalize each step to IST start-of-day, matching the canonical
@@ -1026,8 +1112,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     if (!dateRange.startDate) return false;
     const checkinISO = toISODate(getIstStartOfDay(dateRange.startDate));
     const checkinStatus = dateStatusMap.get(checkinISO);
-    return checkinStatus === 'Blocked' || checkinStatus === 'Hold' || blockedSet.has(checkinISO);
-  }, [dateRange.startDate, dateStatusMap, blockedSet]);
+    // TASK-7491: OR in the no-usable-rate check — the selected check-in day itself has no
+    // usable inbound rate (fail closed on price, same posture as Blocked/Hold).
+    return checkinStatus === 'Blocked' || checkinStatus === 'Hold' || blockedSet.has(checkinISO) || dateBookabilityMap.get(checkinISO) === false;
+  }, [dateRange.startDate, dateStatusMap, blockedSet, dateBookabilityMap]);
 
   // TASK-4334/TASK-4405: recompute the free-cancellation deadline whenever the guest's selected
   // check-in date, the listing's resolved cancellation tier, or the resolved grace hours changes.
@@ -1121,12 +1209,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         : effectiveDailyPricing != null
           ? Math.round(effectiveDailyPricing.actualPrice * (hasSelectedRange ? priceDetails.nights : 1))
           : 0;
-  // TASK-7428: hide Razorpay processing fee + pay rail when no online provider (or WhatsApp handoff).
-  // Booking-engine MOR footer elsewhere is intentionally left alone.
-  const tenantPaymentCtx = getTenantContext();
-  const showOnlinePaymentProcessing =
-    Boolean((tenantPaymentCtx?.paymentProvider ?? '').trim()) &&
-    tenantPaymentCtx?.bookingMode !== 'WHATSAPP';
+  // TASK-7428: hide Razorpay processing fee + pay rail when no online gateway will charge the
+  // guest. Delegated to `hasOnlinePaymentRail` so this widget, the property-details trust list and
+  // the footer MOR disclosure cannot drift apart again; that helper also treats MANUAL
+  // (pay-on-arrival) as no-gateway, which the previous inline predicate missed.
+  const showOnlinePaymentProcessing = hasOnlinePaymentRail();
 
   const convenienceFeePercent = !showOnlinePaymentProcessing
     ? 0
@@ -1326,7 +1413,14 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
     const checkinISO = toISODate(checkinIst);
     const checkinStatus = dateStatusMap.get(checkinISO);
-    if (checkinStatus === 'Blocked' || checkinStatus === 'Hold' || blockedSet.has(checkinISO)) {
+    if (
+      checkinStatus === 'Blocked' ||
+      checkinStatus === 'Hold' ||
+      blockedSet.has(checkinISO) ||
+      // TASK-7491: defense-in-depth, mirrors checkinUnavailable — never create a hold whose
+      // check-in night has no usable inbound rate.
+      dateBookabilityMap.get(checkinISO) === false
+    ) {
       setFormError('Check-in date is not available. Please select a different check-in date.');
       return;
     }
@@ -1461,7 +1555,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       setIsSubmitting(false);
     }
   }, [
-    isSubmitting, isBookingDisabled, availabilityFailed, dateRange, dateStatusMap, blockedSet, today,
+    isSubmitting, isBookingDisabled, availabilityFailed, dateRange, dateStatusMap, blockedSet,
+    dateBookabilityMap, today,
     listingId, guests, propertySlug, unitSlug, listingName, breakdownPrice, breakdownConvenienceFee,
     breakdownFinalTotal, finalTotal, updateBooking, navigate,
     resolvedCancellationTier, resolvedCancellationWindowHours, resolvedGraceHours,

@@ -366,8 +366,12 @@ const BecomeHost = () => {
         method: "POST",
         headers: { "Content-Type": "application/json", ...getApiHeaders() },
         body: JSON.stringify({
-          url: airbnb.url.trim() || undefined,
-          text: airbnb.pastedText.trim() || undefined,
+          // TASK-7490: field names must match the backend's AirbnbPrefillRequestDto
+          // (Atlas.Api/DTOs/OnboardingDtos.cs) — AirbnbUrl/PastedText, camelCase over the wire
+          // (ASP.NET Core's default JSON policy; no PropertyNamingPolicy override in Program.cs).
+          // The old {url, text} shape matched neither field, so both always arrived null server-side.
+          airbnbUrl: airbnb.url.trim() || undefined,
+          pastedText: airbnb.pastedText.trim() || undefined,
         }),
       });
 
@@ -375,17 +379,33 @@ const BecomeHost = () => {
         throw new Error(await messageFromApiResponse(res));
       }
 
+      // TASK-7490: AirbnbPrefillResponseDto only returns
+      // title/locationText/propertyType/amenities/photoUrls/houseRules/maxGuests/description/
+      // source/warnings — it has no city/pincode/address/roomCount. Reading those (as this used
+      // to) always produced undefined; only propertyType maps onto a PropertyInfo field.
       const data = await res.json();
       const prefilled: Partial<PropertyInfo> = {};
       if (data.propertyType) prefilled.propertyType = data.propertyType;
-      if (data.city) prefilled.city = data.city;
-      if (data.pincode) prefilled.pincode = data.pincode;
-      if (data.address) prefilled.address = data.address;
-      if (data.roomCount) prefilled.roomCount = data.roomCount;
+      const warnings: string[] = Array.isArray(data.warnings)
+        ? data.warnings.filter((w: unknown): w is string => typeof w === "string" && w.trim().length > 0)
+        : [];
 
       setAirbnb((prev) => ({ ...prev, prefilled, loading: false }));
       setProperty((prev) => ({ ...prev, ...prefilled }));
-      toast.success("Listing details imported!");
+      // TASK-7490: only celebrate an import that actually prefilled something — a 200 response
+      // with no usable fields (e.g. an unparseable listing) is not a success from the host's
+      // point of view. Surface API warnings either way so hosts see why extraction was thin.
+      if (Object.keys(prefilled).length > 0) {
+        toast.success("Listing details imported!");
+        for (const w of warnings) toast.info(w);
+      } else {
+        const warnText = warnings.length > 0 ? warnings.join(" ") : "";
+        toast.info(
+          warnText
+            ? `Could not extract listing details. ${warnText} You can still fill in details manually.`
+            : "Could not extract listing details from that input. You can still fill in details manually.",
+        );
+      }
       logUserAction("onboarding_airbnb_prefill", { status: "success", feature: "become-host" });
     } catch (err) {
       reportError(err, { feature: "become-host-airbnb-prefill" });
@@ -585,7 +605,7 @@ const BecomeHost = () => {
             min={1}
             max={10}
             value={estimatorRooms}
-            onChange={(e) => setEstimatorRooms(Number(e.target.value))}
+            onChange={(e) => setEstimatorRooms(e.target.valueAsNumber)}
             aria-label="Number of rooms"
             aria-valuetext={`${estimatorRooms} ${estimatorRooms === 1 ? "room" : "rooms"}`}
             className="w-full accent-[#b8472f]"
@@ -1023,7 +1043,10 @@ const BecomeHost = () => {
                 {airbnb.loading ? "Importing..." : "Import listing"}
               </Button>
 
-              {airbnb.prefilled && (
+              {/* TASK-7490: an empty extraction (prefilled = {}) is still truthy — gate on having
+                  at least one real field so this box doesn't render empty alongside a toast that
+                  now correctly stays silent for the same case. */}
+              {airbnb.prefilled && Object.keys(airbnb.prefilled).length > 0 && (
                 <div style={styles.prefillBox}>
                   <Typography
                     variant="muted"

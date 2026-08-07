@@ -126,18 +126,33 @@ describe("Hero date picker", () => {
     const calendar = openCalendar();
 
     expect(calendar.getAttribute("data-months")).toBe("1");
-    // React useId() values (e.g. :rg:, :rh:) are render-order dependent: their base counter
-    // shifts with unrelated render changes, which made this snapshot chronically flaky
-    // (re-recorded repeatedly per git history). Normalise each distinct id to a stable
-    // :ridN: token by first-seen order so the snapshot captures structure, not React internals.
+    // React useId() values are render-order dependent: their base counter shifts with
+    // unrelated render changes, which made this snapshot chronically flaky (re-recorded
+    // repeatedly per git history). Normalise each distinct id to a stable :ridN: token by
+    // first-seen order so the snapshot captures structure, not React internals.
+    // Two formats are matched: React 18's `:r0:` (colon-wrapped) and React 19's `_r_a_`
+    // (underscore-wrapped, base-32 counter — react-dom-client.development.js formats it as
+    // `"_" + identifierPrefix + "r_" + treeId.toString(32) + "_"`). Match both so a future
+    // React version bump doesn't silently let raw, unstable ids leak back into the snapshot.
     const idMap = new Map<string, string>();
-    const stableHtml = document.body.innerHTML.replace(/:r[0-9a-z]+:/gi, (id) => {
-      const existing = idMap.get(id);
-      if (existing) return existing;
-      const token = `:rid${idMap.size}:`;
-      idMap.set(id, token);
-      return token;
-    });
+    const stableHtml = document.body.innerHTML
+      .replace(/:r[0-9a-z]+:|_r_[0-9a-z]+_/gi, (id) => {
+        const existing = idMap.get(id);
+        if (existing) return existing;
+        const token = `:rid${idMap.size}:`;
+        idMap.set(id, token);
+        return token;
+      })
+      // TASK-7502 follow-up: jsdom's `cssstyle` re-serialises a nested CSS `min()`/`calc()`
+      // inconsistently ACROSS ENVIRONMENTS — some emit `min(640px, calc(100vw - 48px))` (what
+      // DateRangePickerPopover.tsx:154 literally sets) and some emit
+      // `min(640px * , * calc(100vw - 48px))`, injecting stray `*` tokens around the comma.
+      // Both have been committed as the baseline within one night, and each one turned the
+      // test red in whichever environment produced the other — so NEITHER literal is a valid
+      // thing to store. Normalise the artifact away instead of re-recording it: the assertion
+      // is about the popover's structure, not about which jsdom build is installed.
+      // Do NOT "fix" this by regenerating the snapshot; that just moves the failure.
+      .replace(/\s*\*\s*,\s*\*\s*/g, ", ");
     expect(stableHtml).toMatchSnapshot("date-picker-mobile");
 
     view.unmount();

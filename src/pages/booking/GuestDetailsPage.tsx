@@ -32,6 +32,7 @@ import {
   toRazorpayContactDigits,
 } from '@/utils/guestPhoneDial';
 import { getTenantContext } from '@/tenant/tenantContext';
+import { hasOnlinePaymentRail } from '@/tenant/paymentRail';
 import { getGuestDataProcessingEntityName, getTenantBrandName } from '@/tenant/displayBrand';
 import { formatCurrency } from '@/utils/formatting';
 import { formatDateInTimezone } from '@/utils/dateHelpers';
@@ -2170,7 +2171,7 @@ const TrustBand: React.FC<TrustBandProps> = ({ freeCancellationCopy, brandName, 
       <IconLock size={14}/>
       {/* TASK-7428: Razorpay / 3% copy only when an online payment provider is configured. */}
       <span>
-        {(getTenantContext()?.paymentProvider ?? '').trim() && getTenantContext()?.bookingMode !== 'WHATSAPP'
+        {hasOnlinePaymentRail()
           ? <>Direct booking · secure payment via Razorpay · <b>no OTA fee</b> · 3% payment processing at checkout</>
           : <>Direct booking with the host · <b>no OTA fee</b></>}
       </span>

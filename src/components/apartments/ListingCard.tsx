@@ -100,10 +100,11 @@ const ListingCard: React.FC<ListingCardProps> = ({
     return null;
   }, [lastBookedAt]);
   const finalPrice = pricingBreakdown?.finalNightlyPrice ?? price;
-  // TASK-7011: also the GST slab-selection basis for the est-total estimator below — the server
-  // picks the accommodation GST band off the PUBLISHED (pre-discount) rate, not what the guest
-  // actually pays, so `estTotalInclGst`/`formatEstTotalInclGst` need this, not `finalPrice`, to
-  // agree with the server's band choice.
+  // Published/sticker rate, used only for the "was ₹X" strikethrough display below (and the
+  // savings badge) when a discount applies. TASK-7543: this must NOT be passed to
+  // `estTotalInclGst`/`formatEstTotalInclGst` as their banding-basis override anymore — the server
+  // now selects the GST band off the CHARGED rate (`finalPrice`), not this published rate; see
+  // accommodationGstSlabPercentForChargedRate's doc comment in guestPriceEstimate.ts.
   const originalPrice = pricingBreakdown?.baseNightlyPrice ?? price;
   /** TASK-1660: only treat star average as verified when at least one guest review exists. */
   const hasVerifiedReviews = reviews > 0 && rating > 0;
@@ -293,7 +294,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
                         {/* TASK-4832: use the same est-total helper/inputs as the collapsed
                             estimate so the toggle never shows two different money totals
                             (previously omitted the 3% fee and the GST-registration flag). */}
-                        {formatCurrency(estTotalInclGst(finalPrice, estimateNights, 3, isGstRegistered, originalPrice))}
+                        {formatCurrency(estTotalInclGst(finalPrice, estimateNights, 3, isGstRegistered))}
                         <span className="ml-1 text-sm font-semibold text-text-muted">total</span>
                       </>
                     ) : (
@@ -316,7 +317,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
                 ) : (
                   <div className="flex flex-col gap-1">
                     <span className="text-xs text-text-muted">
-                      {formatEstTotalInclGst(finalPrice, estimateNights, formatCurrency, 3, isGstRegistered, originalPrice)}
+                      {formatEstTotalInclGst(finalPrice, estimateNights, formatCurrency, 3, isGstRegistered)}
                     </span>
                     <button
                       type="button"

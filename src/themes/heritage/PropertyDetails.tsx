@@ -19,6 +19,7 @@ import React from 'react';
 import { toast } from 'react-toastify'; // TASK-4288: share fallback feedback
 import { getListingDisplayName } from '@/lib/listingDisplayName';
 import { getTenantContext as _getTenantCtx } from '@/tenant/tenantContext';
+import { hasOnlinePaymentRail } from '@/tenant/paymentRail';
 import { getTenantOverrides, shouldHideAtlasBranding } from '@/tenant/tenantOverrides';
 import { getTenantBrandName } from '@/tenant/displayBrand';
 import { getGuestFacingPhone } from '@/config/contact';
@@ -41,6 +42,7 @@ import { trackEvent } from '@/utils/analytics';
 import { Button } from '@/components/ui/Button';
 import { calculateNightlyPrice, inferUnitType } from '@/utils/pricing';
 import { buildHomeUnitPath, getPropertySlug } from '@/utils/navigation';
+import { propertySlugMatchesListing } from '@/utils/propertySlugMatch';
 import { useBooking } from '@/contexts/BookingContext';
 import { resolveListing } from '@/utils/listingResolver';
 import { filterGuestImageUrls, sanitizeGuestImageUrl } from '@/utils/guestImageUrl';
@@ -471,6 +473,10 @@ const PropertyDetails = () => {
     const listingId = listingIdParam ? Number(listingIdParam) : NaN;
     const [data, setData] = useState<Property | null>(null);
     const [notFound, setNotFound] = useState(false);
+    // TASK-7195 four-state rule: a FAILED listing fetch used to call setNotFound(true), so a
+    // network/5xx error rendered "Home not found — please check the link" and told a guest the
+    // property does not exist. Absent and unreachable are different states; keep them apart.
+    const [loadFailed, setLoadFailed] = useState(false);
     const [listingPropertyId, setListingPropertyId] = useState<string | number | null>(null);
     const [resolvedListingId, setResolvedListingId] = useState<string | number | null>(null);
     // TASK-2739-v1: "Draft" | "Published" (undefined on legacy payloads = treated as live).
@@ -783,6 +789,7 @@ const PropertyDetails = () => {
 
     useEffect(() => {
         setNotFound(false);
+        setLoadFailed(false); // TASK-7195: clear the failure state on every re-resolve, like notFound.
         setData(null);
 
         if (listingIdParam && !Number.isNaN(listingId) && listingId <= 0) {
@@ -803,20 +810,15 @@ const PropertyDetails = () => {
         const normalizedPropertySlugStripped = stripHyphens(normalizedPropertySlug);
 
         // TASK-7430: URL property slug must match the listing's canonical property slug (404 otherwise).
-        const urlPropertySlugMatches = (item: { property_name?: string; id?: string | number }) => {
-            if (!normalizedPropertySlug) return true;
-            const expected = normalizeSlug(
-                getPropertySlug({
-                    property_name: item.property_name,
-                    name: item.property_name,
-                    id: item.id,
-                }),
-            );
-            return (
-                expected === normalizedPropertySlug ||
-                stripHyphens(expected) === normalizedPropertySlugStripped
-            );
-        };
+        // TASK-7448 (P0 fix): match against the PROPERTY name (`propertyName`) as well as the unit
+        // name (`property_name`). The original guard only used `property_name`, which on a
+        // TenantPropertyRecord holds the UNIT name — so it rejected the very URLs the link builders
+        // generate and 404'd every listing page on every tenant. See utils/propertySlugMatch.ts.
+        const urlPropertySlugMatches = (item: {
+            propertyName?: string | null;
+            property_name?: string;
+            id?: string | number;
+        }) => propertySlugMatchesListing(normalizedPropertySlug, item);
 
         // 1) Match by listingId (PK from DB/API) — IDs 1–7 etc.
         const foundByListingId = listingIdParam && Number.isFinite(listingId) && listingId > 0
@@ -829,21 +831,22 @@ const PropertyDetails = () => {
         }
 
         if (foundByListingId) {
-            if (!urlPropertySlugMatches(foundByListingId)) {
-                setNotFound(true);
+            if (urlPropertySlugMatches(foundByListingId)) {
+                setData(coerceProperty({
+                    ...foundByListingId,
+                    property_neighborhoods: Array.isArray(foundByListingId.property_neighborhoods)
+                        ? foundByListingId.property_neighborhoods
+                        : [],
+                    property_img: foundByListingId.property_img || [],
+                    maxGuests:
+                        resolveStaticMaxGuests(foundByListingId as unknown as Record<string, unknown>) ??
+                        foundByListingId.maxGuests,
+                }));
                 return;
             }
-            setData(coerceProperty({
-                ...foundByListingId,
-                property_neighborhoods: Array.isArray(foundByListingId.property_neighborhoods)
-                    ? foundByListingId.property_neighborhoods
-                    : [],
-                property_img: foundByListingId.property_img || [],
-                maxGuests:
-                    resolveStaticMaxGuests(foundByListingId as unknown as Record<string, unknown>) ??
-                    foundByListingId.maxGuests,
-            }));
-            return;
+            // TASK-7448 / whitelabel E2E: bundled catalog listingId 1–7 can collide with real
+            // tenant listing PKs (e.g. e2e-wa-only fixture id=1). Slug mismatch must NOT 404
+            // here — fall through to GET /listings/{id} which is tenant-scoped.
         }
 
         // 2) Match by unit slug / property name (legacy URLs)
@@ -880,11 +883,7 @@ const PropertyDetails = () => {
         const propertyId = normalizedUnitSlug || undefined;
         if (propertyId) {
             const foundById = apiProperties.find((item) => String(item.id) === String(propertyId));
-            if (foundById) {
-                if (!urlPropertySlugMatches(foundById)) {
-                    setNotFound(true);
-                    return;
-                }
+            if (foundById && urlPropertySlugMatches(foundById)) {
                 setData(coerceProperty({
                     ...foundById,
                     property_neighborhoods: Array.isArray(foundById.property_neighborhoods)
@@ -896,6 +895,7 @@ const PropertyDetails = () => {
                 }));
                 return;
             }
+            // Slug mismatch (or id collision with bundled catalog) — fall through to API resolve.
         }
         // If still not found, try to get from location state
         if (location.state?.property) {
@@ -938,16 +938,18 @@ const PropertyDetails = () => {
                         return;
                     }
                     // TASK-7430: reject when the URL property slug does not match this listing.
+                    // TASK-7448: keep property vs unit names distinct — never stuff unit name into
+                    // propertyName (that made slug guards accept the wrong candidate).
                     const apiPropertyName =
-                        (typeof (apiListing as Record<string, unknown>).propertyName === 'string'
+                        typeof (apiListing as Record<string, unknown>).propertyName === 'string'
                             ? ((apiListing as Record<string, unknown>).propertyName as string)
-                            : null) ||
-                        (typeof apiListing.name === 'string' ? apiListing.name : '') ||
-                        '';
+                            : null;
                     if (
                         normalizedPropertySlug &&
                         !urlPropertySlugMatches({
-                            property_name: apiPropertyName,
+                            propertyName: apiPropertyName,
+                            property_name:
+                                typeof apiListing.name === 'string' ? apiListing.name : undefined,
                             id: apiListing.id,
                         })
                     ) {
@@ -1064,7 +1066,8 @@ const PropertyDetails = () => {
                     setData({ ...mapped, property_img: images });
                 })
                 .catch(() => {
-                    if (!cancelled) setNotFound(true);
+                    // TASK-7195: the fetch failed — we do NOT know the listing is absent.
+                    if (!cancelled) setLoadFailed(true);
                 });
             return () => {
                 cancelled = true;
@@ -1302,6 +1305,21 @@ useEffect(() => {
     ]);
 
     if (!data) {
+        // TASK-7195 four-state rule: check the FAILURE state before the absent state. A load that
+        // errored tells us nothing about whether this home exists, so saying "not found" (and
+        // telling the guest to check their link) is an authoritative claim we have not earned.
+        if (loadFailed) {
+            return (
+                <StateMessage
+                    data-testid="listing-load-failed-homepage"
+                    icon="⚠️"
+                    title="We couldn't load this home"
+                    message="Something went wrong on our side — the home is probably still there. Please try again in a moment."
+                    primaryAction={{ label: "Try again", onClick: () => window.location.reload() }}
+                    secondaryActions={[{ label: "Browse available homes", to: "/" }]}
+                />
+            );
+        }
         if (notFound) {
             return (
                 <StateMessage
@@ -1384,8 +1402,9 @@ useEffect(() => {
       ? data.hostName!.trim()
       : tenantNameFromUrl ? `Listed by ${tenantNameFromUrl}` : `Listed by ${ppBrandName}`;
     const ppHostInitial = ppHostDisplayName.charAt(0).toUpperCase();
-    const ppHasOnlinePayment =
-      typeof _getTenantCtx()?.paymentProvider === 'string' && _getTenantCtx()?.paymentProvider !== 'MANUAL';
+    // TASK-7428: one shared predicate for "an online gateway will actually charge this guest" —
+    // drives both the cancellation copy and the Razorpay payment-rail claim below.
+    const ppHasOnlinePayment = hasOnlinePaymentRail(ppTenantCtx);
     const ppCancellationInfo = getPpCancellationInfo(data.cancellationTier, {
       fallbackText: _resolvedCancellationText,
       hasOnlinePayment: ppHasOnlinePayment,
@@ -1808,7 +1827,12 @@ useEffect(() => {
                         <PpCheckIcon size={16} />
                         <span>
                           <b>Direct booking — no middlemen.</b>
-                          <span className="pp-meta">You pay the host directly via Razorpay.</span>
+                          {/* TASK-7428: only claim the Razorpay rail when a gateway will actually
+                              take the payment. On a WhatsApp-handoff / pay-on-arrival tenant no
+                              payment is taken on this site at all. */}
+                          {ppHasOnlinePayment && (
+                            <span className="pp-meta">You pay the host directly via Razorpay.</span>
+                          )}
                         </span>
                       </li>
                       {ppHasMapCoordinates ? (

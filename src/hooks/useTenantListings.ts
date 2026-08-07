@@ -16,6 +16,15 @@ export type TenantPropertyRecord = {
   listingId?: number;
   maxGuests?: number;
   unitType?: string;
+  /**
+   * TASK-7448: the CANONICAL property name (`dto.propertyName`), e.g. "Stay by City Focus".
+   * Distinct from `property_name` below, which — despite its name — holds the UNIT name
+   * (`dto.name`, e.g. "Aurelia Loft - 623"). The `/homes/:propertySlug/...` segment is built from
+   * THIS field by every link builder, so the route guard must match against it. Dropping it here
+   * is what made the TASK-7430 slug guard 404 every listing page on every tenant.
+   */
+  propertyName?: string | null;
+  /** Unit/listing name (`dto.name`). Historically misnamed — NOT the property name. */
   property_name?: string;
   property_description?: string;
   property_location?: string;
@@ -86,15 +95,32 @@ export const mapDtoToProperty = (dto: PublicListing): TenantPropertyRecord => {
     listingId: dto.id,
     maxGuests: dto.maxGuests || local?.maxGuests || 2,
     unitType: local?.unitType ?? inferUnitTypeFromName(dto.name ?? dto.propertyName),
+    // TASK-7448: preserve the canonical property name so the route slug guard can match the URL
+    // segment that link builders actually emit. Falls back to the local catalog for static data.
+    propertyName:
+      (dto.propertyName?.trim() ? dto.propertyName : null) ??
+      local?.property_name ??
+      null,
     property_name:
       (dto.name?.trim() ? dto.name : null) ??
       (dto.propertyName?.trim() ? dto.propertyName : null) ??
       local?.property_name ??
       `Listing ${dto.id}`,
     property_description:
-      local?.property_description ??
-      // TASK-4313: singular "1 guest" when capacity is 1.
-      `Comfortable stay for up to ${dto.maxGuests || local?.maxGuests || 2} guest${(dto.maxGuests || local?.maxGuests || 2) === 1 ? '' : 's'}.`,
+      dto.seoDescription?.trim() ||
+      dto.metaDescription?.trim() ||
+      // TASK-7502: the parentheses are load-bearing, not style. `a || b || c ?? d` is a hard
+      // SyntaxError ("Cannot use '??' with '||' without parentheses") — it does not merely warn,
+      // the module fails to parse and every importer dies with it. TASK-7193 introduced the mix by
+      // prepending the two `||` clauses above onto what was already `c ?? d`. Grouped as
+      // `a || b || (c ?? d)` so BOTH intents survive: the two new `.trim()` clauses keep `||`
+      // fall-through (an empty string must fall through, which is the whole point of trimming),
+      // while the original nullish-coalescing default is preserved exactly as TASK-4313 wrote it.
+      // Do NOT "simplify" to `(a || b || c) ?? d` — that returns "" for a tenant whose stored
+      // description is blank, printing an empty description instead of the generated fallback.
+      (local?.property_description ??
+        // TASK-4313: singular "1 guest" when capacity is 1.
+        `Comfortable stay for up to ${dto.maxGuests || local?.maxGuests || 2} guest${(dto.maxGuests || local?.maxGuests || 2) === 1 ? '' : 's'}.`),
     // TASK-7194: never invent a city — empty when the tenant has no address.
     property_location: local?.property_location ?? dto.propertyAddress ?? "",
     property_neighborhoods: local?.property_neighborhoods ?? [],

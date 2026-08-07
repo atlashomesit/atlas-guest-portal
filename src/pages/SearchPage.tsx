@@ -14,6 +14,7 @@ import { getTenantContext } from "../tenant/tenantContext";
 import { getTenantBrandName } from "../tenant/displayBrand";
 import { getTenantOverrides, getTenantPublicListingIdAllowlist, getUnitNoun, shouldHideAtlasBranding } from "../tenant/tenantOverrides";
 import { LoadingState } from "../components/LoadingState";
+import ErrorBanner from "../components/ErrorBanner"; // TASK-7195
 import SEO from "../components/SEO"; // TASK-4290
 import OptimizedImage from "../components/ui/OptimizedImage";
 import OwnerShareBadge from "../components/OwnerShareBadge"; // TASK-1705
@@ -234,6 +235,12 @@ const SearchPage = () => {
   // TASK-1867: track real API errors separately; null apiListings on 0-listing response is not an error
   const [apiError, setApiError] = useState(false);
   const [loadingTimeoutReached, setLoadingTimeoutReached] = useState(false);
+  // TASK-7195: bumping this re-runs the load effect below — same "Try again" pattern as
+  // MyBookingsPage. Needed because `apiError` used to be tracked but never gated the empty-state
+  // copy (see showEmptyState/showErrorState): a marketplace or onlyApiListings tenant whose
+  // primary listings fetch failed on first load was told "No <homes> match your filters" with no
+  // way to retry, indistinguishable from a real zero-result search.
+  const [retryCount, setRetryCount] = useState(0);
 
   const checkInParam = searchParams.get("checkIn");
   const checkOutParam = searchParams.get("checkOut");
@@ -306,7 +313,7 @@ const SearchPage = () => {
       controller.abort();
       clearTimeout(fallbackTimer);
     };
-  }, [isMarketplaceSearch, loadFromApi, loadFromMarketplace]);
+  }, [isMarketplaceSearch, loadFromApi, loadFromMarketplace, retryCount]);
 
   const minPriceParam = searchParams.get("minPrice");
   const maxPriceParam = searchParams.get("maxPrice");
@@ -836,8 +843,16 @@ const SearchPage = () => {
   const dateAvailCheckFailed =
     explicitDateSearch && !dateAvailLoading && dateAvailableIds === null && !hasInvalidDates;
   const showTonightProbeBanner = availableNow && tonightProbeLoading;
+  // TASK-7195: a failed primary listings fetch must never be told apart from a genuine
+  // zero-result search. For most tenants a static fallback keeps `sortedUnits` non-empty on
+  // failure (see the `listings` memo above), but marketplace search and `onlyApiListings`
+  // tenants clear listings to `[]` in the same catch that sets `apiError` — before this, that
+  // combination fell straight into showEmptyState's "No <homes> match your filters" copy, with
+  // no retry.
+  const showErrorState =
+    !isLoading && !hasInvalidDates && apiError && sortedUnits.length === 0 && !showTonightProbeBanner;
   const showEmptyState =
-    !isLoading && !hasInvalidDates && sortedUnits.length === 0 && !showTonightProbeBanner;
+    !isLoading && !hasInvalidDates && !apiError && sortedUnits.length === 0 && !showTonightProbeBanner;
   /** TASK-1648: skeleton while public availability resolves for selected dates (list view). */
   const showDateAvailabilitySkeleton =
     explicitDateSearch && !hasInvalidDates && dateAvailLoading && !isLoading && !mapView;
@@ -1206,21 +1221,27 @@ const SearchPage = () => {
         )}
 
         {!isLoading && apiError && listings.length > 0 && (
-          <div className="flex items-center gap-3 rounded-xl border border-support-warning/40 bg-support-warning/10 px-4 py-3 text-support-warning">
-            <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
-            <span>
-              Live listing refresh failed. Showing cached results — call{" "}
-              <a href={`tel:+91${CONTACT.business.phone}`} className="font-semibold underline underline-offset-2">
-                +91-{CONTACT.business.phone}
-              </a>{" "}
-              to confirm before booking.
-            </span>
+          <div data-testid="search-load-error" className="mb-2">
+            <ErrorBanner
+              severity="warning"
+              message={`Live listing refresh failed. Showing cached results — call +91-${CONTACT.business.phone} to confirm before booking.`}
+              onRetry={() => setRetryCount((n) => n + 1)}
+            />
           </div>
         )}
 
         {hasInvalidDates && (
           <div className="rounded-xl border border-support-error/40 bg-support-error/10 px-4 py-3 text-support-error">
             Check-out date must be after check-in. Please update your search to continue.
+          </div>
+        )}
+
+        {showErrorState && !mapView && (
+          <div data-testid="search-load-error" className="mb-6">
+            <ErrorBanner
+              message={`We couldn't load ${unitNoun.marketingPlural}. Check your connection and try again.`}
+              onRetry={() => setRetryCount((n) => n + 1)}
+            />
           </div>
         )}
 
@@ -1310,9 +1331,10 @@ const SearchPage = () => {
                           const suggestBreakdown = getDailyListingPricing(unit.numericId);
                           const suggestDisplayedPrice =
                             (suggestBreakdown?.actualPrice ?? 0) > 0 ? suggestBreakdown!.actualPrice : unit.pricePerNight;
-                          // TASK-7011: GST slab must be selected off the PUBLISHED (pre-discount)
-                          // rate, matching the server — see accommodationGstSlabPercentForPublishedRate.
-                          const suggestPublishedPrice = suggestBreakdown?.baseAmount ?? unit.pricePerNight;
+                          // TASK-7543: GST slab is selected off the CHARGED (discounted) per-night
+                          // rate, matching the server — see accommodationGstSlabPercentForChargedRate's
+                          // doc comment. `suggestDisplayedPrice` is already that charged value, so the
+                          // default (no override) banding basis is correct here.
                           return (
                             <>
                               <p className="text-lg font-bold text-text-primary">
@@ -1327,7 +1349,6 @@ const SearchPage = () => {
                                   formatDisplayCurrency,
                                   3,
                                   unit.isGstRegistered,
-                                  suggestPublishedPrice,
                                 )}
                               </p>
                             </>
@@ -1371,6 +1392,14 @@ const SearchPage = () => {
         {!isLoading && !(explicitDateSearch && dateAvailLoading) && !hasInvalidDates && mapView && (
           <div className="flex flex-col gap-3">
             <div className="relative">
+              {showErrorState && (
+                <div data-testid="search-load-error" className="absolute inset-x-0 top-4 z-10 mx-auto w-fit max-w-sm px-4">
+                  <ErrorBanner
+                    message={`We couldn't load ${unitNoun.marketingPlural}. Try again.`}
+                    onRetry={() => setRetryCount((n) => n + 1)}
+                  />
+                </div>
+              )}
               {showEmptyState && (
                 <div className="absolute inset-x-0 top-4 z-10 mx-auto w-fit rounded-xl border border-border-subtle bg-bg-surface/95 px-4 py-3 text-sm text-text-secondary shadow-md text-center">
                   No matches in this area — try wider search or clear filters
@@ -1462,7 +1491,7 @@ const SearchPage = () => {
           </section>
         )}
 
-        {!isLoading && !showDateAvailabilitySkeleton && !showEmptyState && !hasInvalidDates && !mapView && (
+        {!isLoading && !showDateAvailabilitySkeleton && !showEmptyState && !showErrorState && !hasInvalidDates && !mapView && (
           <section
             className="search-results-grid"
             data-testid="guest-search-results"
@@ -1482,11 +1511,10 @@ const SearchPage = () => {
               const dailyBreakdown = getDailyListingPricing(unit.numericId);
               const displayedPrice =
                 (dailyBreakdown?.actualPrice ?? 0) > 0 ? dailyBreakdown!.actualPrice : unit.pricePerNight;
-              // TASK-7011: GST slab must be selected off the PUBLISHED (pre-discount) rate,
-              // matching the server — see accommodationGstSlabPercentForPublishedRate's doc
-              // comment. `unit.pricePerNight` is itself already a published rate (l.baseNightlyRate
-              // above) so the fallback stays correct with no discount data at all.
-              const publishedPrice = dailyBreakdown?.baseAmount ?? unit.pricePerNight;
+              // TASK-7543: GST slab is selected off the CHARGED (discounted) rate, matching the
+              // server — see accommodationGstSlabPercentForChargedRate's doc comment.
+              // `displayedPrice` is already that charged value, so the default (no override)
+              // banding basis below is correct.
 
               return (
               <article key={unit.id} data-testid="guest-listing-card" className="search-card">
@@ -1586,7 +1614,7 @@ const SearchPage = () => {
                       )}
                       <p className="mt-0.5 text-sm text-text-muted">per night</p>
                       <p className="text-xs text-text-muted">
-                        {formatEstTotalInclGst(displayedPrice, estimateNights, formatDisplayCurrency, 3, unit.isGstRegistered, publishedPrice)}
+                        {formatEstTotalInclGst(displayedPrice, estimateNights, formatDisplayCurrency, 3, unit.isGstRegistered)}
                       </p>
                       {longStay && (
                         <LongStayCalculator

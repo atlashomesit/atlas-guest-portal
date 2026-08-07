@@ -60,14 +60,31 @@ function handlerCoercesNumericValue(handler) {
   if (!body) return false;
 
   const stack = [body];
+  const seen = new Set();
   while (stack.length) {
     const cur = stack.pop();
     if (!cur || typeof cur !== "object") continue;
+    // TASK-7459: the walk below must not revisit a node. Without this the traversal is
+    // unbounded and V8 aborts the process with `Fatal JavaScript invalid size error` —
+    // see the `parent` note below for how the cycle forms.
+    if (seen.has(cur)) continue;
+    seen.add(cur);
 
     if (cur.type === "LogicalExpression" && logicalOrCoercion(cur)) return true;
     if (cur.type === "CallExpression" && isNumericCoercion(cur)) return true;
 
     for (const key of Object.keys(cur)) {
+      // TASK-7459 — THE BUG THIS FIXES. ESLint sets `node.parent` on every node during
+      // traversal, and `parent` is an object whose `.type` is a string, so the generic
+      // "push anything that looks like a node" test below matched it. The walk then cycled
+      // child -> parent -> child -> parent without end, growing `stack` until V8 refused to
+      // allocate and killed the process (`invalid size error`, byte-identical every run).
+      // That takes down `npm run lint` for the WHOLE repo, so gate STEP 1 can never reach a
+      // verdict and under MERGE-FAST nothing can be pushed at all.
+      // An ESLint AST is a tree apart from these back-references, so skipping `parent` is
+      // what makes the traversal finite; `seen` above is belt-and-braces for any other
+      // back-reference a future parser adds (e.g. `scope`, `range` objects).
+      if (key === "parent") continue;
       const val = cur[key];
       if (Array.isArray(val)) val.forEach((v) => stack.push(v));
       else if (val && typeof val.type === "string") stack.push(val);

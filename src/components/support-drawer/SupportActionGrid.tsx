@@ -1,3 +1,4 @@
+import type React from "react";
 import { cloneElement } from "react";
 import { Link } from "react-router-dom";
 import { FaWhatsapp } from "react-icons/fa";
@@ -39,7 +40,7 @@ const SupportActionGrid = ({
   tertiaryActionIds,
   whatsappLink,
 }: SupportActionGridProps) => {
-  const allActions: Record<SupportActionId, JSX.Element> = {
+  const allActions: Record<SupportActionId, React.JSX.Element> = {
     whatsapp: (
       <a
         href={whatsappLink}

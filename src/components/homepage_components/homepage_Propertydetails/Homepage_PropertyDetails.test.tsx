@@ -30,7 +30,28 @@ describe('TASK-7430: URL property slug must match listing property slug', () => 
       const content = readFileSync(path, 'utf-8');
       expect(content).toContain('urlPropertySlugMatches');
       expect(content).toContain('TASK-7430');
-      expect(content).toMatch(/if \(foundByListingId\) \{\s*\n\s*if \(!urlPropertySlugMatches\(foundByListingId\)\)/);
+
+      // The INVARIANT (not the phrasing): inside the `foundByListingId` block, the listing must
+      // never be rendered without the URL's property slug having been checked first. Asserted
+      // structurally rather than by matching one exact `if (...)` spelling, because the guard has
+      // legitimately been expressed both ways:
+      //   TASK-7430 (2026-08-04): `if (!urlPropertySlugMatches(x)) { setNotFound(); return; }`
+      //   TASK-7448 (d9a030c2, 2026-08-07): `if (urlPropertySlugMatches(x)) { setData(...); return; }`
+      //     then deliberately FALLS THROUGH on mismatch instead of 404ing, because a bundled-catalog
+      //     listingId 1-7 can collide with a real tenant listing PK (e.g. the e2e-wa-only fixture
+      //     id=1) and must be re-resolved via the tenant-scoped GET /listings/{id}.
+      // Both satisfy TASK-7430's actual guarantee: no render on an unverified slug. Pinning the
+      // negated spelling made this test fail the moment the safer fall-through landed, which is a
+      // false red, not a caught regression.
+      const blockStart = content.indexOf('if (foundByListingId) {');
+      expect(blockStart).toBeGreaterThan(-1);
+
+      const guardAt = content.indexOf('urlPropertySlugMatches(foundByListingId)', blockStart);
+      const renderAt = content.indexOf('setData(', blockStart);
+      expect(guardAt).toBeGreaterThan(-1);
+      expect(renderAt).toBeGreaterThan(-1);
+      // The slug check must appear before the first setData() reachable from this block.
+      expect(guardAt).toBeLessThan(renderAt);
     });
   }
 });
