@@ -35,6 +35,11 @@ const ATLAS_DIRECT_BOOKING_HOSTS = new Set<string>([
   "atlashomes.in",
   "www.atlashomes.in",
   "dev.atlashomestays.com",
+  // TASK-7705: qa release-train guest surface. Without this, qa.atlashomestays.com falls to the
+  // tenant-subdomain branch below, which round-trips resolveTenantSlugFromDomain (always a miss —
+  // no CustomDomain row) before falling back to ATLAS_TENANT_KEY. Listing it here makes QA resolve
+  // the same direct way dev.atlashomestays.com already does, with no extra API call per request.
+  "qa.atlashomestays.com",
   "localhost",
   "127.0.0.1",
 ]);
