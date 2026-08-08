@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Atlas Homestays Guest Portal — pre-push hook for TypeScript type checking (TASK-7511).
+#
+# Runs `npm run typecheck` before allowing a push. This catches TypeScript compilation
+# errors early, preventing syntax errors from reaching the remote (c4758ad7 incident).
+#
+# The typecheck must pass independently of lint status (TASK-7510: lint may be broken).
+#
+# Install: scripts/hooks/install.sh
+# Bypass with: git push --no-verify
+set -e
+
+REPO_ROOT=$(git rev-parse --show-toplevel)
+cd "$REPO_ROOT"
+
+# Check if npm run typecheck succeeds
+if ! npm run typecheck >/dev/null 2>&1; then
+  echo "❌ Pre-push BLOCKED: TypeScript type checking failed." >&2
+  echo "   Run: npm run typecheck" >&2
+  echo "   Bypass with: git push --no-verify" >&2
+  exit 1
+fi
+
+exit 0
