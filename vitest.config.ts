@@ -92,7 +92,7 @@ const sharedFiles = testFiles.filter((f) => !usesModuleMocks.has(f));
 // the scheduler pools workers across projects.
 const workerCap =
   process.platform === "win32"
-    ? { maxWorkers: 1 }
+    ? { maxWorkers: 1, fileParallelism: false }
     : process.env.CI
       ? { maxWorkers: 2 }
       : {};
@@ -106,6 +106,8 @@ const baseTest = {
   },
   testTimeout: 120000, // 2 minutes for heavy property tests
   hookTimeout: 60000,
+  // Use threads pool to avoid ESM/CommonJS conflicts with forks (mirrors atlas-admin-portal).
+  pool: "threads" as const,
   ...workerCap,
   exclude,
 };
