@@ -30,6 +30,7 @@ import { propertySlugMatchesListing } from '../../../utils/propertySlugMatch';
 import { useBooking } from '../../../contexts/BookingContext';
 import { resolveListing } from '../../../utils/listingResolver';
 import { filterGuestImageUrls, sanitizeGuestImageUrl } from '../../../utils/guestImageUrl';
+import { describeCancellationPolicy } from '../../../utils/cancellationPolicy';
 import type { ListingDetail, PublicListing } from '../../../api/listingClient';
 import {
     fetchListingById,
@@ -182,34 +183,31 @@ function getPpCancellationInfo(
   opts?: { fallbackText?: string; hasOnlinePayment?: boolean },
 ): PpCancellationInfo {
   const steps = getPpRefundSteps(opts?.hasOnlinePayment !== false);
-  if (tier === 'Flexible') return {
-    headline: 'Full refund if cancelled 48 hours before check-in',
-    description: opts?.hasOnlinePayment !== false
-      ? 'Money returns to the exact UPI or card you paid with. No phone calls needed.'
-      : 'Your host arranges the refund directly with you.',
-    steps,
-  };
-  if (tier === 'Moderate') return {
-    headline: 'Full refund if cancelled 5 days before check-in',
-    description: 'Partial refund for cancellations after the window. Check your booking for exact terms.',
-    steps,
-  };
-  if (tier === 'Strict') return {
-    headline: '50% refund if cancelled 7 days before check-in',
-    description: 'No refund within 7 days of check-in. Check your booking for exact terms.',
-    steps,
-  };
-  const fallback = opts?.fallbackText?.trim();
-  if (fallback) {
+  const policyInfo = describeCancellationPolicy(tier);
+
+  // TASK-7539: all tiers now read from the single source of truth.
+  // Flexible (0% fee): afterWindowCopy is empty, so headline alone suffices.
+  // Moderate/Strict: append the after-window sentence for clarity.
+  const description =
+    tier === 'Flexible'
+      ? (opts?.hasOnlinePayment !== false
+          ? 'Money returns to the exact UPI or card you paid with. No phone calls needed.'
+          : 'Your host arranges the refund directly with you.')
+      : policyInfo.afterWindowCopy
+        ? `${policyInfo.afterWindowCopy} Check your booking for exact terms.`
+        : 'Check your booking for exact terms.';
+
+  if (opts?.fallbackText?.trim()) {
     return {
       headline: 'Cancellation policy',
-      description: fallback,
+      description: opts.fallbackText.trim(),
       steps,
     };
   }
+
   return {
-    headline: 'Flexible cancellation — full refund 48+ hours before check-in',
-    description: 'Standard direct-booking policy. See your booking confirmation for exact cut-off times.',
+    headline: policyInfo.headline,
+    description,
     steps,
   };
 }
@@ -1354,11 +1352,24 @@ useEffect(() => {
         return fromListingPolicy || inlinePolicySnippets?.cancellation || 'Full refund if cancelled 7+ days before check-in.';
     })();
 
-    // TASK-1385: tier-specific plain-language text overrides generic policy copy when set
+    // TASK-7539: tier-specific plain-language text now reads from the single source of truth
+    // (describeCancellationPolicy). Both this surface and getPpCancellationInfo render the same
+    // policy, so they cannot diverge (fixes TASK-7539 Defect 3).
+    const buildCancellationTierLabel = (tier: string | null | undefined): string => {
+        const policy = describeCancellationPolicy(tier);
+        if (!tier) return '';
+        // Capitalize tier name for the label
+        const tierName = tier.charAt(0).toUpperCase() + tier.slice(1);
+        // For Flexible (0% fee), afterWindowCopy is empty, so just the headline.
+        // For others, append after-window copy.
+        return policy.afterWindowCopy
+            ? `${tierName} — ${policy.headline}; ${policy.afterWindowCopy}`
+            : `${tierName} — ${policy.headline}.`;
+    };
     const cancellationTierLabel: Record<string, string> = {
-        Flexible: 'Flexible — full refund if cancelled 24+ hours before check-in.',
-        Moderate: 'Moderate — full refund if cancelled 5+ days before check-in.',
-        Strict: 'Strict — 50% refund if cancelled 7+ days before check-in; no refund after.',
+        Flexible: buildCancellationTierLabel('Flexible'),
+        Moderate: buildCancellationTierLabel('Moderate'),
+        Strict: buildCancellationTierLabel('Strict'),
     };
     const _resolvedCancellationText = data?.cancellationTier
         ? cancellationTierLabel[data.cancellationTier]

@@ -42,11 +42,64 @@ export const DEFAULT_FREE_CANCELLATION_WINDOW_HOURS = 168;
  */
 export const PLATFORM_DEFAULT_GRACE_HOURS = 24;
 
+/**
+ * TASK-7539: the founder-approved refund fee table per cancellation tier.
+ * These percentages mirror the server's refund logic in
+ * `atlas-api/Atlas.Api/Services/Bookings/CancellationRefundCalculator.cs`.
+ * Flexible hosts charge NO FEE, so guests always get 100% refund.
+ * Moderate hosts charge 50% fee if cancelled after the free window.
+ * Strict hosts charge 100% fee (full retention) if cancelled after the free window.
+ */
+export const LATE_CANCELLATION_FEE_PERCENT: Record<CancellationTier, number> = {
+  Flexible: 0,
+  Moderate: 50,
+  Strict: 100,
+};
+
 /** @deprecated Only used by the local fallback map when no server-sourced tier/hours are available. */
 export const DEFAULT_CANCELLATION_TIER: CancellationTier = 'Flexible';
 
 function isCancellationTier(value: unknown): value is CancellationTier {
   return value === 'Flexible' || value === 'Moderate' || value === 'Strict';
+}
+
+/**
+ * TASK-7539: single source of truth for guest-facing cancellation policy copy.
+ * Returns a headline and after-window sentence that accurately reflect the server's refund math.
+ *
+ * - Flexible (0% fee): full refund ANY TIME (no time window condition, since there's no fee gate).
+ * - Moderate (50% fee): full refund 5+ days before check-in; 50% refund after.
+ * - Strict (100% fee): full refund 7+ days before check-in; no refund after.
+ *
+ * Both call sites (property-details card and trust-strip) render from this function,
+ * so they cannot diverge (fixes TASK-7539 Defect 3).
+ */
+export function describeCancellationPolicy(
+  tier: CancellationTier | string | null | undefined,
+): { headline: string; afterWindowCopy: string } {
+  if (tier === 'Flexible') {
+    return {
+      headline: 'Full refund any time before check-in',
+      afterWindowCopy: '',
+    };
+  }
+  if (tier === 'Moderate') {
+    return {
+      headline: 'Full refund if cancelled 5+ days before check-in',
+      afterWindowCopy: 'Partial refund (50%) for cancellations after the 5-day window.',
+    };
+  }
+  if (tier === 'Strict') {
+    return {
+      headline: 'Full refund if cancelled 7+ days before check-in',
+      afterWindowCopy: 'No refund within 7 days of check-in.',
+    };
+  }
+  // Fallback for unrecognized tier
+  return {
+    headline: 'Flexible cancellation policy applies',
+    afterWindowCopy: '',
+  };
 }
 
 /**
