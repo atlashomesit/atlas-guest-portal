@@ -1,17 +1,19 @@
 import { useEffect } from "react";
-import { isNeutralBrandingMode } from "../tenant/displayBrand";
 import { getTenantContext } from "../tenant/tenantContext";
 
 // Default OG/Twitter preview image shipped in index.html. Used as the fallback when a route
 // renders <SEO> without an `image` on Platform/marketplace hosts only.
 // TASK-7468 #5: Neutral / white-label hosts must NOT fall back to this Atlas-branded asset.
+// Uses getTenantContext only (not displayBrand helpers) so page tests that mock displayBrand
+// without exporting isNeutralBrandingMode keep working.
 const DEFAULT_OG_IMAGE = "/og-image.svg";
 
 function resolveOgImageFallback(explicit?: string): string {
   if (explicit) return explicit;
   const ctx = getTenantContext();
   const isWhiteLabel = Boolean(ctx?.legalContactPack?.isCustomDomain);
-  if (isWhiteLabel || isNeutralBrandingMode()) return "";
+  const isNeutral = ctx?.guestCommsBrandingMode === "Neutral";
+  if (isWhiteLabel || isNeutral) return "";
   return DEFAULT_OG_IMAGE;
 }
 
