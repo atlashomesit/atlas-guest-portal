@@ -68,12 +68,19 @@ export function isRewriteEligibleHost(hostname: string | null | undefined): bool
   return true;
 }
 
-/** Pre-JS fallback OG image — same relative asset `index.html`'s static tags already reference. */
-const FALLBACK_OG_IMAGE = "/og-image.svg";
+/**
+ * TASK-7468 done-when #5: this helper runs only for rewrite-eligible *tenant* hosts
+ * (see {@link isRewriteEligibleHost}). Never fall back to Atlas `/og-image.svg` here —
+ * that asset is an Atlas brand mark and would leak onto white-label / Neutral share cards.
+ * Empty `image` means the middleware removes og/twitter image tags rather than substituting
+ * a platform asset.
+ */
+export const NEUTRAL_NO_OG_IMAGE = "";
 
 export interface MetaRewriteValues {
   title: string;
   description: string;
+  /** Absolute or relative image URL; empty string = omit og/twitter image (no Atlas fallback). */
   image: string;
   url: string;
   canonical: string;
@@ -98,7 +105,8 @@ export function buildMetaRewriteValues(meta: TenantSiteMeta, requestUrl: string)
     (meta.description ?? "").trim() ||
     `Book ${propertyName} directly. Verified property, zero booking fees, instant confirmation.`;
 
-  const image = (meta.photoUrl ?? "").trim() || FALLBACK_OG_IMAGE;
+  // TASK-7468 #5: white-label/Neutral hosts must not inherit Atlas /og-image.svg.
+  const image = (meta.photoUrl ?? "").trim() || NEUTRAL_NO_OG_IMAGE;
 
   const metaCanonical = (meta.canonicalUrl ?? "").trim();
   let canonical = metaCanonical || requestUrl;
