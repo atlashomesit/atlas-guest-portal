@@ -17,6 +17,12 @@ describe("isRewriteEligibleHost (TASK-4905 / ADR-0018 amendment)", () => {
     expect(isRewriteEligibleHost("127.0.0.1")).toBe(false);
   });
 
+  // TASK-7705: qa release train — qa.atlashomestays.com is a first-party Atlas host, not a
+  // tenant subdomain the OG rewrite should touch.
+  it("excludes the qa release-train host", () => {
+    expect(isRewriteEligibleHost("qa.atlashomestays.com")).toBe(false);
+  });
+
   it("is case-insensitive", () => {
     expect(isRewriteEligibleHost("ATLASTAYS.COM")).toBe(false);
     expect(isRewriteEligibleHost("Www.AtlasHomestays.com")).toBe(false);

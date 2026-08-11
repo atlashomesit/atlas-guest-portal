@@ -4,6 +4,18 @@ We welcome contributions that improve the Atlas Homes Frontend. Please follow th
 
 For feature work spanning the guest frontend and API, see workspace root `ATLAS-HIGH-VALUE-BACKLOG.md` and `ATLAS-FEATURE-EXECUTION-PROMPT.md`.
 
+## Git Hooks
+
+Before pushing, the repository runs a **pre-push TypeScript type check** via `npm run typecheck` to catch syntax errors early. Install the hook once per clone:
+
+```bash
+scripts/hooks/install.sh
+```
+
+This prevents broken TypeScript from reaching the remote (as in commit c4758ad7). The typecheck runs **independently of lint** and cannot be bypassed by lint failures (TASK-7510).
+
+Bypass the hook if needed with `git push --no-verify`, but this is not recommended.
+
 ## Release Gate (run before pushing to dev)
 
 ```bash

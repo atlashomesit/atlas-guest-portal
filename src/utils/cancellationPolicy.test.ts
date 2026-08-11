@@ -4,8 +4,10 @@ import {
   computeEffectiveCancellationDeadline,
   formatCancellationDeadline,
   FREE_CANCELLATION_WINDOW_HOURS,
+  LATE_CANCELLATION_FEE_PERCENT,
   resolveApplicableGraceHours,
   resolveFreeCancellationTrustCopy,
+  describeCancellationPolicy,
 } from './cancellationPolicy';
 
 // TASK-4334: guest-facing cancellation deadline computation/formatting.
@@ -258,5 +260,106 @@ describe('resolveApplicableGraceHours', () => {
     expect(resolveApplicableGraceHours(checkIn, bookedAt, 24)).toBe(24);
     // 48h window: check-in − 48h = 26 Jul 00:00 IST, which is before booking → voided.
     expect(resolveApplicableGraceHours(checkIn, bookedAt, 48)).toBeNull();
+  });
+});
+
+/**
+ * TASK-7539: the portal's cancellation copy must pin against the server's fee table.
+ * These tests verify that the canonical fee values match the founder-approved tier
+ * (Flexible 0% / Moderate 50% / Strict 100%) and that copy generation correctly
+ * reflects those percentages, including special handling for 0%-fee tiers.
+ *
+ * The proving test must fail against the old copy-generating logic (before the fix)
+ * and pass after.
+ */
+describe('TASK-7539: Cancellation policy fee table and copy generation', () => {
+  describe('LATE_CANCELLATION_FEE_PERCENT: founder-approved tier structure', () => {
+    it('Flexible tier has 0% fee (no refund gate on time window)', () => {
+      expect(LATE_CANCELLATION_FEE_PERCENT['Flexible']).toBe(0);
+    });
+
+    it('Moderate tier has 50% fee (partial refund after window)', () => {
+      expect(LATE_CANCELLATION_FEE_PERCENT['Moderate']).toBe(50);
+    });
+
+    it('Strict tier has 100% fee (full retention after window)', () => {
+      expect(LATE_CANCELLATION_FEE_PERCENT['Strict']).toBe(100);
+    });
+
+    it('all three tiers defined', () => {
+      expect(Object.keys(LATE_CANCELLATION_FEE_PERCENT).sort()).toEqual([
+        'Flexible',
+        'Moderate',
+        'Strict',
+      ]);
+    });
+  });
+
+  describe('describeCancellationPolicy: copy generation from fee table', () => {
+    it('Flexible (0% fee): headline makes NO window condition (since refund always 100%)', () => {
+      const policy = describeCancellationPolicy('Flexible');
+      expect(policy.headline).toBe('Full refund any time before check-in');
+      // No after-window copy for Flexible, since the window is not a gate
+      expect(policy.afterWindowCopy).toBe('');
+    });
+
+    it('Moderate (50% fee): headline describes window, afterWindowCopy states 50% refund', () => {
+      const policy = describeCancellationPolicy('Moderate');
+      expect(policy.headline).toBe('Full refund if cancelled 5+ days before check-in');
+      expect(policy.afterWindowCopy).toContain('50%');
+      expect(policy.afterWindowCopy).toBe(
+        'Partial refund (50%) for cancellations after the 5-day window.'
+      );
+    });
+
+    it('Strict (100% fee): headline describes window, afterWindowCopy states no refund', () => {
+      const policy = describeCancellationPolicy('Strict');
+      expect(policy.headline).toBe('Full refund if cancelled 7+ days before check-in');
+      expect(policy.afterWindowCopy).toBe('No refund within 7 days of check-in.');
+    });
+
+    it('unrecognized tier: returns safe fallback (Flexible equivalent)', () => {
+      const policy = describeCancellationPolicy('UnknownTier');
+      expect(policy.headline).toBe('Flexible cancellation policy applies');
+      expect(policy.afterWindowCopy).toBe('');
+    });
+
+    it('null/undefined tier: returns safe fallback', () => {
+      const policyNull = describeCancellationPolicy(null);
+      const policyUndef = describeCancellationPolicy(undefined);
+      expect(policyNull.headline).toBe('Flexible cancellation policy applies');
+      expect(policyUndef.headline).toBe('Flexible cancellation policy applies');
+    });
+  });
+
+  describe('TASK-7539 Defects fixed:', () => {
+    it('Defect 1: Strict early-cancel states 100% refund, NOT 50%', () => {
+      const strictPolicy = describeCancellationPolicy('Strict');
+      expect(strictPolicy.headline).toContain('Full refund');
+      expect(strictPolicy.headline).not.toContain('50%');
+      // The 50% applies AFTER the window, not inside it
+      expect(strictPolicy.afterWindowCopy).not.toContain('50%');
+    });
+
+    it('Defect 2: Flexible states NO hardcoded window (0% fee means time is not a gate)', () => {
+      const flexiblePolicy = describeCancellationPolicy('Flexible');
+      // No hardcoded hour counts in copy, and no "if cancelled before" condition
+      expect(flexiblePolicy.headline).not.toMatch(/\d+\s*hours?/);
+      expect(flexiblePolicy.headline).not.toMatch(/48|24/);
+      expect(flexiblePolicy.headline).toBe('Full refund any time before check-in');
+    });
+
+    it('Defect 4: Flexible copy does NOT present the window as a condition', () => {
+      const flexiblePolicy = describeCancellationPolicy('Flexible');
+      // "any time" and afterWindowCopy="" means no gate at all
+      expect(flexiblePolicy.headline).toContain('any time');
+      expect(flexiblePolicy.afterWindowCopy).toBe('');
+    });
+
+    it('Moderate explicitly states 50% refund after the window', () => {
+      const moderatePolicy = describeCancellationPolicy('Moderate');
+      expect(moderatePolicy.afterWindowCopy).toContain('50%');
+      expect(moderatePolicy.afterWindowCopy).toMatch(/50%/);
+    });
   });
 });

