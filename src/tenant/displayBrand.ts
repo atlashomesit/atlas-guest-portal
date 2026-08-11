@@ -69,7 +69,8 @@ type BrandNameSource = {
  *  1. `legalContactPack.displayName` — host-configured business display name
  *  2. `brandNameLong` — legal/property-style long brand when no business display name
  *  3. `legalContactPack.legalName` — legal entity name
- *  4. Platform: `brandName` / `name`. Neutral: `name` only (skip `brandName` — often a person's name)
+ *  4. Platform: `brandName` / `name`. Neutral: never use `brandName` or `name`
+ *     (both frequently hold a host's personal name — TASK-7468 / TASK-7431)
  *  5. Neutral → `NEUTRAL_NO_BRAND_FALLBACK`; otherwise `MARKETPLACE_BRAND_BASELINE`
  *
  * TASK-4899: a `Neutral`-mode tenant with nothing configured falls back to
@@ -84,9 +85,8 @@ export function resolveTenantBrandName(c: BrandNameSource): string {
   if (legalName) return legalName;
   const isNeutral = c?.guestCommsBrandingMode === "Neutral";
   if (isNeutral) {
-    // Never publish brandName on Neutral white-label — it frequently holds a host's personal name (TASK-7431).
-    const tenantName = (c?.name ?? "").trim();
-    if (tenantName) return tenantName;
+    // TASK-7468: align with API ResolveSiteMetaPropertyName — never publish Tenants.Name
+    // (personal) on Neutral when no business brand is configured.
     return NEUTRAL_NO_BRAND_FALLBACK;
   }
   const raw = (c?.brandName ?? c?.name ?? "").trim();
