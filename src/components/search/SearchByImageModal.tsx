@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { buildApiUrl, getApiHeaders } from '../../api/client';
 import type { PublicListing } from '../../api/listingClient';
 import { Modal } from '../ui/Modal';

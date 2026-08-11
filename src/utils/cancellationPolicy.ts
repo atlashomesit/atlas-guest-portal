@@ -64,6 +64,22 @@ function isCancellationTier(value: unknown): value is CancellationTier {
 }
 
 /**
+ * TASK-7819: resolve a listing's tier the way the SERVER resolves it, so guest-facing copy can
+ * never disagree with the refund the engine computes.
+ *
+ * `CancellationRefundCalculator.Compute` opens with
+ * `var tierName = (tier ?? CancellationTier.Flexible).ToString();` — an absent or unrecognized
+ * tier is Flexible, and Flexible's late fee is 0, so the engine returns a FULL refund whenever
+ * the guest cancels. Any surface that treats "untiered" as its own, stricter policy is stating
+ * something the server does not do.
+ */
+export function resolveEffectiveCancellationTier(
+  tier: CancellationTier | string | null | undefined,
+): CancellationTier {
+  return isCancellationTier(tier) ? tier : DEFAULT_CANCELLATION_TIER;
+}
+
+/**
  * TASK-7539: single source of truth for guest-facing cancellation policy copy.
  * Returns a headline and after-window sentence that accurately reflect the server's refund math.
  *
@@ -77,27 +93,27 @@ function isCancellationTier(value: unknown): value is CancellationTier {
 export function describeCancellationPolicy(
   tier: CancellationTier | string | null | undefined,
 ): { headline: string; afterWindowCopy: string } {
-  if (tier === 'Flexible') {
-    return {
-      headline: 'Full refund any time before check-in',
-      afterWindowCopy: '',
-    };
-  }
-  if (tier === 'Moderate') {
+  // TASK-7819: resolve null/unknown to Flexible FIRST, exactly as the server does. The old
+  // fallback returned a vague "Flexible cancellation policy applies" for untiered listings,
+  // which let callers substitute their own (wrong) literal for the untiered case.
+  const effectiveTier = resolveEffectiveCancellationTier(tier);
+
+  if (effectiveTier === 'Moderate') {
     return {
       headline: 'Full refund if cancelled 5+ days before check-in',
       afterWindowCopy: 'Partial refund (50%) for cancellations after the 5-day window.',
     };
   }
-  if (tier === 'Strict') {
+  if (effectiveTier === 'Strict') {
     return {
       headline: 'Full refund if cancelled 7+ days before check-in',
       afterWindowCopy: 'No refund within 7 days of check-in.',
     };
   }
-  // Fallback for unrecognized tier
+  // Flexible — fee is 0%, so the engine refunds in full at any time and NOTHING gates it.
+  // Do not add a window condition here: it would read as "cancel later and you get nothing".
   return {
-    headline: 'Flexible cancellation policy applies',
+    headline: 'Full refund any time before check-in',
     afterWindowCopy: '',
   };
 }

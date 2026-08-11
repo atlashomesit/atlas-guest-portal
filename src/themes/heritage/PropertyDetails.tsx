@@ -37,7 +37,10 @@ import { X, ShieldCheck, CalendarClock, CreditCard } from 'lucide-react';
 import { useEffect, useMemo, useState, Suspense, lazy } from 'react';
 import { useTenantListings } from '@/hooks/useTenantListings';
 import { usePropertyListings } from '@/hooks/usePropertyListings';
-import { inlinePolicySnippets } from '@/content/terms';
+import {
+  describeCancellationPolicy,
+  resolveEffectiveCancellationTier,
+} from '@/utils/cancellationPolicy';
 import { trackEvent } from '@/utils/analytics';
 import { Button } from '@/components/ui/Button';
 import { calculateNightlyPrice, inferUnitType } from '@/utils/pricing';
@@ -197,23 +200,23 @@ function getPpCancellationInfo(
   opts?: { fallbackText?: string; hasOnlinePayment?: boolean },
 ): PpCancellationInfo {
   const steps = getPpRefundSteps(opts?.hasOnlinePayment !== false);
-  if (tier === 'Flexible') return {
-    headline: 'Full refund if cancelled 48 hours before check-in',
-    description: opts?.hasOnlinePayment !== false
-      ? 'Money returns to the exact UPI or card you paid with. No phone calls needed.'
-      : 'Your host arranges the refund directly with you.',
-    steps,
-  };
-  if (tier === 'Moderate') return {
-    headline: 'Full refund if cancelled 5 days before check-in',
-    description: 'Partial refund for cancellations after the window. Check your booking for exact terms.',
-    steps,
-  };
-  if (tier === 'Strict') return {
-    headline: '50% refund if cancelled 7 days before check-in',
-    description: 'No refund within 7 days of check-in. Check your booking for exact terms.',
-    steps,
-  };
+
+  // TASK-7819 / TASK-7539: this theme is a full fork of the classic property-detail page and
+  // used to carry its own hardcoded tier copy, which kept every defect TASK-7539 fixed in the
+  // classic page — Strict understating by 50 points, Flexible contradicting itself (48h vs 24h),
+  // and the Flexible window stated as a condition when the fee is 0. It now renders from the
+  // single source of truth. Do not re-type percentages or windows here.
+  const policyInfo = describeCancellationPolicy(tier);
+
+  const description =
+    resolveEffectiveCancellationTier(tier) === 'Flexible'
+      ? (opts?.hasOnlinePayment !== false
+          ? 'Money returns to the exact UPI or card you paid with. No phone calls needed.'
+          : 'Your host arranges the refund directly with you.')
+      : policyInfo.afterWindowCopy
+        ? `${policyInfo.afterWindowCopy} Check your booking for exact terms.`
+        : 'Check your booking for exact terms.';
+
   const fallback = opts?.fallbackText?.trim();
   if (fallback) {
     return {
@@ -222,9 +225,10 @@ function getPpCancellationInfo(
       steps,
     };
   }
+
   return {
-    headline: 'Flexible cancellation — full refund 48+ hours before check-in',
-    description: 'Standard direct-booking policy. See your booking confirmation for exact cut-off times.',
+    headline: policyInfo.headline,
+    description,
     steps,
   };
 }
@@ -1346,16 +1350,29 @@ useEffect(() => {
         const fromListingPolicy = policies.find((p) =>
             typeof p?.type === 'string' && p.type.toLowerCase().includes('cancellation'),
         )?.value;
-        // TASK-4356: honest default when the host hasn't set an explicit tier or custom text —
-        // matches the server's 7-day free-cancellation default (CancellationPolicyWindow.cs).
-        return fromListingPolicy || inlinePolicySnippets?.cancellation || 'Full refund if cancelled 7+ days before check-in.';
+        // TASK-7819: only host-authored policy text may override the tier-derived copy — see the
+        // matching comment in Homepage_PropertyDetails.tsx. The inline snippet used to sit here and,
+        // being a non-empty constant, made the tier branch unreachable.
+        return fromListingPolicy || '';
     })();
 
-    // TASK-1385: tier-specific plain-language text overrides generic policy copy when set
+    // TASK-1385 / TASK-7819: tier-specific plain-language text, derived from the single source of
+    // truth rather than re-typed. The previous literals were the pre-TASK-7539 wording and were
+    // wrong in three ways: Flexible said 24h (canonical is 48h, and the 0% fee means no window
+    // gates the refund at all) and Strict claimed 50% where the server refunds 100% inside the
+    // window. Never re-type percentages or hour counts in this fork.
+    const buildCancellationTierLabel = (tier: string | null | undefined): string => {
+        const policy = describeCancellationPolicy(tier);
+        if (!tier) return '';
+        const tierName = tier.charAt(0).toUpperCase() + tier.slice(1);
+        return policy.afterWindowCopy
+            ? `${tierName} — ${policy.headline}; ${policy.afterWindowCopy}`
+            : `${tierName} — ${policy.headline}.`;
+    };
     const cancellationTierLabel: Record<string, string> = {
-        Flexible: 'Flexible — full refund if cancelled 24+ hours before check-in.',
-        Moderate: 'Moderate — full refund if cancelled 5+ days before check-in.',
-        Strict: 'Strict — 50% refund if cancelled 7+ days before check-in; no refund after.',
+        Flexible: buildCancellationTierLabel('Flexible'),
+        Moderate: buildCancellationTierLabel('Moderate'),
+        Strict: buildCancellationTierLabel('Strict'),
     };
     const _resolvedCancellationText = data?.cancellationTier
         ? cancellationTierLabel[data.cancellationTier]

@@ -21,7 +21,6 @@ import { X, ShieldCheck, CalendarClock, CreditCard } from 'lucide-react';
 import { useEffect, useMemo, useState, Suspense, lazy } from 'react';
 import { useTenantListings } from '../../../hooks/useTenantListings';
 import { usePropertyListings } from '../../../hooks/usePropertyListings';
-import { inlinePolicySnippets } from '../../../content/terms';
 import { trackEvent } from '../../../utils/analytics';
 import { Button } from '../../ui/Button';
 import { calculateNightlyPrice, inferUnitType } from '../../../utils/pricing';
@@ -805,13 +804,17 @@ const PropertyDetails = () => {
                 ]);
                 if (ac.signal.aborted) return;
 
-                let nativePayload: {
+                // Named type, not `typeof nativePayload`: at the assignment below the variable is
+                // control-flow-narrowed to `null`, so `as typeof nativePayload` cast the response
+                // to `null` and every later property read resolved to `never` (tsc TS2339).
+                type NativeReviewsPayload = {
                     averageRating?: number;
                     totalCount?: number;
                     reviews?: ListingReviewRow[];
-                } | null = null;
+                };
+                let nativePayload: NativeReviewsPayload | null = null;
                 if (nativeRes.ok) {
-                    nativePayload = (await nativeRes.json()) as typeof nativePayload;
+                    nativePayload = (await nativeRes.json()) as NativeReviewsPayload;
                 } else if (!ac.signal.aborted) {
                     setListingReviewsFromApi(null);
                 }
@@ -1416,9 +1419,14 @@ useEffect(() => {
         const fromListingPolicy = policies.find((p) =>
             typeof p?.type === 'string' && p.type.toLowerCase().includes('cancellation'),
         )?.value;
-        // TASK-4356: honest default when the host hasn't set an explicit tier or custom text —
-        // matches the server's 7-day free-cancellation default (CancellationPolicyWindow.cs).
-        return fromListingPolicy || inlinePolicySnippets?.cancellation || 'Full refund if cancelled 7+ days before check-in.';
+        // TASK-7819: ONLY host-authored policy text may override the tier-derived copy.
+        // `inlinePolicySnippets.cancellation` used to sit here, and because it is a non-empty
+        // constant it made this value always truthy — which fed `fallbackText` into
+        // getPpCancellationInfo, whose fallback branch returns BEFORE the tier branch. The
+        // tier-derived copy was therefore unreachable, and every untiered listing rendered a
+        // hardcoded "no refunds within 7 days" while the engine refunded 100%.
+        // Empty here means "no host override" — let describeCancellationPolicy decide.
+        return fromListingPolicy || '';
     })();
 
     // TASK-7539: tier-specific plain-language text now reads from the single source of truth
