@@ -385,6 +385,45 @@ type ListingReviewRow = {
     ratingCommunication?: number | null;
 };
 
+/** TASK-1979: row shape from `GET /api/public/listings/{id}` externalReviews array. */
+type ExternalReviewRow = {
+    guestName?: string;
+    rating?: number | null;
+    body?: string | null;
+    reviewDate?: string;
+    source?: string;
+    sourceUrl?: string | null;
+};
+
+type DisplayReviewRow = ListingReviewRow & {
+    displayKey: string;
+    isGoogle?: boolean;
+    sourceUrl?: string | null;
+};
+
+function mergeListingAndExternalReviews(
+    native: ListingReviewRow[],
+    external: ExternalReviewRow[],
+): DisplayReviewRow[] {
+    const externalRows: DisplayReviewRow[] = external.map((r, idx) => ({
+        id: -(idx + 1),
+        displayKey: `gbp-${idx}-${r.reviewDate ?? ''}`,
+        guestName: r.guestName ?? 'Google user',
+        rating: r.rating ?? 0,
+        body: r.body ?? null,
+        createdAt: r.reviewDate ? `${r.reviewDate}T00:00:00.000Z` : new Date(0).toISOString(),
+        isGoogle: true,
+        sourceUrl: r.sourceUrl ?? null,
+    }));
+    const nativeRows: DisplayReviewRow[] = native.map((r) => ({
+        ...r,
+        displayKey: `native-${r.id}`,
+    }));
+    return [...nativeRows, ...externalRows].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+}
+
 /** TASK-1359: Convert YouTube/Vimeo watch URL to embed URL, or return null if unrecognised. */
 function toEmbedUrl(url: string): string | null {
     try {
@@ -503,6 +542,8 @@ const PropertyDetails = () => {
         totalCount: number;
         reviews: ListingReviewRow[];
     }>(null);
+    /** TASK-1979: GBP-imported reviews from `GET /api/public/listings/{id}`. */
+    const [externalReviewsFromApi, setExternalReviewsFromApi] = useState<ExternalReviewRow[]>([]);
 
     // AMN-001: Fetch amenity master list once on mount
     useEffect(() => {
@@ -738,39 +779,67 @@ const PropertyDetails = () => {
         const lid = resolvedListingId;
         if (lid == null) {
             setListingReviewsFromApi(null);
+            setExternalReviewsFromApi([]);
             return;
         }
         const num = typeof lid === 'number' ? lid : Number(lid);
         if (!Number.isFinite(num) || num <= 0) {
             setListingReviewsFromApi(null);
+            setExternalReviewsFromApi([]);
             return;
         }
         const ac = new AbortController();
         setListingReviewsFromApi({ loading: true, averageRating: 0, totalCount: 0, reviews: [] });
+        setExternalReviewsFromApi([]);
         void (async () => {
             try {
-                const res = await fetch(buildApiUrl(`/api/listings/${num}/reviews`), {
-                    headers: getApiHeaders(),
-                    signal: ac.signal,
-                });
-                if (!res.ok) {
-                    if (!ac.signal.aborted) setListingReviewsFromApi(null);
-                    return;
-                }
-                const j = (await res.json()) as {
+                const [nativeRes, publicRes] = await Promise.all([
+                    fetch(buildApiUrl(`/api/listings/${num}/reviews`), {
+                        headers: getApiHeaders(),
+                        signal: ac.signal,
+                    }),
+                    fetch(buildApiUrl(`/api/public/listings/${num}`), {
+                        headers: getApiHeaders(),
+                        signal: ac.signal,
+                    }),
+                ]);
+                if (ac.signal.aborted) return;
+
+                let nativePayload: {
                     averageRating?: number;
                     totalCount?: number;
                     reviews?: ListingReviewRow[];
-                };
-                if (ac.signal.aborted) return;
-                setListingReviewsFromApi({
-                    loading: false,
-                    averageRating: j.averageRating ?? 0,
-                    totalCount: j.totalCount ?? 0,
-                    reviews: Array.isArray(j.reviews) ? j.reviews : [],
-                });
+                } | null = null;
+                if (nativeRes.ok) {
+                    nativePayload = (await nativeRes.json()) as typeof nativePayload;
+                } else if (!ac.signal.aborted) {
+                    setListingReviewsFromApi(null);
+                }
+
+                if (publicRes.ok) {
+                    const publicPayload = (await publicRes.json()) as { externalReviews?: ExternalReviewRow[] };
+                    if (!ac.signal.aborted) {
+                        setExternalReviewsFromApi(
+                            Array.isArray(publicPayload.externalReviews) ? publicPayload.externalReviews : [],
+                        );
+                    }
+                } else if (!ac.signal.aborted) {
+                    setExternalReviewsFromApi([]);
+                }
+
+                if (nativePayload && !ac.signal.aborted) {
+                    setListingReviewsFromApi({
+                        loading: false,
+                        averageRating: nativePayload.averageRating ?? 0,
+                        totalCount: nativePayload.totalCount ?? 0,
+                        reviews: Array.isArray(nativePayload.reviews) ? nativePayload.reviews : [],
+                    });
+                }
             } catch {
-                if (!ac.signal.aborted) setListingReviewsFromApi(null);
+                if (!ac.signal.aborted) {
+                    setListingReviewsFromApi(null);
+                    setExternalReviewsFromApi([]);
+                }
             }
         })();
         return () => ac.abort();
@@ -1444,9 +1513,19 @@ useEffect(() => {
         : (data.property_amenities || []).map((a) => a.amenities_icon ? formatAmenityName(a.amenities_icon) : 'Amenity');
 
     const ppApiReviews = listingReviewsFromApi;
-    const ppHasApiReviews = Boolean(ppApiReviews && !ppApiReviews.loading && ppApiReviews.totalCount > 0);
+    const ppMergedReviews = ppApiReviews && !ppApiReviews.loading
+        ? mergeListingAndExternalReviews(ppApiReviews.reviews, externalReviewsFromApi)
+        : [];
+    const ppCombinedReviewCount = ppMergedReviews.length;
+    const ppCombinedAverageRating = ppCombinedReviewCount > 0
+        ? ppMergedReviews.reduce((sum, r) => sum + (r.rating > 0 ? r.rating : 0), 0)
+            / ppMergedReviews.filter((r) => r.rating > 0).length
+        : 0;
+    const ppHasApiReviews = Boolean(
+        ppApiReviews && !ppApiReviews.loading && (ppApiReviews.totalCount > 0 || externalReviewsFromApi.length > 0),
+    );
     const ppDisplayedReviews = ppHasApiReviews
-        ? (showAllReviews ? ppApiReviews!.reviews : ppApiReviews!.reviews.slice(0, 6))
+        ? (showAllReviews ? ppMergedReviews : ppMergedReviews.slice(0, 6))
         : [];
     const ppAmenityDisplay = ppAmenityLabels.slice(0, 12);
     const ppAmenityCodes = data.amenityCodes && data.amenityCodes.length > 0
@@ -1979,9 +2058,9 @@ useEffect(() => {
                       <div style={{ height: 120, borderRadius: 16, background: '#f0ddd0' }} />
                     </section>
                   );
-                  if (!api || api.totalCount <= 0) return null;
-                  const rating = api.averageRating;
-                  const count = api.totalCount;
+                  if (!api || (!api.loading && api.totalCount <= 0 && externalReviewsFromApi.length <= 0)) return null;
+                  const rating = ppCombinedAverageRating;
+                  const count = ppCombinedReviewCount;
                   return (
                     <section className="pp-section" aria-label="Guest reviews" data-testid="reviews-section">
                       <div className="pp-section-head">
@@ -2002,7 +2081,7 @@ useEffect(() => {
                         </div>
                         {/* Sub-rating bars derived from API reviews if available */}
                         {api.reviews.length > 0 && (() => {
-                          const rs = api.reviews;
+                          const rs = api.reviews.filter((r) => r.rating > 0);
                           const avg = (vals: (number | null | undefined)[]) => {
                             const valid = vals.filter((v): v is number => v != null && v >= 1);
                             return valid.length > 0 ? (valid.reduce((a, b) => a + b, 0) / valid.length) : null;
@@ -2046,7 +2125,7 @@ useEffect(() => {
                         })()}
                       </div>
 
-                      {api.reviews.length > 0 ? (
+                      {ppMergedReviews.length > 0 ? (
                         <>
                           {/* TASK-4404: review summary (sentiment + top keywords) — same id source as the reviews fetch */}
                           <Suspense fallback={null}>
@@ -2055,8 +2134,33 @@ useEffect(() => {
                           {/* v2: 3-col card layout with quote marks */}
                           <div className="pp-v2-review-grid" data-testid="reviews-grid">
                             {ppDisplayedReviews.map((r, idx) => (
-                              <article key={r.id} className="pp-v2-review-card">
+                              <article key={r.displayKey} className="pp-v2-review-card">
                                 <span className="pp-v2-review-quote" aria-hidden="true">&ldquo;</span>
+                                {r.isGoogle && (
+                                  <span
+                                    title="Review from Google"
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      width: 20,
+                                      height: 20,
+                                      borderRadius: '50%',
+                                      background: '#4285F4',
+                                      color: '#fff',
+                                      fontSize: 12,
+                                      fontWeight: 700,
+                                      marginBottom: 8,
+                                    }}
+                                  >
+                                    G
+                                  </span>
+                                )}
+                                {r.rating > 0 && (
+                                  <div style={{ marginBottom: 8, fontSize: 13, color: 'var(--text-primary, #4a3535)' }} aria-label={`${r.rating} out of 5 stars`}>
+                                    {'★'.repeat(Math.min(5, r.rating))}{'☆'.repeat(Math.max(0, 5 - r.rating))}
+                                  </div>
+                                )}
                                 {r.body && <p className="pp-v2-review-body">{r.body}</p>}
                                 {!r.body && r.title && <p className="pp-v2-review-body">{r.title}</p>}
                                 {(() => {
@@ -2102,7 +2206,7 @@ useEffect(() => {
                               </article>
                             ))}
                           </div>
-                          {api.reviews.length > 6 && (
+                          {ppMergedReviews.length > 6 && (
                             <button
                               type="button"
                               onClick={() => setShowAllReviews((s) => !s)}
@@ -2112,7 +2216,7 @@ useEffect(() => {
                             >
                               {showAllReviews
                                 ? 'Show fewer reviews'
-                                : `View all ${api.totalCount} reviews`}
+                                : `View all ${count} reviews`}
                               <PpChevronDown size={14} />
                             </button>
                           )}
