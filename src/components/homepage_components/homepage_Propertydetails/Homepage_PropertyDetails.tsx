@@ -29,7 +29,10 @@ import { propertySlugMatchesListing } from '../../../utils/propertySlugMatch';
 import { useBooking } from '../../../contexts/BookingContext';
 import { resolveListing } from '../../../utils/listingResolver';
 import { filterGuestImageUrls, sanitizeGuestImageUrl } from '../../../utils/guestImageUrl';
-import { describeCancellationPolicy } from '../../../utils/cancellationPolicy';
+import {
+  describeCancellationPolicy,
+  resolveEffectiveCancellationTier,
+} from '../../../utils/cancellationPolicy';
 import type { ListingDetail, PublicListing } from '../../../api/listingClient';
 import {
     fetchListingById,
@@ -187,8 +190,12 @@ function getPpCancellationInfo(
   // TASK-7539: all tiers now read from the single source of truth.
   // Flexible (0% fee): afterWindowCopy is empty, so headline alone suffices.
   // Moderate/Strict: append the after-window sentence for clarity.
+  // TASK-7819: branch on the EFFECTIVE tier, not the raw one. An untiered listing is Flexible on
+  // the server, so it must get the Flexible description here too — otherwise this theme and the
+  // heritage fork render different descriptions for the same listing, which is the drift class
+  // this task exists to remove.
   const description =
-    tier === 'Flexible'
+    resolveEffectiveCancellationTier(tier) === 'Flexible'
       ? (opts?.hasOnlinePayment !== false
           ? 'Money returns to the exact UPI or card you paid with. No phone calls needed.'
           : 'Your host arranges the refund directly with you.')
