@@ -1,0 +1,42 @@
+# TASK-7728 option 1 — server-side unit bar on PRs to dev.
+# Mirrors run-unit-bar.ps1: npm run lint + npm run build + npx vitest run.
+# Scope: this repo only; opened+synchronize; cancel-in-progress for spend control.
+# Does not touch allow-feature-to-dev / enforce-dev-to-main job names.
+# GHA-COST-APPROVED: 120
+name: Unit tests (PR to dev)
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    branches: [dev]
+
+concurrency:
+  group: pr-unit-test-dev-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  unit-bar:
+    name: Unit bar
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Unit tests (vitest)
+        run: npx vitest run
