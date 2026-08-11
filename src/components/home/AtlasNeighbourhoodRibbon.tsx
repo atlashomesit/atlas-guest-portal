@@ -59,7 +59,7 @@ const AtlasNeighbourhoodRibbon: React.FC<AtlasNeighbourhoodRibbonProps> = ({ var
     >
       <span className="ahv2-ribbon-left">
         <span className="ahv2-dot" aria-hidden="true" />
-        Kukatpally · KPHB 7th Phase
+        Neighbourhood
       </span>
       <div className="ahv2-ribbon-middle">
         <span className="ahv2-ribbon-stat">2 min to metro</span>

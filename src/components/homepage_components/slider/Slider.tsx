@@ -42,13 +42,13 @@ const Slider = () => {
   const heroImageUrl = showAtlasContent ? HERO_IMAGE_URL : '';
   const hasHeroPhoto = Boolean(heroImageUrl.trim());
   const heroPhotoAriaLabel = showAtlasContent
-    ? `A warm, owner-run ${brandName} living room in KPHB`
+    ? `A warm, owner-run ${brandName} living room`
     : `Welcome to ${brandName}`;
   // TASK-7194 #4: Atlas subcopy uses the live listing count, not a hardcoded "Seven".
   const atlasHeroSub =
     listingCount > 0
-      ? `${listingCount} owner-run home${listingCount === 1 ? '' : 's'} in KPHB. Same hands clean them, restock them, answer the door.`
-      : 'Owner-run homes in KPHB. Same hands clean them, restock them, answer the door.';
+      ? `${listingCount} owner-run home${listingCount === 1 ? '' : 's'} in this neighbourhood. Same hands clean them, restock them, answer the door.`
+      : 'Owner-run homes in this neighbourhood. Same hands clean them, restock them, answer the door.';
 
   // CSS-driven animations replace the manual headlineIn state
   // All entrance animations are now in atlas-home-v2.css
@@ -181,7 +181,7 @@ const Slider = () => {
         {showAtlasContent && hasHeroPhoto ? (
           <div className="ahv2-caption-pill">
             <span className="ahv2-dot" aria-hidden="true" />
-            KPHB 7th Phase
+            Neighbourhood
           </div>
         ) : null}
       </div>

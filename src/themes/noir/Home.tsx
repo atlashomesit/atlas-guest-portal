@@ -102,7 +102,7 @@ const NoirHome = () => {
     const heroImageUrl = showAtlasContent ? HERO_IMAGE_URL : '';
     const hasHeroPhoto = Boolean(heroImageUrl.trim());
     const heroPhotoAriaLabel = showAtlasContent
-        ? `A warm, owner-run ${schemaBrandName} living room in KPHB, shown at night`
+        ? `A warm, owner-run ${schemaBrandName} living room, shown at night`
         : `Welcome to ${schemaBrandName}`;
 
     const faqHighlights = getFaqHighlights();
@@ -188,7 +188,7 @@ const NoirHome = () => {
                         </h1>
                         <p className="noir-hero-sub">
                             {showAtlasContent
-                                ? 'Owner-run homes in KPHB, kept immaculate and always ready — book direct, arrive to a home that is genuinely yours for the night.'
+                                ? 'Owner-run homes in this neighbourhood, kept immaculate and always ready — book direct, arrive to a home that is genuinely yours for the night.'
                                 : `Direct from the owner — responsive support from ${schemaBrandName}.`}
                         </p>
                         <div id="search-form" data-testid="hero-widget" className="noir-hero-widget">

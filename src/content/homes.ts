@@ -31,7 +31,7 @@ export const defaultHomeHighlights = [
   "Fully furnished interiors",
   "In-unit workspace and smart TV",
   "Housekeeping support",
-  "Prime Jubilee Hills location",
+  "Prime neighbourhood location",
 ];
 
 type HomeConfig = Pick<Home, "tagline" | "highlights">;

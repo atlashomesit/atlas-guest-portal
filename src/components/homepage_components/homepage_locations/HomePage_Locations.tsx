@@ -332,7 +332,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
               if (hideAtlasBranding) {
                 return `${sortedListings.length} owner-run ${noun}${city ? ` in ${city}` : ''}. Same hands clean them, restock them, and answer the door.`;
               }
-              return `${sortedListings.length} owner-run ${noun} in KPHB, Kukatpally. Same hands clean them, restock them, and answer the door.`;
+              return `${sortedListings.length} owner-run ${noun} in this neighbourhood. Same hands clean them, restock them, and answer the door.`;
             })()}
           </p>
         </div>
@@ -353,7 +353,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
               : (getHomeDescriptor(model.listing.id) ??
                 model.listing.subtitle ??
                 model.property?.property_description ??
-                "A calm, owner-run home in KPHB 7th Phase.");
+                "A calm, owner-run home in this neighbourhood.");
 
             return (
               <Link

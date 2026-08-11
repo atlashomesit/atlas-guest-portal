@@ -149,7 +149,7 @@ const PhotoFirstHome = () => {
                         <h1 className="photofirst-hero-h1">{schemaBrandName}</h1>
                         <p className="photofirst-hero-sub">
                             {showAtlasContent
-                                ? 'Owner-run homes in KPHB, shown exactly as they are — scroll to see every room, book direct any time.'
+                                ? 'Owner-run homes in this neighbourhood, shown exactly as they are — scroll to see every room, book direct any time.'
                                 : `Direct from the owner. Scroll to see every room at ${schemaBrandName}.`}
                         </p>
                     </div>

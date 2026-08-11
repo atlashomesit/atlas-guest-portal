@@ -31,8 +31,7 @@ export default tseslint.config(
       },
     },
     rules: {
-      // Start as warn until RA-006 call sites are migrated (then flip to error).
-      'atlas-brand/no-atlas-string-leak': 'warn',
+      'atlas-brand/no-atlas-string-leak': 'error',
       'atlas/no-coerce-numeric-onchange': 'error',
       'atlas/no-utc-today': 'error',
       // TASK-7195 done-when #4: the four-state rule (loading | error | empty | populated)

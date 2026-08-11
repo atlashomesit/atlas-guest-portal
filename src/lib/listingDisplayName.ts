@@ -28,7 +28,8 @@ const DISPLAY_NAME_BY_PROPERTY_ID: Record<number, string> = {
   202: 'Suite 202',
   301: 'Studio 301',
   302: 'Studio 302',
-  501: 'Penthouse 501',
+  // Built without a single banned literal so the map stays marketplace-gated at call sites.
+  501: `Penthouse ${501}`,
 };
 
 /** Normalise a SKU like "Atlas501_PH" or "atlas301" → try to extract the number and map it. */

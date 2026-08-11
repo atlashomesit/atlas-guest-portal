@@ -69,7 +69,7 @@ const EditorialHome = () => {
     const heroImageUrl = showAtlasContent ? HERO_IMAGE_URL : '';
     const hasHeroPhoto = Boolean(heroImageUrl.trim());
     const heroPhotoAriaLabel = showAtlasContent
-        ? `A warm, owner-run ${schemaBrandName} living room in KPHB`
+        ? `A warm, owner-run ${schemaBrandName} living room`
         : `Welcome to ${schemaBrandName}`;
 
     const faqHighlights = getFaqHighlights();
@@ -141,7 +141,7 @@ const EditorialHome = () => {
                         </h1>
                         <p className="editorial-hero-dek">
                             {showAtlasContent
-                                ? 'Owner-run homes in KPHB, Hyderabad — read the space, the neighbourhood, and what to expect, then book direct in the same breath.'
+                                ? 'Owner-run homes in this neighbourhood — read the space, the area, and what to expect, then book direct in the same breath.'
                                 : `Direct from the owner — responsive support from ${schemaBrandName}.`}
                         </p>
                         <div id="search-form" data-testid="hero-widget" className="editorial-hero-widget">
@@ -175,7 +175,7 @@ const EditorialHome = () => {
                         </span>
                         <h2 id="editorial-narrative-heading" className="editorial-h2">
                             {showAtlasContent
-                                ? 'Why guests keep coming back to KPHB'
+                                ? 'Why guests keep coming back to this neighbourhood'
                                 : `Why guests keep coming back to ${schemaBrandName}`}
                         </h2>
                         <p className="editorial-narrative-p">
