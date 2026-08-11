@@ -50,7 +50,9 @@ export const PropertyMobileStickyBar: React.FC<Props> = ({
                 Free cancel until {summary.freeCancelUntil}
               </span>
             ) : (
-              <span className="pp-m-sticky-taxes">+ taxes &amp; fees</span>
+              <span className="pp-m-sticky-taxes" data-testid="mobile-sticky-fees-included">
+                all fees included
+              </span>
             )}
           </>
         ) : showLiveTotal && pricingPending ? (
