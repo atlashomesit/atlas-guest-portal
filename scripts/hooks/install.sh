@@ -3,7 +3,8 @@
 # directory. Run once per clone to enable TypeScript type checking on push.
 #
 # When sibling atlas-e2e/.githooks is present, prefer core.hooksPath so this clone
-# uses the central hook suite. Otherwise, install repo-local pre-push.
+# uses the central hook suite (incl. TASK-7211 No-Task: trailer). Otherwise, install
+# repo-local pre-push + commit-msg.
 set -e
 
 REPO_ROOT=$(git rev-parse --show-toplevel)
@@ -21,9 +22,9 @@ E2E_HOOKS="$(cd "$REPO_ROOT/.." && pwd)/atlas-e2e/.githooks"
 
 if [ -d "$E2E_HOOKS" ]; then
   git -C "$REPO_ROOT" config core.hooksPath "$E2E_HOOKS"
-  echo "Set core.hooksPath -> $E2E_HOOKS"
-  echo "Note: Atlas-e2e pre-push applies to all repos. Repo-local typecheck is NOT bypassed."
-  echo "Bypass with: git push --no-verify"
+  echo "Set core.hooksPath -> $E2E_HOOKS (TASK-7211; shared atlas-e2e/.githooks)"
+  echo "Repo-local scripts/hooks/commit-msg still chains from the central hook when present."
+  echo "Bypass with: git commit --no-verify / git push --no-verify"
   exit 0
 fi
 
@@ -39,4 +40,13 @@ mkdir -p "$HOOKS_DIR"
 cp "$SRC" "$DEST"
 chmod +x "$DEST"
 echo "Installed pre-push hook -> $DEST"
-echo "Bypass with: git push --no-verify"
+
+CM_SRC="$REPO_ROOT/scripts/hooks/commit-msg"
+CM_DEST="$HOOKS_DIR/commit-msg"
+if [ -f "$CM_SRC" ]; then
+  cp "$CM_SRC" "$CM_DEST"
+  chmod +x "$CM_DEST"
+  echo "Installed commit-msg hook -> $CM_DEST (TASK-7211; shared validator in sibling atlas-e2e)"
+fi
+
+echo "Bypass with: git commit --no-verify / git push --no-verify"
