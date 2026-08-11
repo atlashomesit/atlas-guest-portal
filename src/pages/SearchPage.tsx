@@ -31,6 +31,7 @@ import {
   type ListingAvailabilitySummary,
 } from "../api/availabilitySummaryClient";
 import RecentlyViewedStrip from "../components/RecentlyViewedStrip";
+import { SearchByImageModal, type ImageSearchMatch } from "../components/search/SearchByImageModal";
 import { fallbackCoordsForListing, hasMapCoords } from "../utils/mapCoords";
 import { amenityCodeMatchesCategory, resolveAmenityLabel } from "../utils/amenityCodes";
 import { estimateStayNights, formatEstTotalInclGst } from "../utils/guestPriceEstimate";
@@ -235,6 +236,10 @@ const SearchPage = () => {
   // TASK-1867: track real API errors separately; null apiListings on 0-listing response is not an error
   const [apiError, setApiError] = useState(false);
   const [loadingTimeoutReached, setLoadingTimeoutReached] = useState(false);
+  const [imageSearchOpen, setImageSearchOpen] = useState(false);
+  const [imageSearchListings, setImageSearchListings] = useState<NormalizedListing[] | null>(null);
+  const searchByImageEnabled = getTenantContext()?.searchByImageEnabled === true;
+  const imageSearchMode = searchParams.get("image") === "true" || imageSearchListings !== null;
   // TASK-7195: bumping this re-runs the load effect below — same "Try again" pattern as
   // MyBookingsPage. Needed because `apiError` used to be tracked but never gated the empty-state
   // copy (see showEmptyState/showErrorState): a marketplace or onlyApiListings tenant whose
@@ -386,6 +391,9 @@ const SearchPage = () => {
   const onlyApiListings = overrides.onlyApiListings === true;
   const estimateNights = useMemo(() => estimateStayNights(checkIn, checkOut), [checkIn, checkOut]);
   const listings = useMemo(() => {
+    if (imageSearchListings !== null) {
+      return imageSearchListings;
+    }
     if (isMarketplaceSearch) {
       return apiListings !== null ? apiListings : [];
     }
@@ -400,7 +408,7 @@ const SearchPage = () => {
       return [];
     }
     return buildStaticListings(tenantAllowedIds);
-  }, [apiListings, isMarketplaceSearch, tenantAllowedIds, onlyApiListings, isLoading]);
+  }, [apiListings, imageSearchListings, isMarketplaceSearch, tenantAllowedIds, onlyApiListings, isLoading]);
   const showingSampleListings =
     !onlyApiListings && apiListings === null && !isLoading && listings.length > 0;
 
@@ -554,6 +562,15 @@ const SearchPage = () => {
 
     return () => controller.abort();
   }, [checkIn, checkOut, hasInvalidDates]);
+
+  const handleImageSearchResults = useCallback((matches: ImageSearchMatch[]) => {
+    const normalized = apiToNormalized(matches.map((m) => m.listing));
+    setImageSearchListings(normalized);
+    setVisibleCount(ITEMS_PER_PAGE);
+    const next = new URLSearchParams(searchParams);
+    next.set("image", "true");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const hasAmenity = (unit: NormalizedListing, amenity: string): boolean => {
     const codes = (unit.amenities || []).map((a) => a.amenities_icon || "");
@@ -935,6 +952,16 @@ const SearchPage = () => {
 
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-semibold text-text-primary">Filters</span>
+          {searchByImageEnabled && !isMarketplaceSearch ? (
+            <button
+              type="button"
+              className="rounded-full border border-border-default px-3 py-1 text-sm font-medium text-text-primary hover:bg-bg-muted"
+              data-testid="search-by-photo-button"
+              onClick={() => setImageSearchOpen(true)}
+            >
+              Search by photo
+            </button>
+          ) : null}
           {activeFilterChips.length > 0 ? (
             <span
               className="inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded-full bg-cta-primary px-2 text-xs font-bold text-[var(--text-on-cta)]"
@@ -1460,6 +1487,12 @@ const SearchPage = () => {
           </div>
         )}
 
+        {imageSearchMode && imageSearchListings !== null ? (
+          <p className="text-sm text-text-muted mb-4" data-testid="image-search-results-banner">
+            Found {imageSearchListings.length} listings similar to your image
+          </p>
+        ) : null}
+
         {showingSampleListings && (
           <div
             className="mb-4 flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
@@ -1648,6 +1681,11 @@ const SearchPage = () => {
           </section>
         )}
       </div>
+      <SearchByImageModal
+        isOpen={imageSearchOpen}
+        onClose={() => setImageSearchOpen(false)}
+        onResults={handleImageSearchResults}
+      />
     </div>
   );
 };

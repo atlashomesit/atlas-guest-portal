@@ -105,6 +105,8 @@ export interface TenantInfo {
    * that is the safe direction until the API ships the field.
    */
   guestCommsBrandingMode?: 'Platform' | 'Neutral';
+  /** TASK-1715: Premium search-by-image feature flag from tenant bootstrap API. */
+  searchByImageEnabled?: boolean;
 }
 
 /** RA-006 §3.5: legal/contact identity returned by /tenants/from-domain.LegalContactPack. */
@@ -294,6 +296,7 @@ export async function resolveFromDomain(apiBaseUrl: string, domain: string): Pro
         data.guestCommsBrandingMode === 'Platform' || data.guestCommsBrandingMode === 'Neutral'
           ? data.guestCommsBrandingMode
           : undefined,
+      searchByImageEnabled: Boolean(data.searchByImageEnabled),
     };
     return tenantInfo;
   } catch (error) {
@@ -365,6 +368,7 @@ export async function validateTenant(slug: string): Promise<TenantInfo> {
       typeof data.effectiveColorPresetId === 'string' || data.effectiveColorPresetId === null
         ? data.effectiveColorPresetId
         : undefined,
+    searchByImageEnabled: Boolean(data.searchByImageEnabled),
   };
   return tenantInfo;
 }
