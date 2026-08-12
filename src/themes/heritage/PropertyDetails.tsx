@@ -1881,28 +1881,47 @@ useEffect(() => {
                   ariaLabel="From your hosts"
                 />
 
-                {/* About this home */}
-                <section className="pp-section" aria-label="About this home">
+                {/* About this home — DESIGN-031: omit invented prose; Ask host when empty */}
+                {(data.property_description?.trim() ||
+                  resolvedCheckInTime ||
+                  resolvedCheckOutTime ||
+                  (data.property_neighborhoods || []).length > 0 ||
+                  ppWaAskUrl) && (
+                <section className="pp-section" aria-label="About this home" data-testid="property-about-section">
                   <h2>About this home</h2>
-                  {data.property_description && (
-                    <p className="pp-prose">
-                      {showAboutMore
-                        ? data.property_description
-                        : `${data.property_description.slice(0, 300)}${data.property_description.length > 300 ? '…' : ''}`}
+                  {data.property_description?.trim() ? (
+                    <>
+                      <p className="pp-prose">
+                        {showAboutMore
+                          ? data.property_description
+                          : `${data.property_description.slice(0, 300)}${data.property_description.length > 300 ? '…' : ''}`}
+                      </p>
+                      {data.property_description.length > 300 && (
+                        <button
+                          type="button"
+                          className="pp-prose-more"
+                          onClick={() => setShowAboutMore((s) => !s)}
+                          aria-expanded={showAboutMore}
+                        >
+                          {showAboutMore ? 'Show less' : 'Read more'}
+                          <PpChevronDown size={14} />
+                        </button>
+                      )}
+                    </>
+                  ) : ppWaAskUrl ? (
+                    <p className="pp-prose" data-testid="property-about-ask-host">
+                      The host hasn&apos;t added a description yet.{' '}
+                      <a
+                        href={ppWaAskUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline underline-offset-2"
+                      >
+                        Ask them about this home
+                      </a>
+                      .
                     </p>
-                  )}
-                  {data.property_description && data.property_description.length > 300 && (
-                    <button
-                      type="button"
-                      className="pp-prose-more"
-                      onClick={() => setShowAboutMore((s) => !s)}
-                      aria-expanded={showAboutMore}
-                    >
-                      {showAboutMore ? 'Show less' : 'Read more'}
-                      <PpChevronDown size={14} />
-                    </button>
-                  )}
-                  {/* Check-in / Check-out times */}
+                  ) : null}
                   {(resolvedCheckInTime || resolvedCheckOutTime) && (
                     <div
                       style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginTop: 16 }}
@@ -1920,7 +1939,6 @@ useEffect(() => {
                       )}
                     </div>
                   )}
-                  {/* Neighborhoods */}
                   {(data.property_neighborhoods || []).length > 0 && (
                     <div style={{ marginTop: 14, display: 'flex', flexWrap: 'wrap', gap: 8 }} role="list" aria-label="Neighborhoods">
                       {data.property_neighborhoods!.map((n, idx) => (
@@ -1931,9 +1949,11 @@ useEffect(() => {
                     </div>
                   )}
                 </section>
+                )}
 
-                {/* Amenities */}
-                <section className="pp-section" aria-label="Amenities">
+                {/* Amenities — DESIGN-031: omit empty section */}
+                {ppAmenityLabels.length > 0 && (
+                <section className="pp-section" aria-label="Amenities" data-testid="property-amenities-section">
                   <div className="pp-section-head">
                     <h2>What&rsquo;s here</h2>
                   </div>
@@ -1972,6 +1992,7 @@ useEffect(() => {
                     </button>
                   )}
                 </section>
+                )}
 
                 {/* Guest Reviews */}
                 {(() => {
@@ -2169,21 +2190,31 @@ useEffect(() => {
                           : 'Contact host for occupancy details.'}
                       </span>
                     </div>
-                    {/* Check-in card */}
+                    {/* Check-in card — DESIGN-031 */}
                     <div className="pp-v2-knowcard" data-testid="property-check-in-card">
                       <div className="pp-v2-knowicon"><PpV2ClockInIcon /></div>
                       <small>Check-in</small>
                       <strong data-testid={resolvedCheckInTime ? 'property-check-in-time' : 'property-check-in-pending'}>
-                        {resolvedCheckInTime ?? 'Confirmed after booking'}
+                        {resolvedCheckInTime ?? 'Ask host'}
                       </strong>
-                      {resolvedCheckInTime && <span>Early check-in subject to availability.</span>}
+                      {resolvedCheckInTime ? (
+                        <span>Early check-in subject to availability.</span>
+                      ) : (
+                        <span>Host will confirm check-in time.</span>
+                      )}
                     </div>
                     {/* Check-out card */}
                     <div className="pp-v2-knowcard">
                       <div className="pp-v2-knowicon"><PpV2ClockOutIcon /></div>
                       <small>Check-out</small>
-                      <strong>{resolvedCheckOutTime ?? 'Confirmed after booking'}</strong>
-                      {resolvedCheckOutTime && <span>Late check-out subject to availability.</span>}
+                      <strong data-testid={resolvedCheckOutTime ? 'property-check-out-time' : 'property-check-out-pending'}>
+                        {resolvedCheckOutTime ?? 'Ask host'}
+                      </strong>
+                      {resolvedCheckOutTime ? (
+                        <span>Late check-out subject to availability.</span>
+                      ) : (
+                        <span>Host will confirm check-out time.</span>
+                      )}
                     </div>
                   </div>
                 </section>

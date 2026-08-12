@@ -9,6 +9,10 @@ import { useBooking } from "../../contexts/BookingContext";
 import { estTotalInclGst, estimateStayNights, formatEstTotalInclGst } from "../../utils/guestPriceEstimate";
 import { getPropertyDesignImage } from "../../config/branding";
 import { resolveAmenityLabel } from "../../utils/amenityCodes";
+import {
+  resolveListingCardCancellationChip,
+  type CancellationTier,
+} from "../../utils/cancellationPolicy";
 
 type ListingCardProps = {
   id: string;
@@ -46,6 +50,8 @@ type ListingCardProps = {
   lastMinuteDiscountPercent?: number | null;
   /** TASK-4312: whether the listing owner is GST-registered. */
   isGstRegistered?: boolean;
+  /** DESIGN-028: listing-scoped cancellation tier for the card trust chip. */
+  cancellationTier?: CancellationTier | string | null;
   onClick?: () => void;
 };
 
@@ -78,8 +84,10 @@ const ListingCard: React.FC<ListingCardProps> = ({
   estimateNights: estimateNightsProp,
   lastMinuteDiscountPercent,
   isGstRegistered = true, // TASK-4312: default to true for backward compat
+  cancellationTier = null,
   onClick,
 }) => {
+  const cancellationChip = resolveListingCardCancellationChip(cancellationTier);
   const { format: formatCurrency } = useCurrency();
   const { booking } = useBooking();
   const estimateNights = useMemo(() => {
@@ -369,6 +377,13 @@ const ListingCard: React.FC<ListingCardProps> = ({
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="inline-flex items-center gap-1 rounded-full bg-bg-surface px-2 py-1">No hidden fees</span>
                   <span className="inline-flex items-center gap-1 rounded-full bg-bg-surface px-2 py-1">Secure Razorpay payments</span>
+                  {/* DESIGN-028: listing-scoped free-cancel promise (tier known here). */}
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full bg-bg-surface px-2 py-1"
+                    data-testid="listing-card-cancellation-chip"
+                  >
+                    {cancellationChip}
+                  </span>
                   <span className="inline-flex items-center gap-1 rounded-full bg-bg-surface px-2 py-1">
                     {hasVerifiedReviews ? `Avg. rating ${ratingSnippet}` : ratingSnippet}
                   </span>

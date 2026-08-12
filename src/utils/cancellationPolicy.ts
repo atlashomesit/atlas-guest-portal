@@ -1,4 +1,5 @@
 import { DateTime } from 'luxon';
+import { REFUND_APPROVAL_WINDOW } from '@/config/refundPolicyTimelines';
 
 /**
  * TASK-4334: Single source of truth for the free-cancellation window per listing
@@ -241,8 +242,9 @@ export type FreeCancellationTrustCopy = {
  * hidden too.
  */
 /**
- * TASK-7432: homepage hero has no listing/check-in context, so it cannot invent 48h+24h badges.
- * When a default tier is known, return one short policy chip; otherwise omit (callers link to /policies).
+ * TASK-7432 / DESIGN-028: homepage hero has no listing/check-in context, so it cannot invent
+ * free-cancel hour badges. Defer free-cancel detail to /policies; the hero may still assert the
+ * unconditional refund-*processing* commitment (see `resolveHeroRefundProcessingChip`).
  */
 export function resolveHomepageCancellationChip(input: {
   tier: CancellationTier | string | null | undefined;
@@ -251,6 +253,25 @@ export function resolveHomepageCancellationChip(input: {
   if (!tier) return null;
   // Single statement — never pair contradictory hour windows on the hero.
   return 'See cancellation policy';
+}
+
+/**
+ * DESIGN-028: unconditional processing promise for pre-listing surfaces (hero).
+ * Numbers come from `refundPolicyTimelines` — never invent free-cancel windows here.
+ */
+export function resolveHeroRefundProcessingChip(): string {
+  // Keep short for a single-row 375px chip strip.
+  return `Refunds approved ${REFUND_APPROVAL_WINDOW}`;
+}
+
+/**
+ * DESIGN-028: listing/search card chip when a listing (and thus an effective tier) is in scope.
+ * Uses the same tier prose as the listing-detail trust band — never invents hour windows.
+ */
+export function resolveListingCardCancellationChip(
+  tier: CancellationTier | string | null | undefined,
+): string {
+  return describeCancellationPolicy(tier).headline;
 }
 
 export function resolveFreeCancellationTrustCopy(input: {

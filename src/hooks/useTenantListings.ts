@@ -45,6 +45,8 @@ export type TenantPropertyRecord = {
   /** TL-GUEST: property pin from GET /listings/public — same source as Location page multi-pin. */
   latitude?: number | null;
   longitude?: number | null;
+  /** DESIGN-028: listing cancellation tier for card trust chips. */
+  cancellationTier?: "Flexible" | "Moderate" | "Strict" | null;
 };
 
 export type TenantListingsState = "idle" | "loading" | "error" | "success";
@@ -106,29 +108,22 @@ export const mapDtoToProperty = (dto: PublicListing): TenantPropertyRecord => {
       (dto.propertyName?.trim() ? dto.propertyName : null) ??
       local?.property_name ??
       `Listing ${dto.id}`,
+    // DESIGN-031 / TASK-7194: never invent "Comfortable stay…" and never borrow Atlas demo
+    // catalog prose/amenities via listingId collision — empty means omit on the listing page.
     property_description:
       dto.seoDescription?.trim() ||
       dto.metaDescription?.trim() ||
-      // TASK-7502: the parentheses are load-bearing, not style. `a || b || c ?? d` is a hard
-      // SyntaxError ("Cannot use '??' with '||' without parentheses") — it does not merely warn,
-      // the module fails to parse and every importer dies with it. TASK-7193 introduced the mix by
-      // prepending the two `||` clauses above onto what was already `c ?? d`. Grouped as
-      // `a || b || (c ?? d)` so BOTH intents survive: the two new `.trim()` clauses keep `||`
-      // fall-through (an empty string must fall through, which is the whole point of trimming),
-      // while the original nullish-coalescing default is preserved exactly as TASK-4313 wrote it.
-      // Do NOT "simplify" to `(a || b || c) ?? d` — that returns "" for a tenant whose stored
-      // description is blank, printing an empty description instead of the generated fallback.
-      (local?.property_description ??
-        // TASK-4313: singular "1 guest" when capacity is 1.
-        `Comfortable stay for up to ${dto.maxGuests || local?.maxGuests || 2} guest${(dto.maxGuests || local?.maxGuests || 2) === 1 ? '' : 's'}.`),
-    // TASK-7194: never invent a city — empty when the tenant has no address.
-    property_location: local?.property_location ?? dto.propertyAddress ?? "",
-    property_neighborhoods: local?.property_neighborhoods ?? [],
+      "",
+    // TASK-7194 / DESIGN-031: never invent a city and never borrow demo catalog location.
+    property_location: (dto.propertyAddress ?? "").trim(),
+    property_neighborhoods: [],
     property_reviews: dto.reviewCount ?? local?.property_reviews ?? 0,
     property_rating: dto.propertyRating ?? local?.property_rating ?? 0,
     property_img: photoUrls,
-    property_amenities: local?.property_amenities ?? [],
-    property_policy_details: local?.property_policy_details ?? [],
+    // DESIGN-031: amenities come from the API only (see listing detail amenityCodes). Do not
+    // pad from bundled propertyData when dto.id collides with an Atlas demo unit.
+    property_amenities: [],
+    property_policy_details: [],
     lastBookedAt: dto.lastBookedAt ?? null, // TASK-1360
     losDiscountMinNights: dto.losDiscountMinNights ?? null,
     losDiscountPercent: dto.losDiscountPercent ?? null,
@@ -137,6 +132,7 @@ export const mapDtoToProperty = (dto: PublicListing): TenantPropertyRecord => {
     lastMinuteDiscountPercent: dto.lastMinuteDiscountPercent ?? null,
     latitude: dto.latitude ?? null,
     longitude: dto.longitude ?? null,
+    cancellationTier: dto.cancellationTier ?? null,
   };
 };
 

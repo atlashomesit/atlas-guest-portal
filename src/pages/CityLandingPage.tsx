@@ -76,6 +76,7 @@ function toListingCardModel(listing: PublicListing) {
     losDiscountPercent: listing.losDiscountPercent ?? undefined,
     losDiscount2MinNights: listing.losDiscount2MinNights ?? undefined,
     losDiscount2Percent: listing.losDiscount2Percent ?? undefined,
+    cancellationTier: listing.cancellationTier ?? null,
   };
 }
 
@@ -248,6 +249,7 @@ const CityLandingPage = ({ citySlug }: CityLandingPageProps) => {
                 losDiscountPercent={c.losDiscountPercent ?? null}
                 losDiscount2MinNights={c.losDiscount2MinNights ?? null}
                 losDiscount2Percent={c.losDiscount2Percent ?? null}
+                cancellationTier={c.cancellationTier ?? null}
                 estimateNights={1}
                 onClick={() => navigate(buildHomeUnitPath(c.propertySlug, c.listingId))}
               />

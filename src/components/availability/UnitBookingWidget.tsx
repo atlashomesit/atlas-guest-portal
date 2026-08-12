@@ -85,6 +85,8 @@ export type BookingStickySummary = {
   totalAmount: number | null;
   pricingPending: boolean;
   freeCancelUntil: string | null;
+  /** DESIGN-030: selected range cannot be booked — sticky must not show a bookable total. */
+  datesUnavailable?: boolean;
 };
 
 /** Detect network/connection failures (timeout, offline, ECONNREFUSED, etc.). */
@@ -1177,6 +1179,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
   // When API has loaded: use API price (or calendar sum). When API has not loaded: use 0.
   const hasSelectedRange = Boolean(dateRange.startDate && dateRange.endDate);
+  // DESIGN-030: one unavailable posture — do not stack a full purchase summary with conflict alerts.
+  const datesUnavailable =
+    Boolean(dateError) || checkinUnavailable || availabilityFailed;
 
   // TASK-4303: per-date pricing + fee percent for the selected range are still resolving.
   // While pending, the headline total and price breakdown render a loading skeleton instead
@@ -1318,13 +1323,19 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   useEffect(() => {
     onStickySummaryChange?.({
       hasCompleteDates: hasSelectedRange,
-      totalAmount: hasSelectedRange && displayFinalTotal > 0 ? displayFinalTotal : null,
-      pricingPending: rangePricingPending || calendarOpenPricingPending,
-      freeCancelUntil: freeCancellationCopy?.deadlineFormatted ?? null,
+      // DESIGN-030: never feed the sticky a bookable total for unavailable dates.
+      totalAmount:
+        hasSelectedRange && !datesUnavailable && displayFinalTotal > 0 ? displayFinalTotal : null,
+      pricingPending: !datesUnavailable && (rangePricingPending || calendarOpenPricingPending),
+      freeCancelUntil: datesUnavailable
+        ? null
+        : freeCancellationCopy?.deadlineFormatted ?? null,
+      datesUnavailable,
     });
   }, [
     onStickySummaryChange,
     hasSelectedRange,
+    datesUnavailable,
     displayFinalTotal,
     rangePricingPending,
     calendarOpenPricingPending,
@@ -1343,13 +1354,14 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   // v2: "Why book direct" block removed from widget JSX. Calculation kept (prefixed _) for future
   // OTA comparison card on the listing page. TASK-2576 context: data was used to show OTA fee delta.
   const illustrativeOtaGuestFeeComparison = useMemo(() => {
-    if (!hasSelectedRange || breakdownPrice <= 0) return null;
+    // DESIGN-030: no "Save ~₹…" confidence line for dates that cannot be booked.
+    if (!hasSelectedRange || datesUnavailable || breakdownPrice <= 0) return null;
     const illustrativeGuestFee = Math.round((breakdownPrice * ILLUSTRATIVE_OTA_GUEST_FEE_PERCENT) / 100);
     return {
       illustrativeGuestFee,
       illustrativeRoomPlusFee: breakdownPrice + illustrativeGuestFee,
     };
-  }, [hasSelectedRange, breakdownPrice]);
+  }, [hasSelectedRange, datesUnavailable, breakdownPrice]);
 
   // v2 date display uses split check-in/check-out cells (see lv-date-cell blocks below).
 
@@ -1581,9 +1593,19 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
       {/* v2 block (1): Price headline */}
       <div className="lv-booking-headline" data-testid="bw-header">
-        {/* TASK-4303: while per-date pricing resolves, show a skeleton — never the provisional
-            base-rate total that silently jumps once the API responds. */}
-        {hasSelectedRange && !invalidIstStayRange && rangePricingPending ? (
+        {/* DESIGN-030: unavailable range → one clear headline, not a confident purchase total. */}
+        {hasSelectedRange && !invalidIstStayRange && datesUnavailable ? (
+          <>
+            <div className="lv-booking-total" data-testid="bw-dates-unavailable-headline">
+              <b style={{ fontWeight: 600 }}>Dates unavailable</b>
+            </div>
+            <p className="lv-booking-sub">
+              {dateRange.startDate && dateRange.endDate
+                ? `${format(dateRange.startDate, 'dd MMM')} — ${format(dateRange.endDate, 'dd MMM')} · pick different nights`
+                : 'Pick different nights to continue'}
+            </p>
+          </>
+        ) : hasSelectedRange && !invalidIstStayRange && rangePricingPending ? (
           <>
             <div className="lv-booking-total" data-testid="bw-price-pending" aria-busy="true">
               <span
@@ -1845,7 +1867,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             TASK-4303: also held behind a skeleton until per-date pricing + fee percent have
             resolved — the provisional breakdown (base rate × nights, ₹0 processing fee) read
             ~12% below the settled total and silently jumped once the API responded. */}
-        {hasSelectedRange && !invalidIstStayRange && rangePricingPending && (
+        {/* DESIGN-030: while unavailable, skip the purchase-ready skeleton/breakdown. */}
+        {hasSelectedRange && !invalidIstStayRange && !datesUnavailable && rangePricingPending && (
           <div className="lv-price-rows" data-testid="bw-breakdown-pending" aria-busy="true" role="status">
             <div className="lv-price-row">
               <span className="inline-block h-4 w-32 animate-pulse rounded bg-[#f0e6dc]" aria-hidden="true" />
@@ -1858,7 +1881,16 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             <p className="text-xs text-text-muted" style={{ marginTop: 4 }}>Fetching latest prices…</p>
           </div>
         )}
-        {hasSelectedRange && !invalidIstStayRange && !rangePricingPending && (
+        {hasSelectedRange && !invalidIstStayRange && datesUnavailable && displayFinalTotal > 0 && !rangePricingPending && (
+          <p
+            className="text-sm text-text-muted"
+            data-testid="bw-unavailable-price-hint"
+            style={{ marginTop: 8, lineHeight: 1.45 }}
+          >
+            These dates would be ~{displayPrice(displayFinalTotal)} — pick available dates to book.
+          </p>
+        )}
+        {hasSelectedRange && !invalidIstStayRange && !datesUnavailable && !rangePricingPending && (
         <div className="lv-price-rows">
           {/* TASK-4282: Show per-night breakdown when rates vary, or averaged format when uniform */}
           {(() => {
@@ -1986,9 +2018,16 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
       {/* TASK-2612: Add-ons moved to GuestDetailsPage */}
 
-      {dateError && (
-        <p id={dateErrorId} role="alert" data-testid="guest-booking-date-error" className="text-sm text-support-error" style={{ marginTop: 4 }}>
-          {dateError}
+      {/* DESIGN-030: one conflict message — overlap wins over check-in-unavailable (no restating). */}
+      {(dateError || (checkinUnavailable && !availabilityFailed)) && (
+        <p
+          id={dateErrorId}
+          role="alert"
+          data-testid={dateError ? "guest-booking-date-error" : "guest-booking-checkin-unavailable"}
+          className="text-sm text-support-error"
+          style={{ marginTop: 4 }}
+        >
+          {dateError ?? "These dates aren’t available. Please select a different check-in date."}
         </p>
       )}
       {statusMessage && <p className="text-xs text-text-secondary" style={{ marginTop: 4 }}>{statusMessage}</p>}
@@ -2001,17 +2040,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         </p>
       )}
 
-      {/* TASK-4293: the check-in day is Blocked/Hold — the Reserve button is disabled, so surface the
-          reason proactively (the click-time formError can no longer fire). */}
-      {checkinUnavailable && (
-        <p className="text-sm text-support-error" role="alert" data-testid="guest-booking-checkin-unavailable" style={{ marginTop: 4 }}>
-          Check-in date is not available. Please select a different check-in date.
-        </p>
-      )}
-
-      {/* TASK-4830: availability fetch failed — the Reserve button is disabled (we cannot trust the
-          empty dateStatusMap/blockedSet as all-open). Surface the failure and offer a retry so the
-          guest can re-check availability instead of reserving nights that may already be booked. */}
+      {/* TASK-4830: availability fetch failed — keep retry; DESIGN-030: this is the sole alert when fetch fails. */}
       {availabilityFailed && (
         <div
           className="text-sm text-support-error"
@@ -2043,13 +2072,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           isSubmitting ||
           isBookingDisabled ||
           (Boolean(dateRange.startDate) && Boolean(dateRange.endDate) && invalidIstStayRange) ||
-          // TASK-4293: check-in day itself is Blocked/Hold — disable up front, don't let the click
-          // reach a confusing API-level failure.
-          checkinUnavailable ||
-          // TASK-4830: availability fetch FAILED — dateStatusMap/blockedSet are empty and cannot be
-          // trusted as all-open, so fail CLOSED (a retry control is offered above). This gates on a
-          // terminal failure only, NOT on the availability loading window (that stays TASK-4277-safe).
-          availabilityFailed ||
+          // DESIGN-030 / TASK-4293 / TASK-4830: overlap, blocked check-in, or availability failure.
+          datesUnavailable ||
           // TASK-4303: pricing still resolving for the selected range (1–3 s worst case) —
           // reserving now would seed holdPriceBreakdown's client fallback with the provisional
           // base-rate/₹0-fee numbers (see the TASK-4286 fallback in handleReserve). Blank dates
@@ -2061,22 +2085,25 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           // TASK-4729: guard against NaN pricing (non-numeric server response)
           (hasSelectedRange && !rangePricingPending && isNaN(finalTotal))
         }
-        title={checkinUnavailable ? 'Check-in date is not available. Please select a different check-in date.' : undefined}
+        title={datesUnavailable ? 'These dates aren’t available. Please select different dates.' : undefined}
         className={`bw-reserve lv-booking-cta${isSubmitting ? ' opacity-75' : ''}`}
         data-testid="guest-booking-submit"
         style={{ marginTop: 20, width: '100%', background: 'var(--gradient-cta, linear-gradient(135deg, #f08c71, #e86a4a))', color: '#fff', border: 0, borderRadius: 12, padding: '14px 24px', fontSize: 15, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer', transition: 'filter .2s, box-shadow .2s', boxShadow: '0 4px 12px rgba(196, 90, 63, 0.25)' }}
       >
-        {isBookingDisabled || checkinUnavailable || availabilityFailed
+        {isBookingDisabled || datesUnavailable
           ? 'Unavailable'
           : isSubmitting
             ? 'Reserving…'
             : 'Reserve'}
       </Button>
+      {/* DESIGN-030: hide purchase-confidence chrome when the selected dates cannot be booked. */}
+      {!datesUnavailable && (
       <p className="bw-charge-note" data-testid="bw-charge-note" style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-muted, #6b5a55)', marginTop: 8 }}>
         You won&apos;t be charged yet
       </p>
+      )}
 
-      {illustrativeOtaGuestFeeComparison && illustrativeOtaGuestFeeComparison.illustrativeGuestFee > 0 && (
+      {!datesUnavailable && illustrativeOtaGuestFeeComparison && illustrativeOtaGuestFeeComparison.illustrativeGuestFee > 0 && (
         <p
           className="bw-direct-savings"
           data-testid="bw-direct-savings-line"
@@ -2088,8 +2115,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
       {/* TASK-2623/TASK-4334: Trust strip — free cancellation, actual computed deadline
           when a check-in date is selected; generic fallback copy otherwise. TASK-7012: rendered only
-          when there is a truthful claim to make — never as a bare check icon with blank text. */}
-      {cancellationTrustText ? (
+          when there is a truthful claim to make — never as a bare check icon with blank text.
+          DESIGN-030: never advertise a refund promise for unavailable dates. */}
+      {!datesUnavailable && cancellationTrustText ? (
         <div className="lv-booking-cancel bw-trust" data-testid="bw-trust-strip">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M20 6L9 17l-5-5"/>
@@ -2102,7 +2130,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           shown when the server has resolved a non-null graceHours for this listing (flag-off parity).
           TASK-7012: and only when the selected dates do not VOID that window — the server will not
           honour a voided grace window, so advertising it would over-promise the refund. */}
-      {disclosableGraceHours ? (
+      {!datesUnavailable && disclosableGraceHours ? (
         <div className="lv-booking-cancel bw-trust" data-testid="bw-grace-window-strip">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M20 6L9 17l-5-5"/>

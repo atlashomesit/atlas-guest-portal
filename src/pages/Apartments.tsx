@@ -85,6 +85,8 @@ type CombinedListing = {
   losDiscount2Percent?: number | null;
   /** TASK-4011: Last-minute discount percentage. */
   lastMinuteDiscountPercent?: number | null;
+  /** DESIGN-028: listing cancellation tier for card chip. */
+  cancellationTier?: "Flexible" | "Moderate" | "Strict" | null;
 };
 
 const derivePropertyType = (name?: string): string => {
@@ -404,6 +406,8 @@ export const Apartments = () => {
             losDiscount2MinNights: (property as { losDiscount2MinNights?: number | null }).losDiscount2MinNights ?? null,
             losDiscount2Percent: (property as { losDiscount2Percent?: number | null }).losDiscount2Percent ?? null,
             lastMinuteDiscountPercent: (property as { lastMinuteDiscountPercent?: number | null }).lastMinuteDiscountPercent ?? null, // TASK-4528
+            cancellationTier:
+              (property as { cancellationTier?: "Flexible" | "Moderate" | "Strict" | null }).cancellationTier ?? null,
           };
         } catch (error) {
           console.error(`Error processing listing ${listing.id}:`, error);
@@ -674,6 +678,7 @@ export const Apartments = () => {
                   losDiscount2MinNights={listing.losDiscount2MinNights}
                   losDiscount2Percent={listing.losDiscount2Percent}
                   lastMinuteDiscountPercent={listing.lastMinuteDiscountPercent}
+                  cancellationTier={listing.cancellationTier}
                   estimateNights={estimateNights}
                   onClick={() => handleNavigate(listing.property)}
                 />
