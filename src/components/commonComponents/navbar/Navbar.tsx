@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, useNavigate, useLocation, matchPath } from 'react-router-dom';
 import './navbar.css';
+import './mobile-search.css';
+import MobileSearchPill from './MobileSearchPill';
 
 import { primaryNav, ctaNav, tripsMenuNav } from '../../../config/navigation';
 import { LOGO_URL } from '../../../config/branding';
@@ -232,6 +234,9 @@ const Navbar = () => {
               <span className="navbar-logo-text">{brandName}</span>
             ) : null}
           </Link>
+
+          {/* DESIGN-026: persistent mobile search pill — sits between logo and hamburger */}
+          <MobileSearchPill />
 
           {/* Mobile Menu Button - Only visible on mobile */}
           <div className="lg:hidden">
