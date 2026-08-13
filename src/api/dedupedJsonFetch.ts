@@ -50,7 +50,7 @@ export async function dedupedJsonFetch(url: string, init?: RequestInit): Promise
 
   const promise = (async (): Promise<DedupedJsonResult> => {
     const response = await fetch(url, restInit);
-    let body: unknown = null;
+    let body: unknown;
     try {
       body = await response.json();
     } catch {
