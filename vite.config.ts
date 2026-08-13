@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import fs from "fs";
+import { clampTransformWidth, isAllowedBlobImageUrl } from "./functions/_lib/guestImageProxy";
 
 const RUNTIME_CONFIG_PATH = path.resolve(__dirname, "public/.well-known/atlas-runtime-config.json");
 const MANIFEST_PATH = path.resolve(__dirname, "public/manifest.webmanifest");
@@ -54,8 +55,8 @@ function devRuntimeConfigPlugin() {
 }
 
 /**
- * TASK-7821: in Vite dev, `/img?u=` 302s to the allowlisted blob (no CF Image
- * Resizing locally). Production uses `functions/img.ts`.
+ * TASK-7821: Vite dev `/img?u=&w=` actually resizes with sharp (same allowlist as
+ * `functions/img.ts`). A 302 to the blob would still ship the multi-MB original.
  */
 function devGuestImageProxyPlugin() {
   return {
@@ -66,23 +67,44 @@ function devGuestImageProxyPlugin() {
         if (rawUrl !== "/img") {
           return next();
         }
-        try {
-          const parsed = new URL(req.url ?? "", "http://local.invalid");
-          const origin = (parsed.searchParams.get("u") ?? "").trim();
-          const host = origin ? new URL(origin).hostname : "";
-          if (host !== "atlashomestorage.blob.core.windows.net" || !origin.startsWith("https://")) {
-            res.statusCode = 400;
-            res.end("Invalid image origin");
-            return;
+        void (async () => {
+          try {
+            const parsed = new URL(req.url ?? "", "http://local.invalid");
+            const origin = (parsed.searchParams.get("u") ?? "").trim();
+            if (!isAllowedBlobImageUrl(origin)) {
+              res.statusCode = 400;
+              res.end("Invalid image origin");
+              return;
+            }
+            const width = clampTransformWidth(parsed.searchParams.get("w"));
+            const upstream = await fetch(origin, { redirect: "manual" });
+            if (upstream.status >= 300 && upstream.status < 400) {
+              res.statusCode = 400;
+              res.end("Redirected image origin is not allowed");
+              return;
+            }
+            if (!upstream.ok) {
+              res.statusCode = upstream.status === 404 ? 404 : 502;
+              res.end("Image origin failed");
+              return;
+            }
+            const bytes = Buffer.from(await upstream.arrayBuffer());
+            const sharp = (await import("sharp")).default;
+            const body = await sharp(bytes)
+              .resize({ width, withoutEnlargement: true })
+              .webp({ quality: 75 })
+              .toBuffer();
+            res.statusCode = 200;
+            res.setHeader("Content-Type", "image/webp");
+            res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+            res.setHeader("X-Atlas-Image-Proxy", "1");
+            res.setHeader("X-Atlas-Image-Width", String(width));
+            res.end(body);
+          } catch {
+            res.statusCode = 502;
+            res.end("Image origin unreachable");
           }
-          res.statusCode = 302;
-          res.setHeader("Location", origin);
-          res.setHeader("Cache-Control", "no-store");
-          res.end();
-        } catch {
-          res.statusCode = 400;
-          res.end("Invalid image origin");
-        }
+        })();
       });
     },
   };
