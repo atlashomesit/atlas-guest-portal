@@ -202,7 +202,10 @@ describe('UnitBookingWidget - TASK-2623: .bw-* design header, price labels, trus
     // Rendering the strip off `resolvedGraceHours` advertises a refund the API will not issue.
     expect(content).toContain('disclosableGraceHours');
     expect(content).toContain('applicableGraceHours');
-    expect(content).toMatch(/\{disclosableGraceHours \?/);
+    // DESIGN-030 (326df4d6) added a `!datesUnavailable &&` guard ahead of the ternary (never
+    // advertise a refund promise for dates that cannot be booked at all) — match the still-required
+    // disclosableGraceHours ternary regardless of that leading guard.
+    expect(content).toContain('disclosableGraceHours ? (');
     expect(content).not.toMatch(/\{resolvedGraceHours \?\s*\(/);
   });
 
@@ -425,19 +428,38 @@ describe('UnitBookingWidget - TASK-4293: Reserve button disabled when the select
     expect(memoSection).toContain('if (!dateRange.startDate) return false;');
   });
 
-  it('wires checkinUnavailable into the Reserve button disabled condition', () => {
+  it('wires checkinUnavailable into the Reserve button disabled condition (via datesUnavailable)', () => {
     const content = readFileSync(filePath, 'utf-8');
+    // DESIGN-030 (326df4d6): the disabled condition now ORs a single consolidated
+    // `datesUnavailable` flag instead of referencing `checkinUnavailable` directly — assert the
+    // consolidated flag's own definition still folds in checkinUnavailable, AND that it is wired
+    // into the button, so the two can never fall out of sync.
+    const datesUnavailableDef = content.slice(
+      content.indexOf('const datesUnavailable ='),
+      content.indexOf('const datesUnavailable =') + 200,
+    );
+    expect(datesUnavailableDef).toContain('checkinUnavailable');
     const buttonSection = content.slice(
       content.indexOf('data-testid="guest-booking-submit"') - 900,
       content.indexOf('data-testid="guest-booking-submit"'),
     );
-    expect(buttonSection).toContain('checkinUnavailable');
+    expect(buttonSection).toContain('datesUnavailable');
   });
 
   it('surfaces the unavailability reason proactively (disabled button cannot fire the click-time formError)', () => {
     const content = readFileSync(filePath, 'utf-8');
-    expect(content).toContain('data-testid="guest-booking-checkin-unavailable"');
-    expect(content).toContain('Check-in date is not available. Please select a different check-in date.');
+    // DESIGN-030 (326df4d6) consolidated the overlap-dateError and checkin-unavailable alerts into
+    // one <p> (never stack two conflict messages), so data-testid is now assigned via a ternary
+    // rather than a literal attribute, and the copy reads "These dates aren't available..." instead
+    // of the old "Check-in date is not available..." — assert the checkin-unavailable arm of that
+    // ternary is still gated on checkinUnavailable and still carries a proactive message.
+    const alertSection = content.slice(
+      content.indexOf('id={dateErrorId}') - 200,
+      content.indexOf('id={dateErrorId}') + 450,
+    );
+    expect(alertSection).toContain('"guest-booking-checkin-unavailable"');
+    expect(alertSection).toContain('checkinUnavailable');
+    expect(alertSection).toContain('These dates aren’t available. Please select a different check-in date.');
   });
 
   it('re-hydrates URL dates after listingId resolves (listingId is a hydration dep)', () => {
@@ -471,7 +493,10 @@ describe('UnitBookingWidget - TASK-4303: no provisional total before per-date pr
     // Headline and breakdown must render a skeleton — not the base-rate provisional — while pending.
     expect(content).toContain('data-testid="bw-price-pending"');
     expect(content).toContain('data-testid="bw-breakdown-pending"');
-    expect(content).toContain('hasSelectedRange && !invalidIstStayRange && !rangePricingPending && (');
+    // DESIGN-030 (326df4d6) added a `!datesUnavailable &&` guard alongside `!rangePricingPending`
+    // on the settled breakdown (an unavailable range shows the "Dates unavailable" headline
+    // instead, never the real purchase breakdown) — the rangePricingPending gate is unchanged.
+    expect(content).toContain('hasSelectedRange && !invalidIstStayRange && !datesUnavailable && !rangePricingPending && (');
   });
 
   it('only a terminal (non-abort) pricing fetch failure degrades to the fallback estimate', () => {
@@ -575,11 +600,19 @@ describe('UnitBookingWidget - TASK-4830: availability fetch failure fail-closes 
 
   it('fail-closes the Reserve button on availability failure (a terminal error, not TASK-4277 loading)', () => {
     const content = readFileSync(filePath, 'utf-8');
+    // DESIGN-030 (326df4d6): same consolidation as TASK-4293 above — the disabled condition ORs
+    // `datesUnavailable`, which folds in `availabilityFailed` (asserted via its own definition),
+    // rather than referencing `availabilityFailed` directly at the button.
+    const datesUnavailableDef = content.slice(
+      content.indexOf('const datesUnavailable ='),
+      content.indexOf('const datesUnavailable =') + 200,
+    );
+    expect(datesUnavailableDef).toContain('availabilityFailed');
     const buttonSection = content.slice(
       content.indexOf('data-testid="guest-booking-submit"') - 1800,
       content.indexOf('data-testid="guest-booking-submit"'),
     );
-    expect(buttonSection).toContain('availabilityFailed ||');
+    expect(buttonSection).toContain('datesUnavailable');
   });
 
   it('offers a retry that clears the dedup key and re-issues the availability GET', () => {
