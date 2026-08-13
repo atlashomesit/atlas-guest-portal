@@ -703,18 +703,23 @@ const PropertyDetails = () => {
 
     // Public /listings only Includes cover + SortOrder==1, so catalog property_img is incomplete.
     // Hydrate full photoUrls from GET /listings/{id} once per listing for "View gallery".
+    // TASK-7824 root cause: this effect listed `data` in its deps. Each setData() (photos /
+    // maxGuests / hostPhone) created a new object, re-ran the effect, and stacked 2–6 identical
+    // GET /listings/{id} calls (plus resolveListing on the same URL). Depend on listing-id
+    // primitives only; `dedupedJsonFetch` still collapses this caller with resolveListing.
     const detailPhotosHydratedRef = React.useRef<number | null>(null);
+    const hasPropertyRow = data != null;
+    const dataListingId = data?.listingId ?? null;
     useEffect(() => {
-        const lid = Number(resolvedListingId ?? data?.listingId ?? NaN);
-        if (!data || !Number.isFinite(lid) || lid <= 0) return;
-        const hasMaxGuests = typeof data.maxGuests === 'number' && data.maxGuests >= 1;
-        const hasHostPhone = typeof data.hostPhone === 'string' && data.hostPhone.trim().length > 0;
-        const photosHydrated = detailPhotosHydratedRef.current === lid;
-        if (hasMaxGuests && hasHostPhone && photosHydrated) return;
+        if (!hasPropertyRow) return;
+        const lid = Number(resolvedListingId ?? dataListingId ?? listingId ?? NaN);
+        if (!Number.isFinite(lid) || lid <= 0) return;
+        if (detailPhotosHydratedRef.current === lid) return;
 
         const ac = new AbortController();
         void fetchListingById(lid, ac.signal)
             .then((detail) => {
+                if (ac.signal.aborted) return;
                 const d = detail as Record<string, unknown>;
                 // TASK-2739-v1: GET /listings/{id} also carries publishStatus; keep state in sync.
                 if (typeof d.publishStatus === 'string') setPublishStatus(d.publishStatus);
@@ -753,7 +758,7 @@ const PropertyDetails = () => {
             })
             .catch(() => {});
         return () => ac.abort();
-    }, [resolvedListingId, data]);
+    }, [hasPropertyRow, resolvedListingId, dataListingId, listingId]);
 
     /** TASK-1466: deep links e.g. `/homes/.../123?bookingId=1&t=...` load host phone without exposing it on public catalog. */
     const bookingIdForContact = searchParams.get('bookingId');

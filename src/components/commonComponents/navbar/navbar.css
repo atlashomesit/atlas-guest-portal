@@ -392,6 +392,8 @@
   gap: 0.1rem;
   min-width: 220px;
   max-width: 320px;
+  /* TASK-7822: desktop-only pill (`hidden lg:flex`) must occupy a stable box. */
+  min-height: 44px;
   padding: 0.55rem 1rem;
   border-radius: 999px;
   border: 1px solid var(--navbar-search-pill-border, rgba(220, 210, 200, 0.55));

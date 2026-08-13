@@ -51,10 +51,13 @@
 <body>
   <!-- TASK-7839 / TASK-7822: inlined first-paint shell. Present in the HTML so FCP
        does not wait for the 49-chunk SPA. React replace()s #root when the app is
-       ready. Dimensions match the real navbar (116px desktop / 80px mobile) and
-       listing-card 4/3 so the swap does not shift layout. -->
+       ready. Shifting nodes identified from the live homepage (not guessed):
+       the previous boot shell was a 2-column photo split, but `.ahv2-hero` is a
+       single centered gradient column — that desktop-only mismatch is the CLS
+       0.385 source (mobile already stacks to 1 column, CLS 0). Dimensions now
+       match navbar 116px/80px, 1-col hero min(72vh,760px), widget slot, 4/3 cards. -->
   <style>
-    :root { --boot-nav-height: 116px; --boot-ivory: #fff8e7; --boot-ink: #1a1a2e; }
+    :root { --boot-nav-height: 116px; --boot-ivory: #fff8e7; }
     @media (max-width: 760px) { :root { --boot-nav-height: 80px; } }
     html, body { margin: 0; background: var(--boot-ivory); }
     #root:not(:empty) { min-height: 100vh; }
@@ -66,21 +69,25 @@
     }
     .boot-main { padding-top: var(--boot-nav-height); }
     .boot-hero {
-      min-height: min(72vh, 760px); display: grid;
-      grid-template-columns: 1fr 1fr; gap: 0;
+      min-height: min(72vh, 760px);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: linear-gradient(135deg, #fff8e7 0%, #ffe4d6 45%, #f2e1eb 100%);
+      padding: 84px 8% 48px; box-sizing: border-box; text-align: center;
     }
-    @media (max-width: 760px) {
-      .boot-hero { grid-template-columns: 1fr; min-height: 0; }
-    }
-    .boot-hero-copy { padding: 48px 8% 32px; }
     .boot-kicker {
-      height: 14px; width: 120px; background: #f0ddd0; border-radius: 4px; margin-bottom: 18px;
+      height: 14px; width: 120px; background: #f0ddd0; border-radius: 4px; margin-bottom: 24px;
     }
     .boot-title {
-      height: 48px; width: 80%; max-width: 420px; background: #e8d5c8; border-radius: 6px; margin-bottom: 12px;
+      height: 64px; width: min(18ch, 80%); background: #e8d5c8; border-radius: 6px; margin-bottom: 16px;
     }
-    .boot-title-2 { width: 55%; height: 36px; }
-    .boot-photo { min-height: 460px; background: linear-gradient(135deg, #f7c4ae 0%, #ee9d7f 100%); }
+    .boot-title-2 { width: min(12ch, 55%); height: 48px; margin-bottom: 28px; }
+    .boot-sub {
+      height: 16px; width: min(52ch, 70%); background: #f0ddd0; border-radius: 4px; margin-bottom: 40px;
+    }
+    .boot-widget {
+      width: min(100%, 900px); min-height: 144px; background: #fff; border-radius: 18px;
+      box-shadow: 0 8px 24px rgba(44, 24, 16, 0.08);
+    }
     .boot-grid {
       display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
       padding: 32px 8% 64px;
@@ -96,12 +103,11 @@
       <div class="boot-nav" aria-hidden="true"></div>
       <div class="boot-main">
         <div class="boot-hero">
-          <div class="boot-hero-copy">
-            <div class="boot-kicker"></div>
-            <div class="boot-title"></div>
-            <div class="boot-title boot-title-2"></div>
-          </div>
-          <div class="boot-photo" aria-hidden="true"></div>
+          <div class="boot-kicker"></div>
+          <div class="boot-title"></div>
+          <div class="boot-title boot-title-2"></div>
+          <div class="boot-sub"></div>
+          <div class="boot-widget" aria-hidden="true"></div>
         </div>
         <div class="boot-grid" aria-hidden="true">
           <div class="boot-card"><div class="boot-card-photo"></div><div class="boot-card-body"></div></div>

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearRuntimeConfig, setRuntimeConfig } from '@/runtime-config';
 import { _resetDedupedJsonFetchForTests } from '@/api/dedupedJsonFetch';
+import { fetchListingById } from '@/api/listingClient';
 import { resolveListing } from '../listingResolver';
 
 const API_BASE = 'https://atlas-homes-api-dev-fhdtg0gkgmcmhwfd.centralindia-01.azurewebsites.net';
@@ -107,6 +108,23 @@ describe('resolveListing', () => {
       id: 'atlas-102',
       propertyId: 'P102',
     });
+  });
+
+  it('TASK-7824: resolveListing and fetchListingById share one GET for the same numeric id', async () => {
+    fetchMock.mockResolvedValue(
+      makeResponse({
+        ok: true,
+        status: 200,
+        json: async () => ({ id: 2, name: 'Atlas102', propertyId: 1 }),
+      }),
+    );
+
+    const [resolved, byId] = await Promise.all([resolveListing('2'), fetchListingById(2)]);
+
+    expect(resolved).toMatchObject({ id: 2, name: 'Atlas102' });
+    expect(byId).toMatchObject({ id: 2, name: 'Atlas102' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(`${API_BASE}/listings/2`);
   });
 
   it('returns listing directly when param is Listing.Id (PK)', async () => {

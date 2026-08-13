@@ -149,6 +149,8 @@
   max-width: min(100%, 900px);
   margin: 0 auto 32px;
   text-align: left;
+  /* TASK-7822: reserve the search-card slot so the widget paint cannot grow the hero. */
+  min-height: 144px;
   opacity: 0;
   transform: translateY(12px);
   animation: ahv2-widget-in 700ms var(--ahv2-ease) 400ms forwards;
