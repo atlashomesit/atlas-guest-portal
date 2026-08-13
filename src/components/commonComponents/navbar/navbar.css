@@ -118,6 +118,14 @@
   position: relative;
 }
 
+/* TASK-7822: desktop wrap was shifting the fixed header after first paint (CLS 0.385).
+   Reserve the row with nowrap rather than contain:layout (that only hides shift). */
+@media (min-width: 761px) {
+  .navbar-main {
+    flex-wrap: nowrap;
+  }
+}
+
 .navbar-left,
 .navbar-center,
 .navbar-right {

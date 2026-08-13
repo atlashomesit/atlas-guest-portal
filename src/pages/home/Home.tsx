@@ -1,14 +1,11 @@
 import Slider from "../../components/homepage_components/slider/Slider";
 import HomePage_Locations from "../../components/homepage_components/homepage_locations/HomePage_Locations";
-import { useEffect, useMemo } from "react";
+import { lazy, Suspense, useEffect, useMemo } from "react";
 import { useTenantListings } from "../../hooks/useTenantListings";
 import { getTenantOverrides, shouldHideAtlasBranding } from "../../tenant/tenantOverrides";
 import { getTenantContext } from "../../tenant/tenantContext";
 import { getFaqHighlights } from "../../content/faqHighlights";
 import { trackEvent } from "../../utils/analytics";
-import ServicesSection from "../../components/home/ServicesSection";
-import TestimonialsSection from "../../components/home/TestimonialsSection";
-import FooterCtaStrip from "../../components/home/FooterCtaStrip";
 import AtlasNeighbourhoodRibbon from "../../components/home/AtlasNeighbourhoodRibbon";
 import SEO from "../../components/SEO";
 import { LOGO_URL } from "../../config/branding";
@@ -20,10 +17,14 @@ import {
 } from "../../config/homepageUxFlags";
 import { useBooking } from "../../contexts/BookingContext";
 import { useLocation } from "react-router-dom";
-import FaqHighlights from "../../components/faq/FaqHighlights";
 import WaveDivider from "../../components/ui/WaveDivider";
 import { getPublicSiteOrigin } from "../../config/siteOrigin";
 import { buildHomepageJsonLd } from "./homepageJsonLd";
+
+const ServicesSection = lazy(() => import("../../components/home/ServicesSection"));
+const TestimonialsSection = lazy(() => import("../../components/home/TestimonialsSection"));
+const FooterCtaStrip = lazy(() => import("../../components/home/FooterCtaStrip"));
+const FaqHighlights = lazy(() => import("../../components/faq/FaqHighlights"));
 
 /* ---- Why-direct 2-pillar strip — Home v2 design §5 ---- */
 const WHY_DIRECT_ITEMS_ATLAS = [
@@ -236,20 +237,22 @@ const Home = () => {
                     <WaveDivider tone="lavender" flip />
                 </section>
 
-                <div className="">
-                    <ServicesSection />
-                </div>
-                <WaveDivider tone="coral" className="px-[10%]" />
-                <div className="px-4 lg:px-20 py-10 md:py-12" style={{ background: 'var(--bg-primary, #fff8e7)' }}>
-                    <FaqHighlights />
-                </div>
-                <WaveDivider tone="lavender" className="px-[10%]" />
-                <div className="">
-                    <TestimonialsSection />
-                </div>
-                {enableFooterMiniCtaAboveFooter && (
-                    <FooterCtaStrip />
-                )}
+                <Suspense fallback={null}>
+                    <div className="">
+                        <ServicesSection />
+                    </div>
+                    <WaveDivider tone="coral" className="px-[10%]" />
+                    <div className="px-4 lg:px-20 py-10 md:py-12" style={{ background: 'var(--bg-primary, #fff8e7)' }}>
+                        <FaqHighlights />
+                    </div>
+                    <WaveDivider tone="lavender" className="px-[10%]" />
+                    <div className="">
+                        <TestimonialsSection />
+                    </div>
+                    {enableFooterMiniCtaAboveFooter && (
+                        <FooterCtaStrip />
+                    )}
+                </Suspense>
                 <WaveDivider tone="cream" className="px-[6%]" />
             </section>
         </>

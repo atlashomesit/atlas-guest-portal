@@ -5,6 +5,7 @@ import { setRuntimeConfig } from "../runtime-config";
 import { _resetTenantResolutionForTests } from "../tenant/tenantResolver";
 import { _resetTenantContextForTests } from "../tenant/tenantContext";
 import { _resetAvailabilityCalendarCacheForTests } from "../api/availabilityCalendarClient";
+import { _resetDedupedJsonFetchForTests } from "../api/dedupedJsonFetch";
 import { _resetCurrentLayoutThemeIdForTests } from "../themes/registry";
 
 // Re-arm the real jsdom `window` if a previous test file in this worker replaced
@@ -41,6 +42,7 @@ if (globalThis.window !== globals[REAL_WINDOW_KEY]) {
 _resetTenantResolutionForTests();
 _resetTenantContextForTests();
 _resetAvailabilityCalendarCacheForTests();
+_resetDedupedJsonFetchForTests();
 _resetCurrentLayoutThemeIdForTests();
 
 // The shared-fast project runs with `isolate: false` (see vitest.config.ts). With a

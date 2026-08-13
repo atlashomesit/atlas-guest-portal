@@ -20,7 +20,9 @@
   <link rel="canonical" href="" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet" />
+  <!-- TASK-7822: display=optional so desktop heading swap cannot contribute CLS.
+       TASK-7839: this CSS is small; the FCP shell below paints without waiting for JS. -->
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=optional" rel="stylesheet" />
   <link rel="preconnect" href="https://checkout.razorpay.com" crossorigin />
   <link rel="preconnect" href="https://atlashomestorage.blob.core.windows.net" crossorigin />
   <!-- TASK-1453: warm API + image CDN for first paint (same-origin /api still benefits on split deployments) -->
@@ -47,7 +49,68 @@
 </head>
 
 <body>
-  <div id="root"></div>
+  <!-- TASK-7839 / TASK-7822: inlined first-paint shell. Present in the HTML so FCP
+       does not wait for the 49-chunk SPA. React replace()s #root when the app is
+       ready. Dimensions match the real navbar (116px desktop / 80px mobile) and
+       listing-card 4/3 so the swap does not shift layout. -->
+  <style>
+    :root { --boot-nav-height: 116px; --boot-ivory: #fff8e7; --boot-ink: #1a1a2e; }
+    @media (max-width: 760px) { :root { --boot-nav-height: 80px; } }
+    html, body { margin: 0; background: var(--boot-ivory); }
+    #root:not(:empty) { min-height: 100vh; }
+    .boot-shell { font-family: Georgia, "Times New Roman", serif; color: #2c1810; }
+    .boot-nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 20;
+      height: var(--boot-nav-height); background: var(--boot-ivory);
+      border-bottom: 1px solid #f0ddd0;
+    }
+    .boot-main { padding-top: var(--boot-nav-height); }
+    .boot-hero {
+      min-height: min(72vh, 760px); display: grid;
+      grid-template-columns: 1fr 1fr; gap: 0;
+    }
+    @media (max-width: 760px) {
+      .boot-hero { grid-template-columns: 1fr; min-height: 0; }
+    }
+    .boot-hero-copy { padding: 48px 8% 32px; }
+    .boot-kicker {
+      height: 14px; width: 120px; background: #f0ddd0; border-radius: 4px; margin-bottom: 18px;
+    }
+    .boot-title {
+      height: 48px; width: 80%; max-width: 420px; background: #e8d5c8; border-radius: 6px; margin-bottom: 12px;
+    }
+    .boot-title-2 { width: 55%; height: 36px; }
+    .boot-photo { min-height: 460px; background: linear-gradient(135deg, #f7c4ae 0%, #ee9d7f 100%); }
+    .boot-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
+      padding: 32px 8% 64px;
+    }
+    @media (max-width: 760px) { .boot-grid { grid-template-columns: 1fr; } }
+    .boot-card { border-radius: 18px; overflow: hidden; background: #fff; }
+    .boot-card-photo { aspect-ratio: 4 / 3; background: linear-gradient(135deg, #f7c4ae 0%, #ee9d7f 100%); }
+    .boot-card:nth-child(even) .boot-card-photo { background: linear-gradient(135deg, #d9cdf7 0%, #b6a3ee 100%); }
+    .boot-card-body { height: 88px; }
+  </style>
+  <div id="root">
+    <div class="boot-shell" data-testid="boot-shell" role="status" aria-label="Loading stays">
+      <div class="boot-nav" aria-hidden="true"></div>
+      <div class="boot-main">
+        <div class="boot-hero">
+          <div class="boot-hero-copy">
+            <div class="boot-kicker"></div>
+            <div class="boot-title"></div>
+            <div class="boot-title boot-title-2"></div>
+          </div>
+          <div class="boot-photo" aria-hidden="true"></div>
+        </div>
+        <div class="boot-grid" aria-hidden="true">
+          <div class="boot-card"><div class="boot-card-photo"></div><div class="boot-card-body"></div></div>
+          <div class="boot-card"><div class="boot-card-photo"></div><div class="boot-card-body"></div></div>
+          <div class="boot-card"><div class="boot-card-photo"></div><div class="boot-card-body"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
   <script type="module" src="/src/main.tsx"></script>
   <!-- JSON-LD blocks are injected at runtime by TenantJsonLd.tsx (RA-006/TASK-2335) -->
 </body>

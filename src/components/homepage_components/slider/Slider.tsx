@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { HERO_IMAGE_URL } from '../../../config/hero';
+import { toTransformedGuestImageUrl } from '../../../utils/guestImageUrl';
 import { getTenantContext } from '../../../tenant/tenantContext';
 import { getTenantBrandName } from '../../../tenant/displayBrand';
 import { getTenantOverrides, shouldHideAtlasBranding } from '../../../tenant/tenantOverrides';
@@ -40,7 +41,9 @@ const Slider = () => {
   const heroCity = showAtlasContent
     ? 'Hyderabad'
     : (tenant?.legalContactPack?.city?.trim() || null);
-  const heroImageUrl = showAtlasContent ? HERO_IMAGE_URL : '';
+  const heroImageUrl = showAtlasContent
+    ? (toTransformedGuestImageUrl(HERO_IMAGE_URL, 1200) ?? '')
+    : '';
   const hasHeroPhoto = Boolean(heroImageUrl.trim());
   const heroPhotoAriaLabel = showAtlasContent
     ? `A warm, owner-run ${brandName} living room`

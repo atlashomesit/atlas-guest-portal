@@ -54,6 +54,41 @@ function devRuntimeConfigPlugin() {
 }
 
 /**
+ * TASK-7821: in Vite dev, `/img?u=` 302s to the allowlisted blob (no CF Image
+ * Resizing locally). Production uses `functions/img.ts`.
+ */
+function devGuestImageProxyPlugin() {
+  return {
+    name: "dev-guest-image-proxy",
+    configureServer(server: { middlewares: { use: (fn: (req: any, res: any, next: () => void) => void) => void } }) {
+      server.middlewares.use((req, res, next) => {
+        const rawUrl = req.url?.split("?")[0];
+        if (rawUrl !== "/img") {
+          return next();
+        }
+        try {
+          const parsed = new URL(req.url ?? "", "http://local.invalid");
+          const origin = (parsed.searchParams.get("u") ?? "").trim();
+          const host = origin ? new URL(origin).hostname : "";
+          if (host !== "atlashomestorage.blob.core.windows.net" || !origin.startsWith("https://")) {
+            res.statusCode = 400;
+            res.end("Invalid image origin");
+            return;
+          }
+          res.statusCode = 302;
+          res.setHeader("Location", origin);
+          res.setHeader("Cache-Control", "no-store");
+          res.end();
+        } catch {
+          res.statusCode = 400;
+          res.end("Invalid image origin");
+        }
+      });
+    },
+  };
+}
+
+/**
  * Serve `/manifest.json` as an alias for `/manifest.webmanifest` with an
  * explicit `application/json` Content-Type. PWA tooling and several E2E
  * checks expect this canonical path; without the alias, Vite falls back to
@@ -89,6 +124,7 @@ export default defineConfig({
     tailwindcss(),
     react(),
     devRuntimeConfigPlugin(),
+    devGuestImageProxyPlugin(),
     devManifestJsonAliasPlugin(),
   ],
   envPrefix: ["VITE_", "NEXT_PUBLIC_"],
@@ -120,57 +156,25 @@ export default defineConfig({
     },
   },
   build: {
+    modulePreload: {
+      polyfill: false,
+    },
     rollupOptions: {
       output: {
         manualChunks(id: string) {
-          // Core React libraries
-          if (id.includes("node_modules/react-dom") || id.includes("node_modules/react-router-dom")) {
-            return "react-core";
-          }
-          if (id.includes("node_modules/react/")) {
-            return "react";
-          }
-
-          // UI libraries
-          if (id.includes("node_modules/@emotion")) {
-            return "emotion";
-          }
-          if (id.includes("node_modules/lucide-react") || id.includes("node_modules/react-icons")) {
-            return "icons";
-          }
-          if (id.includes("node_modules/react-toastify")) {
-            return "toast";
-          }
-
-          // Maps (heavy, only on LocationPage)
+          if (!id.includes("node_modules")) return;
+          // Heavy, route-level only — keep off the homepage graph.
           if (id.includes("node_modules/leaflet") || id.includes("node_modules/react-leaflet")) {
             return "maps";
           }
-
-          // Carousel (heavy, only on home/search pages)
-          if (id.includes("node_modules/swiper") || id.includes("node_modules/react-slick") || id.includes("node_modules/slick-carousel")) {
-            return "carousel";
-          }
-
-          // Date/time libraries
-          if (id.includes("node_modules/date-fns") || id.includes("node_modules/luxon") || id.includes("node_modules/react-calendar") || id.includes("node_modules/react-date-range")) {
-            return "datetime";
-          }
-
-          // Payment (heavy, only on checkout)
-          if (id.includes("node_modules/axios") || id.includes("node_modules/qrcode.react")) {
-            return "payment";
-          }
-
-          // Markdown rendering (only on content pages)
           if (id.includes("node_modules/react-markdown")) {
             return "markdown";
           }
-
-          // Framer Motion (animation)
-          if (id.includes("node_modules/framer-motion")) {
-            return "motion";
+          if (id.includes("node_modules/axios") || id.includes("node_modules/qrcode.react")) {
+            return "payment";
           }
+          // TASK-7839: one vendor chunk instead of 10 tiny splits that became 49 requests.
+          return "vendor";
         },
       },
     },

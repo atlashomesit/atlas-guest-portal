@@ -1,6 +1,6 @@
 import type { ListingDetail } from '../api/listingClient';
 import { buildApiUrl, getApiHeaders } from '@/api/client';
-import { messageFromApiResponse } from '@/utils/serverErrorFromResponse';
+import { dedupedJsonFetch } from '@/api/dedupedJsonFetch';
 
 const normalizeListingPayload = (
   payload: Record<string, unknown>,
@@ -70,16 +70,22 @@ export const resolveListing = async (
   }> => {
     const singleListingUrl = buildApiUrl(`/listings/${encodeURIComponent(param)}`);
     try {
-      const response = await fetch(singleListingUrl, { signal, headers });
-      if (response.ok) {
-        const payload = (await response.json()) as Record<string, unknown>;
-        return { listing: normalizeListingPayload(payload, param) };
+      const result = await dedupedJsonFetch(singleListingUrl, { signal, headers });
+      if (result.ok && result.body && typeof result.body === 'object') {
+        return { listing: normalizeListingPayload(result.body as Record<string, unknown>, param) };
       }
 
-      if (response.status !== 404) {
-        const msg = await messageFromApiResponse(response);
-        console.error(`[resolveListing] API Error (${response.status}):`, msg);
+      if (result.status !== 404) {
+        const msg = `Request failed (${result.status})`;
+        console.error(`[resolveListing] API Error (${result.status}):`, result.body ?? msg);
         return { listing: null, error: new Error(msg) };
+      }
+
+      // TASK-7824: when the URL already carries a numeric listing id, do not
+      // pull GET /listings/public (264 KB) to resolve an id the path already has.
+      // Slug-only params still use the catalog fallback below.
+      if (/^\d+$/.test(param)) {
+        return { listing: null };
       }
     } catch (error) {
       if (isAbortLikeError(error, signal)) {
@@ -91,10 +97,13 @@ export const resolveListing = async (
 
     const listEndpoint = buildApiUrl('/listings/public');
     try {
-      const listResponse = await fetch(listEndpoint, { signal, headers });
+      const listResult = await dedupedJsonFetch(listEndpoint, { signal, headers });
 
-      if (!listResponse.ok) {
-        const msg = await messageFromApiResponse(listResponse);
+      if (!listResult.ok) {
+        const msg =
+          typeof listResult.body === 'object' && listResult.body
+            ? JSON.stringify(listResult.body)
+            : `Request failed (${listResult.status})`;
         console.error('[resolveListing] Failed to fetch public listings:', msg);
         return {
           listing: null,
@@ -102,8 +111,7 @@ export const resolveListing = async (
         };
       }
 
-      const listPayload = (await listResponse.json()) as unknown;
-      const listingRows = coercePublicListingsArray(listPayload);
+      const listingRows = coercePublicListingsArray(listResult.body);
 
       const normalizedParam = normalizeMatchValue(param);
       const atlasParam = `atlas${normalizedParam}`;

@@ -53,6 +53,7 @@ import type { ListingDetail, PublicListing } from '@/api/listingClient';
 import {
     fetchListingById,
     fetchListingContact,
+    fetchSimilarListings,
     parseMaxGuestsFromPayload,
     resolveStaticMaxGuests,
 } from '@/api/listingClient';
@@ -1115,8 +1116,7 @@ useEffect(() => {
         if (!Number.isFinite(lid) || lid <= 0) return;
         const ac = new AbortController();
         setSimilarFromApi({ loading: true, items: [] });
-        fetch(buildApiUrl(`/listings/${lid}/similar?limit=6`), { headers: { Accept: 'application/json', ...getApiHeaders() }, signal: ac.signal })
-            .then(async (res) => (res.ok ? (await res.json()) : []))
+        fetchSimilarListings(lid, 6, ac.signal)
             .then((j) => {
                 if (ac.signal.aborted) return;
                 setSimilarFromApi({ loading: false, items: Array.isArray(j) ? j : [] });

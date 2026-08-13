@@ -1,5 +1,9 @@
 import React from "react";
-import { sanitizeGuestImageUrl } from "@/utils/guestImageUrl";
+import {
+  buildGuestImageSrcSet,
+  sanitizeGuestImageUrl,
+  toTransformedGuestImageUrl,
+} from "@/utils/guestImageUrl";
 
 const RESPONSIVE_WIDTHS = [480, 768, 1200];
 
@@ -9,15 +13,16 @@ const PLACEHOLDER_CLASS =
   "bg-bg-muted bg-[linear-gradient(135deg,color-mix(in_srgb,var(--border-subtle)_55%,transparent)_0%,color-mix(in_srgb,var(--bg-muted)_92%,transparent)_100%)]";
 
 /**
- * TASK-7433: Azure Blob Storage ignores imgix-style ?w= / ?auto=format params — emitting a
- * multi-width srcset against blob URLs is decorative and ships full-resolution bytes on every
- * viewport. Option (c): no srcset unless the origin can honour resize params (transform CDN).
+ * TASK-7433 / TASK-7821: Azure Blob Storage ignores imgix-style ?w= / ?auto=format params.
+ * Blob URLs are rewritten through `/img` (see `buildGuestImageSrcSet`) rather than this
+ * query-param builder. Only emit decorative ?w= srcset for origins that honour it.
  */
 export function shouldBuildResponsiveSrcSet(src: string): boolean {
   try {
     const base = typeof window !== "undefined" ? window.location.origin : "https://example.invalid";
     const url = new URL(src, base);
     if (url.hostname.includes("blob.core.windows.net")) return false;
+    if (url.pathname === "/img" || url.pathname.startsWith("/img?")) return false;
     if (url.hostname === "localhost" || url.hostname === "127.0.0.1") return false;
     if (url.pathname.includes("/uploads/")) return false;
     return true;
@@ -69,17 +74,22 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
   const [isLoaded, setIsLoaded] = React.useState(false);
   const [loadFailed, setLoadFailed] = React.useState(false);
   const safeSrc = React.useMemo(() => sanitizeGuestImageUrl(src), [src]);
+  const displaySrc = React.useMemo(
+    () => (safeSrc ? toTransformedGuestImageUrl(safeSrc, 768) ?? safeSrc : undefined),
+    [safeSrc],
+  );
 
   React.useEffect(() => {
     setIsLoaded(false);
     setLoadFailed(false);
-  }, [safeSrc]);
+  }, [displaySrc]);
 
   const computedSrcSet = React.useMemo(() => {
     if (srcSet != null) return srcSet;
     if (!safeSrc) return undefined;
-    const built = buildResponsiveSrcSet(safeSrc);
-    return built;
+    const blobSrcSet = buildGuestImageSrcSet(safeSrc);
+    if (blobSrcSet) return blobSrcSet;
+    return buildResponsiveSrcSet(safeSrc);
   }, [srcSet, safeSrc]);
 
   const showPlaceholder = !safeSrc || loadFailed;
@@ -124,7 +134,7 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
         alt={alt}
         className={`${isLoaded ? "opacity-100" : "opacity-0"} ${className ?? ""}`}
         decoding={decoding}
-        {...(fetchPriority != null ? { fetchpriority: fetchPriority } : {})}
+        fetchPriority={fetchPriority}
         loading={loading}
         onError={(event) => {
           setLoadFailed(true);
@@ -135,7 +145,7 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
           props.onLoad?.(event);
         }}
         sizes={sizes}
-        src={safeSrc}
+        src={displaySrc}
         srcSet={computedSrcSet}
       />
     </div>

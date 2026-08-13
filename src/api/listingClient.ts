@@ -1,5 +1,6 @@
 import { buildApiUrl, getApiHeaders } from '@/api/client';
 import { messageFromApiResponse } from '@/utils/serverErrorFromResponse';
+import { dedupedJsonFetch } from '@/api/dedupedJsonFetch';
 
 /** Parse maxGuests from listing JSON (camelCase or PascalCase). Returns undefined if missing/invalid. */
 export function parseMaxGuestsFromPayload(payload: Record<string, unknown>): number | undefined {
@@ -507,16 +508,20 @@ export const fetchListingById = async (
     params.append('locale', options.locale);
   }
   const url = buildApiUrl(`${LISTING_ENDPOINT}/${listingId}${params.toString() ? '?' + params.toString() : ''}`);
-  const response = await fetch(url, {
+  const result = await dedupedJsonFetch(url, {
     signal,
     headers: getApiHeaders(),
   });
 
-  if (!response.ok) {
-    throw new Error(await messageFromApiResponse(response));
+  if (!result.ok) {
+    throw new Error(
+      typeof result.body === 'object' && result.body && 'message' in (result.body as object)
+        ? String((result.body as { message?: unknown }).message)
+        : `Request failed (${result.status})`,
+    );
   }
 
-  const payload = (await response.json()) as Record<string, unknown>;
+  const payload = (result.body ?? {}) as Record<string, unknown>;
   const normalized: ListingDetail = {
     ...payload,
     id: (payload.id ?? payload.listingId ?? listingId) as string | number,
@@ -529,3 +534,19 @@ export const fetchListingById = async (
 
   return normalized;
 };
+
+/** TASK-7824: similar-listings GET with the same in-flight cache as listing detail. */
+export async function fetchSimilarListings(
+  listingId: number,
+  limit = 6,
+  signal?: AbortSignal,
+): Promise<unknown[]> {
+  if (!Number.isFinite(listingId) || listingId <= 0) return [];
+  const url = buildApiUrl(`${LISTING_ENDPOINT}/${listingId}/similar?limit=${limit}`);
+  const result = await dedupedJsonFetch(url, {
+    signal,
+    headers: { Accept: 'application/json', ...getApiHeaders() },
+  });
+  if (!result.ok) return [];
+  return Array.isArray(result.body) ? result.body : [];
+}
