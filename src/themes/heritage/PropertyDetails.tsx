@@ -589,8 +589,12 @@ const PropertyDetails = () => {
         }
     }, [data, unitType]);
 
-    const dailyPricing = useDailyPricingSummary();
     const listingNumericForPricing = Number(resolvedListingId ?? data?.listingId ?? NaN);
+    const dailyPricing = useDailyPricingSummary(
+      Number.isFinite(listingNumericForPricing) && listingNumericForPricing > 0
+        ? listingNumericForPricing
+        : undefined,
+    );
     const dailyPricingRow = useMemo(() => {
         if (!Number.isFinite(listingNumericForPricing) || listingNumericForPricing <= 0) return undefined;
         return dailyPricing.data?.listings?.find((l) => l.listingId === listingNumericForPricing);

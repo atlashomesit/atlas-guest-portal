@@ -1148,7 +1148,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     ? freeCancellationCopy?.applicableGraceHours ?? null
     : resolvedGraceHours;
 
-  const { loading: dailyPricingLoading, error: _dailyPricingError, getListingPricing } = useDailyPricingSummary();
+  const { loading: dailyPricingLoading, error: _dailyPricingError, getListingPricing } = useDailyPricingSummary(listingId);
   const dailyPricing = useMemo(
     () => (listingId != null && String(listingId).trim() !== '' ? getListingPricing(listingId) : null),
     [listingId, getListingPricing],
