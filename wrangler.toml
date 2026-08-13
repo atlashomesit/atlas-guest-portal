@@ -1,4 +1,6 @@
 name = "atlas-guest-portal"
+# TASK-7821: Cloudflare Image Resizing must be enabled on this zone or `cf.image`
+# in functions/img.ts is ignored (bytes still proxy+cache). Zone setting, not wrangler.
 type = "javascript"
 account_id = "268fbc55e5364fe69a2bd0e9a4764f68"
 workers_dev = true
