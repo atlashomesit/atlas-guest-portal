@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, MapPin, Search, Users, X } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, Search, Users } from 'lucide-react';
 
-import { filterDestinations, POPULAR_DESTINATIONS } from '../../marketplace/airbnbSearch/destinationData';
+import { filterDestinations } from '../../marketplace/airbnbSearch/destinationData';
 import { readRecentSearches } from '../../marketplace/airbnbSearch/recentSearches';
 import { trackEvent } from '../../../utils/analytics';
 
