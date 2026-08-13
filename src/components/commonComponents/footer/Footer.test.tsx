@@ -74,6 +74,18 @@ describe('TASK-7428: MOR footer disclosure is gated by half', () => {
     expect(disclosure.textContent).not.toContain('Payments secured by');
   });
 
+  it('TASK-7822: footer logo reserves a 96×96 box (width/height attributes)', async () => {
+    tenantCtxMock.getTenantContext.mockReturnValue(
+      customDomainTenant({ paymentProvider: 'RAZORPAY', bookingMode: 'ONLINE' }),
+    );
+
+    await renderFooter();
+
+    const logo = screen.getByTestId('footer-brand-logo');
+    expect(logo).toHaveAttribute('width', '96');
+    expect(logo).toHaveAttribute('height', '96');
+  });
+
   it('no-provider tenant: no Razorpay copy anywhere in the footer', async () => {
     tenantCtxMock.getTenantContext.mockReturnValue(
       customDomainTenant({ paymentProvider: undefined, bookingMode: 'WHATSAPP' }),

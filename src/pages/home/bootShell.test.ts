@@ -38,3 +38,19 @@ describe("navbar.css (TASK-7822)", () => {
     expect(css).toContain("min-width: 761px");
   });
 });
+
+describe("LazyFallback (TASK-7822 cycle-2)", () => {
+  const app = readFileSync(join(root, "src/App.tsx"), "utf8");
+  const footer = readFileSync(join(root, "src/components/commonComponents/footer/Footer.tsx"), "utf8");
+
+  it("keeps the route fallback at 100vh so the footer cannot sit in the first viewport", () => {
+    expect(app).toContain("minHeight: '100vh'");
+    expect(app).not.toContain("minHeight: '50vh'");
+  });
+
+  it("gives the footer logo explicit width and height so the unsized image cannot CLS", () => {
+    expect(footer).toContain("width={96}");
+    expect(footer).toContain("height={96}");
+    expect(footer).toContain("h-24 w-24");
+  });
+});

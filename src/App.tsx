@@ -71,12 +71,18 @@ const GuestDetailsPage = React.lazy(() => import("./pages/booking/GuestDetailsPa
 const GuestLoginPage = React.lazy(() => import("./pages/GuestLoginPage"))
 
 function LazyFallback() {
+  // TASK-7822: 50vh left the site footer in the first desktop viewport. Home then
+  // replaced this fallback and shoved `footer.pt-16` down the page — that single
+  // shift is CLS 0.377 of the measured 0.385 (Lighthouse 13.4 desktop on
+  // dev.atlashomestays.com, 2026-08-13). 100vh keeps the footer below the fold
+  // until the route chunk paints.
   return (
     <div
       role="status"
       aria-live="polite"
       aria-label="Loading page"
-      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50vh' }}
+      data-testid="lazy-route-fallback"
+      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}
     >
       <div style={{ textAlign: 'center' }}>
         <div style={{ width: 40, height: 40, border: '4px solid #f5ebe0', borderTopColor: 'var(--cta-primary, #b8472f)', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 1rem' }} />

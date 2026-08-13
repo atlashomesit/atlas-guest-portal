@@ -112,9 +112,12 @@ const Footer = () => {
                 <div className='flex flex-col gap-3 items-center lg:items-start'>
                     {showLogo && (
                         <img
-                            className={`rounded-md object-contain ${logoSrc.includes('stay-bycityfocus') ? 'w-24 md:w-28 bg-[#fff8e7] p-2.5' : 'w-28 md:w-24'}`}
+                            data-testid="footer-brand-logo"
+                            className={`rounded-md object-contain h-24 w-24 ${logoSrc.includes('stay-bycityfocus') ? 'bg-[#fff8e7] p-2.5' : ''}`}
                             src={logoSrc}
                             alt={footerBrand}
+                            width={96}
+                            height={96}
                             loading="lazy"
                             decoding="async"
                         />

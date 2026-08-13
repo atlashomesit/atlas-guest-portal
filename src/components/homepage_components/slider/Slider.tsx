@@ -98,7 +98,7 @@ const Slider = () => {
             data-testid="home-direct-booking-promo"
             role="region"
             aria-label="Direct booking savings"
-            style={{ marginBottom: 24 }}
+            style={{ marginBottom: 24, minHeight: 126 }}
           >
             <p className="text-sm font-semibold tracking-tight sm:text-base">{directPromo.savingsStripLine}</p>
             <p className="mt-1 text-xs text-emerald-100/95 sm:text-sm">{directPromo.sub}</p>
