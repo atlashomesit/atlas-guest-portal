@@ -252,3 +252,5 @@ Each command should return a 301/302 with a `Location` header set to `/property_
 The Help area (Policies, FAQs, Terms) uses a single source of truth located in `src/content/legal/`. Edit `terms.ts` first, then reference those IDs from `policies.ts` (summaries) and `faqs.ts` (answers). Every policy must include `termsRefs` pointing to valid Terms IDs, and every FAQ needs at least one `linksTo` entry pointing to a policy or terms section. A build/test-time validator (`npm run validate:legal`) blocks builds if IDs are missing, unknown, or if risky promises in Policies/FAQs are not tied back to the Terms.
 
 Shared layout components live under `src/components/legal/` and provide tabs, sticky section navigation, and search for Policies/FAQs. The “Help” navigation group in the header/footer links to all three pages without duplicating content.
+
+<!-- CI red-ownership probe 7146df25: docs-only, no source touched. Delete with this branch. -->
