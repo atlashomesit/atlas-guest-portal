@@ -1,9 +1,20 @@
 import React from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { addDays, format, startOfDay, startOfMonth } from 'date-fns';
+import { addDays, format, startOfMonth } from 'date-fns';
 import { CalendarRange, ChevronDown } from 'lucide-react';
 import { trackEvent } from '../../utils/analytics';
 import { useBooking } from '../../contexts/BookingContext';
+// CALENDAR basis throughout this widget — see the header comment in utils/date.ts. Every Date
+// held in widget state (today, dateRange, shownDate) is a local-midnight civil date, matching
+// the cells AtlasDateRangePicker hands to onChange/disabledDay. Instants (now, URL params) are
+// converted at the boundary with getIstCalendarDate, and dates leaving for BookingContext are
+// converted back with istInstantFromCalendarDate — its wire format is an IST-midnight instant.
+import {
+  getIstCalendarDate,
+  istInstantFromCalendarDate,
+  startOfCalendarDay,
+  toCalendarISO,
+} from '../../utils/date';
 import { AtlasDateRangePicker, type AtlasDateRangePickerValue } from '../date/AtlasDateRangePicker';
 import { calculateNights, formatNightCount } from '../../utils/dateHelpers';
 import { GuestTypeSelector, type GuestCounts } from '../ui/GuestTypeSelector';
@@ -29,7 +40,9 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const today = React.useMemo(() => startOfDay(new Date()), []);
+  // The property's "today" is the IST civil date, carried on the calendar basis so this widget's
+  // past-date guard agrees with UnitBookingWidget's in every guest timezone.
+  const today = React.useMemo(() => getIstCalendarDate(), []);
   const defaultRange = React.useMemo(
     () => ({
       startDate: today,
@@ -79,10 +92,14 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
     [],
   );
 
+  // BOUNDARY: both sources here are INSTANTS — BookingContext's wire value is an IST-midnight
+  // ISO instant, and a `?checkIn=YYYY-MM-DD` param parses as UTC midnight. `startOfDay` read
+  // either in the guest's local zone, which is the wrong basis on both sides of +05:30.
   const parseDate = (value?: string | null) => {
     if (!value) return null;
-    const parsed = startOfDay(new Date(value));
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
+    const instant = new Date(value);
+    if (Number.isNaN(instant.getTime())) return null;
+    return getIstCalendarDate(instant);
   };
 
   const clampRange = (startDate: Date | null, endDate: Date | null) => {
@@ -197,8 +214,11 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
     setGuestCounts(nextGuestCounts);
     setShownDate(nextRange.startDate ?? today);
     updateBooking({
-      checkIn: nextRange.startDate?.toISOString() ?? null,
-      checkOut: nextRange.endDate?.toISOString() ?? null,
+      // BookingContext's wire format is an IST-midnight ISO instant (UnitBookingWidget emits it
+      // the same way and reads it back with getIstCalendarDate). A bare `.toISOString()` on a
+      // local-midnight Date does not round-trip through that east of +05:30 — it loses a day.
+      checkIn: nextRange.startDate ? istInstantFromCalendarDate(nextRange.startDate).toISOString() : null,
+      checkOut: nextRange.endDate ? istInstantFromCalendarDate(nextRange.endDate).toISOString() : null,
       guests: totalGuests,
       adults: nextGuestCounts.adults,
       children: nextGuestCounts.children,
@@ -301,8 +321,9 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
   React.useEffect(() => {
     const totalGuests = guestCounts.adults + guestCounts.children;
     updateBooking({
-      checkIn: dateRange.startDate?.toISOString() ?? null,
-      checkOut: dateRange.endDate?.toISOString() ?? null,
+      // IST-midnight instant — the BookingContext wire format. See the hydration effect above.
+      checkIn: dateRange.startDate ? istInstantFromCalendarDate(dateRange.startDate).toISOString() : null,
+      checkOut: dateRange.endDate ? istInstantFromCalendarDate(dateRange.endDate).toISOString() : null,
       guests: totalGuests,
       adults: guestCounts.adults,
       children: guestCounts.children,
@@ -370,8 +391,9 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
       return { isValid: false };
     }
 
-    const formattedCheckIn = format(startDate, 'yyyy-MM-dd');
-    const formattedCheckOut = format(endDate, 'yyyy-MM-dd');
+    // The ONE calendar-cell→key helper, shared with the booking calendar and widget.
+    const formattedCheckIn = toCalendarISO(startDate);
+    const formattedCheckOut = toCalendarISO(endDate);
 
     const params = new URLSearchParams({
       checkIn: formattedCheckIn,
@@ -401,8 +423,8 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
       'availability_search',
       {
         surface: 'hero_form',
-        checkIn: validation.startDate.toISOString(),
-        checkOut: validation.endDate.toISOString(),
+        checkIn: istInstantFromCalendarDate(validation.startDate).toISOString(),
+        checkOut: istInstantFromCalendarDate(validation.endDate).toISOString(),
         guests: guestCounts.adults + guestCounts.children,
         adults: guestCounts.adults,
         children: guestCounts.children,
@@ -416,8 +438,8 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
       'listings_browse',
       {
         surface: 'hero_form',
-        checkIn: validation.startDate.toISOString(),
-        checkOut: validation.endDate.toISOString(),
+        checkIn: istInstantFromCalendarDate(validation.startDate).toISOString(),
+        checkOut: istInstantFromCalendarDate(validation.endDate).toISOString(),
         guests: guestCounts.adults + guestCounts.children + guestCounts.infants,
       },
       { route: `/search?${validation.searchParams.toString()}` },
@@ -428,8 +450,9 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
   };
 
   const handleRangeChange = (selection: AtlasDateRangePickerValue) => {
-    const normalizedStart = selection.startDate ? startOfDay(selection.startDate) : null;
-    const normalizedEnd = selection.endDate ? startOfDay(selection.endDate) : null;
+    // Calendar-basis cells in, calendar-basis state out — no instant conversion on this path.
+    const normalizedStart = selection.startDate ? startOfCalendarDay(selection.startDate) : null;
+    const normalizedEnd = selection.endDate ? startOfCalendarDay(selection.endDate) : null;
     markHeroInteraction();
 
     const attemptedStart = normalizedStart ?? dateRange.startDate;
@@ -454,8 +477,8 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
 
     trackEvent('hero_dates_changed', {
       surface: 'hero_form',
-      checkIn: normalizedStart?.toISOString(),
-      checkOut: normalizedEnd?.toISOString(),
+      checkIn: normalizedStart ? istInstantFromCalendarDate(normalizedStart).toISOString() : undefined,
+      checkOut: normalizedEnd ? istInstantFromCalendarDate(normalizedEnd).toISOString() : undefined,
     });
     if (selection.startDate && selection.endDate && normalizedEnd && normalizedStart && normalizedEnd > normalizedStart) {
       setIsCalendarOpen(false);
@@ -595,7 +618,7 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
           value={dateRange}
           onChange={handleRangeChange}
           minDate={today}
-          disabledDay={(date) => startOfDay(date) < today}
+          disabledDay={(date) => startOfCalendarDay(date) < today}
           months={monthsToShow}
           shownDate={shownDate}
           onShownDateChange={(date) => {
@@ -605,9 +628,9 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
           loading={!calendarReady}
           activeField={activeField}
           dayContentRenderer={(day) => {
-            const dayStart = startOfDay(day);
-            const selectionStart = dateRange.startDate ? startOfDay(dateRange.startDate).getTime() : null;
-            const selectionEnd = dateRange.endDate ? startOfDay(dateRange.endDate).getTime() : null;
+            const dayStart = startOfCalendarDay(day);
+            const selectionStart = dateRange.startDate ? startOfCalendarDay(dateRange.startDate).getTime() : null;
+            const selectionEnd = dateRange.endDate ? startOfCalendarDay(dateRange.endDate).getTime() : null;
             const isRangeStart = selectionStart !== null && dayStart.getTime() === selectionStart;
             const isRangeEnd = selectionEnd !== null && dayStart.getTime() === selectionEnd;
             const isDisabled = dayStart < today;
@@ -615,7 +638,7 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
          return (
   <div className="relative flex h-full w-full items-center justify-center">
     <span
-      data-testid={`hero-date-${format(day, 'yyyy-MM-dd')}`}
+      data-testid={`hero-date-${toCalendarISO(day)}`}
       className={`relative z-10 flex items-center justify-center text-sm font-medium transition ${
         isRangeStart || isRangeEnd
           ? 'bg-[var(--cta-primary)] text-[var(--text-on-cta)] rounded-xl px-3 py-3 shadow-sm'

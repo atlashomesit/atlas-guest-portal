@@ -1,12 +1,17 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { addDays, startOfDay } from 'date-fns';
+import { addDays, differenceInCalendarDays } from 'date-fns';
 import { DateRange } from 'react-date-range';
 import 'react-date-range/dist/styles.css';
 import 'react-date-range/dist/theme/default.css';
 import { formatDisplayNumber } from '@/config/contact';
 
 import { DateRangePickerPopover } from '../homepage_components/hotelBooking_form/DateRangePickerPopover';
-import { getIstStartOfDay } from '@/utils/date';
+// CALENDAR basis throughout this picker — see the header comment in utils/date.ts.
+// react-date-range builds every day cell as a LOCAL-midnight Date (a civil date, not an
+// instant), and date-fns reads it back on the same basis, so that is the basis this component
+// both consumes and hands to its consumers. Instants (`new Date()`) are converted at the
+// boundary with getIstCalendarDate and never leak inward.
+import { getIstCalendarDate, startOfCalendarDay } from '@/utils/date';
 
 // Helper to normalize date to start of month (avoids timezone issues with date-fns startOfMonth)
 const normalizeToStartOfMonth = (date: Date): Date => {
@@ -15,8 +20,11 @@ const normalizeToStartOfMonth = (date: Date): Date => {
 
 const normalizeDate = (date: Date | null): Date | null => {
   if (!date) return null;
-  // Use IST normalization to match BookingCardCalendarSection and ensure consistent comparisons
-  return getIstStartOfDay(date);
+  // CALENDAR basis. This was `getIstStartOfDay(date)` — an instant→IST conversion applied to the
+  // local-midnight cells react-date-range hands out, i.e. the exact defect fixed for the booking
+  // calendar in #449. East of UTC+05:30 local midnight of day D is still D-1 in IST, so every
+  // date leaving this picker was shifted a day back: the guest's own selection came back wrong.
+  return startOfCalendarDay(date);
 };
 
 export interface AtlasDateRangePickerValue {
@@ -99,7 +107,12 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
 
   /** TASK-1712: Quick-preset date ranges */
   const quickPresets = useMemo(() => {
-    const today = getIstStartOfDay(new Date());
+    // The property's "today" is the IST civil date, carried on the calendar basis so it lines up
+    // with the grid's cells (and with UnitBookingWidget's `today`) in every guest timezone.
+    // `getIstStartOfDay` here returned an IST-midnight INSTANT, which reads as the right civil
+    // day only by luck east of IST and as the PREVIOUS day everywhere west of +05:30 — including
+    // UTC, so a guest in London or New York got yesterday's presets.
+    const today = getIstCalendarDate();
     const dayOfWeek = today.getDay(); // 0=Sun … 6=Sat
 
     // Next Friday (0 if today is Friday)
@@ -125,7 +138,7 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
 
     const isDisabled = (start: Date) => {
       if (!minDate) return false;
-      return getIstStartOfDay(start) < getIstStartOfDay(minDate);
+      return startOfCalendarDay(start) < startOfCalendarDay(minDate);
     };
 
     return [
@@ -137,12 +150,12 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
     ];
   }, [minDate]);
 
+  // differenceInCalendarDays, not an epoch-millis divide: on the calendar basis a guest whose
+  // zone crosses a DST boundary mid-stay has 23h and 25h civil days, and the old arithmetic
+  // miscounted those nights (same correction #449 made to calculateNights).
   const nights =
     value.startDate && value.endDate
-      ? Math.max(
-          1,
-          Math.round((value.endDate.getTime() - value.startDate.getTime()) / (1000 * 60 * 60 * 24)),
-        )
+      ? Math.max(1, differenceInCalendarDays(value.endDate, value.startDate))
       : null;
 
   useEffect(() => {
@@ -159,7 +172,8 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
 
   const validateDateRange = (checkIn: Date | null, checkOut: Date | null) => {
     if (!checkIn || !checkOut) return { valid: true, error: null };
-    const diffDays = Math.floor((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
+    // Civil nights, not elapsed 24h blocks — see the note on `nights` above.
+    const diffDays = differenceInCalendarDays(checkOut, checkIn);
     if (checkOut <= checkIn) {
       return { valid: false, error: 'Check-out date must be after check-in date' };
     }
@@ -276,7 +290,8 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
     }
   };
 
-  const normalizedStart = normalizeDate(value.startDate) ?? normalizeDate(minDate ?? null) ?? startOfDay(new Date());
+  const normalizedStart =
+    normalizeDate(value.startDate) ?? normalizeDate(minDate ?? null) ?? getIstCalendarDate();
   const normalizedEnd = normalizeDate(value.endDate) ?? normalizedStart;
 
   useEffect(() => {
