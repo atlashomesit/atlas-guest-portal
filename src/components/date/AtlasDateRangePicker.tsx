@@ -207,35 +207,70 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
     }
   };
 
-  const composedDisabledDay = (date: Date) => {
+  /**
+   * Reasons a day is unselectable whichever end of the stay is being picked: outside the
+   * min/max window, or vetoed by the consumer (past days on both search bars, booked nights on
+   * the unit pages).
+   */
+  const isDayUnavailable = (date: Date) => {
     const normalized = normalizeDate(date);
-    const checkIn = normalizeDate(value.startDate);
     if (minDate && normalized && normalized < normalizeDate(minDate)!) return true;
     if (maxDate && normalized && normalized > normalizeDate(maxDate)!) return true;
-    // When selecting checkout, disable same-day or earlier than check-in to enforce 1-night minimum
-    if (selectionState === 'CHECK_IN_SELECTED' && checkIn && normalized && normalized <= checkIn) {
-      return true;
-    }
     return disabledDay ? disabledDay(date) : false;
   };
+
+  /**
+   * The 1-night minimum, stated as what it actually is: a rule about a CHECK-OUT CANDIDATE,
+   * which may not land on or before the check-in. It says nothing about a check-in, and in
+   * particular nothing about the check-in we already hold — see handleRangeChange.
+   */
+  const isTooEarlyForCheckout = (date: Date) => {
+    const normalized = normalizeDate(date);
+    const checkIn = normalizeDate(value.startDate);
+    return !!(checkIn && normalized && normalized <= checkIn);
+  };
+
+  // What the grid greys out. During step 2 that includes every day that cannot be the check-out,
+  // which is where the 1-night minimum is enforced against the guest: react-date-range's DayCell
+  // short-circuits on `disabled`, so those days cannot even be clicked.
+  const composedDisabledDay = (date: Date) =>
+    isDayUnavailable(date) ||
+    (selectionState === 'CHECK_IN_SELECTED' && isTooEarlyForCheckout(date));
 
   const handleRangeChange = (ranges: { selection?: { startDate?: Date | null; endDate?: Date | null } }) => {
     const selection = ranges.selection ?? { startDate: null, endDate: null };
     const startDate = normalizeDate(selection.startDate ?? null);
     const endDate = normalizeDate(selection.endDate ?? null);
+    const existingCheckIn = normalizeDate(value.startDate);
 
-    // Reject clicks on disabled dates - ensure visual disabled state matches functional behavior
-    if (startDate && composedDisabledDay(startDate)) {
-      if (selectionState === 'CHECK_IN_SELECTED') {
-        const checkIn = normalizeDate(value.startDate);
-        const normalized = normalizeDate(startDate);
-        if (checkIn && normalized && normalized.getTime() <= checkIn.getTime()) {
-          setValidationError('Minimum stay is one night. Select a check-out date after check-in.');
-        }
-      }
+    // react-date-range commits a CHECK-OUT by setting `endDate` alone and passing `startDate`
+    // straight back out of the `ranges` prop untouched (DateRange.calcNewSelection, the
+    // `focusedRange[1] === 1` branch). With dragSelectionEnabled={false} that commit happens on
+    // mousedown, one per click, so the second click always arrives here as
+    // `startDate === value.startDate` — an echo of what we already hold, not a day the guest
+    // clicked. Judging it by the check-out rules dropped EVERY valid completion: the check-in
+    // equals itself, so `<= checkIn` was true, the whole selection was discarded, and the guest
+    // was told "Minimum stay is one night" with no check-out ever recorded. Those rules belong to
+    // `endDate` alone.
+    const isCheckoutCommit =
+      selectionState === 'CHECK_IN_SELECTED' &&
+      !!existingCheckIn &&
+      !!startDate &&
+      startDate.getTime() === existingCheckIn.getTime();
+
+    // Reject clicks on unavailable dates - keep the visual disabled state and what actually
+    // happens on click in step with each other.
+    if (startDate && !isCheckoutCommit && isDayUnavailable(startDate)) {
       return; // Ignore selection - date is disabled (e.g. past date)
     }
-    if (endDate && composedDisabledDay(endDate)) {
+    if (endDate && isDayUnavailable(endDate)) {
+      return;
+    }
+
+    // 1-night minimum, judged against the candidate check-out. The grid already greys these days
+    // out, so this is the backstop for a consumer that overrides `disabledDay` via dateRangeProps.
+    if (isCheckoutCommit && endDate && isTooEarlyForCheckout(endDate)) {
+      setValidationError('Minimum stay is one night. Select a check-out date after check-in.');
       return;
     }
 
@@ -252,7 +287,6 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
     }
 
     if (selectionState === 'CHECK_IN_SELECTED') {
-      const existingCheckIn = normalizeDate(value.startDate);
       if (!existingCheckIn) {
         if (applySelection(startDate, null)) {
           setSelectionState('CHECK_IN_SELECTED');
