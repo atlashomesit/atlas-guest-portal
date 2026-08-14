@@ -2,8 +2,6 @@ import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { addDays, format, startOfDay } from 'date-fns';
-import { toISODate } from '@/utils/dateRange';
-import { getIstStartOfDay } from '@/utils/date';
 
 /**
  * TASK-7491 (Rate Sync Authority opt-out — guest-portal slice): verifies the guest booking
@@ -102,14 +100,15 @@ describe('UnitBookingWidget - TASK-7491: availability-rates bookable gate (rende
   const carriedForwardDate = day(5);
   const normalDate = day(6);
 
-  // The two maps the widget hands the grid are keyed on DIFFERENT bases, so each fixture key must
-  // go through the same function the component does or this file drifts back into zone-dependence:
-  //   • calendar prices    → MonthGrid's `toYMD(cell)` — LOCAL y-m-d
-  //   • availability rates → `toISODate(getIstStartOfDay(cell))` — UnitBookingWidget.isDateDisabled
-  // The two coincide in IST and in UTC and diverge only east of IST; routing each map through its
-  // own key keeps the fixture correct in every zone rather than just the two we happen to run.
-  const priceKey = (d: Date) => format(d, 'yyyy-MM-dd');
-  const rateKey = (d: Date) => toISODate(getIstStartOfDay(d));
+  // Both maps the widget hands the grid are now keyed on ONE basis — the CALENDAR basis
+  // (`toCalendarISO`, utils/date.ts), used by MonthGrid and by UnitBookingWidget's gate alike.
+  // This file previously mirrored the two DIFFERENT bases the widget used to key them on, which
+  // made it pass everywhere while the product shipped an off-by-one availability gate east of
+  // UTC+05:30. A single key is the point: if the two ever diverge again, the east-of-IST
+  // regression suite (calendarDateBasis.test.tsx) fails regardless of the runner's zone.
+  const dayKey = (d: Date) => format(d, 'yyyy-MM-dd');
+  const priceKey = dayKey;
+  const rateKey = dayKey;
   // Deliberately < 10000 so AtlasBookingCalendar's formatINR uses plain "₹N,NNN" (not the "₹N.NK"
   // form it switches to at >= 10000) — irrelevant to the assertions below, which strip non-digits.
   const CARRIED_FORWARD_PRICE = 4200;
