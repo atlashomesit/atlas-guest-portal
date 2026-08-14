@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { addDays, format } from 'date-fns';
-import { getIstCalendarDate } from '@/utils/date';
+import { addDays, format, startOfDay } from 'date-fns';
+import { toISODate } from '@/utils/dateRange';
+import { getIstStartOfDay } from '@/utils/date';
 
 /**
  * TASK-7491 (Rate Sync Authority opt-out — guest-portal slice): verifies the guest booking
@@ -82,22 +83,33 @@ vi.mock('@/components/FomoBar', () => ({ default: () => null }));
 vi.mock('@/lib/events', () => ({ track: vi.fn() }));
 
 describe('UnitBookingWidget - TASK-7491: availability-rates bookable gate (render)', () => {
-  // Timezone basis (must match AtlasBookingCalendar, or this file is only green in IST):
-  // the grid builds every cell as `new Date(year, month, d)` and derives BOTH its lookup key
-  // (`toYMD`) and its aria-label (`format(date, 'd MMMM')`) from that LOCAL calendar date.
-  // `getIstStartOfDay()` returns the *instant* of IST midnight (= 18:30 UTC the previous day),
-  // so on a non-IST runner every date derived from it names the day AFTER the cell it formats
-  // as — the mocks below got keyed to D+n while `findDayCell` looked up the D+n-1 cell.
-  // `getIstCalendarDate()` is local midnight carrying the IST calendar day, and keying the mocks
-  // with the same local `yyyy-MM-dd` the grid uses keeps both halves on one basis in any zone.
-  const today = getIstCalendarDate();
-  const toGridKey = (date: Date) => format(date, 'yyyy-MM-dd');
-  const unusableDate = addDays(today, 4);
-  const carriedForwardDate = addDays(today, 5);
-  const normalDate = addDays(today, 6);
-  const unusableIso = toGridKey(unusableDate);
-  const carriedForwardIso = toGridKey(carriedForwardDate);
-  const normalIso = toGridKey(normalDate);
+  // Clock is pinned (see beforeEach) and the fixture days are derived from this same constant
+  // rather than from `new Date()`, so collection-time and render-time can never land on
+  // different days. Mid-month and mid-day UTC: every fixture day (+4…+6) stays inside February
+  // for any runner offset, so both rendered months always contain them.
+  const FIXED_NOW = new Date('2026-02-15T12:00:00Z');
+
+  // MonthGrid builds every cell as `new Date(year, month, d)` — LOCAL midnight
+  // (AtlasBookingCalendar.tsx, MonthGrid) — so the fixture days must be local-calendar days too,
+  // and `findDayCell`'s `format(date, 'd MMMM')` then matches DayCell's identical `format` call
+  // exactly. The previous anchor was `getIstStartOfDay()`, an IST *instant*: `toISODate` reads its
+  // IST components while `format` reads its LOCAL ones, so in any zone behind IST the mocked ISO
+  // and the looked-up cell were a day apart and the assertions read the neighbouring day's price.
+  // Under TZ=UTC (CI's zone) that surfaced as `expected '4200' to be '5100'` — the file had never
+  // passed on CI, only on IST dev machines.
+  const day = (offset: number) => addDays(startOfDay(FIXED_NOW), offset);
+  const unusableDate = day(4);
+  const carriedForwardDate = day(5);
+  const normalDate = day(6);
+
+  // The two maps the widget hands the grid are keyed on DIFFERENT bases, so each fixture key must
+  // go through the same function the component does or this file drifts back into zone-dependence:
+  //   • calendar prices    → MonthGrid's `toYMD(cell)` — LOCAL y-m-d
+  //   • availability rates → `toISODate(getIstStartOfDay(cell))` — UnitBookingWidget.isDateDisabled
+  // The two coincide in IST and in UTC and diverge only east of IST; routing each map through its
+  // own key keeps the fixture correct in every zone rather than just the two we happen to run.
+  const priceKey = (d: Date) => format(d, 'yyyy-MM-dd');
+  const rateKey = (d: Date) => toISODate(getIstStartOfDay(d));
   // Deliberately < 10000 so AtlasBookingCalendar's formatINR uses plain "₹N,NNN" (not the "₹N.NK"
   // form it switches to at >= 10000) — irrelevant to the assertions below, which strip non-digits.
   const CARRIED_FORWARD_PRICE = 4200;
@@ -107,20 +119,24 @@ describe('UnitBookingWidget - TASK-7491: availability-rates bookable gate (rende
   const INVENTED_PRICE_IF_BUG = 9999;
 
   beforeEach(() => {
+    // Only `Date` is faked: `waitFor`/`findBy*` keep their real setTimeout/setInterval, so the
+    // async assertions below behave exactly as they do under real timers.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(FIXED_NOW);
     availabilityCalendarMock.fetch.mockReset();
     availabilityCalendarMock.fetch.mockImplementation(availabilityCalendarOk);
     mocks.fetchCalendarPricing.mockResolvedValue({
       dateToPrice: new Map([
-        [unusableIso, INVENTED_PRICE_IF_BUG],
-        [carriedForwardIso, CARRIED_FORWARD_PRICE],
-        [normalIso, NORMAL_PRICE],
+        [priceKey(unusableDate), INVENTED_PRICE_IF_BUG],
+        [priceKey(carriedForwardDate), CARRIED_FORWARD_PRICE],
+        [priceKey(normalDate), NORMAL_PRICE],
       ]),
       convenienceFeePercent: 3,
     });
     mocks.fetchGuestGstBreakdown.mockResolvedValue({ gstPercent: 5, gstAmount: 0, finalAmount: 0 });
     mocks.fetchAvailabilityRatesForMonths.mockResolvedValue([
       {
-        date: unusableIso,
+        date: rateKey(unusableDate),
         nightlyRate: 0,
         roomsAvailable: 0,
         isAvailable: false,
@@ -129,7 +145,7 @@ describe('UnitBookingWidget - TASK-7491: availability-rates bookable gate (rende
         priceSource: null,
       },
       {
-        date: carriedForwardIso,
+        date: rateKey(carriedForwardDate),
         nightlyRate: CARRIED_FORWARD_PRICE,
         roomsAvailable: 1,
         isAvailable: true,
@@ -138,7 +154,7 @@ describe('UnitBookingWidget - TASK-7491: availability-rates bookable gate (rende
         priceSource: 'carried_forward',
       },
       {
-        date: normalIso,
+        date: rateKey(normalDate),
         nightlyRate: NORMAL_PRICE,
         roomsAvailable: 1,
         isAvailable: true,
@@ -152,6 +168,7 @@ describe('UnitBookingWidget - TASK-7491: availability-rates bookable gate (rende
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
+    vi.useRealTimers();
     mocks.booking.checkIn = null;
     mocks.booking.checkOut = null;
   });
