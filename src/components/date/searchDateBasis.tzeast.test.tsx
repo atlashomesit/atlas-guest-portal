@@ -90,14 +90,24 @@ describe('AtlasDateRangePicker — hands out the civil date the guest clicked (e
     vi.useRealTimers();
   });
 
-  const renderPicker = (onChange: (v: AtlasDateRangePickerValue) => void) =>
-    render(
+  // Controlled, like both real consumers: react-date-range reads `ranges[0]` back off the value
+  // the parent last stored, so a frozen `value` here would exercise a component the guest never
+  // meets (and would make the two-click case below vacuous).
+  const Harness: React.FC<{ onChange: (v: AtlasDateRangePickerValue) => void }> = ({ onChange }) => {
+    const [value, setValue] = React.useState<AtlasDateRangePickerValue>({
+      startDate: null,
+      endDate: null,
+    });
+    return (
       <AtlasDateRangePicker
         anchorRef={{ current: document.createElement('div') }}
         open
         onClose={vi.fn()}
-        value={{ startDate: null, endDate: null }}
-        onChange={onChange}
+        value={value}
+        onChange={(next) => {
+          setValue(next);
+          onChange(next);
+        }}
         minDate={getIstCalendarDate(FIXED_NOW)}
         shownDate={new Date(2026, 1, 1)}
         // date-fns `format` reads LOCAL components, so this testid IS the date printed on the
@@ -106,8 +116,12 @@ describe('AtlasDateRangePicker — hands out the civil date the guest clicked (e
         dayContentRenderer={(day) => (
           <span data-testid={`cell-${format(day, 'yyyy-MM-dd')}`}>{format(day, 'd')}</span>
         )}
-      />,
+      />
     );
+  };
+
+  const renderPicker = (onChange: (v: AtlasDateRangePickerValue) => void) =>
+    render(<Harness onChange={onChange} />);
 
   // react-date-range's DayCell commits a selection on mousedown+mouseup (see its
   // `handleMouseEvent`); a bare `click` fires no handler at all and would silently assert
@@ -130,6 +144,22 @@ describe('AtlasDateRangePicker — hands out the civil date the guest clicked (e
     const { startDate } = onChange.mock.calls.at(-1)![0] as AtlasDateRangePickerValue;
     expect(startDate).toBeTruthy();
     expect(format(startDate!, 'yyyy-MM-dd')).toBe(PICKED_ISO);
+  });
+
+  // Both ends of the stay, on the real two-click path — the check-out is the one react-date-range
+  // echoes the check-in back through (see AtlasDateRangePicker.rangeCompletion.test.tsx), so it is
+  // worth proving here that the echoed value keeps its civil date east of IST rather than being
+  // re-normalised into the previous day on its way back out.
+  it('a two-click range reaches onChange as the two civil dates the guest clicked', () => {
+    const onChange = vi.fn();
+    renderPicker(onChange);
+
+    selectDay(PICKED_ISO);
+    selectDay(CHECKOUT_ISO);
+
+    const { startDate, endDate } = onChange.mock.calls.at(-1)![0] as AtlasDateRangePickerValue;
+    expect(format(startDate!, 'yyyy-MM-dd')).toBe(PICKED_ISO);
+    expect(format(endDate!, 'yyyy-MM-dd')).toBe(CHECKOUT_ISO);
   });
 
   // The quick presets convert an INSTANT (`new Date()`) into calendar basis. That boundary
@@ -241,11 +271,32 @@ describe('SearchAvailabilityWidget — the night written to BookingContext is th
     expect(screen.getByTestId('hero-date-toggle').textContent).toContain('20 Feb 2026');
   });
 
-  // The quick presets are the one guest action that yields a COMPLETE range in a single
-  // interaction, so they are what exercises the /search URL sink end to end here. (Completing a
-  // range by clicking check-in then check-out is currently impossible for an unrelated,
-  // timezone-independent reason — see the note at the bottom of this file.)
-  //
+  // The whole guest flow on the real path: two clicks, then Search. Both sinks must carry the two
+  // civil dates that were clicked. This is the case that has to hold for a booking to be possible
+  // at all, and until the two-click completion defect was fixed it could not even be written.
+  it('a check-in and a check-out clicked in turn reach BookingContext and /search intact', async () => {
+    renderWidget();
+    await openCalendar();
+
+    await selectDay(PICKED_ISO);
+    await selectDay(CHECKOUT_ISO);
+
+    await waitFor(() => {
+      expect(wireToCivilDate(screen.getByTestId('probe-checkin').textContent)).toBe(PICKED_ISO);
+    });
+    expect(wireToCivilDate(screen.getByTestId('probe-checkout').textContent)).toBe(CHECKOUT_ISO);
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('hero-search-submit'));
+    });
+
+    await waitFor(() => {
+      const search = screen.getByTestId('probe-search').textContent ?? '';
+      expect(search).toContain(`checkIn=${PICKED_ISO}`);
+      expect(search).toContain(`checkOut=${CHECKOUT_ISO}`);
+    });
+  });
+
   // The preset converts an instant (`new Date()`) to calendar basis; the widget then writes that
   // range to BOTH sinks. Pre-fix east of IST the URL stayed right while BookingContext lost a
   // day — the two sinks disagreeing is the signature of a mixed basis.
@@ -275,18 +326,10 @@ describe('SearchAvailabilityWidget — the night written to BookingContext is th
 });
 
 /**
- * SEPARATE, PRE-EXISTING, TIMEZONE-INDEPENDENT DEFECT found while writing this file — deliberately
- * NOT covered here, because it is not a date-basis problem and fixing it changes the picker's
- * selection state machine:
- *
- *   `AtlasDateRangePicker` cannot complete a range by clicking check-in and then check-out.
- *   react-date-range commits on mousedown (`dragSelectionEnabled={false}`), and on the second
- *   click `calcNewSelection` takes the `focusedRange[1] === 1` branch: it sets `endDate = value`
- *   and passes `startDate` through UNCHANGED from the `ranges` prop. So `handleRangeChange`
- *   receives `startDate === value.startDate`, and its first guard —
- *   `composedDisabledDay(startDate)`, which returns true for `normalized <= checkIn` while
- *   `selectionState === 'CHECK_IN_SELECTED'` — rejects the whole selection and returns early.
- *   The guest gets "Minimum stay is one night. Select a check-out date after check-in." and no
- *   check-out is ever recorded. Reproduced in Asia/Kolkata (offset -330) as well as here, so it
- *   is unrelated to timezone. Affects both consumers (SearchAvailabilityWidget, AirbnbSearchBar).
+ * The separate two-click defect found while writing this file — `AtlasDateRangePicker` could not
+ * complete a range at all, because `handleRangeChange` ran the check-out rules against the
+ * `startDate` react-date-range echoes back — is FIXED, and is covered by
+ * AtlasDateRangePicker.rangeCompletion.test.tsx. It lives there rather than here because it was
+ * never timezone-dependent (it reproduced identically in Asia/Kolkata), and a case that does not
+ * need the pin does not belong in the pinned project.
  */
