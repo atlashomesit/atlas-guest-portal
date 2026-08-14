@@ -52,9 +52,31 @@ const exclude = [
   ...heavyRouteSmokes,
 ];
 
-// Scan roots: src/ plus tests/. A test file added under a NEW top-level
-// directory must be added here or vitest will not see it (the old config used
+// Scan roots: src/, tests/, functions/ and eslint-rules/. A test file added under a NEW
+// top-level directory must be added here or vitest will not see it (the old config used
 // vitest's default include, which scanned everything).
+//
+// functions/ and eslint-rules/ were both MISSING from this list until 2026-08-14, and the
+// omission was silent in the worst way: a test outside the scan roots does not fail, it
+// DISAPPEARS, and the suite keeps reporting a healthy green "N passed".
+//   - functions/sitemap.xml.test.ts (6 cases) had never executed once. listingPathSlug and
+//     resolveSitemapTenantSlug — i.e. the whole TASK-7430 "never emit /homes/atlas-homes/...
+//     on a white-label host" guard — had ZERO coverage anywhere in the repo as a result.
+//   - eslint-rules/{no-utc-today,require-error-before-empty-state}.test.cjs (25 cases) were
+//     wired to no runner at all: absent from package.json scripts and from every workflow,
+//     and no-utc-today's documented `npx mocha` command could not have worked because mocha
+//     is not a dependency of this repo.
+// `npx vitest run <file>` answered "No test files found, exiting with code 1" for all three,
+// and neither project's resolved include list held an entry for them.
+//
+// eslint RuleTester harnesses DO run correctly under this config's jsdom environment and
+// src/test/setup.ts — RuleTester binds to vitest's injected describe/it globals. Verified
+// here, and atlas-admin-portal has scanned ["src", "eslint-rules"] for eight structurally
+// identical .cjs harnesses all along. They keep their `node eslint-rules/<f>.test.cjs`
+// header comments, which still work; they are simply no longer the ONLY way these run.
+//
+// tests/showcaseNoindexHosts.test.ts had to be parked in tests/ to dodge the functions/ gap.
+// Anything that must run belongs under a root listed HERE.
 // NOTE: enumerated with readdirSync({recursive:true}), NOT fs.globSync. globSync landed in Node 22
 // and this repo's .nvmrc does pin 22 — but the release gate runs all five repos under whatever Node
 // is active on the machine, and atlas-admin-portal pins 20. Under Node 20 the named import is a hard
@@ -63,7 +85,7 @@ const exclude = [
 // recursive option exists on 18.17/20.1+ AND 22, so this config no longer cares which is active.
 // Same defect was live in atlas-admin-portal's config; see TASK-7044.
 const TEST_FILE_RE = /\.(test|spec)\.(ts|tsx|js|jsx|cjs|mjs)$/;
-const testFiles = ["src", "tests"]
+const testFiles = ["src", "tests", "functions", "eslint-rules"]
   .flatMap((d) => {
     let entries: unknown[];
     try {
