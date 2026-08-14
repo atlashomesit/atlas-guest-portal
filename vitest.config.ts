@@ -99,13 +99,35 @@ const testFiles = ["src", "tests", "functions", "eslint-rules"]
   })
   .filter((f) => !heavyRouteSmokes.includes(f))
   .sort();
+// ---------------------------------------------------------------------------
+// TZ-pinned partition (2026-08-15). A THIRD project, scoped to `*.tzeast.test.*`, runs east of
+// UTC+05:30 (Asia/Tokyo). It exists because a whole class of date defect is INVISIBLE at or west
+// of +05:30, and both zones this suite normally runs in — UTC on CI, Asia/Kolkata on dev
+// machines — sit on that accidentally-correct side. A local-midnight calendar cell converted as
+// if it were an instant lands on the previous IST day only east of the split, which is how an
+// off-by-one availability gate shipped to guests in NPT/BST/ICT/CST/JST/KST/AEST/NZST while every
+// test stayed green.
+//
+// Deliberately NOT a suite-wide TZ pin: pinning globally would put every test on one side of the
+// split and freeze exactly this class of bug invisible. (atlas-admin-portal's global pin,
+// 70d4449e, addresses an unrelated snapshot-stability problem and is not a precedent here.)
+//
+// The zone must come from the runner, not the test file: `process.env.TZ = ...` inside a worker
+// does NOT change the resolved zone (Node has already cached it by then), so a test that sets it
+// itself silently runs in the runner's zone and asserts nothing. Files in this project carry a
+// guard case asserting the offset really is east of IST so the pin can never decay unnoticed.
+const TZ_EAST_RE = /\.tzeast\.test\.(ts|tsx|js|jsx|cjs|mjs)$/;
+const TZ_EAST_ZONE = "Asia/Tokyo"; // +09:00
+
 const usesModuleMocks = new Set(
   testFiles.filter((f) =>
     /\bvi\.(mock|doMock)\(/.test(readFileSync(path.resolve(__dirname, f), "utf8"))
   )
 );
-const mockedFiles = testFiles.filter((f) => usesModuleMocks.has(f));
-const sharedFiles = testFiles.filter((f) => !usesModuleMocks.has(f));
+const tzEastFiles = testFiles.filter((f) => TZ_EAST_RE.test(f));
+const nonTzFiles = testFiles.filter((f) => !TZ_EAST_RE.test(f));
+const mockedFiles = nonTzFiles.filter((f) => usesModuleMocks.has(f));
+const sharedFiles = nonTzFiles.filter((f) => !usesModuleMocks.has(f));
 
 // Windows: release gate runs API/admin/guest Vitest in parallel — keep 1 worker
 // to avoid pool startup timeouts / worker-heap exhaustion (see heavyRouteSmokes
@@ -167,6 +189,23 @@ export default defineConfig({
           name: "shared-fast",
           include: sharedFiles,
           isolate: false,
+        },
+      },
+      // Runs east of +05:30 — see the TZ-pinned partition note above. Isolated because these
+      // files use vi.mock, and kept a separate project so the pin covers ONLY them.
+      {
+        extends: true,
+        test: {
+          ...baseTest,
+          name: "tz-east-of-ist",
+          include: tzEastFiles,
+          isolate: true,
+          // `forks`, not the suite-wide `threads`: the zone must be set BEFORE the runtime
+          // resolves it. A forked child process is spawned with this env, so it starts in
+          // Asia/Tokyo; with threads the env is assigned after jsdom's VM context already
+          // resolved the zone, and the pin silently does nothing.
+          pool: "forks" as const,
+          env: { TZ: TZ_EAST_ZONE },
         },
       },
     ],
