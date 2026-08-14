@@ -32,8 +32,12 @@ async function ensureDirExists(filePath) {
 }
 
 async function removeOutdatedOptimizedFiles(dir, baseName, expectedFile) {
-  const pattern = path.join(dir, `${baseName}.*.webp`);
-  const matches = await glob(pattern, { absolute: true, nodir: true });
+  // `dir` is passed via `cwd` rather than joined into the pattern: on Windows
+  // path.join yields backslashes, which glob reads as escape characters, so the
+  // joined pattern matched nothing and this sweep was a silent no-op — every
+  // regeneration orphaned the previous hash instead of removing it. Keeping the
+  // pattern separator-free mirrors how `sourceGlobs` is resolved above.
+  const matches = await glob(`${baseName}.*.webp`, { cwd: dir, absolute: true, nodir: true });
   await Promise.all(
     matches
       .filter((candidate) => path.resolve(candidate) !== path.resolve(expectedFile))
