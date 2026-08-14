@@ -7,6 +7,8 @@
  * The environment is read from ATLAS_ENVIRONMENT (same env var as atlas-runtime-config.json).
  */
 
+import { isNoindexHost } from "./_lib/noindexHosts";
+
 interface Env {
   ATLAS_ENVIRONMENT?: string;
 }
@@ -46,8 +48,12 @@ export const onRequestGet = async ({ request, env }: { request: Request; env: En
   const environment = (env.ATLAS_ENVIRONMENT ?? "").trim().toLowerCase();
   const isProduction = !environment || environment === "production";
 
-  const origin = new URL(request.url).origin.replace(/\/+$/, "");
-  const body = isProduction
+  const url = new URL(request.url);
+  const origin = url.origin.replace(/\/+$/, "");
+  // An internal-tenant demo host is suppressed even in production — see _lib/noindexHosts.
+  const suppressed = isNoindexHost(url.hostname);
+
+  const body = isProduction && !suppressed
     ? PRODUCTION_BODY(`${origin}/sitemap.xml`)
     : NON_PRODUCTION_BODY;
 
