@@ -1,5 +1,6 @@
 import { resolveTenantSlugFromDomain } from "./_lib/tenantSlug";
 import { isAtlasDirectBookingHost, isMarketplaceHost } from "./_lib/tenantSiteMeta";
+import { isNoindexHost } from "./_lib/noindexHosts";
 
 interface Env {
   ATLAS_API_BASE_URL?: string;
@@ -163,8 +164,11 @@ export const onRequestGet = async ({ request, env }: { request: Request; env?: E
   // TASK-7194: omit /homestays-in-* from white-label tenant sitemaps.
   const corePaths = isAtlasHost ? CORE_PATHS : SHARED_CORE_PATHS;
 
+  // An internal-tenant demo host publishes core paths only — never its seeded listings. Enumerating
+  // them here would hand every non-JS crawler a full index of fabricated Atlas inventory and prices,
+  // which is precisely what the JS-only noindex meta tag (TASK-4386) cannot prevent.
   const listingPaths: string[] = [];
-  if (apiBase && tenantSlug) {
+  if (apiBase && tenantSlug && !isNoindexHost(host)) {
     try {
       const res = await fetch(`${apiBase}/listings/public`, {
         headers: {
