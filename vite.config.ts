@@ -3,7 +3,21 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import fs from "fs";
+import { randomBytes } from "crypto";
 import { clampTransformWidth, isAllowedBlobImageUrl } from "./functions/_lib/guestImageProxy";
+
+// Dev-server CSP (below) mirrors production's strict script-src (no 'unsafe-inline' — see
+// xss-input-sanitization.e2e.spec.ts) so local Playwright security gates see the real policy.
+// But @vitejs/plugin-react injects an inline preamble <script> (React Fast Refresh setup) into
+// the dev HTML, and Vite's own HMR client script is inline too — a strict script-src with no
+// 'unsafe-inline' blocks both, which throws "@vitejs/plugin-react can't detect preamble" on
+// every page (the preamble script never runs) and cascades into every guest spec that loads the
+// navbar. Fix: a CSP nonce, not 'unsafe-inline' — Vite stamps this onto every script tag it
+// injects via `html.cspNonce`, and the nonce below is threaded into the dev CSP string so the
+// browser allows exactly those tags and nothing else. Inert during `vite build` (the production
+// CSP in public/_headers carries no nonce token, so a baked-in nonce attribute on the built
+// index.html's script tag is simply ignored, not a real credential).
+const devCspNonce = randomBytes(16).toString("base64");
 
 const RUNTIME_CONFIG_PATH = path.resolve(__dirname, "public/.well-known/atlas-runtime-config.json");
 const MANIFEST_PATH = path.resolve(__dirname, "public/manifest.webmanifest");
@@ -156,6 +170,11 @@ export default defineConfig({
     },
     dedupe: ["react", "react-dom", "react-router", "react-router-dom"],
   },
+  html: {
+    // Stamps nonce="..." onto every <script> tag Vite itself injects (HMR client, the
+    // React-refresh preamble) so they clear the strict script-src below without 'unsafe-inline'.
+    cspNonce: devCspNonce,
+  },
   server: {
     port: 5174,
     /** Must stay 5174 — E2E and docs assume guest portal here; do not silently move to another port. */
@@ -166,6 +185,17 @@ export default defineConfig({
       "X-Content-Type-Options": "nosniff",
       "X-Frame-Options": "DENY",
       "Permissions-Policy": "geolocation=(), microphone=(), camera=()",
+      // Mirror public/_headers CSP so local Playwright security gates see the same policy as Pages,
+      // plus 'nonce-<devCspNonce>' in the two script directives ONLY (never 'unsafe-inline' — that
+      // would trip xss-input-sanitization.e2e.spec.ts's "script-src must not include 'unsafe-inline'"
+      // assertion) so Vite's own dev-mode inline scripts (see html.cspNonce above) are allowed. Also
+      // widens img-src with the same "http://127.0.0.1:* http://localhost:*" already carved out for
+      // connect-src below — production serves listing photos over https (matched by the plain
+      // `https:` source-scheme already present), but local dev serves them straight off the dotnet
+      // API over http, which `https:` does not cover; without this every listing photo 404s as a
+      // CSP block (image-optimization.e2e.spec.ts, guest-listing-gallery, mobile-viewport-flows).
+      "Content-Security-Policy":
+        `default-src 'self'; script-src 'self' 'nonce-${devCspNonce}' https://checkout.razorpay.com https://api.razorpay.com https://*.razorpay.com https://static.cloudflareinsights.com https://maps.googleapis.com; script-src-elem 'self' 'nonce-${devCspNonce}' https://checkout.razorpay.com https://api.razorpay.com https://*.razorpay.com https://static.cloudflareinsights.com https://maps.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https: http://127.0.0.1:* http://localhost:* https://maps.gstatic.com https://*.googleapis.com; connect-src 'self' http://127.0.0.1:* http://localhost:* https://checkout.razorpay.com https://api.razorpay.com https://*.razorpay.com https://cloudflareinsights.com https://api.atlaspms.in https://atlas-homes-api-dev-fhdtg0gkgmcmhwfd.centralindia-01.azurewebsites.net https://qaapi.atlaspms.in https://maps.googleapis.com https://*.googleapis.com; frame-src https://checkout.razorpay.com https://api.razorpay.com https://*.razorpay.com https://www.google.com https://www.google.com/maps https://maps.googleapis.com; frame-ancestors 'none'`,
     },
     proxy: {
       "/tenants": { target: BACKEND_TARGET, changeOrigin: true, secure: false },
