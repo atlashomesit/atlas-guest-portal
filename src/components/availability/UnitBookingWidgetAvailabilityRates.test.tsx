@@ -2,8 +2,7 @@ import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { addDays, format } from 'date-fns';
-import { toISODate } from '@/utils/dateRange';
-import { getIstStartOfDay } from '@/utils/date';
+import { getIstCalendarDate } from '@/utils/date';
 
 /**
  * TASK-7491 (Rate Sync Authority opt-out — guest-portal slice): verifies the guest booking
@@ -83,13 +82,22 @@ vi.mock('@/components/FomoBar', () => ({ default: () => null }));
 vi.mock('@/lib/events', () => ({ track: vi.fn() }));
 
 describe('UnitBookingWidget - TASK-7491: availability-rates bookable gate (render)', () => {
-  const today = getIstStartOfDay();
+  // Timezone basis (must match AtlasBookingCalendar, or this file is only green in IST):
+  // the grid builds every cell as `new Date(year, month, d)` and derives BOTH its lookup key
+  // (`toYMD`) and its aria-label (`format(date, 'd MMMM')`) from that LOCAL calendar date.
+  // `getIstStartOfDay()` returns the *instant* of IST midnight (= 18:30 UTC the previous day),
+  // so on a non-IST runner every date derived from it names the day AFTER the cell it formats
+  // as — the mocks below got keyed to D+n while `findDayCell` looked up the D+n-1 cell.
+  // `getIstCalendarDate()` is local midnight carrying the IST calendar day, and keying the mocks
+  // with the same local `yyyy-MM-dd` the grid uses keeps both halves on one basis in any zone.
+  const today = getIstCalendarDate();
+  const toGridKey = (date: Date) => format(date, 'yyyy-MM-dd');
   const unusableDate = addDays(today, 4);
   const carriedForwardDate = addDays(today, 5);
   const normalDate = addDays(today, 6);
-  const unusableIso = toISODate(unusableDate);
-  const carriedForwardIso = toISODate(carriedForwardDate);
-  const normalIso = toISODate(normalDate);
+  const unusableIso = toGridKey(unusableDate);
+  const carriedForwardIso = toGridKey(carriedForwardDate);
+  const normalIso = toGridKey(normalDate);
   // Deliberately < 10000 so AtlasBookingCalendar's formatINR uses plain "₹N,NNN" (not the "₹N.NK"
   // form it switches to at >= 10000) — irrelevant to the assertions below, which strip non-digits.
   const CARRIED_FORWARD_PRICE = 4200;
