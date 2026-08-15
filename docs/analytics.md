@@ -1,7 +1,7 @@
 ## Analytics overview
 
 This project includes a lightweight analytics helper that standardizes event payloads and keeps them network-safe by default. Events are enriched with the current environment (`dev` or `prod`), route context, timestamps, and relevant identifiers (listing/unit/property codes) so future backends can ingest consistent telemetry. Always pass a `surface` string so downstream consumers can filter by UI origin, and never include PII (phone numbers, email addresses, raw chat text, etc.).
-
+---------------------------------------------------
 ### Helper usage
 
 The helper lives at `src/utils/analytics.ts` and exposes:
