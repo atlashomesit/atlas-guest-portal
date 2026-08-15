@@ -74,11 +74,16 @@ describe("TASK-4899: isNeutralBrandingMode / brand-name+email fallbacks", () => 
   });
 
   describe("getTenantBrandName", () => {
-    it("neutral-with-branding: uses the tenant's own configured name unchanged", () => {
+    it("neutral-with-branding: uses the tenant's own configured display name unchanged", () => {
       vi.mocked(getTenantContext).mockReturnValue({
         slug: "gaurav",
-        name: "Elsiya Loft",
-        brandName: "Elsiya Loft",
+        name: "Gaurav Personal",
+        brandName: "Gaurav Personal",
+        legalContactPack: {
+          displayName: "Elsiya Loft",
+          showAtlasFooterCredit: false,
+          isCustomDomain: false,
+        },
         guestCommsBrandingMode: "Neutral",
       } as ReturnType<typeof getTenantContext>);
       expect(getTenantBrandName()).toBe("Elsiya Loft");
@@ -139,14 +144,14 @@ describe("TASK-4899: isNeutralBrandingMode / brand-name+email fallbacks", () => 
       expect(getTenantBrandName()).toBe("Sunrise Villas Pvt Ltd");
     });
 
-    it("TASK-7431: Neutral uses tenant name when no business display name or long brand", () => {
+    it("TASK-7468: Neutral never publishes Tenants.Name when no business brand is set", () => {
       vi.mocked(getTenantContext).mockReturnValue({
         slug: "sunrise",
         name: "Sunrise Short",
         brandName: "Sunrise Short",
         guestCommsBrandingMode: "Neutral",
       } as ReturnType<typeof getTenantContext>);
-      expect(getTenantBrandName()).toBe("Sunrise Short");
+      expect(getTenantBrandName()).toBe(NEUTRAL_NO_BRAND_FALLBACK);
     });
 
     it("TASK-7431: Neutral never falls back to a personal brandName", () => {

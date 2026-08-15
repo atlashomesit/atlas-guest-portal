@@ -152,6 +152,11 @@ describe("Hero date picker", () => {
       // thing to store. Normalise the artifact away instead of re-recording it: the assertion
       // is about the popover's structure, not about which jsdom build is installed.
       // Do NOT "fix" this by regenerating the snapshot; that just moves the failure.
+      // Scope note: that prohibition is about ENVIRONMENT-dependent drift (the jsdom artifact
+      // above, and useId churn). A third-party glyph change from a pinned dependency bump is
+      // not that — it renders identically everywhere on the new version — so re-recording IS
+      // correct there. Verify before re-recording: the tag COUNT must be unchanged and every
+      // differing tag must be svg geometry. (lucide-react 1.27 -> 1.28 moved calendar-range.)
       .replace(/\s*\*\s*,\s*\*\s*/g, ", ");
     expect(stableHtml).toMatchSnapshot("date-picker-mobile");
 

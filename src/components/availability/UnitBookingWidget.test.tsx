@@ -226,9 +226,11 @@ describe('UnitBookingWidget - TASK-2630: URL date hydration and picker interacti
     expect(content).toContain('booking.checkIn');
     expect(content).toContain('booking.checkOut');
     expect(content).toContain('setDateRange');
-    // Hydration should convert ISO strings to Date objects
-    expect(content).toContain('getIstStartOfDay(new Date(ci))');
-    expect(content).toContain('getIstStartOfDay(new Date(co))');
+    // Hydration converts the ISO-instant URL params to CALENDAR-basis Dates at the boundary,
+    // so a URL-hydrated range keys and gates identically to a calendar-picked one in every
+    // guest timezone (getIstStartOfDay here would re-introduce the east-of-IST off-by-one).
+    expect(content).toContain('getIstCalendarDate(new Date(ci))');
+    expect(content).toContain('getIstCalendarDate(new Date(co))');
   });
 
   it('passes dateRange value to AtlasBookingCalendar as controlled value prop', () => {
@@ -717,12 +719,14 @@ describe('UnitBookingWidget - TASK-4628: E13 overlap-block message must fire on 
     return content.slice(start, end);
   };
 
-  it('re-normalizes the iteration cursor to IST start-of-day each step (matches doesRangeIntersectBlocked)', () => {
+  it('re-normalizes the iteration cursor to calendar start-of-day each step', () => {
     const section = overlapHelper();
-    // The canonical timezone-safe increment used across dateRange.ts. A bare `addDays(cursor, 1)`
-    // preserves runtime-local wall-clock and can drift the iterated ISO off the IST calendar day
-    // across a DST/offset boundary — the exact local-vs-remote-dev divergence in TASK-4628.
-    expect(section).toContain('cursor = getIstStartOfDay(addDays(cursor, 1))');
+    // The timezone-safe increment. A bare `addDays(cursor, 1)` leaves the cursor un-normalized,
+    // which can drift the iterated ISO off the civil day across a DST boundary — the exact
+    // local-vs-remote-dev divergence in TASK-4628. The widget now works on the CALENDAR basis
+    // (utils/date.ts), so the normalizer is startOfCalendarDay, not getIstStartOfDay: applying
+    // an instant→IST conversion to a calendar cell is what shipped the east-of-IST gate bug.
+    expect(section).toContain('cursor = startOfCalendarDay(addDays(cursor, 1))');
     // The un-normalized form must NOT be the increment (only the guarded, normalized form).
     expect(section).not.toMatch(/cursor = addDays\(cursor, 1\);/);
   });

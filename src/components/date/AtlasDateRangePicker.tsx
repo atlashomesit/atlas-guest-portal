@@ -1,12 +1,17 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { addDays, startOfDay } from 'date-fns';
+import { addDays, differenceInCalendarDays } from 'date-fns';
 import { DateRange } from 'react-date-range';
 import 'react-date-range/dist/styles.css';
 import 'react-date-range/dist/theme/default.css';
 import { formatDisplayNumber } from '@/config/contact';
 
 import { DateRangePickerPopover } from '../homepage_components/hotelBooking_form/DateRangePickerPopover';
-import { getIstStartOfDay } from '@/utils/date';
+// CALENDAR basis throughout this picker — see the header comment in utils/date.ts.
+// react-date-range builds every day cell as a LOCAL-midnight Date (a civil date, not an
+// instant), and date-fns reads it back on the same basis, so that is the basis this component
+// both consumes and hands to its consumers. Instants (`new Date()`) are converted at the
+// boundary with getIstCalendarDate and never leak inward.
+import { getIstCalendarDate, startOfCalendarDay } from '@/utils/date';
 
 // Helper to normalize date to start of month (avoids timezone issues with date-fns startOfMonth)
 const normalizeToStartOfMonth = (date: Date): Date => {
@@ -15,8 +20,11 @@ const normalizeToStartOfMonth = (date: Date): Date => {
 
 const normalizeDate = (date: Date | null): Date | null => {
   if (!date) return null;
-  // Use IST normalization to match BookingCardCalendarSection and ensure consistent comparisons
-  return getIstStartOfDay(date);
+  // CALENDAR basis. This was `getIstStartOfDay(date)` — an instant→IST conversion applied to the
+  // local-midnight cells react-date-range hands out, i.e. the exact defect fixed for the booking
+  // calendar in #449. East of UTC+05:30 local midnight of day D is still D-1 in IST, so every
+  // date leaving this picker was shifted a day back: the guest's own selection came back wrong.
+  return startOfCalendarDay(date);
 };
 
 export interface AtlasDateRangePickerValue {
@@ -99,7 +107,12 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
 
   /** TASK-1712: Quick-preset date ranges */
   const quickPresets = useMemo(() => {
-    const today = getIstStartOfDay(new Date());
+    // The property's "today" is the IST civil date, carried on the calendar basis so it lines up
+    // with the grid's cells (and with UnitBookingWidget's `today`) in every guest timezone.
+    // `getIstStartOfDay` here returned an IST-midnight INSTANT, which reads as the right civil
+    // day only by luck east of IST and as the PREVIOUS day everywhere west of +05:30 — including
+    // UTC, so a guest in London or New York got yesterday's presets.
+    const today = getIstCalendarDate();
     const dayOfWeek = today.getDay(); // 0=Sun … 6=Sat
 
     // Next Friday (0 if today is Friday)
@@ -125,7 +138,7 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
 
     const isDisabled = (start: Date) => {
       if (!minDate) return false;
-      return getIstStartOfDay(start) < getIstStartOfDay(minDate);
+      return startOfCalendarDay(start) < startOfCalendarDay(minDate);
     };
 
     return [
@@ -137,12 +150,12 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
     ];
   }, [minDate]);
 
+  // differenceInCalendarDays, not an epoch-millis divide: on the calendar basis a guest whose
+  // zone crosses a DST boundary mid-stay has 23h and 25h civil days, and the old arithmetic
+  // miscounted those nights (same correction #449 made to calculateNights).
   const nights =
     value.startDate && value.endDate
-      ? Math.max(
-          1,
-          Math.round((value.endDate.getTime() - value.startDate.getTime()) / (1000 * 60 * 60 * 24)),
-        )
+      ? Math.max(1, differenceInCalendarDays(value.endDate, value.startDate))
       : null;
 
   useEffect(() => {
@@ -159,7 +172,8 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
 
   const validateDateRange = (checkIn: Date | null, checkOut: Date | null) => {
     if (!checkIn || !checkOut) return { valid: true, error: null };
-    const diffDays = Math.floor((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
+    // Civil nights, not elapsed 24h blocks — see the note on `nights` above.
+    const diffDays = differenceInCalendarDays(checkOut, checkIn);
     if (checkOut <= checkIn) {
       return { valid: false, error: 'Check-out date must be after check-in date' };
     }
@@ -193,35 +207,70 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
     }
   };
 
-  const composedDisabledDay = (date: Date) => {
+  /**
+   * Reasons a day is unselectable whichever end of the stay is being picked: outside the
+   * min/max window, or vetoed by the consumer (past days on both search bars, booked nights on
+   * the unit pages).
+   */
+  const isDayUnavailable = (date: Date) => {
     const normalized = normalizeDate(date);
-    const checkIn = normalizeDate(value.startDate);
     if (minDate && normalized && normalized < normalizeDate(minDate)!) return true;
     if (maxDate && normalized && normalized > normalizeDate(maxDate)!) return true;
-    // When selecting checkout, disable same-day or earlier than check-in to enforce 1-night minimum
-    if (selectionState === 'CHECK_IN_SELECTED' && checkIn && normalized && normalized <= checkIn) {
-      return true;
-    }
     return disabledDay ? disabledDay(date) : false;
   };
+
+  /**
+   * The 1-night minimum, stated as what it actually is: a rule about a CHECK-OUT CANDIDATE,
+   * which may not land on or before the check-in. It says nothing about a check-in, and in
+   * particular nothing about the check-in we already hold — see handleRangeChange.
+   */
+  const isTooEarlyForCheckout = (date: Date) => {
+    const normalized = normalizeDate(date);
+    const checkIn = normalizeDate(value.startDate);
+    return !!(checkIn && normalized && normalized <= checkIn);
+  };
+
+  // What the grid greys out. During step 2 that includes every day that cannot be the check-out,
+  // which is where the 1-night minimum is enforced against the guest: react-date-range's DayCell
+  // short-circuits on `disabled`, so those days cannot even be clicked.
+  const composedDisabledDay = (date: Date) =>
+    isDayUnavailable(date) ||
+    (selectionState === 'CHECK_IN_SELECTED' && isTooEarlyForCheckout(date));
 
   const handleRangeChange = (ranges: { selection?: { startDate?: Date | null; endDate?: Date | null } }) => {
     const selection = ranges.selection ?? { startDate: null, endDate: null };
     const startDate = normalizeDate(selection.startDate ?? null);
     const endDate = normalizeDate(selection.endDate ?? null);
+    const existingCheckIn = normalizeDate(value.startDate);
 
-    // Reject clicks on disabled dates - ensure visual disabled state matches functional behavior
-    if (startDate && composedDisabledDay(startDate)) {
-      if (selectionState === 'CHECK_IN_SELECTED') {
-        const checkIn = normalizeDate(value.startDate);
-        const normalized = normalizeDate(startDate);
-        if (checkIn && normalized && normalized.getTime() <= checkIn.getTime()) {
-          setValidationError('Minimum stay is one night. Select a check-out date after check-in.');
-        }
-      }
+    // react-date-range commits a CHECK-OUT by setting `endDate` alone and passing `startDate`
+    // straight back out of the `ranges` prop untouched (DateRange.calcNewSelection, the
+    // `focusedRange[1] === 1` branch). With dragSelectionEnabled={false} that commit happens on
+    // mousedown, one per click, so the second click always arrives here as
+    // `startDate === value.startDate` — an echo of what we already hold, not a day the guest
+    // clicked. Judging it by the check-out rules dropped EVERY valid completion: the check-in
+    // equals itself, so `<= checkIn` was true, the whole selection was discarded, and the guest
+    // was told "Minimum stay is one night" with no check-out ever recorded. Those rules belong to
+    // `endDate` alone.
+    const isCheckoutCommit =
+      selectionState === 'CHECK_IN_SELECTED' &&
+      !!existingCheckIn &&
+      !!startDate &&
+      startDate.getTime() === existingCheckIn.getTime();
+
+    // Reject clicks on unavailable dates - keep the visual disabled state and what actually
+    // happens on click in step with each other.
+    if (startDate && !isCheckoutCommit && isDayUnavailable(startDate)) {
       return; // Ignore selection - date is disabled (e.g. past date)
     }
-    if (endDate && composedDisabledDay(endDate)) {
+    if (endDate && isDayUnavailable(endDate)) {
+      return;
+    }
+
+    // 1-night minimum, judged against the candidate check-out. The grid already greys these days
+    // out, so this is the backstop for a consumer that overrides `disabledDay` via dateRangeProps.
+    if (isCheckoutCommit && endDate && isTooEarlyForCheckout(endDate)) {
+      setValidationError('Minimum stay is one night. Select a check-out date after check-in.');
       return;
     }
 
@@ -238,7 +287,6 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
     }
 
     if (selectionState === 'CHECK_IN_SELECTED') {
-      const existingCheckIn = normalizeDate(value.startDate);
       if (!existingCheckIn) {
         if (applySelection(startDate, null)) {
           setSelectionState('CHECK_IN_SELECTED');
@@ -276,7 +324,8 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
     }
   };
 
-  const normalizedStart = normalizeDate(value.startDate) ?? normalizeDate(minDate ?? null) ?? startOfDay(new Date());
+  const normalizedStart =
+    normalizeDate(value.startDate) ?? normalizeDate(minDate ?? null) ?? getIstCalendarDate();
   const normalizedEnd = normalizeDate(value.endDate) ?? normalizedStart;
 
   useEffect(() => {
