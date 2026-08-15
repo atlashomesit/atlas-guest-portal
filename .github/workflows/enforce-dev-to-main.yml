@@ -1,14 +1,34 @@
-name: Enforce dev → main
+name: Enforce qa → main
 
-# Workspace policy: every commit reaching main MUST first land on dev.
-# This workflow fails any PR to main whose head branch is not `dev`.
-# Non-negotiable per founder decision 2026-05-14.
+# Workspace policy: every commit reaching main MUST come from the `qa` release branch.
+# This workflow fails any PR to main whose head branch is not `qa`.
+# Non-negotiable per founder decision 2026-05-14; narrowed dev -> qa by the release train.
 #
 # Trigger scope: `opened` + `reopened` only — the head branch of an open PR
 # cannot change without closing + reopening, so re-validating on every
 # `synchronize` (default) is pure waste. The trim cut billed GHA minutes
 # ~95% on 2026-05-23 (was ~1,600 min/mo across 5 repos, now ~50).
 # Do NOT add `synchronize` back without a cost review.
+#
+# ── RENAME IN PROGRESS (2026-08-15, founder-directed) ────────────────────────────
+# The historical check name "PR source must be dev" is now actively misleading: this
+# gate REJECTS dev and accepts ONLY qa. Renaming it is a two-phase change because the
+# job name IS the required status-check context in main's branch protection, and
+# `enforce_admins: true` means a mismatch deadlocks EVERY promotion to prod with no
+# way to click past it.
+#
+#   PHASE 1 (this commit): publish BOTH names. `branch-source` keeps the legacy
+#     context alive; `branch-source-qa` introduces the correct one. Both run the same
+#     assertion, so protection is satisfied whichever context it requires.
+#   PHASE 2 (founder, after this reaches qa on the next dev->qa cut): flip main's
+#     required_status_checks from "PR source must be dev" to "PR source must be qa"
+#     on all five repos, then delete the `branch-source` job below.
+#
+# Until Phase 2 lands, DO NOT delete `branch-source` — it is still the required
+# context. Both jobs are ~3s and only run on PRs to main, so the duplication is free.
+# ─────────────────────────────────────────────────────────────────────────────────
+#
+# GHA-COST-APPROVED: 1
 
 on:
   pull_request:
@@ -21,15 +41,30 @@ permissions:
 
 jobs:
   branch-source:
-    # DO NOT RENAME. "PR source must be dev" is the required status-check name configured in
-    # branch protection on main. Renaming the job means the required check never reports and
-    # every PR to main hangs forever waiting for a status that can no longer arrive. The qa
-    # release train (2026-08-08) widened the ACCEPTED head refs to dev + qa; the check NAME is
-    # load-bearing and deliberately stays as-is.
+    # LEGACY CONTEXT — required by branch protection on main until Phase 2 above.
+    # Do not rename or delete this job before protection is switched, or every PR to
+    # main hangs forever waiting for a status that can no longer arrive.
     name: PR source must be dev
     runs-on: ubuntu-latest
     steps:
-      - name: Verify PR head_ref == dev
+      - name: Verify PR head_ref == qa
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          if [ "$HEAD_REF" != "qa" ]; then
+            echo "::error title=Branch policy violation::PR #${PR_NUMBER} targets main from '${HEAD_REF}', but workspace policy requires every PR to main come from the release branch 'qa'. Nothing reaches prod without passing STEP 9 on a frozen qa SHA. Land your change on dev (unit + integration bar), let the daily qa cut carry it — or cherry-pick it to qa if it cannot wait — then promote qa → main."
+            exit 1
+          fi
+          echo "PR head is '${HEAD_REF}' — branch policy satisfied."
+
+  branch-source-qa:
+    # NEW CONTEXT — becomes the required check in Phase 2. Same assertion as above;
+    # named for what this gate actually enforces.
+    name: PR source must be qa
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify PR head_ref == qa
         env:
           HEAD_REF: ${{ github.head_ref }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
