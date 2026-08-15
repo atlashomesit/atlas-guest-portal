@@ -1938,7 +1938,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             } else {
               // Show averaged format (original behavior)
               return (
-                <div className="lv-price-row" data-testid="bw-bd-subtotal-row price-line-base">
+                <div className="lv-price-row" data-testid="price-line-base">
                   <span>
                     {priceDetails.nights > 0 && perNightForDisplay > 0
                       ? `${displayPrice(perNightForDisplay)} × ${priceDetails.nights} ${priceDetails.nights === 1 ? 'night' : 'nights'}`

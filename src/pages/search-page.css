@@ -25,6 +25,15 @@
   border-radius: var(--search-radius);
   background: var(--bg-surface);
   box-shadow: var(--shadow-level-1);
+  /* Sticky (see `sticky top-16` on the wrapper in SearchPage.tsx) pins this panel while the
+     page scrolls. With every filter row plus the amenity/digital-nomad chip rows all rendered,
+     the panel's natural height can exceed the viewport and its sticky box then sits on top of
+     the results grid below — its own empty flex gaps still catch clicks meant for listing
+     cards ("no overlap" per the file header above, so this is a bug, not a trade-off). Cap it
+     to the viewport and let its own content scroll instead of bleeding into the page below.
+     top-16 = 4rem; leave another 2rem of breathing room under it. */
+  max-height: calc(100vh - 6rem);
+  overflow-y: auto;
 }
 
 .search-filters__row {
@@ -250,6 +259,17 @@
 }
 
 @media (max-width: 900px) {
+  /* The max-height cap above still leaves a ~570px sticky panel on a 667px-tall phone
+     viewport — effectively the whole screen, so it still covers the first row of results no
+     matter how far the page scrolls (sticky, by definition, doesn't move with it). The other
+     sticky element on this page (SearchPage.tsx's AirbnbSearchBar wrapper) already goes
+     `md:static` below this same breakpoint; mirror that instead of trying to cap height further. */
+  .search-filters {
+    position: static;
+    max-height: none;
+    overflow-y: visible;
+  }
+
   .search-filters__row--fields,
   .search-filters__row--toggles {
     grid-template-columns: 1fr;

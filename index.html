@@ -118,6 +118,8 @@
     </div>
   </div>
   <script type="module" src="/src/main.tsx"></script>
+  <!-- PWA: register SW after first paint (public/sw-register.js — identical in Vite + Pages). -->
+  <script src="/sw-register.js" defer></script>
   <!-- JSON-LD blocks are injected at runtime by TenantJsonLd.tsx (RA-006/TASK-2335) -->
 </body>
 

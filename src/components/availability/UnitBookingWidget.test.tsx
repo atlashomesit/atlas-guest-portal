@@ -1025,7 +1025,7 @@ describe('UnitBookingWidget - TASK-4910: no misleading GST-less total in incompl
     expect(screen.queryByText('Total')).toBeNull();
     expect(screen.queryByTestId('bw-bd-service-fee-row')).toBeNull();
     expect(screen.queryByTestId('bw-bd-gst-row')).toBeNull();
-    expect(screen.queryByTestId('bw-bd-subtotal-row price-line-base')).toBeNull();
+    expect(screen.queryByTestId('price-line-base')).toBeNull();
     expect(screen.queryByTestId('bw-bd-accommodation-subtotal')).toBeNull();
     expect(screen.queryByTestId('bw-breakdown-pending')).toBeNull();
     expect(screen.queryByTestId('bw-price-pending')).toBeNull();
