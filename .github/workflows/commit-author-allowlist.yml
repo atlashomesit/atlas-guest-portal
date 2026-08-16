@@ -1,6 +1,24 @@
 # TASK-2733 — server-side author-email allowlist (docs/governance/feedback_author_email_allowlist.md in atlas-e2e).
 # Durable defense against placeholder-identity commits (atlas@example.com class) that bypass client-side hooks.
 # Founder-approved 2026-07-08 (interactive session). GHA-COST-APPROVED: 360
+#
+# 2026-08-16 COST TRIM — `pull_request` scoped to `types: [opened, reopened]` (founder-directed).
+# WHY: this workflow burned 3,131 billed min of the fleet's 5,484 August MTD (57%) against its
+# 360/mo declared ceiling — an 8.7x breach, and the largest single line while the Free tier sat
+# at 274% of cap. The default `pull_request` types include `synchronize`, which re-fires on every
+# push to an open PR head branch.
+#
+# WHAT THIS COSTS US — READ BEFORE "RESTORING" IT, and do NOT repeat the 2026-07-20 mistake of
+# assuming the removed trigger was redundant:
+# this is NOT the same trim enforce-dev-to-main.yml got on 2026-05-23. That workflow checks the
+# PR's SOURCE BRANCH, which cannot change mid-PR, so `synchronize` there was pure waste. THIS
+# workflow checks the COMMITS IN THE PR, and commits CAN be added after the PR is opened. So a
+# bad-identity commit pushed to a head branch AFTER open is no longer caught before merge; the
+# `push: [dev]` run catches it once it LANDS on dev. TASK-2733 therefore stays enforced on the
+# direct-push path but degrades to POST-FACT DETECTION on the "amend an open PR" path.
+# Accepted deliberately as a cost tradeoff. Measured saving ~500 billed min/month.
+#
+# IF A LEAK EVER ARRIVES BY THAT PATH: restore `synchronize` here rather than touching `push`.
 name: Author email allowlist
 
 # Trigger scope: `pull_request` AND `push: [dev]`.
@@ -14,6 +32,7 @@ name: Author email allowlist
 # GHA-COST-APPROVED: 360 (unchanged — same single job, one added step, no new job).
 on:
   pull_request:
+    types: [opened, reopened]
     branches: [dev, main]
   push:
     branches: [dev]
