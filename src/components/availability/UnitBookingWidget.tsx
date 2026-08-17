@@ -2080,7 +2080,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         <p
           id={dateErrorId}
           role="alert"
-          data-testid={dateError ? "guest-booking-date-error" : "guest-booking-checkin-unavailable"}
+          data-testid={checkinUnavailable ? "guest-booking-checkin-unavailable" : "guest-booking-date-error"}
           data-checkin-unavailable={checkinUnavailable ? 'true' : undefined}
           className="text-sm text-support-error"
           style={{ marginTop: 4 }}
