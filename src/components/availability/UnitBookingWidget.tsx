@@ -256,7 +256,29 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const hydratedRangeRef = useRef<{ start: Date; end: Date } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const [dateError, setDateError] = useState<string | null>(null);
+  const [dateError, setDateErrorMessage] = useState<string | null>(null);
+  // TASK-4277 / DESIGN-030: `dateError` carries TWO different kinds of message — ordinary
+  // validation copy ("Add a check-in date to continue.", "Check-out must be after check-in.",
+  // min-stay, advance notice) and genuine unavailability ("These dates overlap an existing
+  // booking or hold."). Only the LATTER may disable Reserve. DESIGN-030 (326df4d6) folded
+  // `Boolean(dateError)` into `datesUnavailable`, so every ordinary validation message killed the
+  // CTA — relabelled "Unavailable" with a tooltip contradicting the inline text — and only a
+  // calendar click could revive it. This flag isolates the availability-conflict subset.
+  const [availabilityConflict, setAvailabilityConflict] = useState(false);
+  // Ordinary validation copy: shows the inline message, leaves Reserve clickable (TASK-4277).
+  // Clearing the conflict flag here is what keeps the two states from drifting — a writer cannot
+  // set a validation message and accidentally inherit a stale conflict from an earlier selection.
+  const setDateError = useCallback((message: string | null) => {
+    setDateErrorMessage(message);
+    setAvailabilityConflict(false);
+  }, []);
+  // Genuine unavailability: the selected nights really are taken / unbookable. Disables Reserve
+  // and collapses the purchase chrome (DESIGN-030). Use ONLY where availability was actually
+  // evaluated against blockedSet/dateStatusMap.
+  const setDateConflictError = useCallback((message: string) => {
+    setDateErrorMessage(message);
+    setAvailabilityConflict(true);
+  }, []);
   const [resolvedMinStay, setResolvedMinStay] = useState(1);
   // TASK-4334: cancellation tier drives the trust-strip deadline computation below.
   const [resolvedCancellationTier, setResolvedCancellationTier] = useState<CancellationTier | null>(null);
@@ -520,7 +542,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     // below, which catches an overlap that only becomes visible once that fetch settles.
     if (checkInteriorNightOverlap(start, end)) {
       setDateRange({ startDate: start, endDate: end });
-      setDateError('These dates overlap an existing booking or hold.');
+      setDateConflictError('These dates overlap an existing booking or hold.');
       hasHydratedFromContextRef.current = true;
       hydratedRangeRef.current = { start, end };
       return;
@@ -549,7 +571,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
       return;
     }
     if (checkInteriorNightOverlap(hydrated.start, hydrated.end)) {
-      setDateError('These dates overlap an existing booking or hold.');
+      setDateConflictError('These dates overlap an existing booking or hold.');
     }
   }, [blockedSet, dateStatusMap, dateRange.startDate, dateRange.endDate]);
 
@@ -1087,7 +1109,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       setOpenCalendar(false);
       return;
     }
-    setDateError('These dates overlap an existing booking or hold.');
+    setDateConflictError('These dates overlap an existing booking or hold.');
     return;
   }
 
@@ -1202,8 +1224,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   // When API has loaded: use API price (or calendar sum). When API has not loaded: use 0.
   const hasSelectedRange = Boolean(dateRange.startDate && dateRange.endDate);
   // DESIGN-030: one unavailable posture — do not stack a full purchase summary with conflict alerts.
+  // TASK-4277: keyed to `availabilityConflict`, NOT `Boolean(dateError)`. An ordinary validation
+  // message (blank date, inverted range, min-stay, advance notice) is not evidence the nights are
+  // taken, and must leave Reserve clickable so handleReserve can keep surfacing it.
   const datesUnavailable =
-    Boolean(dateError) || checkinUnavailable || availabilityFailed;
+    availabilityConflict || checkinUnavailable || availabilityFailed;
 
   // TASK-4303: per-date pricing + fee percent for the selected range are still resolving.
   // While pending, the headline total and price breakdown render a loading skeleton instead
@@ -1464,7 +1489,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
     // TASK-4726: check interior-night overlaps in handleReserve (like handleRangeChange does)
     if (checkInteriorNightOverlap(checkinIst, checkoutIst)) {
-      setDateError('These dates overlap an existing booking or hold.');
+      setDateConflictError('These dates overlap an existing booking or hold.');
       return;
     }
 
@@ -2046,12 +2071,17 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
       {/* TASK-2612: Add-ons moved to GuestDetailsPage */}
 
-      {/* DESIGN-030: one conflict message — overlap wins over check-in-unavailable (no restating). */}
+      {/* DESIGN-030: one conflict message — overlap wins over check-in-unavailable (no restating).
+          TASK-4293: because the overlap copy wins, `data-testid` flips to guest-booking-date-error
+          and the "your check-in day itself is unavailable" fact became undiscoverable without a
+          click. `data-checkin-unavailable` is independent of which copy won, so that reason stays
+          detectable from the DOM in BOTH arms of the ternary. */}
       {(dateError || (checkinUnavailable && !availabilityFailed)) && (
         <p
           id={dateErrorId}
           role="alert"
           data-testid={dateError ? "guest-booking-date-error" : "guest-booking-checkin-unavailable"}
+          data-checkin-unavailable={checkinUnavailable ? 'true' : undefined}
           className="text-sm text-support-error"
           style={{ marginTop: 4 }}
         >

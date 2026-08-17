@@ -448,6 +448,31 @@ describe('UnitBookingWidget - TASK-4293: Reserve button disabled when the select
     expect(buttonSection).toContain('datesUnavailable');
   });
 
+  it('datesUnavailable reflects a real availability conflict, never any dateError (TASK-4277)', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    const datesUnavailableDef = content.slice(
+      content.indexOf('const datesUnavailable ='),
+      content.indexOf('const datesUnavailable =') + 200,
+    );
+    // DESIGN-030 (326df4d6) shipped `Boolean(dateError) || checkinUnavailable || availabilityFailed`.
+    // `dateError` also carries ORDINARY validation copy, so every one of those messages disabled the
+    // Reserve CTA, relabelled it "Unavailable", and attached a tooltip contradicting the inline text
+    // — with only a calendar click able to revive it. Never re-introduce the dateError term here.
+    expect(datesUnavailableDef).not.toContain('dateError');
+    expect(datesUnavailableDef).toContain('availabilityConflict');
+    // …and the conflict flag is written ONLY by the dedicated setter, at sites that actually
+    // evaluated availability. Every other writer goes through setDateError, which clears it.
+    expect(content).toContain('const setDateConflictError = useCallback(');
+    const conflictWrites = content.match(/setDateConflictError\(/g) ?? [];
+    // Exactly 4 call sites (the `= useCallback(` definition does not match this pattern): URL
+    // hydrate, post-fetch re-validate, handleRangeChange, handleReserve. All four carry the same
+    // "overlap an existing booking or hold" copy.
+    expect(conflictWrites.length).toBe(4);
+    for (const site of content.match(/setDateConflictError\('([^']*)'\)/g) ?? []) {
+      expect(site).toContain('overlap an existing booking or hold');
+    }
+  });
+
   it('surfaces the unavailability reason proactively (disabled button cannot fire the click-time formError)', () => {
     const content = readFileSync(filePath, 'utf-8');
     // DESIGN-030 (326df4d6) consolidated the overlap-dateError and checkin-unavailable alerts into
@@ -462,6 +487,22 @@ describe('UnitBookingWidget - TASK-4293: Reserve button disabled when the select
     expect(alertSection).toContain('"guest-booking-checkin-unavailable"');
     expect(alertSection).toContain('checkinUnavailable');
     expect(alertSection).toContain('These dates aren’t available. Please select a different check-in date.');
+  });
+
+  it('keeps the check-in-unavailable state discoverable even when the overlap copy wins the ternary', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    // The DESIGN-030 consolidation made `data-testid` conditional: whenever a dateError is ALSO
+    // present (e.g. the URL-hydration overlap message), the testid renders as
+    // guest-booking-date-error and `guest-booking-checkin-unavailable` never appears in the DOM at
+    // all — silently dropping TASK-4293's "the reason is discoverable without a click" criterion,
+    // which on origin/main was carried by an UNCONDITIONAL testid on its own <p>.
+    // The consolidated message stays (one alert, overlap copy wins); the FACT is re-exposed by a
+    // marker attribute that does not depend on which arm of the ternary rendered.
+    const alertSection = content.slice(
+      content.indexOf('id={dateErrorId}'),
+      content.indexOf('id={dateErrorId}') + 450,
+    );
+    expect(alertSection).toContain("data-checkin-unavailable={checkinUnavailable ? 'true' : undefined}");
   });
 
   it('re-hydrates URL dates after listingId resolves (listingId is a hydration dep)', () => {
@@ -932,6 +973,14 @@ describe('UnitBookingWidget - TASK-4911: Reserve CTA surfaces inline validation 
     expect(error.textContent).toContain('Add a check-in date to continue.');
     expect(error).toHaveAttribute('role', 'alert');
 
+    // DESIGN-030 regression guard: showing this validation message must NOT turn the CTA into a
+    // dead "Unavailable" button. Only a calendar click cleared dateError, so the guest was stranded
+    // with an inline "Add a check-in date" instruction next to a disabled button whose tooltip said
+    // the dates aren't available — two contradicting claims and no way forward.
+    expect(reserve).toBeEnabled();
+    expect(reserve.textContent).toContain('Reserve');
+    expect(reserve).not.toHaveAttribute('title');
+
     // Silence, not just a blocked submit, was the bug — assert the checkout call never fired.
     expect(postSpy).not.toHaveBeenCalled();
     // Focus moves to the missing (check-in) field instead of leaving the guest stranded.
@@ -961,6 +1010,11 @@ describe('UnitBookingWidget - TASK-4911: Reserve CTA surfaces inline validation 
     const error = await screen.findByTestId('guest-booking-date-error');
     expect(error.textContent).toContain('Add a check-out date to continue.');
     expect(error).toHaveAttribute('role', 'alert');
+
+    // Same DESIGN-030 regression guard as the check-in case: a missing check-out is ordinary
+    // validation, not unavailability — the CTA stays clickable so the guest can retry.
+    expect(reserve).toBeEnabled();
+    expect(reserve.textContent).toContain('Reserve');
 
     expect(postSpy).not.toHaveBeenCalled();
     expect(document.activeElement).toBe(screen.getByTestId('unit-booking-checkout-cell'));
