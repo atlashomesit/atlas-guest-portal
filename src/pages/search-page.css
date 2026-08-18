@@ -31,8 +31,17 @@
      the results grid below — its own empty flex gaps still catch clicks meant for listing
      cards ("no overlap" per the file header above, so this is a bug, not a trade-off). Cap it
      to the viewport and let its own content scroll instead of bleeding into the page below.
-     top-16 = 4rem; leave another 2rem of breathing room under it. */
-  max-height: calc(100vh - 6rem);
+     top-16 = 4rem; leave another 2rem of breathing room under it.
+
+     2026-08-18: a viewport-RELATIVE cap alone does not fix this. At 1280x720 (Playwright's
+     Desktop Chrome, and a common laptop window) `calc(100vh - 6rem)` = 624px, so the panel
+     still occupied ~87% of the viewport and kept intercepting clicks on the first row of
+     result cards — reproduced by guest-listing-gallery.e2e.spec.ts, which timed out for 60s
+     with `.search-filters__chips ... subtree intercepts pointer events` while trying to click
+     a card's "View home" link. Capping the panel's SCROLLING was never enough; its FOOTPRINT
+     has to be bounded. Hence the absolute ceiling below — do not revert it to a bare vh
+     expression. */
+  max-height: min(22rem, calc(100vh - 6rem));
   overflow-y: auto;
 }
 
