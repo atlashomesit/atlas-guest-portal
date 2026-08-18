@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { hasOnlinePaymentRail } from './paymentRail';
+import { hasOnlinePaymentRail, directBookingPriceClaim } from './paymentRail';
 import type { TenantInfo } from './tenantContext';
 
 const tenant = (over: Partial<TenantInfo>): TenantInfo => ({
@@ -63,5 +63,19 @@ describe('TASK-7428: hasOnlinePaymentRail', () => {
     expect(hasOnlinePaymentRail(tenant({ paymentProvider: 'RAZORPAY' }))).toBe(true);
     expect(hasOnlinePaymentRail(tenant({ paymentProvider: 'manual' }))).toBe(false);
     expect(hasOnlinePaymentRail(tenant({ paymentProvider: '   ' }))).toBe(false);
+  });
+});
+
+describe('TASK-8055: directBookingPriceClaim', () => {
+  it('ONLINE includes the 3% payment-processing fee claim', () => {
+    expect(directBookingPriceClaim(tenant({ bookingMode: 'ONLINE' }))).toContain(
+      '3% payment-processing fee',
+    );
+  });
+
+  it('WHATSAPP omits any percentage fee string', () => {
+    const claim = directBookingPriceClaim(tenant({ bookingMode: 'WHATSAPP' }));
+    expect(claim).not.toMatch(/\d%\s+payment-processing/i);
+    expect(claim).toContain('no surprise OTA markups');
   });
 });

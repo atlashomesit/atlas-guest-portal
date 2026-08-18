@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { vi } from "vitest";
+import { afterEach, beforeEach, vi } from "vitest";
 import OffersPage from "../src/pages/OffersPage";
 
 // TASK-4462: OffersPage must surface an explicit error/retry state when the
@@ -17,9 +17,28 @@ vi.mock("../src/hooks/useTenantListings", () => ({
   }),
 }));
 
+vi.mock("@/api/client", () => ({
+  buildApiUrl: (path: string) => `https://api.test${path}`,
+  getApiHeaders: () => ({ "X-Tenant-Slug": "atlas" }),
+}));
+
 describe("OffersPage — listings fetch error state (TASK-4462)", () => {
   beforeEach(() => {
     refetchMock.mockClear();
+    // TASK-8016: OffersPage also validates DIRECT5 on mount — keep that inactive here.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(JSON.stringify({ valid: false }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it("renders an explicit error message with the hook's error detail", () => {

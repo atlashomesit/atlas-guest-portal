@@ -13,6 +13,7 @@
 import { useEffect } from 'react';
 import { getTenantContext } from '@/tenant/tenantContext';
 import { getTenantBrandName } from '@/tenant/displayBrand';
+import { hasOnlinePaymentRail } from '@/tenant/paymentRail';
 import { getContactPhone, getContactEmail } from '@/config/contact';
 import { getAvailableLanguages } from '@/i18n/i18n';
 
@@ -95,55 +96,71 @@ export const TenantJsonLd: React.FC = () => {
 
     // ── FAQPage JSON-LD ──────────────────────────────────────────────────────────
     // Replace "Atlas Homestays" in the FAQ question with the tenant's brand name.
+    // TASK-8055: omit fee / Razorpay claims when there is no online payment rail —
+    // structured data cannot be caveated and must not invent a processor fee.
+    const showProcessingFee = hasOnlinePaymentRail(tenantInfo);
+    const faqEntities: Record<string, unknown>[] = [
+      {
+        '@type': 'Question',
+        name: 'How do I book a property?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: `Browse properties on ${
+            typeof window !== 'undefined'
+              ? window.location.hostname
+              : 'your property site'
+          }, select your dates, and complete booking${showProcessingFee ? ' via UPI or card' : ' with the host'}. You will receive an instant confirmation.`,
+        },
+      },
+      {
+        '@type': 'Question',
+        name: `What properties are available at ${brandName}?`,
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: `${brandName} offers serviced apartments and vacation rentals including studio rooms, 1BHK, and 2BHK units. All properties are verified and managed directly.`,
+        },
+      },
+    ];
+    if (showProcessingFee) {
+      faqEntities.push({
+        '@type': 'Question',
+        name: `Is there a booking fee at ${brandName}?`,
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: `Direct booking — no OTA commission. You pay the nightly rate, applicable GST, and a 3% Razorpay payment-processing fee shown at checkout.`,
+        },
+      });
+      faqEntities.push({
+        '@type': 'Question',
+        name: 'What payment methods are accepted?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: 'UPI, credit card, debit card, and net banking via Razorpay. UPI payment is instant with immediate booking confirmation.',
+        },
+      });
+    } else {
+      faqEntities.push({
+        '@type': 'Question',
+        name: `Is there a booking fee at ${brandName}?`,
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: `Direct booking — no OTA commission. You pay the nightly rate and applicable GST shown at checkout.`,
+        },
+      });
+    }
+    faqEntities.push({
+      '@type': 'Question',
+      name: `Does ${brandName} provide GST invoices?`,
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Yes. GST-compliant invoices are automatically generated after checkout for all bookings. SAC 9963 with CGST/SGST breakdown for intra-state guests.',
+      },
+    });
+
     const faqPageJsonLd = {
       '@context': 'https://schema.org',
       '@type': 'FAQPage',
-      mainEntity: [
-        {
-          '@type': 'Question',
-          name: 'How do I book a property?',
-          acceptedAnswer: {
-            '@type': 'Answer',
-            text: `Browse properties on ${
-              typeof window !== 'undefined'
-                ? window.location.hostname
-                : 'your property site'
-            }, select your dates, and complete booking via UPI or card. You will receive an instant confirmation.`,
-          },
-        },
-        {
-          '@type': 'Question',
-          name: `What properties are available at ${brandName}?`,
-          acceptedAnswer: {
-            '@type': 'Answer',
-            text: `${brandName} offers serviced apartments and vacation rentals including studio rooms, 1BHK, and 2BHK units. All properties are verified and managed directly.`,
-          },
-        },
-        {
-          '@type': 'Question',
-          name: `Is there a booking fee at ${brandName}?`,
-          acceptedAnswer: {
-            '@type': 'Answer',
-            text: `Direct booking — no OTA commission. You pay the nightly rate, applicable GST, and a 3% Razorpay payment-processing fee shown at checkout.`,
-          },
-        },
-        {
-          '@type': 'Question',
-          name: 'What payment methods are accepted?',
-          acceptedAnswer: {
-            '@type': 'Answer',
-            text: 'UPI, credit card, debit card, and net banking via Razorpay. UPI payment is instant with immediate booking confirmation.',
-          },
-        },
-        {
-          '@type': 'Question',
-          name: `Does ${brandName} provide GST invoices?`,
-          acceptedAnswer: {
-            '@type': 'Answer',
-            text: 'Yes. GST-compliant invoices are automatically generated after checkout for all bookings. SAC 9963 with CGST/SGST breakdown for intra-state guests.',
-          },
-        },
-      ],
+      mainEntity: faqEntities,
     };
 
     appendJsonLdScript('faqpage', faqPageJsonLd);

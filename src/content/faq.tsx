@@ -90,11 +90,12 @@ export function buildRetailFaqSections(brandName: string): FaqSection[] {
         question: "How are partial refunds calculated?",
         answer: (
           <p>
-            Refunds are pro-rated based on notice period and nights already stayed. Please review the
-            refund slabs in our <Link to="/policies">Policies</Link> page for exact thresholds.
+            Refund amounts follow the cancellation policy shown on the listing at booking (and on our{" "}
+            <Link to="/policies">Policies</Link> page). Atlas does not pro-rate by nights stayed after
+            check-in — once you have checked in, the booking cannot be cancelled through self-service.
           </p>
         ),
-        tags: ["partial", "refund", "pro-rated"],
+        tags: ["partial", "refund", "policy"],
       },
       {
         id: "refund-timeline",

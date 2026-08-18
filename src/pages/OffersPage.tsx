@@ -4,7 +4,10 @@ import { Button } from "../components/ui/Button";
 import { buildApiUrl } from "@/api/client";
 import { normalizePromoCodeInput, normalizePromoCodeSubmit } from "@/utils/promoCodeInput";
 import { useTenantListings, type TenantPropertyRecord } from "@/hooks/useTenantListings";
+import { useAdvertisedPromoActive } from "@/hooks/useAdvertisedPromoActive";
 import { getTenantBrandName } from "@/tenant/displayBrand";
+
+const DIRECT5_CODE = "DIRECT5";
 
 interface DiscountTier {
   minNights: number;
@@ -52,6 +55,8 @@ export default function OffersPage() {
 
   const discountTiers = state === "success" ? extractDiscountTiers(properties) : [];
   const lastMinutePercent = state === "success" ? extractLastMinutePercent(properties) : 0;
+  // TASK-8016: never advertise DIRECT5 unless validate confirms it is active.
+  const direct5State = useAdvertisedPromoActive(DIRECT5_CODE);
 
   useEffect(() => {
     setPromoResult(null);
@@ -96,23 +101,32 @@ export default function OffersPage() {
           <p className="text-lg text-text-muted">Book direct and unlock the best rates — no OTA fees, no middlemen.</p>
         </div>
 
-        {/* Direct booking deal */}
-        <div className="rounded-2xl bg-emerald-50 border border-emerald-200 p-6 flex flex-col sm:flex-row sm:items-center gap-4">
-          <div className="text-3xl">🎁</div>
-          <div className="flex-1">
-            <h2 className="font-bold text-emerald-900 text-lg">Direct Booking Discount</h2>
-            <p className="text-emerald-800 text-sm mt-1">Use promo code <strong>DIRECT5</strong> at checkout for 5% off any direct booking.</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => handleCopy("DIRECT5")}
-            className="self-start sm:self-center inline-flex items-center gap-2 rounded-xl bg-white border border-emerald-300 px-4 py-2 font-mono font-bold text-emerald-700 text-sm hover:bg-emerald-50 transition"
-            aria-label="Copy DIRECT5 promo code"
+        {/* Direct booking deal — TASK-8016: gated on validate; inactive → render nothing */}
+        {direct5State === "active" && (
+          <div
+            data-testid="offers-direct5-card"
+            className="rounded-2xl bg-emerald-50 border border-emerald-200 p-6 flex flex-col sm:flex-row sm:items-center gap-4"
           >
-            DIRECT5
-            <span className="text-xs font-normal text-emerald-700">{copied === "DIRECT5" ? "Copied!" : "Copy"}</span>
-          </button>
-        </div>
+            <div className="text-3xl">🎁</div>
+            <div className="flex-1">
+              <h2 className="font-bold text-emerald-900 text-lg">Direct Booking Discount</h2>
+              <p className="text-emerald-800 text-sm mt-1">
+                Use promo code <strong>{DIRECT5_CODE}</strong> at checkout for 5% off any direct booking.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleCopy(DIRECT5_CODE)}
+              className="self-start sm:self-center inline-flex items-center gap-2 rounded-xl bg-white border border-emerald-300 px-4 py-2 font-mono font-bold text-emerald-700 text-sm hover:bg-emerald-50 transition"
+              aria-label={`Copy ${DIRECT5_CODE} promo code`}
+            >
+              {DIRECT5_CODE}
+              <span className="text-xs font-normal text-emerald-700">
+                {copied === DIRECT5_CODE ? "Copied!" : "Copy"}
+              </span>
+            </button>
+          </div>
+        )}
 
         {/* TASK-4462: explicit error/retry state — a failed deals load must be
             distinguishable from "no deals" (previously the sections just vanished). */}

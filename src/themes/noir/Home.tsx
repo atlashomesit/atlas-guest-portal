@@ -23,6 +23,7 @@ import { useEffect, useMemo } from 'react';
 import { useTenantListings } from '../../hooks/useTenantListings';
 import { getTenantOverrides, shouldHideAtlasBranding } from '../../tenant/tenantOverrides';
 import { getTenantContext } from '../../tenant/tenantContext';
+import { directBookingPriceClaim } from '../../tenant/paymentRail';
 import { getFaqHighlights } from '../../content/faqHighlights';
 import { trackEvent } from '../../utils/analytics';
 import ServicesSection from '../../components/home/ServicesSection';
@@ -62,7 +63,7 @@ const NOIR_VALUE_ITEMS = [
             </svg>
         ),
         heading: 'Pay the host, directly',
-        body: 'The host keeps more when you book direct. Price shown includes room rate, GST, and a 3% payment-processing fee.',
+        body: '',
     },
 ] as const;
 
@@ -85,20 +86,16 @@ const NoirHome = () => {
     // hidden for white-label tenants pending a per-tenant heroImageUrl (RA-006, same rule
     // Slider follows).
     const showAtlasContent = !hideAtlasBranding;
-    /** TASK-5194 / TASK-7428: white-label — no Atlas verification claim, no invented 3% fee. */
+    /** TASK-8055: fee claim follows payment rail, not white-label branding alone. */
+    const payDirectBody = directBookingPriceClaim(tenant);
     const noirValueItems = useMemo(() => {
-        if (!hideAtlasBranding) return [...NOIR_VALUE_ITEMS];
-        return NOIR_VALUE_ITEMS
-            .filter((item) => item.heading !== 'Every address, verified')
-            .map((item) =>
-                item.heading === 'Pay the host, directly'
-                    ? {
-                        ...item,
-                        body: 'Book direct with the host. The total shown at checkout is what you pay — no surprise OTA markups.',
-                    }
-                    : item,
-            );
-    }, [hideAtlasBranding]);
+        const items = hideAtlasBranding
+            ? NOIR_VALUE_ITEMS.filter((item) => item.heading !== 'Every address, verified')
+            : [...NOIR_VALUE_ITEMS];
+        return items.map((item) =>
+            item.heading === 'Pay the host, directly' ? { ...item, body: payDirectBody } : item,
+        );
+    }, [hideAtlasBranding, payDirectBody]);
     const heroImageUrl = showAtlasContent
         ? (toTransformedGuestImageUrl(HERO_IMAGE_URL, 1200) ?? '')
         : '';

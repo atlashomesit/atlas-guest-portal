@@ -3,11 +3,12 @@
  *
  * Shown when the user's traffic is direct (no OTA UTM source detected).
  * Promotes the DIRECT5 promo code — 5% off for direct bookings.
- * The code is injected via ?promo=DIRECT5 URL param when the user clicks
- * "Book now", which UnitBookingWidget picks up and auto-fills.
+ * TASK-8016: only renders after /api/promo-codes/validate confirms the code is active.
+ * The code is stored in localStorage when the user copies it so UnitBookingWidget can auto-fill.
  */
 
 import { useEffect, useState } from "react";
+import { useAdvertisedPromoActive } from "@/hooks/useAdvertisedPromoActive";
 
 const PROMO_CODE = "DIRECT5";
 const OTA_UTM_SOURCES = ["booking.com", "airbnb", "makemytrip", "mmt", "goibibo", "agoda", "expedia", "tripadvisor"];
@@ -30,20 +31,21 @@ function isDirectTraffic(): boolean {
 }
 
 export default function DirectDiscountBanner() {
-  const [visible, setVisible] = useState(false);
+  const [eligible, setEligible] = useState(false);
   const [copied, setCopied] = useState(false);
+  const promoState = useAdvertisedPromoActive(PROMO_CODE);
 
   useEffect(() => {
     if (!isDirectTraffic()) return;
     try {
       if (sessionStorage.getItem(DISMISS_KEY) === "1") return;
     } catch { /* ignore */ }
-    setVisible(true);
+    setEligible(true);
   }, []);
 
   function handleDismiss() {
     try { sessionStorage.setItem(DISMISS_KEY, "1"); } catch { /* ignore */ }
-    setVisible(false);
+    setEligible(false);
   }
 
   function handleCopy() {
@@ -63,7 +65,8 @@ export default function DirectDiscountBanner() {
     });
   }
 
-  if (!visible) return null;
+  // TASK-8016: render nothing while checking or when the code is inactive in this tenant.
+  if (!eligible || promoState !== "active") return null;
 
   return (
     <div
@@ -73,6 +76,7 @@ export default function DirectDiscountBanner() {
       // section, which is exactly what role="region" + aria-label is for.
       role="region"
       aria-label="Direct booking discount"
+      data-testid="direct-discount-banner"
       className="relative flex items-center justify-between gap-3 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800 ring-1 ring-inset ring-emerald-200"
     >
       <div className="flex flex-wrap items-center gap-2">
@@ -89,7 +93,7 @@ export default function DirectDiscountBanner() {
           {PROMO_CODE}
           <span className="ml-1 text-xs font-normal text-emerald-700">{copied ? "Copied!" : "Copy"}</span>
         </button>
-        <span className="text-xs text-emerald-800">at checkout — auto-applied when you tap "Book now"</span>
+        <span className="text-xs text-emerald-800">at checkout — auto-applied when you tap &quot;Book now&quot;</span>
       </div>
       <button
         type="button"

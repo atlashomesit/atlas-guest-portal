@@ -1645,11 +1645,13 @@ useEffect(() => {
                 )}
                 <h1 className="pp-display">{getListingDisplayName(data.id, data.property_name)}</h1>
                 <div className="pp-submeta">
-                  {ppHasApiReviews && (
+                  {/* TASK-8019: header must use the same combined average/count as the reviews section —
+                      native-only fields render ★ 0.0 (0 reviews) when Google imports are the only source. */}
+                  {ppHasApiReviews && ppCombinedReviewCount > 0 && (
                     <>
-                      <span className="pp-rating">
-                        ★ {ppApiReviews!.averageRating.toFixed(1)}{' '}
-                        <em>({ppApiReviews!.totalCount} {ppApiReviews!.totalCount === 1 ? 'review' : 'reviews'})</em>
+                      <span className="pp-rating" data-testid="property-header-rating">
+                        ★ {ppCombinedAverageRating.toFixed(1)}{' '}
+                        <em>({ppCombinedReviewCount} {ppCombinedReviewCount === 1 ? 'review' : 'reviews'})</em>
                       </span>
                       <span className="pp-submeta-sep" aria-hidden="true">·</span>
                     </>
@@ -2108,6 +2110,8 @@ useEffect(() => {
                   if (!api || (!api.loading && api.totalCount <= 0 && externalReviewsFromApi.length <= 0)) return null;
                   const rating = ppCombinedAverageRating;
                   const count = ppCombinedReviewCount;
+                  // TASK-8019: "verified stay(s) / through this platform" only for native Atlas reviews.
+                  const nativeVerifiedCount = api.totalCount;
                   return (
                     <section className="pp-section" aria-label="Guest reviews" data-testid="reviews-section">
                       <div className="pp-section-head">
@@ -2124,7 +2128,11 @@ useEffect(() => {
                             {rating.toFixed(1)}
                           </div>
                           <span className="pp-rating-stars" aria-hidden="true">★★★★★</span>
-                          <div className="pp-v2-rating-big-sub">{count} verified {count === 1 ? 'stay' : 'stays'}</div>
+                          <div className="pp-v2-rating-big-sub">
+                            {nativeVerifiedCount > 0
+                              ? `${nativeVerifiedCount} verified ${nativeVerifiedCount === 1 ? 'stay' : 'stays'}`
+                              : `${count} ${count === 1 ? 'review' : 'reviews'}`}
+                          </div>
                         </div>
                         {/* Sub-rating bars derived from API reviews if available */}
                         {api.reviews.length > 0 && (() => {
@@ -2148,7 +2156,9 @@ useEffect(() => {
                               <div style={{ fontSize: 14, color: 'var(--text-muted, #6b5a55)', lineHeight: 1.6 }}>
                                 <p style={{ margin: '0 0 4px', fontWeight: 600, color: 'var(--text-primary, #4a3535)' }}>Overall rating</p>
                                 <p style={{ margin: 0 }}>
-                                  {count} verified {count === 1 ? 'review' : 'reviews'} · all through this platform.
+                                  {nativeVerifiedCount > 0
+                                    ? `${nativeVerifiedCount} verified ${nativeVerifiedCount === 1 ? 'review' : 'reviews'} · all through this platform.`
+                                    : `${count} ${count === 1 ? 'review' : 'reviews'} including guest feedback from Google.`}
                                 </p>
                               </div>
                             );

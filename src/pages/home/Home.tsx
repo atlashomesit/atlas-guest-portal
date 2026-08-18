@@ -4,6 +4,7 @@ import { lazy, Suspense, useEffect, useMemo } from "react";
 import { useTenantListings } from "../../hooks/useTenantListings";
 import { getTenantOverrides, shouldHideAtlasBranding } from "../../tenant/tenantOverrides";
 import { getTenantContext } from "../../tenant/tenantContext";
+import { directBookingPriceClaim } from "../../tenant/paymentRail";
 import { getFaqHighlights } from "../../content/faqHighlights";
 import { trackEvent } from "../../utils/analytics";
 import AtlasNeighbourhoodRibbon from "../../components/home/AtlasNeighbourhoodRibbon";
@@ -46,12 +47,12 @@ const WHY_DIRECT_ITEMS_ATLAS = [
             </svg>
         ),
         heading: "You pay the host directly",
-        body: "The host keeps more when you book direct. Price shown includes room rate, GST, and a 3% payment-processing fee.",
+        // Body is replaced at render via directBookingPriceClaim (TASK-8055).
+        body: "",
     },
 ] as const;
 
-/** TASK-7194 / TASK-7428: white-label copy must not invent Atlas operator voice or a 3% fee
- *  (WhatsApp tenants have no payment provider — fee only belongs on online checkout). */
+/** TASK-7194: white-label copy must not invent Atlas operator voice. */
 const WHY_DIRECT_ITEMS_TENANT = [
     {
         icon: WHY_DIRECT_ITEMS_ATLAS[0].icon,
@@ -61,7 +62,7 @@ const WHY_DIRECT_ITEMS_TENANT = [
     {
         icon: WHY_DIRECT_ITEMS_ATLAS[1].icon,
         heading: "You pay the host directly",
-        body: "Book direct with the host. The total shown at checkout is what you pay — no surprise OTA markups.",
+        body: "",
     },
 ] as const;
 
@@ -79,11 +80,14 @@ const Home = () => {
     const room101Cover = sanitizeGuestImageUrl(propertyData.find((property) => property.id === 101)?.property_img?.[0]);
     const primaryOgImage = room101Cover ?? (!overrides.hideLogo ? LOGO_URL : undefined);
     const listingAddress = propertyData.find((property) => property.property_location?.trim())?.property_location?.trim();
-    /** TASK-5194 / TASK-7194: white-label tenants must not assert Atlas operator copy. */
-    const whyDirectItems = useMemo(
-        () => (hideAtlasBranding ? WHY_DIRECT_ITEMS_TENANT : WHY_DIRECT_ITEMS_ATLAS),
-        [hideAtlasBranding],
-    );
+    /** TASK-8055: fee claim follows payment rail; branding still gates Atlas operator voice. */
+    const payDirectBody = directBookingPriceClaim(tenant);
+    const whyDirectItems = useMemo(() => {
+        const base = hideAtlasBranding ? WHY_DIRECT_ITEMS_TENANT : WHY_DIRECT_ITEMS_ATLAS;
+        return base.map((item) =>
+            item.heading === "You pay the host directly" ? { ...item, body: payDirectBody } : item,
+        );
+    }, [hideAtlasBranding, payDirectBody]);
     const faqHighlights = getFaqHighlights();
     // CPO-007: derive canonical from the actual host (or VITE_PUBLIC_SITE_ORIGIN for SSR) so tenant
     // subdomains emit the right URL in JSON-LD instead of defaulting to the marketplace domain.
