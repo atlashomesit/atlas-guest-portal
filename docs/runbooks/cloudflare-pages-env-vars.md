@@ -15,6 +15,7 @@ The app reads API base URL and discount at **runtime** from **`/.well-known/atla
 | `ATLAS_GLOBAL_DISCOUNT_PERCENT` | No | `17` (for 17% discount) |
 | `ATLAS_ENVIRONMENT` | No | `dev` or `production` |
 | `ATLAS_GOOGLE_MAPS_API_KEY` | No | Your Google Maps API key |
+| `ATLAS_WORKER_PROXY_SECRET` | **Yes for wildcard** (TASK-7464 / TASK-7207) | Same value as Worker secret `ATLAS_WORKER_PROXY_SECRET` (`wrangler secret put` in `workers/tenant-subdomain-router/`). Pages middleware trusts `X-Forwarded-Host` only when `X-Atlas-Worker-Proxy` matches. |
 
 Without `ATLAS_API_BASE_URL`, the app shows "Runtime config missing/invalid". See [runtime-config.md](./runtime-config.md).
 

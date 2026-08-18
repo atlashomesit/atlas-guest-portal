@@ -88,14 +88,15 @@ describe("buildMetaRewriteValues (TASK-4905 / ADR-0018 amendment)", () => {
     expect(values.description).toContain("Gaurav's Lake View Villa");
   });
 
-  it("falls back to the OG placeholder image when photoUrl is missing", () => {
+  // TASK-7468 #5: rewrite path is tenant/white-label only — never Atlas /og-image.svg.
+  it("leaves image empty when photoUrl is missing (no Atlas og-image fallback)", () => {
     const values = buildMetaRewriteValues({ ...fullMeta, photoUrl: null }, "https://x.com/");
-    expect(values.image).toBe("/og-image.svg");
+    expect(values.image).toBe("");
   });
 
-  it("falls back to the OG placeholder image when photoUrl is whitespace-only (malformed)", () => {
+  it("leaves image empty when photoUrl is whitespace-only (malformed)", () => {
     const values = buildMetaRewriteValues({ ...fullMeta, photoUrl: "   " }, "https://x.com/");
-    expect(values.image).toBe("/og-image.svg");
+    expect(values.image).toBe("");
   });
 
   it("falls back to tenantSlug when propertyName is empty (malformed)", () => {
@@ -120,7 +121,7 @@ describe("buildMetaRewriteValues (TASK-4905 / ADR-0018 amendment)", () => {
     expect(values.url).toBe("https://gauravsguesthouse.com/homes/1");
   });
 
-  it("never produces an empty title/description/image/canonical even for a fully-blank payload", () => {
+  it("never produces an empty title/description/canonical even for a fully-blank payload", () => {
     const blank: TenantSiteMeta = {
       tenantSlug: "",
       propertyName: "",
@@ -132,7 +133,8 @@ describe("buildMetaRewriteValues (TASK-4905 / ADR-0018 amendment)", () => {
 
     expect(values.title.length).toBeGreaterThan(0);
     expect(values.description.length).toBeGreaterThan(0);
-    expect(values.image.length).toBeGreaterThan(0);
+    // TASK-7468 #5: image may be empty — middleware omits og:image rather than leaking Atlas art.
+    expect(values.image).toBe("");
     expect(values.canonical.length).toBeGreaterThan(0);
   });
 });

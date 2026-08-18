@@ -137,7 +137,9 @@ export const onRequest = async (context: {
       })
       .on('meta[property="og:image"]', {
         element(el: RewriterElement) {
-          el.setAttribute("content", values.image);
+          // TASK-7468 #5: omit Atlas-branded fallback on tenant hosts when no listing photo.
+          if (values.image) el.setAttribute("content", values.image);
+          else el.remove();
         },
       })
       .on('meta[property="og:url"]', {
@@ -162,7 +164,8 @@ export const onRequest = async (context: {
       })
       .on('meta[name="twitter:image"]', {
         element(el: RewriterElement) {
-          el.setAttribute("content", values.image);
+          if (values.image) el.setAttribute("content", values.image);
+          else el.remove();
         },
       });
 

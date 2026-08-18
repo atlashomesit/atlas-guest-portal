@@ -1,8 +1,12 @@
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { format, startOfDay, startOfMonth } from 'date-fns';
+import { format, startOfMonth } from 'date-fns';
 import { Search, X } from 'lucide-react';
 
+// CALENDAR basis throughout — see the header comment in utils/date.ts and the matching note in
+// SearchAvailabilityWidget. Cells from AtlasDateRangePicker are local-midnight civil dates;
+// instants (now, URL params) are converted at the boundary with getIstCalendarDate.
+import { getIstCalendarDate, startOfCalendarDay, toCalendarISO } from '@/utils/date';
 import { AtlasDateRangePicker, type AtlasDateRangePickerValue } from '@/components/date/AtlasDateRangePicker';
 import type { GuestCounts } from '@/components/ui/GuestTypeSelector';
 import { calculateNights, formatNightCount } from '@/utils/dateHelpers';
@@ -14,10 +18,13 @@ import type { AirbnbSearchValues } from './types';
 const MAX_GUESTS = 20;
 const DEBOUNCE_MS = 300;
 
+// BOUNDARY: `?checkIn=YYYY-MM-DD` parses as a UTC-midnight INSTANT, so it needs converting to
+// the calendar basis rather than re-reading in the guest's local zone.
 function parseIsoDate(value: string | null): Date | null {
   if (!value) return null;
-  const parsed = startOfDay(new Date(value));
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
+  const instant = new Date(value);
+  if (Number.isNaN(instant.getTime())) return null;
+  return getIstCalendarDate(instant);
 }
 
 function formatGuestSummary(counts: GuestCounts): string {
@@ -51,7 +58,8 @@ export default function AirbnbSearchBar() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const today = useMemo(() => startOfDay(new Date()), []);
+  // The property's civil today, on the calendar basis — see SearchAvailabilityWidget.
+  const today = useMemo(() => getIstCalendarDate(), []);
 
   const [destination, setDestination] = useState('');
   const [destinationQuery, setDestinationQuery] = useState('');
@@ -161,8 +169,8 @@ export default function AirbnbSearchBar() {
   };
 
   const handleRangeChange = (selection: AtlasDateRangePickerValue) => {
-    const start = selection.startDate ? startOfDay(selection.startDate) : null;
-    const end = selection.endDate ? startOfDay(selection.endDate) : null;
+    const start = selection.startDate ? startOfCalendarDay(selection.startDate) : null;
+    const end = selection.endDate ? startOfCalendarDay(selection.endDate) : null;
     if (start && start < today) {
       setDateError('Please select valid travel dates.');
       return;
@@ -197,8 +205,8 @@ export default function AirbnbSearchBar() {
 
     return {
       destination: destination.trim(),
-      checkIn: format(dateRange.startDate!, 'yyyy-MM-dd'),
-      checkOut: format(dateRange.endDate!, 'yyyy-MM-dd'),
+      checkIn: toCalendarISO(dateRange.startDate!),
+      checkOut: toCalendarISO(dateRange.endDate!),
       guests: guestCounts,
     };
   };
@@ -381,7 +389,7 @@ export default function AirbnbSearchBar() {
             value={dateRange}
             onChange={handleRangeChange}
             minDate={today}
-            disabledDay={(date) => startOfDay(date) < today}
+            disabledDay={(date) => startOfCalendarDay(date) < today}
             months={typeof window !== 'undefined' && window.innerWidth < 768 ? 1 : 2}
             shownDate={dateRange.startDate ?? today}
             onShownDateChange={(d) => setDateRange((r) => ({ ...r, startDate: r.startDate ?? startOfMonth(d) }))}

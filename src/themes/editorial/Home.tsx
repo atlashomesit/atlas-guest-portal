@@ -33,7 +33,7 @@ import FooterCtaStrip from '../../components/home/FooterCtaStrip';
 import SEO from '../../components/SEO';
 import { LOGO_URL } from '../../config/branding';
 import { HERO_IMAGE_URL } from '../../config/hero';
-import { sanitizeGuestImageUrl } from '../../utils/guestImageUrl';
+import { buildGuestImageSrcSet, sanitizeGuestImageUrl, toTransformedGuestImageUrl } from '../../utils/guestImageUrl';
 import { CONTACT, getContactEmail } from '../../config/contact';
 import { getTenantBrandName } from '../../tenant/displayBrand';
 import { enableFooterMiniCtaAboveFooter } from '../../config/homepageUxFlags';
@@ -66,10 +66,12 @@ const EditorialHome = () => {
     // sourcing), hidden for white-label tenants pending a per-tenant heroImageUrl (RA-006,
     // same rule every other layout's hero follows).
     const showAtlasContent = !hideAtlasBranding;
-    const heroImageUrl = showAtlasContent ? HERO_IMAGE_URL : '';
+    const heroImageUrl = showAtlasContent
+        ? (toTransformedGuestImageUrl(HERO_IMAGE_URL, 1200) ?? '')
+        : '';
     const hasHeroPhoto = Boolean(heroImageUrl.trim());
     const heroPhotoAriaLabel = showAtlasContent
-        ? `A warm, owner-run ${schemaBrandName} living room in KPHB`
+        ? `A warm, owner-run ${schemaBrandName} living room`
         : `Welcome to ${schemaBrandName}`;
 
     const faqHighlights = getFaqHighlights();
@@ -141,7 +143,7 @@ const EditorialHome = () => {
                         </h1>
                         <p className="editorial-hero-dek">
                             {showAtlasContent
-                                ? 'Owner-run homes in KPHB, Hyderabad — read the space, the neighbourhood, and what to expect, then book direct in the same breath.'
+                                ? 'Owner-run homes in this neighbourhood — read the space, the area, and what to expect, then book direct in the same breath.'
                                 : `Direct from the owner — responsive support from ${schemaBrandName}.`}
                         </p>
                         <div id="search-form" data-testid="hero-widget" className="editorial-hero-widget">
@@ -152,9 +154,12 @@ const EditorialHome = () => {
                         {hasHeroPhoto ? (
                             <img
                                 src={heroImageUrl}
+                                srcSet={buildGuestImageSrcSet(HERO_IMAGE_URL)}
+                                sizes="(max-width: 760px) 100vw, 42vw"
                                 alt={heroPhotoAriaLabel}
                                 className="editorial-hero-photo"
                                 loading="eager"
+                                fetchPriority="high"
                             />
                         ) : (
                             <div
@@ -175,7 +180,7 @@ const EditorialHome = () => {
                         </span>
                         <h2 id="editorial-narrative-heading" className="editorial-h2">
                             {showAtlasContent
-                                ? 'Why guests keep coming back to KPHB'
+                                ? 'Why guests keep coming back to this neighbourhood'
                                 : `Why guests keep coming back to ${schemaBrandName}`}
                         </h2>
                         <p className="editorial-narrative-p">

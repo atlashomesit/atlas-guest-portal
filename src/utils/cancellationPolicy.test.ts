@@ -318,17 +318,24 @@ describe('TASK-7539: Cancellation policy fee table and copy generation', () => {
       expect(policy.afterWindowCopy).toBe('No refund within 7 days of check-in.');
     });
 
-    it('unrecognized tier: returns safe fallback (Flexible equivalent)', () => {
+    // TASK-7819 (founder ruling 2026-08-11): these two cases previously pinned the vague
+    // 'Flexible cancellation policy applies'. That string described no refund outcome, which is
+    // what allowed callers to substitute their own literal for the untiered case — and the
+    // literal they substituted ("no refunds within 7 days") contradicted the engine, which
+    // resolves a null tier to Flexible and refunds 100%. The fallback now states the outcome
+    // the server actually produces.
+    it('unrecognized tier: resolves to Flexible, exactly as the server does', () => {
       const policy = describeCancellationPolicy('UnknownTier');
-      expect(policy.headline).toBe('Flexible cancellation policy applies');
+      expect(policy.headline).toBe('Full refund any time before check-in');
       expect(policy.afterWindowCopy).toBe('');
     });
 
-    it('null/undefined tier: returns safe fallback', () => {
+    it('null/undefined tier: resolves to Flexible, exactly as the server does', () => {
       const policyNull = describeCancellationPolicy(null);
       const policyUndef = describeCancellationPolicy(undefined);
-      expect(policyNull.headline).toBe('Flexible cancellation policy applies');
-      expect(policyUndef.headline).toBe('Flexible cancellation policy applies');
+      expect(policyNull.headline).toBe('Full refund any time before check-in');
+      expect(policyUndef.headline).toBe('Full refund any time before check-in');
+      expect(policyNull).toEqual(describeCancellationPolicy('Flexible'));
     });
   });
 

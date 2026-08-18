@@ -27,3 +27,16 @@ eslint-violations.json
 
 # Claude Design handoff bundles — scratch inbox, not source
 Claude Design Patches/
+
+# Optimized image output from tools/optimize-images.mjs (runs on every build via the
+# `prebuild` script). For each raster source it writes a sibling named
+# `<base>.<sha1-8-of-source>.webp`, so a NEW file appears whenever a source's bytes
+# change — and orphans are only swept while the source still exists, so a renamed or
+# deleted source leaves its .webp behind forever. Generated, not shipped: nothing reads
+# the public/ output (manifest.webmanifest and index.html reference the .png sources
+# directly, and optimize-images.mjs records only src/assets/ output in
+# optimized-manifest.json). Safe to delete — `npm run build` regenerates them.
+# NOTE: public/images/stay-bycityfocus-logo.*.webp were committed before this rule and
+# stay tracked; .gitignore does not untrack them. Removing them is a separate change.
+public/**/*.????????.webp
+src/assets/**/*.????????.webp

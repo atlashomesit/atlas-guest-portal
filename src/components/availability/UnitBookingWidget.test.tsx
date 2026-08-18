@@ -202,7 +202,10 @@ describe('UnitBookingWidget - TASK-2623: .bw-* design header, price labels, trus
     // Rendering the strip off `resolvedGraceHours` advertises a refund the API will not issue.
     expect(content).toContain('disclosableGraceHours');
     expect(content).toContain('applicableGraceHours');
-    expect(content).toMatch(/\{disclosableGraceHours \?/);
+    // DESIGN-030 (326df4d6) added a `!datesUnavailable &&` guard ahead of the ternary (never
+    // advertise a refund promise for dates that cannot be booked at all) — match the still-required
+    // disclosableGraceHours ternary regardless of that leading guard.
+    expect(content).toContain('disclosableGraceHours ? (');
     expect(content).not.toMatch(/\{resolvedGraceHours \?\s*\(/);
   });
 
@@ -223,9 +226,11 @@ describe('UnitBookingWidget - TASK-2630: URL date hydration and picker interacti
     expect(content).toContain('booking.checkIn');
     expect(content).toContain('booking.checkOut');
     expect(content).toContain('setDateRange');
-    // Hydration should convert ISO strings to Date objects
-    expect(content).toContain('getIstStartOfDay(new Date(ci))');
-    expect(content).toContain('getIstStartOfDay(new Date(co))');
+    // Hydration converts the ISO-instant URL params to CALENDAR-basis Dates at the boundary,
+    // so a URL-hydrated range keys and gates identically to a calendar-picked one in every
+    // guest timezone (getIstStartOfDay here would re-introduce the east-of-IST off-by-one).
+    expect(content).toContain('getIstCalendarDate(new Date(ci))');
+    expect(content).toContain('getIstCalendarDate(new Date(co))');
   });
 
   it('passes dateRange value to AtlasBookingCalendar as controlled value prop', () => {
@@ -425,19 +430,79 @@ describe('UnitBookingWidget - TASK-4293: Reserve button disabled when the select
     expect(memoSection).toContain('if (!dateRange.startDate) return false;');
   });
 
-  it('wires checkinUnavailable into the Reserve button disabled condition', () => {
+  it('wires checkinUnavailable into the Reserve button disabled condition (via datesUnavailable)', () => {
     const content = readFileSync(filePath, 'utf-8');
+    // DESIGN-030 (326df4d6): the disabled condition now ORs a single consolidated
+    // `datesUnavailable` flag instead of referencing `checkinUnavailable` directly — assert the
+    // consolidated flag's own definition still folds in checkinUnavailable, AND that it is wired
+    // into the button, so the two can never fall out of sync.
+    const datesUnavailableDef = content.slice(
+      content.indexOf('const datesUnavailable ='),
+      content.indexOf('const datesUnavailable =') + 200,
+    );
+    expect(datesUnavailableDef).toContain('checkinUnavailable');
     const buttonSection = content.slice(
       content.indexOf('data-testid="guest-booking-submit"') - 900,
       content.indexOf('data-testid="guest-booking-submit"'),
     );
-    expect(buttonSection).toContain('checkinUnavailable');
+    expect(buttonSection).toContain('datesUnavailable');
+  });
+
+  it('datesUnavailable reflects a real availability conflict, never any dateError (TASK-4277)', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    const datesUnavailableDef = content.slice(
+      content.indexOf('const datesUnavailable ='),
+      content.indexOf('const datesUnavailable =') + 200,
+    );
+    // DESIGN-030 (326df4d6) shipped `Boolean(dateError) || checkinUnavailable || availabilityFailed`.
+    // `dateError` also carries ORDINARY validation copy, so every one of those messages disabled the
+    // Reserve CTA, relabelled it "Unavailable", and attached a tooltip contradicting the inline text
+    // — with only a calendar click able to revive it. Never re-introduce the dateError term here.
+    expect(datesUnavailableDef).not.toContain('dateError');
+    expect(datesUnavailableDef).toContain('availabilityConflict');
+    // …and the conflict flag is written ONLY by the dedicated setter, at sites that actually
+    // evaluated availability. Every other writer goes through setDateError, which clears it.
+    expect(content).toContain('const setDateConflictError = useCallback(');
+    const conflictWrites = content.match(/setDateConflictError\(/g) ?? [];
+    // Exactly 4 call sites (the `= useCallback(` definition does not match this pattern): URL
+    // hydrate, post-fetch re-validate, handleRangeChange, handleReserve. All four carry the same
+    // "overlap an existing booking or hold" copy.
+    expect(conflictWrites.length).toBe(4);
+    for (const site of content.match(/setDateConflictError\('([^']*)'\)/g) ?? []) {
+      expect(site).toContain('overlap an existing booking or hold');
+    }
   });
 
   it('surfaces the unavailability reason proactively (disabled button cannot fire the click-time formError)', () => {
     const content = readFileSync(filePath, 'utf-8');
-    expect(content).toContain('data-testid="guest-booking-checkin-unavailable"');
-    expect(content).toContain('Check-in date is not available. Please select a different check-in date.');
+    // DESIGN-030 (326df4d6) consolidated the overlap-dateError and checkin-unavailable alerts into
+    // one <p> (never stack two conflict messages), so data-testid is now assigned via a ternary
+    // rather than a literal attribute, and the copy reads "These dates aren't available..." instead
+    // of the old "Check-in date is not available..." — assert the checkin-unavailable arm of that
+    // ternary is still gated on checkinUnavailable and still carries a proactive message.
+    const alertSection = content.slice(
+      content.indexOf('id={dateErrorId}') - 200,
+      content.indexOf('id={dateErrorId}') + 450,
+    );
+    expect(alertSection).toContain('"guest-booking-checkin-unavailable"');
+    expect(alertSection).toContain('checkinUnavailable');
+    expect(alertSection).toContain('These dates aren’t available. Please select a different check-in date.');
+  });
+
+  it('keeps the check-in-unavailable state discoverable even when the overlap copy wins the ternary', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    // The DESIGN-030 consolidation made `data-testid` conditional: whenever a dateError is ALSO
+    // present (e.g. the URL-hydration overlap message), the testid renders as
+    // guest-booking-date-error and `guest-booking-checkin-unavailable` never appears in the DOM at
+    // all — silently dropping TASK-4293's "the reason is discoverable without a click" criterion,
+    // which on origin/main was carried by an UNCONDITIONAL testid on its own <p>.
+    // The consolidated message stays (one alert, overlap copy wins); the FACT is re-exposed by a
+    // marker attribute that does not depend on which arm of the ternary rendered.
+    const alertSection = content.slice(
+      content.indexOf('id={dateErrorId}'),
+      content.indexOf('id={dateErrorId}') + 450,
+    );
+    expect(alertSection).toContain("data-checkin-unavailable={checkinUnavailable ? 'true' : undefined}");
   });
 
   it('re-hydrates URL dates after listingId resolves (listingId is a hydration dep)', () => {
@@ -471,7 +536,10 @@ describe('UnitBookingWidget - TASK-4303: no provisional total before per-date pr
     // Headline and breakdown must render a skeleton — not the base-rate provisional — while pending.
     expect(content).toContain('data-testid="bw-price-pending"');
     expect(content).toContain('data-testid="bw-breakdown-pending"');
-    expect(content).toContain('hasSelectedRange && !invalidIstStayRange && !rangePricingPending && (');
+    // DESIGN-030 (326df4d6) added a `!datesUnavailable &&` guard alongside `!rangePricingPending`
+    // on the settled breakdown (an unavailable range shows the "Dates unavailable" headline
+    // instead, never the real purchase breakdown) — the rangePricingPending gate is unchanged.
+    expect(content).toContain('hasSelectedRange && !invalidIstStayRange && !datesUnavailable && !rangePricingPending && (');
   });
 
   it('only a terminal (non-abort) pricing fetch failure degrades to the fallback estimate', () => {
@@ -575,11 +643,19 @@ describe('UnitBookingWidget - TASK-4830: availability fetch failure fail-closes 
 
   it('fail-closes the Reserve button on availability failure (a terminal error, not TASK-4277 loading)', () => {
     const content = readFileSync(filePath, 'utf-8');
+    // DESIGN-030 (326df4d6): same consolidation as TASK-4293 above — the disabled condition ORs
+    // `datesUnavailable`, which folds in `availabilityFailed` (asserted via its own definition),
+    // rather than referencing `availabilityFailed` directly at the button.
+    const datesUnavailableDef = content.slice(
+      content.indexOf('const datesUnavailable ='),
+      content.indexOf('const datesUnavailable =') + 200,
+    );
+    expect(datesUnavailableDef).toContain('availabilityFailed');
     const buttonSection = content.slice(
       content.indexOf('data-testid="guest-booking-submit"') - 1800,
       content.indexOf('data-testid="guest-booking-submit"'),
     );
-    expect(buttonSection).toContain('availabilityFailed ||');
+    expect(buttonSection).toContain('datesUnavailable');
   });
 
   it('offers a retry that clears the dedup key and re-issues the availability GET', () => {
@@ -684,12 +760,14 @@ describe('UnitBookingWidget - TASK-4628: E13 overlap-block message must fire on 
     return content.slice(start, end);
   };
 
-  it('re-normalizes the iteration cursor to IST start-of-day each step (matches doesRangeIntersectBlocked)', () => {
+  it('re-normalizes the iteration cursor to calendar start-of-day each step', () => {
     const section = overlapHelper();
-    // The canonical timezone-safe increment used across dateRange.ts. A bare `addDays(cursor, 1)`
-    // preserves runtime-local wall-clock and can drift the iterated ISO off the IST calendar day
-    // across a DST/offset boundary — the exact local-vs-remote-dev divergence in TASK-4628.
-    expect(section).toContain('cursor = getIstStartOfDay(addDays(cursor, 1))');
+    // The timezone-safe increment. A bare `addDays(cursor, 1)` leaves the cursor un-normalized,
+    // which can drift the iterated ISO off the civil day across a DST boundary — the exact
+    // local-vs-remote-dev divergence in TASK-4628. The widget now works on the CALENDAR basis
+    // (utils/date.ts), so the normalizer is startOfCalendarDay, not getIstStartOfDay: applying
+    // an instant→IST conversion to a calendar cell is what shipped the east-of-IST gate bug.
+    expect(section).toContain('cursor = startOfCalendarDay(addDays(cursor, 1))');
     // The un-normalized form must NOT be the increment (only the guarded, normalized form).
     expect(section).not.toMatch(/cursor = addDays\(cursor, 1\);/);
   });
@@ -895,6 +973,14 @@ describe('UnitBookingWidget - TASK-4911: Reserve CTA surfaces inline validation 
     expect(error.textContent).toContain('Add a check-in date to continue.');
     expect(error).toHaveAttribute('role', 'alert');
 
+    // DESIGN-030 regression guard: showing this validation message must NOT turn the CTA into a
+    // dead "Unavailable" button. Only a calendar click cleared dateError, so the guest was stranded
+    // with an inline "Add a check-in date" instruction next to a disabled button whose tooltip said
+    // the dates aren't available — two contradicting claims and no way forward.
+    expect(reserve).toBeEnabled();
+    expect(reserve.textContent).toContain('Reserve');
+    expect(reserve).not.toHaveAttribute('title');
+
     // Silence, not just a blocked submit, was the bug — assert the checkout call never fired.
     expect(postSpy).not.toHaveBeenCalled();
     // Focus moves to the missing (check-in) field instead of leaving the guest stranded.
@@ -924,6 +1010,11 @@ describe('UnitBookingWidget - TASK-4911: Reserve CTA surfaces inline validation 
     const error = await screen.findByTestId('guest-booking-date-error');
     expect(error.textContent).toContain('Add a check-out date to continue.');
     expect(error).toHaveAttribute('role', 'alert');
+
+    // Same DESIGN-030 regression guard as the check-in case: a missing check-out is ordinary
+    // validation, not unavailability — the CTA stays clickable so the guest can retry.
+    expect(reserve).toBeEnabled();
+    expect(reserve.textContent).toContain('Reserve');
 
     expect(postSpy).not.toHaveBeenCalled();
     expect(document.activeElement).toBe(screen.getByTestId('unit-booking-checkout-cell'));
@@ -992,7 +1083,7 @@ describe('UnitBookingWidget - TASK-4910: no misleading GST-less total in incompl
     expect(screen.queryByText('Total')).toBeNull();
     expect(screen.queryByTestId('bw-bd-service-fee-row')).toBeNull();
     expect(screen.queryByTestId('bw-bd-gst-row')).toBeNull();
-    expect(screen.queryByTestId('bw-bd-subtotal-row price-line-base')).toBeNull();
+    expect(screen.queryByTestId('price-line-base')).toBeNull();
     expect(screen.queryByTestId('bw-bd-accommodation-subtotal')).toBeNull();
     expect(screen.queryByTestId('bw-breakdown-pending')).toBeNull();
     expect(screen.queryByTestId('bw-price-pending')).toBeNull();

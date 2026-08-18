@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { buildApiUrl, getApiHeaders } from "@/api/client";
 import SEO from "@/components/SEO";
 import { LoadingState } from "@/components/LoadingState";
-import { getTenantBrandName } from "@/tenant/displayBrand";
+import { getTenantBrandName, getTenantContactEmail } from "@/tenant/displayBrand";
 import { messageFromApiResponse } from "@/utils/serverErrorFromResponse";
 
 type ExportPayload = {
@@ -15,6 +15,7 @@ type ExportPayload = {
 
 export default function MyDataPage() {
   const brandName = getTenantBrandName();
+  const privacyEmail = getTenantContactEmail("privacy");
   const { guestToken } = useParams();
   const [loading, setLoading] = React.useState(true);
   const [exportData, setExportData] = React.useState<ExportPayload | null>(null);
@@ -137,10 +138,17 @@ export default function MyDataPage() {
       <section className="mb-8 rounded border p-4 bg-white" data-testid="my-data-erasure">
         <h2 className="font-semibold mb-2">Right to erasure</h2>
         <p className="text-sm text-gray-600">
-          To ask us to delete your personal data (DPDP Section 12), email{" "}
-          <a className="underline" href="mailto:privacy@atlastays.com">
-            privacy@atlastays.com
-          </a>
+          To ask us to delete your personal data (DPDP Section 12)
+          {privacyEmail ? (
+            <>
+              , email{" "}
+              <a className="underline" href={`mailto:${privacyEmail}`}>
+                {privacyEmail}
+              </a>
+            </>
+          ) : (
+            ", contact the host"
+          )}
           . See our{" "}
           <Link className="underline" to="/privacy">
             Privacy Policy

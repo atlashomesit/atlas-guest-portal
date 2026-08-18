@@ -118,6 +118,14 @@
   position: relative;
 }
 
+/* TASK-7822: desktop wrap was shifting the fixed header after first paint (CLS 0.385).
+   Reserve the row with nowrap rather than contain:layout (that only hides shift). */
+@media (min-width: 761px) {
+  .navbar-main {
+    flex-wrap: nowrap;
+  }
+}
+
 .navbar-left,
 .navbar-center,
 .navbar-right {
@@ -384,6 +392,8 @@
   gap: 0.1rem;
   min-width: 220px;
   max-width: 320px;
+  /* TASK-7822: desktop-only pill (`hidden lg:flex`) must occupy a stable box. */
+  min-height: 44px;
   padding: 0.55rem 1rem;
   border-radius: 999px;
   border: 1px solid var(--navbar-search-pill-border, rgba(220, 210, 200, 0.55));

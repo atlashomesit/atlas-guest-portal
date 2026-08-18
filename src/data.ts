@@ -165,7 +165,7 @@ High-speed Wi-Fi (150 Mbps, multiple ISPs), air-conditioning in the bedroom, a f
         listingId: 4,
         unitType: "1bhk",
         property_name: "Room 202",
-        property_description: `Welcome to this thoughtfully designed 450 sq. ft. 1BHK apartment in Hyderabad’s KPHB, just 2 km from Cyber Towers. This first-floor unit blends comfort and affordability, making it ideal for business travelers, couples, or families seeking a convenient stay near Hitech City.
+        property_description: `Welcome to this thoughtfully designed 450 sq. ft. 1BHK apartment in Hyderabad, just 2 km from Cyber Towers. This first-floor unit blends comfort and affordability, making it ideal for business travelers, couples, or families seeking a convenient stay near Hitech City.
 
 Indoor Spaces:
 The apartment features a cozy bedroom with a king-size bed, AC, and storage, plus a sofa cum bed in the hall for additional guests. The attached kitchen is equipped with essentials, while the bathroom comes with a geyser, toiletries, and towels. For entertainment, enjoy a 55-inch TV with 500+ channels, 17 OTT apps, and complimentary high-speed Wi-Fi. Natural light fills the space through large windows and a private balcony.
@@ -176,7 +176,7 @@ Step onto the balcony to enjoy a refreshing breeze, or explore the surrounding n
 Additional Amenities:
 Complimentary Wi-Fi, air-conditioning, inverter backup, daily housekeeping, and CCTV in common areas. A fully equipped kitchen includes a microwave, gas stove, refrigerator, toaster, and RO water purifier. Washing machine facility available at ₹150 per wash.`,
         property_location: "Hyderabad, Telangana",
-        property_neighborhoods: ["Kukatpally"],
+        property_neighborhoods: ["Neighbourhood"],
         property_reviews: 64,
         property_rating: 4.8,
         maxCapacity: 4,
@@ -189,7 +189,7 @@ Complimentary Wi-Fi, air-conditioning, inverter backup, daily housekeeping, and 
         property_img: [],
         property_nearplaces: [
             "Cyber Towers (2 km)",
-            "KPHB Local Shops",
+            "Local Shops",
             "Markets",
             "Eateries"
         ],
@@ -235,7 +235,7 @@ Complimentary Wi-Fi, air-conditioning, inverter backup, daily housekeeping, and 
         listingId: 5,
         unitType: "1bhk",
         property_name: "Room 301",
-        property_description: `Welcome to this 450 sq. ft. apartment that offers the perfect balance of affordability and functionality in Hyderabad’s tech hub. Located in KPHB, just 2 km from Cyber Towers, this unit is ideal for both work and leisure stays.
+        property_description: `Welcome to this 450 sq. ft. apartment that offers the perfect balance of affordability and functionality in Hyderabad’s tech hub. Located in this neighbourhood, just 2 km from Cyber Towers, this unit is ideal for both work and leisure stays.
 
 Indoor Spaces
 The apartment includes a king-size bed, AC, and a sofa cum bed in the hall. A 55-inch TV with OTT access keeps you entertained. The attached bathroom includes a geyser, toiletries, and towels. Large windows and a balcony ensure natural light and ventilation.
@@ -246,7 +246,7 @@ Enjoy your private balcony, perfect for sipping tea in the evenings, or explore 
 Additional Amenities
 Complimentary Wi-Fi (150 Mbps), fully equipped kitchen (gas stove, microwave, refrigerator, toaster), air-conditioning, and housekeeping services.`,
         property_location: "Hyderabad, Telangana",
-        property_neighborhoods: ["Kukatpally"],
+        property_neighborhoods: ["Neighbourhood"],
         property_reviews: 72,
         property_rating: 4.7,
         maxCapacity: 4,
@@ -259,7 +259,7 @@ Complimentary Wi-Fi (150 Mbps), fully equipped kitchen (gas stove, microwave, re
         property_img: [],
         property_nearplaces: [
             "Cyber Towers (2 km)",
-            "KPHB Local Shops",
+            "Local Shops",
             "Markets",
             "Eateries"
         ],
@@ -368,7 +368,7 @@ High-speed Wi-Fi (150 Mbps, multiple ISPs), air-conditioning in the bedroom, a f
         listingId: 2,
         unitType: "1bhk",
         property_name: "Room 102",
-        property_description: `Step into this spacious and affordable 450 sq. ft. 1BHK in KPHB, just minutes from Cyber Towers. This first-floor apartment combines homely comfort with modern conveniences, perfect for couples, business travelers, or small families.
+        property_description: `Step into this spacious and affordable 450 sq. ft. 1BHK in this neighbourhood, just minutes from Cyber Towers. This first-floor apartment combines homely comfort with modern conveniences, perfect for couples, business travelers, or small families.
 
 Indoor Spaces
 The apartment features a king-size bed in the bedroom and a sofa cum bed in the hall for additional guests. The attached bathroom is stocked with shower gel, shampoo, and towels. Entertainment includes a 55-inch TV, 500+ channels, and 17 OTT apps. Large windows and a balcony bring in natural light.
@@ -437,7 +437,7 @@ Enjoy uninterrupted high-speed Wi-Fi, AC, and a fully equipped kitchen with gas 
         listingId: 6,
         unitType: "1bhk",
         property_name: "Room 302",
-        property_description: `This stylish 450 sq. ft. third-floor unit is designed for comfort and convenience. Located in the vibrant KPHB area, it is perfect for travelers looking to stay near Hyderabad’s IT corridor without compromising on modern amenities.
+        property_description: `This stylish 450 sq. ft. third-floor unit is designed for comfort and convenience. Located in a vibrant neighbourhood, it is perfect for travelers looking to stay near Hyderabad’s IT corridor without compromising on modern amenities.
 
 Indoor Spaces
 This private 1BHK features a king-size bed, sofa cum bed, attached kitchen, and bathroom. A 55-inch TV with 17 OTT apps, AC, and high-speed Wi-Fi ensure a relaxing stay. The bathroom includes geyser, toiletries, and towels. The balcony adds a refreshing outdoor touch.
@@ -459,7 +459,7 @@ Fully equipped kitchen with microwave, refrigerator, RO water, toaster, and gas 
         property_img: [],
         property_nearplaces: [
             "Cyber Towers (2 km)",
-            "KPHB Cafes",
+            "Local Cafes",
             "Malls",
             "Shopping Areas"
         ],

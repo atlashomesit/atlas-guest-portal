@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, useNavigate, useLocation, matchPath } from 'react-router-dom';
 import './navbar.css';
+import './mobile-search.css';
+import MobileSearchPill from './MobileSearchPill';
 
 import { primaryNav, ctaNav, tripsMenuNav } from '../../../config/navigation';
 import { LOGO_URL } from '../../../config/branding';
@@ -219,7 +221,11 @@ const Navbar = () => {
             {showLogo && (
               <img
                 src={logoSrc}
-                alt={brandName || "Site logo"}
+                // Wordmark logos visually spell out the brand name, so they carry the real alt
+                // text; a plain icon logo sits next to the navbar-logo-text span below, which
+                // already names the brand as real text — repeating it in alt is redundant
+                // (axe "image-redundant-alt"), so that case is marked decorative instead.
+                alt={logoSrc.includes("stay-bycityfocus") ? brandName || "Site logo" : ""}
                 className={`navbar-logo${logoSrc.includes("stay-bycityfocus") ? " navbar-logo--wordmark" : ""}`}
                 loading="eager"
                 decoding="async"
@@ -232,6 +238,9 @@ const Navbar = () => {
               <span className="navbar-logo-text">{brandName}</span>
             ) : null}
           </Link>
+
+          {/* DESIGN-026: persistent mobile search pill — sits between logo and hamburger */}
+          <MobileSearchPill />
 
           {/* Mobile Menu Button - Only visible on mobile */}
           <div className="lg:hidden">

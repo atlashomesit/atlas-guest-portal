@@ -4,7 +4,10 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 import MyDataPage from "./MyDataPage";
 
 vi.mock("../components/SEO", () => ({ default: () => null }));
-vi.mock("@/tenant/displayBrand", () => ({ getTenantBrandName: () => "Test Brand" }));
+vi.mock("@/tenant/displayBrand", () => ({
+  getTenantBrandName: () => "Test Brand",
+  getTenantContactEmail: () => "privacy@example.com",
+}));
 vi.mock("@/api/client", () => ({
   buildApiUrl: (path: string) => `https://api.test${path}`,
   getApiHeaders: () => ({}),
@@ -54,7 +57,7 @@ describe("MyDataPage — TASK-7204 DPDP export categories", () => {
     expect(screen.getByTestId("my-data-bookings")).toHaveTextContent("Bookings (1)");
     expect(screen.getByTestId("my-data-communication-logs")).toHaveTextContent("Communication logs (1)");
     expect(screen.getByTestId("my-data-reviews")).toHaveTextContent("Reviews (1)");
-    expect(screen.getByTestId("my-data-erasure")).toHaveTextContent("privacy@atlastays.com");
+    expect(screen.getByTestId("my-data-erasure")).toHaveTextContent("privacy@example.com");
 
     const click = vi.fn();
     const origCreate = document.createElement.bind(document);

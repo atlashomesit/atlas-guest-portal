@@ -31,7 +31,7 @@ import FooterCtaStrip from '../../components/home/FooterCtaStrip';
 import SEO from '../../components/SEO';
 import { LOGO_URL } from '../../config/branding';
 import { HERO_IMAGE_URL } from '../../config/hero';
-import { sanitizeGuestImageUrl } from '../../utils/guestImageUrl';
+import { sanitizeGuestImageUrl, toTransformedGuestImageUrl } from '../../utils/guestImageUrl';
 import { CONTACT, getContactEmail } from '../../config/contact';
 import { getTenantBrandName } from '../../tenant/displayBrand';
 import { enableFooterMiniCtaAboveFooter } from '../../config/homepageUxFlags';
@@ -62,7 +62,9 @@ const PhotoFirstHome = () => {
     // imagery/data sourcing), hidden for white-label tenants pending a per-tenant
     // heroImageUrl (RA-006, same rule every other layout follows).
     const showAtlasContent = !hideAtlasBranding;
-    const heroImageUrl = showAtlasContent ? HERO_IMAGE_URL : '';
+    const heroImageUrl = showAtlasContent
+        ? (toTransformedGuestImageUrl(HERO_IMAGE_URL, 1200) ?? '')
+        : '';
     const hasHeroPhoto = Boolean(heroImageUrl.trim());
     const heroPhotoAriaLabel = showAtlasContent
         ? `A ${schemaBrandName} home, shown in full`
@@ -149,7 +151,7 @@ const PhotoFirstHome = () => {
                         <h1 className="photofirst-hero-h1">{schemaBrandName}</h1>
                         <p className="photofirst-hero-sub">
                             {showAtlasContent
-                                ? 'Owner-run homes in KPHB, shown exactly as they are — scroll to see every room, book direct any time.'
+                                ? 'Owner-run homes in this neighbourhood, shown exactly as they are — scroll to see every room, book direct any time.'
                                 : `Direct from the owner. Scroll to see every room at ${schemaBrandName}.`}
                         </p>
                     </div>

@@ -1,4 +1,5 @@
 import { DateTime } from 'luxon';
+import { REFUND_APPROVAL_WINDOW } from '@/config/refundPolicyTimelines';
 
 /**
  * TASK-4334: Single source of truth for the free-cancellation window per listing
@@ -64,6 +65,22 @@ function isCancellationTier(value: unknown): value is CancellationTier {
 }
 
 /**
+ * TASK-7819: resolve a listing's tier the way the SERVER resolves it, so guest-facing copy can
+ * never disagree with the refund the engine computes.
+ *
+ * `CancellationRefundCalculator.Compute` opens with
+ * `var tierName = (tier ?? CancellationTier.Flexible).ToString();` — an absent or unrecognized
+ * tier is Flexible, and Flexible's late fee is 0, so the engine returns a FULL refund whenever
+ * the guest cancels. Any surface that treats "untiered" as its own, stricter policy is stating
+ * something the server does not do.
+ */
+export function resolveEffectiveCancellationTier(
+  tier: CancellationTier | string | null | undefined,
+): CancellationTier {
+  return isCancellationTier(tier) ? tier : DEFAULT_CANCELLATION_TIER;
+}
+
+/**
  * TASK-7539: single source of truth for guest-facing cancellation policy copy.
  * Returns a headline and after-window sentence that accurately reflect the server's refund math.
  *
@@ -77,27 +94,27 @@ function isCancellationTier(value: unknown): value is CancellationTier {
 export function describeCancellationPolicy(
   tier: CancellationTier | string | null | undefined,
 ): { headline: string; afterWindowCopy: string } {
-  if (tier === 'Flexible') {
-    return {
-      headline: 'Full refund any time before check-in',
-      afterWindowCopy: '',
-    };
-  }
-  if (tier === 'Moderate') {
+  // TASK-7819: resolve null/unknown to Flexible FIRST, exactly as the server does. The old
+  // fallback returned a vague "Flexible cancellation policy applies" for untiered listings,
+  // which let callers substitute their own (wrong) literal for the untiered case.
+  const effectiveTier = resolveEffectiveCancellationTier(tier);
+
+  if (effectiveTier === 'Moderate') {
     return {
       headline: 'Full refund if cancelled 5+ days before check-in',
       afterWindowCopy: 'Partial refund (50%) for cancellations after the 5-day window.',
     };
   }
-  if (tier === 'Strict') {
+  if (effectiveTier === 'Strict') {
     return {
       headline: 'Full refund if cancelled 7+ days before check-in',
       afterWindowCopy: 'No refund within 7 days of check-in.',
     };
   }
-  // Fallback for unrecognized tier
+  // Flexible — fee is 0%, so the engine refunds in full at any time and NOTHING gates it.
+  // Do not add a window condition here: it would read as "cancel later and you get nothing".
   return {
-    headline: 'Flexible cancellation policy applies',
+    headline: 'Full refund any time before check-in',
     afterWindowCopy: '',
   };
 }
@@ -225,8 +242,9 @@ export type FreeCancellationTrustCopy = {
  * hidden too.
  */
 /**
- * TASK-7432: homepage hero has no listing/check-in context, so it cannot invent 48h+24h badges.
- * When a default tier is known, return one short policy chip; otherwise omit (callers link to /policies).
+ * TASK-7432 / DESIGN-028: homepage hero has no listing/check-in context, so it cannot invent
+ * free-cancel hour badges. Defer free-cancel detail to /policies; the hero may still assert the
+ * unconditional refund-*processing* commitment (see `resolveHeroRefundProcessingChip`).
  */
 export function resolveHomepageCancellationChip(input: {
   tier: CancellationTier | string | null | undefined;
@@ -235,6 +253,25 @@ export function resolveHomepageCancellationChip(input: {
   if (!tier) return null;
   // Single statement — never pair contradictory hour windows on the hero.
   return 'See cancellation policy';
+}
+
+/**
+ * DESIGN-028: unconditional processing promise for pre-listing surfaces (hero).
+ * Numbers come from `refundPolicyTimelines` — never invent free-cancel windows here.
+ */
+export function resolveHeroRefundProcessingChip(): string {
+  // Keep short for a single-row 375px chip strip.
+  return `Refunds approved ${REFUND_APPROVAL_WINDOW}`;
+}
+
+/**
+ * DESIGN-028: listing/search card chip when a listing (and thus an effective tier) is in scope.
+ * Uses the same tier prose as the listing-detail trust band — never invents hour windows.
+ */
+export function resolveListingCardCancellationChip(
+  tier: CancellationTier | string | null | undefined,
+): string {
+  return describeCancellationPolicy(tier).headline;
 }
 
 export function resolveFreeCancellationTrustCopy(input: {

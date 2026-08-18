@@ -7,6 +7,7 @@
  */
 
 import { getApiHeaders, buildApiUrl } from '@/api/client';
+import { hasRuntimeConfig, getRuntimeConfig } from '@/runtime-config';
 import { setDomainResolvedSlug, setMarketplaceMode, isAtlastaysMarketplaceSurface } from '@/tenant/tenantResolver';
 import { normalizeHostForDomainLookup } from '@/tenant/normalizeHostForDomainLookup';
 
@@ -105,6 +106,8 @@ export interface TenantInfo {
    * that is the safe direction until the API ships the field.
    */
   guestCommsBrandingMode?: 'Platform' | 'Neutral';
+  /** TASK-1715: Premium search-by-image feature flag from tenant bootstrap API. */
+  searchByImageEnabled?: boolean;
 }
 
 /** RA-006 §3.5: legal/contact identity returned by /tenants/from-domain.LegalContactPack. */
@@ -140,9 +143,19 @@ export function getTenantContext(): TenantInfo | null {
   return tenantInfo;
 }
 
-/** TASK-4386: site-wide robots directive for internal tenants (ADR-0068). */
+/** TASK-4386: site-wide robots directive for internal tenants (ADR-0068).
+ *  TASK-7866: also noindex non-production environments (qa, dev) to prevent
+ *  Google from indexing duplicate listing content that competes with production.
+ */
 export function getInternalTenantRobots(): string | undefined {
-  return tenantInfo?.isInternal ? 'noindex, nofollow' : undefined;
+  if (tenantInfo?.isInternal) return 'noindex, nofollow';
+  // TASK-7866: non-production environments must not be indexed — qa advertises 267
+  // URLs of real listing data with self-canonical, which would compete with production.
+  if (hasRuntimeConfig()) {
+    const env = getRuntimeConfig().environment;
+    if (env && env !== 'production') return 'noindex, nofollow';
+  }
+  return undefined;
 }
 
 /**
@@ -294,6 +307,7 @@ export async function resolveFromDomain(apiBaseUrl: string, domain: string): Pro
         data.guestCommsBrandingMode === 'Platform' || data.guestCommsBrandingMode === 'Neutral'
           ? data.guestCommsBrandingMode
           : undefined,
+      searchByImageEnabled: Boolean(data.searchByImageEnabled),
     };
     return tenantInfo;
   } catch (error) {
@@ -365,6 +379,7 @@ export async function validateTenant(slug: string): Promise<TenantInfo> {
       typeof data.effectiveColorPresetId === 'string' || data.effectiveColorPresetId === null
         ? data.effectiveColorPresetId
         : undefined,
+    searchByImageEnabled: Boolean(data.searchByImageEnabled),
   };
   return tenantInfo;
 }

@@ -1,6 +1,6 @@
 
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
-import { addDays, format, startOfMonth } from 'date-fns';
+import { addDays, differenceInCalendarDays, format, startOfMonth } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { NETWORK_ERROR_MESSAGE } from './unitBookingPaymentOrderErrors';
@@ -12,13 +12,22 @@ import { hasRuntimeConfig } from '@/runtime-config';
 import ErrorBanner from '@/components/ErrorBanner';
 import { buildApiUrl, getApiHeaders, getOrderRequestHeaders } from '@/api/client';
 import { dedupedAvailabilityCalendarFetch } from '@/api/availabilityCalendarClient';
-import { getIstStartOfDay } from '@/utils/date';
+// CALENDAR basis throughout this widget — see the header comment in utils/date.ts. Every
+// Date held in widget state (today, dateRange, shownDate, availabilityRange) is a
+// local-midnight civil date, matching the cells AtlasBookingCalendar hands to disabledDay.
+// Instants are converted at the boundary with getIstCalendarDate and never leak inward.
+import {
+  getIstCalendarDate,
+  istInstantFromCalendarDate,
+  startOfCalendarDay,
+  toCalendarISO,
+} from '@/utils/date';
 import { calculateNights, formatDateInTimezone, formatIsoDateInTimezone } from '@/utils/dateHelpers';
 import {
   type CancellationTier,
   resolveFreeCancellationTrustCopy,
 } from '@/utils/cancellationPolicy';
-import { doesRangeIntersectBlocked, toISODate } from '@/utils/dateRange';
+import { doesRangeIntersectBlocked } from '@/utils/dateRange';
 import { normalizePromoCodeSubmit } from '@/utils/promoCodeInput';
 import { formatCurrency } from '@/utils/formatting';
 import { HelpCircle } from 'lucide-react';
@@ -85,6 +94,8 @@ export type BookingStickySummary = {
   totalAmount: number | null;
   pricingPending: boolean;
   freeCancelUntil: string | null;
+  /** DESIGN-030: selected range cannot be booked — sticky must not show a bookable total. */
+  datesUnavailable?: boolean;
 };
 
 /** Detect network/connection failures (timeout, offline, ECONNREFUSED, etc.). */
@@ -177,7 +188,9 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const displayCoverUrl = (coverPhotoUrl?.trim() || coverFromPublicListings || '').trim() || undefined;
   void hostPhone; // passed through for listing pages; payment-failure support lives on GuestDetailsPage
 
-  const today = useMemo(() => getIstStartOfDay(), []);
+  // The property's "today" is the IST civil date, carried as a calendar-basis Date so it can
+  // be compared directly against the calendar's cells in every guest timezone.
+  const today = useMemo(() => getIstCalendarDate(), []);
   const maxBookingDate = useMemo(() => addDays(today, 365), [today]);
 
   const calendarButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -192,7 +205,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   });
   const [openCalendar, setOpenCalendar] = useState(false);
   const [shownDate, setShownDate] = useState<Date>(today);
-  const shownMonthIso = useMemo(() => toISODate(startOfMonth(shownDate)), [shownDate]);
+  const shownMonthIso = useMemo(() => toCalendarISO(startOfMonth(shownDate)), [shownDate]);
   const [calendarDailyPrices, setCalendarDailyPrices] = useState<Map<string, number>>(new Map());
   const [calendarConvenienceFeePercent, setCalendarConvenienceFeePercent] = useState<number | undefined>(undefined);
   const [calendarPricingLoading, setCalendarPricingLoading] = useState(false);
@@ -243,7 +256,29 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const hydratedRangeRef = useRef<{ start: Date; end: Date } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const [dateError, setDateError] = useState<string | null>(null);
+  const [dateError, setDateErrorMessage] = useState<string | null>(null);
+  // TASK-4277 / DESIGN-030: `dateError` carries TWO different kinds of message — ordinary
+  // validation copy ("Add a check-in date to continue.", "Check-out must be after check-in.",
+  // min-stay, advance notice) and genuine unavailability ("These dates overlap an existing
+  // booking or hold."). Only the LATTER may disable Reserve. DESIGN-030 (326df4d6) folded
+  // `Boolean(dateError)` into `datesUnavailable`, so every ordinary validation message killed the
+  // CTA — relabelled "Unavailable" with a tooltip contradicting the inline text — and only a
+  // calendar click could revive it. This flag isolates the availability-conflict subset.
+  const [availabilityConflict, setAvailabilityConflict] = useState(false);
+  // Ordinary validation copy: shows the inline message, leaves Reserve clickable (TASK-4277).
+  // Clearing the conflict flag here is what keeps the two states from drifting — a writer cannot
+  // set a validation message and accidentally inherit a stale conflict from an earlier selection.
+  const setDateError = useCallback((message: string | null) => {
+    setDateErrorMessage(message);
+    setAvailabilityConflict(false);
+  }, []);
+  // Genuine unavailability: the selected nights really are taken / unbookable. Disables Reserve
+  // and collapses the purchase chrome (DESIGN-030). Use ONLY where availability was actually
+  // evaluated against blockedSet/dateStatusMap.
+  const setDateConflictError = useCallback((message: string) => {
+    setDateErrorMessage(message);
+    setAvailabilityConflict(true);
+  }, []);
   const [resolvedMinStay, setResolvedMinStay] = useState(1);
   // TASK-4334: cancellation tier drives the trust-strip deadline computation below.
   const [resolvedCancellationTier, setResolvedCancellationTier] = useState<CancellationTier | null>(null);
@@ -444,8 +479,10 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
       if (!dateStr || typeof dateStr !== 'string') return;
 
       try {
-        // Parse the date string (expected format: YYYY-MM-DD)
-        const selectedDate = getIstStartOfDay(new Date(dateStr));
+        // Parse the date string (expected format: YYYY-MM-DD). `new Date('YYYY-MM-DD')` is a
+        // UTC-midnight INSTANT; convert to calendar basis at this boundary so it compares and
+        // keys identically to a cell the guest could have clicked in the grid.
+        const selectedDate = getIstCalendarDate(new Date(dateStr));
         if (Number.isNaN(selectedDate.getTime())) return;
 
         // Update the date range: set check-in to the selected date, clear check-out
@@ -473,8 +510,10 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     const ci = booking.checkIn;
     const co = booking.checkOut;
     if (!ci || !co) return;
-    const start = getIstStartOfDay(new Date(ci));
-    const end = getIstStartOfDay(new Date(co));
+    // ?checkIn=/?checkOut= carry instants (ISO strings); convert to calendar basis at this
+    // boundary so a URL-hydrated range gates identically to a calendar-picked one.
+    const start = getIstCalendarDate(new Date(ci));
+    const end = getIstCalendarDate(new Date(co));
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return;
     if (end.getTime() <= start.getTime()) return;
     // TASK-4285: URL-param dates (?checkIn=&checkOut=) bypass the calendar's past-date guard.
@@ -503,7 +542,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     // below, which catches an overlap that only becomes visible once that fetch settles.
     if (checkInteriorNightOverlap(start, end)) {
       setDateRange({ startDate: start, endDate: end });
-      setDateError('These dates overlap an existing booking or hold.');
+      setDateConflictError('These dates overlap an existing booking or hold.');
       hasHydratedFromContextRef.current = true;
       hydratedRangeRef.current = { start, end };
       return;
@@ -532,7 +571,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
       return;
     }
     if (checkInteriorNightOverlap(hydrated.start, hydrated.end)) {
-      setDateError('These dates overlap an existing booking or hold.');
+      setDateConflictError('These dates overlap an existing booking or hold.');
     }
   }, [blockedSet, dateStatusMap, dateRange.startDate, dateRange.endDate]);
 
@@ -562,8 +601,8 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     const fetchBlockedDates = async () => {
       try {
         const url = new URL(buildApiUrl(`/api/public/listings/${Number(listingId)}/availability-calendar`));
-        url.searchParams.set('from', toISODate(getIstStartOfDay(availabilityRange.startDate)));
-        url.searchParams.set('to', toISODate(getIstStartOfDay(availabilityRange.endDate)));
+        url.searchParams.set('from', toCalendarISO(availabilityRange.startDate));
+        url.searchParams.set('to', toCalendarISO(availabilityRange.endDate));
 
         const availabilityKey = url.toString();
         if (lastAvailabilityKeyRef.current === availabilityKey) {
@@ -595,8 +634,10 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
           const dateStr = item?.date;
           if (!dateStr) return;
           
-          const itemDate = getIstStartOfDay(new Date(dateStr));
-          const itemISO = toISODate(itemDate);
+          // API date strings are instants (UTC midnight); convert at this boundary so
+          // `itemDate` compares against calendar-basis `today` below on the same footing.
+          const itemDate = getIstCalendarDate(new Date(dateStr));
+          const itemISO = toCalendarISO(itemDate);
           
           // Filter out past dates - only process dates from today onwards (inclusive)
           // Use <= instead of < to ensure today is included, but we want >= today, so keep <
@@ -738,7 +779,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     if (!openCalendar) return;
     if (!listingId || String(listingId).trim() === '') return;
     if (!dateRange.startDate || !dateRange.endDate) return;
-    const selectedMonthIso = toISODate(startOfMonth(dateRange.startDate));
+    const selectedMonthIso = toCalendarISO(startOfMonth(dateRange.startDate));
     if (selectedMonthIso === shownMonthIso) return; // already covered by the effect above
     const controller = new AbortController();
     const gen = calendarOpenFetchGenRef.current;
@@ -767,11 +808,11 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   // instead of that misleading number.
   const selectedRangeNightsPriced = useMemo(() => {
     if (!dateRange.startDate || !dateRange.endDate) return false;
-    let d = getIstStartOfDay(dateRange.startDate);
-    const end = getIstStartOfDay(dateRange.endDate);
+    let d = startOfCalendarDay(dateRange.startDate);
+    const end = startOfCalendarDay(dateRange.endDate);
     if (end.getTime() <= d.getTime()) return false;
     while (d.getTime() < end.getTime()) {
-      if (!calendarDailyPrices.has(toISODate(d))) return false;
+      if (!calendarDailyPrices.has(toCalendarISO(d))) return false;
       d = addDays(d, 1);
     }
     return true;
@@ -782,7 +823,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   // the mount-fetched 3-month window). Without this, such a range would previously show the
   // silent base-rate fallback total — and with the pending gate below it would instead hold
   // the skeleton forever, since no fetch would ever cover its nights.
-  const selectedStartMonthIso = dateRange.startDate ? toISODate(startOfMonth(dateRange.startDate)) : null;
+  const selectedStartMonthIso = dateRange.startDate ? toCalendarISO(startOfMonth(dateRange.startDate)) : null;
   useEffect(() => {
     if (!listingId || String(listingId).trim() === '') return;
     if (!selectedStartMonthIso || !dateRange.endDate) return;
@@ -838,7 +879,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     if (!openCalendar) return;
     if (!listingId || String(listingId).trim() === '') return;
     if (!dateRange.startDate || !dateRange.endDate) return;
-    const selectedMonthIso = toISODate(startOfMonth(dateRange.startDate));
+    const selectedMonthIso = toCalendarISO(startOfMonth(dateRange.startDate));
     if (selectedMonthIso === shownMonthIso) return; // already covered by the effect above
     const controller = new AbortController();
     fetchAvailabilityRatesForMonths(listingId, selectedMonthIso, 3, controller.signal)
@@ -872,8 +913,8 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   // per-day LOS field into the calendar pricing DTO — at which point this should fetch
   // and render genuine LOS data instead of re-deriving it from the global discount.
 
-  const gstRangeStartIso = dateRange?.startDate ? toISODate(dateRange.startDate) : null;
-  const gstRangeEndIso = dateRange?.endDate ? toISODate(dateRange.endDate) : null;
+  const gstRangeStartIso = dateRange?.startDate ? toCalendarISO(dateRange.startDate) : null;
+  const gstRangeEndIso = dateRange?.endDate ? toCalendarISO(dateRange.endDate) : null;
 
   // TASK-4331: fetch the server's own GST slab/amount for the selected range instead of
   // re-deriving 5%/18% client-side from a pre-adjustment per-night rate. The calendar
@@ -906,7 +947,10 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   }, [listingId, gstRangeStartIso, gstRangeEndIso]);
 
   const isCheckInAllowed = (date: Date) => {
-  const iso = toISODate(getIstStartOfDay(date));
+  // `date` is a CALENDAR-basis cell from AtlasBookingCalendar — key it through the same
+  // helper the grid uses (utils/date.ts). Routing it through an instant→IST conversion
+  // instead evaluated the PREVIOUS night for every guest east of UTC+05:30.
+  const iso = toCalendarISO(date);
   
   // Check status from dateStatusMap (from GET API response)
   const status = dateStatusMap.get(iso);
@@ -922,7 +966,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   if (dateBookabilityMap.get(iso) === false) return false;
 
   // Allow check-in if previous date is blocked or it's today
-  const prevDayISO = toISODate(addDays(date, -1));
+  const prevDayISO = toCalendarISO(addDays(date, -1));
   const prevStatus = dateStatusMap.get(prevDayISO);
   if (prevStatus === 'Blocked' || prevStatus === 'Hold' || blockedSet.has(prevDayISO)) {
     return true;
@@ -931,12 +975,16 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
 };
 
   const disabledDay = useCallback((date: Date) => {
-  const normalized = getIstStartOfDay(date);
+  // `date` is a CALENDAR-basis cell from AtlasBookingCalendar (see utils/date.ts). It must be
+  // normalised and keyed on that basis: converting it as if it were an instant made this gate
+  // read the PREVIOUS night for every guest east of UTC+05:30, so the night the guest saw and
+  // clicked was never the night whose availability was actually checked.
+  const normalized = startOfCalendarDay(date);
 
   // Disable past dates
   if (normalized.getTime() < today.getTime()) return true;
 
-  const iso = toISODate(normalized);
+  const iso = toCalendarISO(normalized);
 
   // TASK-7491: a date with no usable inbound rate (beyond the carry-forward cap, or no prior
   // rate at all) is never selectable — fail closed on price, unconditionally (no checkout
@@ -962,8 +1010,8 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   // unbookable even though the validator in handleRangeChange already accepts it. Still
   // disabled as a CHECK-IN date — this only exempts candidates that could be a checkout for
   // the currently-selected startDate.
-  if (dateRange.startDate && normalized.getTime() > getIstStartOfDay(dateRange.startDate).getTime()) {
-    const startISO = toISODate(getIstStartOfDay(dateRange.startDate));
+  if (dateRange.startDate && normalized.getTime() > startOfCalendarDay(dateRange.startDate).getTime()) {
+    const startISO = toCalendarISO(dateRange.startDate);
     if (!doesRangeIntersectBlocked(startISO, iso, blockedSet)) {
       return false; // valid checkout — nights in between are all free
     }
@@ -975,12 +1023,12 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
 // Helper function to check if a date range has interior-night overlaps with blocked/hold dates.
 // Used by URL hydration, handleRangeChange, and handleReserve to ensure consistent validation.
 const checkInteriorNightOverlap = (startDate: Date, endDate: Date): boolean => {
-  const startIST = getIstStartOfDay(startDate);
-  const endIST = getIstStartOfDay(endDate);
+  const start = startOfCalendarDay(startDate);
+  const end = startOfCalendarDay(endDate);
 
-  let cursor = startIST;
-  while (cursor.getTime() < endIST.getTime()) {
-    const dayISO = toISODate(cursor);
+  let cursor = start;
+  while (cursor.getTime() < end.getTime()) {
+    const dayISO = toCalendarISO(cursor);
     const status = dateStatusMap.get(dayISO);
     // TASK-7491: a no-usable-rate NIGHT blocks the range exactly like a Blocked/Hold night —
     // fail closed on price. The checkout date itself is exclusive (this loop stops BEFORE
@@ -989,16 +1037,12 @@ const checkInteriorNightOverlap = (startDate: Date, endDate: Date): boolean => {
     if (blockedSet.has(dayISO) || status === 'Blocked' || status === 'Hold' || dateBookabilityMap.get(dayISO) === false) {
       return true;
     }
-    // TASK-4628: re-normalize each step to IST start-of-day, matching the canonical
-    // doesRangeIntersectBlocked/expandBookingsToBlockedSet iterators (dateRange.ts). A bare
-    // addDays preserves the runtime-local wall-clock, so across a DST/offset boundary the
-    // iterated dayISO can drift off the IST calendar day and MISS the occupied night — even
-    // though the calendar's per-cell disabledDay (which derives each ISO directly) still
-    // paints it .bc-unavail. That divergence is why the E13 overlap-block message fired
-    // locally (fixed-offset gate TZ) but not on remote dev (E13 seeds the occupied night one
-    // month out). Re-normalizing keeps the overlap check's per-night ISOs in lockstep with
-    // the calendar's block rendering.
-    cursor = getIstStartOfDay(addDays(cursor, 1));
+    // TASK-4628: re-normalize each step so the iterated dayISO can never drift off the civil
+    // day and MISS an occupied night — the divergence behind the E13 overlap-block message
+    // firing locally but not on remote dev. On the calendar basis `addDays` already preserves
+    // local midnight across a DST boundary; `startOfCalendarDay` keeps that guarantee explicit
+    // and keeps these per-night ISOs in lockstep with the calendar's own block rendering.
+    cursor = startOfCalendarDay(addDays(cursor, 1));
   }
   return false;
 };
@@ -1023,22 +1067,24 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     return;
   }
 
-  const startIST = getIstStartOfDay(startDate);
-  const endIST = getIstStartOfDay(endDate);
-  if (endIST.getTime() <= startIST.getTime()) {
+  const startCal = startOfCalendarDay(startDate);
+  const endCal = startOfCalendarDay(endDate);
+  if (endCal.getTime() <= startCal.getTime()) {
     setDateError('Check-out must be after check-in.');
     return;
   }
 
-  const selectedNights = Math.round((endIST.getTime() - startIST.getTime()) / 86400000);
+  // differenceInCalendarDays, not an epoch-millis divide: on the calendar basis a guest whose
+  // local zone crosses a DST boundary mid-stay has days that are 23h or 25h long.
+  const selectedNights = differenceInCalendarDays(endCal, startCal);
   if (minStayNights > 1 && selectedNights < minStayNights) {
     setDateError(`Minimum stay is ${minStayNights} nights.`);
     return;
   }
 
   if (minAdvanceDays > 0) {
-    const minCheckin = addDays(getIstStartOfDay(new Date()), minAdvanceDays);
-    if (startIST < minCheckin) {
+    const minCheckin = addDays(today, minAdvanceDays);
+    if (startCal < minCheckin) {
       setDateError(`This listing requires at least ${minAdvanceDays} day${minAdvanceDays !== 1 ? 's' : ''} advance notice.`);
       return;
     }
@@ -1048,12 +1094,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   // dateStatusMap is the source of truth from the availability API, while blockedSet is a
   // cached set for performance. We must check both to catch dates that the API marks as
   // Blocked/Hold but haven't been added to blockedSet (e.g., new blocks created mid-session).
-  const hasOverlap = checkInteriorNightOverlap(startIST, endIST);
+  const hasOverlap = checkInteriorNightOverlap(startCal, endCal);
 
   if (hasOverlap) {
     // Exception: allow single-day checkout if blocked/hold (check-out on blocked/hold date is allowed)
     const prevDay = addDays(startDate, 1);
-    const endISOForCheck = toISODate(endDate);
+    const endISOForCheck = toCalendarISO(endDate);
     if (
       endDate.getTime() === prevDay.getTime() &&
       (blockedSet.has(endISOForCheck) || dateStatusMap.get(endISOForCheck) === 'Blocked' || dateStatusMap.get(endISOForCheck) === 'Hold')
@@ -1063,7 +1109,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       setOpenCalendar(false);
       return;
     }
-    setDateError('These dates overlap an existing booking or hold.');
+    setDateConflictError('These dates overlap an existing booking or hold.');
     return;
   }
 
@@ -1082,8 +1128,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     const nights =
       dateRange.startDate && dateRange.endDate
         ? (() => {
-            const s = getIstStartOfDay(dateRange.startDate);
-            const e = getIstStartOfDay(dateRange.endDate);
+            const s = startOfCalendarDay(dateRange.startDate);
+            const e = startOfCalendarDay(dateRange.endDate);
             if (e.getTime() <= s.getTime()) return 0;
             return calculateNights(s, e);
           })()
@@ -1093,8 +1139,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
   const invalidIstStayRange = useMemo(() => {
     if (!dateRange.startDate || !dateRange.endDate) return false;
-    const s = getIstStartOfDay(dateRange.startDate).getTime();
-    const e = getIstStartOfDay(dateRange.endDate).getTime();
+    const s = startOfCalendarDay(dateRange.startDate).getTime();
+    const e = startOfCalendarDay(dateRange.endDate).getTime();
     if (e <= s) return true;
     // TASK-4285: a past-dated check-in (e.g. via URL params) is never bookable — disable Reserve
     // and suppress the price breakdown just as for an inverted range.
@@ -1110,7 +1156,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   // (TASK-4277) because this is false without a startDate.
   const checkinUnavailable = useMemo(() => {
     if (!dateRange.startDate) return false;
-    const checkinISO = toISODate(getIstStartOfDay(dateRange.startDate));
+    const checkinISO = toCalendarISO(dateRange.startDate);
     const checkinStatus = dateStatusMap.get(checkinISO);
     // TASK-7491: OR in the no-usable-rate check — the selected check-in day itself has no
     // usable inbound rate (fail closed on price, same posture as Blocked/Hold).
@@ -1146,7 +1192,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     ? freeCancellationCopy?.applicableGraceHours ?? null
     : resolvedGraceHours;
 
-  const { loading: dailyPricingLoading, error: _dailyPricingError, getListingPricing } = useDailyPricingSummary();
+  const { loading: dailyPricingLoading, error: _dailyPricingError, getListingPricing } = useDailyPricingSummary(listingId);
   const dailyPricing = useMemo(
     () => (listingId != null && String(listingId).trim() !== '' ? getListingPricing(listingId) : null),
     [listingId, getListingPricing],
@@ -1159,10 +1205,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   const selectedRangeTotalFromCalendar = useMemo(() => {
     if (!dateRange.startDate || !dateRange.endDate) return null;
     let total = 0;
-    let d = getIstStartOfDay(dateRange.startDate);
-    const end = getIstStartOfDay(dateRange.endDate);
+    let d = startOfCalendarDay(dateRange.startDate);
+    const end = startOfCalendarDay(dateRange.endDate);
     while (d.getTime() < end.getTime()) {
-      const iso = toISODate(d);
+      const iso = toCalendarISO(d);
       const price = calendarDailyPrices.get(iso) ?? effectiveDailyPricing?.actualPrice ?? 0;
       total += price;
       d = addDays(d, 1);
@@ -1177,6 +1223,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
   // When API has loaded: use API price (or calendar sum). When API has not loaded: use 0.
   const hasSelectedRange = Boolean(dateRange.startDate && dateRange.endDate);
+  // DESIGN-030: one unavailable posture — do not stack a full purchase summary with conflict alerts.
+  // TASK-4277: keyed to `availabilityConflict`, NOT `Boolean(dateError)`. An ordinary validation
+  // message (blank date, inverted range, min-stay, advance notice) is not evidence the nights are
+  // taken, and must leave Reserve clickable so handleReserve can keep surfacing it.
+  const datesUnavailable =
+    availabilityConflict || checkinUnavailable || availabilityFailed;
 
   // TASK-4303: per-date pricing + fee percent for the selected range are still resolving.
   // While pending, the headline total and price breakdown render a loading skeleton instead
@@ -1186,7 +1238,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   const rangePricingPending =
     hasSelectedRange && !invalidIstStayRange && !selectedRangeNightsPriced && !calendarPricingFailed;
   const serverGstMatchesSelection =
-    hasSelectedRange && gstRangeStartIso === toISODate(dateRange.startDate!) && gstRangeEndIso === toISODate(dateRange.endDate!);
+    hasSelectedRange && gstRangeStartIso === toCalendarISO(dateRange.startDate!) && gstRangeEndIso === toCalendarISO(dateRange.endDate!);
 
   const serverGstPercent =
     serverGstMatchesSelection && serverPriceBreakdown ? serverPriceBreakdown.gstPercent : null;
@@ -1318,13 +1370,19 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   useEffect(() => {
     onStickySummaryChange?.({
       hasCompleteDates: hasSelectedRange,
-      totalAmount: hasSelectedRange && displayFinalTotal > 0 ? displayFinalTotal : null,
-      pricingPending: rangePricingPending || calendarOpenPricingPending,
-      freeCancelUntil: freeCancellationCopy?.deadlineFormatted ?? null,
+      // DESIGN-030: never feed the sticky a bookable total for unavailable dates.
+      totalAmount:
+        hasSelectedRange && !datesUnavailable && displayFinalTotal > 0 ? displayFinalTotal : null,
+      pricingPending: !datesUnavailable && (rangePricingPending || calendarOpenPricingPending),
+      freeCancelUntil: datesUnavailable
+        ? null
+        : freeCancellationCopy?.deadlineFormatted ?? null,
+      datesUnavailable,
     });
   }, [
     onStickySummaryChange,
     hasSelectedRange,
+    datesUnavailable,
     displayFinalTotal,
     rangePricingPending,
     calendarOpenPricingPending,
@@ -1343,13 +1401,14 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   // v2: "Why book direct" block removed from widget JSX. Calculation kept (prefixed _) for future
   // OTA comparison card on the listing page. TASK-2576 context: data was used to show OTA fee delta.
   const illustrativeOtaGuestFeeComparison = useMemo(() => {
-    if (!hasSelectedRange || breakdownPrice <= 0) return null;
+    // DESIGN-030: no "Save ~₹…" confidence line for dates that cannot be booked.
+    if (!hasSelectedRange || datesUnavailable || breakdownPrice <= 0) return null;
     const illustrativeGuestFee = Math.round((breakdownPrice * ILLUSTRATIVE_OTA_GUEST_FEE_PERCENT) / 100);
     return {
       illustrativeGuestFee,
       illustrativeRoomPlusFee: breakdownPrice + illustrativeGuestFee,
     };
-  }, [hasSelectedRange, breakdownPrice]);
+  }, [hasSelectedRange, datesUnavailable, breakdownPrice]);
 
   // v2 date display uses split check-in/check-out cells (see lv-date-cell blocks below).
 
@@ -1388,8 +1447,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       }
       return;
     }
-    const checkinIst = getIstStartOfDay(dateRange.startDate);
-    const checkoutIst = getIstStartOfDay(dateRange.endDate);
+    // CALENDAR basis — these become the reserved nights in the order payload below. Deriving
+    // them as instants sent D-1 for every guest east of UTC+05:30: the hold was created for a
+    // different night from the one shown, silently and without any error.
+    const checkinIst = startOfCalendarDay(dateRange.startDate);
+    const checkoutIst = startOfCalendarDay(dateRange.endDate);
     if (checkoutIst.getTime() <= checkinIst.getTime()) {
       setDateError('Check-out must be after check-in.');
       return;
@@ -1411,7 +1473,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       return;
     }
 
-    const checkinISO = toISODate(checkinIst);
+    const checkinISO = toCalendarISO(checkinIst);
     const checkinStatus = dateStatusMap.get(checkinISO);
     if (
       checkinStatus === 'Blocked' ||
@@ -1427,7 +1489,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
     // TASK-4726: check interior-night overlaps in handleReserve (like handleRangeChange does)
     if (checkInteriorNightOverlap(checkinIst, checkoutIst)) {
-      setDateError('These dates overlap an existing booking or hold.');
+      setDateConflictError('These dates overlap an existing booking or hold.');
       return;
     }
 
@@ -1462,8 +1524,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       const orderPayload = {
         bookingDraft: {
           listingId: numericListingId,
-          checkinDate: toISODate(checkinIst),
-          checkoutDate: toISODate(checkoutIst),
+          checkinDate: toCalendarISO(checkinIst),
+          checkoutDate: toCalendarISO(checkoutIst),
           guests,
         },
         currency: 'INR',
@@ -1527,9 +1589,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         holdCancellationTier: resolvedCancellationTier,
         holdCancellationWindowHours: resolvedCancellationWindowHours,
         holdGraceHours: resolvedGraceHours,
-        // Forward dates/guests into context for the details page
-        checkIn: checkinIst.toISOString(),
-        checkOut: checkoutIst.toISOString(),
+        // Forward dates/guests into context for the details page. BookingContext's wire format
+        // is an ISO instant, and the hydration effect above reads it back as an IST civil date —
+        // so emit the IST-midnight instant (unchanged format, correct day) rather than
+        // `.toISOString()` on a local-midnight Date, which would not round-trip east of +05:30.
+        checkIn: istInstantFromCalendarDate(checkinIst).toISOString(),
+        checkOut: istInstantFromCalendarDate(checkoutIst).toISOString(),
         guests,
       });
 
@@ -1581,9 +1646,19 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
       {/* v2 block (1): Price headline */}
       <div className="lv-booking-headline" data-testid="bw-header">
-        {/* TASK-4303: while per-date pricing resolves, show a skeleton — never the provisional
-            base-rate total that silently jumps once the API responds. */}
-        {hasSelectedRange && !invalidIstStayRange && rangePricingPending ? (
+        {/* DESIGN-030: unavailable range → one clear headline, not a confident purchase total. */}
+        {hasSelectedRange && !invalidIstStayRange && datesUnavailable ? (
+          <>
+            <div className="lv-booking-total" data-testid="bw-dates-unavailable-headline">
+              <b style={{ fontWeight: 600 }}>Dates unavailable</b>
+            </div>
+            <p className="lv-booking-sub">
+              {dateRange.startDate && dateRange.endDate
+                ? `${format(dateRange.startDate, 'dd MMM')} — ${format(dateRange.endDate, 'dd MMM')} · pick different nights`
+                : 'Pick different nights to continue'}
+            </p>
+          </>
+        ) : hasSelectedRange && !invalidIstStayRange && rangePricingPending ? (
           <>
             <div className="lv-booking-total" data-testid="bw-price-pending" aria-busy="true">
               <span
@@ -1793,7 +1868,13 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             type="button"
             id="unit-booking-guests"
             className="bw-guests-trigger"
-            style={{ padding: 0, background: 'transparent', border: 0, width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+            // minHeight 44: the inline `padding: 0` here intentionally cancels
+            // .bw-guests-trigger's CSS padding (the visual inset comes from the .lv-guest-cell
+            // wrapper), which left the BUTTON box ~38px tall while the card looked ~58px
+            // tappable — the wrapper has cursor:pointer but no onClick, so the outer 10px was
+            // dead. minHeight restores a 44px hit area (WCAG 2.2 SC 2.5.5 / Apple HIG) without
+            // re-introducing double padding. Applies on desktop too — it was ~38px there as well.
+            style={{ padding: 0, minHeight: 44, background: 'transparent', border: 0, width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
             aria-label={`Guests: ${guests} ${guests === 1 ? 'guest' : 'guests'}. Click to change.`}
             onClick={(e) => { e.stopPropagation(); setGuestsOpen((o) => !o); }}
           >
@@ -1845,7 +1926,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             TASK-4303: also held behind a skeleton until per-date pricing + fee percent have
             resolved — the provisional breakdown (base rate × nights, ₹0 processing fee) read
             ~12% below the settled total and silently jumped once the API responded. */}
-        {hasSelectedRange && !invalidIstStayRange && rangePricingPending && (
+        {/* DESIGN-030: while unavailable, skip the purchase-ready skeleton/breakdown. */}
+        {hasSelectedRange && !invalidIstStayRange && !datesUnavailable && rangePricingPending && (
           <div className="lv-price-rows" data-testid="bw-breakdown-pending" aria-busy="true" role="status">
             <div className="lv-price-row">
               <span className="inline-block h-4 w-32 animate-pulse rounded bg-[#f0e6dc]" aria-hidden="true" />
@@ -1858,17 +1940,26 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             <p className="text-xs text-text-muted" style={{ marginTop: 4 }}>Fetching latest prices…</p>
           </div>
         )}
-        {hasSelectedRange && !invalidIstStayRange && !rangePricingPending && (
+        {hasSelectedRange && !invalidIstStayRange && datesUnavailable && displayFinalTotal > 0 && !rangePricingPending && (
+          <p
+            className="text-sm text-text-muted"
+            data-testid="bw-unavailable-price-hint"
+            style={{ marginTop: 8, lineHeight: 1.45 }}
+          >
+            These dates would be ~{displayPrice(displayFinalTotal)} — pick available dates to book.
+          </p>
+        )}
+        {hasSelectedRange && !invalidIstStayRange && !datesUnavailable && !rangePricingPending && (
         <div className="lv-price-rows">
           {/* TASK-4282: Show per-night breakdown when rates vary, or averaged format when uniform */}
           {(() => {
             // Collect daily prices for the selected range
             const dailyPrices: { date: string; price: number }[] = [];
             if (dateRange.startDate && dateRange.endDate) {
-              let d = getIstStartOfDay(dateRange.startDate);
-              const end = getIstStartOfDay(dateRange.endDate);
+              let d = startOfCalendarDay(dateRange.startDate);
+              const end = startOfCalendarDay(dateRange.endDate);
               while (d.getTime() < end.getTime()) {
-                const iso = toISODate(d);
+                const iso = toCalendarISO(d);
                 const price = calendarDailyPrices.get(iso) ?? effectiveDailyPricing?.actualPrice ?? 0;
                 dailyPrices.push({ date: iso, price });
                 d = addDays(d, 1);
@@ -1906,7 +1997,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             } else {
               // Show averaged format (original behavior)
               return (
-                <div className="lv-price-row" data-testid="bw-bd-subtotal-row price-line-base">
+                <div className="lv-price-row" data-testid="price-line-base">
                   <span>
                     {priceDetails.nights > 0 && perNightForDisplay > 0
                       ? `${displayPrice(perNightForDisplay)} × ${priceDetails.nights} ${priceDetails.nights === 1 ? 'night' : 'nights'}`
@@ -1986,9 +2077,21 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
       {/* TASK-2612: Add-ons moved to GuestDetailsPage */}
 
-      {dateError && (
-        <p id={dateErrorId} role="alert" data-testid="guest-booking-date-error" className="text-sm text-support-error" style={{ marginTop: 4 }}>
-          {dateError}
+      {/* DESIGN-030: one conflict message — overlap wins over check-in-unavailable (no restating).
+          TASK-4293: because the overlap copy wins, `data-testid` flips to guest-booking-date-error
+          and the "your check-in day itself is unavailable" fact became undiscoverable without a
+          click. `data-checkin-unavailable` is independent of which copy won, so that reason stays
+          detectable from the DOM in BOTH arms of the ternary. */}
+      {(dateError || (checkinUnavailable && !availabilityFailed)) && (
+        <p
+          id={dateErrorId}
+          role="alert"
+          data-testid={checkinUnavailable ? "guest-booking-checkin-unavailable" : "guest-booking-date-error"}
+          data-checkin-unavailable={checkinUnavailable ? 'true' : undefined}
+          className="text-sm text-support-error"
+          style={{ marginTop: 4 }}
+        >
+          {dateError ?? "These dates aren’t available. Please select a different check-in date."}
         </p>
       )}
       {statusMessage && <p className="text-xs text-text-secondary" style={{ marginTop: 4 }}>{statusMessage}</p>}
@@ -2001,17 +2104,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         </p>
       )}
 
-      {/* TASK-4293: the check-in day is Blocked/Hold — the Reserve button is disabled, so surface the
-          reason proactively (the click-time formError can no longer fire). */}
-      {checkinUnavailable && (
-        <p className="text-sm text-support-error" role="alert" data-testid="guest-booking-checkin-unavailable" style={{ marginTop: 4 }}>
-          Check-in date is not available. Please select a different check-in date.
-        </p>
-      )}
-
-      {/* TASK-4830: availability fetch failed — the Reserve button is disabled (we cannot trust the
-          empty dateStatusMap/blockedSet as all-open). Surface the failure and offer a retry so the
-          guest can re-check availability instead of reserving nights that may already be booked. */}
+      {/* TASK-4830: availability fetch failed — keep retry; DESIGN-030: this is the sole alert when fetch fails. */}
       {availabilityFailed && (
         <div
           className="text-sm text-support-error"
@@ -2043,13 +2136,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           isSubmitting ||
           isBookingDisabled ||
           (Boolean(dateRange.startDate) && Boolean(dateRange.endDate) && invalidIstStayRange) ||
-          // TASK-4293: check-in day itself is Blocked/Hold — disable up front, don't let the click
-          // reach a confusing API-level failure.
-          checkinUnavailable ||
-          // TASK-4830: availability fetch FAILED — dateStatusMap/blockedSet are empty and cannot be
-          // trusted as all-open, so fail CLOSED (a retry control is offered above). This gates on a
-          // terminal failure only, NOT on the availability loading window (that stays TASK-4277-safe).
-          availabilityFailed ||
+          // DESIGN-030 / TASK-4293 / TASK-4830: overlap, blocked check-in, or availability failure.
+          datesUnavailable ||
           // TASK-4303: pricing still resolving for the selected range (1–3 s worst case) —
           // reserving now would seed holdPriceBreakdown's client fallback with the provisional
           // base-rate/₹0-fee numbers (see the TASK-4286 fallback in handleReserve). Blank dates
@@ -2061,22 +2149,25 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           // TASK-4729: guard against NaN pricing (non-numeric server response)
           (hasSelectedRange && !rangePricingPending && isNaN(finalTotal))
         }
-        title={checkinUnavailable ? 'Check-in date is not available. Please select a different check-in date.' : undefined}
+        title={datesUnavailable ? 'These dates aren’t available. Please select different dates.' : undefined}
         className={`bw-reserve lv-booking-cta${isSubmitting ? ' opacity-75' : ''}`}
         data-testid="guest-booking-submit"
         style={{ marginTop: 20, width: '100%', background: 'var(--gradient-cta, linear-gradient(135deg, #f08c71, #e86a4a))', color: '#fff', border: 0, borderRadius: 12, padding: '14px 24px', fontSize: 15, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer', transition: 'filter .2s, box-shadow .2s', boxShadow: '0 4px 12px rgba(196, 90, 63, 0.25)' }}
       >
-        {isBookingDisabled || checkinUnavailable || availabilityFailed
+        {isBookingDisabled || datesUnavailable
           ? 'Unavailable'
           : isSubmitting
             ? 'Reserving…'
             : 'Reserve'}
       </Button>
+      {/* DESIGN-030: hide purchase-confidence chrome when the selected dates cannot be booked. */}
+      {!datesUnavailable && (
       <p className="bw-charge-note" data-testid="bw-charge-note" style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-muted, #6b5a55)', marginTop: 8 }}>
         You won&apos;t be charged yet
       </p>
+      )}
 
-      {illustrativeOtaGuestFeeComparison && illustrativeOtaGuestFeeComparison.illustrativeGuestFee > 0 && (
+      {!datesUnavailable && illustrativeOtaGuestFeeComparison && illustrativeOtaGuestFeeComparison.illustrativeGuestFee > 0 && (
         <p
           className="bw-direct-savings"
           data-testid="bw-direct-savings-line"
@@ -2088,8 +2179,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
       {/* TASK-2623/TASK-4334: Trust strip — free cancellation, actual computed deadline
           when a check-in date is selected; generic fallback copy otherwise. TASK-7012: rendered only
-          when there is a truthful claim to make — never as a bare check icon with blank text. */}
-      {cancellationTrustText ? (
+          when there is a truthful claim to make — never as a bare check icon with blank text.
+          DESIGN-030: never advertise a refund promise for unavailable dates. */}
+      {!datesUnavailable && cancellationTrustText ? (
         <div className="lv-booking-cancel bw-trust" data-testid="bw-trust-strip">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M20 6L9 17l-5-5"/>
@@ -2102,7 +2194,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           shown when the server has resolved a non-null graceHours for this listing (flag-off parity).
           TASK-7012: and only when the selected dates do not VOID that window — the server will not
           honour a voided grace window, so advertising it would over-promise the refund. */}
-      {disclosableGraceHours ? (
+      {!datesUnavailable && disclosableGraceHours ? (
         <div className="lv-booking-cancel bw-trust" data-testid="bw-grace-window-strip">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M20 6L9 17l-5-5"/>

@@ -25,6 +25,29 @@
   border-radius: var(--search-radius);
   background: var(--bg-surface);
   box-shadow: var(--shadow-level-1);
+  /* DO NOT make this panel `position: sticky` again (removed from SearchPage.tsx 2026-08-18).
+     Measured at 1280x720, the `local` Playwright viewport and a common laptop window:
+
+       border 1 + pad 20 + fields 63.8 + 16 + toggles 44 + 16 + meta 45 + 16
+       + amenity chips 36 + 16 + nomad chips 49 + pad 20 + border 1   =  343.8px
+
+     Pinned at top:64px that is y 64 -> 408 of a 720px viewport. Chromium's
+     scrollIntoViewIfNeeded uses CenterIfNeeded, so Playwright — and any browser
+     `scrollIntoView({block:'center'})` — parks its target at y=360, which is INSIDE that box
+     (specifically inside the second `.search-filters__chips` row, y 338-387). Every result
+     card CTA below the fold became unclickable; guest-listing-gallery.e2e.spec.ts timed out
+     for 60s x3 with `.search-filters__chips ... subtree intercepts pointer events`.
+
+     Two prior attempts capped max-height instead. Both were arithmetic no-ops: the panel's
+     NATURAL height is 343.8px, so `calc(100vh - 6rem)` (624px) and `min(22rem, ...)` (352px)
+     never bound — the second missed by 8.2px. To clear y=360 a cap would have to be <=18.5rem,
+     which clips the whole Digital-nomad row behind an inner scrollbar. The footprint was never
+     the problem; pinning a 344px panel over the middle of the viewport was.
+
+     Related: the pin used top-16 (64px) while the navbar is `position: fixed` with
+     --nav-height: 116px (navbar.css:94, base.css:131), so the panel's top 52px — the price
+     input labels — sat permanently behind the header. Static flow moots that too.
+     "no overlap" per the file header above. */
 }
 
 .search-filters__row {
@@ -250,6 +273,9 @@
 }
 
 @media (max-width: 900px) {
+  /* `.search-filters` needs no position/max-height reset here any more — it is static and
+     unbounded at every width now (see the block comment on .search-filters above). Do not
+     re-add one "for symmetry"; there is no desktop rule left to countermand. */
   .search-filters__row--fields,
   .search-filters__row--toggles {
     grid-template-columns: 1fr;

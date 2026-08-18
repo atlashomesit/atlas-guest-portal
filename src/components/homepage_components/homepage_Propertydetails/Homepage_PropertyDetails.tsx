@@ -21,7 +21,6 @@ import { X, ShieldCheck, CalendarClock, CreditCard } from 'lucide-react';
 import { useEffect, useMemo, useState, Suspense, lazy } from 'react';
 import { useTenantListings } from '../../../hooks/useTenantListings';
 import { usePropertyListings } from '../../../hooks/usePropertyListings';
-import { inlinePolicySnippets } from '../../../content/terms';
 import { trackEvent } from '../../../utils/analytics';
 import { Button } from '../../ui/Button';
 import { calculateNightlyPrice, inferUnitType } from '../../../utils/pricing';
@@ -30,11 +29,15 @@ import { propertySlugMatchesListing } from '../../../utils/propertySlugMatch';
 import { useBooking } from '../../../contexts/BookingContext';
 import { resolveListing } from '../../../utils/listingResolver';
 import { filterGuestImageUrls, sanitizeGuestImageUrl } from '../../../utils/guestImageUrl';
-import { describeCancellationPolicy } from '../../../utils/cancellationPolicy';
+import {
+  describeCancellationPolicy,
+  resolveEffectiveCancellationTier,
+} from '../../../utils/cancellationPolicy';
 import type { ListingDetail, PublicListing } from '../../../api/listingClient';
 import {
     fetchListingById,
     fetchListingContact,
+    fetchSimilarListings,
     parseMaxGuestsFromPayload,
     resolveStaticMaxGuests,
 } from '../../../api/listingClient';
@@ -188,8 +191,12 @@ function getPpCancellationInfo(
   // TASK-7539: all tiers now read from the single source of truth.
   // Flexible (0% fee): afterWindowCopy is empty, so headline alone suffices.
   // Moderate/Strict: append the after-window sentence for clarity.
+  // TASK-7819: branch on the EFFECTIVE tier, not the raw one. An untiered listing is Flexible on
+  // the server, so it must get the Flexible description here too — otherwise this theme and the
+  // heritage fork render different descriptions for the same listing, which is the drift class
+  // this task exists to remove.
   const description =
-    tier === 'Flexible'
+    resolveEffectiveCancellationTier(tier) === 'Flexible'
       ? (opts?.hasOnlinePayment !== false
           ? 'Money returns to the exact UPI or card you paid with. No phone calls needed.'
           : 'Your host arranges the refund directly with you.')
@@ -385,6 +392,45 @@ type ListingReviewRow = {
     ratingCommunication?: number | null;
 };
 
+/** TASK-1979: row shape from `GET /api/public/listings/{id}` externalReviews array. */
+type ExternalReviewRow = {
+    guestName?: string;
+    rating?: number | null;
+    body?: string | null;
+    reviewDate?: string;
+    source?: string;
+    sourceUrl?: string | null;
+};
+
+type DisplayReviewRow = ListingReviewRow & {
+    displayKey: string;
+    isGoogle?: boolean;
+    sourceUrl?: string | null;
+};
+
+function mergeListingAndExternalReviews(
+    native: ListingReviewRow[],
+    external: ExternalReviewRow[],
+): DisplayReviewRow[] {
+    const externalRows: DisplayReviewRow[] = external.map((r, idx) => ({
+        id: -(idx + 1),
+        displayKey: `gbp-${idx}-${r.reviewDate ?? ''}`,
+        guestName: r.guestName ?? 'Google user',
+        rating: r.rating ?? 0,
+        body: r.body ?? null,
+        createdAt: r.reviewDate ? `${r.reviewDate}T00:00:00.000Z` : new Date(0).toISOString(),
+        isGoogle: true,
+        sourceUrl: r.sourceUrl ?? null,
+    }));
+    const nativeRows: DisplayReviewRow[] = native.map((r) => ({
+        ...r,
+        displayKey: `native-${r.id}`,
+    }));
+    return [...nativeRows, ...externalRows].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+}
+
 /** TASK-1359: Convert YouTube/Vimeo watch URL to embed URL, or return null if unrecognised. */
 function toEmbedUrl(url: string): string | null {
     try {
@@ -503,6 +549,8 @@ const PropertyDetails = () => {
         totalCount: number;
         reviews: ListingReviewRow[];
     }>(null);
+    /** TASK-1979: GBP-imported reviews from `GET /api/public/listings/{id}`. */
+    const [externalReviewsFromApi, setExternalReviewsFromApi] = useState<ExternalReviewRow[]>([]);
 
     // AMN-001: Fetch amenity master list once on mount
     useEffect(() => {
@@ -573,8 +621,12 @@ const PropertyDetails = () => {
         }
     }, [data, unitType]);
 
-    const dailyPricing = useDailyPricingSummary();
     const listingNumericForPricing = Number(resolvedListingId ?? data?.listingId ?? NaN);
+    const dailyPricing = useDailyPricingSummary(
+      Number.isFinite(listingNumericForPricing) && listingNumericForPricing > 0
+        ? listingNumericForPricing
+        : undefined,
+    );
     const dailyPricingRow = useMemo(() => {
         if (!Number.isFinite(listingNumericForPricing) || listingNumericForPricing <= 0) return undefined;
         return dailyPricing.data?.listings?.find((l) => l.listingId === listingNumericForPricing);
@@ -655,18 +707,23 @@ const PropertyDetails = () => {
 
     // Public /listings only Includes cover + SortOrder==1, so catalog property_img is incomplete.
     // Hydrate full photoUrls from GET /listings/{id} once per listing for "View gallery".
+    // TASK-7824 root cause: this effect listed `data` in its deps. Each setData() (photos /
+    // maxGuests / hostPhone) created a new object, re-ran the effect, and stacked 2–6 identical
+    // GET /listings/{id} calls (plus resolveListing on the same URL). Depend on listing-id
+    // primitives only; `dedupedJsonFetch` still collapses this caller with resolveListing.
     const detailPhotosHydratedRef = React.useRef<number | null>(null);
+    const hasPropertyRow = data != null;
+    const dataListingId = data?.listingId ?? null;
     useEffect(() => {
-        const lid = Number(resolvedListingId ?? data?.listingId ?? NaN);
-        if (!data || !Number.isFinite(lid) || lid <= 0) return;
-        const hasMaxGuests = typeof data.maxGuests === 'number' && data.maxGuests >= 1;
-        const hasHostPhone = typeof data.hostPhone === 'string' && data.hostPhone.trim().length > 0;
-        const photosHydrated = detailPhotosHydratedRef.current === lid;
-        if (hasMaxGuests && hasHostPhone && photosHydrated) return;
+        if (!hasPropertyRow) return;
+        const lid = Number(resolvedListingId ?? dataListingId ?? listingId ?? NaN);
+        if (!Number.isFinite(lid) || lid <= 0) return;
+        if (detailPhotosHydratedRef.current === lid) return;
 
         const ac = new AbortController();
         void fetchListingById(lid, ac.signal)
             .then((detail) => {
+                if (ac.signal.aborted) return;
                 const d = detail as Record<string, unknown>;
                 // TASK-2739-v1: GET /listings/{id} also carries publishStatus; keep state in sync.
                 if (typeof d.publishStatus === 'string') setPublishStatus(d.publishStatus);
@@ -705,7 +762,7 @@ const PropertyDetails = () => {
             })
             .catch(() => {});
         return () => ac.abort();
-    }, [resolvedListingId, data]);
+    }, [hasPropertyRow, resolvedListingId, dataListingId, listingId]);
 
     /** TASK-1466: deep links e.g. `/homes/.../123?bookingId=1&t=...` load host phone without exposing it on public catalog. */
     const bookingIdForContact = searchParams.get('bookingId');
@@ -738,39 +795,71 @@ const PropertyDetails = () => {
         const lid = resolvedListingId;
         if (lid == null) {
             setListingReviewsFromApi(null);
+            setExternalReviewsFromApi([]);
             return;
         }
         const num = typeof lid === 'number' ? lid : Number(lid);
         if (!Number.isFinite(num) || num <= 0) {
             setListingReviewsFromApi(null);
+            setExternalReviewsFromApi([]);
             return;
         }
         const ac = new AbortController();
         setListingReviewsFromApi({ loading: true, averageRating: 0, totalCount: 0, reviews: [] });
+        setExternalReviewsFromApi([]);
         void (async () => {
             try {
-                const res = await fetch(buildApiUrl(`/api/listings/${num}/reviews`), {
-                    headers: getApiHeaders(),
-                    signal: ac.signal,
-                });
-                if (!res.ok) {
-                    if (!ac.signal.aborted) setListingReviewsFromApi(null);
-                    return;
-                }
-                const j = (await res.json()) as {
+                const [nativeRes, publicRes] = await Promise.all([
+                    fetch(buildApiUrl(`/api/listings/${num}/reviews`), {
+                        headers: getApiHeaders(),
+                        signal: ac.signal,
+                    }),
+                    fetch(buildApiUrl(`/api/public/listings/${num}`), {
+                        headers: getApiHeaders(),
+                        signal: ac.signal,
+                    }),
+                ]);
+                if (ac.signal.aborted) return;
+
+                // Named type, not `typeof nativePayload`: at the assignment below the variable is
+                // control-flow-narrowed to `null`, so `as typeof nativePayload` cast the response
+                // to `null` and every later property read resolved to `never` (tsc TS2339).
+                type NativeReviewsPayload = {
                     averageRating?: number;
                     totalCount?: number;
                     reviews?: ListingReviewRow[];
                 };
-                if (ac.signal.aborted) return;
-                setListingReviewsFromApi({
-                    loading: false,
-                    averageRating: j.averageRating ?? 0,
-                    totalCount: j.totalCount ?? 0,
-                    reviews: Array.isArray(j.reviews) ? j.reviews : [],
-                });
+                let nativePayload: NativeReviewsPayload | null = null;
+                if (nativeRes.ok) {
+                    nativePayload = (await nativeRes.json()) as NativeReviewsPayload;
+                } else if (!ac.signal.aborted) {
+                    setListingReviewsFromApi(null);
+                }
+
+                if (publicRes.ok) {
+                    const publicPayload = (await publicRes.json()) as { externalReviews?: ExternalReviewRow[] };
+                    if (!ac.signal.aborted) {
+                        setExternalReviewsFromApi(
+                            Array.isArray(publicPayload.externalReviews) ? publicPayload.externalReviews : [],
+                        );
+                    }
+                } else if (!ac.signal.aborted) {
+                    setExternalReviewsFromApi([]);
+                }
+
+                if (nativePayload && !ac.signal.aborted) {
+                    setListingReviewsFromApi({
+                        loading: false,
+                        averageRating: nativePayload.averageRating ?? 0,
+                        totalCount: nativePayload.totalCount ?? 0,
+                        reviews: Array.isArray(nativePayload.reviews) ? nativePayload.reviews : [],
+                    });
+                }
             } catch {
-                if (!ac.signal.aborted) setListingReviewsFromApi(null);
+                if (!ac.signal.aborted) {
+                    setListingReviewsFromApi(null);
+                    setExternalReviewsFromApi([]);
+                }
             }
         })();
         return () => ac.abort();
@@ -1112,8 +1201,7 @@ useEffect(() => {
         if (!Number.isFinite(lid) || lid <= 0) return;
         const ac = new AbortController();
         setSimilarFromApi({ loading: true, items: [] });
-        fetch(buildApiUrl(`/listings/${lid}/similar?limit=6`), { headers: { Accept: 'application/json', ...getApiHeaders() }, signal: ac.signal })
-            .then(async (res) => (res.ok ? (await res.json()) : []))
+        fetchSimilarListings(lid, 6, ac.signal)
             .then((j) => {
                 if (ac.signal.aborted) return;
                 setSimilarFromApi({ loading: false, items: Array.isArray(j) ? j : [] });
@@ -1347,9 +1435,14 @@ useEffect(() => {
         const fromListingPolicy = policies.find((p) =>
             typeof p?.type === 'string' && p.type.toLowerCase().includes('cancellation'),
         )?.value;
-        // TASK-4356: honest default when the host hasn't set an explicit tier or custom text —
-        // matches the server's 7-day free-cancellation default (CancellationPolicyWindow.cs).
-        return fromListingPolicy || inlinePolicySnippets?.cancellation || 'Full refund if cancelled 7+ days before check-in.';
+        // TASK-7819: ONLY host-authored policy text may override the tier-derived copy.
+        // `inlinePolicySnippets.cancellation` used to sit here, and because it is a non-empty
+        // constant it made this value always truthy — which fed `fallbackText` into
+        // getPpCancellationInfo, whose fallback branch returns BEFORE the tier branch. The
+        // tier-derived copy was therefore unreachable, and every untiered listing rendered a
+        // hardcoded "no refunds within 7 days" while the engine refunded 100%.
+        // Empty here means "no host override" — let describeCancellationPolicy decide.
+        return fromListingPolicy || '';
     })();
 
     // TASK-7539: tier-specific plain-language text now reads from the single source of truth
@@ -1444,9 +1537,19 @@ useEffect(() => {
         : (data.property_amenities || []).map((a) => a.amenities_icon ? formatAmenityName(a.amenities_icon) : 'Amenity');
 
     const ppApiReviews = listingReviewsFromApi;
-    const ppHasApiReviews = Boolean(ppApiReviews && !ppApiReviews.loading && ppApiReviews.totalCount > 0);
+    const ppMergedReviews = ppApiReviews && !ppApiReviews.loading
+        ? mergeListingAndExternalReviews(ppApiReviews.reviews, externalReviewsFromApi)
+        : [];
+    const ppCombinedReviewCount = ppMergedReviews.length;
+    const ppCombinedAverageRating = ppCombinedReviewCount > 0
+        ? ppMergedReviews.reduce((sum, r) => sum + (r.rating > 0 ? r.rating : 0), 0)
+            / ppMergedReviews.filter((r) => r.rating > 0).length
+        : 0;
+    const ppHasApiReviews = Boolean(
+        ppApiReviews && !ppApiReviews.loading && (ppApiReviews.totalCount > 0 || externalReviewsFromApi.length > 0),
+    );
     const ppDisplayedReviews = ppHasApiReviews
-        ? (showAllReviews ? ppApiReviews!.reviews : ppApiReviews!.reviews.slice(0, 6))
+        ? (showAllReviews ? ppMergedReviews : ppMergedReviews.slice(0, 6))
         : [];
     const ppAmenityDisplay = ppAmenityLabels.slice(0, 12);
     const ppAmenityCodes = data.amenityCodes && data.amenityCodes.length > 0
@@ -1877,28 +1980,48 @@ useEffect(() => {
                   ariaLabel="A note from your host"
                 />
 
-                {/* About this home */}
-                <section className="pp-section" aria-label="About this home">
+                {/* About this home — DESIGN-031: omit invented prose; Ask host when empty */}
+                {(data.property_description?.trim() ||
+                  resolvedCheckInTime ||
+                  resolvedCheckOutTime ||
+                  (data.property_neighborhoods || []).length > 0 ||
+                  ppWaAskUrl) && (
+                <section className="pp-section" aria-label="About this home" data-testid="property-about-section">
                   <h2>About this home</h2>
-                  {data.property_description && (
-                    <p className="pp-prose">
-                      {showAboutMore
-                        ? data.property_description
-                        : `${data.property_description.slice(0, 300)}${data.property_description.length > 300 ? '…' : ''}`}
+                  {data.property_description?.trim() ? (
+                    <>
+                      <p className="pp-prose">
+                        {showAboutMore
+                          ? data.property_description
+                          : `${data.property_description.slice(0, 300)}${data.property_description.length > 300 ? '…' : ''}`}
+                      </p>
+                      {data.property_description.length > 300 && (
+                        <button
+                          type="button"
+                          className="pp-prose-more"
+                          onClick={() => setShowAboutMore((s) => !s)}
+                          aria-expanded={showAboutMore}
+                        >
+                          {showAboutMore ? 'Show less' : 'Read more'}
+                          <PpChevronDown size={14} />
+                        </button>
+                      )}
+                    </>
+                  ) : ppWaAskUrl ? (
+                    <p className="pp-prose" data-testid="property-about-ask-host">
+                      The host hasn&apos;t added a description yet.{' '}
+                      <a
+                        href={ppWaAskUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline underline-offset-2"
+                      >
+                        Ask them about this home
+                      </a>
+                      .
                     </p>
-                  )}
-                  {data.property_description && data.property_description.length > 300 && (
-                    <button
-                      type="button"
-                      className="pp-prose-more"
-                      onClick={() => setShowAboutMore((s) => !s)}
-                      aria-expanded={showAboutMore}
-                    >
-                      {showAboutMore ? 'Show less' : 'Read more'}
-                      <PpChevronDown size={14} />
-                    </button>
-                  )}
-                  {/* Check-in / Check-out times */}
+                  ) : null}
+                  {/* Check-in / Check-out times — same resolver as Things to know */}
                   {(resolvedCheckInTime || resolvedCheckOutTime) && (
                     <div
                       style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginTop: 16 }}
@@ -1927,9 +2050,11 @@ useEffect(() => {
                     </div>
                   )}
                 </section>
+                )}
 
-                {/* Amenities */}
-                <section className="pp-section" aria-label="Amenities">
+                {/* Amenities — DESIGN-031: omit empty "What's here" heading */}
+                {ppAmenityLabels.length > 0 && (
+                <section className="pp-section" aria-label="Amenities" data-testid="property-amenities-section">
                   <div className="pp-section-head">
                     <h2>What&rsquo;s here</h2>
                   </div>
@@ -1968,6 +2093,7 @@ useEffect(() => {
                     </button>
                   )}
                 </section>
+                )}
 
                 {/* Guest Reviews */}
                 {(() => {
@@ -1979,9 +2105,9 @@ useEffect(() => {
                       <div style={{ height: 120, borderRadius: 16, background: '#f0ddd0' }} />
                     </section>
                   );
-                  if (!api || api.totalCount <= 0) return null;
-                  const rating = api.averageRating;
-                  const count = api.totalCount;
+                  if (!api || (!api.loading && api.totalCount <= 0 && externalReviewsFromApi.length <= 0)) return null;
+                  const rating = ppCombinedAverageRating;
+                  const count = ppCombinedReviewCount;
                   return (
                     <section className="pp-section" aria-label="Guest reviews" data-testid="reviews-section">
                       <div className="pp-section-head">
@@ -2002,7 +2128,7 @@ useEffect(() => {
                         </div>
                         {/* Sub-rating bars derived from API reviews if available */}
                         {api.reviews.length > 0 && (() => {
-                          const rs = api.reviews;
+                          const rs = api.reviews.filter((r) => r.rating > 0);
                           const avg = (vals: (number | null | undefined)[]) => {
                             const valid = vals.filter((v): v is number => v != null && v >= 1);
                             return valid.length > 0 ? (valid.reduce((a, b) => a + b, 0) / valid.length) : null;
@@ -2046,7 +2172,7 @@ useEffect(() => {
                         })()}
                       </div>
 
-                      {api.reviews.length > 0 ? (
+                      {ppMergedReviews.length > 0 ? (
                         <>
                           {/* TASK-4404: review summary (sentiment + top keywords) — same id source as the reviews fetch */}
                           <Suspense fallback={null}>
@@ -2055,8 +2181,33 @@ useEffect(() => {
                           {/* v2: 3-col card layout with quote marks */}
                           <div className="pp-v2-review-grid" data-testid="reviews-grid">
                             {ppDisplayedReviews.map((r, idx) => (
-                              <article key={r.id} className="pp-v2-review-card">
+                              <article key={r.displayKey} className="pp-v2-review-card">
                                 <span className="pp-v2-review-quote" aria-hidden="true">&ldquo;</span>
+                                {r.isGoogle && (
+                                  <span
+                                    title="Review from Google"
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      width: 20,
+                                      height: 20,
+                                      borderRadius: '50%',
+                                      background: '#4285F4',
+                                      color: '#fff',
+                                      fontSize: 12,
+                                      fontWeight: 700,
+                                      marginBottom: 8,
+                                    }}
+                                  >
+                                    G
+                                  </span>
+                                )}
+                                {r.rating > 0 && (
+                                  <div style={{ marginBottom: 8, fontSize: 13, color: 'var(--text-primary, #4a3535)' }} aria-label={`${r.rating} out of 5 stars`}>
+                                    {'★'.repeat(Math.min(5, r.rating))}{'☆'.repeat(Math.max(0, 5 - r.rating))}
+                                  </div>
+                                )}
                                 {r.body && <p className="pp-v2-review-body">{r.body}</p>}
                                 {!r.body && r.title && <p className="pp-v2-review-body">{r.title}</p>}
                                 {(() => {
@@ -2102,7 +2253,7 @@ useEffect(() => {
                               </article>
                             ))}
                           </div>
-                          {api.reviews.length > 6 && (
+                          {ppMergedReviews.length > 6 && (
                             <button
                               type="button"
                               onClick={() => setShowAllReviews((s) => !s)}
@@ -2112,7 +2263,7 @@ useEffect(() => {
                             >
                               {showAllReviews
                                 ? 'Show fewer reviews'
-                                : `View all ${api.totalCount} reviews`}
+                                : `View all ${count} reviews`}
                               <PpChevronDown size={14} />
                             </button>
                           )}
@@ -2165,21 +2316,31 @@ useEffect(() => {
                           : 'Contact host for occupancy details.'}
                       </span>
                     </div>
-                    {/* Check-in card */}
+                    {/* Check-in card — DESIGN-031: same source as About; never invent "Confirmed after booking" */}
                     <div className="pp-v2-knowcard" data-testid="property-check-in-card">
                       <div className="pp-v2-knowicon"><PpV2ClockInIcon /></div>
                       <small>Check-in</small>
                       <strong data-testid={resolvedCheckInTime ? 'property-check-in-time' : 'property-check-in-pending'}>
-                        {resolvedCheckInTime ?? 'Confirmed after booking'}
+                        {resolvedCheckInTime ?? 'Ask host'}
                       </strong>
-                      {resolvedCheckInTime && <span>Early check-in subject to availability.</span>}
+                      {resolvedCheckInTime ? (
+                        <span>Early check-in subject to availability.</span>
+                      ) : (
+                        <span>Host will confirm check-in time.</span>
+                      )}
                     </div>
                     {/* Check-out card */}
                     <div className="pp-v2-knowcard">
                       <div className="pp-v2-knowicon"><PpV2ClockOutIcon /></div>
                       <small>Check-out</small>
-                      <strong>{resolvedCheckOutTime ?? 'Confirmed after booking'}</strong>
-                      {resolvedCheckOutTime && <span>Late check-out subject to availability.</span>}
+                      <strong data-testid={resolvedCheckOutTime ? 'property-check-out-time' : 'property-check-out-pending'}>
+                        {resolvedCheckOutTime ?? 'Ask host'}
+                      </strong>
+                      {resolvedCheckOutTime ? (
+                        <span>Late check-out subject to availability.</span>
+                      ) : (
+                        <span>Host will confirm check-out time.</span>
+                      )}
                     </div>
                   </div>
                 </section>

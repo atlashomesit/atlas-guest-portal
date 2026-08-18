@@ -67,7 +67,7 @@ export function buildHomepageJsonLd(input: {
         url: input.canonicalUrl,
         ...(input.schemaLogo ? { logo: input.schemaLogo } : {}),
         description:
-          "Serviced apartments in KPHB, Hyderabad with Wi-Fi, parking, and responsive support for business and family stays.",
+          "Serviced apartments in Hyderabad with Wi-Fi, parking, and responsive support for business and family stays.",
         slogan: "Best price on our website",
         telephone: `+91-${CONTACT.business.phone}`,
         email: input.contactEmail,

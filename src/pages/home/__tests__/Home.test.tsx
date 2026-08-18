@@ -38,7 +38,7 @@ vi.mock("../../../utils/analytics", async () => {
 });
 
 describe("Home", () => {
-  it("renders default sections when all UX flags are disabled", () => {
+  it("renders default sections when all UX flags are disabled", async () => {
     render(
       <BookingProvider>
         <MemoryRouter>
@@ -51,7 +51,10 @@ describe("Home", () => {
     expect(screen.getByText(/We verify every home/i)).toBeInTheDocument();
     expect(screen.getByText(/You pay the host directly/i)).toBeInTheDocument();
     expect(screen.queryByText(/Free cancellation 48h before/i)).not.toBeInTheDocument();
-    expect(screen.getByText(/Discover Our Exclusive Services/i)).toBeInTheDocument();
-    expect(screen.getByText(/Hear What Our Happy Guests Are Saying/i)).toBeInTheDocument();
+    // 3cee54b3 (TASK-7822) moved these two behind React.lazy + <Suspense fallback={null}>, so
+    // they are absent on the first synchronous paint and only appear once the dynamic import
+    // resolves. getByText asserts against the fallback and always fails — await them.
+    expect(await screen.findByText(/Discover Our Exclusive Services/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Hear What Our Happy Guests Are Saying/i)).toBeInTheDocument();
   });
 });

@@ -5,12 +5,14 @@ import {
   fetchListingPhotos,
   fetchPropertyListingPhotos,
   fetchPublicListings,
+  fetchSimilarListings,
   invalidatePublicListingsCache,
   listingPhotosToSortedUrls,
   normalizeListingPhotoResponse,
   parseListingPhotosResponse,
   PUBLIC_LISTINGS_TTL_MS,
 } from "./listingClient";
+import { _resetDedupedJsonFetchForTests } from "./dedupedJsonFetch";
 
 const API_BASE = "https://api.example.com";
 
@@ -21,9 +23,11 @@ describe("listingClient", () => {
     fetchMock.mockReset();
     vi.stubGlobal("fetch", fetchMock);
     setRuntimeConfig({ apiBaseUrl: API_BASE });
+    _resetDedupedJsonFetchForTests();
   });
 
   afterEach(() => {
+    _resetDedupedJsonFetchForTests();
     clearRuntimeConfig();
     vi.unstubAllGlobals();
   });
@@ -45,6 +49,30 @@ describe("listingClient", () => {
       invalidatePublicListingsCache();
       vi.useRealTimers();
     }
+  });
+
+  it("TASK-7824: concurrent fetchListingById(2) share one network GET", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: 2, name: "Atlas102", propertyId: 1 }),
+    });
+
+    const [a, b] = await Promise.all([fetchListingById(2), fetchListingById(2)]);
+
+    expect(a).toMatchObject({ id: 2, name: "Atlas102" });
+    expect(b).toMatchObject({ id: 2, name: "Atlas102" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("TASK-7824: fetchSimilarListings hits /listings/{id}/similar", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => [{ id: 9, name: "Near" }],
+    });
+
+    const rows = await fetchSimilarListings(2, 6);
+    expect(rows).toEqual([{ id: 9, name: "Near" }]);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(`${API_BASE}/listings/2/similar?limit=6`);
   });
 
   it("fetchListingById(2) calls /listings/2", async () => {

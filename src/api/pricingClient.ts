@@ -305,9 +305,13 @@ export async function fetchCalendarPricing(
   return { dateToPrice: map, convenienceFeePercent };
 }
 
-/** GET /pricing/daily-summary. Uses server's current date. Fetch once and reuse. */
-export async function fetchDailySummary(signal?: AbortSignal): Promise<DailyPricingSummaryDto> {
+/** GET /pricing/daily-summary. Uses server's current date.
+ * TASK-7823: pass listingId so a property page does not price the whole catalog. */
+export async function fetchDailySummary(signal?: AbortSignal, listingId?: string | number): Promise<DailyPricingSummaryDto> {
   const url = new URL(buildApiUrl(DAILY_SUMMARY_ENDPOINT));
+  if (listingId != null && String(listingId).trim() !== '') {
+    url.searchParams.set('listingId', String(listingId));
+  }
   const response = await fetch(url.toString(), { signal, headers: getApiHeaders() });
 
   if (!response.ok) {

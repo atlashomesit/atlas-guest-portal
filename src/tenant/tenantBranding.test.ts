@@ -103,9 +103,25 @@ describe('applyTenantBranding — TASK-4899 no-brand-configured fallback', () =>
     expect(document.title).toBe('Your Stay');
   });
 
-  it('neutral-with-branding: document.title uses the tenant name unchanged', () => {
-    applyTenantBranding(makeTenant({ slug: 'gaurav', name: 'Elsiya Loft', guestCommsBrandingMode: 'Neutral' }));
+  it('neutral-with-branding: document.title uses the configured business display name unchanged', () => {
+    applyTenantBranding(
+      makeTenant({
+        slug: 'gaurav',
+        name: 'Gaurav Personal',
+        guestCommsBrandingMode: 'Neutral',
+        legalContactPack: {
+          displayName: 'Elsiya Loft',
+          showAtlasFooterCredit: false,
+          isCustomDomain: false,
+        },
+      }),
+    );
     expect(document.title).toBe('Elsiya Loft');
+  });
+
+  it('TASK-7468: neutral with only a personal Tenants.Name never publishes it as the title', () => {
+    applyTenantBranding(makeTenant({ slug: 'sunrise', name: 'Sunrise Short', guestCommsBrandingMode: 'Neutral' }));
+    expect(document.title).toBe('Your Stay');
   });
 
   it('platform-mode regression: unset name still falls back to the Atlas marketplace baseline', () => {

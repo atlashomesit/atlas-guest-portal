@@ -177,20 +177,25 @@ describe("Slider hero search", () => {
     expect(screen.getByRole("status")).toHaveTextContent(/hero form ready/i);
   });
 
-  it("shows the inline trust strip without inventing free-cancellation hour counts (TASK-7201)", () => {
+  it("shows the inline trust strip without inventing free-cancellation hour counts (TASK-7201 / DESIGN-028)", () => {
     renderSlider();
     // Home v2: trust badges section replaced with inline strip inside the hero.
-    // TASK-7201: hero has no listing context — link to /policies instead of 48h/24h claims.
+    // TASK-7201 / DESIGN-028: hero has no listing context — defer free-cancel deadlines to
+    // /policies; assert unconditional refund *processing* (within 24 hours) instead.
     const trustStrip = screen.getByRole("list", { name: /booking guarantees/i });
     expect(trustStrip).toBeInTheDocument();
     expect(within(trustStrip).getByText(/instant confirmation/i)).toBeInTheDocument();
     expect(within(trustStrip).getByText(/verified homes/i)).toBeInTheDocument();
+    expect(within(trustStrip).getByTestId("hero-refund-processing-chip")).toHaveTextContent(
+      /refunds approved within 24 hours/i,
+    );
     expect(within(trustStrip).getByRole("link", { name: /see cancellation policy/i })).toHaveAttribute(
       "href",
       "/policies",
     );
     expect(within(trustStrip).queryByText(/free cancellation/i)).toBeNull();
-    expect(within(trustStrip).queryByText(/48h|24h/i)).toBeNull();
+    // Processing chip may say "24 hours"; still never invent free-cancel "48h before check-in".
+    expect(within(trustStrip).queryByText(/48h/i)).toBeNull();
   });
 
   it("does not hardcode Hyderabad/KPHB copy on white-label tenants (TASK-7194)", () => {

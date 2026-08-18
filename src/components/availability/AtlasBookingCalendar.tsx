@@ -17,6 +17,7 @@ import React, {
 } from 'react';
 import { addDays, format, isSameDay, startOfMonth } from 'date-fns';
 import { type AtlasDateRangePickerValue } from '@/components/date/AtlasDateRangePicker';
+import { toCalendarISO } from '@/utils/date';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 import './AtlasBookingCalendar.css';
 
@@ -90,13 +91,6 @@ function startOfMonthOffset(year: number, month: number): number {
 
 function daysInMonth(year: number, month: number): number {
   return new Date(year, month + 1, 0).getDate();
-}
-
-function toYMD(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
 }
 
 function formatINR(n: number): string {
@@ -352,7 +346,10 @@ const MonthGrid: React.FC<MonthProps> = ({
           }
           const date = new Date(year, month, d);
           date.setHours(0, 0, 0, 0);
-          const iso = toYMD(date);
+          // CALENDAR basis — see utils/date.ts. UnitBookingWidget's disabledDay /
+          // isCheckInAllowed key this same cell through this same helper, so the grid the
+          // guest sees and the gate that decides bookability cannot drift apart.
+          const iso = toCalendarISO(date);
           const isPast = date.getTime() < today.getTime();
           const isDisabledByWidget = !isPast && disabledDay(date);
           const apiStatus = dateStatusMap.get(iso);

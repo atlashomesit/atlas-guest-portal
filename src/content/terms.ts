@@ -46,9 +46,14 @@ export const termsSections: TermsSection[] = [
     id: "cancellations",
     number: "4",
     title: "Cancellations",
+    // TASK-7819 (founder ruling 2026-08-11: the engine is correct, this copy was wrong).
+    // The refund is computed by the server from the listing's cancellation tier — see
+    // `CancellationRefundCalculator`. A listing with no tier resolves to Flexible, whose late
+    // fee is 0%, so it refunds in full at any time. Do not restate percentages or windows here:
+    // they belong to the per-listing policy shown on the listing page.
     paragraphs: [
-      "No refunds for no-shows or cancellations within 7 days of check-in.",
-      "Earlier cancellations may get credit for future booking at our discretion.",
+      "Cancellation terms depend on the cancellation policy set for the home you booked. The policy that applies to your stay is shown on the listing page before you pay, and again on your booking confirmation.",
+      "Refunds are returned to the original payment method. Where a cancellation fee applies under the home's policy, only that fee is retained and the remainder is refunded.",
     ],
   },
   {
@@ -114,8 +119,13 @@ export function getPaymentDataSharingNote(): string {
 export const inlinePolicySnippets = {
   guestId: "Govt ID required for all adult guests; guests under 21 must stay with a guardian.",
   extraGuests: "Base stay covers 2 guests. Extra guests are charged \u20b9400–\u20b9600/night depending on the unit.",
+  // TASK-7819: this snippet is rendered as generic inline policy text and has NO listing in
+  // scope, so it must not assert any refund outcome — the outcome depends on the listing's tier
+  // and is computed server-side. It previously hardcoded "No refunds ... within 7 days", which
+  // pre-empted the tier-derived copy and contradicted the engine on every untiered listing.
+  // Keep it non-numeric: no percentages, no day/hour windows.
   cancellation:
-    "No refunds for no-shows or cancellations within 7 days of check-in; earlier cancellations may receive a credit at our discretion.",
+    "Cancellation terms follow the policy set for this home — see the cancellation policy on the listing page.",
   houseRules:
     "Keep quiet hours 10PM–7AM; no parties or decorations without approval; smoke only in balcony/patio/terrace; pets only if pre-approved.",
   damages: "Damage or missing items will be billed; specific penalties may apply.",

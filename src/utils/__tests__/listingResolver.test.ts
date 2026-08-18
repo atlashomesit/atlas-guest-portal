@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearRuntimeConfig, setRuntimeConfig } from '@/runtime-config';
+import { _resetDedupedJsonFetchForTests } from '@/api/dedupedJsonFetch';
+import { fetchListingById } from '@/api/listingClient';
 import { resolveListing } from '../listingResolver';
 
 const API_BASE = 'https://atlas-homes-api-dev-fhdtg0gkgmcmhwfd.centralindia-01.azurewebsites.net';
@@ -17,44 +19,30 @@ describe('resolveListing', () => {
     fetchMock.mockReset();
     vi.stubGlobal('fetch', fetchMock);
     setRuntimeConfig({ apiBaseUrl: API_BASE });
+    _resetDedupedJsonFetchForTests();
   });
 
   afterEach(() => {
+    _resetDedupedJsonFetchForTests();
     clearRuntimeConfig();
     vi.unstubAllGlobals();
   });
 
-  it('matches Atlas102 when param=102', async () => {
-    fetchMock
-      .mockResolvedValueOnce(makeResponse({ ok: false, status: 404 }))
-      .mockResolvedValueOnce(
-        makeResponse({
-          ok: true,
-          status: 200,
-          json: async () => [{ name: 'Atlas102', listingId: 'atlas-102', propertyId: 'P102' }],
-        }),
-      );
+  it('TASK-7824: numeric listing id does not fall back to GET /listings/public on 404', async () => {
+    fetchMock.mockResolvedValueOnce(makeResponse({ ok: false, status: 404 }));
 
     const result = await resolveListing('102');
 
-    expect(result).toMatchObject({
-      name: 'Atlas102',
-      id: 'atlas-102',
-      propertyId: 'P102',
-    });
+    expect(result).toBeNull();
+    expect(fetchMock).toHaveBeenCalledOnce();
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
       `${API_BASE}/listings/102`,
-      expect.objectContaining({ signal: undefined }),
-    );
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
-      `${API_BASE}/listings/public`,
-      expect.objectContaining({ signal: undefined }),
+      expect.anything(),
     );
   });
 
-  it('matches Atlas501_PH when param=501 (param is substring of name)', async () => {
+  it('TASK-7824: slug-only param still searches GET /listings/public after a 404', async () => {
     fetchMock
       .mockResolvedValueOnce(makeResponse({ ok: false, status: 404 }))
       .mockResolvedValueOnce(
@@ -65,25 +53,23 @@ describe('resolveListing', () => {
         }),
       );
 
-    const result = await resolveListing('501');
+    const result = await resolveListing('atlas501ph');
 
     expect(result).toMatchObject({ name: 'Atlas501_PH', id: 'atlas-501-ph' });
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      `${API_BASE}/listings/public`,
+      expect.anything(),
+    );
   });
 
-  it('returns null when param=999 is not found', async () => {
-    fetchMock
-      .mockResolvedValueOnce(makeResponse({ ok: false, status: 404 }))
-      .mockResolvedValueOnce(
-        makeResponse({
-          ok: true,
-          status: 200,
-          json: async () => [{ name: 'Atlas102', listingId: 'atlas-102' }],
-        }),
-      );
+  it('returns null when numeric param=999 is not found without catalog fallback', async () => {
+    fetchMock.mockResolvedValueOnce(makeResponse({ ok: false, status: 404 }));
 
     const result = await resolveListing('999');
 
     expect(result).toBeNull();
+    expect(fetchMock).toHaveBeenCalledOnce();
   });
 
   it('TASK-1185: garbage legacy slug does not false-match a short listing name (e.g. "In")', async () => {
@@ -102,7 +88,7 @@ describe('resolveListing', () => {
     expect(result).toBeNull();
   });
 
-  it('accepts paged { items } shape from GET /listings/public', async () => {
+  it('accepts paged { items } shape from GET /listings/public for slug params', async () => {
     fetchMock
       .mockResolvedValueOnce(makeResponse({ ok: false, status: 404 }))
       .mockResolvedValueOnce(
@@ -115,13 +101,30 @@ describe('resolveListing', () => {
         }),
       );
 
-    const result = await resolveListing('102');
+    const result = await resolveListing('atlas102');
 
     expect(result).toMatchObject({
       name: 'Atlas102',
       id: 'atlas-102',
       propertyId: 'P102',
     });
+  });
+
+  it('TASK-7824: resolveListing and fetchListingById share one GET for the same numeric id', async () => {
+    fetchMock.mockResolvedValue(
+      makeResponse({
+        ok: true,
+        status: 200,
+        json: async () => ({ id: 2, name: 'Atlas102', propertyId: 1 }),
+      }),
+    );
+
+    const [resolved, byId] = await Promise.all([resolveListing('2'), fetchListingById(2)]);
+
+    expect(resolved).toMatchObject({ id: 2, name: 'Atlas102' });
+    expect(byId).toMatchObject({ id: 2, name: 'Atlas102' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(`${API_BASE}/listings/2`);
   });
 
   it('returns listing directly when param is Listing.Id (PK)', async () => {
@@ -168,7 +171,7 @@ describe('resolveListing', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
       `${API_BASE}/listings/501`,
-      expect.objectContaining({ signal: undefined }),
+      expect.anything(),
     );
   });
 });

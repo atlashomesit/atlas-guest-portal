@@ -271,10 +271,65 @@ const LocationPage = () => {
             </div>
           </Card>
         ) : (
-          <Card className="flex items-center justify-center py-16 text-center">
-            <Typography className="text-text-muted">
-              Map location not configured for this property.
+          // DESIGN-031: never show an internal "not configured" error to guests — degrade to
+          // legalContactPack address/contact (and optional Maps search) when pins are missing.
+          <Card className="space-y-4 py-10 px-6 text-center" data-testid="location-contact-fallback">
+            <Typography as="h2" variant="h2" className="text-text-primary">
+              Where to find us
             </Typography>
+            {(() => {
+              const pack = tenant?.legalContactPack;
+              const addressParts = [
+                pack?.registeredAddress,
+                pack?.city,
+                pack?.state,
+                pack?.pincode,
+              ]
+                .map((p) => (typeof p === "string" ? p.trim() : ""))
+                .filter(Boolean);
+              const addressLine = addressParts.join(", ");
+              const phone = pack?.contactPhone?.trim();
+              const email = pack?.contactEmail?.trim();
+              const mapsQuery = encodeURIComponent(addressLine || tenantName);
+              return (
+                <div className="space-y-3 max-w-xl mx-auto">
+                  {addressLine ? (
+                    <Typography className="text-text-primary font-semibold">{addressLine}</Typography>
+                  ) : (
+                    <Typography className="text-text-muted">
+                      Exact map pins aren&apos;t published yet — reach {tenantName} for directions.
+                    </Typography>
+                  )}
+                  {(phone || email) && (
+                    <Typography className="text-text-muted">
+                      {phone ? (
+                        <>
+                          <a href={`tel:${phone.replace(/\s+/g, "")}`} className="underline underline-offset-2">
+                            {phone}
+                          </a>
+                          {email ? " · " : null}
+                        </>
+                      ) : null}
+                      {email ? (
+                        <a href={`mailto:${email}`} className="underline underline-offset-2">
+                          {email}
+                        </a>
+                      ) : null}
+                    </Typography>
+                  )}
+                  <div className="flex flex-col sm:flex-row gap-3 items-center justify-center pt-2">
+                    <a
+                      className="rb-button rb-button--secondary"
+                      href={`https://maps.google.com/?q=${mapsQuery}`}
+                      rel="noopener noreferrer"
+                      target="_blank"
+                    >
+                      Search on Google Maps
+                    </a>
+                  </div>
+                </div>
+              );
+            })()}
           </Card>
         )}
 

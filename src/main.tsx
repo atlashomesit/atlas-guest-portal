@@ -1,8 +1,5 @@
 import { createRoot } from 'react-dom/client'
-import 'react-date-range/dist/styles.css'
-import 'react-date-range/dist/theme/default.css'
 import './index.css'
-import 'react-toastify/dist/ReactToastify.css'
 import { DEFAULT_THEME, applyLayoutDefaultColorTokens, applyTheme } from './styles/theme'
 import App from './App.tsx'
 import ErrorBoundary from './components/ErrorBoundary'
@@ -16,7 +13,6 @@ import { getTenantSlug, isAtlastaysMarketplaceSurface, isMarketplaceMode, setMar
 import { validateTenant, resolveFromDomain, getTenantContext, SubdomainNotActivatedError, type TenantInfo } from './tenant/tenantContext'
 import SubdomainNotActivatedScreen from './components/SubdomainNotActivatedScreen'
 import { applyTenantBranding } from './tenant/tenantBranding'
-import { ConfigLoadingScreen } from './runtime-config/ConfigLoadingScreen'
 import { ConfigErrorScreen } from './runtime-config/ConfigErrorScreen'
 import TenantJsonLd from './components/TenantJsonLd'
 // TASK-4903 (ADR-0081): boot-time layout-theme resolution + prefetch. `src/App.tsx` is the
@@ -49,8 +45,11 @@ window.addEventListener("unhandledrejection", (event) => {
   }
 }, true);
 
-const rootEl = document.getElementById('root')!
-const root = createRoot(rootEl)
+  const rootEl = document.getElementById('root')!
+  const root = createRoot(rootEl)
+
+  // TASK-7839: keep the inlined HTML boot shell visible until tenant/config resolve.
+  // Rendering ConfigLoadingScreen here used to wipe the shell and delay FCP until JS.
 
 /** Enable multi-tenant marketplace UI on atlastays.com apex (homepage + /search). */
 function activateMarketplaceSurface(
@@ -87,8 +86,6 @@ const bootstrapApp = async () => {
   window.addEventListener('atlas:cookie-consent-changed', () => {
     initAnalytics()
   })
-
-  root.render(<ConfigLoadingScreen />)
 
   try {
     const config = await loadRuntimeConfig()
@@ -195,9 +192,8 @@ const bootstrapApp = async () => {
       }
     }
 
-    // Keep loading screen visible briefly to prevent tenant flicker
-    // This ensures the correct tenant branding is applied before the app renders
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // TASK-7839: do not delay first app render — the HTML boot shell already occupies
+    // the reserved navbar/hero slots, so branding applies on this render without a 100ms pause.
 
     // ThemeProvider is seeded with the boot-resolved preset rather than a bare DEFAULT_THEME:
     // its mount effect re-runs applyTheme(initialTheme), which would otherwise stand the

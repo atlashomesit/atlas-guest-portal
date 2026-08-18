@@ -67,7 +67,11 @@ export default function DirectDiscountBanner() {
 
   return (
     <div
-      role="banner"
+      // "banner" is the ARIA landmark for the page's own site-wide header — using it here for a
+      // promotional callout creates a second, nested banner landmark (axe
+      // landmark-no-duplicate-banner / landmark-banner-is-top-level). This is a labeled content
+      // section, which is exactly what role="region" + aria-label is for.
+      role="region"
       aria-label="Direct booking discount"
       className="relative flex items-center justify-between gap-3 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800 ring-1 ring-inset ring-emerald-200"
     >

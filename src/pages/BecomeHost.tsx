@@ -7,6 +7,7 @@ import { Input } from "../components/ui/Input";
 import { Button } from "../components/ui/Button";
 import { toast } from "react-toastify";
 import { buildApiUrl, getApiHeaders } from "../api/client";
+import { getAdminPortalBaseUrl, getAdminPortalLoginUrl } from "../config/adminPortal";
 import { getTenantBrandNameLong, getTenantContactEmail } from "../tenant/displayBrand";
 import { messageFromApiResponse } from "../utils/serverErrorFromResponse";
 import { logUserAction, reportError } from "../lib/monitoring";
@@ -462,7 +463,7 @@ const BecomeHost = () => {
         localStorage.setItem('onboarding_listing_id', String(data.listingId));
       }
 
-      const adminBase = (import.meta.env.VITE_ADMIN_PORTAL_URL as string | undefined)?.trim() || "https://app.atlaspms.in";
+      const adminBase = getAdminPortalBaseUrl();
       const setupParams = new URLSearchParams({ auto_login: "1" });
       if (data?.token) setupParams.set("setup_token", String(data.token));
       if (data?.tenantSlug) setupParams.set("tenant_slug", String(data.tenantSlug));
@@ -503,7 +504,7 @@ const BecomeHost = () => {
                 to set up pricing, upload photos, and go live.
               </Typography>
               <a
-                href={adminPortalUrl ?? `${(import.meta.env.VITE_ADMIN_PORTAL_URL as string | undefined)?.trim() || "https://app.atlaspms.in"}/onboarding/setup?auto_login=1`}
+                href={adminPortalUrl ?? `${getAdminPortalBaseUrl()}/onboarding/setup?auto_login=1`}
                 style={styles.adminLink}
               >
                 Open Admin Portal
@@ -1154,10 +1155,7 @@ const BecomeHost = () => {
         >
           Already a host?{" "}
           <a
-            href={
-              (import.meta.env.VITE_ADMIN_PORTAL_URL as string | undefined)?.trim() ||
-              "https://app.atlaspms.in"
-            }
+            href={getAdminPortalLoginUrl()}
             style={{ color: "var(--cta-primary, #2563eb)", fontWeight: 600 }}
           >
             Sign in to the admin portal

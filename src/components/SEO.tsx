@@ -1,9 +1,21 @@
 import { useEffect } from "react";
+import { getTenantContext } from "../tenant/tenantContext";
 
 // Default OG/Twitter preview image shipped in index.html. Used as the fallback when a route
-// renders <SEO> without an `image`, so SPA navigation never leaves the previous route's image
-// (or canonical/og:url) behind — those tags are reset to their index.html defaults instead.
+// renders <SEO> without an `image` on Platform/marketplace hosts only.
+// TASK-7468 #5: Neutral / white-label hosts must NOT fall back to this Atlas-branded asset.
+// Uses getTenantContext only (not displayBrand helpers) so page tests that mock displayBrand
+// without exporting isNeutralBrandingMode keep working.
 const DEFAULT_OG_IMAGE = "/og-image.svg";
+
+function resolveOgImageFallback(explicit?: string): string {
+  if (explicit) return explicit;
+  const ctx = getTenantContext();
+  const isWhiteLabel = Boolean(ctx?.legalContactPack?.isCustomDomain);
+  const isNeutral = ctx?.guestCommsBrandingMode === "Neutral";
+  if (isWhiteLabel || isNeutral) return "";
+  return DEFAULT_OG_IMAGE;
+}
 
 interface SEOProps {
   title: string;
@@ -79,8 +91,13 @@ const SEO = ({
     }
     canonical.href = url ?? "";
 
+    const resolvedImage = resolveOgImageFallback(image);
     const ogImage = ensureMeta("og:image", "property");
-    ogImage.content = image ?? DEFAULT_OG_IMAGE;
+    if (resolvedImage) {
+      ogImage.content = resolvedImage;
+    } else {
+      ogImage.remove();
+    }
 
     const ogType = ensureMeta("og:type", "property");
     ogType.content = type;
@@ -98,7 +115,11 @@ const SEO = ({
     }
 
     const twitterImage = ensureMeta("twitter:image");
-    twitterImage.content = image ?? DEFAULT_OG_IMAGE;
+    if (resolvedImage) {
+      twitterImage.content = resolvedImage;
+    } else {
+      twitterImage.remove();
+    }
 
     if (twitterSite) {
       const twitterSiteMeta = ensureMeta("twitter:site");

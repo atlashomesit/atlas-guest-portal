@@ -4,6 +4,7 @@ import { buildApiUrl, getApiHeaders } from "../api/client";
 import SEO from "../components/SEO";
 import { getTenantBrandName } from "../tenant/displayBrand";
 import GuestGuidebook from "../components/GuestGuidebook"; // TASK-4510
+import DamageWaiverSignature, { type SignatureMode } from "../components/DamageWaiverSignature"; // TASK-1975
 
 interface CheckinDetails {
   bookingRef: string;
@@ -29,7 +30,7 @@ interface CheckinDetails {
   guidebookFoodThingsTodoText?: string | null;
 }
 
-type Step = "auth" | "summary" | "id-upload" | "house-rules" | "done";
+type Step = "auth" | "summary" | "id-upload" | "house-rules" | "damage-waiver" | "done";
 
 export default function SelfCheckIn() {
   const brandName = getTenantBrandName();
@@ -46,6 +47,11 @@ export default function SelfCheckIn() {
   const [govtIdNumber, setGovtIdNumber] = useState("");
   const [rulesAccepted, setRulesAccepted] = useState(false);
   const [alreadySigned, setAlreadySigned] = useState(false);
+  // TASK-1975
+  const [waiverPdfUrl, setWaiverPdfUrl] = useState<string | null>(null);
+  const [waiverAlreadySigned, setWaiverAlreadySigned] = useState(false);
+  const [showSignModal, setShowSignModal] = useState(false);
+  const [waiverAgreed, setWaiverAgreed] = useState(false);
   // TASK-4009: Government ID file upload
   const [idFile, setIdFile] = useState<File | null>(null);
   const [idFilePreview, setIdFilePreview] = useState<string | null>(null);
@@ -63,7 +69,70 @@ export default function SelfCheckIn() {
   const [idCollectedElsewhere, setIdCollectedElsewhere] = useState(false);
 
   const stepIndex: Record<Step, number> = {
-    auth: 0, summary: 1, "id-upload": 2, "house-rules": 3, done: 4,
+    auth: 0, summary: 1, "id-upload": 2, "house-rules": 3, "damage-waiver": 4, done: 5,
+  };
+
+  const proceedFromHouseRules = async () => {
+    if (!details) return;
+    setBusy(true);
+    setError("");
+    try {
+      const url = buildApiUrl(
+        `/api/public/checkin/${encodeURIComponent(bookingRef.trim())}/damage-waiver?lastName=${encodeURIComponent(lastName.trim())}`
+      );
+      const res = await fetch(url, { headers: getApiHeaders() });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const status = (await res.json()) as {
+        required: boolean;
+        signed: boolean;
+        waiverPdfUrl?: string | null;
+      };
+      if (status.signed) {
+        setWaiverAlreadySigned(true);
+        await handleComplete();
+        return;
+      }
+      setWaiverPdfUrl(status.waiverPdfUrl ?? null);
+      setStep("damage-waiver");
+    } catch {
+      setError("Could not load the damage waiver. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleSignWaiver = async (payload: {
+    signatureType: SignatureMode;
+    typedName?: string;
+    signatureBlob?: Blob;
+  }) => {
+    setBusy(true);
+    setError("");
+    try {
+      const form = new FormData();
+      form.append("signatureType", payload.signatureType);
+      if (payload.typedName) form.append("typedName", payload.typedName);
+      if (payload.signatureBlob) form.append("signatureBlob", payload.signatureBlob, "signature.png");
+
+      const res = await fetch(
+        buildApiUrl(
+          `/api/public/checkin/${encodeURIComponent(bookingRef.trim())}/damage-waiver/sign?lastName=${encodeURIComponent(lastName.trim())}`
+        ),
+        { method: "POST", headers: getApiHeaders(), body: form }
+      );
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: string } | null;
+        setError(body?.error || "Could not save your signature. Please try again.");
+        setBusy(false);
+        return;
+      }
+      setShowSignModal(false);
+      setWaiverAlreadySigned(true);
+      await handleComplete();
+    } catch {
+      setError("Could not save your signature. Please try again.");
+      setBusy(false);
+    }
   };
   const handleVerify = async () => {
     if (!bookingRef.trim() || !lastName.trim()) {
@@ -195,7 +264,7 @@ export default function SelfCheckIn() {
         {/* Step dots (auth is hidden once verified) */}
         {step !== "auth" && step !== "done" && (
           <div className="flex justify-center gap-2 mb-8">
-            {(["summary", "id-upload", "house-rules"] as const).map((s, i) => (
+            {(["summary", "id-upload", "house-rules", "damage-waiver"] as const).map((s, i) => (
               <span
                 key={s}
                 className={`h-2 rounded-full transition-all ${
@@ -554,13 +623,78 @@ export default function SelfCheckIn() {
             )}
 
             <button
-              onClick={handleComplete}
+              onClick={() => void proceedFromHouseRules()}
               disabled={busy || (!alreadySigned && !rulesAccepted)}
+              data-testid="checkin-house-rules-continue"
               className="w-full rounded-xl bg-brand-primary py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
             >
-              {busy ? "Saving…" : "Complete check-in →"}
+              {busy ? "Loading…" : "Continue →"}
             </button>
           </div>
+        )}
+
+        {/* ── Step: Damage Waiver (TASK-1975) ─────────────────────── */}
+        {step === "damage-waiver" && details && (
+          <div className="rounded-2xl border border-border-subtle bg-bg-surface p-6 shadow-level1" data-testid="damage-waiver-step">
+            <h2 className="text-xl font-bold text-text-primary mb-1">Damage waiver</h2>
+            <p className="text-text-secondary text-sm mb-4">
+              Please review the waiver, then sign to finish check-in. Atlas provides the signing mechanism only —
+              your host&apos;s lawyer must approve the template before it is relied on.
+            </p>
+
+            {waiverPdfUrl ? (
+              <iframe
+                title="Damage waiver PDF"
+                src={waiverPdfUrl}
+                className="w-full h-64 rounded-xl border border-border-subtle mb-4 bg-white"
+                data-testid="damage-waiver-pdf"
+              />
+            ) : (
+              <div className="rounded-xl bg-bg-page border border-border-subtle p-4 text-sm text-text-secondary mb-4" data-testid="damage-waiver-default-copy">
+                <p className="font-semibold text-red-700 mb-2">NOT FOR USE WITHOUT LEGAL REVIEW.</p>
+                <p>
+                  By signing, you acknowledge responsibility for damage to the property beyond normal wear and tear
+                  during your stay, and authorise the host to pursue recovery of reasonably documented repair costs.
+                </p>
+              </div>
+            )}
+
+            {waiverAlreadySigned ? (
+              <p className="text-sm text-green-700 font-medium mb-4">✓ Waiver already signed.</p>
+            ) : (
+              <label className="flex items-start gap-3 cursor-pointer mb-5">
+                <input
+                  type="checkbox"
+                  checked={waiverAgreed}
+                  onChange={(e) => setWaiverAgreed(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 accent-brand-primary"
+                  data-testid="damage-waiver-agree"
+                />
+                <span className="text-sm text-text-secondary">I have read and agree to the damage waiver</span>
+              </label>
+            )}
+
+            {error && (
+              <p role="alert" className="rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 mb-4">{error}</p>
+            )}
+
+            <button
+              onClick={() => (waiverAlreadySigned ? void handleComplete() : setShowSignModal(true))}
+              disabled={busy || (!waiverAlreadySigned && !waiverAgreed)}
+              data-testid="damage-waiver-continue"
+              className="w-full rounded-xl bg-brand-primary py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
+            >
+              {busy ? "Saving…" : waiverAlreadySigned ? "Complete check-in →" : "I Agree — Sign"}
+            </button>
+          </div>
+        )}
+
+        {showSignModal && (
+          <DamageWaiverSignature
+            busy={busy}
+            onCancel={() => setShowSignModal(false)}
+            onSign={(p) => void handleSignWaiver(p)}
+          />
         )}
 
         {/* ── Step: Done ─────────────────────────────────────────── */}

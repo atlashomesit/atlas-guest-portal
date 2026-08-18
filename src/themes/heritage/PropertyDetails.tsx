@@ -37,7 +37,10 @@ import { X, ShieldCheck, CalendarClock, CreditCard } from 'lucide-react';
 import { useEffect, useMemo, useState, Suspense, lazy } from 'react';
 import { useTenantListings } from '@/hooks/useTenantListings';
 import { usePropertyListings } from '@/hooks/usePropertyListings';
-import { inlinePolicySnippets } from '@/content/terms';
+import {
+  describeCancellationPolicy,
+  resolveEffectiveCancellationTier,
+} from '@/utils/cancellationPolicy';
 import { trackEvent } from '@/utils/analytics';
 import { Button } from '@/components/ui/Button';
 import { calculateNightlyPrice, inferUnitType } from '@/utils/pricing';
@@ -50,6 +53,7 @@ import type { ListingDetail, PublicListing } from '@/api/listingClient';
 import {
     fetchListingById,
     fetchListingContact,
+    fetchSimilarListings,
     parseMaxGuestsFromPayload,
     resolveStaticMaxGuests,
 } from '@/api/listingClient';
@@ -197,23 +201,23 @@ function getPpCancellationInfo(
   opts?: { fallbackText?: string; hasOnlinePayment?: boolean },
 ): PpCancellationInfo {
   const steps = getPpRefundSteps(opts?.hasOnlinePayment !== false);
-  if (tier === 'Flexible') return {
-    headline: 'Full refund if cancelled 48 hours before check-in',
-    description: opts?.hasOnlinePayment !== false
-      ? 'Money returns to the exact UPI or card you paid with. No phone calls needed.'
-      : 'Your host arranges the refund directly with you.',
-    steps,
-  };
-  if (tier === 'Moderate') return {
-    headline: 'Full refund if cancelled 5 days before check-in',
-    description: 'Partial refund for cancellations after the window. Check your booking for exact terms.',
-    steps,
-  };
-  if (tier === 'Strict') return {
-    headline: '50% refund if cancelled 7 days before check-in',
-    description: 'No refund within 7 days of check-in. Check your booking for exact terms.',
-    steps,
-  };
+
+  // TASK-7819 / TASK-7539: this theme is a full fork of the classic property-detail page and
+  // used to carry its own hardcoded tier copy, which kept every defect TASK-7539 fixed in the
+  // classic page — Strict understating by 50 points, Flexible contradicting itself (48h vs 24h),
+  // and the Flexible window stated as a condition when the fee is 0. It now renders from the
+  // single source of truth. Do not re-type percentages or windows here.
+  const policyInfo = describeCancellationPolicy(tier);
+
+  const description =
+    resolveEffectiveCancellationTier(tier) === 'Flexible'
+      ? (opts?.hasOnlinePayment !== false
+          ? 'Money returns to the exact UPI or card you paid with. No phone calls needed.'
+          : 'Your host arranges the refund directly with you.')
+      : policyInfo.afterWindowCopy
+        ? `${policyInfo.afterWindowCopy} Check your booking for exact terms.`
+        : 'Check your booking for exact terms.';
+
   const fallback = opts?.fallbackText?.trim();
   if (fallback) {
     return {
@@ -222,9 +226,10 @@ function getPpCancellationInfo(
       steps,
     };
   }
+
   return {
-    headline: 'Flexible cancellation — full refund 48+ hours before check-in',
-    description: 'Standard direct-booking policy. See your booking confirmation for exact cut-off times.',
+    headline: policyInfo.headline,
+    description,
     steps,
   };
 }
@@ -584,8 +589,12 @@ const PropertyDetails = () => {
         }
     }, [data, unitType]);
 
-    const dailyPricing = useDailyPricingSummary();
     const listingNumericForPricing = Number(resolvedListingId ?? data?.listingId ?? NaN);
+    const dailyPricing = useDailyPricingSummary(
+      Number.isFinite(listingNumericForPricing) && listingNumericForPricing > 0
+        ? listingNumericForPricing
+        : undefined,
+    );
     const dailyPricingRow = useMemo(() => {
         if (!Number.isFinite(listingNumericForPricing) || listingNumericForPricing <= 0) return undefined;
         return dailyPricing.data?.listings?.find((l) => l.listingId === listingNumericForPricing);
@@ -666,18 +675,22 @@ const PropertyDetails = () => {
 
     // Public /listings only Includes cover + SortOrder==1, so catalog property_img is incomplete.
     // Hydrate full photoUrls from GET /listings/{id} once per listing for "View gallery".
+    // TASK-7824 root cause: this effect listed `data` in its deps. Each setData() created a new
+    // object, re-ran the effect, and stacked 2–6 identical GET /listings/{id} calls. Depend on
+    // listing-id primitives only; `dedupedJsonFetch` still collapses this caller with resolveListing.
     const detailPhotosHydratedRef = React.useRef<number | null>(null);
+    const hasPropertyRow = data != null;
+    const dataListingId = data?.listingId ?? null;
     useEffect(() => {
-        const lid = Number(resolvedListingId ?? data?.listingId ?? NaN);
-        if (!data || !Number.isFinite(lid) || lid <= 0) return;
-        const hasMaxGuests = typeof data.maxGuests === 'number' && data.maxGuests >= 1;
-        const hasHostPhone = typeof data.hostPhone === 'string' && data.hostPhone.trim().length > 0;
-        const photosHydrated = detailPhotosHydratedRef.current === lid;
-        if (hasMaxGuests && hasHostPhone && photosHydrated) return;
+        if (!hasPropertyRow) return;
+        const lid = Number(resolvedListingId ?? dataListingId ?? listingId ?? NaN);
+        if (!Number.isFinite(lid) || lid <= 0) return;
+        if (detailPhotosHydratedRef.current === lid) return;
 
         const ac = new AbortController();
         void fetchListingById(lid, ac.signal)
             .then((detail) => {
+                if (ac.signal.aborted) return;
                 const d = detail as Record<string, unknown>;
                 // TASK-2739-v1: GET /listings/{id} also carries publishStatus; keep state in sync.
                 if (typeof d.publishStatus === 'string') setPublishStatus(d.publishStatus);
@@ -716,7 +729,7 @@ const PropertyDetails = () => {
             })
             .catch(() => {});
         return () => ac.abort();
-    }, [resolvedListingId, data]);
+    }, [hasPropertyRow, resolvedListingId, dataListingId, listingId]);
 
     /** TASK-1466: deep links e.g. `/homes/.../123?bookingId=1&t=...` load host phone without exposing it on public catalog. */
     const bookingIdForContact = searchParams.get('bookingId');
@@ -1111,8 +1124,7 @@ useEffect(() => {
         if (!Number.isFinite(lid) || lid <= 0) return;
         const ac = new AbortController();
         setSimilarFromApi({ loading: true, items: [] });
-        fetch(buildApiUrl(`/listings/${lid}/similar?limit=6`), { headers: { Accept: 'application/json', ...getApiHeaders() }, signal: ac.signal })
-            .then(async (res) => (res.ok ? (await res.json()) : []))
+        fetchSimilarListings(lid, 6, ac.signal)
             .then((j) => {
                 if (ac.signal.aborted) return;
                 setSimilarFromApi({ loading: false, items: Array.isArray(j) ? j : [] });
@@ -1346,16 +1358,29 @@ useEffect(() => {
         const fromListingPolicy = policies.find((p) =>
             typeof p?.type === 'string' && p.type.toLowerCase().includes('cancellation'),
         )?.value;
-        // TASK-4356: honest default when the host hasn't set an explicit tier or custom text —
-        // matches the server's 7-day free-cancellation default (CancellationPolicyWindow.cs).
-        return fromListingPolicy || inlinePolicySnippets?.cancellation || 'Full refund if cancelled 7+ days before check-in.';
+        // TASK-7819: only host-authored policy text may override the tier-derived copy — see the
+        // matching comment in Homepage_PropertyDetails.tsx. The inline snippet used to sit here and,
+        // being a non-empty constant, made the tier branch unreachable.
+        return fromListingPolicy || '';
     })();
 
-    // TASK-1385: tier-specific plain-language text overrides generic policy copy when set
+    // TASK-1385 / TASK-7819: tier-specific plain-language text, derived from the single source of
+    // truth rather than re-typed. The previous literals were the pre-TASK-7539 wording and were
+    // wrong in three ways: Flexible said 24h (canonical is 48h, and the 0% fee means no window
+    // gates the refund at all) and Strict claimed 50% where the server refunds 100% inside the
+    // window. Never re-type percentages or hour counts in this fork.
+    const buildCancellationTierLabel = (tier: string | null | undefined): string => {
+        const policy = describeCancellationPolicy(tier);
+        if (!tier) return '';
+        const tierName = tier.charAt(0).toUpperCase() + tier.slice(1);
+        return policy.afterWindowCopy
+            ? `${tierName} — ${policy.headline}; ${policy.afterWindowCopy}`
+            : `${tierName} — ${policy.headline}.`;
+    };
     const cancellationTierLabel: Record<string, string> = {
-        Flexible: 'Flexible — full refund if cancelled 24+ hours before check-in.',
-        Moderate: 'Moderate — full refund if cancelled 5+ days before check-in.',
-        Strict: 'Strict — 50% refund if cancelled 7+ days before check-in; no refund after.',
+        Flexible: buildCancellationTierLabel('Flexible'),
+        Moderate: buildCancellationTierLabel('Moderate'),
+        Strict: buildCancellationTierLabel('Strict'),
     };
     const _resolvedCancellationText = data?.cancellationTier
         ? cancellationTierLabel[data.cancellationTier]
@@ -1864,28 +1889,47 @@ useEffect(() => {
                   ariaLabel="From your hosts"
                 />
 
-                {/* About this home */}
-                <section className="pp-section" aria-label="About this home">
+                {/* About this home — DESIGN-031: omit invented prose; Ask host when empty */}
+                {(data.property_description?.trim() ||
+                  resolvedCheckInTime ||
+                  resolvedCheckOutTime ||
+                  (data.property_neighborhoods || []).length > 0 ||
+                  ppWaAskUrl) && (
+                <section className="pp-section" aria-label="About this home" data-testid="property-about-section">
                   <h2>About this home</h2>
-                  {data.property_description && (
-                    <p className="pp-prose">
-                      {showAboutMore
-                        ? data.property_description
-                        : `${data.property_description.slice(0, 300)}${data.property_description.length > 300 ? '…' : ''}`}
+                  {data.property_description?.trim() ? (
+                    <>
+                      <p className="pp-prose">
+                        {showAboutMore
+                          ? data.property_description
+                          : `${data.property_description.slice(0, 300)}${data.property_description.length > 300 ? '…' : ''}`}
+                      </p>
+                      {data.property_description.length > 300 && (
+                        <button
+                          type="button"
+                          className="pp-prose-more"
+                          onClick={() => setShowAboutMore((s) => !s)}
+                          aria-expanded={showAboutMore}
+                        >
+                          {showAboutMore ? 'Show less' : 'Read more'}
+                          <PpChevronDown size={14} />
+                        </button>
+                      )}
+                    </>
+                  ) : ppWaAskUrl ? (
+                    <p className="pp-prose" data-testid="property-about-ask-host">
+                      The host hasn&apos;t added a description yet.{' '}
+                      <a
+                        href={ppWaAskUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline underline-offset-2"
+                      >
+                        Ask them about this home
+                      </a>
+                      .
                     </p>
-                  )}
-                  {data.property_description && data.property_description.length > 300 && (
-                    <button
-                      type="button"
-                      className="pp-prose-more"
-                      onClick={() => setShowAboutMore((s) => !s)}
-                      aria-expanded={showAboutMore}
-                    >
-                      {showAboutMore ? 'Show less' : 'Read more'}
-                      <PpChevronDown size={14} />
-                    </button>
-                  )}
-                  {/* Check-in / Check-out times */}
+                  ) : null}
                   {(resolvedCheckInTime || resolvedCheckOutTime) && (
                     <div
                       style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginTop: 16 }}
@@ -1903,7 +1947,6 @@ useEffect(() => {
                       )}
                     </div>
                   )}
-                  {/* Neighborhoods */}
                   {(data.property_neighborhoods || []).length > 0 && (
                     <div style={{ marginTop: 14, display: 'flex', flexWrap: 'wrap', gap: 8 }} role="list" aria-label="Neighborhoods">
                       {data.property_neighborhoods!.map((n, idx) => (
@@ -1914,9 +1957,11 @@ useEffect(() => {
                     </div>
                   )}
                 </section>
+                )}
 
-                {/* Amenities */}
-                <section className="pp-section" aria-label="Amenities">
+                {/* Amenities — DESIGN-031: omit empty section */}
+                {ppAmenityLabels.length > 0 && (
+                <section className="pp-section" aria-label="Amenities" data-testid="property-amenities-section">
                   <div className="pp-section-head">
                     <h2>What&rsquo;s here</h2>
                   </div>
@@ -1955,6 +2000,7 @@ useEffect(() => {
                     </button>
                   )}
                 </section>
+                )}
 
                 {/* Guest Reviews */}
                 {(() => {
@@ -2152,21 +2198,31 @@ useEffect(() => {
                           : 'Contact host for occupancy details.'}
                       </span>
                     </div>
-                    {/* Check-in card */}
+                    {/* Check-in card — DESIGN-031 */}
                     <div className="pp-v2-knowcard" data-testid="property-check-in-card">
                       <div className="pp-v2-knowicon"><PpV2ClockInIcon /></div>
                       <small>Check-in</small>
                       <strong data-testid={resolvedCheckInTime ? 'property-check-in-time' : 'property-check-in-pending'}>
-                        {resolvedCheckInTime ?? 'Confirmed after booking'}
+                        {resolvedCheckInTime ?? 'Ask host'}
                       </strong>
-                      {resolvedCheckInTime && <span>Early check-in subject to availability.</span>}
+                      {resolvedCheckInTime ? (
+                        <span>Early check-in subject to availability.</span>
+                      ) : (
+                        <span>Host will confirm check-in time.</span>
+                      )}
                     </div>
                     {/* Check-out card */}
                     <div className="pp-v2-knowcard">
                       <div className="pp-v2-knowicon"><PpV2ClockOutIcon /></div>
                       <small>Check-out</small>
-                      <strong>{resolvedCheckOutTime ?? 'Confirmed after booking'}</strong>
-                      {resolvedCheckOutTime && <span>Late check-out subject to availability.</span>}
+                      <strong data-testid={resolvedCheckOutTime ? 'property-check-out-time' : 'property-check-out-pending'}>
+                        {resolvedCheckOutTime ?? 'Ask host'}
+                      </strong>
+                      {resolvedCheckOutTime ? (
+                        <span>Late check-out subject to availability.</span>
+                      ) : (
+                        <span>Host will confirm check-out time.</span>
+                      )}
                     </div>
                   </div>
                 </section>

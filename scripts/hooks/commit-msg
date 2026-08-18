@@ -1,0 +1,26 @@
+#!/bin/sh
+# TASK-2462 / TASK-7211: delegate to monorepo atlas-e2e shared validator (clone layout:
+# code/atlas-guest-portal next to code/atlas-e2e).
+#
+# TASK-7537: `git rev-parse --show-toplevel` returns the WORKTREE's own path, not the
+# primary checkout's — so from any worktree under C:\AtlasWork\<slot>\atlas-guest-portal,
+# REPO_ROOT/../atlas-e2e resolved to a nonexistent sibling and the validator silently
+# skipped. `--git-common-dir` resolves to the PRIMARY checkout's .git even from a
+# worktree, so its parent is the real repo root with an actual sibling atlas-e2e.
+GIT_COMMON_DIR="$(git rev-parse --git-common-dir 2>/dev/null)"
+REPO_ROOT="$(cd "$GIT_COMMON_DIR/.." && pwd)"
+VALIDATOR="$REPO_ROOT/../atlas-e2e/scripts/git-hooks/commit-msg-validator.sh"
+if ! test -f "$VALIDATOR"; then
+  echo "" >&2
+  echo "commit-msg: BLOCKED — shared validator missing: $VALIDATOR (expected sibling atlas-e2e checkout)" >&2
+  echo "  The validator carries the TASK-ATTRIBUTION GUARD (TASK-7211 No-Task: trailer) and" >&2
+  echo "  the GHA cost-impact gate — silent skip is forbidden after the 2026-05-16 incident." >&2
+  echo "  Bypass (visible, logged): ATLAS_COMMIT_VALIDATOR_MISSING_OK=1 git commit ..." >&2
+  echo "" >&2
+  if [ "${ATLAS_COMMIT_VALIDATOR_MISSING_OK:-0}" = "1" ]; then
+    echo "commit-msg: bypassed via ATLAS_COMMIT_VALIDATOR_MISSING_OK=1 — commit NOT validated." >&2
+    exit 0
+  fi
+  exit 1
+fi
+exec sh "$VALIDATOR" "$1"

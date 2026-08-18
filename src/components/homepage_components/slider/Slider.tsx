@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { HERO_IMAGE_URL } from '../../../config/hero';
+import { toTransformedGuestImageUrl } from '../../../utils/guestImageUrl';
 import { getTenantContext } from '../../../tenant/tenantContext';
 import { getTenantBrandName } from '../../../tenant/displayBrand';
 import { getTenantOverrides, shouldHideAtlasBranding } from '../../../tenant/tenantOverrides';
@@ -8,6 +9,7 @@ import {
   PMS_AIRBNB_2026_TERMS_URL,
   resolveDirectBookingPromo,
 } from '../../../utils/directBookingPromo';
+import { resolveHeroRefundProcessingChip } from '../../../utils/cancellationPolicy';
 import { SearchAvailabilityWidget } from '../../availability/SearchAvailabilityWidget';
 import { useTenantListings } from '../../../hooks/useTenantListings';
 import '../atlas-home-v2.css';
@@ -39,16 +41,18 @@ const Slider = () => {
   const heroCity = showAtlasContent
     ? 'Hyderabad'
     : (tenant?.legalContactPack?.city?.trim() || null);
-  const heroImageUrl = showAtlasContent ? HERO_IMAGE_URL : '';
+  const heroImageUrl = showAtlasContent
+    ? (toTransformedGuestImageUrl(HERO_IMAGE_URL, 1200) ?? '')
+    : '';
   const hasHeroPhoto = Boolean(heroImageUrl.trim());
   const heroPhotoAriaLabel = showAtlasContent
-    ? `A warm, owner-run ${brandName} living room in KPHB`
+    ? `A warm, owner-run ${brandName} living room`
     : `Welcome to ${brandName}`;
   // TASK-7194 #4: Atlas subcopy uses the live listing count, not a hardcoded "Seven".
   const atlasHeroSub =
     listingCount > 0
-      ? `${listingCount} owner-run home${listingCount === 1 ? '' : 's'} in KPHB. Same hands clean them, restock them, answer the door.`
-      : 'Owner-run homes in KPHB. Same hands clean them, restock them, answer the door.';
+      ? `${listingCount} owner-run home${listingCount === 1 ? '' : 's'} in this neighbourhood. Same hands clean them, restock them, answer the door.`
+      : 'Owner-run homes in this neighbourhood. Same hands clean them, restock them, answer the door.';
 
   // CSS-driven animations replace the manual headlineIn state
   // All entrance animations are now in atlas-home-v2.css
@@ -94,7 +98,7 @@ const Slider = () => {
             data-testid="home-direct-booking-promo"
             role="region"
             aria-label="Direct booking savings"
-            style={{ marginBottom: 24 }}
+            style={{ marginBottom: 24, minHeight: 126 }}
           >
             <p className="text-sm font-semibold tracking-tight sm:text-base">{directPromo.savingsStripLine}</p>
             <p className="mt-1 text-xs text-emerald-100/95 sm:text-sm">{directPromo.sub}</p>
@@ -122,11 +126,10 @@ const Slider = () => {
           </div>
         ) : null}
 
-        {/* Trust strip — no hour counts here (TASK-7201): hero has no listing/booking context,
-            so inventing 48h/24h over-promises vs per-listing tier + graceHours. Point guests
-            at /policies; widget/checkout disclose the server-resolved windows.
-            TASK-7432 AC4: "Instant confirmation" / "Verified homes" are marketplace marketing
-            claims (not tenant-derived); keep them as static copy, not API-backed badges. */}
+        {/* Trust strip — DESIGN-028 three-surface model (hero):
+            Defer free-cancel deadlines (no listing in scope); assert unconditional refund
+            *processing* from refundPolicyTimelines; keep Instant/Verified as marketing chips.
+            Listing cards + detail disclose the per-tier free-cancel promise. */}
         <ul className="ahv2-chip-row" role="list" aria-label="Booking guarantees">
           <li role="listitem" className="ahv2-chip">
             <span className="ahv2-tick" aria-hidden="true">
@@ -140,12 +143,17 @@ const Slider = () => {
             </span>
             Verified homes
           </li>
-          {/* TASK-7432: one cancellation affordance only — never invent 48h + 24h. */}
+          <li role="listitem" className="ahv2-chip" data-testid="hero-refund-processing-chip">
+            <span className="ahv2-tick" aria-hidden="true">
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+            </span>
+            {resolveHeroRefundProcessingChip()}
+          </li>
           <li role="listitem" className="ahv2-chip">
             <span className="ahv2-tick" aria-hidden="true">
               <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
             </span>
-            <Link to="/policies" className="underline-offset-2 hover:underline">
+            <Link to="/policies" className="underline-offset-2 hover:underline" data-testid="hero-cancellation-policy-link">
               See cancellation policy
             </Link>
           </li>
@@ -181,7 +189,7 @@ const Slider = () => {
         {showAtlasContent && hasHeroPhoto ? (
           <div className="ahv2-caption-pill">
             <span className="ahv2-dot" aria-hidden="true" />
-            KPHB 7th Phase
+            Neighbourhood
           </div>
         ) : null}
       </div>

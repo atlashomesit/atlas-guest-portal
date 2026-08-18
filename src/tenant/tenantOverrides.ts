@@ -200,6 +200,7 @@ const TENANT_OVERRIDES: Record<string, TenantOverrides> = {
       // eslint-disable-next-line atlas-brand/no-atlas-string-leak -- canonical Atlas marketplace WhatsApp; scoped to the `atlas` marketplace slug only, never a white-label tenant
       whatsappPhone: '7032493290',
     },
+    /* eslint-disable atlas-brand/no-atlas-string-leak -- Atlas marketplace slug-only location copy; never applied to white-label tenants */
     mapLocation: {
       lat: 17.4948,
       lng: 78.3996,
@@ -250,6 +251,7 @@ const TENANT_OVERRIDES: Record<string, TenantOverrides> = {
         },
       ],
     },
+    /* eslint-enable atlas-brand/no-atlas-string-leak */
   },
 };
 

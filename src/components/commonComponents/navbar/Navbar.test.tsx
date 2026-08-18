@@ -177,6 +177,63 @@ describe("Navbar CTA", () => {
     expect(screen.getByTestId("navbar-host-login")).toHaveTextContent("Host login");
   });
 
+  it("DESIGN-026: renders a persistent mobile search pill", () => {
+    Object.defineProperty(window, "innerWidth", { writable: true, configurable: true, value: 375 });
+    renderNavbar();
+
+    const pill = screen.getByTestId("mobile-search-pill");
+    expect(pill).toBeInTheDocument();
+    expect(pill).toHaveAttribute("aria-label", "Search stays");
+    expect(pill).toHaveTextContent("Where to?");
+  });
+
+  it("DESIGN-026: mobile search pill opens full-screen overlay", () => {
+    Object.defineProperty(window, "innerWidth", { writable: true, configurable: true, value: 375 });
+    renderNavbar();
+
+    const pill = screen.getByTestId("mobile-search-pill");
+    fireEvent.click(pill);
+
+    const overlay = screen.getByTestId("mobile-search-overlay");
+    expect(overlay).toBeInTheDocument();
+    expect(overlay).toHaveAttribute("role", "dialog");
+    expect(overlay).toHaveAttribute("aria-modal", "true");
+
+    // Close button works
+    const closeBtn = screen.getByTestId("mobile-search-overlay-close");
+    fireEvent.click(closeBtn);
+    expect(screen.queryByTestId("mobile-search-overlay")).toBeNull();
+  });
+
+  it("DESIGN-026: mobile search overlay navigates to /search on submit", () => {
+    renderNavbar();
+
+    fireEvent.click(screen.getByTestId("mobile-search-pill"));
+    const input = screen.getByTestId("mobile-search-destination-input");
+    fireEvent.change(input, { target: { value: "Goa" } });
+
+    fireEvent.click(screen.getByTestId("mobile-search-submit"));
+    expect(mockNavigate).toHaveBeenCalledWith(
+      "/search?destination=Goa",
+      expect.objectContaining({ state: { fromMobileSearch: true } }),
+    );
+  });
+
+  it("DESIGN-026: handleBookNow is not regressed by mobile search changes", () => {
+    renderNavbar();
+
+    // Book Now still functions exactly as before
+    const bookNow = screen.getByRole("button", { name: /book now/i });
+    fireEvent.click(bookNow);
+
+    expect(mockNavigate).toHaveBeenCalledWith(
+      "/search",
+      expect.objectContaining({
+        state: { bookingPrefill: expect.objectContaining({ guests: 2 }) },
+      }),
+    );
+  });
+
   it("TASK-7088: mobile menu has no duplicate destinations", () => {
     Object.defineProperty(window, "innerWidth", { writable: true, configurable: true, value: 375 });
     renderNavbar();
