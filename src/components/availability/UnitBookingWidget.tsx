@@ -1868,7 +1868,13 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             type="button"
             id="unit-booking-guests"
             className="bw-guests-trigger"
-            style={{ padding: 0, background: 'transparent', border: 0, width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+            // minHeight 44: the inline `padding: 0` here intentionally cancels
+            // .bw-guests-trigger's CSS padding (the visual inset comes from the .lv-guest-cell
+            // wrapper), which left the BUTTON box ~38px tall while the card looked ~58px
+            // tappable — the wrapper has cursor:pointer but no onClick, so the outer 10px was
+            // dead. minHeight restores a 44px hit area (WCAG 2.2 SC 2.5.5 / Apple HIG) without
+            // re-introducing double padding. Applies on desktop too — it was ~38px there as well.
+            style={{ padding: 0, minHeight: 44, background: 'transparent', border: 0, width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
             aria-label={`Guests: ${guests} ${guests === 1 ? 'guest' : 'guests'}. Click to change.`}
             onClick={(e) => { e.stopPropagation(); setGuestsOpen((o) => !o); }}
           >

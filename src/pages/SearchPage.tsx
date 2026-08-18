@@ -995,7 +995,15 @@ const SearchPage = () => {
         ) : null}
 
         {/* Designer filter panel — one surface, three aligned rows + chips */}
-        <div className="search-filters sticky top-16 z-10">
+        {/* NOT sticky. `sticky top-16 z-10` came from TASK-2075, when this was a single-row
+            ~90px filter bar; d1ab2590's redesign grew it to five rows (~344px at 1280px wide)
+            and carried the pin over unexamined. A 344px panel pinned at top:64px occupies
+            y 64-408 of a 720px viewport — which contains y=360, the point Chromium's
+            scrollIntoViewIfNeeded (CenterIfNeeded) parks every click target on. Result: every
+            result-card "View home" link below the fold was unclickable, and the panel's own
+            top 52px sat behind the position:fixed 116px navbar (--nav-height), hiding the
+            price inputs. Capping max-height cannot fix this — see search-page.css. */}
+        <div className="search-filters">
           <div className="search-filters__row search-filters__row--fields">
             <div className="search-filters__field">
               <label htmlFor="filter-min-price">Min price / night</label>

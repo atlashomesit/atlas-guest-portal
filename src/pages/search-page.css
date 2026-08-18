@@ -25,24 +25,29 @@
   border-radius: var(--search-radius);
   background: var(--bg-surface);
   box-shadow: var(--shadow-level-1);
-  /* Sticky (see `sticky top-16` on the wrapper in SearchPage.tsx) pins this panel while the
-     page scrolls. With every filter row plus the amenity/digital-nomad chip rows all rendered,
-     the panel's natural height can exceed the viewport and its sticky box then sits on top of
-     the results grid below — its own empty flex gaps still catch clicks meant for listing
-     cards ("no overlap" per the file header above, so this is a bug, not a trade-off). Cap it
-     to the viewport and let its own content scroll instead of bleeding into the page below.
-     top-16 = 4rem; leave another 2rem of breathing room under it.
+  /* DO NOT make this panel `position: sticky` again (removed from SearchPage.tsx 2026-08-18).
+     Measured at 1280x720, the `local` Playwright viewport and a common laptop window:
 
-     2026-08-18: a viewport-RELATIVE cap alone does not fix this. At 1280x720 (Playwright's
-     Desktop Chrome, and a common laptop window) `calc(100vh - 6rem)` = 624px, so the panel
-     still occupied ~87% of the viewport and kept intercepting clicks on the first row of
-     result cards — reproduced by guest-listing-gallery.e2e.spec.ts, which timed out for 60s
-     with `.search-filters__chips ... subtree intercepts pointer events` while trying to click
-     a card's "View home" link. Capping the panel's SCROLLING was never enough; its FOOTPRINT
-     has to be bounded. Hence the absolute ceiling below — do not revert it to a bare vh
-     expression. */
-  max-height: min(22rem, calc(100vh - 6rem));
-  overflow-y: auto;
+       border 1 + pad 20 + fields 63.8 + 16 + toggles 44 + 16 + meta 45 + 16
+       + amenity chips 36 + 16 + nomad chips 49 + pad 20 + border 1   =  343.8px
+
+     Pinned at top:64px that is y 64 -> 408 of a 720px viewport. Chromium's
+     scrollIntoViewIfNeeded uses CenterIfNeeded, so Playwright — and any browser
+     `scrollIntoView({block:'center'})` — parks its target at y=360, which is INSIDE that box
+     (specifically inside the second `.search-filters__chips` row, y 338-387). Every result
+     card CTA below the fold became unclickable; guest-listing-gallery.e2e.spec.ts timed out
+     for 60s x3 with `.search-filters__chips ... subtree intercepts pointer events`.
+
+     Two prior attempts capped max-height instead. Both were arithmetic no-ops: the panel's
+     NATURAL height is 343.8px, so `calc(100vh - 6rem)` (624px) and `min(22rem, ...)` (352px)
+     never bound — the second missed by 8.2px. To clear y=360 a cap would have to be <=18.5rem,
+     which clips the whole Digital-nomad row behind an inner scrollbar. The footprint was never
+     the problem; pinning a 344px panel over the middle of the viewport was.
+
+     Related: the pin used top-16 (64px) while the navbar is `position: fixed` with
+     --nav-height: 116px (navbar.css:94, base.css:131), so the panel's top 52px — the price
+     input labels — sat permanently behind the header. Static flow moots that too.
+     "no overlap" per the file header above. */
 }
 
 .search-filters__row {
@@ -268,17 +273,9 @@
 }
 
 @media (max-width: 900px) {
-  /* The max-height cap above still leaves a ~570px sticky panel on a 667px-tall phone
-     viewport — effectively the whole screen, so it still covers the first row of results no
-     matter how far the page scrolls (sticky, by definition, doesn't move with it). The other
-     sticky element on this page (SearchPage.tsx's AirbnbSearchBar wrapper) already goes
-     `md:static` below this same breakpoint; mirror that instead of trying to cap height further. */
-  .search-filters {
-    position: static;
-    max-height: none;
-    overflow-y: visible;
-  }
-
+  /* `.search-filters` needs no position/max-height reset here any more — it is static and
+     unbounded at every width now (see the block comment on .search-filters above). Do not
+     re-add one "for symmetry"; there is no desktop rule left to countermand. */
   .search-filters__row--fields,
   .search-filters__row--toggles {
     grid-template-columns: 1fr;
