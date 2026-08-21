@@ -55,8 +55,9 @@ export type Language = keyof typeof locales;
 const SUPPORTED_LANGUAGES: readonly Language[] = ['en', 'hi', 'te', 'mr', 'bn', 'ta', 'kn'];
 
 /**
- * The locales the product actually offers a guest. Kept deliberately narrower than
- * SUPPORTED_LANGUAGES while the switcher is off — see LANGUAGE_SWITCHER_ENABLED.
+ * The locales the product advertises when the switcher is OFF (kept for the rollback
+ * path — see LANGUAGE_SWITCHER_ENABLED). Not read while the switcher is on: with the
+ * flag true, getAvailableLanguages() returns the full SUPPORTED_LANGUAGES set instead.
  */
 const ADVERTISED_LANGUAGES: readonly Language[] = ['en', 'hi', 'te'];
 
@@ -65,18 +66,19 @@ const DEFAULT_LANGUAGE: Language = 'en';
 
 /**
  * TASK-4517: Language switcher visibility flag (gate until coverage is real).
- * Currently only ~12 i18n keys exist; Navbar itself is the only consumer.
- * Threshold for re-enable: search + booking + confirmation flows translated.
- * TODO: Add full coverage for core guest flows before enabling.
+ * TASK-8103 (2026-08-20): left OFF pending fallback verification — see prior note in
+ * git history for the "selecting Hindi changed nothing" concern.
  *
- * TASK-8103 (2026-08-20): re-checked and LEFT OFF. The corpus is still 12 keys and the
- * booking flow is still hardcoded English, so the original reason — "selecting Hindi
- * changed nothing on the page, breaking trust with non-English speakers" (4a6f4dea) —
- * has not been resolved. Adding four more locales does not resolve it either; it widens
- * a promise the copy still cannot keep. Flipping this to true remains a product call
- * that needs the translation work done first, not a plumbing change.
+ * TASK-8103 (2026-08-21, orchestrator product ruling): turned ON. The concern above is
+ * unchanged by this task (the guest app still has ~12 real translation keys and most of
+ * the booking flow is hardcoded English regardless of locale) — but that is exactly what
+ * translate()'s English fallback already produces: picking Marathi shows an English page,
+ * not a blank or broken one, which is the documented bar for shipping this switcher (see
+ * i18n.test.ts "TASK-8103 done-when #2"). Re-tightening this requires the same translation
+ * investment as before; it's a product call, not a plumbing one, and it stays open in
+ * TASK-4517 for that follow-up. This flag only controls whether the switcher is reachable.
  */
-export const LANGUAGE_SWITCHER_ENABLED = false;
+export const LANGUAGE_SWITCHER_ENABLED = true;
 
 function isLanguage(value: string | null): value is Language {
   return value !== null && (SUPPORTED_LANGUAGES as readonly string[]).includes(value);
@@ -139,14 +141,11 @@ export function getSupportedLanguages(): Language[] {
  * Locales offered to the guest.
  *
  * This is NOT cosmetic and is NOT the same as getSupportedLanguages(): TenantJsonLd.tsx
- * feeds this straight into public hreflang <link rel="alternate"> tags. While the
- * switcher is disabled, advertising all seven would tell Google that four locale
- * variants exist which no guest can select and which render identical English (the
- * `?lang=` param in those hreflang URLs is written but never read anywhere) — the SEO
- * form of the same broken promise TASK-4517 removed from the UI.
- *
- * When LANGUAGE_SWITCHER_ENABLED is turned on, the two sets converge automatically, so
- * there is no second place to remember to update.
+ * feeds this straight into public hreflang <link rel="alternate"> tags. It tracks
+ * LANGUAGE_SWITCHER_ENABLED so the switcher and the SEO hreflang set never diverge —
+ * with the flag on (TASK-8103), both advertise the full seven-locale set; if it is ever
+ * turned back off, both narrow to ADVERTISED_LANGUAGES together, with no second place to
+ * remember to update.
  */
 export function getAvailableLanguages(): Language[] {
   return LANGUAGE_SWITCHER_ENABLED ? [...SUPPORTED_LANGUAGES] : [...ADVERTISED_LANGUAGES];

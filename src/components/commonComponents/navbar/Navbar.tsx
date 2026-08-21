@@ -169,7 +169,7 @@ const Navbar = () => {
           <div className="util-bar-right">
             <a className="util-bar-phone" href={telLink}>{formatDisplayNumber()}</a>
             <span className="util-bar-sep" aria-hidden="true" />
-            {/* TASK-4018: Language switcher — TASK-4517: hidden until translation coverage is real */}
+            {/* TASK-4018: Language switcher — TASK-8103: enabled for all 7 locales (English fallback for mr/bn/ta/kn) */}
             {LANGUAGE_SWITCHER_ENABLED && (
               <div className="relative">
                 <button
