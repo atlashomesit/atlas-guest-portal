@@ -105,3 +105,36 @@ describe('TASK-7819 — cancellation copy agrees with the refund engine', () => 
     }
   });
 });
+
+/** Phrases that invent refund arithmetic the engine does not implement (TASK-8020). */
+const CLAIMS_PRORATION =
+  /pro-?rated|nights already stayed|used nights after check-in|per-?night refund/i;
+
+describe('TASK-8020 — FAQ refund copy agrees with the refund engine', () => {
+  it('faqHighlights.ts source never claims pro-rating or post-check-in refund arithmetic', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { fileURLToPath } = await import('node:url');
+    const { dirname, join } = await import('node:path');
+    const here = dirname(fileURLToPath(import.meta.url));
+    const src = readFileSync(join(here, '../content/faqHighlights.ts'), 'utf8');
+    expect(src).not.toMatch(CLAIMS_PRORATION);
+  });
+
+  it('faq.tsx source never claims pro-rating or nights-stayed refund arithmetic', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { fileURLToPath } = await import('node:url');
+    const { dirname, join } = await import('node:path');
+    const here = dirname(fileURLToPath(import.meta.url));
+    const src = readFileSync(join(here, '../content/faq.tsx'), 'utf8');
+    expect(src).not.toMatch(CLAIMS_PRORATION);
+  });
+
+  it('buildRetailFaqSections refund answers defer to listing policy without invented arithmetic', async () => {
+    const { buildRetailFaqSections } = await import('../content/faq');
+    const sections = buildRetailFaqSections('Atlas');
+    const partial = sections.flatMap((s) => s.items).find((i) => i.id === 'partial-refunds');
+    expect(partial).toBeTruthy();
+    expect(partial!.question).toMatch(/partial refund/i);
+    expect((partial!.tags ?? []).join(' ')).not.toMatch(/pro-rated/i);
+  });
+});

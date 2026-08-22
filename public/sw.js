@@ -133,6 +133,11 @@ self.addEventListener('fetch', (event) => {
   // missing one is handled honestly by functions/assets/[[path]].ts (→ 404).
   if (url.pathname.startsWith('/assets/')) return;
 
+  // TASK-8062 — never cache Vite dev module URLs. They are unhashed (`/src/**`),
+  // so a cache-first SW serves stale edits after hard reload until CACHE_VERSION
+  // bumps. Harmless in prod (these paths do not exist there).
+  if (/^\/(?:src|node_modules|@vite|@id|@fs|@react-refresh)\//.test(url.pathname)) return;
+
   // Navigation requests → NetworkFirst with cached-shell fallback.
   if (req.mode === 'navigate') {
     event.respondWith(

@@ -22,7 +22,7 @@ function genericWhiteLabelFaq(businessPhone: string, ownerPhone: string): FaqHig
       id: "changes-cancellations",
       question: "What is the cancellation and change policy?",
       answer:
-        "You can modify dates if the unit is free, and cancellations follow the notice-based policy shown at booking. Refunds are pro-rated for used nights after check-in.",
+        "You can modify dates if the unit is free. Cancellations and refunds follow the notice-based policy shown on the listing at booking — check that policy before you book.",
     },
     {
       id: "extra-guests-fees",
@@ -88,7 +88,7 @@ export function getFaqHighlights(): FaqHighlight[] {
       id: "changes-cancellations",
       question: "What is the cancellation and change policy?",
       answer:
-        "You can modify dates if the unit is free, and cancellations follow the notice-based policy shown at booking. Refunds are pro-rated for used nights after check-in.",
+        "You can modify dates if the unit is free. Cancellations and refunds follow the notice-based policy shown on the listing at booking — check that policy before you book.",
     },
     {
       id: "extra-guests-fees",

@@ -17,6 +17,7 @@ import { useEffect, useMemo } from "react";
 import { useTenantListings } from "../../hooks/useTenantListings";
 import { getTenantOverrides, shouldHideAtlasBranding } from "../../tenant/tenantOverrides";
 import { getTenantContext } from "../../tenant/tenantContext";
+import { directBookingPriceClaim } from "../../tenant/paymentRail";
 import { getFaqHighlights } from "../../content/faqHighlights";
 import { trackEvent } from "../../utils/analytics";
 import ServicesSection from "../../components/home/ServicesSection";
@@ -60,7 +61,7 @@ const WHY_DIRECT_ITEMS = [
             </svg>
         ),
         heading: "You pay the host directly",
-        body: "The host keeps more when you book direct. Price shown includes room rate, GST, and a 3% payment-processing fee.",
+        body: "",
     },
 ] as const;
 
@@ -78,20 +79,16 @@ const CoastalHome = () => {
     const room101Cover = sanitizeGuestImageUrl(propertyData.find((property) => property.id === 101)?.property_img?.[0]);
     const primaryOgImage = room101Cover ?? (!overrides.hideLogo ? LOGO_URL : undefined);
     const listingAddress = propertyData.find((property) => property.property_location?.trim())?.property_location?.trim();
-    /** TASK-5194 / TASK-7428: white-label — no Atlas verification claim, no invented 3% fee. */
+    /** TASK-8055: fee claim follows payment rail, not white-label branding alone. */
+    const payDirectBody = directBookingPriceClaim(tenant);
     const whyDirectItems = useMemo(() => {
-        if (!hideAtlasBranding) return [...WHY_DIRECT_ITEMS];
-        return WHY_DIRECT_ITEMS
-            .filter((item) => item.heading !== "We verify every home")
-            .map((item) =>
-                item.heading === "You pay the host directly"
-                    ? {
-                        ...item,
-                        body: "Book direct with the host. The total shown at checkout is what you pay — no surprise OTA markups.",
-                    }
-                    : item,
-            );
-    }, [hideAtlasBranding]);
+        const items = hideAtlasBranding
+            ? WHY_DIRECT_ITEMS.filter((item) => item.heading !== "We verify every home")
+            : [...WHY_DIRECT_ITEMS];
+        return items.map((item) =>
+            item.heading === "You pay the host directly" ? { ...item, body: payDirectBody } : item,
+        );
+    }, [hideAtlasBranding, payDirectBody]);
 
     const faqHighlights = getFaqHighlights();
     // CPO-007: derive canonical from the actual host (or VITE_PUBLIC_SITE_ORIGIN for SSR) so tenant

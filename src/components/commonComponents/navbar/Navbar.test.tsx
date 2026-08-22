@@ -60,6 +60,13 @@ beforeEach(() => {
   document.querySelectorAll('[data-testid="guest-booking-form"]').forEach((node) => node.remove());
 });
 
+afterEach(() => {
+  // TASK-8103: the language-switcher tests below persist to localStorage via setLanguage();
+  // this repo's own i18n.test.ts documents that leaking a non-English value across tests in
+  // the same worker changes what usePropertyListings sends as `?locale=`.
+  localStorage.removeItem("atlas_language");
+});
+
 describe("Navbar CTA", () => {
   it("renders Help navigation as internal link (replaces Contact — Gap 1 simplification)", () => {
     renderNavbar();
@@ -232,6 +239,37 @@ describe("Navbar CTA", () => {
         state: { bookingPrefill: expect.objectContaining({ guests: 2 }) },
       }),
     );
+  });
+
+  it("TASK-8103: language switcher offers all 7 locales, each with a non-empty native name", () => {
+    renderNavbar();
+
+    const toggle = screen.getByRole("button", { name: /change language/i });
+    fireEvent.click(toggle);
+
+    const menu = screen.getByRole("menu");
+    const items = screen.getAllByRole("menuitem");
+    expect(items).toHaveLength(7);
+
+    const expectedNames = ["English", "हिन्दी", "తెలుగు", "मराठी", "বাংলা", "தமிழ்", "ಕನ್ನಡ"];
+    for (const name of expectedNames) {
+      expect(menu).toHaveTextContent(name);
+    }
+  });
+
+  it("TASK-8103: selecting a stub locale (Marathi) does not blank the switcher — it stays a real language code", () => {
+    renderNavbar();
+
+    fireEvent.click(screen.getByRole("button", { name: /change language/i }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "मराठी" }));
+
+    const toggle = screen.getByRole("button", { name: /change language/i });
+    // The switcher button renders the active language code (e.g. "MR"); it must never
+    // go blank or fall back to raw storage garbage just because mr's corpus is a stub —
+    // the page content itself falls back to English (proved in i18n.test.ts), but the
+    // switcher UI must still reflect the language the guest actually picked.
+    expect(toggle).toHaveTextContent("MR");
+    expect(toggle.textContent?.trim()).not.toBe("");
   });
 
   it("TASK-7088: mobile menu has no duplicate destinations", () => {

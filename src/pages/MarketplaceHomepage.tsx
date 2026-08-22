@@ -15,6 +15,7 @@ import { sanitizeGuestImageUrl } from '@/utils/guestImageUrl';
 import { enrichMarketplaceCoverItems } from '@/utils/marketplaceListingCover';
 import ReviewSummary from '@/components/ReviewSummary'; // TASK-4511
 import OwnerShareBadge from '@/components/OwnerShareBadge'; // TASK-4511
+import { hasOnlinePaymentRail } from '@/tenant/paymentRail';
 
 // TL-PROP: shape from GET /marketplace/properties (powers the map view).
 type MarketplacePropertyApi = {
@@ -200,8 +201,12 @@ export default function MarketplaceHomepage() {
           <span>{items.length} listings</span>
           <span aria-hidden>·</span>
           <span className="font-medium text-emerald-700">Book direct from the owner</span>
-          <span aria-hidden>·</span>
-          <span>Price shown: room + GST + 3% payment-processing fee</span>
+          {hasOnlinePaymentRail() ? (
+            <>
+              <span aria-hidden>·</span>
+              <span>Price shown: room + GST + 3% payment-processing fee</span>
+            </>
+          ) : null}
         </div>
       )}
 

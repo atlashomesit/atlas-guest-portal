@@ -1,4 +1,5 @@
 import { getTenantBrandName } from "../tenant/displayBrand";
+import { hasOnlinePaymentRail } from "../tenant/paymentRail";
 
 /**
  * TASK-1705: Owner-share trust badge.
@@ -30,9 +31,10 @@ const formatINR = (n: number) =>
 
 export default function OwnerShareBadge({ nightlyPrice, className = "" }: OwnerShareBadgeProps) {
   const brandName = getTenantBrandName();
+  const showProcessingFee = hasOnlinePaymentRail();
   const hostAmount =
     nightlyPrice != null && nightlyPrice > 0
-      ? Math.round(nightlyPrice * PLATFORM_SHARE)
+      ? Math.round(nightlyPrice * (showProcessingFee ? PLATFORM_SHARE : 1))
       : null;
 
   const label = hostAmount != null
@@ -42,7 +44,9 @@ export default function OwnerShareBadge({ nightlyPrice, className = "" }: OwnerS
   const tooltip =
     `Booking direct via ${brandName} means your host keeps significantly more. ` +
     "OTA platforms (marketplaces) typically charge 15–20% commission. " +
-    "Direct bookings have 0% platform commission — only a 3% payment-processing fee (Razorpay pass-through).";
+    (showProcessingFee
+      ? "Direct bookings have 0% platform commission — only a 3% payment-processing fee (Razorpay pass-through)."
+      : "Direct bookings have 0% platform commission — you pay the host's price with no invented processing fee.");
 
   return (
     <span

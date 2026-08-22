@@ -40,3 +40,19 @@ export function hasOnlinePaymentRail(ctx: TenantInfo | null = getTenantContext()
   const provider = (ctx.paymentProvider ?? '').trim().toUpperCase();
   return provider.length > 0 && !OFFLINE_PROVIDERS.has(provider);
 }
+
+/** Shared copy when an online rail exists (TASK-8055). */
+export const DIRECT_BOOKING_PRICE_WITH_FEE =
+  'The host keeps more when you book direct. Price shown includes room rate, GST, and a 3% payment-processing fee.';
+
+/** Shared copy when there is no online rail — never invent a fee (TASK-8055). */
+export const DIRECT_BOOKING_PRICE_NO_FEE =
+  'Book direct with the host. The total shown at checkout is what you pay — no surprise OTA markups.';
+
+/**
+ * TASK-8055: one helper for the "what does the price include?" claim so homepage / theme /
+ * marketplace surfaces cannot re-invent a 3% fee when `bookingMode` is WHATSAPP/MANUAL.
+ */
+export function directBookingPriceClaim(ctx: TenantInfo | null = getTenantContext()): string {
+  return hasOnlinePaymentRail(ctx) ? DIRECT_BOOKING_PRICE_WITH_FEE : DIRECT_BOOKING_PRICE_NO_FEE;
+}
