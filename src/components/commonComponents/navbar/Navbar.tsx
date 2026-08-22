@@ -217,7 +217,17 @@ const Navbar = () => {
 
         {/* LEFT - Logo and Mobile Menu Button */}
         <div className="flex items-center justify-between w-full lg:w-auto">
-          <Link to="/" className="flex items-center gap-2 navbar-brand-link">
+          <Link
+            to="/"
+            className="flex items-center gap-2 navbar-brand-link"
+            // TASK-8215: the accessible name must not depend on visible text — the logo's
+            // alt is decorative ("") and .navbar-logo-text is display:none below 640px, so
+            // without this the link's accessible name computes to "" on mobile (axe
+            // link-name, WCAG 2.4.4/4.1.2). Derive from the resolved tenant brand name
+            // (falls back to the marketplace baseline, never empty) rather than hardcoding
+            // "Atlas" so white-label tenants get their own name here too.
+            aria-label={`${brandName || 'Atlas'} — home`}
+          >
             {showLogo && (
               <img
                 src={logoSrc}

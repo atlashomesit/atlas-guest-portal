@@ -287,4 +287,51 @@ describe("Navbar CTA", () => {
     const duplicates = hrefs.filter((h, i) => hrefs.indexOf(h) !== i);
     expect(duplicates).toEqual([]);
   });
+
+  it("TASK-8215: brand link keeps a non-empty accessible name when the wordmark text is hidden (mobile breakpoint) — axe link-name", () => {
+    // Pin the tenant mock explicitly: vi.clearAllMocks() in beforeEach clears call history
+    // but not a mockReturnValue set by an earlier test in this file (e.g. TASK-7434's "Atlas
+    // Homes" tenant), so this test must not rely on ambient state left by test order.
+    vi.mocked(getTenantContext).mockReturnValue(null);
+    renderNavbar();
+
+    const brandLink = document.querySelector(".navbar-brand-link") as HTMLElement;
+    expect(brandLink).toBeTruthy();
+
+    // Sanity check on the root cause: the logo image is correctly decorative
+    // (contributes nothing to the accessible name) — the wordmark span is the only other
+    // source of a name, and TASK-8215's fix must not rely on it.
+    const logoImg = brandLink.querySelector("img.navbar-logo") as HTMLImageElement;
+    expect(logoImg).toBeTruthy();
+    expect(logoImg.getAttribute("alt")).toBe("");
+
+    // navbar.css hides `.navbar-logo-text` below the 640px breakpoint (block again at
+    // >=640px). Vitest's jsdom environment does not evaluate the imported external
+    // stylesheet's @media rule, so the hidden state axe-core observed at 412px is
+    // reproduced directly here via the same inline-style mechanism getComputedStyle
+    // honours — this is the exact DOM condition from TASK-8215's evidence, not a proxy
+    // for it.
+    const wordmark = brandLink.querySelector(".navbar-logo-text") as HTMLElement;
+    expect(wordmark).toBeTruthy();
+    wordmark.style.display = "none";
+
+    // With the decorative image and the now-hidden wordmark text both contributing
+    // nothing, only an aria-label can supply the accessible name. This is the exact
+    // assertion that failed (empty string) before TASK-8215's fix.
+    expect(brandLink).toHaveAccessibleName();
+    expect(brandLink).toHaveAccessibleName("Atlastays — home");
+  });
+
+  it("TASK-8215: brand link's accessible name is derived from the tenant name, not hardcoded 'Atlas'", () => {
+    vi.mocked(getTenantContext).mockReturnValue({ slug: "staybycf", name: "Stay by CF" });
+    vi.mocked(getTenantOverrides).mockReturnValue({});
+
+    renderNavbar();
+
+    const brandLink = document.querySelector(".navbar-brand-link") as HTMLElement;
+    const wordmark = brandLink.querySelector(".navbar-logo-text") as HTMLElement;
+    wordmark.style.display = "none";
+
+    expect(brandLink).toHaveAccessibleName("Stay by CF — home");
+  });
 });
