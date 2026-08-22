@@ -48,7 +48,10 @@ import { hasOnlinePaymentRail } from '@/tenant/paymentRail';
 import {
   ILLUSTRATIVE_OTA_GUEST_FEE_PERCENT,
 } from '@/utils/directBookingPromo';
-import { accommodationGstLineAmount, accommodationGstSlabPercent } from '@/utils/guestPriceEstimate';
+import {
+  accommodationGstLineAmount,
+  accommodationGstSlabPercentForChargedRate,
+} from '@/utils/guestPriceEstimate';
 
 declare global {
   interface Window {
@@ -1310,7 +1313,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     serverGstMatchesSelection && serverGstPercent != null
       ? serverGstPercent
       : hasSelectedRange && perNightForDisplay > 0
-        ? accommodationGstSlabPercent(perNightForDisplay)
+        ? accommodationGstSlabPercentForChargedRate(perNightForDisplay)
         : null;
 
   /**
