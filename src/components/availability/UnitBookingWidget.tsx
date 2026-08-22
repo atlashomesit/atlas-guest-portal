@@ -1337,10 +1337,25 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       ? Math.round(serverPriceBreakdown.convenienceFeeAmount)
       : Math.round(taxableBase * convenienceFeePercent);
 
+  // TASK-8293: the server folds TouristTaxAmount into the FinalAmount that the Total below
+  // prefers, but this widget rendered no tourist-tax row — so on a tourist-tax listing (Goa
+  // style) the line items silently failed to sum to the Total shown directly beneath them,
+  // the same "unexplained gap reads as a hidden fee" defect as the double-subtracted long-stay
+  // discount. Surface it as its own line, mirroring GuestDetailsPage's "Tourist tax" row.
+  const touristTaxLineAmount =
+    serverGstMatchesSelection && serverPriceBreakdown && serverPriceBreakdown.touristTaxAmount > 0
+      ? Math.round(serverPriceBreakdown.touristTaxAmount)
+      : 0;
+
   // TASK-4322: Total = discount-net base + GST + Service Fee (canonical formula).
   // Offline fallback only — TASK-5184 prefers server FinalAmount (includes tourist tax).
   // TASK-7428: when online payment is off, never fold a server FinalAmount that still includes the gateway fee.
-  const breakdownFinalTotal = Math.max(1, taxableBase + gstLineAmount + breakdownConvenienceFee);
+  // TASK-8293: the fallback must carry tourist tax too, or the no-online-rail branch (which
+  // always lands here) renders a Tourist tax row that the Total does not account for.
+  const breakdownFinalTotal = Math.max(
+    1,
+    taxableBase + gstLineAmount + breakdownConvenienceFee + touristTaxLineAmount,
+  );
 
   const finalTotal =
     showOnlinePaymentProcessing &&
@@ -2015,6 +2030,15 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                 GST ({gstSlabPercent}%)
               </span>
               <span className="lv-num">{displayPrice(gstLineAmount)}</span>
+            </div>
+          )}
+
+          {/* TASK-8293: tourist tax is inside the server FinalAmount the Total prefers, so it
+              must appear as its own line or the breakdown does not sum to its own Total. */}
+          {touristTaxLineAmount > 0 && (
+            <div className="lv-price-row" data-testid="bw-bd-tourist-tax-row">
+              <span>Tourist tax</span>
+              <span className="lv-num">{displayPrice(touristTaxLineAmount)}</span>
             </div>
           )}
 
