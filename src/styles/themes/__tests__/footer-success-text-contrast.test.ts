@@ -137,7 +137,8 @@ const royalVioletBlock = extractPresetBlock(luxuryCss, "royalViolet");
 const emeraldOasisBlock = extractPresetBlock(luxuryCss, "emeraldOasis");
 
 // The 14 registered color presets' `--footer-bg`, all confirmed light or dark per TASK-4951.
-const LIGHT_FOOTER_BG: Record<string, string> = {
+  const LIGHT_FOOTER_BG: Record<string, string> = {
+  default: hexColor(extractToken(defaultCss, "--footer-bg")),
   jetsetPearl: hexColor(extractToken(jetsetCss, "--footer-bg")),
   loversRetreatBlush: hexColor(extractToken(loversCss, "--footer-bg")),
   auroraChampagne: hexColor(extractToken(auroraCss, "--footer-bg")),
@@ -147,8 +148,7 @@ const LIGHT_FOOTER_BG: Record<string, string> = {
   emeraldOasis: hexColor(extractToken(emeraldOasisBlock, "--bg-section-alt")),
 };
 
-const DARK_FOOTER_BG: Record<string, string> = {
-  default: hexColor(extractToken(defaultCss, "--footer-bg")),
+  const DARK_FOOTER_BG: Record<string, string> = {
   privateIslandNoir: hexColor(extractToken(privateIslandNoirCss, "--footer-bg")),
   ultraYachtAzure: hexColor(extractToken(ultraYachtAzureCss, "--footer-bg")),
   emeraldDynasty: hexColor(extractToken(emeraldDynastyCss, "--footer-bg")),
@@ -165,9 +165,9 @@ function hexColor(value: string): string {
 }
 
 describe("TASK-4951 — --support-success-text vs every registered --footer-bg (WCAG AA)", () => {
-  it("declares exactly 7 light + 7 dark registered footer backgrounds (sanity guard)", () => {
-    expect(Object.keys(LIGHT_FOOTER_BG)).toHaveLength(7);
-    expect(Object.keys(DARK_FOOTER_BG)).toHaveLength(7);
+  it("classifies the 14 registered footer backgrounds as 8 light + 6 dark (sanity guard)", () => {
+    expect(Object.keys(LIGHT_FOOTER_BG)).toHaveLength(8);
+    expect(Object.keys(DARK_FOOTER_BG)).toHaveLength(6);
   });
 
   const baseSuccessText = extractToken(baseCss, "--support-success-text");
@@ -183,7 +183,6 @@ describe("TASK-4951 — --support-success-text vs every registered --footer-bg (
   );
 
   const darkPresetSources: Record<string, string> = {
-    default: defaultCss,
     privateIslandNoir: privateIslandNoirCss,
     ultraYachtAzure: ultraYachtAzureCss,
     emeraldDynasty: emeraldDynastyCss,

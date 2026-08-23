@@ -105,7 +105,7 @@ const Footer = () => {
 
     return (
         <footer
-            className='pt-16 md:pt-20 pb-28 md:pb-24 px-[5%] text-[var(--footer-text)] border-t border-white/10'
+            className='pt-16 md:pt-20 pb-28 md:pb-24 px-[5%] text-[var(--footer-text)] border-t border-[color:var(--border-subtle)]'
             style={{ background: 'var(--footer-bg)' }}
         >
             <div className='max-w-luxury mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-8 lg:gap-10 lg:items-start'>
@@ -113,7 +113,7 @@ const Footer = () => {
                     {showLogo && (
                         <img
                             data-testid="footer-brand-logo"
-                            className={`rounded-md object-contain h-24 w-24 ${logoSrc.includes('stay-bycityfocus') ? 'bg-[#fff8e7] p-2.5' : ''}`}
+                            className={`rounded-md object-contain h-24 w-24 ${logoSrc.includes('stay-bycityfocus') ? 'bg-[var(--bg-primary)] p-2.5' : ''}`}
                             src={logoSrc}
                             alt={footerBrand}
                             width={96}

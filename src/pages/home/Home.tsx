@@ -166,13 +166,13 @@ const Home = () => {
                 <section
                     aria-labelledby="host-note-heading"
                     className="px-4 sm:px-6 lg:px-8 py-10 md:py-14"
-                    style={{ background: 'var(--bg-primary, #fff8e7)' }}
+                    style={{ background: 'var(--peach, var(--bg-secondary, #fde0c8))' }}
                 >
                     <div
                         className="max-w-6xl mx-auto rounded-2xl px-6 py-7 md:px-10 md:py-9"
                         style={{
-                            background: 'var(--lavender-soft, #f0eafd)',
-                            borderLeft: '4px solid var(--lavender-deep, #8e7cc3)',
+                            background: 'var(--lavender-soft, #efe8f8)',
+                            borderLeft: '4px solid var(--lavender-mid, var(--lavender-deep, #d8c0e8))',
                         }}
                     >
                         <p
@@ -210,7 +210,7 @@ const Home = () => {
                 {/* Why-direct 2-pillar strip — tighter, centred columns (layout fix from screen 2) */}
                 <section
                     className="mt-0"
-                    style={{ background: 'var(--bg-secondary, #fdf2e9)' }}
+                    style={{ background: 'var(--bg-secondary, #fde0c8)' }}
                     aria-labelledby="why-direct-heading"
                 >
                     <WaveDivider tone="coral" className="opacity-80" />
@@ -222,7 +222,7 @@ const Home = () => {
                                     {/* Bare alternating coral/lavender icons — trust strip per Theem mockups */}
                                     <span
                                         className="inline-flex items-center justify-center w-12 h-12"
-                                        style={{ color: index % 2 === 1 ? 'var(--lavender-deep, #8e7cc3)' : 'var(--brand-accent, #f08c71)' }}
+                                        style={{ color: index % 2 === 1 ? 'var(--lavender-deep, #8e7cc3)' : 'var(--brand-accent, #d4724e)' }}
                                         aria-hidden="true"
                                     >
                                         {item.icon}
@@ -246,7 +246,7 @@ const Home = () => {
                         <ServicesSection />
                     </div>
                     <WaveDivider tone="coral" className="px-[10%]" />
-                    <div className="px-4 lg:px-20 py-10 md:py-12" style={{ background: 'var(--bg-primary, #fff8e7)' }}>
+                    <div className="px-4 lg:px-20 py-10 md:py-12" style={{ background: 'var(--bg-primary, #fefcf9)' }}>
                         <FaqHighlights />
                     </div>
                     <WaveDivider tone="lavender" className="px-[10%]" />

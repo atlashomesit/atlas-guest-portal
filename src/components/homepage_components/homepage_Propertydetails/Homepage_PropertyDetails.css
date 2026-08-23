@@ -11,8 +11,8 @@
 .pp-root * { box-sizing: border-box; }
 .pp-root {
   font-family: "DM Sans", system-ui, -apple-system, sans-serif;
-  color: #4a3535;
-  background: #fff8e7;
+  color: #3b1f1e;
+  background: #fefcf9;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -42,11 +42,11 @@
   --bg-card: #ffffff;
   --bg-surface: #ffffff;
   --bg-muted: #f5ebe0;
-  --text-primary: #4a3535;
+  --text-primary: #3b1f1e;
   --text-secondary: #706060;
   --text-muted: #6b5a55;
-  --text-body: #4a3535;
-  --accent-text: #a84832;
+  --text-body: #3b1f1e;
+  --accent-text: #a83c22;
   --lavender: #c5b4f3;
   --lavender-soft: #f0eafd;
   --lavender-deep: #8e7cc3;
@@ -54,10 +54,10 @@
   --border: #f0ddd0;
   --border-subtle: #f0ddd0;
   --border-strong: #e5cfc0;
-  --brand-primary: #b8472f;
-  --accent-primary: #b8472f;
-  --cta-primary: #b8472f;
-  --cta-primary-hover: #a84832;
+  --brand-primary: #c04528;
+  --accent-primary: #c04528;
+  --cta-primary: #c04528;
+  --cta-primary-hover: #a83c22;
   --cta-secondary: #8e7cc3;
   --accent-primary-rgb: 184 71 47;
   --accent-soft-rgb: 242 225 235;
@@ -68,7 +68,7 @@
   --color-bg-secondary: #fdf2e9;
   --color-bg-surface: #ffffff;
   --color-bg-muted: #f5ebe0;
-  --color-text-primary: #4a3535;
+  --color-text-primary: #3b1f1e;
   --color-text-secondary: #706060;
   --color-text-muted: #6b5a55;
   --color-accent-primary: rgb(184 71 47);
@@ -76,7 +76,7 @@
   --color-cta-primary: rgb(184 71 47);
   --color-cta-primary-hover: rgb(168 72 50);
   --color-cta-secondary: rgb(142 124 195);
-  --color-brand-primary: #b8472f;
+  --color-brand-primary: #c04528;
   --color-border-subtle: #f0ddd0;
   --color-border-strong: #e5cfc0;
   --color-primary: rgb(184 71 47);
@@ -95,14 +95,14 @@
   text-decoration: none;
 }
 .pp-btn-primary {
-  background: #b8472f; color: #fff;
+  background: #c04528; color: #fff;
   box-shadow: 0 2px 8px rgba(196, 90, 63,.22), 0 1px 2px rgba(196, 90, 63,.12);
 }
-.pp-btn-primary:hover { background: #a84832; box-shadow: 0 4px 12px rgba(196, 90, 63,.28); }
-.pp-btn-secondary { background: #fff; color: #4a3535; border-color: #e5d9ce; }
-.pp-btn-secondary:hover { border-color: #b8472f; color: #b8472f; }
-.pp-btn-ghost { background: transparent; color: #4a3535; border-color: #f0ddd0; }
-.pp-btn-ghost:hover { border-color: #4a3535; }
+.pp-btn-primary:hover { background: #a83c22; box-shadow: 0 4px 12px rgba(196, 90, 63,.28); }
+.pp-btn-secondary { background: #fff; color: #3b1f1e; border-color: #e5d9ce; }
+.pp-btn-secondary:hover { border-color: #c04528; color: #c04528; }
+.pp-btn-ghost { background: transparent; color: #3b1f1e; border-color: #f0ddd0; }
+.pp-btn-ghost:hover { border-color: #3b1f1e; }
 .pp-btn-whatsapp { background: #075e54; color: #fff; border-color: #075e54; }
 .pp-btn-whatsapp:hover { background: #0a6b62; border-color: #0a6b62; }
 .pp-btn-sm { padding: 8px 14px; font-size: 13px; }
@@ -116,7 +116,7 @@
   background: #ffe4d6;
   border: 1px solid #f0ddd0;
   font-size: 13px; font-weight: 500;
-  color: #4a3535;
+  color: #3b1f1e;
 }
 .pp-chip-success {
   background: #e9f5ef; color: #157046;
@@ -128,15 +128,15 @@
   margin-top: 12px;
   border: 1px solid #f0ddd0;
   border-radius: 14px;
-  background: #fff8e7;
+  background: #fefcf9;
   padding: 14px 16px;
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 .pp-trust-row { display: flex; gap: 10px; align-items: flex-start; }
-.pp-trust-ic { flex: 0 0 auto; color: #b8472f; margin-top: 1px; }
-.pp-trust-t { font-size: 13.5px; font-weight: 600; color: #4a3535; line-height: 1.4; }
+.pp-trust-ic { flex: 0 0 auto; color: #c04528; margin-top: 1px; }
+.pp-trust-t { font-size: 13.5px; font-weight: 600; color: #3b1f1e; line-height: 1.4; }
 .pp-trust-s { font-size: 12.5px; color: var(--text-muted, #6b5a55); line-height: 1.45; margin-top: 2px; }
 
 .pp-eyebrow {
@@ -144,7 +144,7 @@
   font-size: 11.5px; font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--accent-text, #a84832);
+  color: var(--accent-text, #a83c22);
   margin: 0 0 6px;
 }
 .pp-muted { color: var(--text-muted, #6b5a55); }
@@ -161,7 +161,7 @@
   margin: 4px 0 14px;
 }
 .pp-crumbs a { color: var(--text-muted, #6b5a55); text-decoration: none; }
-.pp-crumbs a:hover { color: #b8472f; }
+.pp-crumbs a:hover { color: #c04528; }
 .pp-crumbs .pp-sep { color: #d6c2a8; }
 
 /* ---------- Title row ---------------------------------------------------- */
@@ -173,13 +173,13 @@
   font-family: "Cormorant Garamond", "Georgia", serif;
   font-weight: 500; font-size: 44px;
   line-height: 1.05; margin: 0 0 8px;
-  color: #4a3535; letter-spacing: -0.005em;
+  color: #3b1f1e; letter-spacing: -0.005em;
 }
 .pp-submeta {
   display: flex; align-items: center; gap: 10px;
   font-size: 13.5px; color: var(--text-muted, #6b5a55); flex-wrap: wrap;
 }
-.pp-submeta .pp-rating { color: #4a3535; font-weight: 600; }
+.pp-submeta .pp-rating { color: #3b1f1e; font-weight: 600; }
 .pp-submeta .pp-rating em { font-style: normal; font-weight: 400; color: var(--text-muted, #6b5a55); }
 .pp-submeta-sep { color: #d6c2a8; }
 .pp-title-actions { display: flex; gap: 8px; flex-shrink: 0; }
@@ -257,13 +257,13 @@
   -webkit-backdrop-filter: blur(8px);
   padding: 10px 14px; border-radius: 10px;
   font-size: 11.5px; font-weight: 600;
-  color: #4a3535; letter-spacing: 0.04em;
+  color: #3b1f1e; letter-spacing: 0.04em;
   text-transform: uppercase;
   display: inline-flex; align-items: center; gap: 8px;
 }
 .pp-cell-overlay .pp-dot {
   width: 7px; height: 7px; border-radius: 50%;
-  background: #b8472f;
+  background: #c04528;
   animation: pp-pulse 2s ease-in-out infinite;
   flex-shrink: 0;
 }
@@ -289,7 +289,7 @@
   font-size: 11.5px; font-weight: 600;
   letter-spacing: 0.08em; text-transform: uppercase;
   padding: 6px 10px; border-radius: 6px;
-  background: rgba(255, 250, 245, 0.92); color: #4a3535;
+  background: rgba(255, 250, 245, 0.92); color: #3b1f1e;
 }
 .pp-cell-3:not(.pp-cell--photo) .pp-cell-label,
 .pp-cell-4:not(.pp-cell--photo) .pp-cell-label { background: rgba(26, 26, 46, 0.85); color: #fff8e7; }
@@ -298,7 +298,7 @@
 .pp-gallery-more {
   position: absolute; right: 16px; bottom: 16px;
   background: rgba(255, 250, 245, 0.94);
-  color: #4a3535; border: 1px solid #f0ddd0;
+  color: #3b1f1e; border: 1px solid #f0ddd0;
   font-size: 12.5px; font-weight: 600;
   padding: 8px 14px; border-radius: 999px;
   display: inline-flex; align-items: center; gap: 6px;
@@ -306,7 +306,7 @@
   transition: background .2s;
   font-family: inherit;
 }
-.pp-gallery-more:hover { background: #fff; color: #4a3535; }
+.pp-gallery-more:hover { background: #fff; color: #3b1f1e; }
 
 /* ---------- Main two-column grid ---------------------------------------- */
 .pp-main {
@@ -331,7 +331,7 @@
   font-family: "Cormorant Garamond", "Georgia", serif;
   font-weight: 500; font-size: 28px;
   line-height: 1.15; margin: 0;
-  color: #4a3535; letter-spacing: -0.005em;
+  color: #3b1f1e; letter-spacing: -0.005em;
 }
 
 /* ---------- Host strip --------------------------------------------------- */
@@ -346,7 +346,7 @@
 }
 .pp-host-avatar {
   width: 64px; height: 64px; border-radius: 50%;
-  background: linear-gradient(135deg, #f08c71 0%, #b8472f 100%);
+  background: linear-gradient(135deg, #f08c71 0%, #c04528 100%);
   color: #fff8e7;
   display: inline-flex; align-items: center; justify-content: center;
   font-family: "Cormorant Garamond", "Georgia", serif;
@@ -355,7 +355,7 @@
 .pp-host-name {
   font-family: "Cormorant Garamond", "Georgia", serif;
   font-weight: 500; font-size: 22px;
-  color: #4a3535;
+  color: #3b1f1e;
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   line-height: 1.1; margin-bottom: 4px;
 }
@@ -365,7 +365,7 @@
 /* ---------- Verified panel ----------------------------------------------- */
 .pp-verified-panel {
   margin-top: 24px;
-  background: #fff8e7; border: 1px solid #f0ddd0;
+  background: #fefcf9; border: 1px solid #f0ddd0;
   border-radius: 18px; padding: 26px 28px;
 }
 .pp-verified-panel-head {
@@ -374,14 +374,14 @@
 }
 .pp-shield {
   width: 44px; height: 44px; flex-shrink: 0;
-  background: #b8472f; color: #fff8e7;
+  background: #c04528; color: #fff8e7;
   border-radius: 12px;
   display: inline-flex; align-items: center; justify-content: center;
 }
 .pp-verified-panel h3 {
   font-family: "Cormorant Garamond", "Georgia", serif;
   font-weight: 500; font-size: 22px;
-  margin: 0; line-height: 1.15; color: #4a3535;
+  margin: 0; line-height: 1.15; color: #3b1f1e;
 }
 .pp-verified-panel h3 small {
   display: block;
@@ -396,7 +396,7 @@
 .pp-verified-list li {
   display: grid; grid-template-columns: 18px 1fr;
   gap: 10px; align-items: flex-start;
-  font-size: 14px; line-height: 1.55; color: #4a3535;
+  font-size: 14px; line-height: 1.55; color: #3b1f1e;
 }
 .pp-verified-list li svg { color: #157046; margin-top: 2px; flex-shrink: 0; }
 .pp-verified-list li b { font-weight: 600; }
@@ -414,25 +414,25 @@
 
 /* ---------- About / Prose ------------------------------------------------ */
 .pp-prose {
-  font-size: 15.5px; line-height: 1.72; color: var(--text-primary, #4a3535);
+  font-size: 15.5px; line-height: 1.72; color: var(--text-primary, #3b1f1e);
   max-width: 62ch; margin: 0 0 12px;
 }
-.pp-prose strong { color: #4a3535; }
+.pp-prose strong { color: #3b1f1e; }
 .pp-prose-list {
   list-style: none; padding: 0; margin: 4px 0 0;
   display: grid; gap: 7px;
 }
 .pp-prose-list li {
-  font-size: 14.5px; line-height: 1.65; color: var(--text-primary, #4a3535);
+  font-size: 14.5px; line-height: 1.65; color: var(--text-primary, #3b1f1e);
   padding-left: 16px; position: relative;
 }
 .pp-prose-list li::before {
   content: "·"; position: absolute; left: 0;
-  color: #b8472f; font-weight: 700;
+  color: #c04528; font-weight: 700;
 }
 .pp-prose-more {
   display: inline-flex; align-items: center; gap: 4px;
-  font-weight: 600; color: var(--accent-text, #a84832); font-size: 14px;
+  font-weight: 600; color: var(--accent-text, #a83c22); font-size: 14px;
   background: transparent; border: 0; padding: 0;
   cursor: pointer; margin-top: 10px; font-family: inherit;
 }
@@ -444,7 +444,7 @@
 }
 .pp-amenity {
   display: flex; align-items: center; gap: 12px;
-  font-size: 14.5px; color: #4a3535; padding: 4px 0;
+  font-size: 14.5px; color: #3b1f1e; padding: 4px 0;
 }
 .pp-amenity svg { color: var(--text-muted, #6b5a55); flex-shrink: 0; }
 
@@ -453,14 +453,14 @@
   display: grid; grid-template-columns: auto 1fr;
   gap: 28px; align-items: center;
   padding: 20px 24px;
-  background: #fff8e7; border: 1px solid #f0ddd0; border-radius: 16px;
+  background: #fefcf9; border: 1px solid #f0ddd0; border-radius: 16px;
   margin-bottom: 24px;
 }
 .pp-rating-big {
   font-family: "Cormorant Garamond", "Georgia", serif;
-  font-weight: 500; font-size: 56px; line-height: 1; color: #4a3535;
+  font-weight: 500; font-size: 56px; line-height: 1; color: #3b1f1e;
 }
-.pp-rating-stars { font-size: 18px; color: #b8472f; letter-spacing: 2px; display: block; }
+.pp-rating-stars { font-size: 18px; color: #c04528; letter-spacing: 2px; display: block; }
 .pp-rating-big-sub { font-size: 12.5px; color: var(--text-muted, #6b5a55); margin-top: 4px; }
 
 .pp-review-grid {
@@ -474,9 +474,9 @@
   font-family: "Cormorant Garamond", "Georgia", serif;
   font-size: 17px; font-weight: 500;
 }
-.pp-review-name { font-weight: 600; font-size: 14px; color: #4a3535; line-height: 1.2; }
+.pp-review-name { font-weight: 600; font-size: 14px; color: #3b1f1e; line-height: 1.2; }
 .pp-review-date { font-size: 12px; color: var(--text-muted, #6b5a55); line-height: 1.2; margin-top: 2px; }
-.pp-review-body { font-size: 14.5px; line-height: 1.65; color: var(--text-primary, #4a3535); margin: 0; }
+.pp-review-body { font-size: 14.5px; line-height: 1.65; color: var(--text-primary, #3b1f1e); margin: 0; }
 .pp-review-verified {
   display: inline-flex; align-items: center; gap: 4px;
   font-size: 11.5px; font-weight: 600; color: #157046;
@@ -487,7 +487,7 @@
   margin-top: 10px; padding: 10px 12px;
   background: #fff; border: 1px solid #f0ddd0; border-radius: 10px;
 }
-.pp-review-host-resp-label { font-size: 11.5px; font-weight: 700; color: #4a3535; margin-bottom: 3px; }
+.pp-review-host-resp-label { font-size: 11.5px; font-weight: 700; color: #3b1f1e; margin-bottom: 3px; }
 .pp-review-host-resp p { font-size: 12.5px; color: var(--text-muted, #6b5a55); margin: 0; line-height: 1.55; }
 
 /* ---------- Cancellation / refund timeline ------------------------------ */
@@ -503,7 +503,7 @@
 .pp-refund-head h3 {
   font-family: "Cormorant Garamond", "Georgia", serif;
   font-weight: 500; font-size: 22px;
-  margin: 0; line-height: 1.15; color: #4a3535;
+  margin: 0; line-height: 1.15; color: #3b1f1e;
 }
 .pp-refund-head p { margin: 4px 0 0; font-size: 13.5px; color: var(--text-muted, #6b5a55); }
 
@@ -520,13 +520,13 @@
 .pp-timeline-step .pp-tl-dot {
   position: relative; z-index: 1;
   width: 18px; height: 18px; border-radius: 50%;
-  background: #fff; border: 4px solid #b8472f;
+  background: #fff; border: 4px solid #c04528;
   margin-bottom: 12px;
 }
 .pp-timeline-step h6 {
   font-family: "DM Sans", sans-serif;
   font-weight: 700; font-size: 13.5px;
-  margin: 0 0 4px; color: #4a3535;
+  margin: 0 0 4px; color: #3b1f1e;
 }
 .pp-timeline-step p { font-size: 12.5px; line-height: 1.5; color: var(--text-muted, #6b5a55); margin: 0; }
 
@@ -536,10 +536,10 @@
 }
 .pp-nearby-item {
   padding: 12px 14px;
-  background: #fff8e7; border: 1px solid #f0ddd0; border-radius: 12px;
+  background: #fefcf9; border: 1px solid #f0ddd0; border-radius: 12px;
   font-size: 13px;
 }
-.pp-nearby-item b { display: block; color: #4a3535; font-weight: 600; margin-bottom: 2px; font-size: 13.5px; }
+.pp-nearby-item b { display: block; color: #3b1f1e; font-weight: 600; margin-bottom: 2px; font-size: 13.5px; }
 .pp-nearby-item span { color: var(--text-muted, #6b5a55); font-size: 12.5px; }
 
 /* ---------- Sticky booking aside ---------------------------------------- */
@@ -554,11 +554,11 @@
 }
 .pp-reg-row code {
   font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-  font-size: 11.5px; color: #b8472f;
+  font-size: 11.5px; color: #c04528;
   background: #ffe4d6; padding: 1px 6px;
   border-radius: 4px; letter-spacing: 0.04em;
 }
-.pp-reg-row b { color: #4a3535; font-weight: 600; }
+.pp-reg-row b { color: #3b1f1e; font-weight: 600; }
 
 /* ---------- Mobile sticky CTA (hidden on desktop) ----------------------- */
 .pp-m-sticky { display: none; }
@@ -640,7 +640,7 @@
   .pp-m-sticky {
     display: flex;
     position: fixed; bottom: 0; left: 0; right: 0;
-    background: #fff8e7; border-top: 1px solid #f0ddd0;
+    background: #fefcf9; border-top: 1px solid #f0ddd0;
     padding: 12px 16px;
     align-items: center; justify-content: space-between; gap: 14px;
     box-shadow: 0 -8px 24px rgba(26,26,46,0.06);
@@ -648,7 +648,7 @@
   }
   .pp-m-sticky-price b {
     display: block; font-size: 16px;
-    font-weight: 700; color: #4a3535; line-height: 1.1;
+    font-weight: 700; color: #3b1f1e; line-height: 1.1;
   }
   .pp-m-sticky-price span { display: block; font-size: 11.5px; color: var(--text-muted, #6b5a55); margin-top: 2px; }
   .pp-m-sticky-taxes { font-size: 11px !important; color: var(--text-muted, #6b5a55) !important; margin-top: 1px !important; }
@@ -680,7 +680,7 @@
   font-size: 28px;
   line-height: 1.15;
   margin: 0;
-  color: #4a3535;
+  color: #3b1f1e;
   letter-spacing: -0.005em;
 }
 .pp-v2-loc-chip {
@@ -693,7 +693,7 @@
   border-radius: 999px;
   font-size: 12.5px;
   font-weight: 600;
-  color: #4a3535;
+  color: #3b1f1e;
 }
 
 /* ---- Things-to-know 3-card grid (v2) ----------------------------------- */
@@ -713,7 +713,7 @@
   height: 36px;
   border-radius: 10px;
   background: #fdf2e9;
-  color: #b8472f;
+  color: #c04528;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -734,7 +734,7 @@
   font-family: "Cormorant Garamond", "Georgia", serif;
   font-weight: 500;
   font-size: 20px;
-  color: #4a3535;
+  color: #3b1f1e;
   line-height: 1.2;
   margin-bottom: 3px;
   letter-spacing: -0.005em;
@@ -764,7 +764,7 @@
   font-weight: 500;
   font-size: 34px;
   line-height: 0.6;
-  color: #b8472f;
+  color: #c04528;
   opacity: 0.32;
   display: block;
   margin-bottom: 6px;
@@ -773,7 +773,7 @@
 .pp-v2-review-body {
   font-size: 14px;
   line-height: 1.65;
-  color: var(--text-primary, #4a3535);
+  color: var(--text-primary, #3b1f1e);
   margin: 0 0 14px;
 }
 .pp-v2-review-foot {
@@ -798,7 +798,7 @@
 .pp-v2-review-name {
   font-weight: 600;
   font-size: 13px;
-  color: #4a3535;
+  color: #3b1f1e;
   line-height: 1.2;
 }
 .pp-v2-review-date {
@@ -815,7 +815,7 @@
   gap: 28px;
   align-items: center;
   padding: 20px 24px;
-  background: #fff8e7;
+  background: #fefcf9;
   border: 1px solid #f0ddd0;
   border-radius: 16px;
   margin-bottom: 20px;
@@ -825,7 +825,7 @@
   font-weight: 500;
   font-size: 56px;
   line-height: 1;
-  color: #4a3535;
+  color: #3b1f1e;
 }
 .pp-v2-rating-big-sub {
   font-size: 12px;
@@ -851,10 +851,10 @@
 .pp-v2-rating-bar > span {
   display: block;
   height: 100%;
-  background: #b8472f;
+  background: #c04528;
   border-radius: 999px;
 }
-.pp-v2-rating-bar-val { color: #4a3535; font-weight: 600; font-size: 12px; }
+.pp-v2-rating-bar-val { color: #3b1f1e; font-weight: 600; font-size: 12px; }
 
 /* ---- v2 booking widget styles (lv- prefix, scoped inside pp-root) ------- */
 .pp-root .lv-booking {
@@ -881,7 +881,7 @@
   font-size: 36px;
   line-height: 1;
   letter-spacing: -0.01em;
-  color: #4a3535;
+  color: #3b1f1e;
 }
 .pp-root .lv-booking-total span {
   font-size: 13px;
@@ -899,7 +899,7 @@
 .pp-root .lv-date-pair {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  border: 1.5px solid #4a3535;
+  border: 1.5px solid #3b1f1e;
   border-radius: 12px 12px 0 0;
   overflow: hidden;
 }
@@ -907,7 +907,7 @@
   padding: 10px 13px;
   background: #fff;
   cursor: pointer;
-  border-right: 1px solid #4a3535;
+  border-right: 1px solid #3b1f1e;
 }
 .pp-root .lv-date-cell:last-child { border-right: 0; }
 .pp-root .lv-date-cell small,
@@ -923,7 +923,7 @@
 .pp-root .lv-date-val,
 .pp-root .lv-guest-val {
   font-size: 13.5px;
-  color: #4a3535;
+  color: #3b1f1e;
   font-weight: 600;
 }
 .pp-root .lv-date-placeholder {
@@ -934,7 +934,7 @@
 }
 .pp-root .lv-guest-cell {
   padding: 10px 13px;
-  border: 1.5px solid #4a3535;
+  border: 1.5px solid #3b1f1e;
   border-top: 0;
   border-radius: 0 0 12px 12px;
   display: flex;
@@ -962,7 +962,7 @@
 }
 .pp-root .lv-price-row .lv-num {
   font-variant-numeric: tabular-nums;
-  color: #4a3535;
+  color: #3b1f1e;
   font-weight: 500;
 }
 .pp-root .lv-price-row.lv-total {
@@ -970,7 +970,7 @@
   padding-top: 12px;
   margin-top: 6px;
   font-size: 15px;
-  color: #4a3535;
+  color: #3b1f1e;
   font-weight: 700;
 }
 .pp-root .lv-price-row.lv-total .lv-num {
@@ -995,7 +995,7 @@
 .pp-root .lv-pay-rail {
   margin-top: 16px;
   padding: 10px 13px;
-  background: #fff8e7;
+  background: #fefcf9;
   border: 1px solid #f0ddd0;
   border-radius: 12px;
   display: flex;

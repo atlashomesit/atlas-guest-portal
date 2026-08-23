@@ -2300,18 +2300,18 @@ const gdStyles = `
 @keyframes gd-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
 :root {
-  --gd-ink: #4a3535;
-  --gd-ink-soft: #3b3b52;
-  --gd-muted: #475569;
-  --gd-faint: #64748b;
-  --gd-ivory: #fff8e7;
-  --gd-linen: #fdf2e9;
-  --gd-peach: #ffe4d6;
-  --gd-line: #f0ddd0;
-  --gd-line-strong: #e5cfc0;
-  --gd-coral: #b8472f;
-  --gd-coral-dark: #a84832;
-  --gd-amber: #f08c71;
+  --gd-ink: #3b1f1e;
+  --gd-ink-soft: #5c3d3c;
+  --gd-muted: #6b4a48;
+  --gd-faint: #8a6a68;
+  --gd-ivory: #fefcf9;
+  --gd-linen: #fde0c8;
+  --gd-peach: #f5c8b0;
+  --gd-line: rgba(59, 31, 30, 0.12);
+  --gd-line-strong: rgba(59, 31, 30, 0.20);
+  --gd-coral: #c04528;
+  --gd-coral-dark: #a83c22;
+  --gd-amber: #d4724e;
   --gd-success: #157046;
   --gd-success-bg: #e9f5ef;
   --gd-success-border: #d2ebde;

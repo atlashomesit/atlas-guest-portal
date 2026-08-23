@@ -7,7 +7,7 @@
        applyTenantBranding() (tenant.faviconUrl / TENANT_OVERRIDES[slug].faviconUrl). -->
   <link rel="icon" type="image/x-icon" href="/favicon.ico" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#b8472f" />
+  <meta name="theme-color" content="#c04528" />
   <!-- CPO-watch #15: PWA manifest makes the guest portal installable on mobile + desktop.
        Tenant builds can swap this for a per-tenant manifest as the brand-extraction matures. -->
   <link rel="manifest" href="/manifest.webmanifest" />
@@ -57,36 +57,36 @@
        0.385 source (mobile already stacks to 1 column, CLS 0). Dimensions now
        match navbar 116px/80px, 1-col hero min(72vh,760px), widget slot, 4/3 cards. -->
   <style>
-    :root { --boot-nav-height: 116px; --boot-ivory: #fff8e7; }
+    :root { --boot-nav-height: 116px; --boot-ivory: #fefcf9; }
     @media (max-width: 760px) { :root { --boot-nav-height: 80px; } }
     html, body { margin: 0; background: var(--boot-ivory); }
     #root:not(:empty) { min-height: 100vh; }
-    .boot-shell { font-family: Georgia, "Times New Roman", serif; color: #2c1810; }
+    .boot-shell { font-family: Georgia, "Times New Roman", serif; color: #3b1f1e; }
     .boot-nav {
       position: fixed; top: 0; left: 0; right: 0; z-index: 20;
       height: var(--boot-nav-height); background: var(--boot-ivory);
-      border-bottom: 1px solid #f0ddd0;
+      border-bottom: 1px solid rgba(59, 31, 30, 0.08);
     }
     .boot-main { padding-top: var(--boot-nav-height); }
     .boot-hero {
       min-height: min(72vh, 760px);
       display: flex; flex-direction: column; align-items: center; justify-content: center;
-      background: linear-gradient(135deg, #fff8e7 0%, #ffe4d6 45%, #f2e1eb 100%);
+      background: linear-gradient(145deg, #fde0c8 0%, #f5c8b0 18%, #f0c0c0 35%, #e8c8e0 52%, #d8c0e8 72%, #ccc0ee 100%);
       padding: 84px 8% 48px; box-sizing: border-box; text-align: center;
     }
     .boot-kicker {
-      height: 14px; width: 120px; background: #f0ddd0; border-radius: 4px; margin-bottom: 24px;
+      height: 14px; width: 120px; background: #f5c8b0; border-radius: 4px; margin-bottom: 24px;
     }
     .boot-title {
-      height: 64px; width: min(18ch, 80%); background: #e8d5c8; border-radius: 6px; margin-bottom: 16px;
+      height: 64px; width: min(18ch, 80%); background: #f0c0c0; border-radius: 6px; margin-bottom: 16px;
     }
     .boot-title-2 { width: min(12ch, 55%); height: 48px; margin-bottom: 28px; }
     .boot-sub {
-      height: 16px; width: min(52ch, 70%); background: #f0ddd0; border-radius: 4px; margin-bottom: 40px;
+      height: 16px; width: min(52ch, 70%); background: #e8c8e0; border-radius: 4px; margin-bottom: 40px;
     }
     .boot-widget {
       width: min(100%, 900px); min-height: 144px; background: #fff; border-radius: 18px;
-      box-shadow: 0 8px 24px rgba(44, 24, 16, 0.08);
+      box-shadow: 0 12px 60px rgba(59, 31, 30, 0.12);
     }
     .boot-grid {
       display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
@@ -94,8 +94,8 @@
     }
     @media (max-width: 760px) { .boot-grid { grid-template-columns: 1fr; } }
     .boot-card { border-radius: 18px; overflow: hidden; background: #fff; }
-    .boot-card-photo { aspect-ratio: 4 / 3; background: linear-gradient(135deg, #f7c4ae 0%, #ee9d7f 100%); }
-    .boot-card:nth-child(even) .boot-card-photo { background: linear-gradient(135deg, #d9cdf7 0%, #b6a3ee 100%); }
+    .boot-card-photo { aspect-ratio: 4 / 3; background: linear-gradient(140deg, #fde0c8 0%, #f5c8b0 55%, #ebb89a 100%); }
+    .boot-card:nth-child(even) .boot-card-photo { background: linear-gradient(140deg, #e0d0f0 0%, #d8c0e8 55%, #c0a8d8 100%); }
     .boot-card-body { height: 88px; }
   </style>
   <div id="root">

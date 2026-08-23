@@ -10,29 +10,29 @@
 .ahv2-hero,
 .ahv2-ribbon,
 .ahv2-card {
-  --ahv2-ivory: var(--bg-primary, #fff8e7);
+  --ahv2-ivory: var(--bg-primary, #fefcf9);
   --ahv2-card: var(--bg-card, #ffffff);
-  --ahv2-muted: var(--bg-secondary, #fdf2e9);
-  --ahv2-coral: var(--cta-primary, #b8472f);
-  --ahv2-coral-hover: var(--cta-primary-hover, #a84832);
+  --ahv2-muted: var(--bg-secondary, #fde0c8);
+  --ahv2-coral: var(--cta-primary, #c04528);
+  --ahv2-coral-hover: var(--cta-primary-hover, #a83c22);
   /* Text-safe coral (>=4.5:1 on white/ivory) for small coral TEXT — decorative
      surfaces keep --ahv2-coral. Mirrors the AA-safe --ahv2-muted pattern below. */
-  --ahv2-coral-text: var(--accent-text, #a84832);
-  --ahv2-amber: var(--brand-accent, #f08c71);
-  --ahv2-ink: var(--text-primary, #1a1a2e);
+  --ahv2-coral-text: var(--accent-text, #a8442c);
+  --ahv2-amber: var(--brand-accent, #d4724e);
+  --ahv2-ink: var(--text-primary, #3b1f1e);
   /* AA-safe muted (>=4.5:1 on ivory/white) for small 12-13px secondary text —
      reuses the theme's verified --text-muted instead of a low-contrast alpha. */
-  --ahv2-ink-60: var(--text-muted, #475569);
-  --ahv2-ink-45: rgba(26, 26, 46, 0.45);
-  --ahv2-ink-12: rgba(26, 26, 46, 0.12);
-  --ahv2-ink-08: rgba(26, 26, 46, 0.08);
-  --ahv2-r-md: 0.75rem;
-  --ahv2-r-lg: 1rem;
+  --ahv2-ink-60: var(--text-muted, #6b4a48);
+  --ahv2-ink-45: rgba(59, 31, 30, 0.45);
+  --ahv2-ink-12: rgba(59, 31, 30, 0.12);
+  --ahv2-ink-08: rgba(59, 31, 30, 0.08);
+  --ahv2-r-md: 0.875rem;
+  --ahv2-r-lg: 1.25rem;
   --ahv2-r-2xl: 1.5rem;
-  --ahv2-r-pill: 999px;
-  --ahv2-shadow-soft: 0 2px 8px rgba(26, 26, 46, 0.05);
-  --ahv2-shadow-elev: 0 12px 32px rgba(26, 26, 46, 0.06);
-  --ahv2-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --ahv2-r-pill: 50px;
+  --ahv2-shadow-soft: 0 2px 12px rgba(59, 31, 30, 0.06);
+  --ahv2-shadow-elev: 0 14px 48px rgba(59, 31, 30, 0.14);
+  --ahv2-ease: cubic-bezier(0.25, 0.46, 0.45, 0.94);
   --ahv2-display: "Cormorant Garamond", "Cormorant", Georgia, serif;
 }
 
@@ -78,7 +78,7 @@
   min-height: min(72vh, 760px);
   position: relative;
   background: var(--gradient-hero,
-      linear-gradient(135deg, #fff8e7 0%, #ffe4d6 45%, #f2e1eb 100%));
+      linear-gradient(145deg, #fde0c8 0%, #f5c8b0 18%, #f0c0c0 35%, #e8c8e0 52%, #d8c0e8 72%, #ccc0ee 100%));
   color: var(--ahv2-ink);
 }
 /* Signature interlocking sine-wave band, drawn just below the fixed header.
@@ -285,7 +285,7 @@
 }
 .ahv2-hero-photo--fallback {
   background: var(--gradient-hero,
-      linear-gradient(135deg, #fff8e7 0%, #ffe4d6 45%, #f2e1eb 100%));
+      linear-gradient(145deg, #fde0c8 0%, #f5c8b0 18%, #f0c0c0 35%, #e8c8e0 52%, #d8c0e8 72%, #ccc0ee 100%));
   animation: none;
   display: flex;
   flex-direction: column;
@@ -298,7 +298,7 @@
 
 /* Soft grid wash when design artwork is used as hero fill */
 .ahv2-hero-photo--fallback[style*="stay-design"] {
-  background-color: #ffe4d6;
+  background-color: #fde0c8;
 }
 .ahv2-hero-fallback-mark {
   display: flex;
@@ -591,8 +591,8 @@
    landscape photos, straight from the "Havelis worth the journey" mockup. */
 .ahv2-card {
   background: var(--ahv2-card, #ffffff);
-  border: 1px solid color-mix(in srgb, var(--brand-accent, #f08c71) 70%, #ffffff);
-  border-radius: 18px;
+  border: 1px solid color-mix(in srgb, var(--brand-accent, #d4724e) 35%, #ffffff);
+  border-radius: 1.25rem;
   overflow: hidden;
   cursor: pointer;
   transition: transform 240ms var(--ahv2-ease), box-shadow 240ms var(--ahv2-ease);
@@ -607,7 +607,7 @@
   border-color: var(--lavender, #c5b4f3);
 }
 .ahv2-card:hover {
-  transform: translateY(-3px);
+  transform: translateY(-7px);
   box-shadow: var(--ahv2-shadow-elev);
 }
 .ahv2-card-photo-wrap {
@@ -616,11 +616,11 @@
   overflow: hidden;
   aspect-ratio: 4 / 3;
   /* warm peach loading wash (lavender on even cards), never flat beige */
-  background: linear-gradient(135deg, #f7c4ae 0%, #ee9d7f 100%);
+  background: linear-gradient(140deg, #fde0c8 0%, #f5c8b0 55%, #ebb89a 100%);
   transition: box-shadow 240ms var(--ahv2-ease);
 }
 .ahv2-card:nth-child(even) .ahv2-card-photo-wrap {
-  background: linear-gradient(135deg, #d9cdf7 0%, #b6a3ee 100%);
+  background: linear-gradient(140deg, #e0d0f5 0%, #d8c0e8 55%, #c0a8d8 100%);
 }
 .ahv2-card-photo-inner {
   position: absolute;
