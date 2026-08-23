@@ -5,7 +5,7 @@ import './mobile-search.css';
 import MobileSearchPill from './MobileSearchPill';
 
 import { primaryNav, ctaNav, tripsMenuNav } from '../../../config/navigation';
-import { LOGO_URL } from '../../../config/branding';
+import { LOGO_URL, isWordmarkLogo } from '../../../config/branding';
 import { getTenantContext } from '../../../tenant/tenantContext';
 import { getTenantBrandName } from '../../../tenant/displayBrand';
 import { getTenantOverrides, shouldShowHostAcquisitionCtas } from '../../../tenant/tenantOverrides';
@@ -235,16 +235,16 @@ const Navbar = () => {
                 // text; a plain icon logo sits next to the navbar-logo-text span below, which
                 // already names the brand as real text — repeating it in alt is redundant
                 // (axe "image-redundant-alt"), so that case is marked decorative instead.
-                alt={logoSrc.includes("stay-bycityfocus") ? brandName || "Site logo" : ""}
-                className={`navbar-logo${logoSrc.includes("stay-bycityfocus") ? " navbar-logo--wordmark" : ""}`}
+                alt={isWordmarkLogo(logoSrc) ? brandName || "Site logo" : ""}
+                className={`navbar-logo${isWordmarkLogo(logoSrc) ? " navbar-logo--wordmark" : ""}${logoSrc.includes("atlas-homes-logo") ? " navbar-logo--stacked" : ""}`}
                 loading="eager"
                 decoding="async"
-                width={logoSrc.includes("stay-bycityfocus") ? 52 : 48}
-                height={logoSrc.includes("stay-bycityfocus") ? 48 : 48}
+                width={isWordmarkLogo(logoSrc) ? 52 : 48}
+                height={isWordmarkLogo(logoSrc) ? 48 : 48}
               />
             )}
             {/* Wordmark logos already include the brand name — hide duplicate text */}
-            {brandName && !logoSrc.includes("stay-bycityfocus") ? (
+            {brandName && !isWordmarkLogo(logoSrc) ? (
               <span className="navbar-logo-text">{brandName}</span>
             ) : null}
           </Link>

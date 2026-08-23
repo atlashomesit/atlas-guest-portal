@@ -5,7 +5,7 @@ import { IoIosMail, IoIosCall, IoIosArrowForward } from "react-icons/io";
 import { footerData } from '../../../data';
 import { Link } from 'react-router-dom';
 import { helpNav, moreNav, primaryNav } from '../../../config/navigation';
-import { LOGO_URL } from '../../../config/branding';
+import { LOGO_URL, isWordmarkLogo } from '../../../config/branding';
 import { getTenantContext } from '../../../tenant/tenantContext';
 import { hasOnlinePaymentRail } from '../../../tenant/paymentRail';
 import { getTenantBrandName } from '../../../tenant/displayBrand';
@@ -113,7 +113,7 @@ const Footer = () => {
                     {showLogo && (
                         <img
                             data-testid="footer-brand-logo"
-                            className={`rounded-md object-contain h-24 w-24 ${logoSrc.includes('stay-bycityfocus') ? 'bg-[var(--bg-primary)] p-2.5' : ''}`}
+                            className={`rounded-md object-contain h-24 w-24 ${isWordmarkLogo(logoSrc) ? 'bg-[var(--bg-primary)] p-2.5' : ''}`}
                             src={logoSrc}
                             alt={footerBrand}
                             width={96}

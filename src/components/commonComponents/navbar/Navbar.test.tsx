@@ -334,4 +334,26 @@ describe("Navbar CTA", () => {
 
     expect(brandLink).toHaveAccessibleName("Stay by CF — home");
   });
+
+  it("renders the Atlas Homes stacked lockup as a wordmark (no duplicate brand text)", () => {
+    vi.mocked(getTenantContext).mockReturnValue({
+      slug: "atlas",
+      name: "Atlastays",
+      isCustomDomain: false,
+    });
+    vi.mocked(getTenantOverrides).mockReturnValue({
+      logoUrl: "/images/atlas-homes-logo.png",
+    });
+
+    renderNavbar();
+
+    const brandLink = document.querySelector(".navbar-brand-link") as HTMLElement;
+    const logoImg = brandLink.querySelector("img.navbar-logo") as HTMLImageElement;
+    expect(logoImg.src).toContain("atlas-homes-logo.png");
+    expect(logoImg.className).toContain("navbar-logo--wordmark");
+    expect(logoImg.className).toContain("navbar-logo--stacked");
+    expect(logoImg.getAttribute("alt")).toBe("Atlastays");
+    expect(brandLink.querySelector(".navbar-logo-text")).toBeNull();
+    expect(brandLink).toHaveAccessibleName("Atlastays — home");
+  });
 });

@@ -5,6 +5,8 @@
  * absent. Other tenants are unaffected by entries added here.
  */
 
+import { ATLAS_HOMES_LOGO_URL } from "../config/branding";
+
 // Inline re-export of FaqHighlight to avoid circular deps with content/faqHighlights.ts
 export type TenantFaqEntry = {
   id: string;
@@ -192,6 +194,9 @@ const TENANT_OVERRIDES: Record<string, TenantOverrides> = {
     faviconUrl: '/images/stay-bycityfocus-logo.png',
   },
   atlas: {
+    // Marketplace lockup ships same-origin so the guest portal does not wait on the API logo.
+    logoUrl: ATLAS_HOMES_LOGO_URL,
+    faviconUrl: ATLAS_HOMES_LOGO_URL,
     // TASK-4300 (founder decision 2026-06-30): canonical guest-facing support WhatsApp =
     // +91-7032493290 (Atlastays platform line). The tenant API returns the Atlas Homes admin
     // number (9502244053) for whatsappBookingPhone, which is NOT the guest support line — pin
