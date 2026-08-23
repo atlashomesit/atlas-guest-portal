@@ -59,10 +59,22 @@ describe('applyTenantBranding — per-tenant brand assets', () => {
     expect(document.documentElement.style.getPropertyValue('--brand-logo-url')).toBe('');
   });
 
+  it('applies the Atlas Homes lockup for the atlas marketplace slug only', () => {
+    applyTenantBranding(makeTenant({ slug: 'atlas', name: 'Atlastays', isCustomDomain: false }));
+
+    expect(faviconHref()).toBe('/images/atlas-homes-logo.png');
+    expect(document.documentElement.style.getPropertyValue('--brand-logo-url')).toContain(
+      'atlas-homes-logo',
+    );
+    expect(document.documentElement.style.getPropertyValue('--brand-logo-url')).not.toContain(
+      'stay-bycityfocus',
+    );
+  });
+
   it('leaves the atlas marketplace tenant untouched by the staybycf artwork', () => {
     applyTenantBranding(makeTenant({ slug: 'atlas', name: 'Atlastays', isCustomDomain: false }));
 
-    expect(faviconHref()).toBe(STATIC_FAVICON);
+    expect(faviconHref()).toBe('/images/atlas-homes-logo.png');
     expect(document.documentElement.style.getPropertyValue('--brand-logo-url')).not.toContain(
       'stay-bycityfocus',
     );

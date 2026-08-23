@@ -168,6 +168,12 @@
   background: transparent;
 }
 
+/* Atlas Homes stacked lockup (mountain + ATLAS + HOMES + tagline). */
+.navbar-logo--stacked {
+  height: 56px;
+  max-width: min(96px, 38vw);
+}
+
 .navbar-logo:hover {
   opacity: 0.85;
 }
