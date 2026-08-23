@@ -5,11 +5,13 @@ import { IoIosMail, IoIosCall, IoIosArrowForward } from "react-icons/io";
 import { footerData } from '../../../data';
 import { Link } from 'react-router-dom';
 import { helpNav, moreNav, primaryNav } from '../../../config/navigation';
-import { LOGO_URL, isWordmarkLogo } from '../../../config/branding';
+import { isWordmarkLogo, resolveGuestLogoUrl } from '../../../config/branding';
 import { getTenantContext } from '../../../tenant/tenantContext';
 import { hasOnlinePaymentRail } from '../../../tenant/paymentRail';
 import { getTenantBrandName } from '../../../tenant/displayBrand';
 import { getTenantOverrides, shouldHideAtlasBranding } from '../../../tenant/tenantOverrides';
+import { getTenantSlug } from '../../../tenant/tenantResolver';
+import { hasRuntimeConfig, getRuntimeConfig } from '../../../runtime-config';
 import { formatDisplayNumber, getContactEmail, getTelLink, getWhatsAppLink, getGuestFacingPhone, getWhatsAppPhone } from '../../../config/contact';
 
 const iconMap = {
@@ -35,9 +37,20 @@ const Footer = () => {
     };
     // TASK-7428: gate only the payment-processor half of the TASK-4161 MOR disclosure.
     const showPaymentProcessorCredit = hasOnlinePaymentRail(tenant);
-    const overrides = getTenantOverrides(tenant?.slug);
+    const slug =
+        tenant?.slug ||
+        getTenantSlug({
+            fallbackSlug: hasRuntimeConfig() ? getRuntimeConfig().tenantKey : undefined,
+        });
+    const overrides = getTenantOverrides(slug);
     const hideAtlasBranding = shouldHideAtlasBranding(tenant, overrides);
-    const logoSrc = overrides.hideLogo ? "" : (overrides.logoUrl ?? tenant?.logoUrl ?? LOGO_URL);
+    const logoSrc = overrides.hideLogo
+        ? ""
+        : resolveGuestLogoUrl({
+            overrideLogoUrl: overrides.logoUrl,
+            tenantLogoUrl: tenant?.logoUrl,
+            slug,
+        });
     const showLogo = Boolean(logoSrc);
     // RA-006 §3.5: footer brand always prefers the tenant's own name. Atlas-specific
     // copy is reached only on the Atlas marketplace root where hideAtlasBranding=false.
