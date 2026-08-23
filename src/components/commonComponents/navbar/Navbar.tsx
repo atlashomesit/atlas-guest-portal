@@ -5,12 +5,14 @@ import './mobile-search.css';
 import MobileSearchPill from './MobileSearchPill';
 
 import { primaryNav, ctaNav, tripsMenuNav } from '../../../config/navigation';
-import { LOGO_URL, isWordmarkLogo } from '../../../config/branding';
+import { isWordmarkLogo, resolveGuestLogoUrl } from '../../../config/branding';
 import { getTenantContext } from '../../../tenant/tenantContext';
 import { getTenantBrandName } from '../../../tenant/displayBrand';
 import { getTenantOverrides, shouldShowHostAcquisitionCtas } from '../../../tenant/tenantOverrides';
+import { getTenantSlug } from '../../../tenant/tenantResolver';
 import { getAdminPortalLoginUrl } from '../../../config/adminPortal';
 import { formatDisplayNumber, getTelLink } from '../../../config/contact';
+import { hasRuntimeConfig, getRuntimeConfig } from '../../../runtime-config';
 import { trackEvent } from '../../../utils/analytics';
 import { getFavoriteIds } from '../../../utils/guestHistory';
 import { useBooking } from '../../../contexts/BookingContext';
@@ -19,10 +21,21 @@ import { LANGUAGE_SWITCHER_ENABLED } from '../../../i18n/i18n'; // TASK-4517
 
 const Navbar = () => {
   const tenant = getTenantContext();
-  const overrides = getTenantOverrides(tenant?.slug);
+  // When /tenants/from-domain fails locally, tenant context is null — still honour
+  // runtime config tenantKey so the marketplace lockup (and other atlas overrides) apply.
+  const slug =
+    tenant?.slug ||
+    getTenantSlug({
+      fallbackSlug: hasRuntimeConfig() ? getRuntimeConfig().tenantKey : undefined,
+    });
+  const overrides = getTenantOverrides(slug);
   // Repo-shipped per-tenant artwork (overrides.logoUrl) wins over the API logo;
   // both fall back to the brand-neutral placeholder for logo-less tenants.
-  const logoSrc = overrides.logoUrl ?? tenant?.logoUrl ?? LOGO_URL;
+  const logoSrc = resolveGuestLogoUrl({
+    overrideLogoUrl: overrides.logoUrl,
+    tenantLogoUrl: tenant?.logoUrl,
+    slug,
+  });
   // RA-006 §3.5: prefer tenant name everywhere; only fall back to "Home" on the Atlas root.
   const brandName = getTenantBrandName();
   const showLogo = !overrides.hideLogo;

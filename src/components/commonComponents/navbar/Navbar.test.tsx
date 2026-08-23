@@ -356,4 +356,26 @@ describe("Navbar CTA", () => {
     expect(brandLink.querySelector(".navbar-logo-text")).toBeNull();
     expect(brandLink).toHaveAccessibleName("Atlastays — home");
   });
+
+  it("shows the Atlas Homes lockup when tenant context is null but runtime tenantKey is atlas", async () => {
+    vi.mocked(getTenantContext).mockReturnValue(null);
+    // Use the real override table so slug "atlas" from runtime config resolves the lockup.
+    const actualOverrides = await vi.importActual<
+      typeof import("../../../tenant/tenantOverrides")
+    >("../../../tenant/tenantOverrides");
+    vi.mocked(getTenantOverrides).mockImplementation(actualOverrides.getTenantOverrides);
+
+    const { setRuntimeConfig } = await import("../../../runtime-config");
+    setRuntimeConfig({
+      apiBaseUrl: "http://127.0.0.1:5120",
+      environment: "local",
+      tenantKey: "atlas",
+    });
+
+    renderNavbar();
+
+    const logoImg = document.querySelector("img.navbar-logo") as HTMLImageElement;
+    expect(logoImg.src).toContain("atlas-homes-logo.png");
+    expect(logoImg.className).toContain("navbar-logo--stacked");
+  });
 });

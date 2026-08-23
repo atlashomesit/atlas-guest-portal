@@ -21,6 +21,26 @@ export function isWordmarkLogo(src: string): boolean {
   return src.includes("stay-bycityfocus") || src.includes("atlas-homes-logo");
 }
 
+/**
+ * Resolve the guest-facing logo. Prefer repo overrides / API logo; when the boot
+ * tenant context is still empty (local from-domain 404) but runtime `tenantKey`
+ * is the marketplace slug, still show the Atlas Homes lockup instead of the
+ * brand-neutral house placeholder.
+ */
+export function resolveGuestLogoUrl(args: {
+  overrideLogoUrl?: string;
+  tenantLogoUrl?: string;
+  /** Resolved or config fallback slug (atlas / staybycf / …). */
+  slug?: string | null;
+}): string {
+  if (args.overrideLogoUrl) return args.overrideLogoUrl;
+  const slug = (args.slug ?? "").trim().toLowerCase();
+  if (slug === "atlas" || slug === "marketplace" || slug === "marketplace-root") {
+    return ATLAS_HOMES_LOGO_URL;
+  }
+  return args.tenantLogoUrl ?? LOGO_URL;
+}
+
 /** Decorative property-card / gallery designs (theme mockup style) */
 export const PROPERTY_DESIGN_IMAGES = [
   "/images/stay-design-coral.svg",
