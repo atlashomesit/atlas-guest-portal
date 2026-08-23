@@ -7,9 +7,9 @@ type WaveDividerProps = {
 };
 
 const STROKE = {
-  coral: "var(--brand-accent, #f08c71)",
-  lavender: "var(--lavender, #c5b4f3)",
-  cream: "color-mix(in srgb, var(--brand-accent, #f08c71) 55%, #f2e1eb)",
+  coral: "var(--coral, var(--brand-accent, #d4724e))",
+  lavender: "var(--lavender-mid, var(--lavender, #d8c0e8))",
+  cream: "color-mix(in srgb, var(--coral, var(--brand-accent, #d4724e)) 55%, #fefcf9)",
 } as const;
 
 /**

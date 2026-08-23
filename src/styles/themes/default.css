@@ -1,89 +1,102 @@
-/* Stay by City Focus — Sandstone skin
-   Light cream · coral peach · soft lavender (from Theem images).
-   CTA solids stay WCAG-safe; gradients & accents keep the vibrant mockup coral. */
+/* Stay by City Focus — Ivory Peach skin
+   Gaurav Website visual language (design reference only).
+   Strict 10-color palette: Peach · Apricot · Blush · Mauve · Lavender · Lilac · Maroon · Coral · White · Ivory.
+   CTA fills stay WCAG AA with white labels; decorative coral keeps the reference hue. */
 :root,
 :root[data-theme="default"] {
-  /* Surfaces — warm cream, never stark white page wash */
-  --bg-primary: #fff8e7;
-  --bg-secondary: #fdf2e9;
+  /* ── Palette (Gaurav Website) ─────────────────────────────────────────── */
+  --peach: #fde0c8;
+  --apricot: #f5c8b0;
+  --blush: #f0c0c0;
+  --mauve: #e8c8e0;
+  --lavender-mid: #d8c0e8;
+  --lilac: #ccc0ee;
+  --maroon: #3b1f1e;
+  --coral: #d4724e;
+  --ivory: #fefcf9;
+
+  /* Surfaces — ivory canvas, never yellow cream or stark white page wash */
+  --bg-primary: #fefcf9;
+  --bg-secondary: #fde0c8;
   --bg-card: #ffffff;
   --bg-surface: #ffffff;
-  --bg-muted: #f5ebe0;
+  --bg-muted: #f5c8b0;
 
-  /* Brand — coral peach + lavender companion */
-  --brand-primary: #b8472f;
-  --brand-accent: #f08c71;
-  --brand-soft: #ffe4d6;
-  --accent-primary: #b8472f;
-  --accent-soft: #f2e1eb;
-  --romance-soft: #f0eafd;
-  --accent-primary-rgb: 184 71 47;
-  --accent-soft-rgb: 242 225 235;
+  /* Brand — coral CTA (AA-safe fill) + Gaurav coral accent */
+  --brand-primary: #c04528;
+  --brand-accent: #d4724e;
+  --brand-soft: #fde0c8;
+  --accent-primary: #c04528;
+  --accent-soft: #e8c8e0;
+  --romance-soft: #d8c0e8;
+  --accent-primary-rgb: 192 69 40;
+  --accent-soft-rgb: 232 200 224;
 
-  /* Lavender secondary (cards, callouts, section washes) */
-  --lavender: #c5b4f3;
-  --lavender-soft: #f0eafd;
+  --lavender: #d8c0e8;
+  --lavender-soft: #efe8f8;
   --lavender-deep: #8e7cc3;
 
-  /* Text-role accents — WCAG AA contract: every theme MUST set these to values
-     passing >=4.5:1 on ALL of its surface tints (here: #ffffff, #fff8e7, #ffefe6,
-     #f5ebe0, #f0eafd). Use for small/body TEXT only; decorative/CTA surfaces keep
-     the vibrant hues above. Verified: #b8472f = 5.28:1, #a84832 = 5.77:1, #6f5aa8 = 4.83-5.67. */
-  --accent-text: #a84832;
+  /* Text-role accents — WCAG AA (>=4.5:1) on ivory / white / peach tints.
+     Decorative/CTA surfaces keep the brighter Gaurav coral above. */
+  --accent-text: #a8442c;
   --lavender-text: #6f5aa8;
 
-  /* CTA — solid coral safe for white text (TASK-5218: was #c45a3f at 4.30:1); hover deeper */
-  --cta-primary: #b8472f;
-  --cta-primary-hover: #a84832;
-  --cta-secondary: #8e7cc3;
-  --cta-primary-rgb: 184 71 47;
-  --cta-primary-hover-rgb: 168 72 50;
-  --cta-secondary-rgb: 142 124 195;
+  /* CTA — solid coral safe for white text; hover darker (not lighter) */
+  --cta-primary: #c04528;
+  --cta-primary-hover: #a83c22;
+  --cta-secondary: #6f5aa8;
+  --cta-primary-rgb: 192 69 40;
+  --cta-primary-hover-rgb: 168 60 34;
+  --cta-secondary-rgb: 111 90 168;
 
-  /* Text — warm espresso / taupe (not pure black) */
-  --text-primary: #4a3535;
-  --text-secondary: #706060;
-  --text-muted: #6b5a55;
-  --text-body: #4a3535;
-  --text-on-hero: #4a3535;
+  /* Text — deep maroon ink */
+  --text-primary: #3b1f1e;
+  --text-secondary: #5c3d3c;
+  --text-muted: #6b4a48;
+  --text-body: #3b1f1e;
+  --text-on-hero: #3b1f1e;
 
-  /* Status & border */
+  /* Status & border — maroon-tinted hairlines */
   --success: #10b981;
   --support-success: #10b981;
   --support-danger: #dc2626;
   --support-error: #dc2626;
-  --border: #f0ddd0;
-  --border-subtle: #f0ddd0;
-  --border-strong: #e5cfc0;
+  --border: rgba(59, 31, 30, 0.12);
+  --border-subtle: rgba(59, 31, 30, 0.08);
+  --border-strong: rgba(59, 31, 30, 0.20);
 
-  /* Gradients — cream → peach → lavender (hero mockup) */
-  --gradient-hero: linear-gradient(135deg, #fff8e7 0%, #ffe4d6 45%, #f2e1eb 100%);
-  --gradient-cta: linear-gradient(135deg, #f08c71, #e86a4a);
-  --gradient-card: linear-gradient(180deg, rgba(240, 140, 113, 0.05) 0%, transparent 100%);
-  --gradient-section: linear-gradient(180deg, #fff8e7 0%, #f0eafd 100%);
+  /* Gradients — peach → apricot → blush → mauve → lavender → lilac */
+  --gradient-hero: linear-gradient(145deg,
+    #fde0c8 0%,
+    #f5c8b0 18%,
+    #f0c0c0 35%,
+    #e8c8e0 52%,
+    #d8c0e8 72%,
+    #ccc0ee 100%);
+  --gradient-cta: linear-gradient(135deg, #d4724e, #c04528);
+  --gradient-card: linear-gradient(140deg, #fde0c8 0%, #f5c8b0 55%, #ebb89a 100%);
+  --gradient-section: linear-gradient(180deg, #fefcf9 0%, #fde0c8 100%);
 
   /* Brand aliases for existing components */
-  --brand: #b8472f;
-  --brand-ink: #4a3535;
-  --brand-contrast: #fff8e7;
-  --brand-soft: #ffe4d6;
+  --brand: #c04528;
+  --brand-ink: #3b1f1e;
+  --brand-contrast: #fefcf9;
+  --util-bar-text: #f5c8b0;
 
-  /* Footer — deep chocolate brown from mockups */
-  --footer-bg: #4a3333;
-  --footer-text: #cbb8b0;
-  --footer-heading: #fff8e7;
-  --footer-link: #cbb8b0;
-  --footer-link-hover: #ffffff;
-  /* TASK-4951 — dark footer, base.css's own light-tuned --support-success-text
-     (#065f46) would be unreadable here; restore the original bright emerald-400,
-     which already clears AA on this dark bg (see base.css's comment + test file). */
-  --support-success-text: #34d399;
+  /* Footer — Gaurav apricot, maroon ink (LIGHT footer) */
+  --footer-bg: #f5c8b0;
+  --footer-text: #5c3d3c;
+  --footer-heading: #3b1f1e;
+  --footer-link: #5c3d3c;
+  --footer-link-hover: #c04528;
+  /* Light footer inherits base.css --support-success-text (#065f46). */
 
-  /* Shadows — soft warm */
-  --shadow-level-1: 0 2px 8px rgba(74, 53, 53, 0.05), 0 1px 3px rgba(74, 53, 53, 0.03);
-  --shadow-level-2: 0 8px 24px rgba(74, 53, 53, 0.07), 0 4px 12px rgba(74, 53, 53, 0.04);
-  --shadow-level-3: 0 24px 72px rgba(74, 53, 53, 0.09), 0 12px 32px rgba(74, 53, 53, 0.05);
+  /* Shadows — maroon-tinted only */
+  --shadow-level-1: 0 2px 12px rgba(59, 31, 30, 0.06);
+  --shadow-level-2: 0 4px 28px rgba(59, 31, 30, 0.08), 0 1px 4px rgba(59, 31, 30, 0.05);
+  --shadow-level-3: 0 14px 48px rgba(59, 31, 30, 0.14), 0 4px 12px rgba(59, 31, 30, 0.08);
   --shadow-1: var(--shadow-level-1);
   --shadow-2: var(--shadow-level-2);
   --shadow-3: var(--shadow-level-3);
+  --shadow-cta: 0 6px 22px rgba(212, 114, 78, 0.40);
 }

@@ -24,9 +24,9 @@ export const DEFAULT_LAYOUT_THEME_ID: LayoutThemeId = "classic";
 export const themeRegistry: Record<LayoutThemeId, LayoutThemeDefinition> = {
   classic: {
     id: "classic",
-    label: "Sandstone Coral (Classic)",
+    label: "Ivory Peach (Classic)",
     description:
-      "The current Atlas guest-portal look — cream/coral/lavender palette, the free default layout for every tenant.",
+      "The current Atlas guest-portal look — ivory/peach/lilac palette with coral CTAs, the free default layout for every tenant.",
     load: () => import("./classic"),
     // Implementation judgment call (task text, TASK-4903): a reasonable starting set for
     // the coral layout — `default` plus the four "Light Vibrant" presets (sunriseCoral/
