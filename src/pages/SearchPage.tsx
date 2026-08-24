@@ -287,7 +287,10 @@ const SearchPage = () => {
     const tenantOverrides = getTenantOverrides(getTenantContext()?.slug);
     const strictApiOnly = tenantOverrides.onlyApiListings === true;
     try {
-      const data = await fetchPublicListings(signal);
+      // TASK-8296: search must not serve a 60s-stale slice after a host publishes.
+      // Force a network fetch so a freshly published listing appears within 5s;
+      // the shared cache is still updated so non-search surfaces keep the TTL.
+      const data = await fetchPublicListings(signal, { bypassCache: true });
       let normalized = apiToNormalized(data);
       const allow = getTenantPublicListingIdAllowlist(tenantOverrides);
       if (allow.size > 0) {

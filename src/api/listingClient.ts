@@ -314,14 +314,29 @@ export function invalidatePublicListingsCache(): void {
   cachePromise = null;
 }
 
-export const fetchPublicListings = async (signal?: AbortSignal, options?: { locale?: string }): Promise<PublicListing[]> => {
-  // Return cached result if still within the freshness window
-  if (cachedListings != null && Date.now() - cachedListingsAt < PUBLIC_LISTINGS_TTL_MS) {
+/**
+ * TASK-8296: freshly published listings were invisible in guest /search for ~60s
+ * because search reused the same 60s TTL cache as the home grid. The publish
+ * path in atlas-api now invalidates server-side, but the guest portal must not
+ * keep serving a stale module-scoped slice after that — the search surface
+ * requires instant freshness while still allowing other surfaces to benefit
+ * from the TTL. `bypassCache` forces a network fetch irrespective of TTL and
+ * updates the shared cache so later TTL reads see the fresh rows. Publish
+ * returns 200 immediately; the refresh is async with zero enqueued delay
+ * (no 60-90s poll, no 5s+ host latency).
+ */
+export const fetchPublicListings = async (
+  signal?: AbortSignal,
+  options?: { locale?: string; bypassCache?: boolean },
+): Promise<PublicListing[]> => {
+  const bypassCache = options?.bypassCache === true;
+  // Return cached result if still within the freshness window (unless bypass requested)
+  if (!bypassCache && cachedListings != null && Date.now() - cachedListingsAt < PUBLIC_LISTINGS_TTL_MS) {
     return cachedListings;
   }
 
-  // Return existing promise if already fetching
-  if (cachePromise != null) {
+  // Return existing promise if already fetching (but bypass must start its own fetch)
+  if (!bypassCache && cachePromise != null) {
     return cachePromise;
   }
 
