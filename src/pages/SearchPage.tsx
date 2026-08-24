@@ -521,24 +521,15 @@ const SearchPage = () => {
         });
 
         const fetchPromise = (async () => {
-          const primary = buildApiUrl(
-            `/api/public/listings/availability?checkIn=${encodeURIComponent(startStr)}&checkOut=${encodeURIComponent(endStr)}`,
+          const batchUrl = buildApiUrl(
+            `/api/public/listings/availability-batch?startDate=${encodeURIComponent(startStr)}&endDate=${encodeURIComponent(endStr)}`,
           );
-          let listingIds: number[] | undefined;
-          const resPrimary = await fetch(primary, { signal: controller.signal, headers });
-          if (resPrimary.ok) {
-            listingIds = parseIds(await resPrimary.json());
-          } else {
-            const batchUrl = buildApiUrl(
-              `/api/public/listings/availability-batch?startDate=${encodeURIComponent(startStr)}&endDate=${encodeURIComponent(endStr)}`,
-            );
-            const resBatch = await fetch(batchUrl, { signal: controller.signal, headers });
-            if (resBatch.ok) {
-              const data = (await resBatch.json()) as { availableListingIds?: number[] };
-              listingIds = data.availableListingIds ?? parseIds(data);
-            }
+          const resBatch = await fetch(batchUrl, { signal: controller.signal, headers });
+          if (resBatch.ok) {
+            const data = (await resBatch.json()) as { availableListingIds?: number[] };
+            return data.availableListingIds ?? parseIds(data);
           }
-          return listingIds;
+          return undefined;
         })();
 
         const listingIds = await Promise.race([fetchPromise, timeoutPromise]);
