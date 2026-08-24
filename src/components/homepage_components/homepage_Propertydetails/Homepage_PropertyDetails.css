@@ -211,6 +211,15 @@
 
 .pp-cell-hero { grid-row: 1 / span 2; }
 
+/* TASK-8216: real <img> keeps mosaic identical via object-fit: cover */
+.pp-cell--photo { padding: 0; }
+.pp-gallery-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
 /* Editorial fallback art — coral / lavender / peach theme designs */
 .pp-cell-hero:not(.pp-cell--photo) {
   background-image: url("/images/stay-design-coral.svg");

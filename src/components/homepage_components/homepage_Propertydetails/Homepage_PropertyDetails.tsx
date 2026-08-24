@@ -28,7 +28,13 @@ import { buildHomeUnitPath, getPropertySlug } from '../../../utils/navigation';
 import { propertySlugMatchesListing } from '../../../utils/propertySlugMatch';
 import { useBooking } from '../../../contexts/BookingContext';
 import { resolveListing } from '../../../utils/listingResolver';
-import { filterGuestImageUrls, sanitizeGuestImageUrl } from '../../../utils/guestImageUrl';
+import {
+  buildGuestImageSrcSet,
+  filterGuestImageUrls,
+  GUEST_IMAGE_SRCSET_WIDTHS,
+  sanitizeGuestImageUrl,
+  toTransformedGuestImageUrl,
+} from '../../../utils/guestImageUrl';
 import {
   describeCancellationPolicy,
   resolveEffectiveCancellationTier,
@@ -1494,6 +1500,11 @@ useEffect(() => {
 
     const galleryUrls = filterGuestImageUrls(data?.property_img ?? []).map(buildAtlasMediaUrl);
     const primaryImage = galleryUrls[0];
+    // TASK-8216: route gallery URLs through /img transform (keeps mosaic visually identical via object-fit: cover)
+    const getGalleryTransformedUrl = (url: string, width: number) =>
+      toTransformedGuestImageUrl(url, width) ?? url;
+    const getGallerySrcSet = (url: string) =>
+      buildGuestImageSrcSet(url, GUEST_IMAGE_SRCSET_WIDTHS);
     const mapSrcTrimmed = (data?.property_mapSrc ?? "").trim();
 
     // ---- hi-fi design derived values ----------------------------------------
@@ -1725,16 +1736,25 @@ useEffect(() => {
 
             {/* ---- Gallery mosaic ---- */}
             <div className="pp-gallery" role="region" aria-label="Property photos" data-testid="property-photo-gallery">
-              {/* Hero cell */}
+              {/* Hero cell — TASK-8216: real <img> via /img transform, eager hero */}
               <div
                 className={`pp-cell pp-cell-hero${galleryUrls[0] ? ' pp-cell--photo' : ''}`}
-                style={galleryUrls[0]
-                  ? { backgroundImage: `url(${galleryUrls[0]})`, backgroundSize: 'cover', backgroundPosition: 'center' }
-                  : {}}
                 role="img"
                 aria-label={galleryUrls[0] ? `${data.property_name} — main photo` : `${data.property_name} — photo coming soon`}
               >
-                {!galleryUrls[0] && (
+                {galleryUrls[0] ? (
+                  <img
+                    src={getGalleryTransformedUrl(galleryUrls[0], 768)}
+                    srcSet={getGallerySrcSet(galleryUrls[0])}
+                    sizes="(max-width: 767px) 100vw, (max-width: 1023px) 100vw, 600px"
+                    alt={`${data.property_name} — main photo`}
+                    loading="eager"
+                    fetchPriority="high"
+                    decoding="async"
+                    className="pp-gallery-img"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                  />
+                ) : (
                   <div className="pp-cell-overlay">
                     <span className="pp-dot" aria-hidden="true" />
                     <span>Photos coming soon</span>
@@ -1742,7 +1762,7 @@ useEffect(() => {
                 )}
               </div>
 
-              {/* Thumbnail cells */}
+              {/* Thumbnail cells — TASK-8216: lazy, srcset over GUEST_IMAGE_SRCSET_WIDTHS */}
               {/* TASK-2889: render only cells that have a real photo — no fabricated
                   "Living/Kitchen/Bedroom/Balcony" placeholder tiles for sparse listings. */}
               {([1, 2, 3, 4] as const).map((i) => {
@@ -1752,10 +1772,20 @@ useEffect(() => {
                   <div
                     key={i}
                     className={`pp-cell pp-cell-${i + 1} pp-cell--photo`}
-                    style={{ backgroundImage: `url(${photo})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
                     role="img"
                     aria-label={`${data.property_name} — photo ${i + 1}`}
-                  />
+                  >
+                    <img
+                      src={getGalleryTransformedUrl(photo, 480)}
+                      srcSet={getGallerySrcSet(photo)}
+                      sizes="(max-width: 767px) 0px, (max-width: 1023px) 50vw, 280px"
+                      alt={`${data.property_name} — photo ${i + 1}`}
+                      loading="lazy"
+                      decoding="async"
+                      className="pp-gallery-img"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                    />
+                  </div>
                 );
               })}
 
@@ -1770,7 +1800,7 @@ useEffect(() => {
                     import('@fancyapps/ui/dist/fancybox/fancybox.css'),
                   ]).then(([{ Fancybox }]) => {
                     (Fancybox as { show: (items: object[]) => void }).show(
-                      galleryUrls.map((u) => ({ src: u, type: 'image' })),
+                      galleryUrls.map((u) => ({ src: getGalleryTransformedUrl(u, 1200), type: 'image' })),
                     );
                   }).catch(() => {});
                 }}
