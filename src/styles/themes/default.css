@@ -38,7 +38,7 @@
 
   /* Text-role accents — WCAG AA (>=4.5:1) on ivory / white / peach tints.
      Decorative/CTA surfaces keep the brighter Gaurav coral above. */
-  --accent-text: #a8442c;
+  --accent-text: #8f321e;
   --lavender-text: #6f5aa8;
 
   /* CTA — solid coral safe for white text; hover darker (not lighter) */
