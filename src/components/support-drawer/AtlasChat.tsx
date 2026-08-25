@@ -104,9 +104,10 @@ const AtlasChat = ({ onClose, listingId = null }: AtlasChatProps) => {
         {/* ❌ CROSS BUTTON */}
         <button
           onClick={onClose || (() => setIsOpen(false))}
+          aria-label="Close"
           className="p-0.5 rounded-full hover:bg-[color-mix(in_srgb,var(--text-on-cta)_20%,transparent)] transition text-[color-mix(in_srgb,var(--text-on-cta)_80%,transparent)] hover:text-[var(--text-on-cta)]"
         >
-          <X size={16} />
+          <X size={16} aria-hidden="true" />
         </button>
       </div>
 
@@ -136,11 +137,12 @@ const AtlasChat = ({ onClose, listingId = null }: AtlasChatProps) => {
       <div className="p-1.5 bg-bg-surface border-t border-border-subtle flex items-center gap-1">
         <button
           onClick={startSpeechToText}
+          aria-label="Start voice input"
           className={`p-1 rounded-full text-[11px] ${
             isListening ? 'bg-[var(--support-error)] text-[var(--text-on-cta)]' : 'bg-bg-muted text-text-muted hover:bg-[color-mix(in_srgb,var(--bg-muted)_60%,var(--text-muted)_10%)]'
           }`}
         >
-          <Mic size={18} />
+          <Mic size={18} aria-hidden="true" />
         </button>
 
         <input
@@ -153,9 +155,10 @@ const AtlasChat = ({ onClose, listingId = null }: AtlasChatProps) => {
 
         <button
           onClick={() => handleSend()}
+          aria-label="Send message"
           className="p-1 rounded-full bg-cta-primary text-[var(--text-on-cta)] text-[11px]"
         >
-          <Send size={18} />
+          <Send size={18} aria-hidden="true" />
         </button>
       </div>
     </div>
