@@ -341,8 +341,12 @@ interface Property {
     virtualTourUrl?: string | null;
     /** TASK-1385: Cancellation policy tier from listing — Flexible, Moderate, or Strict. */
     cancellationTier?: 'Flexible' | 'Moderate' | 'Strict' | null;
+    /** TASK-4356: free-cancellation window hours before check-in (server-resolved). */
+    cancellationWindowHours?: number | null;
     /** TASK-4405: server-resolved universal grace-window hours. Null when the flag is off (flag-off parity). */
     graceHours?: number | null;
+    /** TASK-5205 / TASK-956: minimum stay nights from listing payload. */
+    minStay?: number | null;
     /** TL-GUEST: from GET /listings/{id} or /listings/public — drives same Google Maps JS path as Location page. */
     latitude?: number | null;
     longitude?: number | null;
@@ -377,7 +381,9 @@ function coerceProperty(item: Partial<Property> & { id?: number | string }): Pro
         property_address: item.property_address,
         virtualTourUrl: item.virtualTourUrl,
         cancellationTier: item.cancellationTier,
+        cancellationWindowHours: (item as unknown as { cancellationWindowHours?: number | null }).cancellationWindowHours ?? null,
         graceHours: item.graceHours,
+        minStay: (item as unknown as { minStay?: number | null }).minStay ?? null,
         latitude: item.latitude,
         longitude: item.longitude,
     };
@@ -400,6 +406,45 @@ type ListingReviewRow = {
     ratingCheckin?: number | null;
     ratingCommunication?: number | null;
 };
+
+/** TASK-1979: row shape from `GET /api/public/listings/{id}` externalReviews array. */
+type ExternalReviewRow = {
+    guestName?: string;
+    rating?: number | null;
+    body?: string | null;
+    reviewDate?: string;
+    source?: string;
+    sourceUrl?: string | null;
+};
+
+type DisplayReviewRow = ListingReviewRow & {
+    displayKey: string;
+    isGoogle?: boolean;
+    sourceUrl?: string | null;
+};
+
+function mergeListingAndExternalReviews(
+    native: ListingReviewRow[],
+    external: ExternalReviewRow[],
+): DisplayReviewRow[] {
+    const externalRows: DisplayReviewRow[] = external.map((r, idx) => ({
+        id: -(idx + 1),
+        displayKey: `gbp-${idx}-${r.reviewDate ?? ''}`,
+        guestName: r.guestName ?? 'Google user',
+        rating: r.rating ?? 0,
+        body: r.body ?? null,
+        createdAt: r.reviewDate ? `${r.reviewDate}T00:00:00.000Z` : new Date(0).toISOString(),
+        isGoogle: true,
+        sourceUrl: r.sourceUrl ?? null,
+    }));
+    const nativeRows: DisplayReviewRow[] = native.map((r) => ({
+        ...r,
+        displayKey: `native-${r.id}`,
+    }));
+    return [...nativeRows, ...externalRows].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+}
 
 /** TASK-1359: Convert YouTube/Vimeo watch URL to embed URL, or return null if unrecognised. */
 function toEmbedUrl(url: string): string | null {
@@ -519,6 +564,8 @@ const PropertyDetails = () => {
         totalCount: number;
         reviews: ListingReviewRow[];
     }>(null);
+    /** TASK-1979: GBP-imported reviews from `GET /api/public/listings/{id}`. */
+    const [externalReviewsFromApi, setExternalReviewsFromApi] = useState<ExternalReviewRow[]>([]);
 
     // AMN-001: Fetch amenity master list once on mount
     useEffect(() => {
@@ -762,39 +809,68 @@ const PropertyDetails = () => {
         const lid = resolvedListingId;
         if (lid == null) {
             setListingReviewsFromApi(null);
+            setExternalReviewsFromApi([]);
             return;
         }
         const num = typeof lid === 'number' ? lid : Number(lid);
         if (!Number.isFinite(num) || num <= 0) {
             setListingReviewsFromApi(null);
+            setExternalReviewsFromApi([]);
             return;
         }
         const ac = new AbortController();
         setListingReviewsFromApi({ loading: true, averageRating: 0, totalCount: 0, reviews: [] });
+        setExternalReviewsFromApi([]);
         void (async () => {
             try {
-                const res = await fetch(buildApiUrl(`/api/listings/${num}/reviews`), {
-                    headers: getApiHeaders(),
-                    signal: ac.signal,
-                });
-                if (!res.ok) {
-                    if (!ac.signal.aborted) setListingReviewsFromApi(null);
-                    return;
-                }
-                const j = (await res.json()) as {
+                const [nativeRes, publicRes] = await Promise.all([
+                    fetch(buildApiUrl(`/api/listings/${num}/reviews`), {
+                        headers: getApiHeaders(),
+                        signal: ac.signal,
+                    }),
+                    fetch(buildApiUrl(`/api/public/listings/${num}`), {
+                        headers: getApiHeaders(),
+                        signal: ac.signal,
+                    }),
+                ]);
+                if (ac.signal.aborted) return;
+
+                type NativeReviewsPayload = {
                     averageRating?: number;
                     totalCount?: number;
                     reviews?: ListingReviewRow[];
                 };
-                if (ac.signal.aborted) return;
-                setListingReviewsFromApi({
-                    loading: false,
-                    averageRating: j.averageRating ?? 0,
-                    totalCount: j.totalCount ?? 0,
-                    reviews: Array.isArray(j.reviews) ? j.reviews : [],
-                });
+                let nativePayload: NativeReviewsPayload | null = null;
+                if (nativeRes.ok) {
+                    nativePayload = (await nativeRes.json()) as NativeReviewsPayload;
+                } else if (!ac.signal.aborted) {
+                    setListingReviewsFromApi(null);
+                }
+
+                if (publicRes.ok) {
+                    const publicPayload = (await publicRes.json()) as { externalReviews?: ExternalReviewRow[] };
+                    if (!ac.signal.aborted) {
+                        setExternalReviewsFromApi(
+                            Array.isArray(publicPayload.externalReviews) ? publicPayload.externalReviews : [],
+                        );
+                    }
+                } else if (!ac.signal.aborted) {
+                    setExternalReviewsFromApi([]);
+                }
+
+                if (nativePayload && !ac.signal.aborted) {
+                    setListingReviewsFromApi({
+                        loading: false,
+                        averageRating: nativePayload.averageRating ?? 0,
+                        totalCount: nativePayload.totalCount ?? 0,
+                        reviews: Array.isArray(nativePayload.reviews) ? nativePayload.reviews : [],
+                    });
+                }
             } catch {
-                if (!ac.signal.aborted) setListingReviewsFromApi(null);
+                if (!ac.signal.aborted) {
+                    setListingReviewsFromApi(null);
+                    setExternalReviewsFromApi([]);
+                }
             }
         })();
         return () => ac.abort();
@@ -1054,10 +1130,21 @@ const PropertyDetails = () => {
                             const raw = (apiListing as Record<string, unknown>).cancellationTier ?? pub.cancellationTier;
                             return (raw === 'Flexible' || raw === 'Moderate' || raw === 'Strict') ? raw : null;
                         })(), // TASK-1385
+                        cancellationWindowHours: (() => {
+                            const raw =
+                                (apiListing as Record<string, unknown>).cancellationWindowHours ??
+                                pub.cancellationWindowHours;
+                            return typeof raw === 'number' && raw > 0 ? raw : null;
+                        })(), // TASK-4356 / TASK-5205
                         graceHours: (() => {
                             const raw = (apiListing as Record<string, unknown>).graceHours ?? pub.graceHours;
                             return typeof raw === 'number' && raw > 0 ? raw : null;
                         })(), // TASK-4405
+                        minStay: (() => {
+                            const raw = (apiListing as Record<string, unknown>).minStay ?? pub.minStay;
+                            const n = raw == null || raw === '' ? NaN : Number(raw);
+                            return Number.isFinite(n) && n > 0 ? n : null;
+                        })(), // TASK-5205
                         latitude: (() => {
                             const raw =
                                 (apiListing as Record<string, unknown>).latitude ??
@@ -1456,9 +1543,19 @@ useEffect(() => {
         : (data.property_amenities || []).map((a) => a.amenities_icon ? formatAmenityName(a.amenities_icon) : 'Amenity');
 
     const ppApiReviews = listingReviewsFromApi;
-    const ppHasApiReviews = Boolean(ppApiReviews && !ppApiReviews.loading && ppApiReviews.totalCount > 0);
+    const ppMergedReviews = ppApiReviews && !ppApiReviews.loading
+        ? mergeListingAndExternalReviews(ppApiReviews.reviews, externalReviewsFromApi)
+        : [];
+    const ppCombinedReviewCount = ppMergedReviews.length;
+    const ppCombinedAverageRating = ppCombinedReviewCount > 0
+        ? ppMergedReviews.reduce((sum, r) => sum + (r.rating > 0 ? r.rating : 0), 0)
+            / ppMergedReviews.filter((r) => r.rating > 0).length
+        : 0;
+    const ppHasApiReviews = Boolean(
+        ppApiReviews && !ppApiReviews.loading && (ppApiReviews.totalCount > 0 || externalReviewsFromApi.length > 0),
+    );
     const ppDisplayedReviews = ppHasApiReviews
-        ? (showAllReviews ? ppApiReviews!.reviews : ppApiReviews!.reviews.slice(0, 6))
+        ? (showAllReviews ? ppMergedReviews : ppMergedReviews.slice(0, 6))
         : [];
     const ppAmenityDisplay = ppAmenityLabels.slice(0, 12);
     const ppAmenityCodes = data.amenityCodes && data.amenityCodes.length > 0
@@ -1554,11 +1651,11 @@ useEffect(() => {
                 )}
                 <h1 className="pp-display">{getListingDisplayName(data.id, data.property_name)}</h1>
                 <div className="pp-submeta">
-                  {ppHasApiReviews && (
+                  {ppHasApiReviews && ppCombinedReviewCount > 0 && (
                     <>
-                      <span className="pp-rating">
-                        ★ {ppApiReviews!.averageRating.toFixed(1)}{' '}
-                        <em>({ppApiReviews!.totalCount} {ppApiReviews!.totalCount === 1 ? 'review' : 'reviews'})</em>
+                      <span className="pp-rating" data-testid="property-header-rating">
+                        ★ {ppCombinedAverageRating.toFixed(1)}{' '}
+                        <em>({ppCombinedReviewCount} {ppCombinedReviewCount === 1 ? 'review' : 'reviews'})</em>
                       </span>
                       <span className="pp-submeta-sep" aria-hidden="true">·</span>
                     </>
@@ -2013,9 +2110,9 @@ useEffect(() => {
                       <div style={{ height: 120, borderRadius: 16, background: '#f0e6dc' }} />
                     </section>
                   );
-                  if (!api || api.totalCount <= 0) return null;
-                  const rating = api.averageRating;
-                  const count = api.totalCount;
+                  if (!api || (!api.loading && api.totalCount <= 0 && externalReviewsFromApi.length <= 0)) return null;
+                  const rating = ppCombinedAverageRating;
+                  const count = ppCombinedReviewCount;
                   return (
                     <section className="pp-section" aria-label="Guest reviews" data-testid="reviews-section">
                       <div className="pp-section-head">
@@ -2329,8 +2426,16 @@ useEffect(() => {
                         maxGuests={data.maxGuests}
                         propertySlug={propertySlugParam}
                         unitSlug={unitSlugParam}
-                        reviewRating={ppHasApiReviews ? ppApiReviews!.averageRating : undefined}
-                        reviewCount={ppHasApiReviews ? ppApiReviews!.totalCount : undefined}
+                        reviewRating={ppHasApiReviews ? ppCombinedAverageRating : undefined}
+                        reviewCount={ppHasApiReviews ? ppCombinedReviewCount : undefined}
+                        minStayNights={
+                          data.minStay != null && Number.isFinite(data.minStay) && data.minStay > 0
+                            ? data.minStay
+                            : 1
+                        }
+                        cancellationTier={data.cancellationTier ?? null}
+                        cancellationWindowHours={data.cancellationWindowHours ?? null}
+                        graceHours={data.graceHours ?? null}
                         onStickySummaryChange={setStickyBookingSummary}
                       />
                     </Suspense>
