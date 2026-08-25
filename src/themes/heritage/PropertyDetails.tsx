@@ -37,6 +37,7 @@ import { X, ShieldCheck, CalendarClock, CreditCard } from 'lucide-react';
 import { useEffect, useMemo, useState, Suspense, lazy } from 'react';
 import { useTenantListings } from '@/hooks/useTenantListings';
 import { usePropertyListings } from '@/hooks/usePropertyListings';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 import {
   describeCancellationPolicy,
   resolveEffectiveCancellationTier,
@@ -534,6 +535,16 @@ const PropertyDetails = () => {
     const [, setListingLookupError] = useState<string | null>(null);
     const [isListingLookupPending, setIsListingLookupPending] = useState(false);
     const [showAmenitiesModal, setShowAmenitiesModal] = useState(false);
+    const amenitiesModalRef = useFocusTrap<HTMLDivElement>(showAmenitiesModal);
+    const amenitiesModalTitleId = 'amenities-modal-title';
+    useEffect(() => {
+      if (!showAmenitiesModal) return;
+      const onKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') setShowAmenitiesModal(false);
+      };
+      document.addEventListener('keydown', onKeyDown);
+      return () => document.removeEventListener('keydown', onKeyDown);
+    }, [showAmenitiesModal]);
     const [showAboutMore, setShowAboutMore] = useState(false);
     const [showAllReviews, setShowAllReviews] = useState(false);
     const [stickyBookingSummary, setStickyBookingSummary] = useState<BookingStickySummary | null>(null);
@@ -2602,15 +2613,22 @@ useEffect(() => {
 
         {/* Amenities Modal — preserved from original */}
         {showAmenitiesModal && (
-          <div className="fixed inset-0 bg-[color:color-mix(in_srgb,var(--text-primary)_70%,transparent)] z-[var(--z-modal)] flex items-center justify-center p-4">
+          <div
+            ref={amenitiesModalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={amenitiesModalTitleId}
+            className="fixed inset-0 bg-[color:color-mix(in_srgb,var(--text-primary)_70%,transparent)] z-[var(--z-modal)] flex items-center justify-center p-4"
+          >
             <div className="bg-bg-surface rounded-lg max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-border-subtle">
               <div className="flex items-center justify-between p-6 border-b border-border-subtle">
-                <h3 className="text-xl sm:text-2xl font-semibold text-text-primary">All Amenities</h3>
+                <h3 id={amenitiesModalTitleId} className="text-xl sm:text-2xl font-semibold text-text-primary">All Amenities</h3>
                 <button
                   onClick={() => setShowAmenitiesModal(false)}
+                  aria-label="Close"
                   className="p-2 hover:bg-bg-muted rounded-full transition"
                 >
-                  <X className="w-5 h-5 sm:w-6 sm:h-6" />
+                  <X className="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" />
                 </button>
               </div>
               <div className="overflow-y-auto p-6" role="region" aria-label="List of all amenities">
