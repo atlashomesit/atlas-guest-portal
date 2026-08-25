@@ -1091,16 +1091,22 @@ const GuestDetailsPage: React.FC = () => {
 
               type RazorpayCheckout = {
                 open: () => void;
+                close: () => void;
                 on: (event: string, handler: (r: unknown) => void) => void;
               };
               const rzp = new window.Razorpay(options) as RazorpayCheckout;
 
               // TASK-4541: monitor hold expiry while payment modal is open and close on expiry
+              // TASK-8222: hard-close the modal on expiry — the hold-expiry gate exists but without
+              // closing Razorpay the guest can still pay into a released slot.
               const expireCheckInterval = setInterval(() => {
                 if (holdExpired || !holdExpiresAt) {
                   clearInterval(expireCheckInterval);
                   if (holdExpired && !paymentCompleted) {
                     paymentCompleted = true;
+                    checkoutSettledRef.current = true;
+                    try { rzp.close(); } catch { /* ignore */ }
+                    abandonPaymentPendingCheckout(bookingId, bookingToken ?? pendingBookingTokenRef.current);
                     setOrderError('Hold expired while payment was in progress. Please re-select your dates and try again.');
                     setIsSubmitting(false);
                   }
@@ -1110,6 +1116,9 @@ const GuestDetailsPage: React.FC = () => {
                 if (remainingMs <= 0 && !paymentCompleted) {
                   clearInterval(expireCheckInterval);
                   paymentCompleted = true;
+                  checkoutSettledRef.current = true;
+                  try { rzp.close(); } catch { /* ignore */ }
+                  abandonPaymentPendingCheckout(bookingId, bookingToken ?? pendingBookingTokenRef.current);
                   setOrderError('Hold expired while payment was in progress. Please re-select your dates and try again.');
                   setIsSubmitting(false);
                 }
