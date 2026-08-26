@@ -2,6 +2,9 @@ import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import { readdirSync, readFileSync } from "node:fs";
+// JavaScript adapter intentionally mirrors Vitest's internal threads worker protocol.
+// @ts-expect-error no declaration file is needed by the runtime-loaded config
+import isolatedBatchPool from "./scripts/vitest-isolated-batch-pool.mjs";
 
 // ---------------------------------------------------------------------------
 // isolate:false partition (2026-07-07) — ported from atlas-admin-portal
@@ -128,6 +131,18 @@ const tzEastFiles = testFiles.filter((f) => TZ_EAST_RE.test(f));
 const nonTzFiles = testFiles.filter((f) => !TZ_EAST_RE.test(f));
 const mockedFiles = nonTzFiles.filter((f) => usesModuleMocks.has(f));
 const sharedFiles = nonTzFiles.filter((f) => !usesModuleMocks.has(f));
+const gateBatchMode = process.env.ATLAS_VITEST_GATE_BATCH === "1";
+// These files depend on process-global date/fetch/tenant modules being born fresh.
+// Keep the boundary explicit and tiny; every other mocked file has passed with runner-level reset.
+const gateFreshFiles = [
+  "src/api/client.getApiHeaders.test.ts",
+  "src/components/homepage_components/slider/Slider.vrt.test.tsx",
+  "src/pages/MyBookingsPage.dateTz.test.tsx",
+  "src/pages/MyBookingsPage.reviewCta.test.tsx",
+  "src/tenant/displayBrand.slots.test.tsx",
+  "tests/DatePicker.test.tsx",
+];
+const gateReusableMockedFiles = mockedFiles.filter((f) => !gateFreshFiles.includes(f));
 
 // Windows: release gate runs API/admin/guest Vitest in parallel — keep 1 worker
 // to avoid pool startup timeouts / worker-heap exhaustion (see heavyRouteSmokes
@@ -178,8 +193,12 @@ export default defineConfig({
         test: {
           ...baseTest,
           name: "mocked-isolated",
-          include: mockedFiles,
-          isolate: true,
+          include: gateBatchMode ? gateReusableMockedFiles : mockedFiles,
+          // Normal test runs retain Vitest's stock fresh-worker isolation. STEP 1 reuses exactly
+          // one thread, while the adapter restores isolate:true inside the runner so Vitest still
+          // resets its module registry and mocker before every file.
+          isolate: !gateBatchMode,
+          pool: gateBatchMode ? isolatedBatchPool : ("threads" as const),
         },
       },
       {
@@ -191,6 +210,20 @@ export default defineConfig({
           isolate: false,
         },
       },
+      ...(gateBatchMode
+        ? [
+            {
+              extends: true,
+              test: {
+                ...baseTest,
+                name: "gate-fresh-isolated",
+                include: gateFreshFiles,
+                isolate: true,
+                pool: "threads" as const,
+              },
+            },
+          ]
+        : []),
       // Runs east of +05:30 — see the TZ-pinned partition note above. Isolated because these
       // files use vi.mock, and kept a separate project so the pin covers ONLY them.
       {
