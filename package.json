@@ -19,7 +19,7 @@
     "test:version-stamp": "node scripts/write-version-json.self-test.mjs",
     "check:local-network": "node tools/check-local-network-apis.mjs",
     "typecheck": "tsc -p tsconfig.app.json --noEmit",
-    "test": "node node_modules/vitest/vitest.mjs run",
+    "test": "npm run test:version-stamp && node node_modules/vitest/vitest.mjs run",
     "pretest": "npm run validate:legal",
     "lint": "eslint .",
     "format": "prettier -w .",
