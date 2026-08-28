@@ -38,6 +38,10 @@ import { formatCurrency } from '@/utils/formatting';
 import { formatDateInTimezone } from '@/utils/dateHelpers';
 import { track } from '@/lib/events';
 import { mapRazorpayFailureCode } from '@/utils/razorpayGuestErrors';
+import {
+  isServerTotalConfirmRequired,
+  razorpayOrderAmountInrToPaise,
+} from '@/utils/razorpayOrderAmount';
 import { formatDisplayNumber, getContactEmail, getTelLink, getWhatsAppLink } from '@/config/contact';
 import { computeCheckoutTotal } from '@/utils/guestPriceEstimate';
 import {
@@ -565,7 +569,9 @@ const GuestDetailsPage: React.FC = () => {
   const [orderErrorIs409, setOrderErrorIs409] = useState(false);
   const [paymentCancelled, setPaymentCancelled] = useState(false);
   const [razorpayOrderId, setRazorpayOrderId] = useState<string | null>(null);
-  const [razorpayAmountPaise, setRazorpayAmount] = useState<number | null>(null);
+  // PAISE. The value the API hands us is RUPEES — see razorpayOrderAmountInrToPaise,
+  // which is the single boundary where that conversion happens.
+  const [razorpayAmountPaise, setRazorpayAmountPaise] = useState<number | null>(null);
   const pendingBookingTokenRef = useRef<string | null>(null);
   // TASK-8219: the Razorpay-order bookingId for the CURRENT in-flight attempt, kept in sync
   // wherever pendingBookingTokenRef is (the two places a server order response is applied).
@@ -591,7 +597,8 @@ const GuestDetailsPage: React.FC = () => {
     keyId: string;
     orderId: string;
     bookingId: number;
-    amount: number;
+    /** PAISE — already converted at the order-response boundary. */
+    amountPaise: number;
     bookingToken: string | null;
     idempotencyKey: string; // TASK-4536: stable key for retry/resume deduplication
   } | null>(null);
@@ -790,7 +797,9 @@ const GuestDetailsPage: React.FC = () => {
         let keyId: string;
         let orderId: string;
         let bookingId: number;
-        let amount: number;
+        // PAISE throughout this function. The API returns RUPEES; the single conversion
+        // sits at the order-response boundary below (razorpayOrderAmountInrToPaise).
+        let amountPaise: number;
         let bookingToken: string | null = null;
         let idempotencyKey: string;
 
@@ -798,12 +807,12 @@ const GuestDetailsPage: React.FC = () => {
         if (pendingLaunch) {
           pendingRazorpayLaunchRef.current = null;
           setServerTotalConfirmRequired(false);
-          ({ keyId, orderId, bookingId, amount, bookingToken, idempotencyKey } = pendingLaunch);
+          ({ keyId, orderId, bookingId, amountPaise, bookingToken, idempotencyKey } = pendingLaunch);
           currentAttemptIdempotencyKeyRef.current = idempotencyKey;
           pendingBookingTokenRef.current = bookingToken;
           pendingBookingIdRef.current = bookingId; // TASK-8219: available to the pagehide/unmount abandon guard
           setRazorpayOrderId(orderId);
-          setRazorpayAmount(amount);
+          setRazorpayAmountPaise(amountPaise);
         } else {
           // TASK-4536: Generate stable idempotency key for this attempt (same key across retries).
           let idempotencyKey = currentAttemptIdempotencyKeyRef.current;
@@ -824,7 +833,8 @@ const GuestDetailsPage: React.FC = () => {
             orderId: respOrderId,
             bookingId: respBookingId,
             bookingToken: respBookingToken,
-            amount: respAmount,
+            // RUPEES, despite the name — see razorpayOrderAmount.ts for why.
+            amount: respAmountInr,
             appliedReferralCode: serverReferralCode,
             referralDiscountAmount: serverReferralDiscount,
             appliedPromoCode: serverPromoCode,
@@ -840,8 +850,8 @@ const GuestDetailsPage: React.FC = () => {
           if (!respBookingId || (typeof respBookingId !== 'number' && typeof respBookingId !== 'string')) {
             throw new Error('Checkout error: missing booking ID. Please try again.');
           }
-          if (!respAmount || typeof respAmount !== 'number' || respAmount <= 0) {
-            console.error('[GuestDetailsPage] Invalid amount:', respAmount);
+          if (!respAmountInr || typeof respAmountInr !== 'number' || respAmountInr <= 0) {
+            console.error('[GuestDetailsPage] Invalid amount (INR):', respAmountInr);
             throw new Error('Checkout error: invalid payment amount. Please try again.');
           }
 
@@ -888,21 +898,27 @@ const GuestDetailsPage: React.FC = () => {
           keyId = respKeyId;
           orderId = respOrderId;
           bookingId = Number(respBookingId);
-          amount = Number(respAmount);
+          // ── UNIT BOUNDARY ──────────────────────────────────────────────────────
+          // The API returns `amount` in RUPEES (RazorpayPaymentService.cs:658) even
+          // though the Razorpay order it created is in PAISE
+          // (RazorpayPaymentService.cs:575). Convert exactly once, here. Every
+          // consumer below — the divergence gate, the "Total updated" banner, the
+          // Pay CTA, the resume ref, the Razorpay checkout options — is in paise.
+          // Do not "simplify" this call away; see src/utils/razorpayOrderAmount.ts.
+          amountPaise = razorpayOrderAmountInrToPaise(Number(respAmountInr));
           bookingToken = typeof respBookingToken === 'string' ? respBookingToken.trim() : null;
 
           setRazorpayOrderId(orderId);
-          setRazorpayAmount(amount);
+          setRazorpayAmountPaise(amountPaise);
           pendingBookingTokenRef.current = bookingToken;
           pendingBookingIdRef.current = bookingId; // TASK-8219: available to the pagehide/unmount abandon guard
 
-          const clientQuotePaise = Math.round(displayTotal * 100);
-          if (Math.abs(amount - clientQuotePaise) > 100) {
+          if (isServerTotalConfirmRequired(amountPaise, displayTotal)) {
             pendingRazorpayLaunchRef.current = {
               keyId,
               orderId,
               bookingId,
-              amount,
+              amountPaise,
               bookingToken,
               idempotencyKey, // TASK-4536: stash the idempotency key so retries reuse it
             };
@@ -941,7 +957,8 @@ const GuestDetailsPage: React.FC = () => {
 
               const options = {
                 key: keyId,
-                amount: Number(amount),
+                // Razorpay checkout expects the smallest currency unit (paise).
+                amount: Number(amountPaise),
                 currency: 'INR',
                 name: getTenantContext()?.displayMerchantName ?? brandName,
                 description: `Booking confirmation`,
@@ -1137,7 +1154,7 @@ const GuestDetailsPage: React.FC = () => {
                 setOrderError(`No money was taken. ${mapRazorpayFailureCode(code, desc)}`);
                 // TASK-2906: Store the order ID and amount so the "Resume payment" button can retry
                 setRazorpayOrderId(orderId);
-                setRazorpayAmount(amount);
+                setRazorpayAmountPaise(amountPaise);
                 setPaymentCancelled(false);
                 setIsSubmitting(false);
               });
