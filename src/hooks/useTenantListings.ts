@@ -33,6 +33,8 @@ export type TenantPropertyRecord = {
   property_rating?: number;
   property_img?: string[];
   property_amenities?: { amenities_icon: string; name: string }[];
+  /** AMN-001: amenity codes from the public listing DTO for detail-page rendering. */
+  amenityCodes?: string[];
   property_policy_details?: { type: string; value: string }[];
   /** TASK-1360: ISO date of most recent checkout within 30 days (for social proof badge). */
   lastBookedAt?: string | null;
@@ -123,6 +125,9 @@ export const mapDtoToProperty = (dto: PublicListing): TenantPropertyRecord => {
     // DESIGN-031: amenities come from the API only (see listing detail amenityCodes). Do not
     // pad from bundled propertyData when dto.id collides with an Atlas demo unit.
     property_amenities: [],
+    amenityCodes: Array.isArray(dto.amenityCodes)
+      ? dto.amenityCodes.filter((code): code is string => typeof code === "string")
+      : [],
     property_policy_details: [],
     lastBookedAt: dto.lastBookedAt ?? null, // TASK-1360
     losDiscountMinNights: dto.losDiscountMinNights ?? null,
