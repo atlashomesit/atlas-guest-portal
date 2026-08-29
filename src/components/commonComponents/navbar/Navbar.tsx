@@ -5,12 +5,14 @@ import './mobile-search.css';
 import MobileSearchPill from './MobileSearchPill';
 
 import { primaryNav, ctaNav, tripsMenuNav } from '../../../config/navigation';
-import { LOGO_URL } from '../../../config/branding';
+import { isWordmarkLogo, resolveGuestLogoUrl } from '../../../config/branding';
 import { getTenantContext } from '../../../tenant/tenantContext';
 import { getTenantBrandName } from '../../../tenant/displayBrand';
 import { getTenantOverrides, shouldShowHostAcquisitionCtas } from '../../../tenant/tenantOverrides';
+import { getTenantSlug } from '../../../tenant/tenantResolver';
 import { getAdminPortalLoginUrl } from '../../../config/adminPortal';
 import { formatDisplayNumber, getTelLink } from '../../../config/contact';
+import { hasRuntimeConfig, getRuntimeConfig } from '../../../runtime-config';
 import { trackEvent } from '../../../utils/analytics';
 import { getFavoriteIds } from '../../../utils/guestHistory';
 import { useBooking } from '../../../contexts/BookingContext';
@@ -19,10 +21,21 @@ import { LANGUAGE_SWITCHER_ENABLED } from '../../../i18n/i18n'; // TASK-4517
 
 const Navbar = () => {
   const tenant = getTenantContext();
-  const overrides = getTenantOverrides(tenant?.slug);
+  // When /tenants/from-domain fails locally, tenant context is null — still honour
+  // runtime config tenantKey so the marketplace lockup (and other atlas overrides) apply.
+  const slug =
+    tenant?.slug ||
+    getTenantSlug({
+      fallbackSlug: hasRuntimeConfig() ? getRuntimeConfig().tenantKey : undefined,
+    });
+  const overrides = getTenantOverrides(slug);
   // Repo-shipped per-tenant artwork (overrides.logoUrl) wins over the API logo;
   // both fall back to the brand-neutral placeholder for logo-less tenants.
-  const logoSrc = overrides.logoUrl ?? tenant?.logoUrl ?? LOGO_URL;
+  const logoSrc = resolveGuestLogoUrl({
+    overrideLogoUrl: overrides.logoUrl,
+    tenantLogoUrl: tenant?.logoUrl,
+    slug,
+  });
   // RA-006 §3.5: prefer tenant name everywhere; only fall back to "Home" on the Atlas root.
   const brandName = getTenantBrandName();
   const showLogo = !overrides.hideLogo;
@@ -217,7 +230,17 @@ const Navbar = () => {
 
         {/* LEFT - Logo and Mobile Menu Button */}
         <div className="flex items-center justify-between w-full lg:w-auto">
-          <Link to="/" className="flex items-center gap-2 navbar-brand-link">
+          <Link
+            to="/"
+            className="flex items-center gap-2 navbar-brand-link"
+            // TASK-8215: the accessible name must not depend on visible text — the logo's
+            // alt is decorative ("") and .navbar-logo-text is display:none below 640px, so
+            // without this the link's accessible name computes to "" on mobile (axe
+            // link-name, WCAG 2.4.4/4.1.2). Derive from the resolved tenant brand name
+            // (falls back to the marketplace baseline, never empty) rather than hardcoding
+            // "Atlas" so white-label tenants get their own name here too.
+            aria-label={`${brandName || 'Atlas'} — home`}
+          >
             {showLogo && (
               <img
                 src={logoSrc}
@@ -225,16 +248,16 @@ const Navbar = () => {
                 // text; a plain icon logo sits next to the navbar-logo-text span below, which
                 // already names the brand as real text — repeating it in alt is redundant
                 // (axe "image-redundant-alt"), so that case is marked decorative instead.
-                alt={logoSrc.includes("stay-bycityfocus") ? brandName || "Site logo" : ""}
-                className={`navbar-logo${logoSrc.includes("stay-bycityfocus") ? " navbar-logo--wordmark" : ""}`}
+                alt={isWordmarkLogo(logoSrc) ? brandName || "Site logo" : ""}
+                className={`navbar-logo${isWordmarkLogo(logoSrc) ? " navbar-logo--wordmark" : ""}${logoSrc.includes("atlas-homes-logo") ? " navbar-logo--stacked" : ""}`}
                 loading="eager"
                 decoding="async"
-                width={logoSrc.includes("stay-bycityfocus") ? 52 : 48}
-                height={logoSrc.includes("stay-bycityfocus") ? 48 : 48}
+                width={isWordmarkLogo(logoSrc) ? 52 : 48}
+                height={isWordmarkLogo(logoSrc) ? 48 : 48}
               />
             )}
             {/* Wordmark logos already include the brand name — hide duplicate text */}
-            {brandName && !logoSrc.includes("stay-bycityfocus") ? (
+            {brandName && !isWordmarkLogo(logoSrc) ? (
               <span className="navbar-logo-text">{brandName}</span>
             ) : null}
           </Link>

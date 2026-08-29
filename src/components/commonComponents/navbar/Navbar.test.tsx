@@ -287,4 +287,95 @@ describe("Navbar CTA", () => {
     const duplicates = hrefs.filter((h, i) => hrefs.indexOf(h) !== i);
     expect(duplicates).toEqual([]);
   });
+
+  it("TASK-8215: brand link keeps a non-empty accessible name when the wordmark text is hidden (mobile breakpoint) — axe link-name", () => {
+    // Pin the tenant mock explicitly: vi.clearAllMocks() in beforeEach clears call history
+    // but not a mockReturnValue set by an earlier test in this file (e.g. TASK-7434's "Atlas
+    // Homes" tenant), so this test must not rely on ambient state left by test order.
+    vi.mocked(getTenantContext).mockReturnValue(null);
+    renderNavbar();
+
+    const brandLink = document.querySelector(".navbar-brand-link") as HTMLElement;
+    expect(brandLink).toBeTruthy();
+
+    // Sanity check on the root cause: the logo image is correctly decorative
+    // (contributes nothing to the accessible name) — the wordmark span is the only other
+    // source of a name, and TASK-8215's fix must not rely on it.
+    const logoImg = brandLink.querySelector("img.navbar-logo") as HTMLImageElement;
+    expect(logoImg).toBeTruthy();
+    expect(logoImg.getAttribute("alt")).toBe("");
+
+    // navbar.css hides `.navbar-logo-text` below the 640px breakpoint (block again at
+    // >=640px). Vitest's jsdom environment does not evaluate the imported external
+    // stylesheet's @media rule, so the hidden state axe-core observed at 412px is
+    // reproduced directly here via the same inline-style mechanism getComputedStyle
+    // honours — this is the exact DOM condition from TASK-8215's evidence, not a proxy
+    // for it.
+    const wordmark = brandLink.querySelector(".navbar-logo-text") as HTMLElement;
+    expect(wordmark).toBeTruthy();
+    wordmark.style.display = "none";
+
+    // With the decorative image and the now-hidden wordmark text both contributing
+    // nothing, only an aria-label can supply the accessible name. This is the exact
+    // assertion that failed (empty string) before TASK-8215's fix.
+    expect(brandLink).toHaveAccessibleName();
+    expect(brandLink).toHaveAccessibleName("Atlastays — home");
+  });
+
+  it("TASK-8215: brand link's accessible name is derived from the tenant name, not hardcoded 'Atlas'", () => {
+    vi.mocked(getTenantContext).mockReturnValue({ slug: "staybycf", name: "Stay by CF" });
+    vi.mocked(getTenantOverrides).mockReturnValue({});
+
+    renderNavbar();
+
+    const brandLink = document.querySelector(".navbar-brand-link") as HTMLElement;
+    const wordmark = brandLink.querySelector(".navbar-logo-text") as HTMLElement;
+    wordmark.style.display = "none";
+
+    expect(brandLink).toHaveAccessibleName("Stay by CF — home");
+  });
+
+  it("renders the Atlas Homes stacked lockup as a wordmark (no duplicate brand text)", () => {
+    vi.mocked(getTenantContext).mockReturnValue({
+      slug: "atlas",
+      name: "Atlastays",
+      isCustomDomain: false,
+    });
+    vi.mocked(getTenantOverrides).mockReturnValue({
+      logoUrl: "/images/atlas-homes-logo.png",
+    });
+
+    renderNavbar();
+
+    const brandLink = document.querySelector(".navbar-brand-link") as HTMLElement;
+    const logoImg = brandLink.querySelector("img.navbar-logo") as HTMLImageElement;
+    expect(logoImg.src).toContain("atlas-homes-logo.png");
+    expect(logoImg.className).toContain("navbar-logo--wordmark");
+    expect(logoImg.className).toContain("navbar-logo--stacked");
+    expect(logoImg.getAttribute("alt")).toBe("Atlastays");
+    expect(brandLink.querySelector(".navbar-logo-text")).toBeNull();
+    expect(brandLink).toHaveAccessibleName("Atlastays — home");
+  });
+
+  it("shows the Atlas Homes lockup when tenant context is null but runtime tenantKey is atlas", async () => {
+    vi.mocked(getTenantContext).mockReturnValue(null);
+    // Use the real override table so slug "atlas" from runtime config resolves the lockup.
+    const actualOverrides = await vi.importActual<
+      typeof import("../../../tenant/tenantOverrides")
+    >("../../../tenant/tenantOverrides");
+    vi.mocked(getTenantOverrides).mockImplementation(actualOverrides.getTenantOverrides);
+
+    const { setRuntimeConfig } = await import("../../../runtime-config");
+    setRuntimeConfig({
+      apiBaseUrl: "http://127.0.0.1:5120",
+      environment: "local",
+      tenantKey: "atlas",
+    });
+
+    renderNavbar();
+
+    const logoImg = document.querySelector("img.navbar-logo") as HTMLImageElement;
+    expect(logoImg.src).toContain("atlas-homes-logo.png");
+    expect(logoImg.className).toContain("navbar-logo--stacked");
+  });
 });

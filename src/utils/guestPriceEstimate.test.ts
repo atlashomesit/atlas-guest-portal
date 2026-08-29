@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   accommodationGstLineAmount,
-  accommodationGstSlabPercent,
   accommodationGstSlabPercentForChargedRate,
   estTotalInclGst,
   computeCheckoutTotal,
@@ -10,9 +9,11 @@ import {
 
 describe('guestPriceEstimate GST slab (TASK-2870/2871)', () => {
   it('uses 5% at or below ₹7,500/night and 18% above', () => {
-    expect(accommodationGstSlabPercent(7500)).toBe(5);
-    expect(accommodationGstSlabPercent(7501)).toBe(18);
-    expect(accommodationGstSlabPercent(0)).toBeNull();
+    // TASK-8294: repointed from the deleted two-band accommodationGstSlabPercent — see the
+    // dedicated describe block below for the full three-band boundary coverage including 0%.
+    expect(accommodationGstSlabPercentForChargedRate(7500)).toBe(5);
+    expect(accommodationGstSlabPercentForChargedRate(7501)).toBe(18);
+    expect(accommodationGstSlabPercentForChargedRate(0)).toBeNull();
   });
 
   it('computes additive GST on base fare', () => {
@@ -96,7 +97,8 @@ describe('guestPriceEstimate GST slab (TASK-2870/2871)', () => {
     const perNightFromDiscounted = Math.round(discountedSubtotal / nights);
 
     // GST should be on discountedSubtotal, not baseAmount
-    const gstPercent = accommodationGstSlabPercent(perNightFromDiscounted);
+    // TASK-8294: repointed from the deleted two-band accommodationGstSlabPercent.
+    const gstPercent = accommodationGstSlabPercentForChargedRate(perNightFromDiscounted);
     const gstLineAmount = accommodationGstLineAmount(discountedSubtotal, perNightFromDiscounted);
 
     // Expected: 9,000 × 5% = 450
@@ -123,12 +125,30 @@ describe('accommodationGstSlabPercentForChargedRate — TASK-7011/TASK-7543 mirr
     expect(accommodationGstSlabPercentForChargedRate(-100)).toBeNull();
   });
 
-  it('the old two-band accommodationGstSlabPercent still has NO exempt band (separate, still-open gap)', () => {
-    // Guards the deliberate choice to leave the 2-band function alone (UnitBookingWidget's/
-    // computeCheckoutTotal's client-fallback contract) rather than mutate its behavior in place —
-    // it still (wrongly, for a nil-rated stay, but unchanged on purpose) returns 5%, not 0%. This
-    // gap is orthogonal to the published-vs-charged basis fixed by TASK-7540.
-    expect(accommodationGstSlabPercent(600)).toBe(5);
+  it('TASK-8294: covers the widget/checkout fallback path\'s three reference rates — ₹800 (0%), ₹2,500 (5%), ₹8,000 (18%)', () => {
+    // Exercised through the exact functions UnitBookingWidget's fallback (guestPriceEstimate.ts:50,
+    // 117 and UnitBookingWidget.tsx's gstSlabPercent) calls: accommodationGstSlabPercentForChargedRate
+    // for the displayed percent, and accommodationGstLineAmount for the rupee line.
+    expect(accommodationGstSlabPercentForChargedRate(800)).toBe(0);
+    expect(accommodationGstSlabPercentForChargedRate(2500)).toBe(5);
+    expect(accommodationGstSlabPercentForChargedRate(8000)).toBe(18);
+
+    // ₹800/night must show NO GST line at all — not even the pre-existing ₹1 display floor
+    // (that floor exists only to keep a genuinely-taxed line from rounding down to ₹0; it must
+    // not manufacture a tax line for a stay that is legally nil-rated).
+    expect(accommodationGstLineAmount(800, 800)).toBe(0);
+    expect(accommodationGstLineAmount(2500, 2500)).toBe(125); // 5% of ₹2,500
+    expect(accommodationGstLineAmount(8000, 8000)).toBe(1440); // 18% of ₹8,000
+  });
+
+  it('TASK-8294: the two-band accommodationGstSlabPercent hazard is removed — every caller, including the client-side fallback paths, now uses this exempt-aware function', () => {
+    // Previously there were two near-identically-named slab helpers: this three-band function,
+    // and a two-band `accommodationGstSlabPercent` (5%/18% only, no exempt tier) that
+    // UnitBookingWidget's and computeCheckoutTotal's client-side FALLBACK paths called by
+    // mistake — quoting a "GST (5%)" line on a sub-₹1,000/night stay that is legally nil-rated.
+    // The two-band helper has been deleted outright (not merely fixed in place) so a future
+    // reader/caller cannot pick the wrong one again; this is now the ONLY accommodation GST slab
+    // function in the file.
     expect(accommodationGstSlabPercentForChargedRate(600)).toBe(0);
   });
 });
@@ -228,7 +248,8 @@ describe('computeCheckoutTotal — TASK-4831 prefers server finalAmount over cli
     });
 
     // Sanity: the discarded client recompute WOULD have used 18% and diverged.
-    expect(accommodationGstSlabPercent(result.perNight)).toBe(18);
+    // TASK-8294: repointed from the deleted two-band accommodationGstSlabPercent.
+    expect(accommodationGstSlabPercentForChargedRate(result.perNight)).toBe(18);
 
     // Total equals the server-authoritative finalAmount (no divergence, no "tap Pay again").
     expect(result.displayTotal).toBe(serverFinalAmount);

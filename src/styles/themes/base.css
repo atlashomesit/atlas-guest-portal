@@ -5,7 +5,8 @@ html {
 :root {
   /* Typography — Editorial display + clean body (no generic Inter/Roboto) */
   --font-family-base: "DM Sans", system-ui, -apple-system, sans-serif;
-  --font-family-display: "Cormorant Garamond", "Georgia", serif;  --font-size-xs: 0.75rem;
+  --font-family-display: "Cormorant Garamond", "Georgia", serif;
+  --font-size-xs: 0.75rem;
   --font-size-sm: 0.875rem;
   --font-size-md: 1rem;
   --font-size-lg: 1.125rem;
@@ -97,10 +98,11 @@ html {
 
   /* Radius (>=16px for cards/buttons per OLD design) */
   --radius-sm: 0.5rem;
-  --radius-md: 0.75rem;
-  --radius-lg: 1rem;
+  --radius-md: 0.875rem;
+  --radius-lg: 1.25rem;
   --radius-xl: 1.25rem;
-  --radius-2xl: 1.5rem;  --radius-pill: 999px;
+  --radius-2xl: 1.5rem;
+  --radius-pill: 50px;
 
   /* Design tokens */
   --color-bg: var(--bg-primary);
@@ -116,6 +118,8 @@ html {
   --border-default: var(--border-subtle);
   --shadow-soft: var(--shadow-level-1);
   --shadow-strong: var(--shadow-level-2);
+  --shadow-level-3: var(--shadow-level-2);
+  --shadow-cta: 0 6px 22px color-mix(in srgb, var(--cta-primary) 40%, transparent);
   --footer-text: color-mix(in srgb, var(--text-contrast) 82%, transparent);
   --footer-heading: var(--text-contrast);
   --footer-link: color-mix(in srgb, var(--text-contrast) 70%, transparent);
@@ -139,11 +143,12 @@ html {
   --z-modal: 50;
   --z-toast: 60;
 
-  /* Motion / Transitions */
+  /* Motion / Transitions — Gaurav ease + spring lift */
   --transition-fast: 160ms;
   --transition-base: 240ms;
   --transition-slow: 360ms;
-  --transition-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-ease: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 body {
@@ -164,8 +169,10 @@ body {
 
 /* Headings rhythm */
 h1, h2, h3, h4 {
-  letter-spacing: 0.02em;
-  line-height: 1.25;
+  font-family: var(--font-family-display);
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  line-height: 1.12;
 }
 
 h5, h6 {
@@ -178,7 +185,7 @@ button,
 .book-now,
 .cta-primary,
 .cta-secondary {
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-pill);
 }
 
 

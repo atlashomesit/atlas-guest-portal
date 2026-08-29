@@ -104,17 +104,42 @@ export type GuestPriceBreakdown = {
   finalAmount: number | null;
 };
 
-/** Room fare after all server-side rule adjustments, before GST/fees/tax. */
+/**
+ * Room fare after all server-side rule adjustments, before GST/fees/tourist tax.
+ *
+ * TASK-8293 — the pre- vs post-`BaseAmount` asymmetry, which is the whole trap here:
+ *
+ *   PRE  (already netted INTO `baseAmount`, so NEVER subtract again):
+ *     `losDiscountAmount`, `lastMinuteDiscountAmount`, `longStayDiscountAmount`,
+ *     `repeatGuestDiscountAmount`.
+ *     `PricingService` reassigns its running `baseAmount` as it applies each rule (LOS →
+ *     last-minute → minimum-price floor → long-stay) and `BuildBreakdown` returns
+ *     `BaseAmount = RoundCurrency(baseAmount)` — i.e. the POST-rule figure. These four
+ *     `*DiscountAmount` fields are REPORTING METADATA describing what each rule took off;
+ *     they are not amounts still owed to the guest.
+ *
+ *   POST (applied AFTER `BaseAmount` is fixed, so it MUST be subtracted here):
+ *     `discountAmount` — the tenant GLOBAL discount.
+ *     Same convention as every other PricingService DTO in this file:
+ *     `CalendarPricingDayDto` (`finalAmount = base − discount`, see `fetchPricingBreakdown`)
+ *     and `DailyListingPricingDto` (`actualPrice = base − discount`, see
+ *     `getTodayBreakdownFromListing`). `computeCheckoutTotal`
+ *     (src/utils/guestPriceEstimate.ts) states the same server contract for this exact
+ *     endpoint's `finalAmount`: "base − discount + GST + convenience fee", and backs the GST
+ *     line out of it on that basis.
+ *
+ * The previous implementation subtracted ALL FIVE. On any stay hitting the default long-stay
+ * rule (`LongStayDiscounts.Default` = 10% at 7+ nights, applied with no host configuration at
+ * all) that deducted the long-stay amount a second time, so the widget's accommodation line
+ * came out below the server's own base and the rendered line items no longer summed to the
+ * rendered Total — a silent, unexplained gap that reads to a guest as a hidden fee.
+ *
+ * The floored case is why "subtract the metadata" is wrong rather than merely redundant: when
+ * the minimum-price floor clamps `baseAmount`, the rule discounts were only PARTLY realised,
+ * so subtracting their full reported value understates the fare by more than was ever given.
+ */
 export function netChargeableRoomFare(b: GuestPriceBreakdown): number {
-  return Math.max(
-    0,
-    b.baseAmount -
-      b.discountAmount -
-      b.losDiscountAmount -
-      b.lastMinuteDiscountAmount -
-      b.repeatGuestDiscountAmount -
-      b.longStayDiscountAmount,
-  );
+  return Math.max(0, b.baseAmount - b.discountAmount);
 }
 
 /**

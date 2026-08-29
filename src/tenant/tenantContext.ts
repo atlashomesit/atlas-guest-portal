@@ -134,6 +134,25 @@ export interface TenantLegalContactPack {
 
 let tenantInfo: TenantInfo | null = null;
 
+/** TASK-8356: exported parser for legalContactPack — replaces tautological local copy in morDisclosure.test.ts */
+export function parseLegalContactPack(data: Record<string, unknown>): TenantLegalContactPack | undefined {
+  const pack = data.legalContactPack as Record<string, unknown> | null | undefined;
+  if (!pack) return undefined;
+  return {
+    legalName: typeof pack.legalName === 'string' ? pack.legalName : undefined,
+    displayName: typeof pack.displayName === 'string' ? pack.displayName : undefined,
+    contactEmail: typeof pack.contactEmail === 'string' ? pack.contactEmail : undefined,
+    contactPhone: typeof pack.contactPhone === 'string' ? pack.contactPhone : undefined,
+    registeredAddress: typeof pack.registeredAddress === 'string' ? pack.registeredAddress : undefined,
+    city: typeof pack.city === 'string' ? pack.city : undefined,
+    state: typeof pack.state === 'string' ? pack.state : undefined,
+    pincode: typeof pack.pincode === 'string' ? pack.pincode : undefined,
+    gstin: typeof pack.gstin === 'string' ? pack.gstin : undefined,
+    showAtlasFooterCredit: Boolean(pack.showAtlasFooterCredit),
+    isCustomDomain: Boolean(pack.isCustomDomain),
+  };
+}
+
 /** Test-only: clear resolved tenant info (module state outlives test files under isolate:false). */
 export function _resetTenantContextForTests(): void {
   tenantInfo = null;
@@ -275,21 +294,7 @@ export async function resolveFromDomain(apiBaseUrl: string, domain: string): Pro
             landmarks: Array.isArray(data.locationContent.landmarks) ? data.locationContent.landmarks : undefined,
           }
         : undefined,
-      legalContactPack: data.legalContactPack
-        ? {
-            legalName: typeof data.legalContactPack.legalName === 'string' ? data.legalContactPack.legalName : undefined,
-            displayName: typeof data.legalContactPack.displayName === 'string' ? data.legalContactPack.displayName : undefined,
-            contactEmail: typeof data.legalContactPack.contactEmail === 'string' ? data.legalContactPack.contactEmail : undefined,
-            contactPhone: typeof data.legalContactPack.contactPhone === 'string' ? data.legalContactPack.contactPhone : undefined,
-            registeredAddress: typeof data.legalContactPack.registeredAddress === 'string' ? data.legalContactPack.registeredAddress : undefined,
-            city: typeof data.legalContactPack.city === 'string' ? data.legalContactPack.city : undefined,
-            state: typeof data.legalContactPack.state === 'string' ? data.legalContactPack.state : undefined,
-            pincode: typeof data.legalContactPack.pincode === 'string' ? data.legalContactPack.pincode : undefined,
-            gstin: typeof data.legalContactPack.gstin === 'string' ? data.legalContactPack.gstin : undefined,
-            showAtlasFooterCredit: Boolean(data.legalContactPack.showAtlasFooterCredit),
-            isCustomDomain: Boolean(data.legalContactPack.isCustomDomain),
-          }
-        : undefined,
+      legalContactPack: parseLegalContactPack(data as Record<string, unknown>),
       // TASK-4381/4386 / ADR-0068
       isInternal: Boolean(data.isInternal),
       // TASK-4903/4904 (ADR-0081): read defensively — undefined until TASK-4904 ships the

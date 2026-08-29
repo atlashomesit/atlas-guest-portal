@@ -7,7 +7,9 @@ const config: CapacitorConfig = {
   plugins: {
     SplashScreen: {
       launchAutoHide: false,
-      backgroundColor: '#ea580c',
+      // Must match the ground of resources/splash.png (white with the sky-blue mark).
+      // A mismatched colour shows as a border on aspect ratios the splash does not fill.
+      backgroundColor: '#FFFFFF',
     },
   },
 };

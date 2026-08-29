@@ -26,10 +26,28 @@ describe('GuestDetailsPage TASK-5183 abandon-checkout wiring', () => {
     const calls = content.match(/abandonPaymentPendingCheckout\(/g) ?? [];
     expect(calls.length).toBeGreaterThanOrEqual(2);
     expect(content).toContain('handleBackToProperty');
-    expect(content).toMatch(/const handleClose = \(\) => \{[\s\S]{0,300}abandonPaymentPendingCheckout/);
-    expect(content).toMatch(/handleBackToProperty = useCallback\(\(\) => \{[\s\S]{0,300}abandonPaymentPendingCheckout/);
+    expect(content).toMatch(/const handleClose = \(\) => \{[\s\S]{0,600}abandonPaymentPendingCheckout/);
+    expect(content).toMatch(/handleBackToProperty = useCallback\(\(\) => \{[\s\S]{0,600}abandonPaymentPendingCheckout/);
     // payment.failed must keep the draft for TASK-2906 resume
     expect(content).not.toMatch(/payment\.failed[\s\S]{0,500}abandonPaymentPendingCheckout/);
+  });
+
+  it('TASK-8219: also fires abandon on pagehide/visibilitychange and on unmount (browser Back / swipe-back / tab-close)', () => {
+    // pagehide + visibilitychange, NOT beforeunload (unreliable on mobile Safari).
+    expect(content).toContain("window.addEventListener('pagehide'");
+    expect(content).toContain("document.addEventListener('visibilitychange'");
+    expect(content).not.toMatch(/addEventListener\(['"]beforeunload['"]/);
+
+    // The unmount cleanup of that same effect is the React-Router-native guard for in-SPA
+    // navigation away from /details (this app mounts a plain <BrowserRouter>, so `useBlocker`,
+    // which requires a data router, is not available here).
+    expect(content).toMatch(/return \(\) => \{[\s\S]{0,400}fireAbandonOnce/);
+
+    // Every abandon call site — including the new automatic ones — shares one settled guard,
+    // so a single guest departure can only ever send one abandon-checkout POST.
+    const settledSets = content.match(/checkoutSettledRef\.current = true/g) ?? [];
+    expect(settledSets.length).toBeGreaterThanOrEqual(4); // handleClose, payment success, back-to-property, the shared automatic guard
+    expect(content).toMatch(/if \(checkoutSettledRef\.current\) return;\s*\n\s*checkoutSettledRef\.current = true;/);
   });
 });
 

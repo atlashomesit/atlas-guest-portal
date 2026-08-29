@@ -5,13 +5,41 @@
  * `tenant.logoUrl` is unset (e.g. cold load before /tenants/from-domain returns,
  * or a brand-new tenant that hasn't uploaded a logo yet). Tenants who have a logo
  * configured will see *their own* logo via `tenant.logoUrl`. The atlas marketplace
- * apex sets its logo via the API, so users on atlastays.com still see the Atlas brand.
+ * apex ships its lockup via `TENANT_OVERRIDES.atlas.logoUrl` (`ATLAS_HOMES_LOGO_URL`).
  *
- * Per-tenant logo artwork that ships in this repo (e.g. Stay by City Focus) is
- * wired through `TENANT_OVERRIDES[slug].logoUrl` in tenant/tenantOverrides.ts —
+ * Per-tenant logo artwork that ships in this repo (e.g. Stay by City Focus, Atlas Homes)
+ * is wired through `TENANT_OVERRIDES[slug].logoUrl` in tenant/tenantOverrides.ts —
  * never through this fallback, which must stay brand-neutral.
  */
 export const LOGO_URL = "/images/tenant-logo-placeholder.svg";
+
+/** Marketplace lockup: mountain mark + ATLAS HOMES + tagline. Atlas slug only. */
+export const ATLAS_HOMES_LOGO_URL = "/images/atlas-homes-logo.png";
+
+/** True when `src` is a repo-shipped wordmark (already spells the brand; hide duplicate text). */
+export function isWordmarkLogo(src: string): boolean {
+  return src.includes("stay-bycityfocus") || src.includes("atlas-homes-logo");
+}
+
+/**
+ * Resolve the guest-facing logo. Prefer repo overrides / API logo; when the boot
+ * tenant context is still empty (local from-domain 404) but runtime `tenantKey`
+ * is the marketplace slug, still show the Atlas Homes lockup instead of the
+ * brand-neutral house placeholder.
+ */
+export function resolveGuestLogoUrl(args: {
+  overrideLogoUrl?: string;
+  tenantLogoUrl?: string;
+  /** Resolved or config fallback slug (atlas / staybycf / …). */
+  slug?: string | null;
+}): string {
+  if (args.overrideLogoUrl) return args.overrideLogoUrl;
+  const slug = (args.slug ?? "").trim().toLowerCase();
+  if (slug === "atlas" || slug === "marketplace" || slug === "marketplace-root") {
+    return ATLAS_HOMES_LOGO_URL;
+  }
+  return args.tenantLogoUrl ?? LOGO_URL;
+}
 
 /** Decorative property-card / gallery designs (theme mockup style) */
 export const PROPERTY_DESIGN_IMAGES = [

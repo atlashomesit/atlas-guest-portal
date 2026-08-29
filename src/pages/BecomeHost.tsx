@@ -91,7 +91,7 @@ const stepLabels = ["Contact", "Property", "Import & Confirm"];
 const styles = {
   page: {
     minHeight: "100vh",
-    background: "var(--gradient-hero, linear-gradient(135deg, #fff8e7 0%, #ffe4d6 45%, #f2e1eb 100%))",
+    background: "var(--gradient-hero, linear-gradient(145deg, #fde0c8 0%, #f5c8b0 18%, #f0c0c0 35%, #e8c8e0 52%, #d8c0e8 72%, #ccc0ee 100%))",
     paddingTop: 40,
     paddingBottom: 60,
   } as React.CSSProperties,
@@ -609,7 +609,7 @@ const BecomeHost = () => {
             onChange={(e) => setEstimatorRooms(e.target.valueAsNumber)}
             aria-label="Number of rooms"
             aria-valuetext={`${estimatorRooms} ${estimatorRooms === 1 ? "room" : "rooms"}`}
-            className="w-full accent-[#b8472f]"
+            className="w-full accent-[#c04528]"
           />
           <div
             className="flex justify-between text-base mt-1 mb-4"

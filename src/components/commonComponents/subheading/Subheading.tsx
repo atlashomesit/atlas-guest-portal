@@ -1,15 +1,26 @@
 import { Link } from "react-router-dom";
-import { LOGO_URL } from "../../../config/branding";
+import { resolveGuestLogoUrl } from "../../../config/branding";
 import { getTenantContext } from "../../../tenant/tenantContext";
 import { getTenantBrandName } from "../../../tenant/displayBrand";
 import { getTenantOverrides } from "../../../tenant/tenantOverrides";
+import { getTenantSlug } from "../../../tenant/tenantResolver";
+import { hasRuntimeConfig, getRuntimeConfig } from "../../../runtime-config";
 
 const Subheading = () => {
     const tenant = getTenantContext();
-    const overrides = getTenantOverrides(tenant?.slug);
+    const slug =
+        tenant?.slug ||
+        getTenantSlug({
+            fallbackSlug: hasRuntimeConfig() ? getRuntimeConfig().tenantKey : undefined,
+        });
+    const overrides = getTenantOverrides(slug);
     const brandName = getTenantBrandName();
     const showLogo = !overrides.hideLogo;
-    const logoSrc = overrides.logoUrl ?? tenant?.logoUrl ?? LOGO_URL;
+    const logoSrc = resolveGuestLogoUrl({
+        overrideLogoUrl: overrides.logoUrl,
+        tenantLogoUrl: tenant?.logoUrl,
+        slug,
+    });
 
     return (
         <section>

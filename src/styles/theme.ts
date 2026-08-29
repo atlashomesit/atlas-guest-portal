@@ -1,7 +1,7 @@
 export const themeRegistry = {
   default: { 
-    label: "Sandstone Coral",
-    description: "Cream, coral peach & soft lavender — light heritage stay skin"
+    label: "Ivory Peach",
+    description: "Ivory canvas, peach-to-lilac hero, coral CTAs and maroon ink"
   },
   privateIslandNoir: {
     label: "Private Island Noir",
