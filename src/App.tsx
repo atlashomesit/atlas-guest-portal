@@ -67,6 +67,8 @@ const PageNotFound = React.lazy(() => import("./pages/pagenotfound/PageNotFound"
 const AtlasOnlyCityLanding = React.lazy(() => import("./pages/AtlasOnlyCityLanding"))
 // TASK-2612: Two-step booking flow — guest details step after Reserve
 const GuestDetailsPage = React.lazy(() => import("./pages/booking/GuestDetailsPage"))
+// TASK-8093: Embeddable booking widget (iframe entry)
+const EmbedPage = React.lazy(() => import("./pages/EmbedPage"))
 // TASK-4017: Guest OTP login
 const GuestLoginPage = React.lazy(() => import("./pages/GuestLoginPage"))
 
@@ -128,10 +130,13 @@ function AppWrapper() {
   }, []);
 
   const hideNavbarRoutes = ['/property_LocationDetails/:id'];
+  // TASK-8093: embed widget runs inside an iframe on a host's own site — no Atlas chrome.
+  const isEmbedRoute = Boolean(matchPath('/embed/:embedKey', location.pathname));
 
-  const shouldHideNavbar = hideNavbarRoutes.some((pattern) =>
+  const shouldHideNavbar = isEmbedRoute || hideNavbarRoutes.some((pattern) =>
     Boolean(matchPath(pattern, location.pathname))
   );
+  const shouldHideFooter = isEmbedRoute;
 
   const withBoundary = (element: React.ReactNode, name: string) => (
     <ErrorBoundary key={`${name}-${location.pathname}`} name={name}>
@@ -230,6 +235,8 @@ function AppWrapper() {
           <Route path="/my-bookings" element={withBoundary(<Suspense fallback={<LazyFallback />}><MyBookingsPage /></Suspense>, "my-bookings-route")} />
           {/* TASK-4283: /bookings used to hit the catch-all "Link not found" — alias it to /my-bookings. */}
           <Route path="/bookings" element={withBoundary(<Navigate to="/my-bookings" replace />, "bookings-alias-route")} />
+          {/* TASK-8093: embeddable widget iframe — must be before /:shortCode catch-all, no navbar/footer */}
+          <Route path="/embed/:embedKey" element={withBoundary(<Suspense fallback={<LazyFallback />}><EmbedPage /></Suspense>, "embed-widget-route")} />
           <Route path="/login" element={withBoundary(<Suspense fallback={<LazyFallback />}><GuestLoginPage /></Suspense>, "guest-login-route")} />
           <Route path="/favorites" element={withBoundary(<Suspense fallback={<LazyFallback />}><FavoritesPage /></Suspense>, "favorites-route")} />
           <Route path="/saved" element={withBoundary(<Navigate to="/favorites" replace />, "saved-alias-route")} />
@@ -246,9 +253,9 @@ function AppWrapper() {
         </Suspense>
         </main>
       </ErrorBoundary>
-      <Suspense fallback={null}><SupportWidget /></Suspense>
-      <Footer />
-      <Suspense fallback={null}><CookieConsentBanner /></Suspense>
+      {!shouldHideFooter && <Suspense fallback={null}><SupportWidget /></Suspense>}
+      {!shouldHideFooter && <Footer />}
+      {!shouldHideFooter && <Suspense fallback={null}><CookieConsentBanner /></Suspense>}
       <ToastContainer position="top-right" newestOnTop pauseOnFocusLoss={false} />
     </>
   );
