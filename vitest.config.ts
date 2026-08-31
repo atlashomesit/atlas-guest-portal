@@ -148,14 +148,15 @@ const sharedFiles = nonTzFiles.filter((f) => !usesModuleMocks.has(f));
 // against a machine state that no longer occurs — and guest at 571s is the long pole of STEP 1's
 // parallel phase because of it.
 //
-// So the cap becomes a floor-1 default the CALLER may raise. Default is UNCHANGED on win32, so local
-// `npm test`, CI, and any caller that does not set the variable keep exactly the settled behaviour.
-// release-gate.ps1 sets ATLAS_GUEST_VITEST_MAX_WORKERS only for the window it knows admin has left.
+// TASK-8374: caps raised to 4 — the collision that justified 1 no longer exists (admin runs alone,
+// guest not in same window, 4 is safe per 2026-08-23 trial). Default is now 4 on win32, so local
+// `npm test`, CI, and any caller that does not set the variable now get the measured 4, not the
+// contended 1. release-gate.ps1 no longer needs to set ATLAS_GUEST_VITEST_MAX_WORKERS for this window.
 //
-// ⛔ If admin's vitest is ever returned to the 4-way window, DELETE the gate's env line — do not
-// re-tune this. The pin is correct for the contended case and always was.
+// ⛔ If admin's vitest is ever returned to the 4-way window, re-evaluate — the pin was correct for
+// the contended case.
 const envGuestCap = Number.parseInt(process.env.ATLAS_GUEST_VITEST_MAX_WORKERS ?? "", 10);
-const guestCapValue = Number.isFinite(envGuestCap) && envGuestCap > 0 ? envGuestCap : 1;
+const guestCapValue = Number.isFinite(envGuestCap) && envGuestCap > 0 ? envGuestCap : 4;
 const workerCap =
   process.platform === "win32"
     ? { maxWorkers: guestCapValue, fileParallelism: guestCapValue > 1 }
