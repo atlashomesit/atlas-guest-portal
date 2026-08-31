@@ -92,34 +92,28 @@ Cloudflare Pages setup:
 - **docs/short-links.md** — Short-link redirects and verification.
 - **AGENTS.md** — Instructions for AI assistants (CI, CONTRIBUTING).
 
-## Quickstart
+## Quickstart (portal-only — ~2 min)
+
 1. **Install dependencies**
-   ```bash
-   npm install
-   ```
-2. **Copy environment variables**
-   ```bash
-   cp .env.example .env
-   ```
-   Populate the EmailJS identifiers before attempting to send booking/contact forms. Set `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` to a key with Maps JS API enabled and domain restrictions. Do not commit `.env`; it may contain secrets. Phone/WhatsApp
-   numbers are centralized in [`src/config/contact.ts`](src/config/contact.ts) and default to the business line.
+    ```bash
+    npm ci
+    ```
+2. **Copy environment variables** *(only when you need forms, maps, or live API)*
+    ```bash
+    cp .env.example .env
+    ```
+    Populate EmailJS / `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` only if testing those flows. Do not commit `.env`. Phone/WhatsApp numbers are centralized in [`src/config/contact.ts`](src/config/contact.ts).
 3. **Run the development server**
-   ```bash
-   npm run dev
-   ```
-   The app binds to `http://localhost:5173` by default. Pass `--host 0.0.0.0` if you need LAN access.
-4. **Lint and format checks**
-   ```bash
-   npm run lint
-   ```
-5. **Create a production build**
-   ```bash
-   npm run build
-   ```
-6. **Preview the production bundle**
-   ```bash
-   npm run preview
-   ```
+    ```bash
+    npm run dev
+    ```
+    The app binds to `http://localhost:5173` by default. Pass `--host 0.0.0.0` if you need LAN access.
+4. **Checks** — `npm test` / `npm run lint` / `npm run build` only if you changed logic; pre-push hooks and CI enforce them. No manual gate required for onboarding.
+5. **Preview the production bundle** *(only when verifying deploy)*
+    ```bash
+    npm run build
+    npm run preview
+    ```
 
 ## Tests
 - `npm test` runs the Vitest suite (jsdom) including smoke coverage for the header Book Now anchor and the hero date-range + guests flow.
