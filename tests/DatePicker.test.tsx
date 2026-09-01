@@ -153,11 +153,12 @@ describe("Hero date picker", () => {
       // is about the popover's structure, not about which jsdom build is installed.
       // Do NOT "fix" this by regenerating the snapshot; that just moves the failure.
       // Scope note: that prohibition is about ENVIRONMENT-dependent drift (the jsdom artifact
-      // above, and useId churn). A third-party glyph change from a pinned dependency bump is
-      // not that — it renders identically everywhere on the new version — so re-recording IS
-      // correct there. Verify before re-recording: the tag COUNT must be unchanged and every
-      // differing tag must be svg geometry. (lucide-react 1.27 -> 1.28 moved calendar-range.)
-      .replace(/\s*\*\s*,\s*\*\s*/g, ", ");
+      // above, and useId churn). lucide-react minor bumps rewrite calendar-range path `d`
+      // and rect y (0.544→0.545, 0.561→0.562) identically everywhere — still not a product
+      // change. Strip lucide inner markup so a pin bump cannot fail the unit bar; the
+      // snapshot is the popover structure, not icon glyphs.
+      .replace(/\s*\*\s*,\s*\*\s*/g, ", ")
+      .replace(/<svg([^>]*\blucide[\w-]*\b[^>]*)>[\s\S]*?<\/svg>/g, "<svg$1></svg>");
     expect(stableHtml).toMatchSnapshot("date-picker-mobile");
 
     view.unmount();

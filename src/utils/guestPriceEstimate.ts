@@ -2,12 +2,6 @@
 
 export const ACCOMMODATION_GST_THRESHOLD_INR = 7500;
 
-/** Indian accommodation GST slab (5% ≤₹7,500/night, 18% above — eff. 22 Sep 2025). */
-export function accommodationGstSlabPercent(perNight: number): number | null {
-  if (perNight <= 0) return null;
-  return perNight <= ACCOMMODATION_GST_THRESHOLD_INR ? 5 : 18;
-}
-
 /** TASK-5112 / TASK-7011: INR per-night threshold at/below which accommodation is GST-exempt
  * (nil-rated) — mirrors `GstInvoiceConstants.AccommodationExemptSlabThresholdInrPerNight`. */
 export const ACCOMMODATION_GST_EXEMPT_THRESHOLD_INR = 1000;
@@ -30,11 +24,14 @@ export const ACCOMMODATION_GST_EXEMPT_THRESHOLD_INR = 1000;
  * actually pays — passing the published/sticker rate (the previous, TASK-7011-era convention) is
  * exactly the client/server disagreement TASK-7540 fixed; do not reintroduce it.
  *
- * `accommodationGstSlabPercent` above (2 bands, no exempt tier) is a separate, still-open gap used
- * only by `UnitBookingWidget`'s and `computeCheckoutTotal`'s client-side FALLBACK paths (used only
- * while a server quote is loading or unavailable) — both already band off a discounted/charged
- * per-night figure there, just without the 0% exempt tier. That gap is orthogonal to the
- * published-vs-charged basis fixed here (TASK-7540 did not touch it) and remains out of scope.
+ * TASK-8294: this is now the ONLY accommodation GST slab function in this file and every caller —
+ * including `UnitBookingWidget`'s and `computeCheckoutTotal`'s client-side FALLBACK paths (used
+ * only while a server quote is loading or unavailable) — must use it. A two-band sibling
+ * (`accommodationGstSlabPercent`, no exempt tier) used to live here and was the still-open gap
+ * those fallback paths hit: a sub-₹1,000/night stay would be quoted a "GST (5%)" line that legally
+ * does not exist for that stay. It has been deleted rather than fixed-in-place, specifically
+ * because two near-identically-named helpers where only one is correct is itself the hazard — do
+ * not reintroduce a second slab helper; add new bands to this one.
  *
  * KEEP THIS IN SYNC with `GstInvoiceConstants.cs` if that table ever changes — nothing enforces
  * the two stay aligned automatically; this comment is the enforcement.
@@ -47,8 +44,12 @@ export function accommodationGstSlabPercentForChargedRate(chargedPerNight: numbe
 
 /** Additive GST on room fare (CPO-canonical formula). */
 export function accommodationGstLineAmount(baseAmount: number, perNight: number): number {
-  const pct = accommodationGstSlabPercent(perNight);
+  const pct = accommodationGstSlabPercentForChargedRate(perNight);
   if (pct == null || baseAmount <= 0) return 0;
+  // TASK-8294: an exempt (0%) stay must show no GST line at all — the pre-existing ₹1 floor below
+  // exists only so a genuinely-taxed line never rounds down to a misleading ₹0; it must not apply
+  // when there is legally no tax to floor.
+  if (pct === 0) return 0;
   return Math.max(1, Math.round((baseAmount * pct) / 100));
 }
 
@@ -114,7 +115,11 @@ export function computeCheckoutTotal(input: CheckoutTotalInput): CheckoutTotalBr
   const perNight = nights > 0 ? Math.round(discountedSubtotal / nights) : 0;
   const touristTaxAmount = Math.max(0, Number(touristTaxInput) || 0);
 
-  const clientSlabPercent = accommodationGstSlabPercent(perNight);
+  // TASK-8294: this is a client-side fallback (used only when no server finalAmount is available)
+  // — the same category of fallback as UnitBookingWidget's, so it must use the exempt-aware
+  // three-band function too; otherwise a sub-₹1,000/night stay's GST% label would disagree with
+  // the (already-fixed) ₹0 line amount computed below.
+  const clientSlabPercent = accommodationGstSlabPercentForChargedRate(perNight);
   const clientGstLineAmount =
     clientSlabPercent != null && discountedSubtotal > 0
       ? accommodationGstLineAmount(discountedSubtotal, perNight)

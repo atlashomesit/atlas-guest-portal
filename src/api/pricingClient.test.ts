@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearRuntimeConfig, setRuntimeConfig } from '@/runtime-config';
-import { fetchGuestGstBreakdown, fetchPricingBreakdown } from './pricingClient';
+import {
+  fetchGuestGstBreakdown,
+  fetchPricingBreakdown,
+  netChargeableRoomFare,
+  type GuestPriceBreakdown,
+} from './pricingClient';
 
 const defaultRuntimeConfig = {
   apiBaseUrl: 'https://api.test',
@@ -125,5 +130,73 @@ describe('fetchGuestGstBreakdown — TASK-4331 server-sourced GST slab', () => {
     expect(result.gstPercent).toBeNull();
     expect(result.gstAmount).toBeNull();
     expect(result.finalAmount).toBeNull();
+  });
+});
+
+/**
+ * TASK-8293: `netChargeableRoomFare` must subtract ONLY the tenant global `discountAmount`.
+ *
+ * The pre/post-`BaseAmount` asymmetry is the whole trap. `PricingService` reassigns its running
+ * base as it applies LOS → last-minute → min-price floor → long-stay, and `BuildBreakdown`
+ * returns that POST-rule figure as `BaseAmount`; the four `*DiscountAmount` fields are reporting
+ * metadata describing what each rule took off. The global discount is applied AFTER `BaseAmount`
+ * is fixed — the same `final = base − discount` convention `fetchPricingBreakdown` and
+ * `getTodayBreakdownFromListing` use above, and the contract `computeCheckoutTotal`
+ * (src/utils/guestPriceEstimate.ts) states for this endpoint's `finalAmount`.
+ *
+ * The rendered-lines-sum-to-rendered-total invariant these numbers feed is pinned end-to-end in
+ * src/components/availability/UnitBookingWidgetPriceLinesSum.test.tsx.
+ */
+describe('netChargeableRoomFare — TASK-8293 rule discounts are already netted into baseAmount', () => {
+  const quote = (over: Partial<GuestPriceBreakdown> = {}): GuestPriceBreakdown => ({
+    baseAmount: 0,
+    discountAmount: 0,
+    losDiscountAmount: 0,
+    lastMinuteDiscountAmount: 0,
+    repeatGuestDiscountAmount: 0,
+    longStayDiscountAmount: 0,
+    convenienceFeeAmount: 0,
+    convenienceFeePercent: 3,
+    touristTaxAmount: 0,
+    gstPercent: 5,
+    gstAmount: 0,
+    finalAmount: null,
+    ...over,
+  });
+
+  it('returns baseAmount untouched when no discount of any kind applies', () => {
+    expect(netChargeableRoomFare(quote({ baseAmount: 21000 }))).toBe(21000);
+  });
+
+  it('does NOT re-subtract the default 10% long-stay discount already netted into baseAmount', () => {
+    // 7 × ₹3,000 gross → server BaseAmount 18,900, longStayDiscountAmount 2,100 (metadata).
+    // The old code returned 16,800, ₹2,100 below the base the server charges GST and fees on.
+    expect(netChargeableRoomFare(quote({ baseAmount: 18900, longStayDiscountAmount: 2100 }))).toBe(18900);
+  });
+
+  it('does NOT re-subtract LOS / last-minute / repeat-guest metadata either', () => {
+    expect(
+      netChargeableRoomFare(
+        quote({
+          baseAmount: 8500,
+          losDiscountAmount: 500,
+          lastMinuteDiscountAmount: 1500,
+          repeatGuestDiscountAmount: 250,
+        }),
+      ),
+    ).toBe(8500);
+  });
+
+  it('honours a floored baseAmount even though the reported rule discount is larger than what was realised', () => {
+    // Min-price floor clamped BaseAmount at 3,600; longStayDiscountAmount still reports 1,200.
+    expect(netChargeableRoomFare(quote({ baseAmount: 3600, longStayDiscountAmount: 1200 }))).toBe(3600);
+  });
+
+  it('DOES subtract the tenant global discountAmount, which the server applies after BaseAmount', () => {
+    expect(netChargeableRoomFare(quote({ baseAmount: 21000, discountAmount: 2100 }))).toBe(18900);
+  });
+
+  it('never returns a negative fare', () => {
+    expect(netChargeableRoomFare(quote({ baseAmount: 1000, discountAmount: 5000 }))).toBe(0);
   });
 });

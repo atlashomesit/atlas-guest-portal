@@ -149,9 +149,32 @@ const gateReusableMockedFiles = mockedFiles.filter((f) => !gateFreshFiles.includ
 // above); the isolate:false shared registry is where the speedup comes from,
 // not parallelism. Set at root and per-project so the cap holds whether or not
 // the scheduler pools workers across projects.
+//
+// ── 2026-08-23: THE PREMISE OF THAT COMMENT CHANGED ON 2026-08-22.
+//
+// "release gate runs API/admin/guest Vitest in parallel" is no longer true. TASK-8129's second
+// approach (atlas-e2e release-gate.ps1) moved atlas-admin-portal's vitest OUT of STEP 1's parallel
+// window — it now runs alone after api/guest/sdk join. Admin was by far the heaviest sibling here
+// (157 isolate:true files, each paying a cold jsdom worker start); what guest now shares the window
+// with is api's dotnet build/test and the notifications-sdk job.
+//
+// Both prior guest starvation incidents (2026-08-06 at admin=4, 2026-08-21 at admin=3) name ADMIN's
+// worker load as the cause. That load is gone from this window, so the 1-worker pin is now measured
+// against a machine state that no longer occurs — and guest at 571s is the long pole of STEP 1's
+// parallel phase because of it.
+//
+// TASK-8374: caps raised to 4 — the collision that justified 1 no longer exists (admin runs alone,
+// guest not in same window, 4 is safe per 2026-08-23 trial). Default is now 4 on win32, so local
+// `npm test`, CI, and any caller that does not set the variable now get the measured 4, not the
+// contended 1. release-gate.ps1 no longer needs to set ATLAS_GUEST_VITEST_MAX_WORKERS for this window.
+//
+// ⛔ If admin's vitest is ever returned to the 4-way window, re-evaluate — the pin was correct for
+// the contended case.
+const envGuestCap = Number.parseInt(process.env.ATLAS_GUEST_VITEST_MAX_WORKERS ?? "", 10);
+const guestCapValue = Number.isFinite(envGuestCap) && envGuestCap > 0 ? envGuestCap : 4;
 const workerCap =
   process.platform === "win32"
-    ? { maxWorkers: 1, fileParallelism: false }
+    ? { maxWorkers: guestCapValue, fileParallelism: guestCapValue > 1 }
     : process.env.CI
       ? { maxWorkers: 2 }
       : {};

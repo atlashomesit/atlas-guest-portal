@@ -143,3 +143,51 @@ describe('Property details hydrates full gallery from listing detail', () => {
     });
   }
 });
+
+/**
+ * TASK-8231 — the "All Amenities" modal close button was icon-only with no accessible name
+ * (lucide-react's `X` sets no aria-hidden/role/title, so the accessible name was the empty
+ * string — WCAG 2.1 4.1.2 Level A, axe `button-name`, impact critical), and the modal wrapper
+ * had no dialog semantics or focus trap. Fixed at 7c347fac. Regression test was the one "done
+ * when" item that fix landed without — this closes that gap.
+ *
+ * Structural string-match on source, matching this file's own established convention (see the
+ * TASK-7430 block above) rather than a full RTL render: Homepage_PropertyDetails is a heavy page
+ * component (API calls, routing, tenant context) that this file has never rendered directly.
+ */
+describe('TASK-8231: amenities modal accessible close + dialog semantics', () => {
+  const SURFACES: Array<{ label: string; path: string }> = [
+    { label: 'default', path: resolve(__dirname, './Homepage_PropertyDetails.tsx') },
+    { label: 'heritage', path: resolve(__dirname, '../../../themes/heritage/PropertyDetails.tsx') },
+  ];
+
+  for (const { label, path } of SURFACES) {
+    it(`${label}: close button has an accessible name, and the icon is hidden from AT`, () => {
+      const content = readFileSync(path, 'utf-8');
+      expect(content).toContain('aria-label="Close"');
+      // The X icon itself must not double-announce once the button has a name.
+      expect(content).toMatch(/<X className="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" \/>/);
+    });
+
+    it(`${label}: amenities modal wrapper declares dialog semantics and is wired to useFocusTrap`, () => {
+      const content = readFileSync(path, 'utf-8');
+      expect(content).toContain("import { useFocusTrap } from");
+      expect(content).toContain('const amenitiesModalRef = useFocusTrap<HTMLDivElement>(showAmenitiesModal);');
+      expect(content).toContain('ref={amenitiesModalRef}');
+      expect(content).toContain('role="dialog"');
+      expect(content).toContain('aria-modal="true"');
+      expect(content).toContain('aria-labelledby={amenitiesModalTitleId}');
+      // The labelledby target must actually exist on the visible title.
+      expect(content).toContain('<h3 id={amenitiesModalTitleId}');
+    });
+  }
+
+  it('AtlasChat: voice-input and send buttons have accessible names', () => {
+    const content = readFileSync(
+      resolve(__dirname, '../../support-drawer/AtlasChat.tsx'),
+      'utf-8',
+    );
+    expect(content).toContain('aria-label="Start voice input"');
+    expect(content).toContain('aria-label="Send message"');
+  });
+});

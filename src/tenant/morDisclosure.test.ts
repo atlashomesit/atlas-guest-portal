@@ -8,27 +8,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-
-// ── Minimal replay of the tenantContext parsing logic ─────────────────────────
-// We test the parsing rules directly so we don't need to mock fetch.
-
-function parseLegalContactPack(data: Record<string, unknown>) {
-  const pack = data.legalContactPack as Record<string, unknown> | null | undefined;
-  if (!pack) return undefined;
-  return {
-    legalName: typeof pack.legalName === 'string' ? pack.legalName : undefined,
-    displayName: typeof pack.displayName === 'string' ? pack.displayName : undefined,
-    contactEmail: typeof pack.contactEmail === 'string' ? pack.contactEmail : undefined,
-    contactPhone: typeof pack.contactPhone === 'string' ? pack.contactPhone : undefined,
-    registeredAddress: typeof pack.registeredAddress === 'string' ? pack.registeredAddress : undefined,
-    city: typeof pack.city === 'string' ? pack.city : undefined,
-    state: typeof pack.state === 'string' ? pack.state : undefined,
-    pincode: typeof pack.pincode === 'string' ? pack.pincode : undefined,
-    gstin: typeof pack.gstin === 'string' ? pack.gstin : undefined,
-    showAtlasFooterCredit: Boolean(pack.showAtlasFooterCredit),
-    isCustomDomain: Boolean(pack.isCustomDomain),
-  };
-}
+import { parseLegalContactPack } from './tenantContext';
 
 describe('TASK-4161: legalContactPack.isCustomDomain parsing', () => {
   describe('custom-domain tenant API payload', () => {

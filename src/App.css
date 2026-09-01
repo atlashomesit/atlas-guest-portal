@@ -131,7 +131,7 @@ body::-webkit-scrollbar {
   z-index: 100;
   padding: 0.5rem 1rem;
   border-radius: 0.5rem;
-  background: var(--cta-primary, #b8472f);
+  background: var(--cta-primary, #c04528);
   color: var(--text-on-cta, #fff);
   font-size: 0.875rem;
   font-weight: 600;

@@ -6,23 +6,22 @@ For feature work spanning the guest frontend and API, see workspace root `ATLAS-
 
 ## Git Hooks
 
-Before pushing, the repository runs a **pre-push TypeScript type check** via `npm run typecheck` to catch syntax errors early. Install the hook once per clone:
+Install once per clone (canonical shared hook):
 
 ```bash
-scripts/hooks/install.sh
+pwsh ../atlas-e2e/scripts/setup-dev-hooks.ps1
+# fallback: scripts/hooks/install.sh
 ```
 
-This prevents broken TypeScript from reaching the remote (as in commit c4758ad7). The typecheck runs **independently of lint** and cannot be bypassed by lint failures (TASK-7510).
+Sets `core.hooksPath` → `atlas-e2e/.githooks`; enforces typecheck/lint/commit-msg on push. No manual `npm run lint` needed during onboarding (hook + CI handle it). Bypass with `git push --no-verify` (not recommended).
 
-Bypass the hook if needed with `git push --no-verify`, but this is not recommended.
-
-## Release Gate (run before pushing to dev)
+## Release Gate (only for full-stack / dev→main)
 
 ```bash
 cd atlas-e2e; npm run release-gate
 ```
 
-This is the **single pre-commit gate** for all repos. It runs lint, build, unit tests, integration tests, migrations, smoke curls, and Playwright E2E across all four repos. See [atlas-e2e/docs/PROD_READINESS_CHECKLIST.md](../atlas-e2e/docs/PROD_READINESS_CHECKLIST.md) for the full 16-gate DevSecOps mapping.
+Full gate (lint, build, unit, integration, migrations, smoke, Playwright) — the **dev→main** bar. For day-1 / portal-only work, the local bar is `npm ci && npm run lint && npm run build && npm test` (see PR Checklist). Do not block onboarding on the full gate.
 
 ## Shift-left (HARD RULE 13 + 6, amended 2026-07-22)
 

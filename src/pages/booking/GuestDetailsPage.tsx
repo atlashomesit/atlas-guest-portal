@@ -38,6 +38,10 @@ import { formatCurrency } from '@/utils/formatting';
 import { formatDateInTimezone } from '@/utils/dateHelpers';
 import { track } from '@/lib/events';
 import { mapRazorpayFailureCode } from '@/utils/razorpayGuestErrors';
+import {
+  isServerTotalConfirmRequired,
+  razorpayOrderAmountInrToPaise,
+} from '@/utils/razorpayOrderAmount';
 import { formatDisplayNumber, getContactEmail, getTelLink, getWhatsAppLink } from '@/config/contact';
 import { computeCheckoutTotal } from '@/utils/guestPriceEstimate';
 import {
@@ -311,6 +315,20 @@ const GuestDetailsPage: React.FC = () => {
   const holdListingId = booking.holdListingId;
   const priceBreakdown = booking.holdPriceBreakdown;
 
+  // TASK-8219: mirror the current hold identity into a ref so the pagehide/unmount abandon
+  // guard (registered once, empty deps) always reads the latest holdId/holdToken without
+  // needing to re-subscribe its event listeners on every hold change.
+  const latestHoldRef = useRef<{ holdId: number | null; holdToken: string | null }>({
+    holdId: null,
+    holdToken: null,
+  });
+  useEffect(() => {
+    latestHoldRef.current = {
+      holdId: holdId ? Number(holdId) : null,
+      holdToken: holdToken ?? null,
+    };
+  }, [holdId, holdToken]);
+
   // No hold state (direct navigation or hard reload): instead of a silent redirect,
   // we render a "pick your dates again" card (see early return in Render) and keep the
   // guest's typed details, which are persisted to sessionStorage below.
@@ -551,8 +569,20 @@ const GuestDetailsPage: React.FC = () => {
   const [orderErrorIs409, setOrderErrorIs409] = useState(false);
   const [paymentCancelled, setPaymentCancelled] = useState(false);
   const [razorpayOrderId, setRazorpayOrderId] = useState<string | null>(null);
-  const [razorpayAmountPaise, setRazorpayAmount] = useState<number | null>(null);
+  // PAISE. The value the API hands us is RUPEES — see razorpayOrderAmountInrToPaise,
+  // which is the single boundary where that conversion happens.
+  const [razorpayAmountPaise, setRazorpayAmountPaise] = useState<number | null>(null);
   const pendingBookingTokenRef = useRef<string | null>(null);
+  // TASK-8219: the Razorpay-order bookingId for the CURRENT in-flight attempt, kept in sync
+  // wherever pendingBookingTokenRef is (the two places a server order response is applied).
+  // Read by the pagehide/unmount abandon guard below, which runs outside the handleSubmit
+  // closure and therefore cannot see its local `bookingId` variable.
+  const pendingBookingIdRef = useRef<number | null>(null);
+  // TASK-8219: true once this checkout has been explicitly resolved — payment succeeded, the
+  // guest dismissed Razorpay, or tapped "back to property" — OR once the automatic
+  // pagehide/visibilitychange/unmount guard has already fired an abandon call. Shared by every
+  // abandon call site so a single guest departure can only ever produce one abandon-checkout POST.
+  const checkoutSettledRef = useRef(false);
   // TASK-4536: Track the stable idempotency key for the current attempt so retries reuse it.
   const currentAttemptIdempotencyKeyRef = useRef<string | null>(null);
   // TASK-4537: Track the poll timer so we can clear it on unmount.
@@ -567,7 +597,8 @@ const GuestDetailsPage: React.FC = () => {
     keyId: string;
     orderId: string;
     bookingId: number;
-    amount: number;
+    /** PAISE — already converted at the order-response boundary. */
+    amountPaise: number;
     bookingToken: string | null;
     idempotencyKey: string; // TASK-4536: stable key for retry/resume deduplication
   } | null>(null);
@@ -766,7 +797,9 @@ const GuestDetailsPage: React.FC = () => {
         let keyId: string;
         let orderId: string;
         let bookingId: number;
-        let amount: number;
+        // PAISE throughout this function. The API returns RUPEES; the single conversion
+        // sits at the order-response boundary below (razorpayOrderAmountInrToPaise).
+        let amountPaise: number;
         let bookingToken: string | null = null;
         let idempotencyKey: string;
 
@@ -774,11 +807,12 @@ const GuestDetailsPage: React.FC = () => {
         if (pendingLaunch) {
           pendingRazorpayLaunchRef.current = null;
           setServerTotalConfirmRequired(false);
-          ({ keyId, orderId, bookingId, amount, bookingToken, idempotencyKey } = pendingLaunch);
+          ({ keyId, orderId, bookingId, amountPaise, bookingToken, idempotencyKey } = pendingLaunch);
           currentAttemptIdempotencyKeyRef.current = idempotencyKey;
           pendingBookingTokenRef.current = bookingToken;
+          pendingBookingIdRef.current = bookingId; // TASK-8219: available to the pagehide/unmount abandon guard
           setRazorpayOrderId(orderId);
-          setRazorpayAmount(amount);
+          setRazorpayAmountPaise(amountPaise);
         } else {
           // TASK-4536: Generate stable idempotency key for this attempt (same key across retries).
           let idempotencyKey = currentAttemptIdempotencyKeyRef.current;
@@ -799,7 +833,8 @@ const GuestDetailsPage: React.FC = () => {
             orderId: respOrderId,
             bookingId: respBookingId,
             bookingToken: respBookingToken,
-            amount: respAmount,
+            // RUPEES, despite the name — see razorpayOrderAmount.ts for why.
+            amount: respAmountInr,
             appliedReferralCode: serverReferralCode,
             referralDiscountAmount: serverReferralDiscount,
             appliedPromoCode: serverPromoCode,
@@ -815,8 +850,8 @@ const GuestDetailsPage: React.FC = () => {
           if (!respBookingId || (typeof respBookingId !== 'number' && typeof respBookingId !== 'string')) {
             throw new Error('Checkout error: missing booking ID. Please try again.');
           }
-          if (!respAmount || typeof respAmount !== 'number' || respAmount <= 0) {
-            console.error('[GuestDetailsPage] Invalid amount:', respAmount);
+          if (!respAmountInr || typeof respAmountInr !== 'number' || respAmountInr <= 0) {
+            console.error('[GuestDetailsPage] Invalid amount (INR):', respAmountInr);
             throw new Error('Checkout error: invalid payment amount. Please try again.');
           }
 
@@ -863,20 +898,27 @@ const GuestDetailsPage: React.FC = () => {
           keyId = respKeyId;
           orderId = respOrderId;
           bookingId = Number(respBookingId);
-          amount = Number(respAmount);
+          // ── UNIT BOUNDARY ──────────────────────────────────────────────────────
+          // The API returns `amount` in RUPEES (RazorpayPaymentService.cs:658) even
+          // though the Razorpay order it created is in PAISE
+          // (RazorpayPaymentService.cs:575). Convert exactly once, here. Every
+          // consumer below — the divergence gate, the "Total updated" banner, the
+          // Pay CTA, the resume ref, the Razorpay checkout options — is in paise.
+          // Do not "simplify" this call away; see src/utils/razorpayOrderAmount.ts.
+          amountPaise = razorpayOrderAmountInrToPaise(Number(respAmountInr));
           bookingToken = typeof respBookingToken === 'string' ? respBookingToken.trim() : null;
 
           setRazorpayOrderId(orderId);
-          setRazorpayAmount(amount);
+          setRazorpayAmountPaise(amountPaise);
           pendingBookingTokenRef.current = bookingToken;
+          pendingBookingIdRef.current = bookingId; // TASK-8219: available to the pagehide/unmount abandon guard
 
-          const clientQuotePaise = Math.round(displayTotal * 100);
-          if (Math.abs(amount - clientQuotePaise) > 100) {
+          if (isServerTotalConfirmRequired(amountPaise, displayTotal)) {
             pendingRazorpayLaunchRef.current = {
               keyId,
               orderId,
               bookingId,
-              amount,
+              amountPaise,
               bookingToken,
               idempotencyKey, // TASK-4536: stash the idempotency key so retries reuse it
             };
@@ -904,6 +946,9 @@ const GuestDetailsPage: React.FC = () => {
                 if (paymentCompleted) return;
                 paymentCompleted = true;
                 // TASK-5183: release inventory when the guest dismisses Razorpay without paying.
+                // TASK-8219: mark the checkout settled so a pagehide/unmount that follows this
+                // explicit dismiss doesn't fire a second abandon-checkout call for the same hold.
+                checkoutSettledRef.current = true;
                 abandonPaymentPendingCheckout(bookingId, bookingToken ?? pendingBookingTokenRef.current);
                 setIsSubmitting(false);
                 setPaymentCancelled(true);
@@ -912,7 +957,8 @@ const GuestDetailsPage: React.FC = () => {
 
               const options = {
                 key: keyId,
-                amount: Number(amount),
+                // Razorpay checkout expects the smallest currency unit (paise).
+                amount: Number(amountPaise),
                 currency: 'INR',
                 name: getTenantContext()?.displayMerchantName ?? brandName,
                 description: `Booking confirmation`,
@@ -932,6 +978,10 @@ const GuestDetailsPage: React.FC = () => {
                 modal: { ondismiss: handleClose },
                 handler: async (res: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => {
                   paymentCompleted = true;
+                  // TASK-8219: payment succeeded — there is no hold left to abandon, and the
+                  // pagehide/unmount guard must not fire a stray abandon-checkout on the
+                  // navigate-to-confirmation that follows.
+                  checkoutSettledRef.current = true;
                   try {
                     const verifyBody = {
                       bookingId: Number(bookingId),
@@ -1058,16 +1108,22 @@ const GuestDetailsPage: React.FC = () => {
 
               type RazorpayCheckout = {
                 open: () => void;
+                close: () => void;
                 on: (event: string, handler: (r: unknown) => void) => void;
               };
               const rzp = new window.Razorpay(options) as RazorpayCheckout;
 
               // TASK-4541: monitor hold expiry while payment modal is open and close on expiry
+              // TASK-8222: hard-close the modal on expiry — the hold-expiry gate exists but without
+              // closing Razorpay the guest can still pay into a released slot.
               const expireCheckInterval = setInterval(() => {
                 if (holdExpired || !holdExpiresAt) {
                   clearInterval(expireCheckInterval);
                   if (holdExpired && !paymentCompleted) {
                     paymentCompleted = true;
+                    checkoutSettledRef.current = true;
+                    try { rzp.close(); } catch { /* ignore */ }
+                    abandonPaymentPendingCheckout(bookingId, bookingToken ?? pendingBookingTokenRef.current);
                     setOrderError('Hold expired while payment was in progress. Please re-select your dates and try again.');
                     setIsSubmitting(false);
                   }
@@ -1077,6 +1133,9 @@ const GuestDetailsPage: React.FC = () => {
                 if (remainingMs <= 0 && !paymentCompleted) {
                   clearInterval(expireCheckInterval);
                   paymentCompleted = true;
+                  checkoutSettledRef.current = true;
+                  try { rzp.close(); } catch { /* ignore */ }
+                  abandonPaymentPendingCheckout(bookingId, bookingToken ?? pendingBookingTokenRef.current);
                   setOrderError('Hold expired while payment was in progress. Please re-select your dates and try again.');
                   setIsSubmitting(false);
                 }
@@ -1095,7 +1154,7 @@ const GuestDetailsPage: React.FC = () => {
                 setOrderError(`No money was taken. ${mapRazorpayFailureCode(code, desc)}`);
                 // TASK-2906: Store the order ID and amount so the "Resume payment" button can retry
                 setRazorpayOrderId(orderId);
-                setRazorpayAmount(amount);
+                setRazorpayAmountPaise(amountPaise);
                 setPaymentCancelled(false);
                 setIsSubmitting(false);
               });
@@ -1230,6 +1289,9 @@ const GuestDetailsPage: React.FC = () => {
 
   const handleBackToProperty = useCallback(() => {
     // TASK-5183: leaving the details step must free the init-hold inventory.
+    // TASK-8219: mark settled first so the pagehide/unmount guard (this click triggers an
+    // in-SPA navigate() below, which unmounts the page) doesn't send a second abandon call.
+    checkoutSettledRef.current = true;
     abandonPaymentPendingCheckout(holdId, holdToken ?? pendingBookingTokenRef.current);
     try { window.sessionStorage.removeItem(CHECKOUT_HOLD_KEY); } catch { /* ignore */ }
     updateBooking({
@@ -1239,6 +1301,68 @@ const GuestDetailsPage: React.FC = () => {
     });
     navigate(propertySlug && unitSlug ? `/homes/${propertySlug}/${unitSlug}` : '/', { replace: true });
   }, [updateBooking, navigate, propertySlug, unitSlug, holdId, holdToken]);
+
+  // TASK-8219: a guest who leaves /details via browser Back, mobile swipe-back, or tab-close
+  // never routed through handleClose or handleBackToProperty, so abandonPaymentPendingCheckout
+  // was never called and the 15-minute hold survived the guest's own abandonment.
+  //
+  //   - `pagehide` fires on real page discard (tab close, navigating to an external URL, or
+  //     swipe-back past the app's own history root) and is the reliable signal Safari honours
+  //     for a keepalive POST at teardown — NOT `beforeunload`, which mobile Safari drops.
+  //   - `visibilitychange` → 'hidden' is the documented fallback for cases where `pagehide`
+  //     itself is unreliable (iOS backgrounding a tab that is later evicted without ever
+  //     re-foregrounding). It also fires on an ordinary tab switch, so it is debounced: the
+  //     abandon only actually fires if the page is still hidden after HIDDEN_ABANDON_DELAY_MS,
+  //     and is cancelled if the guest switches back before then.
+  //   - The unmount cleanup below is the React-Router-native guard for in-SPA navigation away
+  //     from /details (browser Back / swipe-back handled as a `popstate` route change, or any
+  //     `navigate()` call) — the component unmounts without the page itself ever being
+  //     discarded, so neither of the above fires. `useBlocker` (named in the task spec as the
+  //     alternative) requires a data router (`createBrowserRouter`); this app mounts a plain
+  //     `<BrowserRouter>` (src/App.tsx), so `useBlocker` would throw here — this cleanup is the
+  //     guard that's actually available.
+  //
+  // All three routes share `checkoutSettledRef` with handleClose/handleBackToProperty/the
+  // payment-success handler, so exactly one abandon-checkout call is ever sent per departure —
+  // a duplicate on a live payment hold is its own defect.
+  useEffect(() => {
+    const HIDDEN_ABANDON_DELAY_MS = 3000;
+    let hiddenTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const fireAbandonOnce = () => {
+      if (checkoutSettledRef.current) return;
+      checkoutSettledRef.current = true;
+      const id = pendingBookingIdRef.current ?? latestHoldRef.current.holdId;
+      const token = pendingBookingTokenRef.current ?? latestHoldRef.current.holdToken;
+      abandonPaymentPendingCheckout(id, token);
+    };
+
+    const handlePageHide = () => {
+      if (hiddenTimer) { clearTimeout(hiddenTimer); hiddenTimer = null; }
+      fireAbandonOnce();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        if (hiddenTimer) clearTimeout(hiddenTimer);
+        hiddenTimer = setTimeout(fireAbandonOnce, HIDDEN_ABANDON_DELAY_MS);
+      } else if (hiddenTimer) {
+        clearTimeout(hiddenTimer);
+        hiddenTimer = null;
+      }
+    };
+
+    window.addEventListener('pagehide', handlePageHide);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      if (hiddenTimer) clearTimeout(hiddenTimer);
+      window.removeEventListener('pagehide', handlePageHide);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      // In-SPA navigation away from /details unmounts this component without a pagehide event.
+      fireAbandonOnce();
+    };
+  }, []);
 
   // ── Render ────────────────────────────────────────────────────────────────
   if (!holdHydrationDone) {
@@ -2202,18 +2326,18 @@ const gdStyles = `
 @keyframes gd-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
 :root {
-  --gd-ink: #4a3535;
-  --gd-ink-soft: #3b3b52;
-  --gd-muted: #475569;
-  --gd-faint: #64748b;
-  --gd-ivory: #fff8e7;
-  --gd-linen: #fdf2e9;
-  --gd-peach: #ffe4d6;
-  --gd-line: #f0ddd0;
-  --gd-line-strong: #e5cfc0;
-  --gd-coral: #b8472f;
-  --gd-coral-dark: #a84832;
-  --gd-amber: #f08c71;
+  --gd-ink: #3b1f1e;
+  --gd-ink-soft: #5c3d3c;
+  --gd-muted: #6b4a48;
+  --gd-faint: #8a6a68;
+  --gd-ivory: #fefcf9;
+  --gd-linen: #fde0c8;
+  --gd-peach: #f5c8b0;
+  --gd-line: rgba(59, 31, 30, 0.12);
+  --gd-line-strong: rgba(59, 31, 30, 0.20);
+  --gd-coral: #c04528;
+  --gd-coral-dark: #a83c22;
+  --gd-amber: #d4724e;
   --gd-success: #157046;
   --gd-success-bg: #e9f5ef;
   --gd-success-border: #d2ebde;

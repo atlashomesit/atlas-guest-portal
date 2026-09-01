@@ -48,7 +48,10 @@ import { hasOnlinePaymentRail } from '@/tenant/paymentRail';
 import {
   ILLUSTRATIVE_OTA_GUEST_FEE_PERCENT,
 } from '@/utils/directBookingPromo';
-import { accommodationGstLineAmount, accommodationGstSlabPercent } from '@/utils/guestPriceEstimate';
+import {
+  accommodationGstLineAmount,
+  accommodationGstSlabPercentForChargedRate,
+} from '@/utils/guestPriceEstimate';
 
 declare global {
   interface Window {
@@ -245,6 +248,13 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [availabilityFailed, setAvailabilityFailed] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const lastAvailabilityKeyRef = useRef<string | null>(null);
+  // TASK-8218: stable idempotency key for the CURRENT reserve attempt (listingId, checkIn,
+  // checkOut, guests). Without this, handleReserve minted a fresh crypto.randomUUID() on every
+  // click, so a retry after a lost/timed-out init-hold response sent a different key, missed the
+  // server's replay ledger, and 409'd against the guest's OWN just-created hold. Mirrors
+  // currentAttemptIdempotencyKeyRef in GuestDetailsPage.tsx (TASK-4536): generate lazily when
+  // null, reuse otherwise, and invalidate below whenever the keying inputs change.
+  const reserveIdempotencyKeyRef = useRef<string | null>(null);
   const hasHydratedFromContextRef = useRef(false);
   // TASK-4726 fix: the URL-hydration effect below runs as soon as ?checkIn=/?checkOut= are
   // parsed — typically before the async availability-calendar GET (fetchBlockedDates) has
@@ -1303,7 +1313,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     serverGstMatchesSelection && serverGstPercent != null
       ? serverGstPercent
       : hasSelectedRange && perNightForDisplay > 0
-        ? accommodationGstSlabPercent(perNightForDisplay)
+        ? accommodationGstSlabPercentForChargedRate(perNightForDisplay)
         : null;
 
   /**
@@ -1337,10 +1347,25 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       ? Math.round(serverPriceBreakdown.convenienceFeeAmount)
       : Math.round(taxableBase * convenienceFeePercent);
 
+  // TASK-8293: the server folds TouristTaxAmount into the FinalAmount that the Total below
+  // prefers, but this widget rendered no tourist-tax row — so on a tourist-tax listing (Goa
+  // style) the line items silently failed to sum to the Total shown directly beneath them,
+  // the same "unexplained gap reads as a hidden fee" defect as the double-subtracted long-stay
+  // discount. Surface it as its own line, mirroring GuestDetailsPage's "Tourist tax" row.
+  const touristTaxLineAmount =
+    serverGstMatchesSelection && serverPriceBreakdown && serverPriceBreakdown.touristTaxAmount > 0
+      ? Math.round(serverPriceBreakdown.touristTaxAmount)
+      : 0;
+
   // TASK-4322: Total = discount-net base + GST + Service Fee (canonical formula).
   // Offline fallback only — TASK-5184 prefers server FinalAmount (includes tourist tax).
   // TASK-7428: when online payment is off, never fold a server FinalAmount that still includes the gateway fee.
-  const breakdownFinalTotal = Math.max(1, taxableBase + gstLineAmount + breakdownConvenienceFee);
+  // TASK-8293: the fallback must carry tourist tax too, or the no-online-rail branch (which
+  // always lands here) renders a Tourist tax row that the Total does not account for.
+  const breakdownFinalTotal = Math.max(
+    1,
+    taxableBase + gstLineAmount + breakdownConvenienceFee + touristTaxLineAmount,
+  );
 
   const finalTotal =
     showOnlinePaymentProcessing &&
@@ -1411,6 +1436,14 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   }, [hasSelectedRange, datesUnavailable, breakdownPrice]);
 
   // v2 date display uses split check-in/check-out cells (see lv-date-cell blocks below).
+
+  // TASK-8218: invalidate the reserve idempotency key whenever what's actually being booked
+  // changes, so a key minted for one (listingId, checkIn, checkOut, guests) combination is never
+  // reused for a different one — that would dedupe a genuinely new booking attempt against an
+  // old hold. Mirrors the cart-change key clear in GuestDetailsPage.tsx (TASK-4536/4607).
+  useEffect(() => {
+    reserveIdempotencyKeyRef.current = null;
+  }, [listingId, dateRange.startDate, dateRange.endDate, guests]);
 
   // TASK-2612: handleReserve replaces the old handleSubmit.
   // Calls init-hold mode (GuestInfo absent), stores holdId+holdExpiresAt in context, navigates to details page.
@@ -1533,7 +1566,16 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         guestConsentAccepted: false,
       };
 
-      const idempotencyKey = crypto.randomUUID();
+      // TASK-8218: reuse the stable key for this attempt if one already exists (i.e. this is a
+      // retry after a lost/timed-out response for the SAME listing/dates/guests — the
+      // invalidation effect above already cleared it if anything keying-relevant changed).
+      // Generate lazily only when starting a fresh attempt, mirroring
+      // currentAttemptIdempotencyKeyRef in GuestDetailsPage.tsx.
+      let idempotencyKey = reserveIdempotencyKeyRef.current;
+      if (!idempotencyKey) {
+        idempotencyKey = crypto.randomUUID();
+        reserveIdempotencyKeyRef.current = idempotencyKey;
+      }
       const response = await axios.post(orderUrl, orderPayload, {
         headers: getOrderRequestHeaders(idempotencyKey),
         timeout: 15000,
@@ -1598,6 +1640,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         guests,
       });
 
+      // TASK-8218: the hold succeeded and its ownership token is now in BookingContext — clear
+      // the reserve key so a LATER, unrelated Reserve click (after navigating back) never reuses
+      // a key that already has a completed hold behind it.
+      reserveIdempotencyKeyRef.current = null;
       navigate(`/book/${targetSlug}/${targetUnit}/details`);
     } catch (error: unknown) {
       console.error('[UnitBookingWidget] Reserve error:', error);
@@ -2015,6 +2061,15 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                 GST ({gstSlabPercent}%)
               </span>
               <span className="lv-num">{displayPrice(gstLineAmount)}</span>
+            </div>
+          )}
+
+          {/* TASK-8293: tourist tax is inside the server FinalAmount the Total prefers, so it
+              must appear as its own line or the breakdown does not sum to its own Total. */}
+          {touristTaxLineAmount > 0 && (
+            <div className="lv-price-row" data-testid="bw-bd-tourist-tax-row">
+              <span>Tourist tax</span>
+              <span className="lv-num">{displayPrice(touristTaxLineAmount)}</span>
             </div>
           )}
 

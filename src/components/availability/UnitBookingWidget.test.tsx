@@ -282,7 +282,7 @@ describe('UnitBookingWidget - TASK-2870: accommodation GST uses 18% slab above �
 
   it('uses shared guestPriceEstimate GST helpers (not retired 12% slab)', () => {
     const content = readFileSync(filePath, 'utf-8');
-    expect(content).toContain('accommodationGstSlabPercent');
+    expect(content).toContain('accommodationGstSlabPercentForChargedRate');
     expect(content).toContain('accommodationGstLineAmount');
     expect(content).not.toMatch(/<= 7500 \? 5 : 12/);
     expect(content).not.toContain('else 12%');
@@ -333,12 +333,14 @@ describe('UnitBookingWidget - TASK-4331: GST slab sourced from server, not a pre
   it('gstSlabPercent prefers the server value when it matches the current selection', () => {
     const content = readFileSync(filePath, 'utf-8');
     // Must check serverGstMatchesSelection && serverGstPercent != null BEFORE falling back
-    // to the client-derived accommodationGstSlabPercent(perNightForDisplay).
+    // to the client-derived accommodationGstSlabPercentForChargedRate(perNightForDisplay).
     expect(content).toMatch(
       /const gstSlabPercent =\s*\n\s*serverGstMatchesSelection && serverGstPercent != null/,
     );
-    // Client-derived slab must remain as the fallback path (loading/offline UX), not removed.
-    expect(content).toContain('accommodationGstSlabPercent(perNightForDisplay)');
+    // Client-derived slab must remain as the fallback path (loading/offline UX), not removed —
+    // and TASK-8294: it must be the exempt-aware three-band function, not the retired two-band
+    // accommodationGstSlabPercent (which had no 0% tier and misquoted sub-₹1,000/night stays).
+    expect(content).toContain('accommodationGstSlabPercentForChargedRate(perNightForDisplay)');
   });
 
   it('gstLineAmount prefers the server-computed amount over recomputing from taxableBase', () => {

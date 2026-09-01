@@ -287,7 +287,10 @@ const SearchPage = () => {
     const tenantOverrides = getTenantOverrides(getTenantContext()?.slug);
     const strictApiOnly = tenantOverrides.onlyApiListings === true;
     try {
-      const data = await fetchPublicListings(signal);
+      // TASK-8296: search must not serve a 60s-stale slice after a host publishes.
+      // Force a network fetch so a freshly published listing appears within 5s;
+      // the shared cache is still updated so non-search surfaces keep the TTL.
+      const data = await fetchPublicListings(signal, { bypassCache: true });
       let normalized = apiToNormalized(data);
       const allow = getTenantPublicListingIdAllowlist(tenantOverrides);
       if (allow.size > 0) {
@@ -521,24 +524,15 @@ const SearchPage = () => {
         });
 
         const fetchPromise = (async () => {
-          const primary = buildApiUrl(
-            `/api/public/listings/availability?checkIn=${encodeURIComponent(startStr)}&checkOut=${encodeURIComponent(endStr)}`,
+          const batchUrl = buildApiUrl(
+            `/api/public/listings/availability-batch?startDate=${encodeURIComponent(startStr)}&endDate=${encodeURIComponent(endStr)}`,
           );
-          let listingIds: number[] | undefined;
-          const resPrimary = await fetch(primary, { signal: controller.signal, headers });
-          if (resPrimary.ok) {
-            listingIds = parseIds(await resPrimary.json());
-          } else {
-            const batchUrl = buildApiUrl(
-              `/api/public/listings/availability-batch?startDate=${encodeURIComponent(startStr)}&endDate=${encodeURIComponent(endStr)}`,
-            );
-            const resBatch = await fetch(batchUrl, { signal: controller.signal, headers });
-            if (resBatch.ok) {
-              const data = (await resBatch.json()) as { availableListingIds?: number[] };
-              listingIds = data.availableListingIds ?? parseIds(data);
-            }
+          const resBatch = await fetch(batchUrl, { signal: controller.signal, headers });
+          if (resBatch.ok) {
+            const data = (await resBatch.json()) as { availableListingIds?: number[] };
+            return data.availableListingIds ?? parseIds(data);
           }
-          return listingIds;
+          return undefined;
         })();
 
         const listingIds = await Promise.race([fetchPromise, timeoutPromise]);

@@ -5,11 +5,13 @@ import { IoIosMail, IoIosCall, IoIosArrowForward } from "react-icons/io";
 import { footerData } from '../../../data';
 import { Link } from 'react-router-dom';
 import { helpNav, moreNav, primaryNav } from '../../../config/navigation';
-import { LOGO_URL } from '../../../config/branding';
+import { isWordmarkLogo, resolveGuestLogoUrl } from '../../../config/branding';
 import { getTenantContext } from '../../../tenant/tenantContext';
 import { hasOnlinePaymentRail } from '../../../tenant/paymentRail';
 import { getTenantBrandName } from '../../../tenant/displayBrand';
 import { getTenantOverrides, shouldHideAtlasBranding } from '../../../tenant/tenantOverrides';
+import { getTenantSlug } from '../../../tenant/tenantResolver';
+import { hasRuntimeConfig, getRuntimeConfig } from '../../../runtime-config';
 import { formatDisplayNumber, getContactEmail, getTelLink, getWhatsAppLink, getGuestFacingPhone, getWhatsAppPhone } from '../../../config/contact';
 
 const iconMap = {
@@ -35,9 +37,20 @@ const Footer = () => {
     };
     // TASK-7428: gate only the payment-processor half of the TASK-4161 MOR disclosure.
     const showPaymentProcessorCredit = hasOnlinePaymentRail(tenant);
-    const overrides = getTenantOverrides(tenant?.slug);
+    const slug =
+        tenant?.slug ||
+        getTenantSlug({
+            fallbackSlug: hasRuntimeConfig() ? getRuntimeConfig().tenantKey : undefined,
+        });
+    const overrides = getTenantOverrides(slug);
     const hideAtlasBranding = shouldHideAtlasBranding(tenant, overrides);
-    const logoSrc = overrides.hideLogo ? "" : (overrides.logoUrl ?? tenant?.logoUrl ?? LOGO_URL);
+    const logoSrc = overrides.hideLogo
+        ? ""
+        : resolveGuestLogoUrl({
+            overrideLogoUrl: overrides.logoUrl,
+            tenantLogoUrl: tenant?.logoUrl,
+            slug,
+        });
     const showLogo = Boolean(logoSrc);
     // RA-006 §3.5: footer brand always prefers the tenant's own name. Atlas-specific
     // copy is reached only on the Atlas marketplace root where hideAtlasBranding=false.
@@ -105,7 +118,7 @@ const Footer = () => {
 
     return (
         <footer
-            className='pt-16 md:pt-20 pb-28 md:pb-24 px-[5%] text-[var(--footer-text)] border-t border-white/10'
+            className='pt-16 md:pt-20 pb-28 md:pb-24 px-[5%] text-[var(--footer-text)] border-t border-[color:var(--border-subtle)]'
             style={{ background: 'var(--footer-bg)' }}
         >
             <div className='max-w-luxury mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-8 lg:gap-10 lg:items-start'>
@@ -113,7 +126,7 @@ const Footer = () => {
                     {showLogo && (
                         <img
                             data-testid="footer-brand-logo"
-                            className={`rounded-md object-contain h-24 w-24 ${logoSrc.includes('stay-bycityfocus') ? 'bg-[#fff8e7] p-2.5' : ''}`}
+                            className={`rounded-md object-contain h-24 w-24 ${isWordmarkLogo(logoSrc) ? 'bg-[var(--bg-primary)] p-2.5' : ''}`}
                             src={logoSrc}
                             alt={footerBrand}
                             width={96}
