@@ -15,6 +15,16 @@ type EmbedConfig = {
   publishedListingsCount: number;
 };
 
+export function readableCtaText(background: string): string {
+  const match = background.trim().match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+  if (!match) return 'var(--text-on-cta, #ffffff)';
+  const hex = match[1].length === 3 ? match[1].split('').map((channel) => `${channel}${channel}`).join('') : match[1];
+  const channels = [0, 2, 4].map((offset) => Number.parseInt(hex.slice(offset, offset + 2), 16) / 255);
+  const linear = channels.map((channel) => (channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4));
+  const luminance = 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+  return luminance > 0.179 ? '#111827' : '#ffffff';
+}
+
 export default function EmbedPage() {
   const { embedKey } = useParams<{ embedKey: string }>();
   const [config, setConfig] = useState<EmbedConfig | null>(null);
@@ -103,7 +113,13 @@ export default function EmbedPage() {
 
   if (loading) {
     return (
-      <div data-testid="embed-loading" style={{ padding: 24, fontFamily: 'system-ui' }}>
+      <div
+        data-testid="embed-loading"
+        role="status"
+        aria-live="polite"
+        aria-busy="true"
+        className="min-h-24 bg-bg-primary p-6 font-sans text-text-primary"
+      >
         Loading booking widget…
       </div>
     );
@@ -111,7 +127,11 @@ export default function EmbedPage() {
 
   if (error || !config) {
     return (
-      <div data-testid="embed-error" style={{ padding: 24, fontFamily: 'system-ui', color: '#b42318' }}>
+      <div
+        data-testid="embed-error"
+        role="alert"
+        className="min-h-24 border border-border-subtle bg-bg-surface p-6 font-sans text-support-error"
+      >
         Booking widget unavailable. {error ? `(${error.slice(0, 200)})` : ''}
       </div>
     );
@@ -121,10 +141,10 @@ export default function EmbedPage() {
     return (
       <div
         data-testid="embed-not-eligible"
-        style={{ padding: 24, fontFamily: 'system-ui', border: '1px solid #e5e7eb', borderRadius: 12 }}
+        className="border border-border-subtle bg-bg-surface p-6 font-sans text-text-primary rounded-xl"
       >
-        <h3 style={{ margin: 0, fontWeight: 600 }}>Booking not available</h3>
-        <p style={{ margin: '8px 0 0', color: '#6b7280' }}>
+        <h3 className="m-0 font-semibold">Booking not available</h3>
+        <p className="mt-2 text-text-secondary">
           This property is not currently taking bookings. Please contact the host directly.
         </p>
         <p data-testid="embed-blocker" style={{ display: 'none' }}>
@@ -134,7 +154,8 @@ export default function EmbedPage() {
     );
   }
 
-  const brand = config.brandColor || '#0f766e';
+  const brand = config.brandColor?.trim() || '#0f766e';
+  const brandText = readableCtaText(brand);
   // Link to full site reserve page with tenant hint so X-Tenant-Slug resolves via ?tenant=
   const reserveHref = `/reserve?tenant=${encodeURIComponent(config.tenantSlug)}`;
 
@@ -144,28 +165,28 @@ export default function EmbedPage() {
       data-testid="embed-widget"
       data-embed-key={embedKey}
       data-tenant-slug={config.tenantSlug}
-      style={{ fontFamily: 'system-ui', padding: 16, maxWidth: 480, margin: '0 auto' }}
+      className="mx-auto max-w-[480px] bg-bg-primary p-4 font-sans text-text-primary"
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+      <div className="mb-4 flex items-center gap-3">
         {config.logoUrl ? (
           <img
             src={config.logoUrl}
             alt={`${config.tenantName} logo`}
-            style={{ width: 48, height: 48, objectFit: 'contain', borderRadius: 8 }}
+            className="h-12 w-12 rounded-lg object-contain"
           />
         ) : null}
         <div>
-          <div style={{ fontWeight: 700, fontSize: 16 }}>{config.tenantName}</div>
-          {config.tagline ? <div style={{ color: '#6b7280', fontSize: 13 }}>{config.tagline}</div> : null}
+          <div className="text-base font-bold">{config.tenantName}</div>
+          {config.tagline ? <div className="text-[13px] text-text-secondary">{config.tagline}</div> : null}
         </div>
       </div>
 
       <div
         data-testid="embed-availability"
-        style={{ border: '1px solid #e5e7eb', borderRadius: 12, padding: 16 }}
+        className="rounded-xl border border-border-subtle bg-bg-surface p-4"
       >
-        <h4 style={{ margin: '0 0 8px', fontWeight: 600 }}>Check availability</h4>
-        <p style={{ margin: '0 0 12px', color: '#6b7280', fontSize: 14 }}>
+        <h4 className="mb-2 font-semibold">Check availability</h4>
+        <p className="mb-3 text-sm text-text-secondary">
           {config.publishedListingsCount > 0
             ? `${config.publishedListingsCount} stay${config.publishedListingsCount === 1 ? '' : 's'} available`
             : 'No stays currently listed'}
@@ -178,7 +199,7 @@ export default function EmbedPage() {
           style={{
             display: 'inline-block',
             background: brand,
-            color: 'white',
+            color: brandText,
             padding: '10px 16px',
             borderRadius: 8,
             textDecoration: 'none',
@@ -187,7 +208,7 @@ export default function EmbedPage() {
         >
           Book now
         </a>
-        <div style={{ marginTop: 8, fontSize: 12, color: '#9ca3af' }}>
+        <div className="mt-2 text-xs text-text-muted">
           Powered by Atlas
         </div>
       </div>
