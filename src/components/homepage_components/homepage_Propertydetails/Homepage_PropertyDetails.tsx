@@ -1750,21 +1750,23 @@ useEffect(() => {
               {/* Hero cell — TASK-8216: real <img> via /img transform, eager hero */}
               <div
                 className={`pp-cell pp-cell-hero${galleryUrls[0] ? ' pp-cell--photo' : ''}`}
-                role="img"
-                aria-label={galleryUrls[0] ? `${data.property_name} — main photo` : `${data.property_name} — photo coming soon`}
+                role={galleryUrls[0] ? undefined : 'img'}
+                aria-label={galleryUrls[0] ? undefined : `${data.property_name} — photo coming soon`}
               >
                 {galleryUrls[0] ? (
-                  <img
-                    src={getGalleryTransformedUrl(galleryUrls[0], 768)}
-                    srcSet={getGallerySrcSet(galleryUrls[0])}
-                    sizes="(max-width: 767px) 100vw, (max-width: 1023px) 100vw, 600px"
-                    alt={`${data.property_name} — main photo`}
-                    loading="eager"
-                    fetchPriority="high"
-                    decoding="async"
-                    className="pp-gallery-img"
-                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                  />
+                  <a href={galleryUrls[0]} data-fancybox="property-gallery" data-caption={`${data.property_name} — main photo`} style={{ display: 'block', width: '100%', height: '100%' }}>
+                    <img
+                      src={getGalleryTransformedUrl(galleryUrls[0], 768)}
+                      srcSet={getGallerySrcSet(galleryUrls[0])}
+                      sizes="(max-width: 767px) 100vw, (max-width: 1023px) 100vw, 600px"
+                      alt={`${data.property_name} — main photo`}
+                      loading="eager"
+                      fetchPriority="high"
+                      decoding="async"
+                      className="pp-gallery-img"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                    />
+                  </a>
                 ) : (
                   <div className="pp-cell-overlay">
                     <span className="pp-dot" aria-hidden="true" />
@@ -1783,19 +1785,19 @@ useEffect(() => {
                   <div
                     key={i}
                     className={`pp-cell pp-cell-${i + 1} pp-cell--photo`}
-                    role="img"
-                    aria-label={`${data.property_name} — photo ${i + 1}`}
                   >
-                    <img
-                      src={getGalleryTransformedUrl(photo, 480)}
-                      srcSet={getGallerySrcSet(photo)}
-                      sizes="(max-width: 767px) 0px, (max-width: 1023px) 50vw, 280px"
-                      alt={`${data.property_name} — photo ${i + 1}`}
-                      loading="lazy"
-                      decoding="async"
-                      className="pp-gallery-img"
-                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                    />
+                    <a href={photo} data-fancybox="property-gallery" data-caption={`${data.property_name} — photo ${i + 1}`} style={{ display: 'block', width: '100%', height: '100%' }}>
+                      <img
+                        src={getGalleryTransformedUrl(photo, 480)}
+                        srcSet={getGallerySrcSet(photo)}
+                        sizes="(max-width: 767px) 0px, (max-width: 1023px) 50vw, 280px"
+                        alt={`${data.property_name} — photo ${i + 1}`}
+                        loading="lazy"
+                        decoding="async"
+                        className="pp-gallery-img"
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                      />
+                    </a>
                   </div>
                 );
               })}
