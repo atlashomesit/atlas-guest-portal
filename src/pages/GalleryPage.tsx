@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import SEO from "../components/SEO";
 import { LOGO_URL } from "../config/branding";
 import { useTenantListings } from "../hooks/useTenantListings";
-import { filterGuestImageUrls, sanitizeGuestImageUrl } from "../utils/guestImageUrl";
+import { buildGuestImageSrcSet, filterGuestImageUrls, GUEST_IMAGE_SRCSET_WIDTHS, sanitizeGuestImageUrl, toTransformedGuestImageUrl } from "../utils/guestImageUrl";
 import { getTenantBrandName } from "../tenant/displayBrand";
 import { getTenantContext } from "../tenant/tenantContext";
 import { getTenantOverrides } from "../tenant/tenantOverrides";
@@ -170,7 +170,9 @@ const GalleryPage = () => {
                 >
                   {item.url ? (
                     <img
-                      src={item.url}
+                      src={toTransformedGuestImageUrl(item.url, 480) ?? item.url}
+                      srcSet={buildGuestImageSrcSet(item.url, GUEST_IMAGE_SRCSET_WIDTHS)}
+                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                       alt={`${item.propertyName} photo ${item.order + 1}`}
                       loading="lazy"
                       decoding="async"

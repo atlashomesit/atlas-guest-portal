@@ -415,6 +415,7 @@ const SearchPage = () => {
   const showingSampleListings =
     !onlyApiListings && apiListings === null && !isLoading && listings.length > 0;
 
+  // TASK-8351: single availability-batch call for [today, tomorrow) instead of 40× listing-availability fan-out (5 waves of 8).
   useEffect(() => {
     if (!availableNow) {
       setTonightAvailableIds(null);
@@ -422,63 +423,68 @@ const SearchPage = () => {
       return;
     }
 
-    const controller = new AbortController();
-    const ids = [...new Set(listings.map((u) => u.numericId))].filter((id) => id > 0).slice(0, 40);
-    if (ids.length === 0) {
-      setTonightAvailableIds(new Set());
+    const todayStr = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
+    const tomorrowDate = new Date(Date.now() + 86400000);
+    const tomorrowStr = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(tomorrowDate);
+    const cacheKey = `${todayStr}|${tomorrowStr}`;
+    if (dateAvailCacheRef.current.has(cacheKey)) {
+      setTonightAvailableIds(new Set(dateAvailCacheRef.current.get(cacheKey)!));
       setTonightProbeLoading(false);
       return;
     }
 
+    const controller = new AbortController();
     setTonightProbeLoading(true);
     setTonightAvailableIds(null);
-    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
 
-    const probeOne = async (id: number): Promise<boolean> => {
-      try {
-        const url = buildApiUrl(
-          `/availability/listing-availability?listingId=${id}&startDate=${encodeURIComponent(today)}&months=1`,
-        );
-        const res = await fetch(url, {
-          signal: controller.signal,
-          headers: { Accept: "application/json", ...getApiHeaders() },
-        });
-        if (!res.ok) return true;
-        const j = (await res.json()) as {
-          availability?: { date?: string; Date?: string; status?: string; Status?: string; inventory?: number; Inventory?: number }[];
-          Availability?: { date?: string; Date?: string; status?: string; Status?: string; inventory?: number; Inventory?: number }[];
-        };
-        const days = j.availability ?? j.Availability ?? [];
-        const row = days.find((d) => (d.date ?? d.Date) === today);
-        if (!row) return true;  // TASK-4107: missing today-row = inconclusive → fail-open
-        const st = String(row.status ?? row.Status ?? "").toLowerCase();
-        const inv = Number(row.inventory ?? row.Inventory ?? 0);
-        if (st === "blocked" || st === "hold") return false;
-        return inv > 0 || st === "available" || st === "turnover";
-      } catch {
-        return true;
-      }
+    const parseIds = (payload: unknown): number[] | undefined => {
+      if (!payload || typeof payload !== "object") return undefined;
+      const o = payload as Record<string, unknown>;
+      const raw = o.listingIds ?? o.availableListingIds ?? o.ListingIds ?? o.AvailableListingIds;
+      if (!Array.isArray(raw)) return undefined;
+      return raw.map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0);
     };
 
     void (async () => {
-      const ok = new Set<number>();
-      const batch = 8;
-      for (let i = 0; i < ids.length; i += batch) {
+      try {
+        const timeoutPromise = new Promise<undefined>((resolve) => {
+          setTimeout(() => resolve(undefined), 8000);
+        });
+        const fetchPromise = (async () => {
+          const batchUrl = buildApiUrl(
+            `/api/public/listings/availability-batch?startDate=${encodeURIComponent(todayStr)}&endDate=${encodeURIComponent(tomorrowStr)}`,
+          );
+          const res = await fetch(batchUrl, {
+            signal: controller.signal,
+            headers: { Accept: "application/json", ...getApiHeaders() },
+          });
+          if (res.ok) {
+            const data = (await res.json()) as { availableListingIds?: number[] };
+            return data.availableListingIds ?? parseIds(data);
+          }
+          return undefined;
+        })();
+
+        const listingIds = await Promise.race([fetchPromise, timeoutPromise]);
         if (controller.signal.aborted) return;
-        const slice = ids.slice(i, i + batch);
-        const flags = await Promise.all(slice.map(async (id) => ((await probeOne(id)) ? id : -1)));
-        for (const x of flags) {
-          if (x > 0) ok.add(x);
+        if (listingIds != null) {
+          const next = new Set(listingIds);
+          dateAvailCacheRef.current.set(cacheKey, next);
+          setTonightAvailableIds(next);
+        } else {
+          setTonightAvailableIds(null);
         }
-      }
-      if (!controller.signal.aborted) {
-        setTonightAvailableIds(ok);
-        setTonightProbeLoading(false);
+      } catch {
+        if (!controller.signal.aborted) {
+          setTonightAvailableIds(null);
+        }
+      } finally {
+        if (!controller.signal.aborted) setTonightProbeLoading(false);
       }
     })();
 
     return () => controller.abort();
-  }, [availableNow, listings]);
+  }, [availableNow]);
 
   // TASK-1648: GET /api/public/listings/availability?checkIn&checkOut when present, else batch; cache by date pair; fail-open
   useEffect(() => {

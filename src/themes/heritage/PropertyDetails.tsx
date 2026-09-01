@@ -49,7 +49,7 @@ import { buildHomeUnitPath, getPropertySlug } from '@/utils/navigation';
 import { propertySlugMatchesListing } from '@/utils/propertySlugMatch';
 import { useBooking } from '@/contexts/BookingContext';
 import { resolveListing } from '@/utils/listingResolver';
-import { filterGuestImageUrls, sanitizeGuestImageUrl } from '@/utils/guestImageUrl';
+import { buildGuestImageSrcSet, filterGuestImageUrls, GUEST_IMAGE_SRCSET_WIDTHS, sanitizeGuestImageUrl, toTransformedGuestImageUrl } from '@/utils/guestImageUrl';
 import type { ListingDetail, PublicListing } from '@/api/listingClient';
 import {
     fetchListingById,
@@ -1511,6 +1511,9 @@ useEffect(() => {
 
     const galleryUrls = filterGuestImageUrls(data?.property_img ?? []).map(buildAtlasMediaUrl);
     const primaryImage = galleryUrls[0];
+    // TASK-8216: route gallery through /img transform (heritage fork, mirrors classic)
+    const getHeritageTransformedUrl = (url: string, width: number) => toTransformedGuestImageUrl(url, width) ?? url;
+    const getHeritageSrcSet = (url: string) => buildGuestImageSrcSet(url, GUEST_IMAGE_SRCSET_WIDTHS);
     const mapSrcTrimmed = (data?.property_mapSrc ?? "").trim();
 
     // ---- hi-fi design derived values ----------------------------------------
@@ -1743,13 +1746,23 @@ useEffect(() => {
               {/* Hero cell */}
               <div
                 className={`pp-cell pp-cell-hero${galleryUrls[0] ? ' pp-cell--photo' : ''}`}
-                style={galleryUrls[0]
-                  ? { backgroundImage: `url(${galleryUrls[0]})`, backgroundSize: 'cover', backgroundPosition: 'center' }
-                  : {}}
+                
                 role="img"
                 aria-label={galleryUrls[0] ? `${data.property_name} — main photo` : `${data.property_name} — photo coming soon`}
               >
-                {!galleryUrls[0] && (
+                {galleryUrls[0] ? (
+                  <img
+                    src={getHeritageTransformedUrl(galleryUrls[0], 768)}
+                    srcSet={getHeritageSrcSet(galleryUrls[0])}
+                    sizes="(max-width: 767px) 100vw, (max-width: 1023px) 100vw, 600px"
+                    alt={`${data.property_name} — main photo`}
+                    loading="eager"
+                    fetchPriority="high"
+                    decoding="async"
+                    className="pp-gallery-img"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                  />
+                ) : (
                   <div className="pp-cell-overlay">
                     <span className="pp-dot" aria-hidden="true" />
                     <span>Photos coming soon</span>
@@ -1767,10 +1780,21 @@ useEffect(() => {
                   <div
                     key={i}
                     className={`pp-cell pp-cell-${i + 1} pp-cell--photo`}
-                    style={{ backgroundImage: `url(${photo})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
+                    
                     role="img"
                     aria-label={`${data.property_name} — photo ${i + 1}`}
-                  />
+                  >
+                    <img
+                      src={getHeritageTransformedUrl(photo, 480)}
+                      srcSet={getHeritageSrcSet(photo)}
+                      sizes="(max-width: 767px) 0px, (max-width: 1023px) 50vw, 280px"
+                      alt={`${data.property_name} — photo ${i + 1}`}
+                      loading="lazy"
+                      decoding="async"
+                      className="pp-gallery-img"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                    />
+                  </div>
                 );
               })}
 
@@ -1785,7 +1809,7 @@ useEffect(() => {
                     import('@fancyapps/ui/dist/fancybox/fancybox.css'),
                   ]).then(([{ Fancybox }]) => {
                     (Fancybox as { show: (items: object[]) => void }).show(
-                      galleryUrls.map((u) => ({ src: u, type: 'image' })),
+                      galleryUrls.map((u) => ({ src: getHeritageTransformedUrl(u, 1200), type: 'image' })),
                     );
                   }).catch(() => {});
                 }}
