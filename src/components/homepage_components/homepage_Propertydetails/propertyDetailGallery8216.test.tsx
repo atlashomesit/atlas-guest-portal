@@ -35,12 +35,26 @@ describe('TASK-8216 gallery ships via /img transform, not raw blob', () => {
     expect(gallerySlice).toContain('fetchPriority="high"');
   });
 
-  it('preserves role="img" + aria-label and Photos coming soon empty state', () => {
+  it('labels the gallery region and gives the empty placeholder an img role + name', () => {
     const content = readFileSync(filePath, 'utf-8');
-    const galleryStart = content.indexOf('data-testid="property-photo-gallery"');
+    // Anchor at the ELEMENT start, not the data-testid: role and aria-label are authored before
+    // data-testid on the same tag, so a testid-anchored slice cuts them off.
+    const galleryStart = content.lastIndexOf('<div', content.indexOf('data-testid="property-photo-gallery"'));
     const gallerySlice = content.slice(galleryStart, galleryStart + 6000);
-    expect(gallerySlice).toContain('role="img"');
-    expect(gallerySlice).toContain('aria-label');
+
+    // The container is a NAMED LANDMARK. It is deliberately not role="img": it holds several
+    // photos, and each rendered photo is a real <img alt=...> that carries the img role natively.
+    expect(gallerySlice).toContain('role="region"');
+    expect(gallerySlice).toContain('aria-label="Property photos"');
+
+    // role="img" survives exactly where it is still needed -- the EMPTY placeholder, which has no
+    // <img> to carry it. Both role and name are conditional on there being no photo, so assert the
+    // condition rather than the old unconditional literal: TASK-8061 wrapped photos in Fancybox
+    // anchors, and the previous `toContain('role="img"')` went red on that formatting change alone
+    // while the accessibility contract was intact and had in fact improved.
+    expect(gallerySlice).toMatch(/role=\{galleryUrls\[0\] \? undefined : 'img'\}/);
+    expect(gallerySlice).toMatch(/aria-label=\{galleryUrls\[0\] \? undefined :/);
+    expect(gallerySlice).toContain('photo coming soon');
     expect(gallerySlice).toContain('Photos coming soon');
   });
 
