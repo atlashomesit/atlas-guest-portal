@@ -87,6 +87,19 @@ const exclude = [
 // taking the whole vitest run — and gate STEP 1 — down before a single test executes. readdirSync's
 // recursive option exists on 18.17/20.1+ AND 22, so this config no longer cares which is active.
 // Same defect was live in atlas-admin-portal's config; see TASK-7044.
+// These fixed scan roots are ALSO what keeps a background-agent worktree out of the bar. Such a
+// worktree is created at .claude/worktrees/<name>/ inside this repo and is hidden from git by
+// .git/info/exclude, so `git status` reads clean and run-unit-bar.ps1's dirty-tree refusal passes
+// — but vitest would happily glob the sibling checkout's src/ and run its suite as part of THIS
+// repo's bar. atlas-pms-landing and atlas-sales-portal both had that and needed a `test.exclude`
+// (landing went 19 files/111 tests -> 38/222, moving between runs as the sibling committed).
+// This repo needs no exclude: every project below declares an explicit `include` built from these
+// roots, so .claude is unreachable by construction — verified 2026-09-02 by planting a failing
+// probe at .claude/worktrees/__probe__/ and running `vitest list`, which did not collect it.
+// That safety is incidental to why these lists exist, so it is pinned deliberately by
+// src/vitestProjectIncludeGuard.test.ts: drop an `include` from any project and vitest falls back
+// to its default globs, the sibling returns, and nothing else would notice — the bar's count
+// floor cannot see inflation and `git status` stays clean.
 const TEST_FILE_RE = /\.(test|spec)\.(ts|tsx|js|jsx|cjs|mjs)$/;
 const testFiles = ["src", "tests", "functions", "eslint-rules"]
   .flatMap((d) => {
