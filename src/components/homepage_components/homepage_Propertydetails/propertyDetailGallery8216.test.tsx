@@ -52,8 +52,19 @@ describe('TASK-8216 gallery ships via /img transform, not raw blob', () => {
     // condition rather than the old unconditional literal: TASK-8061 wrapped photos in Fancybox
     // anchors, and the previous `toContain('role="img"')` went red on that formatting change alone
     // while the accessibility contract was intact and had in fact improved.
-    expect(gallerySlice).toMatch(/role=\{galleryUrls\[0\] \? undefined : 'img'\}/);
-    expect(gallerySlice).toMatch(/aria-label=\{galleryUrls\[0\] \? undefined :/);
+    //
+    // Matched as a SHAPE, not as the exact ternary text. Pinning
+    // `/role=\{galleryUrls\[0\] \? undefined : 'img'\}/` re-created the very bug this test was
+    // repaired for, one notch narrower: renaming `galleryUrls`, swapping the branches, switching
+    // quote style or letting prettier reflow the line would all false-red again and block every
+    // merge to dev, with the a11y contract untouched. What must hold is that the placeholder gets
+    // an `img` role and a COMPUTED name -- not how the ternary is spelled.
+    expect(gallerySlice).toMatch(/role=(?:["']img["']|\{[^}]*["']img["'][^}]*\})/);
+    // A computed (expression-valued) aria-label, which is what distinguishes the hero cell's
+    // conditional name from the container's literal aria-label="Property photos" asserted above.
+    // Its wording is pinned separately by the 'photo coming soon' assertion below, so this only
+    // has to establish that the name is computed rather than absent.
+    expect(gallerySlice).toMatch(/aria-label=\{/);
     expect(gallerySlice).toContain('photo coming soon');
     expect(gallerySlice).toContain('Photos coming soon');
   });
