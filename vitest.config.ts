@@ -137,6 +137,7 @@ const gateBatchMode = process.env.ATLAS_VITEST_GATE_BATCH === "1";
 const gateFreshFiles = [
   "src/api/client.getApiHeaders.test.ts",
   "src/components/homepage_components/slider/Slider.vrt.test.tsx",
+  "src/pages/home/__tests__/Home.test.tsx",
   "src/pages/MyBookingsPage.dateTz.test.tsx",
   "src/pages/MyBookingsPage.reviewCta.test.tsx",
   "src/tenant/displayBrand.slots.test.tsx",
@@ -171,7 +172,10 @@ const gateReusableMockedFiles = mockedFiles.filter((f) => !gateFreshFiles.includ
 // ⛔ If admin's vitest is ever returned to the 4-way window, re-evaluate — the pin was correct for
 // the contended case.
 const envGuestCap = Number.parseInt(process.env.ATLAS_GUEST_VITEST_MAX_WORKERS ?? "", 10);
-const guestCapValue = Number.isFinite(envGuestCap) && envGuestCap > 0 ? envGuestCap : 4;
+// Gate batching creates several projects at once; keep each at one worker so their
+// combined pools cannot starve one another while the API build runs beside them.
+// Normal standalone runs retain the measured four-worker default.
+const guestCapValue = Number.isFinite(envGuestCap) && envGuestCap > 0 ? envGuestCap : (gateBatchMode ? 1 : 4);
 const workerCap =
   process.platform === "win32"
     ? { maxWorkers: guestCapValue, fileParallelism: guestCapValue > 1 }
