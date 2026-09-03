@@ -9,6 +9,7 @@ import { getContactEmail, getTelLink, hasHostContact } from "../config/contact";
 import { getTenantBrandName } from "../tenant/displayBrand";
 import { useGuestAuth } from "../contexts/GuestAuthContext";
 import { formatCurrency, parseDate } from "../utils/formatting";
+import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 
 /**
  * TASK-6056: a signed-in guest whose JWT had merely expired was shown "Bookings not found" —
@@ -43,6 +44,14 @@ interface BookingItem {
   token: string;
   hasUnreadMessages?: boolean; // TASK-4359: guest portal messaging unread indicator
   reviewed?: boolean; // TASK-4360 AC2: server-supplied "already reviewed" flag (optional; forward-compatible)
+  // TASK-10091: minimal listing route identity for the "Book this home again" CTA. The server
+  // already nulls this out for a missing/deleted/cross-tenant/unpublished/inactive listing, so
+  // "present" here already means "safe to link to" — no client-side re-validation needed.
+  // NOTE: as of this task, only the magic-link endpoint (`/api/guest/bookings`) returns this
+  // field; the JWT-authenticated endpoint (`/api/guest/auth/bookings`, GuestAuthController.
+  // GetMyBookings) does not yet, so the CTA is gracefully absent for logged-in guests until that
+  // endpoint is updated to match (see PR description / task report for the exact diff needed).
+  listingId?: number;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -317,6 +326,16 @@ export default function MyBookingsPage() {
               // stays keep showing the CTA — server-side eligibility remains the source of truth.
               const alreadyReviewed = reviewEligible && b.reviewed === true;
               const canReview = reviewEligible && !alreadyReviewed;
+              // TASK-10091: a completed (Past, non-cancelled) stay can seed an honest rebook —
+              // this coexists with, never replaces, the review CTA/badge above. Eligibility reuses
+              // `reviewEligible` (Past tab already excludes Cancelled) but additionally requires a
+              // server-supplied `listingId`, which the API only returns for a listing that is still
+              // published/active/same-tenant — so a missing/deleted/unpublished listing simply
+              // hides the CTA rather than linking to a dead route.
+              const canRebook = reviewEligible && b.listingId != null && b.listingId > 0;
+              const rebookHref = canRebook
+                ? buildHomeUnitPath(getPropertySlug({ property_name: b.propertyName }), b.listingId!)
+                : null;
               return (
                 <div key={b.id} className="space-y-2">
                 <Link
@@ -352,23 +371,36 @@ export default function MyBookingsPage() {
                     </p>
                   )}
                 </Link>
-                {canReview && (
-                  <Link
-                    to={`/review/${b.id}?t=${encodeURIComponent(b.token)}`}
-                    data-testid="my-bookings-review-cta"
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-brand-primary/40 px-3 py-2 text-sm font-semibold text-brand-primary hover:bg-brand-primary/5 transition-colors"
-                  >
-                    <span aria-hidden="true">★</span> Rate your stay
-                  </Link>
-                )}
-                {alreadyReviewed && (
-                  <span
-                    data-testid="my-bookings-reviewed-badge"
-                    className="inline-flex items-center gap-1.5 text-sm font-medium text-text-muted"
-                  >
-                    <span aria-hidden="true">✓</span> Reviewed
-                  </span>
-                )}
+                <div className="flex flex-wrap items-center gap-2">
+                  {canReview && (
+                    <Link
+                      to={`/review/${b.id}?t=${encodeURIComponent(b.token)}`}
+                      data-testid="my-bookings-review-cta"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-brand-primary/40 px-3 py-2 text-sm font-semibold text-brand-primary hover:bg-brand-primary/5 transition-colors"
+                    >
+                      <span aria-hidden="true">★</span> Rate your stay
+                    </Link>
+                  )}
+                  {alreadyReviewed && (
+                    <span
+                      data-testid="my-bookings-reviewed-badge"
+                      className="inline-flex items-center gap-1.5 text-sm font-medium text-text-muted"
+                    >
+                      <span aria-hidden="true">✓</span> Reviewed
+                    </span>
+                  )}
+                  {/* TASK-10091: convenience link only — blank dates/guests, no reconstructed
+                      quote/price/discount/token/hold. Coexists with the review CTA/badge above. */}
+                  {canRebook && rebookHref && (
+                    <Link
+                      to={rebookHref}
+                      data-testid="my-bookings-rebook-cta"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-border-subtle px-3 py-2 text-sm font-semibold text-text-primary hover:bg-bg-muted transition-colors"
+                    >
+                      <span aria-hidden="true">↻</span> Book this home again
+                    </Link>
+                  )}
+                </div>
                 </div>
               );
             })}
