@@ -294,6 +294,7 @@ function GuestDetailsForm({
 
   const checkInStr = toCalendarISO(checkIn);
   const checkOutStr = toCalendarISO(checkOut);
+  const nights = calculateNights(checkIn, checkOut);
 
   useEffect(() => {
     let cancelled = false;
@@ -392,8 +393,9 @@ function GuestDetailsForm({
         prefill: { name, email, contact: phone },
         theme: { color: brand },
       });
-      rzp.on('payment.failed', (resp: { error?: { description?: string } }) => {
-        setError(resp.error?.description ?? 'Payment failed. Please try again.');
+      rzp.on('payment.failed', (resp) => {
+        const r = resp as { error?: { description?: string } };
+        setError(r.error?.description ?? 'Payment failed. Please try again.');
         setSubmitting(false);
       });
       rzp.open();
