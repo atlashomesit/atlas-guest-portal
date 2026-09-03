@@ -97,9 +97,10 @@ async function fetchAvailability(
   url.searchParams.set('to', to);
   const res = await fetch(url.toString(), { headers: getApiHeaders() });
   if (!res.ok) return new Map();
-  const days = (await res.json()) as Record<string, unknown>[];
+  const days = (await res.json()) as unknown;
+  if (!Array.isArray(days)) return new Map();
   const map = new Map<string, string>();
-  for (const d of days) {
+  for (const d of days as Record<string, unknown>[]) {
     const date = String(d.date ?? d.Date ?? '').slice(0, 10);
     const status = String(d.status ?? d.Status ?? 'available');
     if (date) map.set(date, status);

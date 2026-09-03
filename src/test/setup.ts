@@ -82,3 +82,18 @@ Object.defineProperty(window, "matchMedia", {
     dispatchEvent: vi.fn(),
   })),
 });
+
+// jsdom does not implement ResizeObserver. Components that observe their own
+// size (e.g. the embed widget's height postMessage) would throw on mount. This
+// stub records the target so cleanup is a no-op.
+class ResizeObserverStub {
+  private cb: ResizeObserverCallback;
+  constructor(cb: ResizeObserverCallback) { this.cb = cb; }
+  observe() {}
+  unobserve() {}
+  disconnect() { this.cb = () => {}; }
+}
+Object.defineProperty(global, "ResizeObserver", {
+  writable: true,
+  value: ResizeObserverStub,
+});
