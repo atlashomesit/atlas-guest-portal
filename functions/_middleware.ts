@@ -35,6 +35,7 @@ interface Env {
 interface RewriterElement {
   setAttribute(name: string, value: string): void;
   setInnerContent(content: string): void;
+  remove(): void;
 }
 interface RewriterElementHandlers {
   element(el: RewriterElement): void;
@@ -50,6 +51,55 @@ const SITE_META_TTL_MS = 5 * 60 * 1000;
 // `null` is cached too (a resolved "no tenant meta for this host" — 404/unresolved) so a
 // mistyped or attacker-probed host does not trigger an API round-trip on every crawler hit.
 const siteMetaCache = new TtlCache<TenantSiteMeta | null>(SITE_META_TTL_MS);
+
+/** TASK-10164: path-aware clickjacking policy — embed routes stay framable; everything else 'none'. */
+function isEmbedFramablePath(pathname: string): boolean {
+  return pathname === "/embed.js" || pathname.startsWith("/embed/");
+}
+
+function stripFrameAncestors(csp: string): string {
+  return csp
+    .replace(/frame-ancestors\s+[^;]+;?/gi, "")
+    .replace(/;\s*;/g, ";")
+    .replace(/^\s*;\s*/, "")
+    .replace(/;\s*$/, "")
+    .trim();
+}
+
+function mergeFrameAncestorsIntoCsp(csp: string, frameAncestors: string): string {
+  const without = stripFrameAncestors(csp);
+  const directive = `frame-ancestors ${frameAncestors}`;
+  if (!without) return directive;
+  return `${without.replace(/;?\s*$/, "")}; ${directive}`;
+}
+
+function collectCspValues(headers: Headers): string[] {
+  const values: string[] = [];
+  headers.forEach((value, key) => {
+    if (key.toLowerCase() === "content-security-policy") values.push(value);
+  });
+  return values;
+}
+
+function applyFrameProtection(request: Request, response: Response): Response {
+  const pathname = new URL(request.url).pathname;
+  const embed = isEmbedFramablePath(pathname);
+  const frameAncestors = embed ? "https: http:" : "'none'";
+  const xfo = embed ? "ALLOWALL" : "SAMEORIGIN";
+
+  const headers = new Headers(response.headers);
+  const csps = collectCspValues(headers);
+  headers.delete("content-security-policy");
+  const base = csps[0] ?? "";
+  headers.set("content-security-policy", mergeFrameAncestorsIntoCsp(base, frameAncestors));
+  headers.set("x-frame-options", xfo);
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
 
 async function fetchTenantSiteMeta(host: string, apiBase: string): Promise<TenantSiteMeta | null> {
   const cached = siteMetaCache.get(host);
@@ -76,13 +126,15 @@ export const onRequest = async (context: {
   next: () => Promise<Response>;
 }): Promise<Response> => {
   const response = await context.next();
+  // TASK-10164: clickjacking headers must apply even when the OG rewrite fail-opens.
+  const framed = applyFrameProtection(context.request, response);
 
   try {
     // Only HTML documents carry OG/meta tags — every other response (API JSON, sitemap.xml,
     // hashed JS/CSS assets, images, the /.well-known runtime-config, etc.) passes through
     // untouched and never triggers the API round-trip below.
-    const contentType = response.headers.get("content-type") ?? "";
-    if (!contentType.toLowerCase().includes("text/html")) return response;
+    const contentType = framed.headers.get("content-type") ?? "";
+    if (!contentType.toLowerCase().includes("text/html")) return framed;
 
     const url = new URL(context.request.url);
     // TASK-7170 / TASK-7207 / ADR-0096: through the `tenant-subdomain-router` Worker the request
@@ -104,13 +156,13 @@ export const onRequest = async (context: {
 
     // Atlas first-party hosts (marketplace apex + Atlas direct-booking domains) keep their
     // existing static/runtime OG tags — no API call, no rewrite.
-    if (!isRewriteEligibleHost(host)) return response;
+    if (!isRewriteEligibleHost(host)) return framed;
 
     const apiBase = (context.env.ATLAS_API_BASE_URL ?? "").trim().replace(/\/+$/, "");
-    if (!apiBase) return response; // misconfigured Pages env — fail open, not a 500
+    if (!apiBase) return framed; // misconfigured Pages env — fail open, not a 500
 
     const meta = await fetchTenantSiteMeta(host, apiBase);
-    if (!meta) return response; // unresolved host / API error — fail open to existing tags
+    if (!meta) return framed; // unresolved host / API error — fail open to existing tags
 
     const values = buildMetaRewriteValues(meta, url.toString());
 
@@ -169,9 +221,9 @@ export const onRequest = async (context: {
         },
       });
 
-    return rewriter.transform(response);
+    return applyFrameProtection(context.request, rewriter.transform(framed));
   } catch {
     // See FAIL-OPEN CONTRACT above — never let this Function break the page.
-    return response;
+    return framed;
   }
 };

@@ -54,7 +54,7 @@ exports[`AboutPage > matches the snapshot 1`] = `
                 r="10"
               />
               <path
-                d="m16 9-5.5 5.5L8 12"
+                d="m9 12 2 2 4-4"
               />
             </svg>
             <span>
@@ -83,7 +83,7 @@ exports[`AboutPage > matches the snapshot 1`] = `
                 r="10"
               />
               <path
-                d="m16 9-5.5 5.5L8 12"
+                d="m9 12 2 2 4-4"
               />
             </svg>
             <span>
@@ -112,7 +112,7 @@ exports[`AboutPage > matches the snapshot 1`] = `
                 r="10"
               />
               <path
-                d="m16 9-5.5 5.5L8 12"
+                d="m9 12 2 2 4-4"
               />
             </svg>
             <span>
@@ -386,7 +386,7 @@ exports[`AboutPage > matches the snapshot 1`] = `
                   r="10"
                 />
                 <path
-                  d="m16 9-5.5 5.5L8 12"
+                  d="m9 12 2 2 4-4"
                 />
               </svg>
             </div>
