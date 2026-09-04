@@ -19,6 +19,23 @@
 # Accepted deliberately as a cost tradeoff. Measured saving ~500 billed min/month.
 #
 # IF A LEAK EVER ARRIVES BY THAT PATH: restore `synchronize` here rather than touching `push`.
+# =============================================================================================
+# 2026-09-04 - THIS REPO KEEPS `push: [dev]` ON PURPOSE. DO NOT "RESYNC" IT AWAY.
+#
+# On 2026-09-04 the founder removed the `push: [dev]` trigger from this workflow in the four
+# PRIVATE repos (atlas-api, atlas-admin-portal, atlas-pms-landing, atlas-e2e) on cost: measured
+# over 30 days it was 4,410 billed min/month across those four, 49% of a 9,085 min bill against
+# 2,000-3,000 included, and the push trigger was 3,111 of those runs.
+#
+# atlas-guest-portal is a PUBLIC repo, so its Actions minutes are FREE. The tradeoff that
+# justified the removal elsewhere - server-side identity checking on direct pushes to dev, versus
+# ~$25/month - does not exist here: keeping it costs nothing. So it stays, and this file
+# deliberately diverges from its four siblings.
+#
+# A future sweep that "makes the five workflows consistent" by deleting the trigger below would
+# be removing free coverage for no saving. If you are here to do that, don't.
+# =============================================================================================
+
 name: Author email allowlist
 
 # Trigger scope: `pull_request` AND `push: [dev]`.

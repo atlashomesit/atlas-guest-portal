@@ -33,7 +33,7 @@ describe("public/_headers Content-Security-Policy connect-src (TASK-7705)", () =
 
   it("still allows the dev API host", () => {
     expect(connectSrc).toContain(
-      "https://atlas-homes-api-dev-fhdtg0gkgmcmhwfd.centralindia-01.azurewebsites.net",
+      "https://devapi.atlaspms.in",
     );
   });
 });

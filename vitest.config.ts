@@ -2,6 +2,9 @@ import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import { readdirSync, readFileSync } from "node:fs";
+// JavaScript adapter intentionally mirrors Vitest's internal threads worker protocol.
+// @ts-expect-error no declaration file is needed by the runtime-loaded config
+import isolatedBatchPool from "./scripts/vitest-isolated-batch-pool.mjs";
 
 // ---------------------------------------------------------------------------
 // isolate:false partition (2026-07-07) — ported from atlas-admin-portal
@@ -84,6 +87,19 @@ const exclude = [
 // taking the whole vitest run — and gate STEP 1 — down before a single test executes. readdirSync's
 // recursive option exists on 18.17/20.1+ AND 22, so this config no longer cares which is active.
 // Same defect was live in atlas-admin-portal's config; see TASK-7044.
+// These fixed scan roots are ALSO what keeps a background-agent worktree out of the bar. Such a
+// worktree is created at .claude/worktrees/<name>/ inside this repo and is hidden from git by
+// .git/info/exclude, so `git status` reads clean and run-unit-bar.ps1's dirty-tree refusal passes
+// — but vitest would happily glob the sibling checkout's src/ and run its suite as part of THIS
+// repo's bar. atlas-pms-landing and atlas-sales-portal both had that and needed a `test.exclude`
+// (landing went 19 files/111 tests -> 38/222, moving between runs as the sibling committed).
+// This repo needs no exclude: every project below declares an explicit `include` built from these
+// roots, so .claude is unreachable by construction — verified 2026-09-02 by planting a failing
+// probe at .claude/worktrees/__probe__/ and running `vitest list`, which did not collect it.
+// That safety is incidental to why these lists exist, so it is pinned deliberately by
+// src/vitestProjectIncludeGuard.test.ts: drop an `include` from any project and vitest falls back
+// to its default globs, the sibling returns, and nothing else would notice — the bar's count
+// floor cannot see inflation and `git status` stays clean.
 const TEST_FILE_RE = /\.(test|spec)\.(ts|tsx|js|jsx|cjs|mjs)$/;
 const testFiles = ["src", "tests", "functions", "eslint-rules"]
   .flatMap((d) => {
@@ -128,6 +144,18 @@ const tzEastFiles = testFiles.filter((f) => TZ_EAST_RE.test(f));
 const nonTzFiles = testFiles.filter((f) => !TZ_EAST_RE.test(f));
 const mockedFiles = nonTzFiles.filter((f) => usesModuleMocks.has(f));
 const sharedFiles = nonTzFiles.filter((f) => !usesModuleMocks.has(f));
+const gateBatchMode = process.env.ATLAS_VITEST_GATE_BATCH === "1";
+// These files depend on process-global date/fetch/tenant modules being born fresh.
+// Keep the boundary explicit and tiny; every other mocked file has passed with runner-level reset.
+const gateFreshFiles = [
+  "src/api/client.getApiHeaders.test.ts",
+  "src/components/homepage_components/slider/Slider.vrt.test.tsx",
+  "src/pages/MyBookingsPage.dateTz.test.tsx",
+  "src/pages/MyBookingsPage.reviewCta.test.tsx",
+  "src/tenant/displayBrand.slots.test.tsx",
+  "tests/DatePicker.test.tsx",
+];
+const gateReusableMockedFiles = mockedFiles.filter((f) => !gateFreshFiles.includes(f));
 
 // Windows: release gate runs API/admin/guest Vitest in parallel — keep 1 worker
 // to avoid pool startup timeouts / worker-heap exhaustion (see heavyRouteSmokes
@@ -148,14 +176,15 @@ const sharedFiles = nonTzFiles.filter((f) => !usesModuleMocks.has(f));
 // against a machine state that no longer occurs — and guest at 571s is the long pole of STEP 1's
 // parallel phase because of it.
 //
-// So the cap becomes a floor-1 default the CALLER may raise. Default is UNCHANGED on win32, so local
-// `npm test`, CI, and any caller that does not set the variable keep exactly the settled behaviour.
-// release-gate.ps1 sets ATLAS_GUEST_VITEST_MAX_WORKERS only for the window it knows admin has left.
+// TASK-8374: caps raised to 4 — the collision that justified 1 no longer exists (admin runs alone,
+// guest not in same window, 4 is safe per 2026-08-23 trial). Default is now 4 on win32, so local
+// `npm test`, CI, and any caller that does not set the variable now get the measured 4, not the
+// contended 1. release-gate.ps1 no longer needs to set ATLAS_GUEST_VITEST_MAX_WORKERS for this window.
 //
-// ⛔ If admin's vitest is ever returned to the 4-way window, DELETE the gate's env line — do not
-// re-tune this. The pin is correct for the contended case and always was.
+// ⛔ If admin's vitest is ever returned to the 4-way window, re-evaluate — the pin was correct for
+// the contended case.
 const envGuestCap = Number.parseInt(process.env.ATLAS_GUEST_VITEST_MAX_WORKERS ?? "", 10);
-const guestCapValue = Number.isFinite(envGuestCap) && envGuestCap > 0 ? envGuestCap : 1;
+const guestCapValue = Number.isFinite(envGuestCap) && envGuestCap > 0 ? envGuestCap : 4;
 const workerCap =
   process.platform === "win32"
     ? { maxWorkers: guestCapValue, fileParallelism: guestCapValue > 1 }
@@ -200,8 +229,12 @@ export default defineConfig({
         test: {
           ...baseTest,
           name: "mocked-isolated",
-          include: mockedFiles,
-          isolate: true,
+          include: gateBatchMode ? gateReusableMockedFiles : mockedFiles,
+          // Normal test runs retain Vitest's stock fresh-worker isolation. STEP 1 reuses exactly
+          // one thread, while the adapter restores isolate:true inside the runner so Vitest still
+          // resets its module registry and mocker before every file.
+          isolate: !gateBatchMode,
+          pool: gateBatchMode ? isolatedBatchPool : ("threads" as const),
         },
       },
       {
@@ -213,6 +246,20 @@ export default defineConfig({
           isolate: false,
         },
       },
+      ...(gateBatchMode
+        ? [
+            {
+              extends: true,
+              test: {
+                ...baseTest,
+                name: "gate-fresh-isolated",
+                include: gateFreshFiles,
+                isolate: true,
+                pool: "threads" as const,
+              },
+            },
+          ]
+        : []),
       // Runs east of +05:30 — see the TZ-pinned partition note above. Isolated because these
       // files use vi.mock, and kept a separate project so the pin covers ONLY them.
       {

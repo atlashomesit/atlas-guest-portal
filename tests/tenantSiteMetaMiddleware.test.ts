@@ -64,6 +64,24 @@ function makeHtmlResponse(): Response {
 
 const WORKER_PROXY_SECRET = "test-worker-proxy-secret";
 
+/** TASK-10164 clones every response to attach exactly one frame-ancestors. Identity equality is gone. */
+async function expectPassthroughWithClickjacking(
+  result: Response,
+  original: Response,
+  opts: { embed?: boolean } = {},
+) {
+  expect(result).not.toBe(original);
+  expect(result.status).toBe(original.status);
+  const csp = (result.headers.get("content-security-policy") ?? "").toLowerCase();
+  if (opts.embed) {
+    expect(csp).toMatch(/frame-ancestors\s+https:\s+http:/);
+    expect(result.headers.get("x-frame-options")).toBe("ALLOWALL");
+  } else {
+    expect(csp).toMatch(/frame-ancestors\s+'none'/);
+    expect(result.headers.get("x-frame-options")).toBe("SAMEORIGIN");
+  }
+}
+
 function makeContext(overrides: {
   url: string;
   next: () => Promise<Response>;
@@ -108,7 +126,7 @@ describe("_middleware onRequest — non-HTML / excluded-host short-circuits (no 
       makeContext({ url: "https://tenant-a.example.com/api/whatever", next: async () => jsonResponse }),
     );
 
-    expect(result).toBe(jsonResponse);
+    await expectPassthroughWithClickjacking(result, jsonResponse);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
@@ -120,7 +138,7 @@ describe("_middleware onRequest — non-HTML / excluded-host short-circuits (no 
     const html = makeHtmlResponse();
     const result = await onRequest(makeContext({ url: "https://atlastays.com/", next: async () => html }));
 
-    expect(result).toBe(html);
+    await expectPassthroughWithClickjacking(result, html);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
@@ -134,7 +152,7 @@ describe("_middleware onRequest — non-HTML / excluded-host short-circuits (no 
       makeContext({ url: "https://www.atlashomestays.com/", next: async () => html }),
     );
 
-    expect(result).toBe(html);
+    await expectPassthroughWithClickjacking(result, html);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 });
@@ -226,7 +244,7 @@ describe("_middleware onRequest — X-Forwarded-Host preference (TASK-7170 / ADR
       }),
     );
 
-    expect(result).toBe(html);
+    await expectPassthroughWithClickjacking(result, html);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
@@ -304,7 +322,7 @@ describe("_middleware onRequest — X-Forwarded-Host preference (TASK-7170 / ADR
       }),
     );
 
-    expect(result).toBe(html); // marketplace apex via URL host — untouched
+    await expectPassthroughWithClickjacking(result, html); // marketplace apex via URL host — untouched
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
@@ -345,7 +363,7 @@ describe("_middleware onRequest — X-Forwarded-Host preference (TASK-7170 / ADR
       }),
     );
 
-    expect(result).toBe(html); // still the untouched first-party response
+    await expectPassthroughWithClickjacking(result, html); // still the untouched first-party response
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 });
@@ -365,7 +383,7 @@ describe("_middleware onRequest — FAIL-OPEN CONTRACT", () => {
       makeContext({ url: `https://fail-fetch-${Date.now()}.example.com/`, next: async () => html }),
     );
 
-    expect(result).toBe(html);
+    await expectPassthroughWithClickjacking(result, html);
   });
 
   it("fails open when the API returns 404 (unresolved host)", async () => {
@@ -377,7 +395,7 @@ describe("_middleware onRequest — FAIL-OPEN CONTRACT", () => {
       makeContext({ url: `https://unresolved-${Date.now()}.example.com/`, next: async () => html }),
     );
 
-    expect(result).toBe(html);
+    await expectPassthroughWithClickjacking(result, html);
   });
 
   it("fails open when the API returns malformed JSON", async () => {
@@ -392,7 +410,7 @@ describe("_middleware onRequest — FAIL-OPEN CONTRACT", () => {
       makeContext({ url: `https://malformed-json-${Date.now()}.example.com/`, next: async () => html }),
     );
 
-    expect(result).toBe(html);
+    await expectPassthroughWithClickjacking(result, html);
   });
 
   it("fails open when ATLAS_API_BASE_URL is not configured (never a 500)", async () => {
@@ -409,7 +427,7 @@ describe("_middleware onRequest — FAIL-OPEN CONTRACT", () => {
       }),
     );
 
-    expect(result).toBe(html);
+    await expectPassthroughWithClickjacking(result, html);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
@@ -425,7 +443,7 @@ describe("_middleware onRequest — FAIL-OPEN CONTRACT", () => {
       makeContext({ url: `https://throwing-rewriter-${Date.now()}.example.com/`, next: async () => html }),
     );
 
-    expect(result).toBe(html);
+    await expectPassthroughWithClickjacking(result, html);
   });
 
   it("fails open when the HTMLRewriter global is entirely absent (worst case — no stub at all)", async () => {
@@ -440,7 +458,7 @@ describe("_middleware onRequest — FAIL-OPEN CONTRACT", () => {
       makeContext({ url: `https://no-rewriter-global-${Date.now()}.example.com/`, next: async () => html }),
     );
 
-    expect(result).toBe(html);
+    await expectPassthroughWithClickjacking(result, html);
   });
 
   it("fails open when context.next() itself throws (never swallowed into a 500 by this Function)", async () => {

@@ -4,7 +4,7 @@ import { _resetDedupedJsonFetchForTests } from '@/api/dedupedJsonFetch';
 import { fetchListingById } from '@/api/listingClient';
 import { resolveListing } from '../listingResolver';
 
-const API_BASE = 'https://atlas-homes-api-dev-fhdtg0gkgmcmhwfd.centralindia-01.azurewebsites.net';
+const API_BASE = 'https://devapi.atlaspms.in';
 
 const fetchMock = vi.fn();
 

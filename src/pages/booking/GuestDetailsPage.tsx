@@ -389,7 +389,12 @@ const GuestDetailsPage: React.FC = () => {
   const [consentError, setConsentError] = useState('');
   const [consentFlash, setConsentFlash] = useState(false);
   const consentRowRef = useRef<HTMLDivElement>(null);
-  const [whatsappOptIn, setWhatsappOptIn] = useState(true); // transactional_whatsapp — pre-checked per spec
+  // TASK-10050 (DPDP guarded consent): transactional WhatsApp must NOT be pre-checked.
+  // The previous `true` default meant consent was assumed unless the guest actively
+  // opted out — a dark pattern that fails DPDP §6 "free, specific, informed" and
+  // left the API with an unverifiable consent record. Default is now false; the
+  // guest must explicitly check the box to opt in.
+  const [whatsappOptIn, setWhatsappOptIn] = useState(false);
   const [marketingOptIn, setMarketingOptIn] = useState(false);
 
   // Persist guest PII to sessionStorage so a hard reload / Back nav doesn't lose it.
@@ -746,6 +751,11 @@ const GuestDetailsPage: React.FC = () => {
       e.preventDefault();
       if (isSubmitting || holdExpired) return;
       if (!validateForm()) return;
+      // TASK-8048: fail closed before touching the network — a WHATSAPP / no-provider tenant must not reach POST /api/Razorpay/order.
+      if (!hasOnlinePaymentRail(getTenantContext())) {
+        setOrderError('Online payment is not available for this property. Please contact the host on WhatsApp to complete your booking.');
+        return;
+      }
 
       const numericHoldId = holdId != null ? Number(holdId) : NaN;
       if (!Number.isFinite(numericHoldId)) {
@@ -1399,6 +1409,15 @@ const GuestDetailsPage: React.FC = () => {
   const brandInitial = brandName.charAt(0).toUpperCase();
   const whatsappNumber = tenantCtx?.whatsappBookingPhone ?? '';
   const consentEntityName = getGuestDataProcessingEntityName();
+  // TASK-8048: single choke-point — do not offer a Razorpay pay rail when no online provider is configured.
+  // hasOnlinePaymentRail() mirrors GET /tenants/from-domain's bookingMode derivation (TENANT vs WHATSAPP).
+  const hasOnlineRail = hasOnlinePaymentRail(tenantCtx);
+  const whatsappHandoffUrl = (() => {
+    const digits = (whatsappNumber || '').replace(/\D/g, '');
+    const text = `Hi, I'm interested in booking ${propertyName || 'your property'}${unitName ? ` · ${unitName}` : ''} for ${checkInDisplay} → ${checkOutDisplay} (${nights} ${nights === 1 ? 'night' : 'nights'}, ${booking.guests ?? 1} guest${(booking.guests ?? 1) !== 1 ? 's' : ''}). Can you help me confirm?`;
+    if (digits) return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
+    return `${getWhatsAppLink()}?text=${encodeURIComponent(text)}`;
+  })();
   const paymentFailureWhatsAppUrl = `${getWhatsAppLink()}?text=${encodeURIComponent(
     'Hi, my payment just failed while booking. Can you help?',
   )}`;
@@ -1902,22 +1921,32 @@ const GuestDetailsPage: React.FC = () => {
               </div>
               {consentError && <div className="gd-input-help error" role="alert">{consentError}</div>}
 
-              {/* WhatsApp opt-in — pre-checked */}
+              {/* WhatsApp opt-in — TASK-10050: unchecked by default, explicit opt-in required */}
               <div
                 className={`gd-consent-row${whatsappOptIn ? ' checked' : ''}`}
                 onClick={() => setWhatsappOptIn((v) => !v)}
                 role="checkbox"
                 aria-checked={whatsappOptIn}
+                aria-label="Send my booking updates on WhatsApp"
                 tabIndex={0}
                 onKeyDown={(e) => e.key === ' ' && setWhatsappOptIn((v) => !v)}
+                data-testid="guest-booking-whatsapp-consent-row"
               >
                 <span className={`gd-check${whatsappOptIn ? ' checked' : ''}`}>
                   <IconCheck size={14}/>
                 </span>
                 <div className="gd-consent-body">
                   Send my booking updates on <b>WhatsApp</b> — confirmations, directions, host messages.{' '}
-                  <span style={{ color: 'var(--gd-faint)' }}>(Optional — transactional WhatsApp.)</span>
+                  <span style={{ color: 'var(--gd-faint)' }}>(Optional — requires your explicit consent.)</span>
                 </div>
+                <input
+                  type="checkbox"
+                  style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }}
+                  checked={whatsappOptIn}
+                  onChange={(e) => setWhatsappOptIn(e.target.checked)}
+                  data-testid="guest-booking-whatsapp-consent"
+                  tabIndex={-1}
+                />
               </div>
 
               {/* Marketing opt-in — optional, separate purpose (TASK-5137) */}
@@ -2165,56 +2194,81 @@ const GuestDetailsPage: React.FC = () => {
             </p>
           )}
 
-          {/* Pay CTA */}
-          <button
-            type="submit"
-            form="gd-details-form"
-            className="gd-pay"
-            disabled={payDisabled}
-            data-testid="guest-booking-submit"
-          >
-            {isSubmitting
-              ? <><IconSpinner size={16}/> Securing your booking…</>
-              : <><IconLock size={14}/> Pay <span className="num">{displayPrice(chargeInr)}</span> to confirm</>
-            }
-          </button>
+          {/* Pay CTA — TASK-8048: do not render a Razorpay pay rail when no online provider is configured. */}
+          {hasOnlineRail ? (
+            <>
+              <button
+                type="submit"
+                form="gd-details-form"
+                className="gd-pay"
+                disabled={payDisabled}
+                data-testid="guest-booking-submit"
+              >
+                {isSubmitting
+                  ? <><IconSpinner size={16}/> Securing your booking…</>
+                  : <><IconLock size={14}/> Pay <span className="num">{displayPrice(chargeInr)}</span> to confirm</>
+                }
+              </button>
 
-          {/* Pay microcopy */}
-          {!consentAccepted && (
-            <div className="gd-pay-microcopy">Tick the consent box to enable payment.</div>
-          )}
-          {consentAccepted && (
-            <div className="gd-pay-microcopy">
-              You'll be charged <b>{displayPrice(chargeInr)}</b> now to confirm.
-              {freeCancellationCopy?.deadlineFormatted
-                && ` Free cancellation until ${freeCancellationCopy.deadlineFormatted}.`}
-              {freeCancellationCopy?.trustMessage
-                && !freeCancellationCopy.deadlineFormatted
-                && ` ${freeCancellationCopy.trustMessage}`}
-              {/* TASK-7012: lapsed tier deadline but a live grace window — state the window that is
-                  actually honoured instead of leaving the charge line with no cancellation terms. */}
-              {!freeCancellationCopy?.deadlineFormatted
-                && !freeCancellationCopy?.trustMessage
-                && freeCancellationCopy?.applicableGraceHours
-                && ` Free cancellation for ${freeCancellationCopy.applicableGraceHours} hours after you book.`}
-              {/* TASK-4410: INR charge disclosure for non-INR shoppers */}
-              {currency !== 'INR' && (
-                <div style={{ marginTop: 8, fontSize: '0.85em', color: '#64748b' }}>
-                  Charged in {formatINR(chargeInr)} — your bank may apply its own conversion fee.
+              {/* Pay microcopy */}
+              {!consentAccepted && (
+                <div className="gd-pay-microcopy">Tick the consent box to enable payment.</div>
+              )}
+              {consentAccepted && (
+                <div className="gd-pay-microcopy">
+                  You'll be charged <b>{displayPrice(chargeInr)}</b> now to confirm.
+                  {freeCancellationCopy?.deadlineFormatted
+                    && ` Free cancellation until ${freeCancellationCopy.deadlineFormatted}.`}
+                  {freeCancellationCopy?.trustMessage
+                    && !freeCancellationCopy.deadlineFormatted
+                    && ` ${freeCancellationCopy.trustMessage}`}
+                  {/* TASK-7012: lapsed tier deadline but a live grace window — state the window that is
+                      actually honoured instead of leaving the charge line with no cancellation terms. */}
+                  {!freeCancellationCopy?.deadlineFormatted
+                    && !freeCancellationCopy?.trustMessage
+                    && freeCancellationCopy?.applicableGraceHours
+                    && ` Free cancellation for ${freeCancellationCopy.applicableGraceHours} hours after you book.`}
+                  {/* TASK-4410: INR charge disclosure for non-INR shoppers */}
+                  {currency !== 'INR' && (
+                    <div style={{ marginTop: 8, fontSize: '0.85em', color: '#64748b' }}>
+                      Charged in {formatINR(chargeInr)} — your bank may apply its own conversion fee.
+                    </div>
+                  )}
                 </div>
               )}
-            </div>
-          )}
 
-          {/* Pay rail (desktop) */}
-          <div className="gd-pay-rail">
-            <span className="gd-pay-rail-label">Pay with</span>
-            <span className="gd-pay-mark">UPI</span>
-            <span className="gd-pay-mark">VISA</span>
-            <span className="gd-pay-mark">RuPay</span>
-            <span className="gd-pay-mark">Net banking</span>
-            <span className="gd-pay-mark razorpay">Razorpay</span>
-          </div>
+              {/* Pay rail (desktop) */}
+              <div className="gd-pay-rail">
+                <span className="gd-pay-rail-label">Pay with</span>
+                <span className="gd-pay-mark">UPI</span>
+                <span className="gd-pay-mark">VISA</span>
+                <span className="gd-pay-mark">RuPay</span>
+                <span className="gd-pay-mark">Net banking</span>
+                <span className="gd-pay-mark razorpay">Razorpay</span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="gd-banner" role="status" data-testid="guest-booking-offline-notice">
+                <IconWhatsApp size={16}/>
+                <div>
+                  <b>Online payment is not available for this property.</b><br/>
+                  <span>Contact the host on WhatsApp to confirm your dates — your hold is reserved for {countdown}.</span>
+                </div>
+              </div>
+              <a
+                href={whatsappHandoffUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="gd-pay"
+                style={{ textDecoration: 'none' }}
+                data-testid="guest-booking-whatsapp-cta"
+              >
+                <IconWhatsApp size={16}/> WhatsApp host to confirm
+              </a>
+              <div className="gd-pay-microcopy">You'll be connected directly to the host — no payment taken on this site.</div>
+            </>
+          )}
 
           {/* Trust band (desktop) */}
           <TrustBand
@@ -2225,27 +2279,40 @@ const GuestDetailsPage: React.FC = () => {
         </aside>
       </main>
 
-      {/* ── Mobile sticky bottom bar ── */}
+      {/* ── Mobile sticky bottom bar — TASK-8048: offline tenants show WhatsApp CTA, not a pay rail. */}
       <div className="gd-mobile-bar">
         <div className="gd-mobile-bar-clock">
           <b>{countdown}</b>
           <small>Held</small>
         </div>
-        <button
-          type={consentAccepted ? 'submit' : 'button'}
-          form="gd-details-form"
-          className="gd-mobile-bar-cta"
-          disabled={isSubmitting || holdExpired}
-          onClick={consentAccepted ? undefined : scrollToConsent}
-          data-testid="guest-booking-submit-mobile"
-        >
-          {isSubmitting
-            ? <><IconSpinner size={14}/> Securing…</>
-            : serverTotalConfirmRequired
-              ? <><IconLock size={14}/> Confirm <span className="num">{displayPrice(chargeInr)}</span></>
-              : <><IconLock size={14}/> Pay <span className="num">{displayPrice(chargeInr)}</span></>
-          }
-        </button>
+        {hasOnlineRail ? (
+          <button
+            type={consentAccepted ? 'submit' : 'button'}
+            form="gd-details-form"
+            className="gd-mobile-bar-cta"
+            disabled={isSubmitting || holdExpired}
+            onClick={consentAccepted ? undefined : scrollToConsent}
+            data-testid="guest-booking-submit-mobile"
+          >
+            {isSubmitting
+              ? <><IconSpinner size={14}/> Securing…</>
+              : serverTotalConfirmRequired
+                ? <><IconLock size={14}/> Confirm <span className="num">{displayPrice(chargeInr)}</span></>
+                : <><IconLock size={14}/> Pay <span className="num">{displayPrice(chargeInr)}</span></>
+            }
+          </button>
+        ) : (
+          <a
+            href={whatsappHandoffUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="gd-mobile-bar-cta"
+            style={{ textDecoration: 'none' }}
+            data-testid="guest-booking-whatsapp-cta-mobile"
+          >
+            <IconWhatsApp size={14}/> WhatsApp host
+          </a>
+        )}
       </div>
 
       <style>{gdStyles}</style>
