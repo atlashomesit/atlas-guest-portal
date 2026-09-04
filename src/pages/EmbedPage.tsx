@@ -39,7 +39,7 @@ type EmbedConfig = {
   listings: EmbedListingSummary[];
 };
 
-type Step = 'select' | 'dates' | 'details' | 'paying' | 'confirmed';
+type Step = 'select' | 'dates' | 'details' | 'confirmed';
 
 type BookingResult = {
   bookingId: number;
@@ -58,7 +58,20 @@ export function readableCtaText(background: string): string {
   return luminance > 0.179 ? '#111827' : '#ffffff';
 }
 
-function normalizeConfig(raw: Record<string, unknown>): EmbedConfig {
+/** TASK-10180: both casings, so a PascalCase payload does not short-circuit to null. */
+export function pickNullableNumber(raw: Record<string, unknown>, camel: string, pascal: string): number | null {
+  const value = raw[camel] ?? raw[pascal];
+  if (value == null || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+export function buildEmbedBookingHref(bookingId: number, bookingToken: string | null): string {
+  const path = `/booking/${bookingId}`;
+  return bookingToken ? `${path}?t=${encodeURIComponent(bookingToken)}` : path;
+}
+
+export function normalizeConfig(raw: Record<string, unknown>): EmbedConfig {
   const g = (camel: string, pascal: string) => raw[camel] ?? raw[pascal];
   const listingsRaw = (g('listings', 'Listings') ?? []) as Record<string, unknown>[];
   return {
@@ -78,7 +91,7 @@ function normalizeConfig(raw: Record<string, unknown>): EmbedConfig {
       propertyId: Number(r.propertyId ?? r.PropertyId),
       propertyName: (r.propertyName ?? r.PropertyName) as string | null,
       maxGuests: Number(r.maxGuests ?? r.MaxGuests ?? 2),
-      baseNightlyRate: r.baseNightlyRate != null ? Number(r.baseNightlyRate ?? r.BaseNightlyRate) : null,
+      baseNightlyRate: pickNullableNumber(r, 'baseNightlyRate', 'BaseNightlyRate'),
       coverPhotoUrl: (r.coverPhotoUrl ?? r.CoverPhotoUrl) as string | null,
       checkInTime: (r.checkInTime ?? r.CheckInTime) as string | null,
       checkOutTime: (r.checkOutTime ?? r.CheckOutTime) as string | null,
@@ -158,44 +171,29 @@ function ListingSelector({
 }) {
   return (
     <div data-testid="embed-listing-select">
-      {listings.length === 1 ? (
-        <div className="mb-3 flex items-center gap-3">
-          {listings[0].coverPhotoUrl && (
-            <img src={listings[0].coverPhotoUrl} alt={listings[0].name} className="h-14 w-14 rounded-lg object-cover" />
-          )}
-          <div>
-            <div className="text-sm font-semibold">{listings[0].name}</div>
-            {listings[0].propertyName && <div className="text-xs text-text-secondary">{listings[0].propertyName}</div>}
-            {listings[0].baseNightlyRate != null && (
-              <div className="mt-0.5 text-xs text-text-muted">{formatCurrency(listings[0].baseNightlyRate)}/night</div>
+      <div className="mb-3 grid gap-2">
+        {listings.map((l) => (
+          <button
+            key={l.id}
+            type="button"
+            onClick={() => onSelect(l)}
+            className="flex items-center gap-3 rounded-lg border border-border-subtle p-3 text-left transition-colors hover:border-border-default"
+          >
+            {l.coverPhotoUrl && (
+              <img src={l.coverPhotoUrl} alt={l.name} className="h-12 w-12 flex-shrink-0 rounded-lg object-cover" />
             )}
-          </div>
-        </div>
-      ) : (
-        <div className="mb-3 grid gap-2">
-          {listings.map((l) => (
-            <button
-              key={l.id}
-              type="button"
-              onClick={() => onSelect(l)}
-              className="flex items-center gap-3 rounded-lg border border-border-subtle p-3 text-left transition-colors hover:border-border-default"
-            >
-              {l.coverPhotoUrl && (
-                <img src={l.coverPhotoUrl} alt={l.name} className="h-12 w-12 flex-shrink-0 rounded-lg object-cover" />
-              )}
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold">{l.name}</div>
-                {l.propertyName && <div className="truncate text-xs text-text-secondary">{l.propertyName}</div>}
-                <div className="mt-0.5 flex items-center gap-2 text-xs text-text-muted">
-                  {l.baseNightlyRate != null && <span>{formatCurrency(l.baseNightlyRate)}/night</span>}
-                  <span>{l.maxGuests} guests max</span>
-                </div>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm font-semibold">{l.name}</div>
+              {l.propertyName && <div className="truncate text-xs text-text-secondary">{l.propertyName}</div>}
+              <div className="mt-0.5 flex items-center gap-2 text-xs text-text-muted">
+                {l.baseNightlyRate != null && <span>{formatCurrency(l.baseNightlyRate)}/night</span>}
+                <span>{l.maxGuests} guests max</span>
               </div>
-              <span className="text-lg text-text-muted">&#8250;</span>
-            </button>
-          ))}
-        </div>
-      )}
+            </div>
+            <span className="text-lg text-text-muted">&#8250;</span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -612,11 +610,13 @@ function GuestDetailsForm({
   );
 }
 
-function ConfirmationView({
+export function ConfirmationView({
   bookingId,
+  bookingToken,
   listing,
   checkIn,
   checkOut,
+  brand,
 }: {
   bookingId: number;
   bookingToken: string | null;
@@ -626,6 +626,7 @@ function ConfirmationView({
   brand: string;
 }) {
   const nights = calculateNights(checkIn, checkOut);
+  const manageHref = buildEmbedBookingHref(bookingId, bookingToken);
   return (
     <div data-testid="embed-confirmed" className="text-center">
       <div className="mb-3 text-3xl">&#10003;</div>
@@ -637,6 +638,18 @@ function ConfirmationView({
         <div>Booking #{bookingId}</div>
         <div>{format(checkIn, 'MMM d')} &ndash; {format(checkOut, 'MMM d')} &middot; {formatNightCount(nights)}</div>
       </div>
+      <p className="mb-3">
+        <Link
+          data-testid="embed-manage-booking"
+          to={manageHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-sm font-semibold underline"
+          style={{ color: brand }}
+        >
+          View your booking
+        </Link>
+      </p>
       <p className="text-xs text-text-muted">
         A confirmation has been sent to your email. Powered by Atlas.
       </p>

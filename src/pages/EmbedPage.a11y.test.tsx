@@ -6,7 +6,13 @@ import { addDays, format } from 'date-fns';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getIstCalendarDate } from '@/utils/date';
-import EmbedPage, { readableCtaText } from './EmbedPage';
+import EmbedPage, {
+  readableCtaText,
+  normalizeConfig,
+  pickNullableNumber,
+  buildEmbedBookingHref,
+  ConfirmationView,
+} from './EmbedPage';
 
 vi.mock('@/runtime-config', () => ({ getApiBaseUrl: () => 'https://api.example.test' }));
 vi.mock('@/api/client', () => ({
@@ -205,5 +211,47 @@ describe('EmbedPage state semantics', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Pay & book' }));
     await waitFor(() => expect(chargeBodies.length).toBeGreaterThan(0));
     expect(chargeBodies[0]).toEqual(expect.objectContaining({ guestConsentAccepted: true }));
+  });
+});
+
+describe('EmbedPage TASK-10180 residuals', () => {
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it('keeps PascalCase BaseNightlyRate instead of short-circuiting to null', () => {
+    const cfg = normalizeConfig({
+      tenantId: 1, tenantSlug: 'test', tenantName: 'Test',
+      isLiveEligible: true, publishedListingsCount: 1,
+      Listings: [{ Id: 9, Name: 'Loft', PropertyId: 1, MaxGuests: 2, BaseNightlyRate: 3200 }],
+    });
+    expect(cfg.listings[0].baseNightlyRate).toBe(3200);
+    expect(pickNullableNumber({ BaseNightlyRate: 0 }, 'baseNightlyRate', 'BaseNightlyRate')).toBe(0);
+  });
+
+  it('links confirmation to /booking/{id}?t={token}', () => {
+    const listing = {
+      id: 1, name: 'Studio', propertyId: 1, propertyName: 'Beach House',
+      maxGuests: 4, baseNightlyRate: 5000, coverPhotoUrl: null,
+      checkInTime: null, checkOutTime: null, timezoneId: null, securityDepositAmount: null,
+    };
+    render(
+      <MemoryRouter>
+        <ConfirmationView
+          bookingId={42}
+          bookingToken="tok+en"
+          listing={listing}
+          checkIn={new Date(2026, 8, 10)}
+          checkOut={new Date(2026, 8, 12)}
+          brand="#0f766e"
+        />
+      </MemoryRouter>,
+    );
+    const link = screen.getByTestId('embed-manage-booking');
+    expect(link).toHaveAttribute('href', '/booking/42?t=tok%2Ben');
+    expect(link).toHaveTextContent('View your booking');
+    expect(buildEmbedBookingHref(7, null)).toBe('/booking/7');
   });
 });
