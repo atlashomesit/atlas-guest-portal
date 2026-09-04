@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { addDays, format } from 'date-fns';
 import { getApiBaseUrl } from '@/runtime-config';
 import { buildApiUrl, getApiHeaders, getOrderRequestHeaders } from '@/api/client';
@@ -22,6 +22,7 @@ type EmbedListingSummary = {
   checkInTime: string | null;
   checkOutTime: string | null;
   timezoneId: string | null;
+  securityDepositAmount: number | null;
 };
 
 type EmbedConfig = {
@@ -82,6 +83,9 @@ function normalizeConfig(raw: Record<string, unknown>): EmbedConfig {
       checkInTime: (r.checkInTime ?? r.CheckInTime) as string | null,
       checkOutTime: (r.checkOutTime ?? r.CheckOutTime) as string | null,
       timezoneId: (r.timezoneId ?? r.TimezoneId) as string | null,
+      securityDepositAmount: r.securityDepositAmount != null || r.SecurityDepositAmount != null
+        ? Number(r.securityDepositAmount ?? r.SecurityDepositAmount)
+        : null,
     })),
   };
 }
@@ -258,8 +262,9 @@ function DateGuestPicker({
 
   return (
     <div data-testid="embed-date-guest">
-      <label className="mb-1 block text-xs font-medium text-text-secondary">Check-in</label>
+      <label htmlFor="embed-checkin-date" className="mb-1 block text-xs font-medium text-text-secondary">Check-in</label>
       <input
+        id="embed-checkin-date"
         type="date"
         data-testid="embed-checkin-date"
         value={checkIn ? format(checkIn, 'yyyy-MM-dd') : ''}
@@ -273,8 +278,9 @@ function DateGuestPicker({
         className="mb-2 w-full rounded-lg border border-border-subtle bg-bg-surface px-3 py-2 text-sm text-text-primary"
       />
 
-      <label className="mb-1 block text-xs font-medium text-text-secondary">Check-out</label>
+      <label htmlFor="embed-checkout-date" className="mb-1 block text-xs font-medium text-text-secondary">Check-out</label>
       <input
+        id="embed-checkout-date"
         type="date"
         data-testid="embed-checkout-date"
         value={checkOut ? format(checkOut, 'yyyy-MM-dd') : ''}
@@ -302,8 +308,9 @@ function DateGuestPicker({
         </div>
       )}
 
-      <label className="mb-1 block text-xs font-medium text-text-secondary">Guests</label>
+      <label htmlFor="embed-guests" className="mb-1 block text-xs font-medium text-text-secondary">Guests</label>
       <select
+        id="embed-guests"
         value={guests}
         onChange={(e) => setGuests(parseInt(e.target.value, 10) || 2)} // eslint-disable-line atlas/no-coerce-numeric-onchange -- select element, cannot be cleared
         className="mb-3 w-full rounded-lg border border-border-subtle bg-bg-surface px-3 py-2 text-sm text-text-primary"
@@ -348,10 +355,14 @@ function GuestDetailsForm({
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [consentAccepted, setConsentAccepted] = useState(false);
+  const [depositAccepted, setDepositAccepted] = useState(false);
   const [pricing, setPricing] = useState<GuestPriceBreakdown | null>(null);
   const [loadingPricing, setLoadingPricing] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const depositRequired = (listing.securityDepositAmount ?? 0) > 0;
 
   const checkInStr = toCalendarISO(checkIn);
   const checkOutStr = toCalendarISO(checkOut);
@@ -370,6 +381,14 @@ function GuestDetailsForm({
   const handleSubmit = async () => {
     if (!name.trim() || !email.trim() || !phone.trim()) {
       setError('Please fill in all guest details.');
+      return;
+    }
+    if (!consentAccepted) {
+      setError('Please accept the privacy notice to continue.');
+      return;
+    }
+    if (depositRequired && !depositAccepted) {
+      setError('Please accept the refundable security deposit terms to continue.');
       return;
     }
     setError(null);
@@ -405,7 +424,8 @@ function GuestDetailsForm({
           holdToken: hold.prepToken,
           currency: 'INR',
           guestInfo: { name: name.trim(), email: email.trim(), phone: phone.trim() },
-          guestConsentAccepted: true,
+          guestConsentAccepted: consentAccepted,
+          securityDepositAccepted: depositRequired ? depositAccepted : false,
         }),
       });
       if (!orderRes.ok) {
@@ -513,28 +533,65 @@ function GuestDetailsForm({
       ) : null}
 
       <div className="mb-3 grid gap-2">
+        <label htmlFor="embed-guest-name" className="text-xs font-medium text-text-secondary">Full name</label>
         <input
+          id="embed-guest-name"
           type="text"
-          placeholder="Full name"
+          autoComplete="name"
           value={name}
           onChange={(e) => setName(e.target.value)}
           className="rounded-lg border border-border-subtle bg-bg-surface px-3 py-2 text-sm text-text-primary"
         />
+        <label htmlFor="embed-guest-email" className="text-xs font-medium text-text-secondary">Email address</label>
         <input
+          id="embed-guest-email"
           type="email"
-          placeholder="Email address"
+          autoComplete="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           className="rounded-lg border border-border-subtle bg-bg-surface px-3 py-2 text-sm text-text-primary"
         />
+        <label htmlFor="embed-guest-phone" className="text-xs font-medium text-text-secondary">Phone number</label>
         <input
+          id="embed-guest-phone"
           type="tel"
-          placeholder="Phone number"
+          autoComplete="tel"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
           className="rounded-lg border border-border-subtle bg-bg-surface px-3 py-2 text-sm text-text-primary"
         />
       </div>
+
+      <label className="mb-3 flex items-start gap-2 text-xs text-text-secondary">
+        <input
+          type="checkbox"
+          data-testid="embed-dpdp-consent"
+          checked={consentAccepted}
+          onChange={(e) => setConsentAccepted(e.target.checked)}
+          className="mt-0.5"
+        />
+        <span>
+          I consent to {tenantName} collecting and using my name, phone, and email to process this booking
+          and send booking-related communications.{' '}
+          <Link to="/privacy" target="_blank" rel="noopener noreferrer" className="underline">Privacy Policy</Link>.
+          <span className="ml-1 text-text-muted">Required · DPDP Act, 2023</span>
+        </span>
+      </label>
+
+      {depositRequired && (
+        <label className="mb-3 flex items-start gap-2 text-xs text-text-secondary">
+          <input
+            type="checkbox"
+            data-testid="embed-deposit-consent"
+            checked={depositAccepted}
+            onChange={(e) => setDepositAccepted(e.target.checked)}
+            className="mt-0.5"
+          />
+          <span>
+            I accept the refundable security deposit of {formatCurrency(listing.securityDepositAmount ?? 0)}.
+          </span>
+        </label>
+      )}
 
       {error && (
         <div role="alert" className="mb-3 rounded-lg border border-red-300 bg-red-50 p-2 text-xs text-red-700">
@@ -544,7 +601,7 @@ function GuestDetailsForm({
 
       <button
         type="button"
-        disabled={submitting || !name.trim() || !email.trim() || !phone.trim()}
+        disabled={submitting || !name.trim() || !email.trim() || !phone.trim() || !consentAccepted || (depositRequired && !depositAccepted)}
         onClick={handleSubmit}
         className="w-full rounded-lg px-4 py-2.5 text-sm font-semibold transition-opacity disabled:opacity-50"
         style={{ background: brand, color: readableCtaText(brand) }}
