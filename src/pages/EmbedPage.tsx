@@ -109,6 +109,22 @@ async function fetchAvailability(
   return map;
 }
 
+// TASK-10168: same posture as UnitBookingWidget's dateStatusMap/blockedSet treatment (see
+// src/components/availability/UnitBookingWidget.tsx:242-248) -- Blocked and Hold nights are
+// never bookable; Turnover (same-day checkout/checkin) and Available are. A night with no
+// entry in the map (never fetched, or the fetch failed) fails CLOSED: it is NOT available.
+function isNightBookable(status: string | undefined): boolean {
+  return status === 'Available' || status === 'Turnover';
+}
+
+// Every night from checkIn (inclusive) to checkOut (exclusive) must be individually bookable.
+function isRangeBookable(map: Map<string, string>, checkIn: Date, checkOut: Date): boolean {
+  for (let d = checkIn; d < checkOut; d = addDays(d, 1)) {
+    if (!isNightBookable(map.get(format(d, 'yyyy-MM-dd')))) return false;
+  }
+  return true;
+}
+
 // ── Razorpay script loader ──────────────────────────────────────────────────
 
 let razorpayPromise: Promise<boolean> | null = null;
@@ -194,28 +210,58 @@ function DateGuestPicker({
   const [checkIn, setCheckIn] = useState<Date | null>(null);
   const [checkOut, setCheckOut] = useState<Date | null>(null);
   const [guests, setGuests] = useState(2);
-  const [loadingAvail, setLoadingAvail] = useState(false);
+  const [loadingAvail, setLoadingAvail] = useState(true);
+  const [availError, setAvailError] = useState(false);
+  const [availability, setAvailability] = useState<Map<string, string> | null>(null);
+  const [retryToken, setRetryToken] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     setLoadingAvail(true);
-    // Pre-warm availability check in background (non-blocking)
+    setAvailError(false);
+    // Fetch the FULL pickable window (today..maxDate), not a shorter slice -- a truncated
+    // fetch would leave everything past its end with no map entry, which the fail-closed
+    // check below would then (correctly, but uselessly) treat as unbookable.
     const from = format(today, 'yyyy-MM-dd');
-    const to = format(addDays(today, 90), 'yyyy-MM-dd');
-    fetchAvailability(listing.id, from, to).then(() => {
-      if (!cancelled) setLoadingAvail(false);
-    });
+    const to = format(maxDate, 'yyyy-MM-dd');
+    fetchAvailability(listing.id, from, to)
+      .then((map) => {
+        if (cancelled) return;
+        setAvailability(map);
+        setLoadingAvail(false);
+      })
+      .catch(() => {
+        // TASK-10168 defect 2: fetchAvailability's own fetch has no .catch, so a network
+        // rejection (DNS/offline/CORS/abort) never reached setLoadingAvail(false) and the
+        // CTA stayed "Checking availability..." and disabled forever. `availability` stays
+        // null here (fail CLOSED) rather than being set to an empty Map.
+        if (cancelled) return;
+        setAvailError(true);
+        setLoadingAvail(false);
+      });
     return () => { cancelled = true; };
-  }, [listing.id, today]);
+  }, [listing.id, today, maxDate, retryToken]);
 
   const nights = checkIn && checkOut ? calculateNights(checkIn, checkOut) : 0;
-  const canSubmit = checkIn && checkOut && nights > 0 && guests >= 1;
+  const rangeSelected = Boolean(checkIn && checkOut && nights > 0 && guests >= 1);
+  // TASK-10168 defect 1: the resolved map used to be discarded entirely, so every date in
+  // the year was selectable regardless of occupancy. Every night in the selected range must
+  // now be individually confirmed bookable.
+  const rangeBookable = rangeSelected && checkIn && checkOut && availability != null
+    && isRangeBookable(availability, checkIn, checkOut);
+  const canSubmit = rangeSelected && !loadingAvail && !availError && rangeBookable;
+
+  const handleCtaClick = () => {
+    if (availError) { setRetryToken((n) => n + 1); return; }
+    if (canSubmit && checkIn && checkOut) onConfirm(checkIn, checkOut, guests);
+  };
 
   return (
     <div data-testid="embed-date-guest">
       <label className="mb-1 block text-xs font-medium text-text-secondary">Check-in</label>
       <input
         type="date"
+        data-testid="embed-checkin-date"
         value={checkIn ? format(checkIn, 'yyyy-MM-dd') : ''}
         min={format(today, 'yyyy-MM-dd')}
         max={format(maxDate, 'yyyy-MM-dd')}
@@ -230,6 +276,7 @@ function DateGuestPicker({
       <label className="mb-1 block text-xs font-medium text-text-secondary">Check-out</label>
       <input
         type="date"
+        data-testid="embed-checkout-date"
         value={checkOut ? format(checkOut, 'yyyy-MM-dd') : ''}
         min={checkIn ? format(addDays(checkIn, 1), 'yyyy-MM-dd') : format(addDays(today, 1), 'yyyy-MM-dd')}
         max={format(maxDate, 'yyyy-MM-dd')}
@@ -241,6 +288,18 @@ function DateGuestPicker({
 
       {checkIn && checkOut && (
         <div className="mb-2 text-xs text-text-muted">{formatNightCount(nights)}</div>
+      )}
+
+      {rangeSelected && !loadingAvail && !availError && !rangeBookable && (
+        <div role="alert" className="mb-2 rounded-lg border border-red-300 bg-red-50 p-2 text-xs text-red-700">
+          Some of the selected nights aren&apos;t available. Please choose different dates.
+        </div>
+      )}
+
+      {availError && (
+        <div role="alert" className="mb-2 rounded-lg border border-red-300 bg-red-50 p-2 text-xs text-red-700">
+          Couldn&apos;t check availability. Please retry before continuing.
+        </div>
       )}
 
       <label className="mb-1 block text-xs font-medium text-text-secondary">Guests</label>
@@ -256,12 +315,12 @@ function DateGuestPicker({
 
       <button
         type="button"
-        disabled={!canSubmit || loadingAvail}
-        onClick={() => canSubmit && onConfirm(checkIn, checkOut, guests)}
+        disabled={!availError && (!canSubmit || loadingAvail)}
+        onClick={handleCtaClick}
         className="w-full rounded-lg px-4 py-2.5 text-sm font-semibold transition-opacity disabled:opacity-50"
         style={{ background: brand, color: readableCtaText(brand) }}
       >
-        {loadingAvail ? 'Checking availability...' : 'Check pricing'}
+        {loadingAvail ? 'Checking availability...' : availError ? 'Retry availability check' : 'Check pricing'}
       </button>
     </div>
   );
