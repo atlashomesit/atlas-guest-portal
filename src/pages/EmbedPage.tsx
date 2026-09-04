@@ -7,6 +7,7 @@ import { fetchGuestPriceBreakdown, netChargeableRoomFare, type GuestPriceBreakdo
 import { getIstCalendarDate, toCalendarISO } from '@/utils/date';
 import { calculateNights, formatNightCount } from '@/utils/dateHelpers';
 import { formatCurrency } from '@/utils/formatting';
+import { razorpayOrderAmountInrToPaise } from '@/utils/razorpayOrderAmount';
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -352,10 +353,14 @@ function GuestDetailsForm({
         const body = await orderRes.json().catch(() => ({}));
         throw new Error(String(body.message ?? body.error ?? 'Failed to create payment order'));
       }
+      // `amount` off this response is RUPEES, while the Razorpay order it created is
+      // PAISE — see src/utils/razorpayOrderAmount.ts. Named with its unit so the
+      // mismatch is visible at the destructure, and converted once, below.
       const order = (await orderRes.json()) as {
         keyId: string; orderId: string; amount: number; currency: string;
         bookingId: number; bookingToken: string | null;
       };
+      const amountPaise = razorpayOrderAmountInrToPaise(Number(order.amount));
 
       // Step 3: open Razorpay modal
       const loaded = await loadRazorpayScript();
@@ -363,7 +368,7 @@ function GuestDetailsForm({
 
       const rzp = new window.Razorpay({
         key: order.keyId,
-        amount: order.amount,
+        amount: amountPaise,
         currency: order.currency,
         name: tenantName,
         description: `${listing.name} — ${formatNightCount(calculateNights(checkIn, checkOut))}`,
