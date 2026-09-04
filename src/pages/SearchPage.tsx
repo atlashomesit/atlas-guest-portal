@@ -415,7 +415,7 @@ const SearchPage = () => {
   const showingSampleListings =
     !onlyApiListings && apiListings === null && !isLoading && listings.length > 0;
 
-  // TASK-8351: single availability-batch call for [today, tomorrow) instead of 40× listing-availability fan-out (5 waves of 8).
+  // TASK-8351: single availability-batch call for [today, tomorrow) instead of 40× listing-availability fan-out (5 waves of 8) — reuses dateAvailCacheRef, fail-open on non-2xx.
   useEffect(() => {
     if (!availableNow) {
       setTonightAvailableIds(null);
