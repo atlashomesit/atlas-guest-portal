@@ -108,6 +108,52 @@ export async function fetchAvailabilityRates({
     .filter((d): d is GuestAvailabilityRateDay => d != null);
 }
 
+/**
+ * Server-side cap on a single /api/pricing/availability-rates request (TASK-8350).
+ * Keep in step with PricingController.cs; a client asking for more gets a 400.
+ */
+const MAX_RANGE_DAYS = 60;
+
+function addDaysToIsoDate(iso: string, days: number): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  const date = new Date(y, m - 1, d + days);
+  const yy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  return `${yy}-${mm}-${dd}`;
+}
+
+function daysBetweenIso(startIso: string, endIso: string): number {
+  const [sy, sm, sd] = startIso.split('-').map(Number);
+  const [ey, em, ed] = endIso.split('-').map(Number);
+  const ms = Date.UTC(ey, em - 1, ed) - Date.UTC(sy, sm - 1, sd);
+  return Math.round(ms / 86_400_000);
+}
+
+/**
+ * Split [startIso, endIso] into consecutive windows of at most `maxDays` days each.
+ * Windows are contiguous and non-overlapping: each starts the day after the previous ended.
+ */
+export function splitIsoRange(
+  startIso: string,
+  endIso: string,
+  maxDays: number,
+): Array<{ start: string; end: string }> {
+  if (daysBetweenIso(startIso, endIso) <= 0) return [{ start: startIso, end: endIso }];
+
+  const windows: Array<{ start: string; end: string }> = [];
+  let cursor = startIso;
+  // Guard the loop: a bad maxDays must not spin forever.
+  const step = Math.max(1, maxDays);
+  while (daysBetweenIso(cursor, endIso) > 0) {
+    const remaining = daysBetweenIso(cursor, endIso);
+    const span = Math.min(step, remaining);
+    windows.push({ start: cursor, end: addDaysToIsoDate(cursor, span) });
+    cursor = addDaysToIsoDate(cursor, span + 1);
+  }
+  return windows;
+}
+
 function addMonthsToIsoDate(iso: string, months: number): string {
   const [y, m, d] = iso.split('-').map(Number);
   const date = new Date(y, m - 1 + months, d);
@@ -129,5 +175,19 @@ export async function fetchAvailabilityRatesForMonths(
   signal?: AbortSignal,
 ): Promise<GuestAvailabilityRateDay[]> {
   const endIso = addMonthsToIsoDate(startMonthIso, Math.max(1, months));
-  return fetchAvailabilityRates({ listingId, startDate: startMonthIso, endDate: endIso, signal });
+
+  // TASK-8350 capped this endpoint at 60 days per request (PricingController.cs:867 --
+  // `if (days > 60) return BadRequest("Range cannot exceed 60 days.")`). The booking widget
+  // asks for 3 months (~91 days), so a single request 400s and the calendar renders empty.
+  // Split the window instead of narrowing it: the cap bounds work PER REQUEST, and shrinking
+  // the calendar to 60 days would be a silent product regression for the guest.
+  const windows = splitIsoRange(startMonthIso, endIso, MAX_RANGE_DAYS);
+  const pages = await Promise.all(
+    windows.map((w) =>
+      fetchAvailabilityRates({ listingId, startDate: w.start, endDate: w.end, signal }),
+    ),
+  );
+
+  // Windows are half-open and never overlap, so a plain concat cannot duplicate a day.
+  return pages.flat();
 }
