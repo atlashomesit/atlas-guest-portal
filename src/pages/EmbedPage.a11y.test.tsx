@@ -14,6 +14,16 @@ vi.mock('@/api/client', () => ({
   getApiHeaders: () => ({}),
   getOrderRequestHeaders: () => ({}),
 }));
+vi.mock('@/api/pricingClient', () => ({
+  fetchGuestPriceBreakdown: async () => ({
+    finalAmount: 5000,
+    convenienceFeeAmount: 0,
+    gstAmount: 0,
+    gstPercent: 0,
+    touristTaxAmount: 0,
+  }),
+  netChargeableRoomFare: () => 5000,
+}));
 
 const renderEmbed = (path: string) => render(
   <MemoryRouter initialEntries={[path]}>
@@ -130,5 +140,70 @@ describe('EmbedPage state semantics', () => {
 
     fireEvent.click(cta);
     await waitFor(() => expect(availabilityCalls).toBe(2));
+  });
+
+  it('exposes accessible names for date, guest and contact controls', async () => {
+    const today = getIstCalendarDate();
+    const checkIn = addDays(today, 1);
+    const checkOut = addDays(today, 2);
+    stubEmbedFetch(async () => new Response(
+      JSON.stringify([{ date: format(checkIn, 'yyyy-MM-dd'), status: 'Available' }]),
+      { status: 200 },
+    ));
+
+    renderEmbed('/embed/demo');
+    await screen.findByTestId('embed-date-guest');
+    expect(screen.getByLabelText('Check-in')).toBeInTheDocument();
+    expect(screen.getByLabelText('Check-out')).toBeInTheDocument();
+    expect(screen.getByLabelText('Guests')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Check-in'), { target: { value: format(checkIn, 'yyyy-MM-dd') } });
+    fireEvent.change(screen.getByLabelText('Check-out'), { target: { value: format(checkOut, 'yyyy-MM-dd') } });
+    fireEvent.click(await screen.findByRole('button', { name: 'Check pricing' }));
+
+    await screen.findByTestId('embed-guest-details');
+    expect(screen.getByLabelText('Full name')).toBeInTheDocument();
+    expect(screen.getByLabelText('Email address')).toBeInTheDocument();
+    expect(screen.getByLabelText('Phone number')).toBeInTheDocument();
+  });
+
+  it('does not send guestConsentAccepted true unless the DPDP control is checked', async () => {
+    const today = getIstCalendarDate();
+    const checkIn = addDays(today, 1);
+    const checkOut = addDays(today, 2);
+    const chargeBodies: unknown[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      if (typeof url === 'string' && url.includes('/availability-calendar')) {
+        return new Response(JSON.stringify([{ date: format(checkIn, 'yyyy-MM-dd'), status: 'Available' }]), { status: 200 });
+      }
+      if (typeof url === 'string' && url.includes('/api/Razorpay/order')) {
+        const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
+        if (body.holdId) chargeBodies.push(body);
+        return new Response(JSON.stringify({
+          holdId: 1, holdExpiresAt: '2099-01-01', prepToken: 't',
+          keyId: 'k', orderId: 'o', amount: 100, currency: 'INR', bookingId: 1, bookingToken: null,
+        }), { status: 200 });
+      }
+      return new Response(singleListingConfig, { status: 200 });
+    }));
+
+    renderEmbed('/embed/demo');
+    await screen.findByTestId('embed-date-guest');
+    fireEvent.change(screen.getByLabelText('Check-in'), { target: { value: format(checkIn, 'yyyy-MM-dd') } });
+    fireEvent.change(screen.getByLabelText('Check-out'), { target: { value: format(checkOut, 'yyyy-MM-dd') } });
+    fireEvent.click(await screen.findByRole('button', { name: 'Check pricing' }));
+    await screen.findByTestId('embed-guest-details');
+
+    fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Ada Guest' } });
+    fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'ada@example.test' } });
+    fireEvent.change(screen.getByLabelText('Phone number'), { target: { value: '9999999999' } });
+
+    expect(screen.getByTestId('embed-dpdp-consent')).not.toBeChecked();
+    expect(screen.getByRole('button', { name: 'Pay & book' })).toBeDisabled();
+
+    fireEvent.click(screen.getByTestId('embed-dpdp-consent'));
+    fireEvent.click(screen.getByRole('button', { name: 'Pay & book' }));
+    await waitFor(() => expect(chargeBodies.length).toBeGreaterThan(0));
+    expect(chargeBodies[0]).toEqual(expect.objectContaining({ guestConsentAccepted: true }));
   });
 });
