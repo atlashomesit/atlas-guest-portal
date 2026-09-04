@@ -3,11 +3,6 @@ import { useParams, useSearchParams } from "react-router-dom";
 import { buildApiUrl, getApiHeaders } from "../api/client";
 import SEO from "../components/SEO";
 
-// TASK-guest-automation-phase3: single-purpose page for the host-approval gate — a Lead-status guest
-// (Airbnb/Booking.com opted-in property) accepts House Rules here before the host can act on their
-// request. Deliberately NOT part of SelfCheckIn.tsx's flow — that flow requires a signed damage waiver
-// + ID upload first, the wrong shape for this lightweight "accept rules to be considered" gesture.
-
 interface HouseRulesData {
   bookingRef: string;
   listingName: string;
@@ -15,6 +10,18 @@ interface HouseRulesData {
   houseRulesPdfUrl: string | null;
   alreadyAccepted: boolean;
   acceptedAtUtc: string | null;
+  bookingStatus?: string;
+  outcome?: string;
+}
+
+function normalizeOutcome(raw: HouseRulesData): "pending" | "confirmed" | "declined" {
+  const o = (raw.outcome ?? "").toLowerCase();
+  if (o === "confirmed" || o === "declined" || o === "pending") return o;
+  const status = (raw.bookingStatus ?? "").toLowerCase();
+  if (status === "lead") return "pending";
+  if (status === "confirmed" || status === "checkedin" || status === "checkedout") return "confirmed";
+  if (status === "cancelled" || status === "expired" || status === "noshow") return "declined";
+  return "pending";
 }
 
 export default function HouseRulesAcceptPage() {
@@ -63,6 +70,10 @@ export default function HouseRulesAcceptPage() {
         headers: { ...getApiHeaders(), "Content-Type": "application/json" },
         body: JSON.stringify({ lastName }),
       });
+      if (res.status === 409) {
+        setError("This booking is no longer awaiting host approval, so House Rules cannot be accepted.");
+        return;
+      }
       if (!res.ok) {
         setError("We couldn't record your acceptance. Please try again.");
         return;
@@ -74,6 +85,9 @@ export default function HouseRulesAcceptPage() {
       setAccepting(false);
     }
   };
+
+  const outcome = data ? normalizeOutcome(data) : "pending";
+  const pending = outcome === "pending";
 
   return (
     <div className="min-h-screen bg-bg-page px-4 py-10">
@@ -97,12 +111,32 @@ export default function HouseRulesAcceptPage() {
               <h1 className="text-2xl font-bold text-text-primary mb-1">House Rules</h1>
               <p className="text-text-secondary text-sm mb-6">{data.listingName}</p>
 
-              {data.alreadyAccepted ? (
+              {outcome === "declined" && (
+                <div
+                  data-testid="house-rules-outcome-declined"
+                  className="rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm px-4 py-3"
+                >
+                  This request was declined. Your host is not confirming this stay.
+                </div>
+              )}
+
+              {outcome === "confirmed" && (
+                <div
+                  data-testid="house-rules-outcome-confirmed"
+                  className="rounded-lg bg-green-50 border border-green-200 text-green-800 text-sm px-4 py-3"
+                >
+                  Your stay is confirmed. Thank you for reviewing the House Rules.
+                </div>
+              )}
+
+              {pending && data.alreadyAccepted && (
                 <div className="rounded-lg bg-green-50 border border-green-200 text-green-800 text-sm px-4 py-3">
-                  ✓ You've accepted the House Rules. Your host has been notified and will confirm your
+                  ✓ You&apos;ve accepted the House Rules. Your host has been notified and will confirm your
                   booking shortly.
                 </div>
-              ) : (
+              )}
+
+              {pending && !data.alreadyAccepted && (
                 <>
                   <div className="rounded-lg border border-border-subtle bg-bg-page p-4 mb-6 whitespace-pre-wrap text-sm text-text-primary">
                     {data.houseRulesText || "No specific house rules have been provided for this property."}
@@ -119,6 +153,7 @@ export default function HouseRulesAcceptPage() {
                   )}
                   <button
                     type="button"
+                    data-testid="house-rules-accept"
                     onClick={handleAccept}
                     disabled={accepting}
                     className="w-full rounded-lg bg-brand text-white font-semibold py-3 text-sm disabled:opacity-60"
