@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { buildApiUrl, getApiHeaders } from "../api/client";
 import SEO from "../components/SEO";
@@ -33,6 +33,10 @@ export default function HouseRulesAcceptPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [accepting, setAccepting] = useState(false);
+  // TASK-10174 a11y half: focus target for the acceptance confirmation banner below, so a
+  // screen-reader guest whose focus was on the (now-unmounted) Accept button lands somewhere
+  // meaningful instead of falling back to <body>.
+  const acceptedConfirmationRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!bookingRef || !lastName) {
@@ -88,6 +92,14 @@ export default function HouseRulesAcceptPage() {
 
   const outcome = data ? normalizeOutcome(data) : "pending";
   const pending = outcome === "pending";
+  const showAcceptedConfirmation = pending && Boolean(data?.alreadyAccepted);
+
+  // TASK-10174 a11y half: WCAG 4.1.3/2.4.3 -- the "I Accept" button unmounts the instant
+  // acceptance succeeds (replaced by the confirmation banner below), so move focus to the
+  // banner rather than letting it fall to <body> with nothing announced.
+  useEffect(() => {
+    if (showAcceptedConfirmation) acceptedConfirmationRef.current?.focus();
+  }, [showAcceptedConfirmation]);
 
   return (
     <div className="min-h-screen bg-bg-page px-4 py-10">
@@ -101,12 +113,19 @@ export default function HouseRulesAcceptPage() {
           {loading && <p className="text-text-secondary text-sm">Loading your booking…</p>}
 
           {!loading && error && (
-            <p role="alert" className="rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3">
+            <p role="alert" className="rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 mb-6">
               {error}
             </p>
           )}
 
-          {!loading && !error && data && (
+          {/* TASK-10174: this used to be gated on `!error` too, so a FAILED accept attempt
+              (handleAccept sets `error` but never clears `data`) unmounted the house-rules
+              text and the Accept button entirely, leaving only the alert above with no way
+              back except a full page reload -- on a link a guest reached from an OTA email.
+              Gating on `data` alone lets the error alert and the still-usable rules/button
+              render together, so the SAME "I Accept the House Rules" button that just failed
+              is still there as the retry control. */}
+          {!loading && data && (
             <>
               <h1 className="text-2xl font-bold text-text-primary mb-1">House Rules</h1>
               <p className="text-text-secondary text-sm mb-6">{data.listingName}</p>
@@ -129,8 +148,13 @@ export default function HouseRulesAcceptPage() {
                 </div>
               )}
 
-              {pending && data.alreadyAccepted && (
-                <div className="rounded-lg bg-green-50 border border-green-200 text-green-800 text-sm px-4 py-3">
+              {showAcceptedConfirmation && (
+                <div
+                  ref={acceptedConfirmationRef}
+                  role="status"
+                  tabIndex={-1}
+                  className="rounded-lg bg-green-50 border border-green-200 text-green-800 text-sm px-4 py-3 outline-none"
+                >
                   ✓ You&apos;ve accepted the House Rules. Your host has been notified and will confirm your
                   booking shortly.
                 </div>
