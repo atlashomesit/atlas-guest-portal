@@ -14,7 +14,7 @@
   "scripts": {
     "dev": "node --max-old-space-size=8192 node_modules/vite/bin/vite.js --host",
     "prebuild": "node scripts/verify-lockfile-linux-ci-deps.mjs && npm run validate:legal && node tools/optimize-images.mjs && node tools/generate-sitemap.mjs",
-    "build": "node scripts/verify-pages-env.mjs && vite build && node scripts/write-version-json.mjs",
+    "build": "node scripts/verify-pages-env.mjs && node scripts/verify-well-known-config-precedence.mjs && vite build && node scripts/write-version-json.mjs",
     "build:functions": "wrangler pages functions build",
     "test:version-stamp": "node scripts/write-version-json.self-test.mjs",
     "check:local-network": "node tools/check-local-network-apis.mjs",
