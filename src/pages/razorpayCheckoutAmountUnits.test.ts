@@ -20,13 +20,19 @@ import { join, relative, resolve } from 'node:path';
  * So this test does not name any file. It DISCOVERS the call sites and holds each
  * one to the boundary rule, which is what makes it able to fail for a third one.
  *
+ * Construction discovery (TASK-101132): regex is `new\s+(?:window\.)?[A-Za-z_$][\w$]*\s*\(`
+ * so alias forms like `new razorpay(` are not invisible; results are filtered to
+ * files that mention Razorpay and whose matched constructor is Razorpay/razorpay.
+ *
  * See `src/utils/razorpayOrderAmount.ts` for the unit contract itself:
  * `POST /api/Razorpay/order` returns `amount` in RUPEES while the Razorpay order
  * it created is denominated in PAISE.
  */
 
 const SRC_ROOT = resolve(__dirname, '..');
-const CHECKOUT_CONSTRUCTION = /new\s+window\.Razorpay\s*\(/;
+/** Wide enough for `new window.Razorpay(` and alias forms like `new razorpay(`. */
+const CHECKOUT_CONSTRUCTION = /new\s+(?:window\.)?[A-Za-z_$][\w$]*\s*\(/;
+const CHECKOUT_CONSTRUCTOR_NAME = /new\s+(?:window\.)?([A-Za-z_$][\w$]*)\s*\(/g;
 
 function collectSourceFiles(dir: string): string[] {
   const out: string[] = [];
@@ -44,9 +50,20 @@ function collectSourceFiles(dir: string): string[] {
   return out;
 }
 
+function isRazorpayCheckoutCallSite(content: string): boolean {
+  // TASK-101132: widen construction regex, then keep only Razorpay-mentioning
+  // files whose matched constructor is Razorpay/razorpay (direct or alias).
+  if (!/Razorpay/i.test(content)) return false;
+  if (!CHECKOUT_CONSTRUCTION.test(content)) return false;
+  for (const match of content.matchAll(CHECKOUT_CONSTRUCTOR_NAME)) {
+    if (/razorpay/i.test(match[1])) return true;
+  }
+  return false;
+}
+
 const checkoutCallSites = collectSourceFiles(SRC_ROOT)
   .map((path) => ({ path, content: readFileSync(path, 'utf-8') }))
-  .filter(({ content }) => CHECKOUT_CONSTRUCTION.test(content));
+  .filter(({ content }) => isRazorpayCheckoutCallSite(content));
 
 describe('Razorpay checkout amount unit boundary — every call site', () => {
   it('finds at least one checkout call site (guards against the regex silently matching nothing)', () => {
