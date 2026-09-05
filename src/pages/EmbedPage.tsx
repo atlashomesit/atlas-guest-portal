@@ -200,7 +200,7 @@ function ListingSelector({
   );
 }
 
-function DateGuestPicker({
+export function DateGuestPicker({
   listing,
   onConfirm,
   brand,
@@ -213,7 +213,17 @@ function DateGuestPicker({
   const maxDate = useMemo(() => addDays(today, 365), [today]);
   const [checkIn, setCheckIn] = useState<Date | null>(null);
   const [checkOut, setCheckOut] = useState<Date | null>(null);
-  const [guests, setGuests] = useState(2);
+  // TASK-10179: `listing.maxGuests` can be malformed (normalizeConfig's `?? 2` fallback lets an
+  // API-supplied literal `0` straight through, since `??` only catches null/undefined) and the
+  // guest count used to default to a bare `useState(2)` with no relation to the listing at all.
+  // Both the option list below and the initial state are now folded through the SAME floor, so
+  // the select's bound value can never land outside its own option set: effectiveMaxGuests is
+  // at least 1 even when the listing's maxGuests is 0, and the initial guest count is clamped
+  // into [1, effectiveMaxGuests] instead of defaulting to a value the options list may not
+  // contain (a single-occupancy listing previously stayed stuck at guests=2, which the server
+  // then rejected as > listing.MaxGuests).
+  const effectiveMaxGuests = Math.max(listing.maxGuests, 1);
+  const [guests, setGuests] = useState(() => Math.min(2, effectiveMaxGuests));
   const [loadingAvail, setLoadingAvail] = useState(true);
   const [availError, setAvailError] = useState(false);
   const [availability, setAvailability] = useState<Map<string, string> | null>(null);
@@ -315,7 +325,7 @@ function DateGuestPicker({
         onChange={(e) => setGuests(parseInt(e.target.value, 10) || 2)} // eslint-disable-line atlas/no-coerce-numeric-onchange -- select element, cannot be cleared
         className="mb-3 w-full rounded-lg border border-border-subtle bg-bg-surface px-3 py-2 text-sm text-text-primary"
       >
-        {Array.from({ length: Math.min(listing.maxGuests, 16) }, (_, i) => i + 1).map((n) => (
+        {Array.from({ length: Math.min(effectiveMaxGuests, 16) }, (_, i) => i + 1).map((n) => (
           <option key={n} value={n}>{n} guest{n === 1 ? '' : 's'}</option>
         ))}
       </select>

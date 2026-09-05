@@ -6,7 +6,7 @@ import { addDays, format } from 'date-fns';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getIstCalendarDate } from '@/utils/date';
-import EmbedPage, { readableCtaText } from './EmbedPage';
+import EmbedPage, { readableCtaText, DateGuestPicker } from './EmbedPage';
 
 vi.mock('@/runtime-config', () => ({ getApiBaseUrl: () => 'https://api.example.test' }));
 vi.mock('@/api/client', () => ({
@@ -125,6 +125,80 @@ describe('EmbedPage state semantics', () => {
     const cta = await screen.findByRole('button', { name: 'Check pricing' });
     expect(cta).toBeDisabled();
     expect(screen.getByRole('alert')).toHaveTextContent(/selected nights/);
+  });
+
+  // TASK-10179: a single-occupancy listing's guest count used to default to a bare
+  // `useState(2)`, which is not one of the select's own options when maxGuests is 1 -- no
+  // onChange ever fires to correct a value the UI can't even display, so the submitted guest
+  // count stayed 2 and the server rejected the booking as guests > listing.maxGuests.
+  it("clamps the initial guest count into the select's own option set when maxGuests is 1", async () => {
+    const today = getIstCalendarDate();
+    const checkIn = addDays(today, 1);
+    const checkOut = addDays(today, 2);
+    stubEmbedFetch(async () => new Response(
+      JSON.stringify([{ date: format(checkIn, 'yyyy-MM-dd'), status: 'Available' }]),
+      { status: 200 },
+    ));
+
+    const onConfirm = vi.fn();
+    render(
+      <DateGuestPicker
+        listing={{
+          id: 1, name: 'Studio', propertyId: 1, propertyName: 'Beach House',
+          maxGuests: 1, baseNightlyRate: 5000, coverPhotoUrl: null,
+          checkInTime: null, checkOutTime: null, timezoneId: null, securityDepositAmount: null,
+        }}
+        brand="#0f766e"
+        onConfirm={onConfirm}
+      />,
+    );
+
+    // The bound value must already agree with the only option the select can display --
+    // asserted before any interaction, since the original bug never needed a click to exist.
+    const guestsSelect = screen.getByLabelText('Guests') as HTMLSelectElement;
+    expect(screen.getAllByRole('option')).toHaveLength(1);
+    expect(guestsSelect.value).toBe('1');
+
+    fireEvent.change(screen.getByTestId('embed-checkin-date'), { target: { value: format(checkIn, 'yyyy-MM-dd') } });
+    fireEvent.change(screen.getByTestId('embed-checkout-date'), { target: { value: format(checkOut, 'yyyy-MM-dd') } });
+    fireEvent.click(await screen.findByRole('button', { name: 'Check pricing' }));
+
+    expect(onConfirm).toHaveBeenCalledWith(expect.any(Date), expect.any(Date), 1);
+  });
+
+  // TASK-10179 (related): `Number(r.maxGuests ?? r.MaxGuests ?? 2)` lets an API-supplied
+  // literal 0 straight through (`??` only catches null/undefined), which used to produce a
+  // ZERO-option select with the guest state still stuck at 2 -- no control at all.
+  it('falls back to a single selectable guest option when maxGuests is 0', async () => {
+    const today = getIstCalendarDate();
+    const checkIn = addDays(today, 1);
+    const checkOut = addDays(today, 2);
+    stubEmbedFetch(async () => new Response(
+      JSON.stringify([{ date: format(checkIn, 'yyyy-MM-dd'), status: 'Available' }]),
+      { status: 200 },
+    ));
+
+    const onConfirm = vi.fn();
+    render(
+      <DateGuestPicker
+        listing={{
+          id: 1, name: 'Studio', propertyId: 1, propertyName: 'Beach House',
+          maxGuests: 0, baseNightlyRate: 5000, coverPhotoUrl: null,
+          checkInTime: null, checkOutTime: null, timezoneId: null, securityDepositAmount: null,
+        }}
+        brand="#0f766e"
+        onConfirm={onConfirm}
+      />,
+    );
+
+    expect(screen.getAllByRole('option')).toHaveLength(1);
+    expect((screen.getByLabelText('Guests') as HTMLSelectElement).value).toBe('1');
+
+    fireEvent.change(screen.getByTestId('embed-checkin-date'), { target: { value: format(checkIn, 'yyyy-MM-dd') } });
+    fireEvent.change(screen.getByTestId('embed-checkout-date'), { target: { value: format(checkOut, 'yyyy-MM-dd') } });
+    fireEvent.click(await screen.findByRole('button', { name: 'Check pricing' }));
+
+    expect(onConfirm).toHaveBeenCalledWith(expect.any(Date), expect.any(Date), 1);
   });
 
   // TASK-10168 defect 2: fetchAvailability's own fetch has no .catch, so a rejected promise
