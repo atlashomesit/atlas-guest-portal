@@ -58,6 +58,23 @@ export function readableCtaText(background: string): string {
   return luminance > 0.179 ? '#111827' : '#ffffff';
 }
 
+// TASK-10178 part 1: on select -> dates -> details -> confirmed, the previous step unmounts
+// (including the button just activated), focus falls to <body>, and nothing is announced --
+// the file's only live region (the pre-config loading state) is long gone by then. Rather than
+// threading a focus ref through four separately-defined sub-components, a single persistent
+// (never unmounted) status region reports each transition in words; only its TEXT changes,
+// which is the reliable way to get assistive tech to actually announce it.
+export function stepAnnouncementText(step: Step, listingCount: number): string {
+  switch (step) {
+    case 'select': return listingCount > 1 ? 'Choose a stay' : 'Loading stay details';
+    case 'dates': return 'Choose your dates and number of guests';
+    case 'details': return 'Enter your details to complete the booking';
+    case 'paying': return 'Processing your payment';
+    case 'confirmed': return 'Booking confirmed';
+    default: return '';
+  }
+}
+
 function normalizeConfig(raw: Record<string, unknown>): EmbedConfig {
   const g = (camel: string, pascal: string) => raw[camel] ?? raw[pascal];
   const listingsRaw = (g('listings', 'Listings') ?? []) as Record<string, unknown>[];
@@ -285,7 +302,7 @@ export function DateGuestPicker({
           setCheckIn(d);
           if (d && checkOut && d >= checkOut) setCheckOut(null);
         }}
-        className="mb-2 w-full rounded-lg border border-border-subtle bg-bg-surface px-3 py-2 text-sm text-text-primary"
+        className="mb-2 w-full rounded-lg border border-border-input bg-bg-surface px-3 py-2 text-sm text-text-primary"
       />
 
       <label htmlFor="embed-checkout-date" className="mb-1 block text-xs font-medium text-text-secondary">Check-out</label>
@@ -299,7 +316,7 @@ export function DateGuestPicker({
         onChange={(e) => {
           setCheckOut(e.target.value ? new Date(e.target.value + 'T00:00:00') : null);
         }}
-        className="mb-2 w-full rounded-lg border border-border-subtle bg-bg-surface px-3 py-2 text-sm text-text-primary"
+        className="mb-2 w-full rounded-lg border border-border-input bg-bg-surface px-3 py-2 text-sm text-text-primary"
       />
 
       {checkIn && checkOut && (
@@ -323,7 +340,7 @@ export function DateGuestPicker({
         id="embed-guests"
         value={guests}
         onChange={(e) => setGuests(parseInt(e.target.value, 10) || 2)} // eslint-disable-line atlas/no-coerce-numeric-onchange -- select element, cannot be cleared
-        className="mb-3 w-full rounded-lg border border-border-subtle bg-bg-surface px-3 py-2 text-sm text-text-primary"
+        className="mb-3 w-full rounded-lg border border-border-input bg-bg-surface px-3 py-2 text-sm text-text-primary"
       >
         {Array.from({ length: Math.min(effectiveMaxGuests, 16) }, (_, i) => i + 1).map((n) => (
           <option key={n} value={n}>{n} guest{n === 1 ? '' : 's'}</option>
@@ -550,7 +567,7 @@ function GuestDetailsForm({
           autoComplete="name"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="rounded-lg border border-border-subtle bg-bg-surface px-3 py-2 text-sm text-text-primary"
+          className="rounded-lg border border-border-input bg-bg-surface px-3 py-2 text-sm text-text-primary"
         />
         <label htmlFor="embed-guest-email" className="text-xs font-medium text-text-secondary">Email address</label>
         <input
@@ -559,7 +576,7 @@ function GuestDetailsForm({
           autoComplete="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="rounded-lg border border-border-subtle bg-bg-surface px-3 py-2 text-sm text-text-primary"
+          className="rounded-lg border border-border-input bg-bg-surface px-3 py-2 text-sm text-text-primary"
         />
         <label htmlFor="embed-guest-phone" className="text-xs font-medium text-text-secondary">Phone number</label>
         <input
@@ -568,7 +585,7 @@ function GuestDetailsForm({
           autoComplete="tel"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
-          className="rounded-lg border border-border-subtle bg-bg-surface px-3 py-2 text-sm text-text-primary"
+          className="rounded-lg border border-border-input bg-bg-surface px-3 py-2 text-sm text-text-primary"
         />
       </div>
 
@@ -770,6 +787,14 @@ export default function EmbedPage() {
           <div className="truncate text-sm font-bold">{config.tenantName}</div>
           {config.tagline && <div className="truncate text-xs text-text-secondary">{config.tagline}</div>}
         </div>
+      </div>
+
+      {/* TASK-10178 part 1: always mounted (never conditionally removed) so its TEXT changing
+          on every step transition is what triggers the announcement -- a newly-mounted
+          role="status" element is less reliably picked up by assistive tech than one whose
+          content changes in place. Visually hidden; carries no visible design change. */}
+      <div role="status" aria-live="polite" className="sr-only">
+        {stepAnnouncementText(step, config.listings.length)}
       </div>
 
       {/* Steps */}

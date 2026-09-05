@@ -19,6 +19,9 @@
   --color-brand-primary: var(--brand-primary);
   --color-border-subtle: var(--border-subtle);
   --color-border-strong: var(--border-strong);
+  /* TASK-10178 part 2 -- stricter-contrast border for interactive form controls only; see
+     base.css's --border-input for why this is a new token rather than darkening the two above. */
+  --color-border-input: var(--border-input);
   --color-primary: rgb(var(--cta-primary-rgb));
   --color-success: var(--support-success);
   --color-danger: var(--support-danger);

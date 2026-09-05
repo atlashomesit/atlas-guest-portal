@@ -116,6 +116,28 @@ html {
   --brand-ink: #1f2c45;
   --brand-contrast: #f4f7ff;
   --border-default: var(--border-subtle);
+  /* TASK-10178 part 2 -- dedicated STRICTER-contrast border for INTERACTIVE form-control
+     boundaries (WCAG 1.4.11 non-text contrast, >=3:1 against the surface the control sits
+     on). Split out from --border-subtle/--border-strong on purpose: those two are consumed
+     ~277 times across ~63 files for purely decorative borders (cards, dividers, section
+     rules) that 1.4.11 doesn't apply to, and default.css's own --border-subtle (8% of
+     --text-primary) measures only 1.17:1 on white, --border-strong (20%) only ~1.49:1 --
+     darkening either at the token level would restyle every one of those 277 call sites for
+     zero compliance benefit, while still not even reaching 3:1.
+     Derived from --text-primary instead of a new hardcoded hex per theme, same "-text"
+     text-role-token pattern as --accent-text/--cta-text above: every theme already audits
+     --text-primary to a much higher bar (>=12:1 typical) against its own --bg-surface, so
+     mixing it in is guaranteed to move contrast in the RIGHT direction on both light-surface
+     AND dark-surface themes with no per-theme override file needed. Verified computed across
+     all 16 registered presets (11 standalone + 5 in atlas-luxury-multi-theme.css) at this
+     55% mix -- worst case auroraChampagne 3.18:1, best case privateIslandNoir 5.64:1; every
+     other preset clears 3.4-5.6:1. See border-input-contrast.test.ts for the per-preset
+     computed table (no ratio hardcoded there either -- only the hex sources and the 3.0
+     floor). First consumer: the six form-control borders in EmbedPage.tsx's embed widget
+     (date inputs, guest select, name/email/phone inputs) -- applied there only, via the
+     `border-border-input` utility, NOT by changing what --border-subtle/--border-strong
+     resolve to. */
+  --border-input: color-mix(in srgb, var(--text-primary) 55%, var(--bg-surface));
   --shadow-soft: var(--shadow-level-1);
   --shadow-strong: var(--shadow-level-2);
   --shadow-level-3: var(--shadow-level-2);

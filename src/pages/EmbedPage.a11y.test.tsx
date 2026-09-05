@@ -37,6 +37,15 @@ const singleListingConfig = JSON.stringify({
   listings: [{ id: 1, name: 'Studio', propertyId: 1, propertyName: 'Beach House', maxGuests: 4, baseNightlyRate: 5000 }],
 });
 
+const twoListingConfig = JSON.stringify({
+  tenantId: 1, tenantSlug: 'test', tenantName: 'Test',
+  isLiveEligible: true, publishedListingsCount: 2,
+  listings: [
+    { id: 1, name: 'Studio', propertyId: 1, propertyName: 'Beach House', maxGuests: 4, baseNightlyRate: 5000 },
+    { id: 2, name: 'Loft', propertyId: 1, propertyName: 'Beach House', maxGuests: 2, baseNightlyRate: 6000 },
+  ],
+});
+
 // Stubs `fetch` to route the embed config request and the availability-calendar request to
 // different canned responses/behaviour, keyed off the request URL -- both land on the global
 // `fetch` EmbedPage.tsx calls directly (see fetchAvailability).
@@ -279,5 +288,76 @@ describe('EmbedPage state semantics', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Pay & book' }));
     await waitFor(() => expect(chargeBodies.length).toBeGreaterThan(0));
     expect(chargeBodies[0]).toEqual(expect.objectContaining({ guestConsentAccepted: true }));
+  });
+
+  // TASK-10178 part 1: on select -> dates -> details -> confirmed, the previous step used to
+  // unmount with nothing announced -- the file's only live region (pre-config loading) is
+  // long gone by then. The persistent status region's TEXT must actually change on each
+  // transition, which is what makes assistive tech announce it (a newly-mounted role="status"
+  // element is less reliable than one whose content changes in place).
+  it('announces the select -> dates step transition in the status region', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(twoListingConfig, { status: 200 })));
+
+    renderEmbed('/embed/demo');
+    await screen.findByTestId('embed-listing-select');
+    expect(screen.getByRole('status')).toHaveTextContent(/choose a stay/i);
+
+    fireEvent.click(screen.getByRole('button', { name: /Studio/ }));
+
+    await screen.findByTestId('embed-date-guest');
+    expect(screen.getByRole('status')).toHaveTextContent(/dates and number of guests/i);
+  });
+
+  it('announces dates -> details -> confirmed step transitions in the status region', async () => {
+    const today = getIstCalendarDate();
+    const checkIn = addDays(today, 1);
+    const checkOut = addDays(today, 2);
+
+    class RazorpayMock {
+      private handler: (resp: unknown) => void;
+      constructor(opts: { handler: (resp: unknown) => void }) { this.handler = opts.handler; }
+      open() { this.handler({ razorpay_payment_id: 'pay_1', razorpay_order_id: 'order_1', razorpay_signature: 'sig_1' }); }
+      on() { /* noop */ }
+    }
+    vi.stubGlobal('Razorpay', RazorpayMock);
+
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.includes('/availability-calendar')) {
+        return new Response(JSON.stringify([{ date: format(checkIn, 'yyyy-MM-dd'), status: 'Available' }]), { status: 200 });
+      }
+      if (url.includes('/api/Razorpay/verify')) return new Response(JSON.stringify({}), { status: 200 });
+      if (url.includes('/api/Razorpay/order')) {
+        const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
+        if (body.holdId) {
+          return new Response(JSON.stringify({
+            keyId: 'k', orderId: 'o', amount: 100, currency: 'INR', bookingId: 42, bookingToken: null,
+          }), { status: 200 });
+        }
+        return new Response(JSON.stringify({ holdId: 1, holdExpiresAt: '2099-01-01', prepToken: 't' }), { status: 200 });
+      }
+      return new Response(singleListingConfig, { status: 200 });
+    }));
+
+    renderEmbed('/embed/demo');
+    await screen.findByTestId('embed-date-guest');
+    expect(screen.getByRole('status')).toHaveTextContent(/dates and number of guests/i);
+
+    fireEvent.change(screen.getByLabelText('Check-in'), { target: { value: format(checkIn, 'yyyy-MM-dd') } });
+    fireEvent.change(screen.getByLabelText('Check-out'), { target: { value: format(checkOut, 'yyyy-MM-dd') } });
+    fireEvent.click(await screen.findByRole('button', { name: 'Check pricing' }));
+
+    await screen.findByTestId('embed-guest-details');
+    expect(screen.getByRole('status')).toHaveTextContent(/enter your details/i);
+
+    fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Ada Guest' } });
+    fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'ada@example.test' } });
+    fireEvent.change(screen.getByLabelText('Phone number'), { target: { value: '9999999999' } });
+    fireEvent.click(screen.getByTestId('embed-dpdp-consent'));
+    fireEvent.click(screen.getByRole('button', { name: 'Pay & book' }));
+
+    // "Booking confirmed!" is a plain <h3> with nothing announcing it -- the same status
+    // region must pick up the confirmation too.
+    await screen.findByTestId('embed-confirmed');
+    expect(screen.getByRole('status')).toHaveTextContent(/booking confirmed/i);
   });
 });
