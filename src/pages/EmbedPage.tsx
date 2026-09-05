@@ -39,7 +39,7 @@ type EmbedConfig = {
   listings: EmbedListingSummary[];
 };
 
-type Step = 'select' | 'dates' | 'details' | 'paying' | 'confirmed';
+type Step = 'select' | 'dates' | 'details' | 'confirmed';
 
 type BookingResult = {
   bookingId: number;
@@ -69,7 +69,6 @@ export function stepAnnouncementText(step: Step, listingCount: number): string {
     case 'select': return listingCount > 1 ? 'Choose a stay' : 'Loading stay details';
     case 'dates': return 'Choose your dates and number of guests';
     case 'details': return 'Enter your details to complete the booking';
-    case 'paying': return 'Processing your payment';
     case 'confirmed': return 'Booking confirmed';
     default: return '';
   }
@@ -95,7 +94,11 @@ function normalizeConfig(raw: Record<string, unknown>): EmbedConfig {
       propertyId: Number(r.propertyId ?? r.PropertyId),
       propertyName: (r.propertyName ?? r.PropertyName) as string | null,
       maxGuests: Number(r.maxGuests ?? r.MaxGuests ?? 2),
-      baseNightlyRate: r.baseNightlyRate != null ? Number(r.baseNightlyRate ?? r.BaseNightlyRate) : null,
+      // TASK-10180 defect 2: the guard used to test only the camelCase key
+      // (`r.baseNightlyRate != null`), so a PascalCase-only payload short-circuited to null even
+      // though the assignment itself already fell back to `r.BaseNightlyRate` -- every sibling
+      // field in this object checks both casings before deciding null vs a value; this one must too.
+      baseNightlyRate: (r.baseNightlyRate ?? r.BaseNightlyRate) != null ? Number(r.baseNightlyRate ?? r.BaseNightlyRate) : null,
       coverPhotoUrl: (r.coverPhotoUrl ?? r.CoverPhotoUrl) as string | null,
       checkInTime: (r.checkInTime ?? r.CheckInTime) as string | null,
       checkOutTime: (r.checkOutTime ?? r.CheckOutTime) as string | null,
@@ -175,44 +178,33 @@ function ListingSelector({
 }) {
   return (
     <div data-testid="embed-listing-select">
-      {listings.length === 1 ? (
-        <div className="mb-3 flex items-center gap-3">
-          {listings[0].coverPhotoUrl && (
-            <img src={listings[0].coverPhotoUrl} alt={listings[0].name} className="h-14 w-14 rounded-lg object-cover" />
-          )}
-          <div>
-            <div className="text-sm font-semibold">{listings[0].name}</div>
-            {listings[0].propertyName && <div className="text-xs text-text-secondary">{listings[0].propertyName}</div>}
-            {listings[0].baseNightlyRate != null && (
-              <div className="mt-0.5 text-xs text-text-muted">{formatCurrency(listings[0].baseNightlyRate)}/night</div>
+      {/* TASK-10180 defect 3: the parent only ever mounts ListingSelector when
+          config.listings.length > 1 (see the `step === 'select' && config.listings.length > 1`
+          guard below), so a `listings.length === 1` branch here could never run. Removed rather
+          than left as dead code overstating the state machine. */}
+      <div className="mb-3 grid gap-2">
+        {listings.map((l) => (
+          <button
+            key={l.id}
+            type="button"
+            onClick={() => onSelect(l)}
+            className="flex items-center gap-3 rounded-lg border border-border-subtle p-3 text-left transition-colors hover:border-border-default"
+          >
+            {l.coverPhotoUrl && (
+              <img src={l.coverPhotoUrl} alt={l.name} className="h-12 w-12 flex-shrink-0 rounded-lg object-cover" />
             )}
-          </div>
-        </div>
-      ) : (
-        <div className="mb-3 grid gap-2">
-          {listings.map((l) => (
-            <button
-              key={l.id}
-              type="button"
-              onClick={() => onSelect(l)}
-              className="flex items-center gap-3 rounded-lg border border-border-subtle p-3 text-left transition-colors hover:border-border-default"
-            >
-              {l.coverPhotoUrl && (
-                <img src={l.coverPhotoUrl} alt={l.name} className="h-12 w-12 flex-shrink-0 rounded-lg object-cover" />
-              )}
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold">{l.name}</div>
-                {l.propertyName && <div className="truncate text-xs text-text-secondary">{l.propertyName}</div>}
-                <div className="mt-0.5 flex items-center gap-2 text-xs text-text-muted">
-                  {l.baseNightlyRate != null && <span>{formatCurrency(l.baseNightlyRate)}/night</span>}
-                  <span>{l.maxGuests} guests max</span>
-                </div>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm font-semibold">{l.name}</div>
+              {l.propertyName && <div className="truncate text-xs text-text-secondary">{l.propertyName}</div>}
+              <div className="mt-0.5 flex items-center gap-2 text-xs text-text-muted">
+                {l.baseNightlyRate != null && <span>{formatCurrency(l.baseNightlyRate)}/night</span>}
+                <span>{l.maxGuests} guests max</span>
               </div>
-              <span className="text-lg text-text-muted">&#8250;</span>
-            </button>
-          ))}
-        </div>
-      )}
+            </div>
+            <span className="text-lg text-text-muted">&#8250;</span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -641,9 +633,11 @@ function GuestDetailsForm({
 
 function ConfirmationView({
   bookingId,
+  bookingToken,
   listing,
   checkIn,
   checkOut,
+  brand,
 }: {
   bookingId: number;
   bookingToken: string | null;
@@ -653,6 +647,13 @@ function ConfirmationView({
   brand: string;
 }) {
   const nights = calculateNights(checkIn, checkOut);
+  // TASK-10180 defect 1: inside a 600px iframe on a stranger's website there is no other route
+  // back to this reservation once the widget unmounts -- the API returns bookingToken precisely
+  // so the guest can view/manage the booking later. Same absolute-URL shape as the QR code on
+  // BookingConfirmationPage.tsx (`${window.location.origin}/booking/{id}?t={token}`) and the same
+  // nullable-token fallback used throughout (GuestDetailsPage.tsx, MyBookingsPage.tsx,
+  // ProfilePage.tsx): omit `?t=` when there is no token rather than sending a malformed query string.
+  const bookingHref = `${window.location.origin}/booking/${bookingId}${bookingToken ? `?t=${encodeURIComponent(bookingToken)}` : ''}`;
   return (
     <div data-testid="embed-confirmed" className="text-center">
       <div className="mb-3 text-3xl">&#10003;</div>
@@ -664,6 +665,20 @@ function ConfirmationView({
         <div>Booking #{bookingId}</div>
         <div>{format(checkIn, 'MMM d')} &ndash; {format(checkOut, 'MMM d')} &middot; {formatNightCount(nights)}</div>
       </div>
+      {/* target="_blank" + rel="noopener noreferrer": this widget runs inside a 600px iframe on a
+          third-party site. A normal same-tab navigation would drag the entire embed away from the
+          confirmation and load the full guest portal inside that cramped frame -- opening a new
+          tab is what actually gets the guest back to their reservation. */}
+      <a
+        href={bookingHref}
+        target="_blank"
+        rel="noopener noreferrer"
+        data-testid="embed-confirmation-link"
+        className="mb-3 inline-block text-sm font-semibold underline"
+        style={{ color: brand }}
+      >
+        View or manage your booking &rarr;
+      </a>
       <p className="text-xs text-text-muted">
         A confirmation has been sent to your email. Powered by Atlas.
       </p>

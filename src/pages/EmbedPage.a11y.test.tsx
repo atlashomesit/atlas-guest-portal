@@ -360,4 +360,77 @@ describe('EmbedPage state semantics', () => {
     await screen.findByTestId('embed-confirmed');
     expect(screen.getByRole('status')).toHaveTextContent(/booking confirmed/i);
   });
+
+  // TASK-10180 defect 1: ConfirmationView took `bookingToken` (and `brand`) as props but
+  // referenced neither -- the guest saw "Booking #N" and nothing else. Inside a 600px iframe on
+  // a stranger's website there is no other route back to the reservation once the widget
+  // unmounts, so the link must carry the token and escape the frame rather than navigate it.
+  it('links the confirmation to the booking with its token, opening in a new tab', async () => {
+    const today = getIstCalendarDate();
+    const checkIn = addDays(today, 1);
+    const checkOut = addDays(today, 2);
+
+    class RazorpayMock {
+      private handler: (resp: unknown) => void;
+      constructor(opts: { handler: (resp: unknown) => void }) { this.handler = opts.handler; }
+      open() { this.handler({ razorpay_payment_id: 'pay_1', razorpay_order_id: 'order_1', razorpay_signature: 'sig_1' }); }
+      on() { /* noop */ }
+    }
+    vi.stubGlobal('Razorpay', RazorpayMock);
+
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.includes('/availability-calendar')) {
+        return new Response(JSON.stringify([{ date: format(checkIn, 'yyyy-MM-dd'), status: 'Available' }]), { status: 200 });
+      }
+      if (url.includes('/api/Razorpay/verify')) return new Response(JSON.stringify({}), { status: 200 });
+      if (url.includes('/api/Razorpay/order')) {
+        const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
+        if (body.holdId) {
+          return new Response(JSON.stringify({
+            keyId: 'k', orderId: 'o', amount: 100, currency: 'INR', bookingId: 42, bookingToken: 'tok_abc123',
+          }), { status: 200 });
+        }
+        return new Response(JSON.stringify({ holdId: 1, holdExpiresAt: '2099-01-01', prepToken: 't' }), { status: 200 });
+      }
+      return new Response(singleListingConfig, { status: 200 });
+    }));
+
+    renderEmbed('/embed/demo');
+    await screen.findByTestId('embed-date-guest');
+    fireEvent.change(screen.getByLabelText('Check-in'), { target: { value: format(checkIn, 'yyyy-MM-dd') } });
+    fireEvent.change(screen.getByLabelText('Check-out'), { target: { value: format(checkOut, 'yyyy-MM-dd') } });
+    fireEvent.click(await screen.findByRole('button', { name: 'Check pricing' }));
+
+    await screen.findByTestId('embed-guest-details');
+    fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Ada Guest' } });
+    fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'ada@example.test' } });
+    fireEvent.change(screen.getByLabelText('Phone number'), { target: { value: '9999999999' } });
+    fireEvent.click(screen.getByTestId('embed-dpdp-consent'));
+    fireEvent.click(screen.getByRole('button', { name: 'Pay & book' }));
+
+    await screen.findByTestId('embed-confirmed');
+    const link = await screen.findByRole('link', { name: /view or manage your booking/i });
+    expect(link).toHaveAttribute('href', `${window.location.origin}/booking/42?t=tok_abc123`);
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+  });
+
+  // TASK-10180 defect 2: the guard `r.baseNightlyRate != null ? Number(r.baseNightlyRate ??
+  // r.BaseNightlyRate) : null` tested only the camelCase key, so a PascalCase-only payload
+  // short-circuited to null and the "/night" line silently vanished -- even though the ?? inside
+  // Number(...) would have read the PascalCase value just fine.
+  it('shows the nightly rate when the API sends only PascalCase BaseNightlyRate', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      tenantId: 1, tenantSlug: 'test', tenantName: 'Test',
+      isLiveEligible: true, publishedListingsCount: 2,
+      listings: [
+        { id: 1, name: 'Studio', propertyId: 1, propertyName: 'Beach House', maxGuests: 4, BaseNightlyRate: 5000 },
+        { id: 2, name: 'Loft', propertyId: 1, propertyName: 'Beach House', maxGuests: 2, BaseNightlyRate: 6000 },
+      ],
+    }), { status: 200 })));
+
+    renderEmbed('/embed/demo');
+    await screen.findByTestId('embed-listing-select');
+    expect(screen.getByText(/5,000\/night/)).toBeInTheDocument();
+  });
 });
