@@ -48,14 +48,86 @@ type BookingResult = {
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
+function parseHexChannels(hex: string): [number, number, number] | null {
+  const match = hex.trim().match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+  if (!match) return null;
+  const full = match[1].length === 3 ? match[1].split('').map((c) => `${c}${c}`).join('') : match[1];
+  return [
+    Number.parseInt(full.slice(0, 2), 16),
+    Number.parseInt(full.slice(2, 4), 16),
+    Number.parseInt(full.slice(4, 6), 16),
+  ];
+}
+
+function luminanceFromRgb(r: number, g: number, b: number): number {
+  const toLinear = (c: number) => {
+    const s = c / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  };
+  const [lr, lg, lb] = [r, g, b].map(toLinear);
+  return 0.2126 * lr + 0.7152 * lg + 0.0722 * lb;
+}
+
+function contrastRatio(l1: number, l2: number): number {
+  const [hi, lo] = l1 > l2 ? [l1, l2] : [l2, l1];
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+const CTA_DARK = '#111827';
+const CTA_DARK_LUM = luminanceFromRgb(0x11, 0x18, 0x27); // 0.00918
+const CTA_WHITE_LUM = 1.0;
+
 export function readableCtaText(background: string): string {
-  const match = background.trim().match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
-  if (!match) return 'var(--text-on-cta, #ffffff)';
-  const hex = match[1].length === 3 ? match[1].split('').map((channel) => `${channel}${channel}`).join('') : match[1];
-  const channels = [0, 2, 4].map((offset) => Number.parseInt(hex.slice(offset, offset + 2), 16) / 255);
-  const linear = channels.map((channel) => (channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4));
-  const luminance = 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
-  return luminance > 0.179 ? '#111827' : '#ffffff';
+  const channels = parseHexChannels(background);
+  if (!channels) return 'var(--text-on-cta, #ffffff)';
+  const lum = luminanceFromRgb(channels[0], channels[1], channels[2]);
+  const contrastWhite = contrastRatio(lum, CTA_WHITE_LUM);
+  const contrastDark = contrastRatio(lum, CTA_DARK_LUM);
+  // Pick the higher-contrast option; threshold alone leaves a dead band where neither reaches 4.5.
+  return contrastWhite >= contrastDark ? '#ffffff' : CTA_DARK;
+}
+
+// TASK-10170: dead band L in (0.18333,0.21631) where neither #fff nor #111827 reaches 4.5:1.
+// The CTA background itself must be nudged out of the band. We blend the original brand
+// toward black (for white text) or toward white (for dark text) in 1% steps and return the
+// first hex that clears 4.5 with its optimal text colour. The step granularity keeps the
+// shift minimal and hue largely intact.
+export function clampedBrandColor(background: string): string {
+  const channels = parseHexChannels(background);
+  if (!channels) return background;
+  const [r, g, b] = channels;
+  const lum = luminanceFromRgb(r, g, b);
+  const cw = contrastRatio(lum, CTA_WHITE_LUM);
+  const cd = contrastRatio(lum, CTA_DARK_LUM);
+  if (cw >= 4.5 || cd >= 4.5) return background;
+
+  // Search both directions; prefer the smallest t that reaches 4.5.
+  const blend = (t: number, target: 'black' | 'white'): [number, number, number] => {
+    if (target === 'black') {
+      return [Math.round(r * (1 - t)), Math.round(g * (1 - t)), Math.round(b * (1 - t))];
+    }
+    return [Math.round(r + (255 - r) * t), Math.round(g + (255 - g) * t), Math.round(b + (255 - b) * t)];
+  };
+
+  for (let step = 1; step <= 100; step++) {
+    const t = step / 100;
+    for (const target of ['black', 'white'] as const) {
+      const [nr, ng, nb] = blend(t, target);
+      const nlum = luminanceFromRgb(nr, ng, nb);
+      const nWhite = contrastRatio(nlum, CTA_WHITE_LUM);
+      const nDark = contrastRatio(nlum, CTA_DARK_LUM);
+      if (nWhite >= 4.5 || nDark >= 4.5) {
+        const hex = `#${nr.toString(16).padStart(2, '0')}${ng.toString(16).padStart(2, '0')}${nb.toString(16).padStart(2, '0')}`;
+        return hex;
+      }
+    }
+  }
+  return background;
+}
+
+export function ctaStyle(background: string): { background: string; color: string } {
+  const bg = clampedBrandColor(background);
+  return { background: bg, color: readableCtaText(bg) };
 }
 
 // TASK-10178 part 1: on select -> dates -> details -> confirmed, the previous step unmounts
@@ -352,7 +424,7 @@ export function DateGuestPicker({
         disabled={!availError && (!canSubmit || loadingAvail)}
         onClick={handleCtaClick}
         className="w-full rounded-lg px-4 py-2.5 text-sm font-semibold transition-opacity disabled:opacity-50"
-        style={{ background: brand, color: readableCtaText(brand) }}
+        style={ctaStyle(brand)}
       >
         {loadingAvail ? 'Checking availability...' : availError ? 'Retry availability check' : 'Check pricing'}
       </button>
@@ -631,7 +703,7 @@ function GuestDetailsForm({
         disabled={submitting || !name.trim() || !email.trim() || !phone.trim() || !consentAccepted || (depositRequired && !depositAccepted)}
         onClick={handleSubmit}
         className="w-full rounded-lg px-4 py-2.5 text-sm font-semibold transition-opacity disabled:opacity-50"
-        style={{ background: brand, color: readableCtaText(brand) }}
+        style={ctaStyle(brand)}
       >
         {submitting ? 'Processing...' : 'Pay & book'}
       </button>
