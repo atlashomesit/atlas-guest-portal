@@ -13,6 +13,7 @@ import {
   resolveListingCardCancellationChip,
   type CancellationTier,
 } from "../../utils/cancellationPolicy";
+import { hasOnlinePaymentRail } from "../../tenant/paymentRail";
 
 type ListingCardProps = {
   id: string;
@@ -88,6 +89,9 @@ const ListingCard: React.FC<ListingCardProps> = ({
   onClick,
 }) => {
   const cancellationChip = resolveListingCardCancellationChip(cancellationTier);
+  // TASK-101158: never claim "Secure Razorpay payments" on a tenant with no online rail
+  // (bookingMode WHATSAPP/MANUAL or paymentProvider null) — omit the chip, don't reword it.
+  const showRazorpayChip = hasOnlinePaymentRail();
   const { format: formatCurrency } = useCurrency();
   const { booking } = useBooking();
   const estimateNights = useMemo(() => {
@@ -376,7 +380,9 @@ const ListingCard: React.FC<ListingCardProps> = ({
               <div className="w-full rounded-xl bg-[color:color-mix(in_srgb,var(--bg-muted)_55%,var(--bg-surface))] px-3 py-2 text-xs font-semibold text-text-primary">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="inline-flex items-center gap-1 rounded-full bg-bg-surface px-2 py-1">No hidden fees</span>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-bg-surface px-2 py-1">Secure Razorpay payments</span>
+                  {showRazorpayChip && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-bg-surface px-2 py-1">Secure Razorpay payments</span>
+                  )}
                   {/* DESIGN-028: listing-scoped free-cancel promise (tier known here). */}
                   <span
                     className="inline-flex items-center gap-1 rounded-full bg-bg-surface px-2 py-1"
