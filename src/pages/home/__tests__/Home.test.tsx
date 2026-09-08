@@ -64,16 +64,33 @@ describe("Home", () => {
     // 107ms-1057ms, 0 failures). Timing every occurrence, pass or fail, so the NEXT gate red
     // carries the actual lazy-import resolution number instead of only a pass/fail bit — this is
     // what settles whether the concurrency hypothesis is the true cause.
-    const servicesStart = performance.now();
-    expect(await screen.findByText(/Discover Our Exclusive Services/i)).toBeInTheDocument();
-    console.info(
-      `[TASK-101855] ServicesSection findByText resolved in ${(performance.now() - servicesStart).toFixed(0)}ms`,
-    );
+    //
+    // ⚠️ THE `finally` IS THE WHOLE POINT — do not "simplify" it back to a log after the await.
+    // An earlier revision of this instrumentation logged on the line AFTER each `await`, which
+    // cannot fire in the one case it was built for: `findByText` THROWS on timeout, so the
+    // statement after it never runs. The observed gate red (2851ms) was on the FIRST assertion,
+    // so that shape would have recorded exactly nothing on the run that mattered. Logging in a
+    // `finally` records the elapsed time on BOTH paths, and the default vitest reporter — which
+    // is what STEP 1 runs — surfaces console output for FAILING tests, so the number reaches
+    // `atlas-gate-guest-<ts>.log` precisely when it is needed. (On PASSING runs the default
+    // reporter suppresses it; that is fine and expected — pass `--reporter=verbose` to see the
+    // baseline locally. Verified both directions 2026-09-09 by forcing this assertion red.)
+    const timedFindByText = async (label: string, matcher: RegExp) => {
+      const started = performance.now();
+      try {
+        return await screen.findByText(matcher);
+      } finally {
+        console.info(
+          `[TASK-101855] ${label} findByText settled in ${(performance.now() - started).toFixed(0)}ms`,
+        );
+      }
+    };
 
-    const testimonialsStart = performance.now();
-    expect(await screen.findByText(/Hear What Our Happy Guests Are Saying/i)).toBeInTheDocument();
-    console.info(
-      `[TASK-101855] TestimonialsSection findByText resolved in ${(performance.now() - testimonialsStart).toFixed(0)}ms`,
-    );
+    expect(
+      await timedFindByText("ServicesSection", /Discover Our Exclusive Services/i),
+    ).toBeInTheDocument();
+    expect(
+      await timedFindByText("TestimonialsSection", /Hear What Our Happy Guests Are Saying/i),
+    ).toBeInTheDocument();
   });
 });
