@@ -29,6 +29,34 @@ vi.mock("../../../components/home/TestimonialsSection", () => ({
   default: () => <div>Hear What Our Happy Guests Are Saying</div>,
 }));
 
+// TASK-101855 ROOT CAUSE. Home.tsx puts FOUR React.lazy children under ONE
+// <Suspense fallback={null}> (3cee54b3 / TASK-7822): ServicesSection, FaqHighlights,
+// TestimonialsSection and FooterCtaStrip. A Suspense boundary renders NOTHING until EVERY
+// lazy child in it has resolved -- so the two assertions below, on components this file
+// stubs to instant <div>s, were in fact gated on vitest transforming and importing the REAL
+// FaqHighlights module. That unrelated import was ~90% of the wait.
+//
+// Measured on this box, 8 interleaved A/B pairs, idle, same worktree:
+//   without this mock: ServicesSection findByText settled in 261-293ms (7 of 8)
+//   with    this mock: ServicesSection findByText settled in  25-37ms  (8 of 8)
+// i.e. ~10x, which is why the assertion sat ~3.7x from findByText's 1000ms deadline instead
+// of ~38x, and why gate-run-20260909T021634 crossed it at 2851ms under STEP 1 contention
+// while 29 isolated retries never did.
+//
+// This is NOT a widened timeout, wait, retry or sleep, and it deletes no assertion -- this
+// file asserts nothing whatsoever about FaqHighlights. It stubs the fourth lazy sibling the
+// way the other three were already stubbed, so the 1000ms budget covers only what this test
+// is about. (FooterCtaStrip needs no stub: enableFooterMiniCtaAboveFooter is false, so it
+// never mounts.)
+//
+// The shared boundary is ALSO a real product latency finding for guests -- one slow chunk
+// delays three other sections in a real browser too. Filed separately as TASK-101857; do not
+// "fix" it here by editing Home.tsx.
+vi.mock("../../../components/faq/FaqHighlights", () => ({
+  __esModule: true,
+  default: () => <div>Faq Highlights</div>,
+}));
+
 vi.mock("../../../utils/analytics", async () => {
   const actual = await vi.importActual<typeof import("../../../utils/analytics")>("../../../utils/analytics");
   return {
