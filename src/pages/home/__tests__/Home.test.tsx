@@ -50,7 +50,7 @@ vi.mock("../../../components/home/TestimonialsSection", () => ({
 // never mounts.)
 //
 // The shared boundary is ALSO a real product latency finding for guests -- one slow chunk
-// delays three other sections in a real browser too. Filed separately as TASK-101857; do not
+// delays three other sections in a real browser too. Filed separately as TASK-101858; do not
 // "fix" it here by editing Home.tsx.
 vi.mock("../../../components/faq/FaqHighlights", () => ({
   __esModule: true,
