@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { FaHeart, FaRegHeart } from 'react-icons/fa';
 import { buildApiUrl } from '@/api/client';
@@ -55,11 +55,23 @@ function marketplaceListingPath(item: Pick<MarketplaceItem, 'id' | 'title' | 'te
 
 type ApiResponse = { items: MarketplaceItem[]; total: number; page: number; pageSize: number };
 
+// TASK-101491: the grid requests one page at a time and appends. This constant is the request
+// size, NOT a ceiling on what the page can show - everything past it is reachable via the
+// "Show more homes" control below. Do not "fix" a truncated grid by raising this: that just
+// moves the cliff and pulls every listing + cover image on first paint.
+const PAGE_SIZE = 20;
+
 export default function MarketplaceHomepage() {
   const [category, setCategory] = useState<'all' | 'homes' | 'rooms'>('all');
   const [query, setQuery] = useState('');
   const [items, setItems] = useState<MarketplaceItem[]>([]);
   const [loading, setLoading] = useState(true);
+  // TASK-101491: server-reported total + progressive paging state. Before this, the component
+  // fetched page 1 only and rendered no pager, so with 27 marketplace-visible listings the last 7
+  // were unreachable by any in-page route - silently, with no truncation notice.
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
   // TASK-1873: save-heart state keyed by listing id
   const [favEpoch, setFavEpoch] = useState(0);
   const favIds = useMemo(() => {
@@ -77,7 +89,10 @@ export default function MarketplaceHomepage() {
   const [minPriceInput, setMinPriceInput] = useState('');
   const [maxPriceInput, setMaxPriceInput] = useState('');
 
-  const apiPath = useMemo(() => {
+  // TASK-101491: the FILTER half of the query only - deliberately excludes page/pageSize so that
+  // changing a filter produces a new key (resetting paging) while paging does not re-trigger the
+  // first-page effect.
+  const filterQuery = useMemo(() => {
     const p = new URLSearchParams();
     if (category !== 'all') p.set('category', category);
     if (query.trim()) p.set('city', query.trim());
@@ -90,22 +105,42 @@ export default function MarketplaceHomepage() {
     if (checkOut) p.set('checkOut', checkOut);
     const guests = searchParams.get('guests');
     if (guests) p.set('guests', guests);
-    p.set('page', '1');
-    p.set('pageSize', '20');
-    return `/marketplace/listings?${p.toString()}`;
+    return p.toString();
   }, [category, query, searchParams]);
+
+  const buildPagePath = useCallback(
+    (pageNumber: number) => {
+      const p = new URLSearchParams(filterQuery);
+      p.set('page', String(pageNumber));
+      p.set('pageSize', String(PAGE_SIZE));
+      return `/marketplace/listings?${p.toString()}`;
+    },
+    [filterQuery],
+  );
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetch(buildApiUrl(apiPath))
-      .then(async (r) => (r.ok ? ((await r.json()) as ApiResponse) : { items: [] as MarketplaceItem[] }))
+    setPage(1);
+    fetch(buildApiUrl(buildPagePath(1)))
+      .then(async (r) =>
+        r.ok ? ((await r.json()) as ApiResponse) : { items: [] as MarketplaceItem[], total: 0 },
+      )
       .then(async (data) => {
         const enriched = await enrichMarketplaceCoverItems(data.items ?? []);
-        if (!cancelled) setItems(enriched);
+        if (cancelled) return;
+        setItems(enriched);
+        // TASK-101491: trust the server's count. Note the API returns the CURRENT PAGE's match
+        // count (not a global one) when a `city` filter is applied - city filtering happens after
+        // the page slice server-side - so this correctly yields no "show more" for city searches
+        // rather than a button that fetches nothing.
+        setTotal(typeof data.total === 'number' ? data.total : enriched.length);
       })
       .catch(() => {
-        if (!cancelled) setItems([]);
+        if (!cancelled) {
+          setItems([]);
+          setTotal(0);
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -113,7 +148,37 @@ export default function MarketplaceHomepage() {
     return () => {
       cancelled = true;
     };
-  }, [apiPath]);
+  }, [buildPagePath]);
+
+  // TASK-101491: everything the server said exists but we have not fetched yet.
+  const hasMore = !loading && items.length < total;
+
+  const loadMore = useCallback(() => {
+    if (loadingMore || !hasMore) return;
+    const next = page + 1;
+    setLoadingMore(true);
+    fetch(buildApiUrl(buildPagePath(next)))
+      .then(async (r) => (r.ok ? ((await r.json()) as ApiResponse) : null))
+      .then(async (data) => {
+        if (!data) return;
+        const enriched = await enrichMarketplaceCoverItems(data.items ?? []);
+        const seen = new Set(items.map((i) => i.id));
+        const fresh = enriched.filter((i) => !seen.has(i.id));
+        if (fresh.length === 0) {
+          // Ranking is score-based and can shift between requests, so a page can come back
+          // entirely deduped. Settle the total to what we actually hold rather than leaving a
+          // button that can never add anything.
+          setTotal(items.length);
+          return;
+        }
+        setItems((prev) => [...prev, ...fresh]);
+        setPage(next);
+      })
+      .catch(() => {
+        /* keep what is already rendered; the control stays available for a retry */
+      })
+      .finally(() => setLoadingMore(false));
+  }, [buildPagePath, hasMore, items, loadingMore, page]);
 
   // TASK-4413: client-side price filter over the fetched grid, mirroring SearchPage.tsx's
   // minPrice/maxPrice behavior. Applying a price filter does not touch `category` state, so
@@ -198,7 +263,11 @@ export default function MarketplaceHomepage() {
         >
           <span>{verifiedHomesCount} Verified homes</span>
           <span aria-hidden>·</span>
-          <span>{items.length} listings</span>
+          {/* TASK-101491: the server's total, not the number loaded so far - this read "20
+              listings" while the API reported 27. `verifiedHomesCount` above stays a count of
+              LOADED items on purpose: it is a trust signal, and undercounting it is the safe
+              direction (never claim verification we have not observed). */}
+          <span>{total || items.length} listings</span>
           <span aria-hidden>·</span>
           <span className="font-medium text-emerald-700">Book direct from the owner</span>
           {hasOnlinePaymentRail() ? (
@@ -408,6 +477,26 @@ export default function MarketplaceHomepage() {
             );
           })}
       </div>
+
+      {/* TASK-101491: progressive loading. An explicit control rather than infinite scroll -
+          the portal targets WCAG-AA, and an auto-appending grid strands keyboard and screen-reader
+          users and makes the footer unreachable. */}
+      {hasMore && (
+        <div className="mt-8 flex flex-col items-center gap-2">
+          <button
+            type="button"
+            data-testid="marketplace-load-more"
+            onClick={loadMore}
+            disabled={loadingMore}
+            className="min-h-[44px] rounded-xl bg-black px-6 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:opacity-60"
+          >
+            {loadingMore ? 'Loading…' : 'Show more homes'}
+          </button>
+          <p className="text-sm text-text-muted" data-testid="marketplace-load-more-count" aria-live="polite">
+            Showing {items.length} of {total}
+          </p>
+        </div>
+      )}
 
       {/* TASK-4309: explicit empty state so a filter/search with no matches shows a
           message instead of a blank gap between the filter bar and the footer.

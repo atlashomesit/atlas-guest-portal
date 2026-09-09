@@ -39,7 +39,7 @@ type EmbedConfig = {
   listings: EmbedListingSummary[];
 };
 
-type Step = 'select' | 'dates' | 'details' | 'paying' | 'confirmed';
+type Step = 'select' | 'dates' | 'details' | 'confirmed';
 
 type BookingResult = {
   bookingId: number;
@@ -48,14 +48,102 @@ type BookingResult = {
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
+function parseHexChannels(hex: string): [number, number, number] | null {
+  const match = hex.trim().match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+  if (!match) return null;
+  const full = match[1].length === 3 ? match[1].split('').map((c) => `${c}${c}`).join('') : match[1];
+  return [
+    Number.parseInt(full.slice(0, 2), 16),
+    Number.parseInt(full.slice(2, 4), 16),
+    Number.parseInt(full.slice(4, 6), 16),
+  ];
+}
+
+function luminanceFromRgb(r: number, g: number, b: number): number {
+  const toLinear = (c: number) => {
+    const s = c / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  };
+  const [lr, lg, lb] = [r, g, b].map(toLinear);
+  return 0.2126 * lr + 0.7152 * lg + 0.0722 * lb;
+}
+
+function contrastRatio(l1: number, l2: number): number {
+  const [hi, lo] = l1 > l2 ? [l1, l2] : [l2, l1];
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+const CTA_DARK = '#111827';
+const CTA_DARK_LUM = luminanceFromRgb(0x11, 0x18, 0x27); // 0.00918
+const CTA_WHITE_LUM = 1.0;
+
 export function readableCtaText(background: string): string {
-  const match = background.trim().match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
-  if (!match) return 'var(--text-on-cta, #ffffff)';
-  const hex = match[1].length === 3 ? match[1].split('').map((channel) => `${channel}${channel}`).join('') : match[1];
-  const channels = [0, 2, 4].map((offset) => Number.parseInt(hex.slice(offset, offset + 2), 16) / 255);
-  const linear = channels.map((channel) => (channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4));
-  const luminance = 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
-  return luminance > 0.179 ? '#111827' : '#ffffff';
+  const channels = parseHexChannels(background);
+  if (!channels) return 'var(--text-on-cta, #ffffff)';
+  const lum = luminanceFromRgb(channels[0], channels[1], channels[2]);
+  const contrastWhite = contrastRatio(lum, CTA_WHITE_LUM);
+  const contrastDark = contrastRatio(lum, CTA_DARK_LUM);
+  // Pick the higher-contrast option; threshold alone leaves a dead band where neither reaches 4.5.
+  return contrastWhite >= contrastDark ? '#ffffff' : CTA_DARK;
+}
+
+// TASK-10170: dead band L in (0.18333,0.21631) where neither #fff nor #111827 reaches 4.5:1.
+// The CTA background itself must be nudged out of the band. We blend the original brand
+// toward black (for white text) or toward white (for dark text) in 1% steps and return the
+// first hex that clears 4.5 with its optimal text colour. The step granularity keeps the
+// shift minimal and hue largely intact.
+export function clampedBrandColor(background: string): string {
+  const channels = parseHexChannels(background);
+  if (!channels) return background;
+  const [r, g, b] = channels;
+  const lum = luminanceFromRgb(r, g, b);
+  const cw = contrastRatio(lum, CTA_WHITE_LUM);
+  const cd = contrastRatio(lum, CTA_DARK_LUM);
+  if (cw >= 4.5 || cd >= 4.5) return background;
+
+  // Search both directions; prefer the smallest t that reaches 4.5.
+  const blend = (t: number, target: 'black' | 'white'): [number, number, number] => {
+    if (target === 'black') {
+      return [Math.round(r * (1 - t)), Math.round(g * (1 - t)), Math.round(b * (1 - t))];
+    }
+    return [Math.round(r + (255 - r) * t), Math.round(g + (255 - g) * t), Math.round(b + (255 - b) * t)];
+  };
+
+  for (let step = 1; step <= 100; step++) {
+    const t = step / 100;
+    for (const target of ['black', 'white'] as const) {
+      const [nr, ng, nb] = blend(t, target);
+      const nlum = luminanceFromRgb(nr, ng, nb);
+      const nWhite = contrastRatio(nlum, CTA_WHITE_LUM);
+      const nDark = contrastRatio(nlum, CTA_DARK_LUM);
+      if (nWhite >= 4.5 || nDark >= 4.5) {
+        const hex = `#${nr.toString(16).padStart(2, '0')}${ng.toString(16).padStart(2, '0')}${nb.toString(16).padStart(2, '0')}`;
+        return hex;
+      }
+    }
+  }
+  return background;
+}
+
+export function ctaStyle(background: string): { background: string; color: string } {
+  const bg = clampedBrandColor(background);
+  return { background: bg, color: readableCtaText(bg) };
+}
+
+// TASK-10178 part 1: on select -> dates -> details -> confirmed, the previous step unmounts
+// (including the button just activated), focus falls to <body>, and nothing is announced --
+// the file's only live region (the pre-config loading state) is long gone by then. Rather than
+// threading a focus ref through four separately-defined sub-components, a single persistent
+// (never unmounted) status region reports each transition in words; only its TEXT changes,
+// which is the reliable way to get assistive tech to actually announce it.
+export function stepAnnouncementText(step: Step, listingCount: number): string {
+  switch (step) {
+    case 'select': return listingCount > 1 ? 'Choose a stay' : 'Loading stay details';
+    case 'dates': return 'Choose your dates and number of guests';
+    case 'details': return 'Enter your details to complete the booking';
+    case 'confirmed': return 'Booking confirmed';
+    default: return '';
+  }
 }
 
 function normalizeConfig(raw: Record<string, unknown>): EmbedConfig {
@@ -78,7 +166,11 @@ function normalizeConfig(raw: Record<string, unknown>): EmbedConfig {
       propertyId: Number(r.propertyId ?? r.PropertyId),
       propertyName: (r.propertyName ?? r.PropertyName) as string | null,
       maxGuests: Number(r.maxGuests ?? r.MaxGuests ?? 2),
-      baseNightlyRate: r.baseNightlyRate != null ? Number(r.baseNightlyRate ?? r.BaseNightlyRate) : null,
+      // TASK-10180 defect 2: the guard used to test only the camelCase key
+      // (`r.baseNightlyRate != null`), so a PascalCase-only payload short-circuited to null even
+      // though the assignment itself already fell back to `r.BaseNightlyRate` -- every sibling
+      // field in this object checks both casings before deciding null vs a value; this one must too.
+      baseNightlyRate: (r.baseNightlyRate ?? r.BaseNightlyRate) != null ? Number(r.baseNightlyRate ?? r.BaseNightlyRate) : null,
       coverPhotoUrl: (r.coverPhotoUrl ?? r.CoverPhotoUrl) as string | null,
       checkInTime: (r.checkInTime ?? r.CheckInTime) as string | null,
       checkOutTime: (r.checkOutTime ?? r.CheckOutTime) as string | null,
@@ -158,49 +250,38 @@ function ListingSelector({
 }) {
   return (
     <div data-testid="embed-listing-select">
-      {listings.length === 1 ? (
-        <div className="mb-3 flex items-center gap-3">
-          {listings[0].coverPhotoUrl && (
-            <img src={listings[0].coverPhotoUrl} alt={listings[0].name} className="h-14 w-14 rounded-lg object-cover" />
-          )}
-          <div>
-            <div className="text-sm font-semibold">{listings[0].name}</div>
-            {listings[0].propertyName && <div className="text-xs text-text-secondary">{listings[0].propertyName}</div>}
-            {listings[0].baseNightlyRate != null && (
-              <div className="mt-0.5 text-xs text-text-muted">{formatCurrency(listings[0].baseNightlyRate)}/night</div>
+      {/* TASK-10180 defect 3: the parent only ever mounts ListingSelector when
+          config.listings.length > 1 (see the `step === 'select' && config.listings.length > 1`
+          guard below), so a `listings.length === 1` branch here could never run. Removed rather
+          than left as dead code overstating the state machine. */}
+      <div className="mb-3 grid gap-2">
+        {listings.map((l) => (
+          <button
+            key={l.id}
+            type="button"
+            onClick={() => onSelect(l)}
+            className="flex items-center gap-3 rounded-lg border border-border-subtle p-3 text-left transition-colors hover:border-border-default"
+          >
+            {l.coverPhotoUrl && (
+              <img src={l.coverPhotoUrl} alt={l.name} className="h-12 w-12 flex-shrink-0 rounded-lg object-cover" />
             )}
-          </div>
-        </div>
-      ) : (
-        <div className="mb-3 grid gap-2">
-          {listings.map((l) => (
-            <button
-              key={l.id}
-              type="button"
-              onClick={() => onSelect(l)}
-              className="flex items-center gap-3 rounded-lg border border-border-subtle p-3 text-left transition-colors hover:border-border-default"
-            >
-              {l.coverPhotoUrl && (
-                <img src={l.coverPhotoUrl} alt={l.name} className="h-12 w-12 flex-shrink-0 rounded-lg object-cover" />
-              )}
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold">{l.name}</div>
-                {l.propertyName && <div className="truncate text-xs text-text-secondary">{l.propertyName}</div>}
-                <div className="mt-0.5 flex items-center gap-2 text-xs text-text-muted">
-                  {l.baseNightlyRate != null && <span>{formatCurrency(l.baseNightlyRate)}/night</span>}
-                  <span>{l.maxGuests} guests max</span>
-                </div>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm font-semibold">{l.name}</div>
+              {l.propertyName && <div className="truncate text-xs text-text-secondary">{l.propertyName}</div>}
+              <div className="mt-0.5 flex items-center gap-2 text-xs text-text-muted">
+                {l.baseNightlyRate != null && <span>{formatCurrency(l.baseNightlyRate)}/night</span>}
+                <span>{l.maxGuests} guests max</span>
               </div>
-              <span className="text-lg text-text-muted">&#8250;</span>
-            </button>
-          ))}
-        </div>
-      )}
+            </div>
+            <span className="text-lg text-text-muted">&#8250;</span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
 
-function DateGuestPicker({
+export function DateGuestPicker({
   listing,
   onConfirm,
   brand,
@@ -213,7 +294,17 @@ function DateGuestPicker({
   const maxDate = useMemo(() => addDays(today, 365), [today]);
   const [checkIn, setCheckIn] = useState<Date | null>(null);
   const [checkOut, setCheckOut] = useState<Date | null>(null);
-  const [guests, setGuests] = useState(2);
+  // TASK-10179: `listing.maxGuests` can be malformed (normalizeConfig's `?? 2` fallback lets an
+  // API-supplied literal `0` straight through, since `??` only catches null/undefined) and the
+  // guest count used to default to a bare `useState(2)` with no relation to the listing at all.
+  // Both the option list below and the initial state are now folded through the SAME floor, so
+  // the select's bound value can never land outside its own option set: effectiveMaxGuests is
+  // at least 1 even when the listing's maxGuests is 0, and the initial guest count is clamped
+  // into [1, effectiveMaxGuests] instead of defaulting to a value the options list may not
+  // contain (a single-occupancy listing previously stayed stuck at guests=2, which the server
+  // then rejected as > listing.MaxGuests).
+  const effectiveMaxGuests = Math.max(listing.maxGuests, 1);
+  const [guests, setGuests] = useState(() => Math.min(2, effectiveMaxGuests));
   const [loadingAvail, setLoadingAvail] = useState(true);
   const [availError, setAvailError] = useState(false);
   const [availability, setAvailability] = useState<Map<string, string> | null>(null);
@@ -275,7 +366,7 @@ function DateGuestPicker({
           setCheckIn(d);
           if (d && checkOut && d >= checkOut) setCheckOut(null);
         }}
-        className="mb-2 w-full rounded-lg border border-border-subtle bg-bg-surface px-3 py-2 text-sm text-text-primary"
+        className="mb-2 w-full rounded-lg border border-border-input bg-bg-surface px-3 py-2 text-sm text-text-primary"
       />
 
       <label htmlFor="embed-checkout-date" className="mb-1 block text-xs font-medium text-text-secondary">Check-out</label>
@@ -289,7 +380,7 @@ function DateGuestPicker({
         onChange={(e) => {
           setCheckOut(e.target.value ? new Date(e.target.value + 'T00:00:00') : null);
         }}
-        className="mb-2 w-full rounded-lg border border-border-subtle bg-bg-surface px-3 py-2 text-sm text-text-primary"
+        className="mb-2 w-full rounded-lg border border-border-input bg-bg-surface px-3 py-2 text-sm text-text-primary"
       />
 
       {checkIn && checkOut && (
@@ -313,9 +404,9 @@ function DateGuestPicker({
         id="embed-guests"
         value={guests}
         onChange={(e) => setGuests(parseInt(e.target.value, 10) || 2)} // eslint-disable-line atlas/no-coerce-numeric-onchange -- select element, cannot be cleared
-        className="mb-3 w-full rounded-lg border border-border-subtle bg-bg-surface px-3 py-2 text-sm text-text-primary"
+        className="mb-3 w-full rounded-lg border border-border-input bg-bg-surface px-3 py-2 text-sm text-text-primary"
       >
-        {Array.from({ length: Math.min(listing.maxGuests, 16) }, (_, i) => i + 1).map((n) => (
+        {Array.from({ length: Math.min(effectiveMaxGuests, 16) }, (_, i) => i + 1).map((n) => (
           <option key={n} value={n}>{n} guest{n === 1 ? '' : 's'}</option>
         ))}
       </select>
@@ -325,7 +416,7 @@ function DateGuestPicker({
         disabled={!availError && (!canSubmit || loadingAvail)}
         onClick={handleCtaClick}
         className="w-full rounded-lg px-4 py-2.5 text-sm font-semibold transition-opacity disabled:opacity-50"
-        style={{ background: brand, color: readableCtaText(brand) }}
+        style={ctaStyle(brand)}
       >
         {loadingAvail ? 'Checking availability...' : availError ? 'Retry availability check' : 'Check pricing'}
       </button>
@@ -540,7 +631,7 @@ function GuestDetailsForm({
           autoComplete="name"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="rounded-lg border border-border-subtle bg-bg-surface px-3 py-2 text-sm text-text-primary"
+          className="rounded-lg border border-border-input bg-bg-surface px-3 py-2 text-sm text-text-primary"
         />
         <label htmlFor="embed-guest-email" className="text-xs font-medium text-text-secondary">Email address</label>
         <input
@@ -549,7 +640,7 @@ function GuestDetailsForm({
           autoComplete="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="rounded-lg border border-border-subtle bg-bg-surface px-3 py-2 text-sm text-text-primary"
+          className="rounded-lg border border-border-input bg-bg-surface px-3 py-2 text-sm text-text-primary"
         />
         <label htmlFor="embed-guest-phone" className="text-xs font-medium text-text-secondary">Phone number</label>
         <input
@@ -558,7 +649,7 @@ function GuestDetailsForm({
           autoComplete="tel"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
-          className="rounded-lg border border-border-subtle bg-bg-surface px-3 py-2 text-sm text-text-primary"
+          className="rounded-lg border border-border-input bg-bg-surface px-3 py-2 text-sm text-text-primary"
         />
       </div>
 
@@ -604,7 +695,7 @@ function GuestDetailsForm({
         disabled={submitting || !name.trim() || !email.trim() || !phone.trim() || !consentAccepted || (depositRequired && !depositAccepted)}
         onClick={handleSubmit}
         className="w-full rounded-lg px-4 py-2.5 text-sm font-semibold transition-opacity disabled:opacity-50"
-        style={{ background: brand, color: readableCtaText(brand) }}
+        style={ctaStyle(brand)}
       >
         {submitting ? 'Processing...' : 'Pay & book'}
       </button>
@@ -614,9 +705,11 @@ function GuestDetailsForm({
 
 function ConfirmationView({
   bookingId,
+  bookingToken,
   listing,
   checkIn,
   checkOut,
+  brand,
 }: {
   bookingId: number;
   bookingToken: string | null;
@@ -626,6 +719,13 @@ function ConfirmationView({
   brand: string;
 }) {
   const nights = calculateNights(checkIn, checkOut);
+  // TASK-10180 defect 1: inside a 600px iframe on a stranger's website there is no other route
+  // back to this reservation once the widget unmounts -- the API returns bookingToken precisely
+  // so the guest can view/manage the booking later. Same absolute-URL shape as the QR code on
+  // BookingConfirmationPage.tsx (`${window.location.origin}/booking/{id}?t={token}`) and the same
+  // nullable-token fallback used throughout (GuestDetailsPage.tsx, MyBookingsPage.tsx,
+  // ProfilePage.tsx): omit `?t=` when there is no token rather than sending a malformed query string.
+  const bookingHref = `${window.location.origin}/booking/${bookingId}${bookingToken ? `?t=${encodeURIComponent(bookingToken)}` : ''}`;
   return (
     <div data-testid="embed-confirmed" className="text-center">
       <div className="mb-3 text-3xl">&#10003;</div>
@@ -637,6 +737,20 @@ function ConfirmationView({
         <div>Booking #{bookingId}</div>
         <div>{format(checkIn, 'MMM d')} &ndash; {format(checkOut, 'MMM d')} &middot; {formatNightCount(nights)}</div>
       </div>
+      {/* target="_blank" + rel="noopener noreferrer": this widget runs inside a 600px iframe on a
+          third-party site. A normal same-tab navigation would drag the entire embed away from the
+          confirmation and load the full guest portal inside that cramped frame -- opening a new
+          tab is what actually gets the guest back to their reservation. */}
+      <a
+        href={bookingHref}
+        target="_blank"
+        rel="noopener noreferrer"
+        data-testid="embed-confirmation-link"
+        className="mb-3 inline-block text-sm font-semibold underline"
+        style={{ color: brand }}
+      >
+        View or manage your booking &rarr;
+      </a>
       <p className="text-xs text-text-muted">
         A confirmation has been sent to your email. Powered by Atlas.
       </p>
@@ -760,6 +874,14 @@ export default function EmbedPage() {
           <div className="truncate text-sm font-bold">{config.tenantName}</div>
           {config.tagline && <div className="truncate text-xs text-text-secondary">{config.tagline}</div>}
         </div>
+      </div>
+
+      {/* TASK-10178 part 1: always mounted (never conditionally removed) so its TEXT changing
+          on every step transition is what triggers the announcement -- a newly-mounted
+          role="status" element is less reliably picked up by assistive tech than one whose
+          content changes in place. Visually hidden; carries no visible design change. */}
+      <div role="status" aria-live="polite" className="sr-only">
+        {stepAnnouncementText(step, config.listings.length)}
       </div>
 
       {/* Steps */}

@@ -58,8 +58,9 @@ export default function SelfCheckIn() {
   // TASK-4514: Collect arrival time and guest count in canonical flow
   const [arrivalTime, setArrivalTime] = useState("");
   const [guestCount, setGuestCount] = useState("");
-  // TASK-5125: nationality + passport for Form III auto-detection
-  const [nationality, setNationality] = useState("India");
+  // TASK-5125 / TASK-101110: do not default to India — a blank field must not overwrite a
+  // host-set foreign nationality on complete (API also preserves host-set when nationality omitted).
+  const [nationality, setNationality] = useState("");
   const [passportNumber, setPassportNumber] = useState("");
   // TASK-5131: Aadhaar VC preferred; photo upload is explicit fallback only
   const [aadhaarPhotoFallback, setAadhaarPhotoFallback] = useState(false);
@@ -234,9 +235,13 @@ export default function SelfCheckIn() {
           // TASK-4514: include arrival time and guest count from canonical flow
           estimatedArrivalTime: arrivalTime || null,
           guestCount: guestCount ? Number(guestCount) : null,
-          nationality: nationality || "India",
+          nationality: nationality.trim() || null,
           passportNumber:
-            nationality !== "India" && passportNumber.trim() ? passportNumber.trim() : null,
+            nationality.trim() &&
+            nationality.trim().toLowerCase() !== "india" &&
+            passportNumber.trim()
+              ? passportNumber.trim()
+              : null,
           idCollectedElsewhere,
         }),
       });
@@ -406,12 +411,15 @@ export default function SelfCheckIn() {
               onChange={(e) => {
                 const next = e.target.value;
                 setNationality(next);
-                if (next !== "India" && !govtIdType) setGovtIdType("Passport");
+                if (next && next !== "India" && !govtIdType) setGovtIdType("Passport");
               }}
             >
+              <option value="">Select nationality</option>
               <option value="India">India</option>
               <option value="United States">United States</option>
+              <option value="United States (OCI)">United States (OCI)</option>
               <option value="United Kingdom">United Kingdom</option>
+              <option value="United Kingdom (OCI)">United Kingdom (OCI)</option>
               <option value="Canada">Canada</option>
               <option value="Australia">Australia</option>
               <option value="Germany">Germany</option>
@@ -419,7 +427,7 @@ export default function SelfCheckIn() {
               <option value="Other">Other</option>
             </select>
 
-            {nationality !== "India" && (
+            {nationality !== "" && nationality !== "India" && (
               <>
                 <label htmlFor="checkin-passport" className="block text-sm font-medium text-text-primary mb-1">
                   Passport number

@@ -210,6 +210,36 @@ describe("Slider hero search", () => {
     expect(screen.getByRole("heading", { name: /Thoughtfully curated stays/i })).toBeInTheDocument();
   });
 
+  describe("TASK-101158: homepage promo subline is gated by hasOnlinePaymentRail", () => {
+    it("WHATSAPP/no-provider tenant: promo strip has no Razorpay or UPI claim", () => {
+      vi.mocked(getTenantContext).mockReturnValue({
+        name: "Atlas Homestays",
+        slug: "atlas",
+        isMarketplaceRoot: true,
+        paymentProvider: undefined,
+        bookingMode: "WHATSAPP",
+      });
+      renderSlider();
+      const promo = screen.getByTestId("home-direct-booking-promo");
+      expect(promo.textContent).not.toMatch(/razorpay/i);
+      expect(promo.textContent).not.toMatch(/\bUPI\b/i);
+    });
+
+    it("ONLINE tenant: promo strip still shows the Razorpay/UPI claim", () => {
+      vi.mocked(getTenantContext).mockReturnValue({
+        name: "Atlas Homestays",
+        slug: "atlas",
+        isMarketplaceRoot: true,
+        paymentProvider: "RAZORPAY",
+        bookingMode: "ONLINE",
+      });
+      renderSlider();
+      const promo = screen.getByTestId("home-direct-booking-promo");
+      expect(promo.textContent).toMatch(/razorpay/i);
+      expect(promo.textContent).toMatch(/\bUPI\b/i);
+    });
+  });
+
   describe("TASK-4911: Check availability CTA surfaces inline validation instead of silently no-op-ing", () => {
     it("clicking Check availability after check-out is cleared shows an inline message and does not navigate", () => {
       renderSlider();

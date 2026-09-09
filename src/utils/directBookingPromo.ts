@@ -8,6 +8,7 @@ import {
   type TenantOverrides,
 } from "../tenant/tenantOverrides";
 import type { TenantInfo } from "../tenant/tenantContext";
+import { hasOnlinePaymentRail } from "../tenant/paymentRail";
 
 /** Illustrative OTA guest-side fees (service + payment friction), not a guarantee. */
 export const ILLUSTRATIVE_OTA_GUEST_FEE_PERCENT = 18;
@@ -38,9 +39,13 @@ export function resolveDirectBookingPromo(
     (effectiveDiscountPercent > 0
       ? `Book direct — save up to ${Math.round(effectiveDiscountPercent)}% vs typical booking sites`
       : "Book direct — best rates on our official site");
+  // TASK-101158: never claim an online payment rail (Razorpay/UPI) that this tenant does not
+  // have — mirrors the hasOnlinePaymentRail() gate used by Footer/OwnerShareBadge/etc.
   const sub =
     overrides.directBookingPromo?.subline?.trim() ||
-    "Pay with UPI or cards via Razorpay. Your price is guaranteed at checkout.";
+    (hasOnlinePaymentRail(tenant ?? null)
+      ? "Pay with UPI or cards via Razorpay. Your price is guaranteed at checkout."
+      : "Your price is guaranteed at checkout — no hidden OTA markups.");
   const savingsStripLine =
     "Booking direct can save you about 18–30% vs typical OTA guest totals (fees and markups vary by site).";
   return { show, effectiveDiscountPercent, headline, sub, savingsStripLine };
