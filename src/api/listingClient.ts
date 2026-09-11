@@ -22,6 +22,8 @@ export type ListingDetail = {
   id: string | number;
   propertyId?: string | number;
   name?: string;
+  /** TASK-101640: server-resolved display name when the detail payload carries it. */
+  displayName?: string | null;
   coverPhotoUrl?: string;
   photoUrls?: string[];
   [key: string]: unknown;
@@ -91,6 +93,12 @@ export type PublicListing = {
   propertyName?: string;
   propertyAddress?: string | null;
   name?: string;
+  /**
+   * TASK-101640: server-resolved guest-facing unit name from `PublicListingDto.displayName`
+   * (friendly for known Atlas SKUs, else the listing name). Undefined/null on legacy
+   * payloads that predate the field — callers fall back to the local display-name map.
+   */
+  displayName?: string | null;
   floor?: number;
   type?: string;
   checkInTime?: string | null;
@@ -194,6 +202,13 @@ function normalizePublicListing(payload: Record<string, unknown>): PublicListing
         ? (payload.propertyAddress as string | null)
         : undefined,
     name: typeof payload.name === 'string' ? payload.name : undefined,
+    // TASK-101640: thread the server-resolved display name through (camelCase or PascalCase).
+    displayName:
+      typeof payload.displayName === 'string'
+        ? payload.displayName
+        : typeof payload.DisplayName === 'string'
+          ? (payload.DisplayName as string)
+          : undefined,
     floor: payload.floor != null ? Number(payload.floor) : undefined,
     type: typeof payload.type === 'string' ? payload.type : undefined,
     checkInTime:
@@ -572,6 +587,8 @@ export const fetchListingById = async (
       | number
       | undefined,
     name: (payload.name ?? payload.property_name ?? payload.title) as string | undefined,
+    // TASK-101640: keep the server-resolved display name (camelCase or PascalCase).
+    displayName: (payload.displayName ?? payload.DisplayName ?? null) as string | null | undefined,
   };
 
   return normalized;
