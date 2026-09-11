@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { FaHeart, FaRegHeart } from 'react-icons/fa';
 import { buildApiUrl } from '@/api/client';
@@ -118,6 +118,14 @@ export default function MarketplaceHomepage() {
     [filterQuery],
   );
 
+  // TASK-101875: generation token for the "Show more homes" race. The page-1 effect above
+  // already guards with `cancelled`, but `loadMore` had none — a filter change while page N+1
+  // was in flight let the stale response append old-filter listings and rewind `page`.
+  const activeFilterRef = useRef(filterQuery);
+  useEffect(() => {
+    activeFilterRef.current = filterQuery;
+  }, [filterQuery]);
+
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -156,11 +164,17 @@ export default function MarketplaceHomepage() {
   const loadMore = useCallback(() => {
     if (loadingMore || !hasMore) return;
     const next = page + 1;
+    const requestFilter = filterQuery;
     setLoadingMore(true);
     fetch(buildApiUrl(buildPagePath(next)))
       .then(async (r) => (r.ok ? ((await r.json()) as ApiResponse) : null))
       .then(async (data) => {
         if (!data) return;
+        // TASK-101875: discard a stale next-page response when the filter changed while it
+        // was in flight. The page-1 effect has already reset items/page/total for the new
+        // filter, so appending here would mix old-filter listings into the fresh grid and
+        // desynchronise `page` for the next request.
+        if (activeFilterRef.current !== requestFilter) return;
         const enriched = await enrichMarketplaceCoverItems(data.items ?? []);
         const seen = new Set(items.map((i) => i.id));
         const fresh = enriched.filter((i) => !seen.has(i.id));
@@ -178,7 +192,7 @@ export default function MarketplaceHomepage() {
         /* keep what is already rendered; the control stays available for a retry */
       })
       .finally(() => setLoadingMore(false));
-  }, [buildPagePath, hasMore, items, loadingMore, page]);
+  }, [buildPagePath, filterQuery, hasMore, items, loadingMore, page]);
 
   // TASK-4413: client-side price filter over the fetched grid, mirroring SearchPage.tsx's
   // minPrice/maxPrice behavior. Applying a price filter does not touch `category` state, so
