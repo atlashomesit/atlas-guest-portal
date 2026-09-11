@@ -11,6 +11,7 @@ import { LoadingState } from "../components/LoadingState";
 import { useCurrency } from "../contexts/CurrencyContext";
 import { useDailyPricingSummary } from "../hooks/useDailyPricingSummary";
 import { estimateStayNights, formatEstTotalInclGst } from "../utils/guestPriceEstimate";
+import SavedHomeCover from "../components/SavedHomeCover";
 
 export default function FavoritesPage() {
   const brandName = getTenantBrandName();
@@ -308,11 +309,7 @@ export default function FavoritesPage() {
               >
                 <div className="relative">
                   <Link to={path} className="block">
-                    {l.coverPhotoUrl ? (
-                      <img src={l.coverPhotoUrl} alt={l.name ?? "Home"} className="w-full h-40 object-cover" loading="lazy" />
-                    ) : (
-                      <div className="w-full h-40 bg-bg-muted" aria-hidden />
-                    )}
+                    <SavedHomeCover src={l.coverPhotoUrl} alt={l.name ?? "Home"} />
                   </Link>
                   {/* TASK-4297: in a SHARED wishlist view the listing isn't the viewer's own save —
                       the remove heart would silently mutate the viewer's own favorites and never
