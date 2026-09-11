@@ -22,6 +22,7 @@ const CallbackRequestForm = ({
 }: CallbackRequestFormProps) => {
   const copy = SUPPORT_DRAWER_COPY.callbackForm;
   const resolvedExpectationText = expectationText ?? copy.expectationText;
+  const callbackErrorId = "callback-phone-error";
 
   return (
     <div className="rounded-2xl border border-border-subtle bg-bg-surface p-[var(--drawer-card-padding-block,0.75rem)] shadow-inner">
@@ -40,9 +41,10 @@ const CallbackRequestForm = ({
           className="w-full bg-transparent text-base font-medium text-text-primary outline-none placeholder:text-text-muted"
           placeholder={copy.phonePlaceholder}
           aria-label={copy.phoneInputAriaLabel}
+          aria-describedby={callbackError ? callbackErrorId : undefined}
         />
       </div>
-      {callbackError ? <p className="mt-1 text-xs font-semibold text-support-error">{callbackError}</p> : null}
+      {callbackError ? <p id={callbackErrorId} role="alert" className="mt-1 text-xs font-semibold text-support-error">{callbackError}</p> : null}
       <div className="mt-2 flex items-center gap-2">
         <button
           type="button"
@@ -68,7 +70,7 @@ const CallbackRequestForm = ({
         </button>
       </div>
       {callbackStatus === "sent" ? (
-        <p className="mt-1 text-xs font-semibold text-success">{copy.successMessage}</p>
+        <p role="status" aria-live="polite" className="mt-1 text-xs font-semibold text-success">{copy.successMessage}</p>
       ) : null}
     </div>
   );
