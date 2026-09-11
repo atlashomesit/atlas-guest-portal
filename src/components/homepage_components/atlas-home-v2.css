@@ -77,6 +77,8 @@
   align-items: stretch;
   min-height: min(72vh, 760px);
   position: relative;
+  z-index: 2;
+  overflow: visible;
   background: var(--gradient-hero,
       linear-gradient(145deg, #fde0c8 0%, #f5c8b0 18%, #f0c0c0 35%, #e8c8e0 52%, #d8c0e8 72%, #ccc0ee 100%));
   color: var(--ahv2-ink);
@@ -154,16 +156,25 @@
   opacity: 0;
   transform: translateY(12px);
   animation: ahv2-widget-in 700ms var(--ahv2-ease) 400ms forwards;
+  /* Guest/calendar popovers overflow this slot. Keep them above the trust chips
+     (next sibling) so laptop clicks on +/- actually hit the guest stepper. */
+  position: relative;
+  z-index: 4;
+  overflow: visible;
 }
 
 /* Hero booking fields — shared alignment shell */
 .ahv2-hero-widget .hero-form {
   padding: 1rem;
   gap: 0.75rem;
+  overflow: visible;
+  position: relative;
+  z-index: 1;
 }
 .ahv2-hero-widget .hero-form-grid {
   gap: 0.75rem;
   align-items: stretch;
+  overflow: visible;
 }
 .ahv2-hero-widget .field-card {
   min-height: 112px;
@@ -230,6 +241,10 @@
   list-style: none;
   /* Align trust chips with the booking widget edge */
   max-width: min(100%, 900px);
+  /* Stay below the booking widget stacking context so open guest/date
+     popovers are clickable on laptop (chips used to paint over Adults +/-). */
+  position: relative;
+  z-index: 1;
 }
 .ahv2-chip {
   font-size: 13px;

@@ -297,6 +297,7 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
   const toggleCalendar = (field: 'checkin' | 'checkout' = 'checkin') => {
     lastFocusedTriggerRef.current = document.activeElement as HTMLElement | null;
     setActiveField(field);
+    setIsGuestsOpen(false);
     setIsCalendarOpen((open) => !open);
   };
 
@@ -677,6 +678,8 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
           isOpen={isGuestsOpen}
           onToggle={() => {
             markHeroInteraction();
+            setIsCalendarOpen(false);
+            setActiveField(null);
             setIsGuestsOpen(!isGuestsOpen);
           }}
           onClose={() => setIsGuestsOpen(false)}

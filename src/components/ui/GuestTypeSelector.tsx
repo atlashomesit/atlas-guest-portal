@@ -148,7 +148,7 @@ export const GuestTypeSelector: React.FC<GuestTypeSelectorProps> = ({
   
   const summary = parts.length > 0 ? parts.join(', ') : 'Add guests';
 
-  // Close dropdown when clicking outside
+  // Close dropdown when clicking outside or pressing Escape
   useEffect(() => {
     if (!isOpen) return;
 
@@ -158,8 +158,18 @@ export const GuestTypeSelector: React.FC<GuestTypeSelectorProps> = ({
       }
     };
 
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
   }, [isOpen, onClose]);
 
   const handleAdultsChange = (n: number) => {
@@ -185,13 +195,14 @@ export const GuestTypeSelector: React.FC<GuestTypeSelectorProps> = ({
   const isAtCapacity = totalOccupancy >= maxCapacity;
 
   return (
-    <div className="relative min-w-0" ref={dropdownRef}>
+    <div className={`relative min-w-0 ${isOpen ? 'z-[70]' : 'z-[1]'}`} ref={dropdownRef}>
       <button
         type="button"
         onClick={onToggle}
         className="field-card flex h-full min-h-[112px] flex-col justify-start gap-2.5 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4 shadow-[var(--shadow-level-1)] hover:shadow-[var(--shadow-level-2)] text-left w-full transition-shadow focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cta-primary)]"
         aria-expanded={isOpen}
         aria-label="Select guests"
+        data-testid="hero-guest-toggle"
       >
         <span className="hf-field-label flex items-center gap-2 text-xs font-bold uppercase tracking-[0.10em] text-[var(--text-muted)]">
           <Users className="h-4 w-4 shrink-0 text-[var(--text-muted)]" aria-hidden="true" />
@@ -209,7 +220,12 @@ export const GuestTypeSelector: React.FC<GuestTypeSelectorProps> = ({
       </button>
       
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 mt-2 bg-[var(--bg-surface)] rounded-xl shadow-[var(--shadow-level-3)] border border-[var(--border-subtle)] p-5 z-50 min-w-[320px]">
+        <div
+          role="dialog"
+          aria-label="Guest selector"
+          data-testid="hero-guest-dropdown"
+          className="absolute top-full left-0 mt-2 w-[min(22rem,calc(100vw-2rem))] bg-[var(--bg-surface)] rounded-xl shadow-[var(--shadow-level-3)] border border-[var(--border-subtle)] p-5 z-[80] pointer-events-auto"
+        >
           <div className="flex flex-col">
             <GuestTypeRow
               label="Adults"
