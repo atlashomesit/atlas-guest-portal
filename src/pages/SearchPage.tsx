@@ -158,7 +158,7 @@ function apiToNormalized(listings: PublicListing[]): NormalizedListing[] {
       return {
         id: `api-${l.id}`,
         numericId: l.id,
-        title: getListingDisplayName(l.id, l.name || l.propertyName),
+        title: getListingDisplayName(l.id, l.name || l.propertyName, l.displayName),
         location: l.propertyAddress ?? "",
         pricePerNight: l.baseNightlyRate ?? 0,
         maxGuests: l.maxGuests,

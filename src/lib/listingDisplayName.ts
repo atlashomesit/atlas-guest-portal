@@ -14,8 +14,10 @@
  * Falls back to the raw name string if no mapping exists — preserves backward compat
  * for any future listings not yet in this map.
  *
- * Long-term: this mapping should move to a `displayName` field on the API DTO.
- * TODO: wire `displayName` from atlas-api PublicListingDto when available.
+ * TASK-101640: the API now serves a server-resolved `displayName` on PublicListingDto
+ * (friendly for known Atlas SKUs, raw-name fallback otherwise). Prefer it when present —
+ * the hardcoded map below stays only as the legacy fallback for payloads that predate
+ * the field (or omit it).
  */
 
 import { getTenantContext } from '../tenant/tenantContext';
@@ -53,6 +55,9 @@ function displayNameFromSku(sku: string): string | null {
  * the id arg.
  *
  * Priority:
+ * 0. API-supplied `displayName` (TASK-101640) — the server-resolved guest-facing name.
+ *    Gated to Atlas marketplace tenants like the map below (TASK-7194): a white-label
+ *    tenant's listing keeps its own raw name even if the API ever resolves one.
  * 1. Atlas SKU → friendly. Gated to names containing "atlas" so cross-tenant marketplace /
  *    search names (e.g. "Sea View 501") are NEVER remapped onto Atlas's unit names. Also
  *    gated to Atlas marketplace tenants only (TASK-7194) — see Strategy 2's comment. Without
@@ -66,6 +71,7 @@ function displayNameFromSku(sku: string): string | null {
 export function getListingDisplayName(
   propertyId: number | string | undefined | null,
   rawName?: string,
+  apiDisplayName?: string | null,
 ): string {
   // Resolve once whether Atlas's own unit-name map may be applied for this tenant.
   // When tenant context is unresolved (null slug), keep marketplace behavior for boot/tests.
@@ -75,6 +81,11 @@ export function getListingDisplayName(
   const slug = tenant?.slug?.trim();
   const allowAtlasUnitMap =
     !slug || !shouldHideAtlasBranding(tenant, getTenantOverrides(slug));
+
+  // Strategy 0 (TASK-101640): server-resolved display name wins when present.
+  // Same marketplace gate as the map below — white-label tenants keep their own names.
+  const trimmedApiName = apiDisplayName?.trim();
+  if (allowAtlasUnitMap && trimmedApiName) return trimmedApiName;
 
   // Strategy 1: Atlas SKU extraction (only for Atlas-owned SKU-style names).
   if (allowAtlasUnitMap && rawName && /atlas/i.test(rawName)) {
