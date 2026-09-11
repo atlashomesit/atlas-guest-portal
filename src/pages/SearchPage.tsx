@@ -34,6 +34,11 @@ import RecentlyViewedStrip from "../components/RecentlyViewedStrip";
 import { SearchByImageModal, type ImageSearchMatch } from "../components/search/SearchByImageModal";
 import { fallbackCoordsForListing, hasMapCoords } from "../utils/mapCoords";
 import { amenityCodeMatchesCategory, resolveAmenityLabel } from "../utils/amenityCodes";
+import {
+  ACCESSIBILITY_CHIP_KEYS,
+  ACCESSIBILITY_CHIP_LABELS,
+  getAccessibilityDeclarations,
+} from "../utils/amenityCodes";
 import { estimateStayNights, formatEstTotalInclGst } from "../utils/guestPriceEstimate";
 import { CONTACT } from "../config/contact";
 import { getPropertyDesignImage } from "../config/branding";
@@ -81,6 +86,10 @@ type NormalizedListing = {
   wifiSpeedMbps?: number | null;
   /** TASK-577/TASK-1738: true when the listing has a dedicated co-working desk. */
   hasCoworkingDesk?: boolean;
+  /** TASK-10086: canonical v1 accessibility features explicitly declared (never inferred). */
+  accessibilityFeatures: string[];
+  /** TASK-10086: true when no v1 accessibility feature is declared — "Not specified — ask host". */
+  accessibilityUnknown: boolean;
 };
 
 function buildStaticListings(allowedIds?: Set<number>): NormalizedListing[] {
@@ -98,6 +107,10 @@ function buildStaticListings(allowedIds?: Set<number>): NormalizedListing[] {
       const propertySlug = getPropertySlug(property);
       const canonicalPath = buildHomeUnitPath(propertySlug, id);
       const pin = fallbackCoordsForListing(id);
+      // TASK-10086: derive step-free declarations from static amenity icons (exact codes only).
+      const staticAccessibility = getAccessibilityDeclarations(
+        (property.property_amenities ?? []).map((a) => a?.amenities_icon ?? ""),
+      );
 
       return {
         id: `${propertySlug}-${id}`,
@@ -115,6 +128,8 @@ function buildStaticListings(allowedIds?: Set<number>): NormalizedListing[] {
         reviewCount: (property as unknown as { property_reviews?: number }).property_reviews ?? null,
         latitude: pin.lat,
         longitude: pin.lng,
+        accessibilityFeatures: staticAccessibility,
+        accessibilityUnknown: staticAccessibility.length === 0,
       };
     })
     .filter((l): l is NonNullable<typeof l> => l !== null);
@@ -131,6 +146,14 @@ function apiToNormalized(listings: PublicListing[]): NormalizedListing[] {
     .map((l) => {
       const propertySlug = getPropertySlug({ name: l.propertyName || l.name });
       const canonicalPath = buildHomeUnitPath(propertySlug, l.id);
+      // TASK-10086: prefer the server's explicit AccessibilityFeatures field when present,
+      // else derive from amenityCodes — exact canonical codes only, never inferred.
+      const rawServerFeatures = (l as unknown as { accessibilityFeatures?: unknown }).accessibilityFeatures;
+      const apiAccessibility = getAccessibilityDeclarations(
+        Array.isArray(rawServerFeatures)
+          ? rawServerFeatures.filter((x): x is string => typeof x === "string")
+          : (l.amenityCodes ?? []),
+      );
 
       return {
         id: `api-${l.id}`,
@@ -163,6 +186,8 @@ function apiToNormalized(listings: PublicListing[]): NormalizedListing[] {
         // TASK-2552: wire nomad fields so WiFi/co-working badges and filters work on API listings
         wifiSpeedMbps: l.wifiSpeedMbps ?? null,
         hasCoworkingDesk: l.hasCoworkingDesk ?? false,
+        accessibilityFeatures: apiAccessibility,
+        accessibilityUnknown: apiAccessibility.length === 0,
       };
     })
     .filter((l) => l.numericId > 0);
@@ -198,6 +223,9 @@ function marketplaceToNormalized(items: MarketplaceApiItem[]): NormalizedListing
     reviewCount: item.reviewCount ?? null,
     latitude: null,
     longitude: null,
+    // TASK-10086: marketplace feed carries no accessibility declarations — unknown, never accessible.
+    accessibilityFeatures: [],
+    accessibilityUnknown: true,
   };
   });
 }
@@ -807,9 +835,11 @@ const SearchPage = () => {
     }
     for (const a of selectedAmenities) {
       if (!a) continue;
+      // TASK-10086: accessibility chip keys render their guest-facing labels.
+      const chipLabel = ACCESSIBILITY_CHIP_LABELS[a] ?? a;
       chips.push({
         key: `amenity:${a}`,
-        label: a,
+        label: chipLabel,
         onRemove: () => {
           setSearchParams((prev) => {
             const next = new URLSearchParams(prev);
@@ -1121,6 +1151,29 @@ const SearchPage = () => {
               </button>
             ))}
           </div>
+
+          <div className="search-filters__chips" data-testid="search-accessibility-filters">
+            <span className="search-filters__chip-label">Accessibility needs</span>
+            {ACCESSIBILITY_CHIP_KEYS.map((key) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => toggleAmenity(key)}
+                data-testid={`search-filter-accessibility-${key}`}
+                aria-pressed={selectedAmenities.includes(key)}
+                className={`rounded-full px-3 py-1.5 text-sm font-medium min-h-9 ${
+                  selectedAmenities.includes(key)
+                    ? "bg-cta-primary text-[var(--text-on-cta)] border border-cta-primary"
+                    : "bg-bg-muted border border-border-subtle text-text-primary hover:border-cta-primary"
+                }`}
+              >
+                {ACCESSIBILITY_CHIP_LABELS[key] ?? key}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-text-muted">
+            Host-declared features only. Homes without a declaration stay visible until you filter.
+          </p>
 
           <div className="search-filters__chips">
             <span className="search-filters__chip-label">Digital nomad</span>

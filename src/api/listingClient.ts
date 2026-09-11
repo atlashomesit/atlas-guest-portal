@@ -1,6 +1,7 @@
 import { buildApiUrl, getApiHeaders } from '@/api/client';
 import { messageFromApiResponse } from '@/utils/serverErrorFromResponse';
 import { dedupedJsonFetch } from '@/api/dedupedJsonFetch';
+import { getAccessibilityDeclarations } from '@/utils/amenityCodes';
 
 /** Parse maxGuests from listing JSON (camelCase or PascalCase). Returns undefined if missing/invalid. */
 export function parseMaxGuestsFromPayload(payload: Record<string, unknown>): number | undefined {
@@ -149,6 +150,14 @@ export type PublicListing = {
   graceHours?: number | null;
   /** TASK-2552: amenity code strings (e.g. "AC", "Pool", "WiFi") returned by PublicListingDto. */
   amenityCodes?: string[];
+  /**
+   * TASK-10086: canonical v1 accessibility features explicitly declared by the host
+   * (step_free_entrance, elevator, accessible_parking). Empty when undeclared —
+   * never inferred. Prefer the server field when present, else derived from amenityCodes.
+   */
+  accessibilityFeatures?: string[];
+  /** TASK-10086: true when no v1 accessibility feature is declared ("Not specified — ask host"). */
+  accessibilityUnknown?: boolean;
   /** TASK-7193: admin-editable SEO description for share previews. */
   seoDescription?: string | null;
   /** TASK-1936: SEO meta description fallback. */
@@ -248,6 +257,24 @@ function normalizePublicListing(payload: Record<string, unknown>): PublicListing
     amenityCodes: Array.isArray(payload.amenityCodes)
       ? payload.amenityCodes.filter((x): x is string => typeof x === 'string')
       : [],
+    // TASK-10086: explicit host declarations only — prefer the server field, else derive.
+    ...(() => {
+      const server = payload.accessibilityFeatures;
+      const fromServer = Array.isArray(server)
+        ? server.filter((x): x is string => typeof x === 'string')
+        : null;
+      const codes = Array.isArray(payload.amenityCodes)
+        ? payload.amenityCodes.filter((x): x is string => typeof x === 'string')
+        : [];
+      const features = getAccessibilityDeclarations(fromServer ?? codes);
+      return {
+        accessibilityFeatures: features,
+        accessibilityUnknown:
+          typeof payload.accessibilityUnknown === 'boolean'
+            ? (payload.accessibilityUnknown as boolean)
+            : features.length === 0,
+      };
+    })(),
     // TASK-2739-v1: publish state drives noindex + the "not yet available" notice on Draft detail pages.
     publishStatus: typeof payload.publishStatus === 'string' ? payload.publishStatus : undefined,
   };
