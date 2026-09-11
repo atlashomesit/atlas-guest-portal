@@ -36,7 +36,7 @@ import { hasOnlinePaymentRail } from '@/tenant/paymentRail';
 import { getGuestDataProcessingEntityName, getTenantBrandName } from '@/tenant/displayBrand';
 import { formatCurrency } from '@/utils/formatting';
 import { formatDateInTimezone } from '@/utils/dateHelpers';
-import { track } from '@/lib/events';
+import { TerminalCheckoutOutcomeEvents, track } from '@/lib/events';
 import { mapRazorpayFailureCode } from '@/utils/razorpayGuestErrors';
 import {
   isServerTotalConfirmRequired,
@@ -960,6 +960,8 @@ const GuestDetailsPage: React.FC = () => {
                 // explicit dismiss doesn't fire a second abandon-checkout call for the same hold.
                 checkoutSettledRef.current = true;
                 abandonPaymentPendingCheckout(bookingId, bookingToken ?? pendingBookingTokenRef.current);
+                // TASK-10087: terminal outcome — anonymous session/listing identifiers only, no PII.
+                track(TerminalCheckoutOutcomeEvents.PaymentModalDismissed, holdListingId ? Number(holdListingId) : 0);
                 setIsSubmitting(false);
                 setPaymentCancelled(true);
                 setRazorpayOrderId(null);
@@ -1032,6 +1034,8 @@ const GuestDetailsPage: React.FC = () => {
                       } catch { /* ignore */ }
                       // TASK-4536: Clear the attempt's idempotency key on successful payment.
                       currentAttemptIdempotencyKeyRef.current = null;
+                      // TASK-10087: terminal outcome — anonymous identifiers only, no PII.
+                      track(TerminalCheckoutOutcomeEvents.PaymentConfirmed, holdListingId ? Number(holdListingId) : 0);
                       updateBooking({
                         holdId: null, holdExpiresAt: null, holdPropertySlug: null,
                         holdUnitSlug: null, holdPriceBreakdown: null, holdListingId: null,
@@ -1059,6 +1063,9 @@ const GuestDetailsPage: React.FC = () => {
                     setChargedUnconfirmedPollExhausted(false);
                     chargedUnconfirmedPollTriesRef.current = 0;
                     chargedUnconfirmedBookingRef.current = { bookingId, pollToken: pendingBookingTokenRef.current };
+                    // TASK-10087: terminal outcome — anonymous identifiers only, no PII
+                    // (payment/order IDs stay in the visible recovery message, never in the event).
+                    track(TerminalCheckoutOutcomeEvents.ChargedUnconfirmed, holdListingId ? Number(holdListingId) : 0);
                     setOrderError(
                       `Payment received but we could not confirm your booking yet. Payment ID: ${paymentId} · Booking #${bookingId}. ` +
                         `We will retry automatically for about 5 minutes — if your stay is not confirmed by then, tap "Check again" below or contact us on WhatsApp (${getWhatsAppLink()}?text=${waText}) ` +
@@ -1134,6 +1141,8 @@ const GuestDetailsPage: React.FC = () => {
                     checkoutSettledRef.current = true;
                     try { rzp.close(); } catch { /* ignore */ }
                     abandonPaymentPendingCheckout(bookingId, bookingToken ?? pendingBookingTokenRef.current);
+                    // TASK-10087: terminal outcome — anonymous identifiers only, no PII.
+                    track(TerminalCheckoutOutcomeEvents.HoldExpiredDuringPayment, holdListingId ? Number(holdListingId) : 0);
                     setOrderError('Hold expired while payment was in progress. Please re-select your dates and try again.');
                     setIsSubmitting(false);
                   }
@@ -1146,6 +1155,8 @@ const GuestDetailsPage: React.FC = () => {
                   checkoutSettledRef.current = true;
                   try { rzp.close(); } catch { /* ignore */ }
                   abandonPaymentPendingCheckout(bookingId, bookingToken ?? pendingBookingTokenRef.current);
+                  // TASK-10087: terminal outcome — anonymous identifiers only, no PII.
+                  track(TerminalCheckoutOutcomeEvents.HoldExpiredDuringPayment, holdListingId ? Number(holdListingId) : 0);
                   setOrderError('Hold expired while payment was in progress. Please re-select your dates and try again.');
                   setIsSubmitting(false);
                 }
@@ -1161,6 +1172,8 @@ const GuestDetailsPage: React.FC = () => {
                 // Do NOT abandon-checkout here: the guest may tap Pay again on the same hold
                 // (TASK-2906 resume / re-order). Inventory is released on modal dismiss (handleClose)
                 // or back-to-property. TTL worker remains the backstop if they leave mid-failure.
+                // TASK-10087: terminal outcome — anonymous identifiers only, no PII.
+                track(TerminalCheckoutOutcomeEvents.PaymentFailed, holdListingId ? Number(holdListingId) : 0);
                 setOrderError(`No money was taken. ${mapRazorpayFailureCode(code, desc)}`);
                 // TASK-2906: Store the order ID and amount so the "Resume payment" button can retry
                 setRazorpayOrderId(orderId);
