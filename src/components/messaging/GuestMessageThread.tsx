@@ -8,6 +8,7 @@ import {
 /** TASK-4333: polling cadence for the guest message thread (matches admin ConversationsPage.tsx). */
 const POLL_INTERVAL_MS = 30_000;
 const MAX_MESSAGE_LENGTH = 2000;
+const NEAR_BOTTOM_PX = 24;
 
 function formatTime(iso: string): string {
   try {
@@ -23,10 +24,21 @@ function formatTime(iso: string): string {
   }
 }
 
+function isHostMessage(message: GuestConversationMessage): boolean {
+  return message.sender !== "Guest";
+}
+
+function hostReplyAnnouncement(count: number): string {
+  return count === 1 ? "New reply from your host" : `${count} new replies from your host`;
+}
+
 /**
  * TASK-4333: "Messages" section on the booking confirmation page. Read + reply to the host,
  * reusing the page's existing per-booking `?t=` token. Request/refresh based (no websocket) —
  * polls on a timer like the admin inbox, and re-fetches immediately after a successful send.
+ *
+ * TASK-10088: polite live-region announcement for a newly polled host reply; never auto-focus
+ * and never pull a composing / manually-scrolled guest to the bottom.
  */
 export default function GuestMessageThread({ bookingId, token }: { bookingId: number; token: string }) {
   const [messages, setMessages] = useState<GuestConversationMessage[]>([]);
@@ -36,7 +48,30 @@ export default function GuestMessageThread({ bookingId, token }: { bookingId: nu
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
+  const [liveAnnouncement, setLiveAnnouncement] = useState("");
   const threadEndRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const initialLoadCompleteRef = useRef(false);
+  const seenHostMessageIdsRef = useRef<Set<number>>(new Set());
+  const isComposingRef = useRef(false);
+  const stickToBottomRef = useRef(true);
+  const pendingGuestSendRef = useRef(false);
+
+  const noteHostReplies = useCallback((incoming: GuestConversationMessage[]) => {
+    const unseenHost = incoming.filter(
+      (m) => isHostMessage(m) && !seenHostMessageIdsRef.current.has(m.id),
+    );
+    for (const m of incoming) {
+      if (isHostMessage(m)) seenHostMessageIdsRef.current.add(m.id);
+    }
+    if (!initialLoadCompleteRef.current) {
+      initialLoadCompleteRef.current = true;
+      return;
+    }
+    if (unseenHost.length === 0) return;
+    setLiveAnnouncement(hostReplyAnnouncement(unseenHost.length));
+  }, []);
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
@@ -44,9 +79,11 @@ export default function GuestMessageThread({ bookingId, token }: { bookingId: nu
         const thread = await fetchGuestMessages(bookingId, token, signal);
         // Defensive: a malformed/partial payload (missing `messages`) must not white-screen
         // the confirmation page — fall back to an empty thread. (TASK-4333 hardening)
-        setMessages(thread?.messages ?? []);
+        const next = thread?.messages ?? [];
+        setMessages(next);
         setHasUnreadMessages(thread?.hasUnreadMessages ?? false);
         setLoadError(null);
+        noteHostReplies(next);
       } catch (err) {
         if ((err as { name?: string })?.name === "AbortError") return;
         console.error("Failed to load guest message thread:", err);
@@ -55,7 +92,7 @@ export default function GuestMessageThread({ bookingId, token }: { bookingId: nu
         setLoading(false);
       }
     },
-    [bookingId, token],
+    [bookingId, token, noteHostReplies],
   );
 
   useEffect(() => {
@@ -69,8 +106,17 @@ export default function GuestMessageThread({ bookingId, token }: { bookingId: nu
   }, [load]);
 
   useEffect(() => {
+    const fromOwnSend = pendingGuestSendRef.current;
+    pendingGuestSendRef.current = false;
+    if (!fromOwnSend && (isComposingRef.current || !stickToBottomRef.current)) return;
     threadEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
+
+  const handleThreadScroll = () => {
+    const el = listRef.current;
+    if (!el) return;
+    stickToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight <= NEAR_BOTTOM_PX;
+  };
 
   const handleSend = async () => {
     const trimmed = draft.trim();
@@ -79,6 +125,8 @@ export default function GuestMessageThread({ bookingId, token }: { bookingId: nu
     setSendError(null);
     try {
       const sent = await sendGuestMessage(bookingId, token, trimmed);
+      pendingGuestSendRef.current = true;
+      stickToBottomRef.current = true;
       setMessages((prev) => [...prev, sent]);
       setDraft("");
     } catch (err) {
@@ -91,6 +139,16 @@ export default function GuestMessageThread({ bookingId, token }: { bookingId: nu
 
   return (
     <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3" data-testid="guest-message-thread">
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        aria-label="Host reply announcements"
+        className="sr-only"
+        data-testid="guest-messages-live-region"
+      >
+        {liveAnnouncement}
+      </div>
       <div className="flex items-center gap-2">
         <h2 className="text-sm font-semibold text-text-primary">Messages</h2>
         {hasUnreadMessages && (
@@ -111,7 +169,12 @@ export default function GuestMessageThread({ bookingId, token }: { bookingId: nu
           No messages yet. Send your host a question below.
         </p>
       ) : (
-        <div className="max-h-80 overflow-y-auto space-y-2 pr-1" data-testid="guest-messages-list">
+        <div
+          ref={listRef}
+          className="max-h-80 overflow-y-auto space-y-2 pr-1"
+          data-testid="guest-messages-list"
+          onScroll={handleThreadScroll}
+        >
           {messages.map((m) => {
             const isGuest = m.sender === "Guest";
             return (
@@ -146,8 +209,15 @@ export default function GuestMessageThread({ bookingId, token }: { bookingId: nu
 
       <div className="flex gap-2">
         <textarea
+          ref={textareaRef}
           value={draft}
           onChange={(e) => setDraft(e.target.value.slice(0, MAX_MESSAGE_LENGTH))}
+          onFocus={() => {
+            isComposingRef.current = true;
+          }}
+          onBlur={() => {
+            isComposingRef.current = false;
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
