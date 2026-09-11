@@ -16,6 +16,8 @@ import { enrichMarketplaceCoverItems } from '@/utils/marketplaceListingCover';
 import ReviewSummary from '@/components/ReviewSummary'; // TASK-4511
 import OwnerShareBadge from '@/components/OwnerShareBadge'; // TASK-4511
 import { hasOnlinePaymentRail } from '@/tenant/paymentRail';
+import { getPublicSiteOrigin } from '@/config/siteOrigin';
+import { MARKETPLACE_BRAND_BASELINE } from '@/tenant/displayBrand';
 
 // TL-PROP: shape from GET /marketplace/properties (powers the map view).
 type MarketplacePropertyApi = {
@@ -261,10 +263,15 @@ export default function MarketplaceHomepage() {
 
   return (
     <section className="mx-auto w-full max-w-6xl px-4 py-8" data-testid="marketplace-homepage">
-      {/* TASK-1876: SEO meta for marketplace homepage */}
+      {/* TASK-1876: SEO meta for marketplace homepage.
+          TASK-101960: self-referencing absolute canonical + og:site_name pinned to the
+          shipped brand baseline (MARKETPLACE_BRAND_BASELINE), mirroring Home.tsx's
+          getPublicSiteOrigin() canonical pattern. */}
       <SEO
         title="Atlastays Marketplace — Verified homes & rooms across India"
         description="Discover homes and rooms across verified hosts on Atlastays. Direct booking from the owner."
+        url={`${getPublicSiteOrigin()}/`}
+        siteName={MARKETPLACE_BRAND_BASELINE}
       />
       <h1 className="text-3xl font-bold text-text-primary">Atlastays Marketplace</h1>
       <p className="mt-2 text-text-body">Discover homes and rooms across verified hosts.</p>
