@@ -8,17 +8,24 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import GuestMessageThread from "./GuestMessageThread";
 import {
   fetchGuestMessages,
+  fetchGuestTypingState,
   sendGuestMessage,
+  sendGuestTypingHeartbeat,
   type GuestConversationMessage,
 } from "@/api/guestMessagesClient";
 
 vi.mock("@/api/guestMessagesClient", () => ({
   fetchGuestMessages: vi.fn(),
   sendGuestMessage: vi.fn(),
+  // TASK-101313: typing presence — default to nobody typing so older scenarios are unaffected.
+  fetchGuestTypingState: vi.fn(),
+  sendGuestTypingHeartbeat: vi.fn(),
 }));
 
 const fetchMock = vi.mocked(fetchGuestMessages);
 const sendMock = vi.mocked(sendGuestMessage);
+const typingMock = vi.mocked(fetchGuestTypingState);
+const heartbeatMock = vi.mocked(sendGuestTypingHeartbeat);
 
 function msg(
   id: number,
@@ -53,6 +60,10 @@ describe("GuestMessageThread a11y (TASK-10088)", () => {
     window.HTMLElement.prototype.scrollIntoView = vi.fn();
     fetchMock.mockReset();
     sendMock.mockReset();
+    typingMock.mockReset();
+    heartbeatMock.mockReset();
+    typingMock.mockResolvedValue({ hostTyping: false, guestTyping: false });
+    heartbeatMock.mockResolvedValue({ hostTyping: false, guestTyping: true });
     vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
