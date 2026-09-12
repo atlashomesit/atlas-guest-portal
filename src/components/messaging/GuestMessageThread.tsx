@@ -1,12 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   fetchGuestMessages,
+  fetchGuestTypingState,
   sendGuestMessage,
+  sendGuestTypingHeartbeat,
   type GuestConversationMessage,
 } from "@/api/guestMessagesClient";
 
 /** TASK-4333: polling cadence for the guest message thread (matches admin ConversationsPage.tsx). */
 const POLL_INTERVAL_MS = 30_000;
+/** TASK-101313: short-poll cadence for the "Host typing…" presence indicator. */
+const TYPING_POLL_INTERVAL_MS = 5_000;
+/** TASK-101313: minimum gap between guest typing heartbeats while composing. */
+const HEARTBEAT_THROTTLE_MS = 4_000;
 const MAX_MESSAGE_LENGTH = 2000;
 const NEAR_BOTTOM_PX = 24;
 
@@ -33,6 +39,47 @@ function hostReplyAnnouncement(count: number): string {
 }
 
 /**
+ * TASK-101313: read-receipt tick state for the guest's own messages, derived from the
+ * API's per-message `status` ("pending" | "sent" | "delivered" | "read" | "failed").
+ * Unknown/absent status (older payloads) falls back to "sent" — never blank.
+ */
+type ReceiptState = "read" | "delivered" | "sent" | "failed";
+
+function receiptState(status?: string): ReceiptState {
+  if (status === "read") return "read";
+  if (status === "delivered") return "delivered";
+  if (status === "failed") return "failed";
+  return "sent";
+}
+
+function receiptGlyph(state: ReceiptState): string {
+  switch (state) {
+    case "read":
+    case "delivered":
+      return "✓✓";
+    case "failed":
+      return "!";
+    default:
+      return "✓";
+  }
+}
+
+function receiptClassName(state: ReceiptState): string {
+  // Guest bubbles are brand-primary with white text — read ticks use sky for the
+  // classic "blue double-tick", the rest stay in the white family for contrast.
+  switch (state) {
+    case "read":
+      return "text-sky-300";
+    case "failed":
+      return "text-red-200";
+    case "delivered":
+      return "text-white/80";
+    default:
+      return "text-white/60";
+  }
+}
+
+/**
  * TASK-4333: "Messages" section on the booking confirmation page. Read + reply to the host,
  * reusing the page's existing per-booking `?t=` token. Request/refresh based (no websocket) —
  * polls on a timer like the admin inbox, and re-fetches immediately after a successful send.
@@ -49,6 +96,11 @@ export default function GuestMessageThread({ bookingId, token }: { bookingId: nu
   const [sendError, setSendError] = useState<string | null>(null);
   const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
   const [liveAnnouncement, setLiveAnnouncement] = useState("");
+  /** TASK-101313: null until the first thread fetch resolves a conversation id. */
+  const [conversationId, setConversationId] = useState<number | null>(null);
+  /** TASK-101313: host-side typing presence from the short poll. */
+  const [hostTyping, setHostTyping] = useState(false);
+  const lastHeartbeatRef = useRef(0);
   const threadEndRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -82,6 +134,7 @@ export default function GuestMessageThread({ bookingId, token }: { bookingId: nu
         const next = thread?.messages ?? [];
         setMessages(next);
         setHasUnreadMessages(thread?.hasUnreadMessages ?? false);
+        setConversationId(thread?.conversationId ?? null);
         setLoadError(null);
         noteHostReplies(next);
       } catch (err) {
@@ -105,6 +158,33 @@ export default function GuestMessageThread({ bookingId, token }: { bookingId: nu
     };
   }, [load]);
 
+  /**
+   * TASK-101313: "Host typing…" presence via short poll. Only polls once a
+   * conversation exists (no thread → nobody to type in it). Best-effort: a failed
+   * poll clears to not-typing and never disturbs the message thread.
+   */
+  useEffect(() => {
+    if (conversationId === null) {
+      setHostTyping(false);
+      return;
+    }
+    let cancelled = false;
+    const pollTyping = async () => {
+      try {
+        const state = await fetchGuestTypingState(bookingId, token);
+        if (!cancelled) setHostTyping(state.hostTyping === true);
+      } catch {
+        if (!cancelled) setHostTyping(false);
+      }
+    };
+    void pollTyping();
+    const interval = window.setInterval(() => void pollTyping(), TYPING_POLL_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [bookingId, token, conversationId]);
+
   useEffect(() => {
     const fromOwnSend = pendingGuestSendRef.current;
     pendingGuestSendRef.current = false;
@@ -116,6 +196,20 @@ export default function GuestMessageThread({ bookingId, token }: { bookingId: nu
     const el = listRef.current;
     if (!el) return;
     stickToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight <= NEAR_BOTTOM_PX;
+  };
+
+  /**
+   * TASK-101313: guest typing heartbeat while composing (throttled). Fire-and-forget —
+   * presence is best-effort and must never surface an error for a keystroke.
+   */
+  const handleDraftChange = (value: string) => {
+    const next = value.slice(0, MAX_MESSAGE_LENGTH);
+    setDraft(next);
+    if (!next.trim() || conversationId === null || sending) return;
+    const now = Date.now();
+    if (now - lastHeartbeatRef.current < HEARTBEAT_THROTTLE_MS) return;
+    lastHeartbeatRef.current = now;
+    void sendGuestTypingHeartbeat(bookingId, token).catch(() => {});
   };
 
   const handleSend = async () => {
@@ -157,6 +251,21 @@ export default function GuestMessageThread({ bookingId, token }: { bookingId: nu
             New reply
           </span>
         )}
+        {hostTyping && (
+          <span
+            className="inline-flex items-center gap-1 text-xs px-2 py-0.5 text-text-secondary"
+            data-testid="host-typing-indicator"
+            role="status"
+            aria-label="Host is typing"
+          >
+            <span className="flex gap-0.5" aria-hidden="true">
+              <span className="w-1 h-1 bg-current rounded-full animate-bounce" />
+              <span className="w-1 h-1 bg-current rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+              <span className="w-1 h-1 bg-current rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+            </span>
+            Host typing…
+          </span>
+        )}
       </div>
       <p className="text-sm text-text-secondary">Ask your host a question or read past replies.</p>
 
@@ -177,6 +286,7 @@ export default function GuestMessageThread({ bookingId, token }: { bookingId: nu
         >
           {messages.map((m) => {
             const isGuest = m.sender === "Guest";
+            const receipt = receiptState(m.status);
             return (
               <div
                 key={m.id}
@@ -192,6 +302,17 @@ export default function GuestMessageThread({ bookingId, token }: { bookingId: nu
                   <p className="whitespace-pre-wrap break-words">{m.body}</p>
                   <p className={`mt-1 text-[11px] ${isGuest ? "text-white/75" : "text-text-secondary"}`}>
                     {isGuest ? "You" : "Host"} · {formatTime(m.sentAtUtc)}
+                    {isGuest && (
+                      <span
+                        data-testid="guest-message-ticks"
+                        data-state={receipt}
+                        role="img"
+                        aria-label={`Message ${receipt}`}
+                        className={`ml-1 ${receiptClassName(receipt)}`}
+                      >
+                        {receiptGlyph(receipt)}
+                      </span>
+                    )}
                   </p>
                 </div>
               </div>
@@ -211,7 +332,7 @@ export default function GuestMessageThread({ bookingId, token }: { bookingId: nu
         <textarea
           ref={textareaRef}
           value={draft}
-          onChange={(e) => setDraft(e.target.value.slice(0, MAX_MESSAGE_LENGTH))}
+          onChange={(e) => handleDraftChange(e.target.value)}
           onFocus={() => {
             isComposingRef.current = true;
           }}
