@@ -1751,8 +1751,6 @@ useEffect(() => {
               {/* Hero cell — TASK-8216: real <img> via /img transform, eager hero */}
               <div
                 className={`pp-cell pp-cell-hero${galleryUrls[0] ? ' pp-cell--photo' : ''}`}
-                role="img"
-                aria-label={`${data.property_name} — ${galleryUrls[0] ? 'main photo' : 'photo coming soon'}`}
               >
                 {galleryUrls[0] ? (
                   <a href={galleryUrls[0]} data-fancybox="property-gallery" data-caption={`${data.property_name} — main photo`} style={{ display: 'block', width: '100%', height: '100%' }}>
