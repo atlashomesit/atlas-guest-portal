@@ -217,12 +217,16 @@ describe('EmbedPage state semantics', () => {
     stubEmbedFetch(async () => { availabilityCalls += 1; throw new TypeError('Failed to fetch'); });
 
     renderEmbed('/embed/demo');
-    const cta = await screen.findByRole('button', { name: 'Retry availability check' });
+    // Gate-load note (measured 2026-09-13): this passes standalone and file-local but failed
+    // inside the release gate's STEP 1 window, where dotnet build + two portal suites share the
+    // box and the default 1s findBy timeout can expire before the rejection flushes through.
+    // Same assertion, explicit budget -- the behaviour under test is unchanged.
+    const cta = await screen.findByRole('button', { name: 'Retry availability check' }, { timeout: 5000 });
     expect(cta).not.toBeDisabled();
     expect(availabilityCalls).toBe(1);
 
     fireEvent.click(cta);
-    await waitFor(() => expect(availabilityCalls).toBe(2));
+    await waitFor(() => expect(availabilityCalls).toBe(2), { timeout: 5000 });
   });
 
   it('exposes accessible names for date, guest and contact controls', async () => {
