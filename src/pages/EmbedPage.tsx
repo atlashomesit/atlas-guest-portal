@@ -33,8 +33,9 @@ type EmbedConfig = {
   brandColor?: string | null;
   tagline?: string | null;
   isLiveEligible: boolean;
-  websiteState: string;
-  blocker?: string | null;
+  // TASK-101487: no websiteState/blocker. The public config is [AllowAnonymous] and deliberately
+  // never sends subscription diagnostics (PublicEmbedConfigNoBillingLeakTests); only the boolean
+  // eligibility crosses this boundary.
   publishedListingsCount: number;
   listings: EmbedListingSummary[];
 };
@@ -157,8 +158,6 @@ function normalizeConfig(raw: Record<string, unknown>): EmbedConfig {
     brandColor: (g('brandColor', 'BrandColor') as string) ?? null,
     tagline: (g('tagline', 'Tagline') as string) ?? null,
     isLiveEligible: Boolean(g('isLiveEligible', 'IsLiveEligible')),
-    websiteState: String(g('websiteState', 'WebsiteState') ?? 'Unknown'),
-    blocker: (g('blocker', 'Blocker') as string) ?? null,
     publishedListingsCount: Number(g('publishedListingsCount', 'PublishedListingsCount') ?? 0),
     listings: listingsRaw.map((r) => ({
       id: Number(r.id ?? r.Id),
@@ -859,7 +858,6 @@ export default function EmbedPage() {
         <p className="mt-2 text-text-secondary">
           This property is not currently taking bookings. Please contact the host directly.
         </p>
-        <p data-testid="embed-blocker" style={{ display: 'none' }}>{config.blocker ?? config.websiteState}</p>
       </div>
     );
   }

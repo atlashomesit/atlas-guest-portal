@@ -69,6 +69,7 @@ import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
 import SkeletonCard from '@/components/apartments/SkeletonCard';
 import PropertyMobileStickyBar from '@/components/property/PropertyMobileStickyBar';
 import HostAboutNote from '@/components/property/HostAboutNote';
+import AccessibilitySection from '@/components/accessibility/AccessibilitySection'; // TASK-10086
 import type { BookingStickySummary } from '@/components/availability/UnitBookingWidget';
 
 const UnitBookingWidget = lazy(() => import('@/components/availability/UnitBookingWidget'));
@@ -2135,6 +2136,16 @@ useEffect(() => {
                   )}
                 </section>
                 )}
+
+                {/* TASK-10086: honest accessibility disclosure — declared features only,
+                    "Not specified — ask host" when absent; no badge, claim, or inference. */}
+                <AccessibilitySection
+                  codes={
+                    data.amenityCodes && data.amenityCodes.length > 0
+                      ? data.amenityCodes
+                      : (data.property_amenities ?? []).map((a) => a?.amenities_icon ?? '')
+                  }
+                />
 
                 {/* Guest Reviews */}
                 {(() => {

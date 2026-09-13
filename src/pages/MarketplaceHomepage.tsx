@@ -16,6 +16,8 @@ import { enrichMarketplaceCoverItems } from '@/utils/marketplaceListingCover';
 import ReviewSummary from '@/components/ReviewSummary'; // TASK-4511
 import OwnerShareBadge from '@/components/OwnerShareBadge'; // TASK-4511
 import { hasOnlinePaymentRail } from '@/tenant/paymentRail';
+import { getPublicSiteOrigin } from '@/config/siteOrigin';
+import { MARKETPLACE_BRAND_BASELINE } from '@/tenant/displayBrand';
 
 // TL-PROP: shape from GET /marketplace/properties (powers the map view).
 type MarketplacePropertyApi = {
@@ -46,11 +48,29 @@ type MarketplaceItem = {
   // TASK-4511: Trust signals
   hasVerifiedPhotos?: boolean;
   isGstRegistered?: boolean;
+  // TASK-10089: source-aware review provenance from GET /marketplace/listings.
+  // verifiedStayCount = native completed stays verified by Atlas (only these may
+  // render "verified"); externalReviewCount = imported feedback (Google etc.).
+  verifiedStayCount?: number | null;
+  externalReviewCount?: number | null;
 };
 
 function marketplaceListingPath(item: Pick<MarketplaceItem, 'id' | 'title' | 'tenantSlug'>): string {
   const propertySlug = getPropertySlug({ property_name: item.title });
   return `${buildHomeUnitPath(propertySlug, item.id)}?tenant=${encodeURIComponent(item.tenantSlug)}`;
+}
+
+// TASK-10089: source-aware provenance labels. "Verified" applies ONLY to completed
+// stays verified by Atlas; imported feedback is labelled by its source. Zero/absent
+// counts render nothing — never "0 verified stays", never a fabricated claim.
+export function formatVerifiedStaysLabel(count?: number | null): string | null {
+  if (count == null || count <= 0) return null;
+  return count === 1 ? '1 verified stay' : `${count} verified stays`;
+}
+
+export function formatExternalReviewsLabel(count?: number | null): string | null {
+  if (count == null || count <= 0) return null;
+  return count === 1 ? '1 Google review' : `${count} Google reviews`;
 }
 
 type ApiResponse = { items: MarketplaceItem[]; total: number; page: number; pageSize: number };
@@ -261,10 +281,15 @@ export default function MarketplaceHomepage() {
 
   return (
     <section className="mx-auto w-full max-w-6xl px-4 py-8" data-testid="marketplace-homepage">
-      {/* TASK-1876: SEO meta for marketplace homepage */}
+      {/* TASK-1876: SEO meta for marketplace homepage.
+          TASK-101960: self-referencing absolute canonical + og:site_name pinned to the
+          shipped brand baseline (MARKETPLACE_BRAND_BASELINE), mirroring Home.tsx's
+          getPublicSiteOrigin() canonical pattern. */}
       <SEO
         title="Atlastays Marketplace — Verified homes & rooms across India"
         description="Discover homes and rooms across verified hosts on Atlastays. Direct booking from the owner."
+        url={`${getPublicSiteOrigin()}/`}
+        siteName={MARKETPLACE_BRAND_BASELINE}
       />
       <h1 className="text-3xl font-bold text-text-primary">Atlastays Marketplace</h1>
       <p className="mt-2 text-text-body">Discover homes and rooms across verified hosts.</p>
@@ -455,8 +480,30 @@ export default function MarketplaceHomepage() {
                     </p>
                   )}
 
-                  {/* TASK-4511: keyword-bucketed sentiment chip — matches SearchPage.tsx card treatment */}
-                  <ReviewSummary listingId={item.id} />
+                  {/* TASK-10089: review provenance — verified stays and Google reviews are
+                      distinct labels from distinct counts. External-only cards (no
+                      verifiedStayCount) never claim a verified stay. */}
+                  {(() => {
+                    const verifiedLabel = formatVerifiedStaysLabel(item.verifiedStayCount);
+                    const externalLabel = formatExternalReviewsLabel(item.externalReviewCount);
+                    if (!verifiedLabel && !externalLabel) return null;
+                    return (
+                      <p className="text-xs text-text-muted" data-testid="marketplace-review-provenance">
+                        {verifiedLabel && (
+                          <span data-testid="marketplace-verified-stays">{verifiedLabel}</span>
+                        )}
+                        {verifiedLabel && externalLabel && <span aria-hidden> · </span>}
+                        {externalLabel && (
+                          <span data-testid="marketplace-external-reviews">{externalLabel}</span>
+                        )}
+                      </p>
+                    );
+                  })()}
+
+                  {/* TASK-4511: keyword-bucketed sentiment chip — matches SearchPage.tsx card treatment.
+                      TASK-10089: gated on provenance agreement — the chip (native reviews only)
+                      renders only when the summary's verified-stay count agrees with the card. */}
+                  <ReviewSummary listingId={item.id} verifiedStayCount={item.verifiedStayCount} />
 
                   {/* TASK-1872: formatCurrency replaces raw 'INR X' */}
                   <p className="text-xl font-bold text-text-primary">

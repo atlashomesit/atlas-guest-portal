@@ -1,6 +1,10 @@
 /**
  * TASK-1480: Conversion funnel event tracking.
  * Posts events to /api/funnel-events (anonymous, fire-and-forget).
+ *
+ * TASK-10087: fixed anonymous vocabulary for terminal checkout outcomes. Payloads
+ * carry session/listing identifiers only — never guest PII, payment/order IDs,
+ * amounts, provider data, or free-text failure reasons.
  */
 
 import { buildApiUrl, getApiHeaders } from '../api/client';
@@ -15,6 +19,22 @@ function getSessionId(): string {
   }
   return sid;
 }
+
+/**
+ * TASK-10087: fixed anonymous vocabulary for terminal checkout outcomes. Each
+ * checkout attempt emits at most one of these; the wire values must match
+ * FunnelEventsController.TerminalCheckoutOutcomeEvents server-side.
+ */
+export const TerminalCheckoutOutcomeEvents = {
+  PaymentModalDismissed: 'payment_modal_dismissed',
+  PaymentFailed: 'payment_failed',
+  HoldExpiredDuringPayment: 'hold_expired_during_payment',
+  ChargedUnconfirmed: 'charged_unconfirmed',
+  PaymentConfirmed: 'payment_confirmed',
+} as const;
+
+export type TerminalCheckoutOutcome =
+  (typeof TerminalCheckoutOutcomeEvents)[keyof typeof TerminalCheckoutOutcomeEvents];
 
 export function track(eventName: string, listingId?: number): void {
   try {
