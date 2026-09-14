@@ -30,6 +30,13 @@ describe("listingDisplayName white-label (TASK-7194)", () => {
   it("does not remap Atlas SKUs on white-label tenants", () => {
     expect(getListingDisplayName(5, "Atlas501_PH")).toBe("Atlas501_PH");
   });
+
+  it("TASK-101640: ignores the API displayName on white-label tenants (keeps own raw name)", () => {
+    expect(getListingDisplayName(5, "Atlas501_PH", "Penthouse 501")).toBe("Atlas501_PH");
+    expect(getListingDisplayName(501, "Oakmont 2bhk - 501", "Penthouse 501")).toBe(
+      "Oakmont 2bhk - 501",
+    );
+  });
 });
 
 describe("listingDisplayName atlas marketplace", () => {

@@ -757,6 +757,9 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     const trackOpen = openCalendarRef.current && hasRangeRef.current;
     if (trackOpen) beginCalendarOpenPricingFetch(gen);
     setCalendarPricingLoading(true);
+    // TASK-101920: clear error flag when starting a new fetch so transient failures don't
+    // permanently disable the button. We'll re-set it only if this specific fetch fails.
+    setCalendarPricingFailed(false);
     fetchCalendarPricing(listingId, shownMonthIso, 3, controller.signal)
       .then((result) => {
         setCalendarDailyPrices((prev) => new Map([...prev, ...result.dateToPrice]));
@@ -840,6 +843,9 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     if (selectedRangeNightsPriced) return; // already covered by a prior fetch
     if (selectedStartMonthIso === shownMonthIso) return; // covered by the mount/month effect above
     const controller = new AbortController();
+    // TASK-101920: clear error flag when starting a new fetch so transient failures don't
+    // permanently disable the button. We'll re-set it only if this specific fetch fails.
+    setCalendarPricingFailed(false);
     fetchCalendarPricing(listingId, selectedStartMonthIso, 3, controller.signal)
       .then((result) => {
         setCalendarDailyPrices((prev) => new Map([...prev, ...result.dateToPrice]));

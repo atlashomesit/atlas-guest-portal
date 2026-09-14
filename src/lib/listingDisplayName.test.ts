@@ -63,4 +63,23 @@ describe('getListingDisplayName — TASK-2635 stability + cross-tenant safety', 
   it('falls back to the raw name for unknown listings', () => {
     expect(getListingDisplayName(9999, 'Garden Cottage')).toBe('Garden Cottage');
   });
+
+  describe('TASK-101640 — API-supplied displayName', () => {
+    it('prefers the API displayName for a listing outside the hardcoded map', () => {
+      // The gap: id 9999 / SKU Atlas601 is in no map — the guest used to see the raw SKU.
+      expect(getListingDisplayName(9999, 'Atlas601', 'Lake View 601')).toBe('Lake View 601');
+    });
+
+    it('lets the API rename even a mapped unit without a portal change', () => {
+      expect(getListingDisplayName(501, 'Atlas501_PH', 'Skyline Penthouse')).toBe(
+        'Skyline Penthouse',
+      );
+    });
+
+    it('falls back to the legacy map when the API value is blank', () => {
+      expect(getListingDisplayName(5, 'Atlas501_PH', '   ')).toBe('Penthouse 501');
+      expect(getListingDisplayName(5, 'Atlas501_PH', undefined)).toBe('Penthouse 501');
+      expect(getListingDisplayName(5, 'Atlas501_PH', null)).toBe('Penthouse 501');
+    });
+  });
 });

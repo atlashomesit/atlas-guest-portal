@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { FaHeart, FaRegHeart } from 'react-icons/fa';
 import { buildApiUrl } from '@/api/client';
@@ -16,6 +16,8 @@ import { enrichMarketplaceCoverItems } from '@/utils/marketplaceListingCover';
 import ReviewSummary from '@/components/ReviewSummary'; // TASK-4511
 import OwnerShareBadge from '@/components/OwnerShareBadge'; // TASK-4511
 import { hasOnlinePaymentRail } from '@/tenant/paymentRail';
+import { getPublicSiteOrigin } from '@/config/siteOrigin';
+import { MARKETPLACE_BRAND_BASELINE } from '@/tenant/displayBrand';
 
 // TL-PROP: shape from GET /marketplace/properties (powers the map view).
 type MarketplacePropertyApi = {
@@ -46,11 +48,29 @@ type MarketplaceItem = {
   // TASK-4511: Trust signals
   hasVerifiedPhotos?: boolean;
   isGstRegistered?: boolean;
+  // TASK-10089: source-aware review provenance from GET /marketplace/listings.
+  // verifiedStayCount = native completed stays verified by Atlas (only these may
+  // render "verified"); externalReviewCount = imported feedback (Google etc.).
+  verifiedStayCount?: number | null;
+  externalReviewCount?: number | null;
 };
 
 function marketplaceListingPath(item: Pick<MarketplaceItem, 'id' | 'title' | 'tenantSlug'>): string {
   const propertySlug = getPropertySlug({ property_name: item.title });
   return `${buildHomeUnitPath(propertySlug, item.id)}?tenant=${encodeURIComponent(item.tenantSlug)}`;
+}
+
+// TASK-10089: source-aware provenance labels. "Verified" applies ONLY to completed
+// stays verified by Atlas; imported feedback is labelled by its source. Zero/absent
+// counts render nothing — never "0 verified stays", never a fabricated claim.
+export function formatVerifiedStaysLabel(count?: number | null): string | null {
+  if (count == null || count <= 0) return null;
+  return count === 1 ? '1 verified stay' : `${count} verified stays`;
+}
+
+export function formatExternalReviewsLabel(count?: number | null): string | null {
+  if (count == null || count <= 0) return null;
+  return count === 1 ? '1 Google review' : `${count} Google reviews`;
 }
 
 type ApiResponse = { items: MarketplaceItem[]; total: number; page: number; pageSize: number };
@@ -118,6 +138,14 @@ export default function MarketplaceHomepage() {
     [filterQuery],
   );
 
+  // TASK-101875: generation token for the "Show more homes" race. The page-1 effect above
+  // already guards with `cancelled`, but `loadMore` had none — a filter change while page N+1
+  // was in flight let the stale response append old-filter listings and rewind `page`.
+  const activeFilterRef = useRef(filterQuery);
+  useEffect(() => {
+    activeFilterRef.current = filterQuery;
+  }, [filterQuery]);
+
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -156,11 +184,17 @@ export default function MarketplaceHomepage() {
   const loadMore = useCallback(() => {
     if (loadingMore || !hasMore) return;
     const next = page + 1;
+    const requestFilter = filterQuery;
     setLoadingMore(true);
     fetch(buildApiUrl(buildPagePath(next)))
       .then(async (r) => (r.ok ? ((await r.json()) as ApiResponse) : null))
       .then(async (data) => {
         if (!data) return;
+        // TASK-101875: discard a stale next-page response when the filter changed while it
+        // was in flight. The page-1 effect has already reset items/page/total for the new
+        // filter, so appending here would mix old-filter listings into the fresh grid and
+        // desynchronise `page` for the next request.
+        if (activeFilterRef.current !== requestFilter) return;
         const enriched = await enrichMarketplaceCoverItems(data.items ?? []);
         const seen = new Set(items.map((i) => i.id));
         const fresh = enriched.filter((i) => !seen.has(i.id));
@@ -178,7 +212,7 @@ export default function MarketplaceHomepage() {
         /* keep what is already rendered; the control stays available for a retry */
       })
       .finally(() => setLoadingMore(false));
-  }, [buildPagePath, hasMore, items, loadingMore, page]);
+  }, [buildPagePath, filterQuery, hasMore, items, loadingMore, page]);
 
   // TASK-4413: client-side price filter over the fetched grid, mirroring SearchPage.tsx's
   // minPrice/maxPrice behavior. Applying a price filter does not touch `category` state, so
@@ -247,10 +281,15 @@ export default function MarketplaceHomepage() {
 
   return (
     <section className="mx-auto w-full max-w-6xl px-4 py-8" data-testid="marketplace-homepage">
-      {/* TASK-1876: SEO meta for marketplace homepage */}
+      {/* TASK-1876: SEO meta for marketplace homepage.
+          TASK-101960: self-referencing absolute canonical + og:site_name pinned to the
+          shipped brand baseline (MARKETPLACE_BRAND_BASELINE), mirroring Home.tsx's
+          getPublicSiteOrigin() canonical pattern. */}
       <SEO
         title="Atlastays Marketplace — Verified homes & rooms across India"
         description="Discover homes and rooms across verified hosts on Atlastays. Direct booking from the owner."
+        url={`${getPublicSiteOrigin()}/`}
+        siteName={MARKETPLACE_BRAND_BASELINE}
       />
       <h1 className="text-3xl font-bold text-text-primary">Atlastays Marketplace</h1>
       <p className="mt-2 text-text-body">Discover homes and rooms across verified hosts.</p>
@@ -441,8 +480,30 @@ export default function MarketplaceHomepage() {
                     </p>
                   )}
 
-                  {/* TASK-4511: keyword-bucketed sentiment chip — matches SearchPage.tsx card treatment */}
-                  <ReviewSummary listingId={item.id} />
+                  {/* TASK-10089: review provenance — verified stays and Google reviews are
+                      distinct labels from distinct counts. External-only cards (no
+                      verifiedStayCount) never claim a verified stay. */}
+                  {(() => {
+                    const verifiedLabel = formatVerifiedStaysLabel(item.verifiedStayCount);
+                    const externalLabel = formatExternalReviewsLabel(item.externalReviewCount);
+                    if (!verifiedLabel && !externalLabel) return null;
+                    return (
+                      <p className="text-xs text-text-muted" data-testid="marketplace-review-provenance">
+                        {verifiedLabel && (
+                          <span data-testid="marketplace-verified-stays">{verifiedLabel}</span>
+                        )}
+                        {verifiedLabel && externalLabel && <span aria-hidden> · </span>}
+                        {externalLabel && (
+                          <span data-testid="marketplace-external-reviews">{externalLabel}</span>
+                        )}
+                      </p>
+                    );
+                  })()}
+
+                  {/* TASK-4511: keyword-bucketed sentiment chip — matches SearchPage.tsx card treatment.
+                      TASK-10089: gated on provenance agreement — the chip (native reviews only)
+                      renders only when the summary's verified-stay count agrees with the card. */}
+                  <ReviewSummary listingId={item.id} verifiedStayCount={item.verifiedStayCount} />
 
                   {/* TASK-1872: formatCurrency replaces raw 'INR X' */}
                   <p className="text-xl font-bold text-text-primary">

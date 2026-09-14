@@ -51,6 +51,26 @@ describe("listingClient", () => {
     }
   });
 
+  it("TASK-101640: fetchPublicListings threads displayName through normalize", async () => {
+    invalidatePublicListingsCache();
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => [
+        { id: 601, name: "Atlas601", displayName: "Lake View 601", maxGuests: 2 },
+        { id: 501, name: "Atlas501_PH", maxGuests: 4 },
+      ],
+    });
+
+    try {
+      const rows = await fetchPublicListings();
+      expect(rows).toHaveLength(2);
+      expect(rows[0].displayName).toBe("Lake View 601");
+      expect(rows[1].displayName).toBeUndefined();
+    } finally {
+      invalidatePublicListingsCache();
+    }
+  });
+
   it("TASK-7824: concurrent fetchListingById(2) share one network GET", async () => {
     fetchMock.mockResolvedValue({
       ok: true,

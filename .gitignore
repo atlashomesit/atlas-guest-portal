@@ -25,6 +25,11 @@ eslint-violations.json
 # Wrangler local state/cache (regenerated locally; never commit)
 .wrangler/
 
+# Wrangler local secrets for `wrangler dev` (e.g. ATLAS_WORKER_PROXY_SECRET, TASK-7207).
+# Real values live in `wrangler secret put` / Pages env vars — never commit them.
+.dev.vars
+.dev.vars.*
+
 # Claude Design handoff bundles — scratch inbox, not source
 Claude Design Patches/
 

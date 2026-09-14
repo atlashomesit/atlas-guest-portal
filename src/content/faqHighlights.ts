@@ -10,6 +10,16 @@ export type FaqHighlight = {
   answer: string;
 };
 
+/**
+ * TASK-101710: white-label tenants have no owner number (formatDisplayNumber
+ * returns "" when the resolved phone is empty) — omit the escalation clause
+ * instead of rendering "the owner line is .".
+ */
+function buildSupportAnswer(businessPhone: string, ownerPhone: string): string {
+  const base = `Message us on WhatsApp at ${businessPhone} or call the same number for quick help.`;
+  return ownerPhone.trim() ? `${base} For escalations, the owner line is ${ownerPhone}.` : base;
+}
+
 function genericWhiteLabelFaq(businessPhone: string, ownerPhone: string): FaqHighlight[] {
   return [
     {
@@ -45,8 +55,7 @@ function genericWhiteLabelFaq(businessPhone: string, ownerPhone: string): FaqHig
     {
       id: "support-contact",
       question: "How do I reach support during my stay?",
-      answer:
-        `Message us on WhatsApp at ${businessPhone} or call the same number for quick help. For escalations, the owner line is ${ownerPhone}.`,
+      answer: buildSupportAnswer(businessPhone, ownerPhone),
     },
   ];
 }
@@ -111,8 +120,7 @@ export function getFaqHighlights(): FaqHighlight[] {
     {
       id: "support-contact",
       question: "How do I reach support during my stay?",
-      answer:
-        `Message us on WhatsApp at ${businessPhone} or call the same number for quick help. For escalations, the owner line is ${ownerPhone}.`,
+      answer: buildSupportAnswer(businessPhone, ownerPhone),
     },
   ];
 }

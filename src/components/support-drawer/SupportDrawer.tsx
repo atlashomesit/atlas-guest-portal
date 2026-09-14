@@ -53,6 +53,10 @@ const SupportDrawer = ({
   trustMicrocopy,
 }: SupportDrawerProps) => {
   const drawerRef = useRef<HTMLDivElement>(null);
+  // TASK-101880: stable close ref so the mount-only a11y effect never re-captures
+  // the trigger element or steals focus on re-renders (onClose identity changes).
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   const {
     enableClickOutsideToClose,
     enableCompactDrawer,
@@ -124,10 +128,44 @@ const SupportDrawer = ({
     };
   }, [enableClickOutsideToClose, onClose]);
 
+  // TASK-101880 (WCAG 2.1 4.1.2 Name, Role, Value / 2.4.3 Focus Order):
+  // dialog semantics + focus-in on mount + Escape to close + focus restore.
+  // Mirrors atlas-pms-landing ChatPanel (TASK-10181).
+  useEffect(() => {
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    drawerRef.current?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onCloseRef.current();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      // Best-effort restore for hosts that keep the trigger mounted. The
+      // floating trigger itself unmounts while the drawer is open (SupportWidget
+      // renders it only when closed), so that case is handled by SupportWidget's
+      // close-transition effect which focuses the remounted trigger.
+      if (previouslyFocused && previouslyFocused.isConnected) {
+        previouslyFocused.focus();
+      }
+    };
+  }, []);
+
   return (
     <SupportDrawerViewContext.Provider value={viewContextValue}>
       <div
         ref={drawerRef}
+        role="dialog"
+        // TASK-101880: deliberately non-modal. The overlay was removed under
+        // TASK-2647 (it blocked the booking widget), the page stays interactive
+        // behind the drawer and there is no focus trap — so aria-modal="true"
+        // would misreport the semantics to assistive tech.
+        aria-modal="false"
+        aria-label={SUPPORT_DRAWER_COPY.header.title}
+        tabIndex={-1}
         className={`fixed right-3 z-[var(--z-floating)] ${widthClass} flex flex-col overflow-hidden rounded-3xl border border-[color-mix(in_srgb,var(--border-subtle)_80%,transparent)] bg-[color-mix(in_srgb,var(--bg-surface)_97%,#f7f4ed_8%)] text-text-primary shadow-level4 ring-1 ring-border-subtle backdrop-blur md:right-5 ${
           resolvedLayoutVariant === "compactDrawer" ? "max-h-[65vh]" : ""
         }`}

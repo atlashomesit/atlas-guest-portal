@@ -23,6 +23,13 @@ interface SEOProps {
   image?: string;
   url?: string;
   type?: string;
+  /**
+   * TASK-101960: value for `<meta property="og:site_name">` (e.g. the marketplace
+   * brand baseline). When set, the tag is created/updated; when undefined any tag
+   * this component previously managed is removed so a prior route's brand never
+   * persists after client-side navigation to a page that does not pass `siteName`.
+   */
+  siteName?: string;
   twitterCard?: "summary" | "summary_large_image" | "app" | "player";
   twitterSite?: string;
   twitterCreator?: string;
@@ -41,6 +48,7 @@ const SEO = ({
   image,
   url,
   type = "website",
+  siteName,
   twitterCard,
   twitterSite,
   twitterCreator,
@@ -101,6 +109,22 @@ const SEO = ({
 
     const ogType = ensureMeta("og:type", "property");
     ogType.content = type;
+
+    // TASK-101960: marketplace home pins og:site_name to the shipped brand baseline.
+    const trimmedSiteName = siteName?.trim();
+    const existingSiteName = document.head.querySelector(
+      "meta[property='og:site_name']",
+    ) as HTMLMetaElement | null;
+    if (trimmedSiteName) {
+      const siteNameMeta = existingSiteName ?? document.createElement("meta");
+      siteNameMeta.setAttribute("property", "og:site_name");
+      siteNameMeta.content = trimmedSiteName;
+      if (!existingSiteName) {
+        document.head.appendChild(siteNameMeta);
+      }
+    } else if (existingSiteName) {
+      existingSiteName.remove();
+    }
 
     const resolvedTwitterCard = twitterCard ?? (image ? "summary_large_image" : "summary");
     const twitterCardMeta = ensureMeta("twitter:card");
@@ -169,6 +193,7 @@ const SEO = ({
     image,
     url,
     type,
+    siteName,
     twitterCard,
     twitterSite,
     twitterCreator,

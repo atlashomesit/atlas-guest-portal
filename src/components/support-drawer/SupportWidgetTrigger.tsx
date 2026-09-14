@@ -1,3 +1,4 @@
+import { Ref } from "react";
 import { FiMessageCircle } from "react-icons/fi";
 
 import { SUPPORT_DRAWER_COPY } from "../../config/supportDrawerCopy";
@@ -5,11 +6,13 @@ import { SUPPORT_DRAWER_COPY } from "../../config/supportDrawerCopy";
 interface SupportWidgetTriggerProps {
   bottomSpacing: string;
   onOpen: () => void;
+  triggerRef?: Ref<HTMLButtonElement>;
 }
 
-const SupportWidgetTrigger = ({ bottomSpacing, onOpen }: SupportWidgetTriggerProps) => (
+const SupportWidgetTrigger = ({ bottomSpacing, onOpen, triggerRef }: SupportWidgetTriggerProps) => (
   <button
     type="button"
+    ref={triggerRef}
     onClick={onOpen}
     className="fixed right-4 z-[var(--z-floating)] inline-flex items-center gap-3 rounded-full border border-border-subtle bg-[color-mix(in_srgb,var(--bg-surface)_96%,#f3f0ea_10%)] px-4 py-3 text-sm font-semibold text-text-primary shadow-level3 ring-1 ring-border-subtle transition hover:-translate-y-0.5 hover:shadow-level4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary md:right-5"
     style={{ bottom: bottomSpacing }}

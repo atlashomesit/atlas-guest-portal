@@ -131,3 +131,92 @@ describe('TASK-101491 marketplace homepage pagination', () => {
     expect(screen.getByText('2 listings')).toBeInTheDocument();
   });
 });
+
+describe('TASK-101875 stale Show-more response is discarded on filter change', () => {
+  function deferred<T>() {
+    let resolve!: (value: T) => void;
+    const promise = new Promise<T>((res) => {
+      resolve = res;
+    });
+    return { promise, resolve };
+  }
+
+  it('a filter change while loadMore is in flight discards the stale response', async () => {
+    const stalePage2 = deferred<{ items: ReturnType<typeof listing>[]; total: number; page: number; pageSize: number }>();
+    const freshPage1 = deferred<{ items: ReturnType<typeof listing>[]; total: number; page: number; pageSize: number }>();
+    const seenUrls: string[] = [];
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        const u = String(url);
+        if (u.includes('/marketplace/properties')) {
+          return { ok: true, json: async () => [] } as unknown as Response;
+        }
+        seenUrls.push(u);
+        const parsed = new URL(u);
+        const pageNumber = Number(parsed.searchParams.get('page') ?? '1');
+        const category = parsed.searchParams.get('category');
+        if (pageNumber === 1 && !category) {
+          // Initial page-1 for the default filter — resolve immediately so the grid mounts.
+          return { ok: true, json: async () => pageFor(1) } as unknown as Response;
+        }
+        if (pageNumber === 2 && !category) {
+          // Stale next-page fetch started before the filter change — hold it open.
+          const data = await stalePage2.promise;
+          return { ok: true, json: async () => data } as unknown as Response;
+        }
+        if (pageNumber === 1 && category === 'homes') {
+          // Fresh page-1 for the new filter — hold it open so the test controls ordering.
+          const data = await freshPage1.promise;
+          return { ok: true, json: async () => data } as unknown as Response;
+        }
+        return { ok: false, json: async () => null } as unknown as Response;
+      }),
+    );
+
+    renderPage();
+    await waitFor(() => expect(screen.getAllByTestId('marketplace-card')).toHaveLength(20));
+
+    // Start the stale next-page fetch.
+    fireEvent.click(screen.getByTestId('marketplace-load-more'));
+    await waitFor(() =>
+      expect(seenUrls.some((u) => new URL(u).searchParams.get('page') === '2')).toBe(true),
+    );
+
+    // Change the filter while page-2 is still in flight.
+    fireEvent.click(screen.getByTestId('marketplace-filter-homes'));
+    await waitFor(() =>
+      expect(
+        seenUrls.some(
+          (u) =>
+            new URL(u).searchParams.get('page') === '1' &&
+            new URL(u).searchParams.get('category') === 'homes',
+        ),
+      ).toBe(true),
+    );
+
+    // Fresh filter results land first…
+    freshPage1.resolve({
+      items: [listing(101), listing(102)],
+      total: 2,
+      page: 1,
+      pageSize: 20,
+    });
+    await waitFor(() => expect(screen.getByText('Listing 101')).toBeInTheDocument());
+
+    // …then the stale old-filter page-2 lands. Without the TASK-101875 guard it appends
+    // Listing 21..27 onto the fresh grid and rewinds `page`.
+    stalePage2.resolve(pageFor(2));
+    // Give the stale promise a chance to write state if unguarded.
+    await new Promise((r) => setTimeout(r, 100));
+
+    // Only the active filter's results survive and paging tracks the new filter's sequence.
+    expect(screen.getAllByTestId('marketplace-card')).toHaveLength(2);
+    expect(screen.getByText('Listing 101')).toBeInTheDocument();
+    expect(screen.getByText('Listing 102')).toBeInTheDocument();
+    expect(screen.queryByText('Listing 21')).not.toBeInTheDocument();
+    expect(screen.queryByText('Listing 1')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('marketplace-load-more')).not.toBeInTheDocument();
+  });
+});
