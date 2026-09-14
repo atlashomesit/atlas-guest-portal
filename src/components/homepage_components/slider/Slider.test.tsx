@@ -198,6 +198,23 @@ describe("Slider hero search", () => {
     expect(within(trustStrip).queryByText(/48h/i)).toBeNull();
   });
 
+  it("lets laptop guests increment the count while the trust chips are on screen", () => {
+    const { viewportSpy } = _renderSliderAtWidth(1280);
+
+    const trigger = screen.getByTestId("hero-guest-toggle");
+    fireEvent.click(trigger);
+
+    expect(screen.getByTestId("hero-guest-dropdown")).toBeInTheDocument();
+    expect(screen.getByRole("list", { name: /booking guarantees/i })).toBeInTheDocument();
+
+    const before = trigger.textContent ?? "";
+    fireEvent.click(screen.getByRole("button", { name: /increase adults/i }));
+    expect(trigger.textContent).not.toBe(before);
+    expect(trigger.textContent).toMatch(/\d+\s+guests?/i);
+
+    viewportSpy.mockRestore();
+  });
+
   it("does not hardcode Hyderabad/KPHB copy on white-label tenants (TASK-7194)", () => {
     vi.mocked(getTenantContext).mockReturnValue({
       name: "Stay by City Focus",

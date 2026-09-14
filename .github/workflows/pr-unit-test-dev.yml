@@ -1,17 +1,23 @@
-# TASK-7728 option 1 — server-side unit bar on PRs to dev.
+# TASK-7728 option 1 — server-side typecheck on PRs to dev.
 #
 # 2026-08-15 FOUNDER RULING — the TEST SUITE is REMOVED. Do not put `npx vitest`
 # back without a new [FG: spend].
 #
 # TASK-10162 (2026-09-04) — restore + typecheck. A PR to `dev` that does not
-# compile cannot report a green Unit bar. Tests stay the local bar:
+# compile cannot report a green Typecheck. Tests stay the local bar:
 #   pwsh atlas-e2e/scripts/run-unit-bar.ps1 -Repo atlas-guest-portal
 #
-# Job name `Unit bar` is load-bearing (required check, HARD RULE 17).
+# ENG-006 follow-up (2026-09-12) — renamed job `Unit bar` -> `Typecheck`. The job
+# runs `npm ci` + `npm run typecheck` only, so the old name confused it with the
+# LOCAL unit bar (run-unit-bar.ps1: build + vitest), which is NOT renamed. This
+# check is ADVISORY, not required: required_status_checks.checks is [] (verified
+# 2026-09-12; unit bar dropped as a gate 2026-09-09) — the old "required check,
+# HARD RULE 17" claim was stale. Do NOT treat this job name as load-bearing.
 #
 # GHA-COST-APPROVED: 5 (stub baseline, 2026-08-15)
 # GHA-COST-APPROVED: 800 (TASK-10162 — compile, not the suite)
-name: Unit tests (PR to dev)
+# GHA-COST-APPROVED: 0 (ENG-006 rename — removes confusion, adds no runs)
+name: Typecheck (PR to dev)
 
 on:
   pull_request:
@@ -26,8 +32,8 @@ permissions:
   contents: read
 
 jobs:
-  unit-bar:
-    name: Unit bar
+  typecheck:
+    name: Typecheck
     runs-on: ubuntu-latest
     steps:
       - name: What this check enforces

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { matchPath, useLocation } from "react-router-dom";
 
 import { CONTACT } from "../../config/contact";
@@ -46,6 +46,17 @@ const SupportWidgetContent = () => {
   } = useSupportDrawerFlags();
   const [isDismissed, setIsDismissed] = useState(false);
   const [isCallbackExpanded, setIsCallbackExpanded] = useState(() => !enableRevealCallbackOnClickOnly);
+  // TASK-101880: the trigger unmounts while the drawer is open, so the drawer's
+  // own unmount cleanup cannot restore focus to it — focus the remounted
+  // trigger on the open→closed transition instead (WCAG 2.4.3).
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const wasOpenRef = useRef(false);
+  useEffect(() => {
+    if (wasOpenRef.current && !isOpen) {
+      triggerRef.current?.focus();
+    }
+    wasOpenRef.current = isOpen;
+  }, [isOpen]);
   /** Lift floating trigger on `/` so it clears the hero date widget on phones (E2E mobile-viewport). */
   const [narrowViewport, setNarrowViewport] = useState(false);
   const routePath = location?.pathname ?? "";
@@ -248,7 +259,7 @@ const SupportWidgetContent = () => {
 
   return (
     <>
-      {!isOpen ? <SupportWidgetTrigger bottomSpacing={bottomSpacing} onOpen={handleOpen} /> : null}
+      {!isOpen ? <SupportWidgetTrigger bottomSpacing={bottomSpacing} onOpen={handleOpen} triggerRef={triggerRef} /> : null}
 
       {isOpen ? (
         <>

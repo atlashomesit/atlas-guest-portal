@@ -9,6 +9,7 @@ import { clearRecentlyViewed, getRecentlyViewed, isFavorite, toggleFavorite } fr
 import { getTenantBrandName } from "../tenant/displayBrand";
 import { useCurrency } from "../contexts/CurrencyContext";
 import { estimateStayNights, formatEstTotalInclGst } from "../utils/guestPriceEstimate";
+import SavedHomeCover from "../components/SavedHomeCover";
 
 type LiveListingPrice = {
   rate: number;
@@ -130,11 +131,7 @@ export default function RecentlyViewedPage() {
                 >
                   <div className="relative">
                     <Link to={it.path} className="block">
-                      {it.coverPhotoUrl ? (
-                        <img src={it.coverPhotoUrl} alt={it.name ?? "Home"} className="w-full h-40 object-cover" loading="lazy" />
-                      ) : (
-                        <div className="w-full h-40 bg-bg-muted" aria-hidden />
-                      )}
+                      <SavedHomeCover src={it.coverPhotoUrl} alt={it.name ?? "Home"} />
                     </Link>
                     <button
                       type="button"

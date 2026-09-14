@@ -59,6 +59,7 @@ import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
 import SkeletonCard from '../../apartments/SkeletonCard';
 import PropertyMobileStickyBar from '@/components/property/PropertyMobileStickyBar';
 import HostAboutNote from '@/components/property/HostAboutNote';
+import AccessibilitySection from '@/components/accessibility/AccessibilitySection'; // TASK-10086
 import type { BookingStickySummary } from '@/components/availability/UnitBookingWidget';
 
 const UnitBookingWidget = lazy(() => import('../../availability/UnitBookingWidget'));
@@ -1747,12 +1748,15 @@ useEffect(() => {
 
             {/* ---- Gallery mosaic ---- */}
             <div className="pp-gallery" role="region" aria-label="Property photos" data-testid="property-photo-gallery">
-              {/* Hero cell — TASK-8216: real <img> via /img transform, eager hero */}
-              <div
-                className={`pp-cell pp-cell-hero${galleryUrls[0] ? ' pp-cell--photo' : ''}`}
-                role={galleryUrls[0] ? undefined : 'img'}
-                aria-label={galleryUrls[0] ? undefined : `${data.property_name} — photo coming soon`}
-              >
+                {/* Hero cell — TASK-8216: real <img> via /img transform, eager hero.
+                    role/name are conditional on the EMPTY state: with a photo the
+                    Fancybox anchor + <img alt> carry semantics, and role="img" here
+                    would nest an interactive inside img (axe nested-interactive). */}
+                <div
+                  className={`pp-cell pp-cell-hero${galleryUrls[0] ? ' pp-cell--photo' : ''}`}
+                  role={galleryUrls[0] ? undefined : 'img'}
+                  aria-label={galleryUrls[0] ? undefined : `${data.property_name} — photo coming soon`}
+                >
                 {galleryUrls[0] ? (
                   <a href={galleryUrls[0]} data-fancybox="property-gallery" data-caption={`${data.property_name} — main photo`} style={{ display: 'block', width: '100%', height: '100%' }}>
                     <img
@@ -2139,6 +2143,16 @@ useEffect(() => {
                   )}
                 </section>
                 )}
+
+                {/* TASK-10086: honest accessibility disclosure — declared features only,
+                    "Not specified — ask host" when absent; no badge, claim, or inference. */}
+                <AccessibilitySection
+                  codes={
+                    data.amenityCodes && data.amenityCodes.length > 0
+                      ? data.amenityCodes
+                      : (data.property_amenities ?? []).map((a) => a?.amenities_icon ?? '')
+                  }
+                />
 
                 {/* Guest Reviews */}
                 {(() => {

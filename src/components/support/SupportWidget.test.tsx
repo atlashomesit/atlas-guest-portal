@@ -40,4 +40,25 @@ describe("SupportWidget", () => {
     expect(screen.getByRole("button", { name: /chat with us/i })).toBeInTheDocument();
     expect(screen.queryByText(/Request callback/i)).not.toBeInTheDocument();
   });
+
+  it("TASK-101880: drawer exposes dialog semantics, takes focus, Escape closes and restores focus", () => {
+    renderWidget();
+
+    const trigger = screen.getByRole("button", { name: /chat with us/i });
+    // Simulate the real interaction where the trigger holds focus on open,
+    // so focus-restore has a meaningful target (jsdom does not focus on click).
+    trigger.focus();
+    fireEvent.click(trigger);
+
+    const dialog = screen.getByRole("dialog", { name: /need a hand/i });
+    expect(dialog).toHaveAttribute("aria-modal", "false");
+    expect(dialog.contains(document.activeElement)).toBe(true);
+
+    fireEvent.keyDown(dialog, { key: "Escape" });
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    const reopenedTrigger = screen.getByRole("button", { name: /chat with us/i });
+    expect(reopenedTrigger).toBeInTheDocument();
+    expect(document.activeElement).toBe(reopenedTrigger);
+  });
 });

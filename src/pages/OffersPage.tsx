@@ -5,6 +5,7 @@ import { buildApiUrl } from "@/api/client";
 import { normalizePromoCodeInput, normalizePromoCodeSubmit } from "@/utils/promoCodeInput";
 import { useTenantListings, type TenantPropertyRecord } from "@/hooks/useTenantListings";
 import { useAdvertisedPromoActive } from "@/hooks/useAdvertisedPromoActive";
+import { useAbSuggest } from "@/hooks/useAbSuggest";
 import { getTenantBrandName } from "@/tenant/displayBrand";
 
 const DIRECT5_CODE = "DIRECT5";
@@ -57,6 +58,23 @@ export default function OffersPage() {
   const lastMinutePercent = state === "success" ? extractLastMinutePercent(properties) : 0;
   // TASK-8016: never advertise DIRECT5 unless validate confirms it is active.
   const direct5State = useAdvertisedPromoActive(DIRECT5_CODE);
+  // TASK-101733: guest A/B suggestion — ?listingId=&abGroup= (alias groupTag) pulls one
+  // weighted suggestion from GET /api/promo-codes/ab-suggest for that listing's group.
+  // The serve increments AbImpressions server-side; the suggestion only prefills the
+  // checker below — validation and checkout discounts still go through the existing
+  // /validate + order paths, so this never touches pricing math.
+  const abParams = (() => {
+    if (typeof window === "undefined") return { listingId: "", groupTag: "" };
+    const q = new URLSearchParams(window.location.search);
+    return {
+      listingId: (q.get("listingId") ?? "").trim(),
+      groupTag: (q.get("abGroup") ?? q.get("groupTag") ?? "").trim(),
+    };
+  })();
+  const abState = useAbSuggest(
+    abParams.listingId !== "" ? abParams.listingId : null,
+    abParams.groupTag !== "" ? abParams.groupTag : null,
+  );
 
   useEffect(() => {
     setPromoResult(null);
@@ -124,6 +142,40 @@ export default function OffersPage() {
               <span className="text-xs font-normal text-emerald-700">
                 {copied === DIRECT5_CODE ? "Copied!" : "Copy"}
               </span>
+            </button>
+          </div>
+        )}
+
+        {/* TASK-101733: A/B suggested offer — renders only when ab-suggest served a code.
+            Apply prefills the promo checker; the code is still validated on submit. */}
+        {abState.status === "ready" && (
+          <div
+            data-testid="offers-ab-suggest-card"
+            className="rounded-2xl bg-violet-50 border border-violet-200 p-6 flex flex-col sm:flex-row sm:items-center gap-4"
+          >
+            <div className="text-3xl">✨</div>
+            <div className="flex-1">
+              <h2 className="font-bold text-violet-900 text-lg">Suggested offer for you</h2>
+              <p className="text-violet-800 text-sm mt-1">
+                Use promo code <strong>{abState.suggestion.code}</strong>
+                {abState.suggestion.discountType === "Percent" &&
+                Number(abState.suggestion.discountValue) > 0
+                  ? ` for ${Number(abState.suggestion.discountValue)}% off`
+                  : abState.suggestion.discountType === "Flat" &&
+                      Number(abState.suggestion.discountValue) > 0
+                    ? ` for ₹${Number(abState.suggestion.discountValue)} off`
+                    : ""}
+                {" "}at checkout.
+              </p>
+            </div>
+            <button
+              type="button"
+              data-testid="offers-ab-suggest-apply"
+              onClick={() => setPromoCode(normalizePromoCodeInput(abState.suggestion.code))}
+              className="self-start sm:self-center inline-flex items-center gap-2 rounded-xl bg-white border border-violet-300 px-4 py-2 font-semibold text-violet-700 text-sm hover:bg-violet-100 transition"
+              aria-label={`Apply suggested code ${abState.suggestion.code}`}
+            >
+              Apply code
             </button>
           </div>
         )}

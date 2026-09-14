@@ -241,22 +241,34 @@ const Home = () => {
                     <WaveDivider tone="lavender" flip />
                 </section>
 
+                {/* TASK-101858: each lazy section gets its OWN Suspense boundary so a slow
+                    chunk delays only itself. A single shared boundary renders all-or-nothing:
+                    nothing inside paints until EVERY lazy child resolves, so the slowest chunk
+                    held three ready sections blank (fallback={null} shows no placeholder).
+                    The WaveDividers stay outside — they are synchronous and cheap.
+                    fallback={null} is kept per boundary to preserve current visuals. */}
                 <Suspense fallback={null}>
                     <div className="">
                         <ServicesSection />
                     </div>
-                    <WaveDivider tone="coral" className="px-[10%]" />
+                </Suspense>
+                <WaveDivider tone="coral" className="px-[10%]" />
+                <Suspense fallback={null}>
                     <div className="px-4 lg:px-20 py-10 md:py-12" style={{ background: 'var(--bg-primary, #fefcf9)' }}>
                         <FaqHighlights />
                     </div>
-                    <WaveDivider tone="lavender" className="px-[10%]" />
+                </Suspense>
+                <WaveDivider tone="lavender" className="px-[10%]" />
+                <Suspense fallback={null}>
                     <div className="">
                         <TestimonialsSection />
                     </div>
-                    {enableFooterMiniCtaAboveFooter && (
-                        <FooterCtaStrip />
-                    )}
                 </Suspense>
+                {enableFooterMiniCtaAboveFooter && (
+                    <Suspense fallback={null}>
+                        <FooterCtaStrip />
+                    </Suspense>
+                )}
                 <WaveDivider tone="cream" className="px-[6%]" />
             </section>
         </>

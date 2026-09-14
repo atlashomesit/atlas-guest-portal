@@ -33,8 +33,9 @@ type EmbedConfig = {
   brandColor?: string | null;
   tagline?: string | null;
   isLiveEligible: boolean;
-  websiteState: string;
-  blocker?: string | null;
+  // TASK-101487: no websiteState/blocker. The public config is [AllowAnonymous] and deliberately
+  // never sends subscription diagnostics (PublicEmbedConfigNoBillingLeakTests); only the boolean
+  // eligibility crosses this boundary.
   publishedListingsCount: number;
   listings: EmbedListingSummary[];
 };
@@ -157,8 +158,6 @@ function normalizeConfig(raw: Record<string, unknown>): EmbedConfig {
     brandColor: (g('brandColor', 'BrandColor') as string) ?? null,
     tagline: (g('tagline', 'Tagline') as string) ?? null,
     isLiveEligible: Boolean(g('isLiveEligible', 'IsLiveEligible')),
-    websiteState: String(g('websiteState', 'WebsiteState') ?? 'Unknown'),
-    blocker: (g('blocker', 'Blocker') as string) ?? null,
     publishedListingsCount: Number(g('publishedListingsCount', 'PublishedListingsCount') ?? 0),
     listings: listingsRaw.map((r) => ({
       id: Number(r.id ?? r.Id),
@@ -452,6 +451,11 @@ function GuestDetailsForm({
   const [loadingPricing, setLoadingPricing] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // TASK-101873: hold must survive Razorpay ondismiss so a retry can reuse the live hold
+  // instead of creating a second one that collides with BookingSlotGuard (15-min TTL).
+  // Mirrors GuestDetailsPage's persisted holdId/holdToken/holdExpiresAt pattern, but here the
+  // hold is created inside this component (not in BookingContext), so we keep it in local state.
+  const [heldHold, setHeldHold] = useState<{ holdId: number; holdToken: string; holdExpiresAt: string } | null>(null);
 
   const depositRequired = (listing.securityDepositAmount ?? 0) > 0;
 
@@ -487,24 +491,36 @@ function GuestDetailsForm({
     try {
       const idempotencyKey = crypto.randomUUID();
 
-      // Step 1: init-hold
-      const holdRes = await fetch(buildApiUrl('/api/Razorpay/order'), {
-        method: 'POST',
-        headers: getOrderRequestHeaders(idempotencyKey),
-        body: JSON.stringify({
-          bookingDraft: {
-            listingId: listing.id,
-            checkinDate: checkInStr,
-            checkoutDate: checkOutStr,
-            guests,
-          },
-        }),
-      });
-      if (!holdRes.ok) {
-        const body = await holdRes.json().catch(() => ({}));
-        throw new Error(String(body.message ?? body.error ?? 'Failed to create hold'));
+      // TASK-101873: reuse live unexpired hold across Razorpay dismiss -> retry.
+      // The hold is local const in the original code, so a dismiss+retry always re-POSTed
+      // a bookingDraft with no guestInfo and hit BookingSlotGuard against its own hold.
+      // We keep the hold in state and skip re-creating it when it is still valid.
+      let hold: { holdId: number; holdExpiresAt: string; prepToken: string };
+      const nowMs = Date.now();
+      const heldIsLive = heldHold != null && new Date(heldHold.holdExpiresAt).getTime() > nowMs + 5_000;
+      if (heldIsLive) {
+        hold = { holdId: heldHold!.holdId, holdExpiresAt: heldHold!.holdExpiresAt, prepToken: heldHold!.holdToken };
+      } else {
+        // Step 1: init-hold (only when no live hold exists or it has expired)
+        const holdRes = await fetch(buildApiUrl('/api/Razorpay/order'), {
+          method: 'POST',
+          headers: getOrderRequestHeaders(idempotencyKey),
+          body: JSON.stringify({
+            bookingDraft: {
+              listingId: listing.id,
+              checkinDate: checkInStr,
+              checkoutDate: checkOutStr,
+              guests,
+            },
+          }),
+        });
+        if (!holdRes.ok) {
+          const body = await holdRes.json().catch(() => ({}));
+          throw new Error(String(body.message ?? body.error ?? 'Failed to create hold'));
+        }
+        hold = (await holdRes.json()) as { holdId: number; holdExpiresAt: string; prepToken: string };
+        setHeldHold({ holdId: hold.holdId, holdToken: hold.prepToken, holdExpiresAt: hold.holdExpiresAt });
       }
-      const hold = (await holdRes.json()) as { holdId: number; holdExpiresAt: string; prepToken: string };
 
       // Step 2: final-charge (Razorpay order)
       const orderRes = await fetch(buildApiUrl('/api/Razorpay/order'), {
@@ -842,7 +858,6 @@ export default function EmbedPage() {
         <p className="mt-2 text-text-secondary">
           This property is not currently taking bookings. Please contact the host directly.
         </p>
-        <p data-testid="embed-blocker" style={{ display: 'none' }}>{config.blocker ?? config.websiteState}</p>
       </div>
     );
   }

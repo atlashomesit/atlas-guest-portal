@@ -1,6 +1,7 @@
 import { buildApiUrl, getApiHeaders } from '@/api/client';
 import { messageFromApiResponse } from '@/utils/serverErrorFromResponse';
 import { dedupedJsonFetch } from '@/api/dedupedJsonFetch';
+import { getAccessibilityDeclarations } from '@/utils/amenityCodes';
 
 /** Parse maxGuests from listing JSON (camelCase or PascalCase). Returns undefined if missing/invalid. */
 export function parseMaxGuestsFromPayload(payload: Record<string, unknown>): number | undefined {
@@ -21,6 +22,8 @@ export type ListingDetail = {
   id: string | number;
   propertyId?: string | number;
   name?: string;
+  /** TASK-101640: server-resolved display name when the detail payload carries it. */
+  displayName?: string | null;
   coverPhotoUrl?: string;
   photoUrls?: string[];
   [key: string]: unknown;
@@ -90,6 +93,12 @@ export type PublicListing = {
   propertyName?: string;
   propertyAddress?: string | null;
   name?: string;
+  /**
+   * TASK-101640: server-resolved guest-facing unit name from `PublicListingDto.displayName`
+   * (friendly for known Atlas SKUs, else the listing name). Undefined/null on legacy
+   * payloads that predate the field — callers fall back to the local display-name map.
+   */
+  displayName?: string | null;
   floor?: number;
   type?: string;
   checkInTime?: string | null;
@@ -149,6 +158,14 @@ export type PublicListing = {
   graceHours?: number | null;
   /** TASK-2552: amenity code strings (e.g. "AC", "Pool", "WiFi") returned by PublicListingDto. */
   amenityCodes?: string[];
+  /**
+   * TASK-10086: canonical v1 accessibility features explicitly declared by the host
+   * (step_free_entrance, elevator, accessible_parking). Empty when undeclared —
+   * never inferred. Prefer the server field when present, else derived from amenityCodes.
+   */
+  accessibilityFeatures?: string[];
+  /** TASK-10086: true when no v1 accessibility feature is declared ("Not specified — ask host"). */
+  accessibilityUnknown?: boolean;
   /** TASK-7193: admin-editable SEO description for share previews. */
   seoDescription?: string | null;
   /** TASK-1936: SEO meta description fallback. */
@@ -185,6 +202,13 @@ function normalizePublicListing(payload: Record<string, unknown>): PublicListing
         ? (payload.propertyAddress as string | null)
         : undefined,
     name: typeof payload.name === 'string' ? payload.name : undefined,
+    // TASK-101640: thread the server-resolved display name through (camelCase or PascalCase).
+    displayName:
+      typeof payload.displayName === 'string'
+        ? payload.displayName
+        : typeof payload.DisplayName === 'string'
+          ? (payload.DisplayName as string)
+          : undefined,
     floor: payload.floor != null ? Number(payload.floor) : undefined,
     type: typeof payload.type === 'string' ? payload.type : undefined,
     checkInTime:
@@ -248,6 +272,24 @@ function normalizePublicListing(payload: Record<string, unknown>): PublicListing
     amenityCodes: Array.isArray(payload.amenityCodes)
       ? payload.amenityCodes.filter((x): x is string => typeof x === 'string')
       : [],
+    // TASK-10086: explicit host declarations only — prefer the server field, else derive.
+    ...(() => {
+      const server = payload.accessibilityFeatures;
+      const fromServer = Array.isArray(server)
+        ? server.filter((x): x is string => typeof x === 'string')
+        : null;
+      const codes = Array.isArray(payload.amenityCodes)
+        ? payload.amenityCodes.filter((x): x is string => typeof x === 'string')
+        : [];
+      const features = getAccessibilityDeclarations(fromServer ?? codes);
+      return {
+        accessibilityFeatures: features,
+        accessibilityUnknown:
+          typeof payload.accessibilityUnknown === 'boolean'
+            ? (payload.accessibilityUnknown as boolean)
+            : features.length === 0,
+      };
+    })(),
     // TASK-2739-v1: publish state drives noindex + the "not yet available" notice on Draft detail pages.
     publishStatus: typeof payload.publishStatus === 'string' ? payload.publishStatus : undefined,
   };
@@ -545,6 +587,8 @@ export const fetchListingById = async (
       | number
       | undefined,
     name: (payload.name ?? payload.property_name ?? payload.title) as string | undefined,
+    // TASK-101640: keep the server-resolved display name (camelCase or PascalCase).
+    displayName: (payload.displayName ?? payload.DisplayName ?? null) as string | null | undefined,
   };
 
   return normalized;
