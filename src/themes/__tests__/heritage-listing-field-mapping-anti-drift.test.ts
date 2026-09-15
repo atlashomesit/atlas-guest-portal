@@ -64,7 +64,6 @@ const extractMappingExpr = (content: string, key: string): { raw: string; evalua
 
 /** Evaluates the extracted mapping expression against a fixture `apiListing` object. */
 const evalMapping = (expr: string, apiListing: Record<string, unknown>): number => {
-  // eslint-disable-next-line no-new-func
   const fn = new Function("apiListing", `return (${expr});`);
   return fn(apiListing) as number;
 };
@@ -159,7 +158,6 @@ describe("TASK-8221: TASK-4015 'Save ~₹X by booking directly' banner renders o
     it(`${label}: banner formula computes the expected savings figure`, () => {
       const m = contents[label].match(/Math\.round\((data\.property_price \* [\d.]+ \* [\d.]+)\)/);
       expect(m, "Math.round(...) savings formula not found").not.toBeNull();
-      // eslint-disable-next-line no-new-func
       const fn = new Function("data", `return Math.round(${m![1]});`);
 
       // Using the TASK-8221 fixture: baseNightlyRate 4200 -> property_price 4200 once mapped.
