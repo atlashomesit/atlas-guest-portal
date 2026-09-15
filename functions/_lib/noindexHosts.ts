@@ -15,9 +15,7 @@
  * robots.txt would be worse), and a duplicated host set is the accepted convention already documented
  * in `_lib/tenantSiteMeta.ts`. Keep this in sync when an internal tenant gains or loses a host.
  */
-/* eslint-disable atlas-brand/no-atlas-string-leak -- internal-tenant host allowlist for crawler suppression; never rendered to guests */
 export const NOINDEX_HOSTS = new Set<string>(["atlas-showcase.atlastays.com"]);
-/* eslint-enable atlas-brand/no-atlas-string-leak */
 
 /** True when this host must be kept out of search indexes regardless of environment. */
 export function isNoindexHost(hostname: string | null | undefined): boolean {
