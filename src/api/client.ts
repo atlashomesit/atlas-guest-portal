@@ -25,7 +25,13 @@ function toResolvableTenantSlug(slug: string | null | undefined): string | null 
 }
 
 /** Headers to attach to Atlas API requests when contract requires tenant (e.g. X-Tenant-Slug). */
-export const getApiHeaders = (): Record<string, string> => {
+export const getApiHeaders = (explicitTenant?: string | null): Record<string, string> => {
+  // TASK-102017: If caller provides an explicit tenant (e.g. holdTenantSlug from BookingContext), use it first.
+  const explicit = toResolvableTenantSlug(explicitTenant);
+  if (explicit) {
+    return { 'X-Tenant-Slug': explicit };
+  }
+
   // Marketplace detail pages pass ?tenant=<slug> so cross-host listings resolve the correct host tenant.
   if (typeof window !== 'undefined') {
     const urlTenant = toResolvableTenantSlug(
@@ -69,8 +75,11 @@ export const CORS_ALLOWED_REQUEST_HEADERS = [
 ] as const;
 
 /** Headers for an idempotent JSON write to the API (Razorpay order create / booking hold). */
-export const getOrderRequestHeaders = (idempotencyKey: string): Record<string, string> => ({
-  ...getApiHeaders(),
+export const getOrderRequestHeaders = (
+  idempotencyKey: string,
+  explicitTenant?: string | null,
+): Record<string, string> => ({
+  ...getApiHeaders(explicitTenant),
   'Content-Type': 'application/json',
   'Accept': 'application/json',
   'Idempotency-Key': idempotencyKey,

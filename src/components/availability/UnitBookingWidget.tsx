@@ -45,6 +45,7 @@ import OptimizedImage from '@/components/ui/OptimizedImage';
 import FomoBar from '@/components/FomoBar';
 import { track } from '@/lib/events'; // TASK-1480
 import { hasOnlinePaymentRail } from '@/tenant/paymentRail';
+import { isMarketplaceMode } from '@/tenant/tenantResolver';
 import {
   ILLUSTRATIVE_OTA_GUEST_FEE_PERCENT,
 } from '@/utils/directBookingPromo';
@@ -1582,8 +1583,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         idempotencyKey = crypto.randomUUID();
         reserveIdempotencyKeyRef.current = idempotencyKey;
       }
+      const initialHoldHeaders = getOrderRequestHeaders(idempotencyKey);
       const response = await axios.post(orderUrl, orderPayload, {
-        headers: getOrderRequestHeaders(idempotencyKey),
+        headers: initialHoldHeaders,
         timeout: 15000,
       });
 
@@ -1610,6 +1612,14 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             ? serverTouristTaxPascal
             : 0;
 
+      // TASK-102017: derive the tenant slug owning this hold so the details route and final-charge
+      // calls send the identical X-Tenant-Slug header instead of 422ing against the apex tenant.
+      const currentSearch = typeof window !== 'undefined' ? window.location.search : '';
+      const tenantFromUrl = typeof window !== 'undefined'
+        ? new URLSearchParams(currentSearch).get('tenant')
+        : null;
+      const holdTenantSlug = tenantFromUrl || initialHoldHeaders['X-Tenant-Slug'] || null;
+
       // Store hold state in context and navigate to details page
       updateBooking({
         holdId: Number(holdId),
@@ -1618,6 +1628,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         holdExpiresAt: typeof holdExpiresAt === 'string' ? holdExpiresAt : new Date(holdExpiresAt).toISOString(),
         holdPropertySlug: propertySlug ?? null,
         holdUnitSlug: unitSlug ?? null,
+        holdTenantSlug,
         holdListingId: numericListingId,
         holdListingName: listingName ?? null,
         holdPriceBreakdown: {
@@ -1650,7 +1661,16 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       // the reserve key so a LATER, unrelated Reserve click (after navigating back) never reuses
       // a key that already has a completed hold behind it.
       reserveIdempotencyKeyRef.current = null;
-      navigate(`/book/${targetSlug}/${targetUnit}/details`);
+
+      // TASK-102017: carry ?tenant=<slug> (and any search params) to the details route so
+      // getApiHeaders() resolves the same tenant on final charge and page refreshes.
+      let navSearch = currentSearch;
+      if (!tenantFromUrl && holdTenantSlug && isMarketplaceMode() && holdTenantSlug !== 'atlas') {
+        const sp = new URLSearchParams(currentSearch);
+        sp.set('tenant', holdTenantSlug);
+        navSearch = `?${sp.toString()}`;
+      }
+      navigate(`/book/${targetSlug}/${targetUnit}/details${navSearch}`);
     } catch (error: unknown) {
       console.error('[UnitBookingWidget] Reserve error:', error);
       const data = (error as { response?: { data?: { code?: string; Code?: string } } })?.response?.data;
