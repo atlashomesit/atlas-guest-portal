@@ -44,6 +44,8 @@ type BookingState = {
   holdPropertySlug: string | null;
   /** Route slug of the listing unit being booked. */
   holdUnitSlug: string | null;
+  /** TASK-102017: Tenant slug owning the payment hold — carried from storefront to checkout. */
+  holdTenantSlug: string | null;
   /** Price breakdown forwarded from the widget (session-only; not persisted to localStorage). */
   holdPriceBreakdown: BookingPriceBreakdown | null;
   /** ListingId for the hold — needed for add-on service loading on GuestDetailsPage. */
@@ -83,6 +85,7 @@ const defaultState: BookingState = {
   holdToken: null,
   holdPropertySlug: null,
   holdUnitSlug: null,
+  holdTenantSlug: null,
   holdPriceBreakdown: null,
   holdListingId: null,
   holdListingName: null,
@@ -121,6 +124,7 @@ const loadState = (): BookingState => {
       holdToken: null,
       holdPropertySlug: null,
       holdUnitSlug: null,
+      holdTenantSlug: null,
       holdPriceBreakdown: null,
       holdListingId: null,
       holdListingName: null,
