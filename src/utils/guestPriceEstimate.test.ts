@@ -115,10 +115,11 @@ describe('guestPriceEstimate GST slab (TASK-2870/2871)', () => {
 });
 
 describe('accommodationGstSlabPercentForChargedRate — TASK-7011/TASK-7543 mirrors the server three-band table', () => {
-  it('mirrors GstInvoiceConstants.cs exactly: 0% <=1,000, 5% 1,001-7,500, 18% >7,500', () => {
+  it('mirrors GstInvoiceCalculation.cs (TASK-101988): 0% <1,000, 5% 1,000-7,500, 18% >7,500', () => {
     expect(accommodationGstSlabPercentForChargedRate(600)).toBe(0);
-    expect(accommodationGstSlabPercentForChargedRate(1000)).toBe(0); // boundary: inclusive exempt
-    expect(accommodationGstSlabPercentForChargedRate(1001)).toBe(5); // boundary: first rupee into 5%
+    expect(accommodationGstSlabPercentForChargedRate(999)).toBe(0); // boundary: strictly below 1000 is exempt
+    expect(accommodationGstSlabPercentForChargedRate(1000)).toBe(5); // TASK-101988 boundary: exactly 1000 is 5%
+    expect(accommodationGstSlabPercentForChargedRate(1001)).toBe(5); // in 5%
     expect(accommodationGstSlabPercentForChargedRate(7500)).toBe(5); // boundary: inclusive lower slab
     expect(accommodationGstSlabPercentForChargedRate(7501)).toBe(18); // boundary: first rupee into 18%
     expect(accommodationGstSlabPercentForChargedRate(0)).toBeNull();
