@@ -433,8 +433,6 @@ export const AtlasBookingCalendar: React.FC<AtlasBookingCalendarProps> = ({
   const [focusedDate, setFocusedDate] = useState<Date | null>(null);
   const popoverRef = useRef<HTMLDivElement | null>(null);
   const [positionStyle, setPositionStyle] = useState<React.CSSProperties>({});
-  const [isScrolling, setIsScrolling] = useState(false);
-  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // TASK-4439: focus trap + focus return (WCAG 2.4.3 / 2.1.2); Escape close below.
   useFocusTrap<HTMLDivElement>(open, popoverRef);
@@ -475,45 +473,11 @@ export const AtlasBookingCalendar: React.FC<AtlasBookingCalendarProps> = ({
       // Vertical positioning: always open directly below the Check-in date field
       const finalTop = anchorRect.bottom + MARGIN;
 
-      // Check if the calendar overlaps with the sticky navbar
-      const navEl =
-        document.getElementById('navbar_container') ||
-        document.querySelector('header');
-      const navBottom = navEl ? navEl.getBoundingClientRect().bottom : 0;
-      const isUnderNavbar = finalTop < navBottom;
-
       setPositionStyle({
         position: 'fixed',
         top: `${finalTop}px`,
         left: `${left}px`,
-        zIndex: isUnderNavbar ? 'auto' : undefined,
       });
-    };
-
-    const handleScroll = () => {
-      setIsScrolling(true);
-      if (popoverRef.current) {
-        popoverRef.current.style.zIndex = 'auto';
-      }
-      if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current);
-      }
-      scrollTimeoutRef.current = setTimeout(() => {
-        setIsScrolling(false);
-        if (popoverRef.current) {
-          const navEl =
-            document.getElementById('navbar_container') ||
-            document.querySelector('header');
-          const navBottom = navEl ? navEl.getBoundingClientRect().bottom : 0;
-          const currentTop = parseFloat(popoverRef.current.style.top) || 0;
-          if (currentTop < navBottom) {
-            popoverRef.current.style.zIndex = 'auto';
-          } else {
-            popoverRef.current.style.zIndex = '';
-          }
-        }
-      }, 150);
-      reposition();
     };
 
     // Run immediately, then again after a paint so offsetWidth is accurate
@@ -521,14 +485,11 @@ export const AtlasBookingCalendar: React.FC<AtlasBookingCalendarProps> = ({
     const raf = requestAnimationFrame(reposition);
 
     window.addEventListener('resize', reposition);
-    window.addEventListener('scroll', handleScroll, true);
+    window.addEventListener('scroll', reposition, true);
     return () => {
-      if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current);
-      }
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', reposition);
-      window.removeEventListener('scroll', handleScroll, true);
+      window.removeEventListener('scroll', reposition, true);
     };
   }, [open, anchorRef]);
 
@@ -735,15 +696,9 @@ export const AtlasBookingCalendar: React.FC<AtlasBookingCalendarProps> = ({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [open, onClose]);
 
-  // Reset state when calendar closes
+  // Reset hover when calendar closes
   useEffect(() => {
-    if (!open) {
-      setHover(null);
-      setIsScrolling(false);
-      if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current);
-      }
-    }
+    if (!open) setHover(null);
   }, [open]);
 
   if (!open) return null;
@@ -751,11 +706,8 @@ export const AtlasBookingCalendar: React.FC<AtlasBookingCalendarProps> = ({
   const popoverNode = (
     <div
       ref={popoverRef}
-      className={`bc-popover${isScrolling ? ' bc-is-scrolling' : ''}`}
-      style={{
-        ...positionStyle,
-        ...(isScrolling ? { zIndex: 'auto' } : {}),
-      }}
+      className="bc-popover"
+      style={positionStyle}
       role="dialog"
       aria-label="Select dates"
     >
