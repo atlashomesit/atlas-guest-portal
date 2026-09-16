@@ -66,6 +66,7 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
   const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
   const [isGuestsOpen, setIsGuestsOpen] = React.useState(false);
   const [activeField, setActiveField] = React.useState<'checkin' | 'checkout' | null>(null);
+  const [hoverDate, setHoverDate] = React.useState<Date | null>(null);
   const [isSubmitting, _setIsSubmitting] = React.useState(false);
   const [statusMessage, setStatusMessage] = React.useState<string>('');
   const [hasInteracted, setHasInteracted] = React.useState(false);
@@ -488,6 +489,7 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
     });
     if (selection.startDate && selection.endDate && normalizedEnd && normalizedStart && normalizedEnd > normalizedStart) {
       setIsCalendarOpen(false);
+      setHoverDate(null);
     }
   };
 
@@ -500,6 +502,7 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
     setStatusMessage('');
     setIsCalendarOpen(false);
     setActiveField(null);
+    setHoverDate(null);
     setShownDate(defaultRange.startDate ?? today);
   };
 
@@ -620,6 +623,7 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
           onClose={() => {
             setIsCalendarOpen(false);
             setActiveField(null);
+            setHoverDate(null);
           }}
           value={dateRange}
           onChange={handleRangeChange}
@@ -634,41 +638,75 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
           loading={!calendarReady}
           activeField={activeField}
           dayContentRenderer={(day) => {
-            const dayStart = startOfCalendarDay(day);
-            const dayTime = dayStart.getTime();
-            const selectionStart = dateRange.startDate ? startOfCalendarDay(dateRange.startDate).getTime() : null;
-            const selectionEnd = dateRange.endDate ? startOfCalendarDay(dateRange.endDate).getTime() : null;
-            const hasValidRange = selectionStart !== null && selectionEnd !== null && selectionEnd > selectionStart;
-            const isRangeStart = selectionStart !== null && dayTime === selectionStart;
-            const isRangeEnd = selectionEnd !== null && dayTime === selectionEnd;
-            const isInRange = hasValidRange && dayTime > selectionStart && dayTime < selectionEnd;
-            const isSelected = isRangeStart || isRangeEnd;
-            const isDisabled = dayStart < today;
+            const checkIn = dateRange.startDate ? startOfCalendarDay(dateRange.startDate) : null;
+            const checkOut = dateRange.endDate ? startOfCalendarDay(dateRange.endDate) : null;
+            const endProbe = checkOut ?? (hoverDate && checkIn && hoverDate > checkIn ? hoverDate : null);
+
+            const dayDate = startOfCalendarDay(day);
+            const dayTime = dayDate.getTime();
+            const dowIndex = dayDate.getDay(); // 0 = Sunday ... 6 = Saturday
+
+            const isStart = checkIn != null && dayTime === checkIn.getTime();
+            const isEnd = checkOut != null && dayTime === checkOut.getTime();
+            const hoverEnd = !isStart && hoverDate != null && checkIn != null && hoverDate > checkIn && dayTime === startOfCalendarDay(hoverDate).getTime();
+            const inRange = checkIn != null && endProbe != null && dayDate > checkIn && dayDate < endProbe;
+            const isEndpoint = isStart || isEnd || hoverEnd;
+            const isDisabled = dayDate < today;
+
+            const nextDate = addDays(dayDate, 1);
+            const prevDate = addDays(dayDate, -1);
+
+            const nextInRange =
+              checkIn != null && endProbe != null
+                ? nextDate > checkIn && nextDate <= endProbe
+                : false;
+            const prevInRange =
+              checkIn != null && endProbe != null
+                ? prevDate >= checkIn && prevDate < endProbe
+                : false;
+
+            const showBandLeft = (inRange || isEnd || hoverEnd) && prevInRange;
+            const showBandRight = (inRange || isStart) && nextInRange;
+            const isFirstOfWeek = dowIndex === 0;
+            const isLastOfWeek = dowIndex === 6;
+
+            let textClass = 'hero-date-idle';
+            if (isEndpoint) {
+              textClass = 'hero-date-endpoint hero-date-selected';
+            } else if (inRange) {
+              textClass = 'hero-date-inrange';
+            } else if (isDisabled) {
+              textClass = 'hero-date-disabled';
+            }
 
             return (
-              <div className="relative flex h-full w-full items-center justify-center">
-                {/* Continuous underlay band for range */}
-                {hasValidRange && isRangeStart && (
-                  <span className="absolute inset-y-0.5 left-1/2 right-0 bg-[#ffe4d6] z-0 pointer-events-none" aria-hidden="true" />
+              <div
+                className="hero-cell-wrap"
+                onMouseEnter={() => {
+                  if (checkIn && !checkOut && !isDisabled) {
+                    setHoverDate(dayDate);
+                  }
+                }}
+              >
+                {/* Range band underlay */}
+                {showBandLeft && (
+                  <div
+                    className={`hero-band hero-band-l${isFirstOfWeek ? ' hero-band-edge-l' : ''}`}
+                    aria-hidden="true"
+                  />
                 )}
-                {hasValidRange && isInRange && (
-                  <span className="absolute inset-y-0.5 inset-x-0 bg-[#ffe4d6] z-0 pointer-events-none" aria-hidden="true" />
+                {showBandRight && (
+                  <div
+                    className={`hero-band hero-band-r${isLastOfWeek ? ' hero-band-edge-r' : ''}`}
+                    aria-hidden="true"
+                  />
                 )}
-                {hasValidRange && isRangeEnd && (
-                  <span className="absolute inset-y-0.5 left-0 right-1/2 bg-[#ffe4d6] z-0 pointer-events-none" aria-hidden="true" />
-                )}
+                {/* Endpoint coral pill */}
+                {isEndpoint && <div className="hero-endpoint-pill" aria-hidden="true" />}
+                {/* Day number */}
                 <span
                   data-testid={`hero-date-${toCalendarISO(day)}`}
-                  className={`relative z-10 flex items-center justify-center text-xs font-medium transition ${
-                    isSelected
-                      ? 'hero-date-selected bg-[var(--cta-primary)] text-white font-semibold rounded-full shadow-sm'
-                      : isInRange
-                      ? 'hero-date-inrange text-[var(--text-primary)] font-medium'
-                      : isDisabled
-                      ? 'text-[var(--border-strong)] cursor-not-allowed opacity-40'
-                      : 'text-[var(--text-primary)] hover:bg-[#f3f4f6] rounded-full'
-                  }`}
-                  style={{ width: 28, height: 28 }}
+                  className={`hero-date-text ${textClass}`}
                 >
                   {format(day, 'd')}
                 </span>

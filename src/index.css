@@ -280,23 +280,105 @@
   color: #111827 !important;
 }
 
-/* Selected dates in hero calendar */
-.rdrDayNumber span.hero-date-selected,
-.rdrDay .rdrDayNumber span.hero-date-selected {
-  background: var(--cta-primary, #b8472f) !important;
-  color: #ffffff !important;
-  font-weight: 600 !important;
-  border-radius: 50% !important;
-  box-shadow: 0 1px 3px rgba(184, 71, 47, 0.25) !important;
+/* Selected dates and range bands in hero calendar (Atlas Hi-Fi Style) */
+.hero-cell-wrap {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-/* In-range text in hero calendar */
-.rdrDayNumber span.hero-date-inrange,
-.rdrDay .rdrDayNumber span.hero-date-inrange {
+/* Range band underlay (z-0 below coral pill) */
+.hero-band {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  background: var(--brand-soft, #ffe4d6) !important;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.hero-band-l {
+  left: 0 !important;
+  right: 50% !important;
+}
+
+.hero-band-r {
+  left: 50% !important;
+  right: 0 !important;
+}
+
+.hero-band-edge-l {
+  border-top-left-radius: 12px !important;
+  border-bottom-left-radius: 12px !important;
+}
+
+.hero-band-edge-r {
+  border-top-right-radius: 12px !important;
+  border-bottom-right-radius: 12px !important;
+}
+
+/* Endpoint coral pill — sits between band and number text (z-1) */
+.hero-endpoint-pill {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 2px;
+  right: 2px;
+  background: var(--brand-primary, #b8472f) !important;
+  border-radius: 8px !important;
+  z-index: 1;
+  box-shadow: 0 2px 6px rgba(196, 90, 63, 0.28) !important;
+  pointer-events: none;
+}
+
+/* Day number text (z-2) */
+.rdrDayNumber span.hero-date-text,
+.rdrDay .rdrDayNumber span.hero-date-text {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  border-radius: 0 !important;
   background: transparent !important;
+  position: relative !important;
+  z-index: 2 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 13px !important;
+  pointer-events: none;
+  border: none !important;
+  box-shadow: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.rdrDayNumber span.hero-date-text.hero-date-endpoint,
+.rdrDay .rdrDayNumber span.hero-date-text.hero-date-endpoint {
+  color: #ffffff !important;
+  font-weight: 700 !important;
+}
+
+.rdrDayNumber span.hero-date-text.hero-date-inrange,
+.rdrDay .rdrDayNumber span.hero-date-text.hero-date-inrange {
+  color: var(--text-primary, #1a1a2e) !important;
+  font-weight: 600 !important;
+}
+
+.rdrDayNumber span.hero-date-text.hero-date-idle,
+.rdrDay .rdrDayNumber span.hero-date-text.hero-date-idle {
   color: var(--text-primary, #1a1a2e) !important;
   font-weight: 500 !important;
-  border-radius: 0 !important;
+}
+
+.rdrDayNumber span.hero-date-text.hero-date-disabled,
+.rdrDay .rdrDayNumber span.hero-date-text.hero-date-disabled {
+  color: #d1d5db !important;
+  opacity: 0.4 !important;
+  cursor: not-allowed;
 }
 
 /* Minimal hover state - just subtle background */
