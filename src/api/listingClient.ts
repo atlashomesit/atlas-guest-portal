@@ -2,6 +2,8 @@ import { buildApiUrl, getApiHeaders } from '@/api/client';
 import { messageFromApiResponse } from '@/utils/serverErrorFromResponse';
 import { dedupedJsonFetch } from '@/api/dedupedJsonFetch';
 import { getAccessibilityDeclarations } from '@/utils/amenityCodes';
+import { getTenantContext } from '@/tenant/tenantContext';
+import { getTenantOverrides, getTenantListingAddress } from '@/tenant/tenantOverrides';
 
 /** Parse maxGuests from listing JSON (camelCase or PascalCase). Returns undefined if missing/invalid. */
 export function parseMaxGuestsFromPayload(payload: Record<string, unknown>): number | undefined {
@@ -197,10 +199,14 @@ function normalizePublicListing(payload: Record<string, unknown>): PublicListing
         ? Number(payload.propertyId)
         : undefined,
     propertyName: typeof payload.propertyName === 'string' ? payload.propertyName : undefined,
-    propertyAddress:
-      payload.propertyAddress === null || typeof payload.propertyAddress === 'string'
+    propertyAddress: (() => {
+      const overrides = getTenantOverrides(getTenantContext()?.slug);
+      const override = getTenantListingAddress(overrides, Number.isFinite(id) ? id : null);
+      if (override) return override;
+      return payload.propertyAddress === null || typeof payload.propertyAddress === 'string'
         ? (payload.propertyAddress as string | null)
-        : undefined,
+        : undefined;
+    })(),
     name: typeof payload.name === 'string' ? payload.name : undefined,
     // TASK-101640: thread the server-resolved display name through (camelCase or PascalCase).
     displayName:

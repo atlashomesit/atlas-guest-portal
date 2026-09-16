@@ -8,6 +8,7 @@ import { propertySlugMatchesListing } from "@/utils/propertySlugMatch";
 vi.mock("@/tenant/tenantContext", () => ({ getTenantContext: vi.fn(() => ({ slug: "staybycf" })) }));
 vi.mock("@/tenant/tenantOverrides", () => ({
   getTenantOverrides: vi.fn(() => ({})),
+  getTenantListingAddress: vi.fn(() => undefined),
   getTenantPublicListingIdAllowlist: vi.fn(() => new Set<number>()),
 }));
 

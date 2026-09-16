@@ -52,6 +52,15 @@ describe('applyTenantBranding — per-tenant brand assets', () => {
     );
   });
 
+  it('applies the Goan Hideaway logo + favicon for the goan-hideaway slug', () => {
+    applyTenantBranding(makeTenant({ slug: 'goan-hideaway', name: 'Goan Hideaway' }));
+
+    expect(faviconHref()).toBe('/images/goan-hideaway-logo.png');
+    expect(document.documentElement.style.getPropertyValue('--brand-logo-url')).toContain(
+      'goan-hideaway-logo',
+    );
+  });
+
   it('leaves other tenants on the neutral static favicon with no logo var', () => {
     applyTenantBranding(makeTenant({ slug: 'some-other-tenant' }));
 

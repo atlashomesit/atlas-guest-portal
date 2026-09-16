@@ -113,6 +113,8 @@ export type TenantOverrides = {
   contact?: TenantContactOverrides;
   /** Listings API endpoint URL (e.g., https://api.example.com/listings/public). */
   listingsApiUrl?: string;
+  /** Per-listing address overrides keyed by numeric listing ID (e.g. 399). */
+  listingAddresses?: Record<number, string>;
   /** TASK-1293: homepage strip above hero (direct booking value prop). */
   directBookingPromo?: TenantDirectBookingPromo;
   /** TASK-1877: white-label cookie banner copy + privacy link override. */
@@ -192,6 +194,17 @@ const TENANT_OVERRIDES: Record<string, TenantOverrides> = {
   staybycf: {
     logoUrl: '/images/stay-bycityfocus-logo.png',
     faviconUrl: '/images/stay-bycityfocus-logo.png',
+  },
+  'goan-hideaway': {
+    logoUrl: '/images/goan-hideaway-logo.png',
+    faviconUrl: '/images/goan-hideaway-logo.png',
+    listingAddresses: {
+      399: 'Apartment 001, Mint Arcadia, Baman Waddo, Near Shri Laxmi Narayan Temple, Siolim, Goa 403517',
+      532: 'C-201, Second Floor, Areia De Goa, Opposite Riviera Palms, Bardez, Arpora, Goa 403516',
+      533: 'Apartment 2208, Riviera Foothills, Riviera Foothills Road, Arpora, Goa 403507',
+      535: 'Apartment 1111, Riviera Foothills, Riviera Foothills Road, Arpora, Goa 403507',
+      536: 'Apartment 2009A, Riviera Foothills, Riviera Foothills Road, Arpora, Goa 403507',
+    },
   },
   atlas: {
     // Marketplace lockup ships same-origin so the guest portal does not wait on the API logo.
@@ -330,3 +343,15 @@ export function shouldHideAtlasBranding(
   if (slug === "atlas") return false;
   return !tenantHint?.isMarketplaceRoot;
 }
+
+/**
+ * Resolves a listing's physical street address from tenant overrides if configured.
+ */
+export function getTenantListingAddress(
+  overrides: TenantOverrides,
+  listingId?: number | null,
+): string | undefined {
+  if (listingId == null || !overrides.listingAddresses) return undefined;
+  return overrides.listingAddresses[listingId];
+}
+
