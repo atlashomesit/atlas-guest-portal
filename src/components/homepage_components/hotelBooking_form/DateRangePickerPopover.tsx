@@ -54,7 +54,7 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
   children,
   popoverClassName,
 }) => {
-  const [position, setPosition] = useState({ top: 0, left: 0, width: 340, caretLeft: 24, isFlipped: false });
+  const [position, setPosition] = useState({ top: 0, left: 0, width: 340, caretLeft: 24 });
   const localPopoverRef = useRef<HTMLDivElement | null>(null);
   const isMobile = useMediaQuery('(max-width: 768px)');
 
@@ -112,7 +112,6 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
 
       const anchorRect = anchorRef.current.getBoundingClientRect();
       const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
       const viewportLeft = window.scrollX;
       const margin = 12;
       const measuredWidth = localPopoverRef.current?.offsetWidth ?? 320;
@@ -122,34 +121,11 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
       const unclampedLeft = anchorRect.left + viewportLeft;
       const maxLeft = viewportLeft + viewportWidth - width - margin;
       const left = clamp(unclampedLeft, viewportLeft + margin, Math.max(viewportLeft + margin, maxLeft));
-
-      const popHeight = localPopoverRef.current?.offsetHeight || 360;
-      const spaceBelow = viewportHeight - anchorRect.bottom - margin;
-      const spaceAbove = anchorRect.top - margin;
-
-      let isFlipped = false;
-      let top: number;
-
-      if (spaceBelow < popHeight && spaceAbove >= spaceBelow) {
-        // Flip above anchor
-        isFlipped = true;
-        top = anchorRect.top + window.scrollY - popHeight - 8;
-        if (top < window.scrollY + margin) {
-          top = window.scrollY + margin;
-        }
-      } else {
-        // Place below anchor
-        isFlipped = false;
-        top = anchorRect.bottom + window.scrollY + 8;
-        const maxTop = window.scrollY + viewportHeight - popHeight - margin;
-        if (top > maxTop && spaceBelow < popHeight) {
-          top = Math.max(window.scrollY + margin, maxTop);
-        }
-      }
+      const top = anchorRect.bottom + window.scrollY + 8;
 
       const caretLeft = clamp(anchorRect.left + anchorRect.width / 2 - (left - viewportLeft), 16, width - 16);
 
-      setPosition({ top, left, width, caretLeft, isFlipped });
+      setPosition({ top, left, width, caretLeft });
     };
 
     updatePosition();
@@ -203,11 +179,7 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
       >
         {!isMobile && (
           <div
-            className={`pointer-events-none absolute h-3.5 w-3.5 rotate-45 border border-[var(--border-subtle)] bg-[var(--bg-surface)] ${
-              position.isFlipped
-                ? '-bottom-2 border-t-transparent border-l-transparent'
-                : '-top-2 border-b-transparent border-r-transparent'
-            }`}
+            className="pointer-events-none absolute -top-2 h-3.5 w-3.5 rotate-45 border border-[var(--border-subtle)] border-b-transparent border-r-transparent bg-[var(--bg-surface)]"
             style={{ left: position.caretLeft - 7 }}
             aria-hidden
           />
