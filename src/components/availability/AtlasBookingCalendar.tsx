@@ -449,8 +449,8 @@ export const AtlasBookingCalendar: React.FC<AtlasBookingCalendarProps> = ({
       if (!anchor || !pop) return;
 
       const anchorRect = anchor.getBoundingClientRect();
-      const popWidth = pop.offsetWidth || 580;
-      const popHeight = pop.offsetHeight || 500;
+      const popWidth = pop.offsetWidth || 500;
+      const popHeight = pop.offsetHeight || 420;
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
       const MARGIN = 8; // px from viewport edges
@@ -462,11 +462,19 @@ export const AtlasBookingCalendar: React.FC<AtlasBookingCalendarProps> = ({
       const navBottom = navEl ? navEl.getBoundingClientRect().bottom : 0;
       const topMin = Math.max(MARGIN, (navBottom > 0 ? navBottom : 0) + MARGIN);
 
-      // Prefer right-aligned to the anchor's right edge; shift left if it would overflow
-      let left = anchorRect.right - popWidth;
-      if (left < MARGIN) left = MARGIN;
+      // Move calendar to the right side: align its right edge with the date container (.lv-date-pair)
+      const container =
+        anchor.closest('.lv-date-pair') ||
+        anchor.closest('.lv-booking-form') ||
+        anchor;
+      const targetRight = container.getBoundingClientRect().right;
+
+      let left = targetRight - popWidth;
       if (left + popWidth > viewportWidth - MARGIN) {
         left = viewportWidth - popWidth - MARGIN;
+      }
+      if (left < MARGIN) {
+        left = MARGIN;
       }
 
       // Vertical positioning: choose best fit between navbar and viewport bottom
