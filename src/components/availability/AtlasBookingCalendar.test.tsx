@@ -99,4 +99,39 @@ describe('AtlasBookingCalendar — Month Visibility & Layout', () => {
     expect(screen.getByText('This weekend')).toBeDefined();
     expect(screen.getByText('Next weekend')).toBeDefined();
   });
+
+  it('positions popover directly below the anchor button', () => {
+    render(<AtlasBookingCalendar {...defaultProps} />);
+    const popover = document.querySelector('.bc-popover') as HTMLElement;
+    expect(popover).toBeDefined();
+    // Anchor bottom is 350, MARGIN is 8 -> top should be 358px
+    expect(popover.style.top).toBe('358px');
+  });
+
+  it('always opens directly below the anchor even when anchor is lower in the viewport', () => {
+    const bottomAnchor = {
+      current: (() => {
+        const btn = document.createElement('button');
+        btn.getBoundingClientRect = () => ({
+          top: 600,
+          bottom: 650,
+          left: 600,
+          right: 750,
+          width: 150,
+          height: 50,
+          x: 600,
+          y: 600,
+          toJSON: () => {},
+        });
+        document.body.appendChild(btn);
+        return btn;
+      })(),
+    };
+    render(<AtlasBookingCalendar {...defaultProps} anchorRef={bottomAnchor} />);
+    const popover = document.querySelector('.bc-popover') as HTMLElement;
+    expect(popover).toBeDefined();
+    // Anchor bottom is 650, MARGIN is 8 -> top should be 658px (never flips above to 600 - 350 - 8 = 242px)
+    expect(popover.style.top).toBe('658px');
+  });
 });
+

@@ -450,19 +450,10 @@ export const AtlasBookingCalendar: React.FC<AtlasBookingCalendarProps> = ({
 
       const anchorRect = anchor.getBoundingClientRect();
       const popWidth = pop.offsetWidth || 390;
-      const popHeight = pop.offsetHeight || 350;
       const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
       const MARGIN = 8; // px from viewport edges
 
-      // Measure fixed/sticky navbar so the popover never renders underneath it
-      const navEl =
-        document.getElementById('navbar_container') ||
-        document.querySelector('header');
-      const navBottom = navEl ? navEl.getBoundingClientRect().bottom : 0;
-      const topMin = Math.max(MARGIN, (navBottom > 0 ? navBottom : 0) + MARGIN);
-
-      // Move calendar to the right side: align with the left edge of the booking column
+      // Align with the left edge of the booking column
       // so it does not spill over to the left side ("this side" / main content area).
       const bookingAside =
         anchor.closest('.pp-booking-col') ||
@@ -479,24 +470,8 @@ export const AtlasBookingCalendar: React.FC<AtlasBookingCalendarProps> = ({
         left = MARGIN;
       }
 
-      // Vertical positioning: choose best fit between navbar and viewport bottom
-      const spaceBelow = viewportHeight - MARGIN - (anchorRect.bottom + MARGIN);
-      const spaceAbove = anchorRect.top - MARGIN - topMin;
-
-      let finalTop: number;
-      if (spaceBelow >= popHeight) {
-        // Fits comfortably below the anchor
-        finalTop = anchorRect.bottom + MARGIN;
-      } else if (spaceAbove >= popHeight) {
-        // Fits comfortably above the anchor without colliding with the navbar
-        finalTop = anchorRect.top - popHeight - MARGIN;
-      } else if (spaceBelow >= spaceAbove) {
-        // More room below than above: align to bottom of viewport or below anchor
-        finalTop = Math.max(topMin, viewportHeight - popHeight - MARGIN);
-      } else {
-        // More room above: clamp to topMin so it never goes behind navbar
-        finalTop = Math.max(topMin, anchorRect.top - popHeight - MARGIN);
-      }
+      // Vertical positioning: always open directly below the Check-in date field
+      const finalTop = anchorRect.bottom + MARGIN;
 
       setPositionStyle({
         position: 'fixed',
