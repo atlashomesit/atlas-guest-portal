@@ -1319,3 +1319,60 @@ describe('UnitBookingWidget - TASK-7012: rendered cancellation copy matches the 
     }
   });
 });
+
+describe('UnitBookingWidget - TASK-102023: split pricing failure flags', () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+    task4303.booking.checkIn = null;
+    task4303.booking.checkOut = null;
+  });
+
+  it('selected-range fetch failure is preserved even if shown-month fetch resolves after it', async () => {
+    const nextYear = new Date().getFullYear() + 1;
+    task4303.booking.checkIn = `${nextYear}-03-10`;
+    task4303.booking.checkOut = `${nextYear}-03-12`;
+
+    let resolveShownMonth!: (r: { dateToPrice: Map<string, number>; convenienceFeePercent?: number }) => void;
+    const shownMonthPromise = new Promise<{ dateToPrice: Map<string, number>; convenienceFeePercent?: number }>(
+      (res) => { resolveShownMonth = res; },
+    );
+
+    task4303.fetchCalendarPricing.mockImplementation((_listingId: number, monthIso: string) => {
+      if (monthIso.startsWith(`${nextYear}-03`)) {
+        return Promise.reject(new Error('Network error on selected range'));
+      }
+      return shownMonthPromise;
+    });
+
+    const { default: UnitBookingWidget } = await import('./UnitBookingWidget');
+    render(
+      <MemoryRouter>
+        <UnitBookingWidget
+          listingId={7}
+          propertyId={3}
+          listingName="Atlas 501 PH"
+          propertySlug="atlas501-ph"
+          unitSlug="ph"
+        />
+      </MemoryRouter>,
+    );
+
+    // Wait for the selected-range fetch to fail and render error affordance
+    await waitFor(() => {
+      expect(screen.getByTestId('bw-pricing-error')).toBeInTheDocument();
+    });
+
+    // Now resolve the shown-month fetch
+    await act(async () => {
+      resolveShownMonth({ dateToPrice: new Map(), convenienceFeePercent: 3 });
+      await shownMonthPromise;
+    });
+
+    // Verify widget does not return to pending skeleton, and error/retry affordance remains
+    expect(screen.queryByTestId('bw-price-pending')).toBeNull();
+    expect(screen.queryByTestId('bw-breakdown-pending')).toBeNull();
+    expect(screen.getByTestId('bw-pricing-error')).toBeInTheDocument();
+  });
+});
+
