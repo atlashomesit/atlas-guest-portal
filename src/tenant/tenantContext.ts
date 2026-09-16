@@ -158,6 +158,11 @@ export function _resetTenantContextForTests(): void {
   tenantInfo = null;
 }
 
+/** Test-only: set resolved tenant info. */
+export function _setTenantContextForTests(info: TenantInfo | null): void {
+  tenantInfo = info;
+}
+
 export function getTenantContext(): TenantInfo | null {
   return tenantInfo;
 }

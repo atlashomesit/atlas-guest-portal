@@ -1,5 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getTenantBrandName } from "../tenant/displayBrand";
+import { getTenantContext } from "../tenant/tenantContext";
+import { getTenantListingAddress, getTenantOverrides } from "../tenant/tenantOverrides";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react"; // TASK-1476
 import SEO from "../components/SEO";
@@ -319,6 +321,12 @@ export default function BookingConfirmationPage() {
         return res.json() as Promise<BookingSummary>;
       })
       .then((b) => {
+        const tenantCtx = getTenantContext();
+        const overrides = getTenantOverrides(tenantCtx?.slug);
+        const overrideAddr = getTenantListingAddress(overrides, b.listingId);
+        if (overrideAddr) {
+          b.propertyAddress = overrideAddr;
+        }
         setBooking(b);
         // TASK-1480: confirmed = guest views booking confirmation page
         track('confirmed', b.listingId);

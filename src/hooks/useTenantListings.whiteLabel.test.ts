@@ -8,6 +8,7 @@ vi.mock("@/tenant/tenantContext", () => ({
 
 vi.mock("@/tenant/tenantOverrides", () => ({
   getTenantOverrides: vi.fn(() => ({})),
+  getTenantListingAddress: vi.fn(() => undefined),
   getTenantPublicListingIdAllowlist: vi.fn(() => new Set<number>()),
 }));
 
