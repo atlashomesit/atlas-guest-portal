@@ -13,6 +13,7 @@ import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 import { getTenantContext } from "../tenant/tenantContext";
 import { getTenantBrandName } from "../tenant/displayBrand";
 import { getTenantOverrides, getTenantPublicListingIdAllowlist, getUnitNoun, shouldHideAtlasBranding, getTenantListingAddress } from "../tenant/tenantOverrides";
+import { resolveEffectiveListingAddress } from "../utils/listingAddress";
 import { LoadingState } from "../components/LoadingState";
 import ErrorBanner from "../components/ErrorBanner"; // TASK-7195
 import SEO from "../components/SEO"; // TASK-4290
@@ -156,7 +157,7 @@ function apiToNormalized(listings: PublicListing[]): NormalizedListing[] {
       );
 
       const overrides = getTenantOverrides(getTenantContext()?.slug);
-      const unitAddress = getTenantListingAddress(overrides, l.id) ?? l.propertyAddress ?? "";
+      const unitAddress = resolveEffectiveListingAddress(l, getTenantListingAddress(overrides, l.id)) ?? "";
 
       return {
         id: `api-${l.id}`,

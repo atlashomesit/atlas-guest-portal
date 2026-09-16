@@ -12,6 +12,7 @@ import {
   getTenantOverrides,
   getTenantPublicListingIdAllowlist,
 } from "@/tenant/tenantOverrides";
+import { resolveEffectiveListingAddress } from "@/utils/listingAddress";
 
 type LocalProperty = (typeof propertyData)[number];
 
@@ -126,13 +127,15 @@ export const mapDtoToProperty = (dto: PublicListing): TenantPropertyRecord => {
       const tenantCtx = getTenantContext();
       const overrides = getTenantOverrides(tenantCtx?.slug);
       const overrideAddr = getTenantListingAddress(overrides, dto.id);
-      return (overrideAddr ?? dto.propertyAddress ?? "").trim();
+      const resolved = resolveEffectiveListingAddress(dto, overrideAddr);
+      return (resolved ?? "").trim();
     })(),
     propertyAddress: (() => {
       const tenantCtx = getTenantContext();
       const overrides = getTenantOverrides(tenantCtx?.slug);
       const overrideAddr = getTenantListingAddress(overrides, dto.id);
-      return overrideAddr ?? (dto.propertyAddress ? dto.propertyAddress.trim() : null);
+      const resolved = resolveEffectiveListingAddress(dto, overrideAddr);
+      return resolved ? resolved.trim() : null;
     })(),
     property_neighborhoods: [],
     property_reviews: dto.reviewCount ?? local?.property_reviews ?? 0,

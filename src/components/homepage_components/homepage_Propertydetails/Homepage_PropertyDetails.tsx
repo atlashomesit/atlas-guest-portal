@@ -5,6 +5,7 @@ import { getListingDisplayName } from '@/lib/listingDisplayName';
 import { getTenantContext as _getTenantCtx } from '@/tenant/tenantContext';
 import { hasOnlinePaymentRail } from '@/tenant/paymentRail';
 import { getTenantListingAddress, getTenantOverrides, shouldHideAtlasBranding } from '@/tenant/tenantOverrides';
+import { resolveEffectiveListingAddress } from '@/utils/listingAddress';
 import { getTenantBrandName } from '@/tenant/displayBrand';
 import { getGuestFacingPhone } from '@/config/contact';
 import { REFUND_INITIATED_STEP_DESC, REFUND_SETTLEMENT_STEP_DESC } from '@/config/refundPolicyTimelines';
@@ -1067,21 +1068,20 @@ const PropertyDetails = () => {
                         const psFallback = (apiListing as Record<string, unknown>).publishStatus;
                         if (typeof psFallback === 'string') setPublishStatus(psFallback);
                     }
-                    const rawAddr =
-                        (apiListing as Record<string, unknown>).propertyAddress ??
-                        (apiListing as Record<string, unknown>).property_address;
-                    const streetFromApi =
-                        typeof rawAddr === 'string' && rawAddr.trim() ? rawAddr.trim() : null;
                     const listingNumericId = Number(apiListing.id) || listingId;
                     const detailTenant = _getTenantCtx();
                     const detailOverrides = getTenantOverrides(detailTenant?.slug);
                     const overrideListingAddress = getTenantListingAddress(detailOverrides, listingNumericId);
+                    const resolvedListingAddress = resolveEffectiveListingAddress(
+                        apiListing as Record<string, unknown>,
+                        overrideListingAddress,
+                    );
                     const mapped: Property = {
                         id: listingNumericId,
                         listingId: listingNumericId,
                         property_name: (apiListing.name as string) ?? `Listing ${apiListing.id}`,
                         property_img: photoUrlsList.length > 0 ? photoUrlsList : (coverUrl ? [coverUrl] : []),
-                        property_location: overrideListingAddress ?? ((apiListing as Record<string, unknown>).property_location as string ?? 'Location not specified'),
+                        property_location: resolvedListingAddress ?? ((apiListing as Record<string, unknown>).property_location as string ?? 'Location not specified'),
                         property_neighborhoods: Array.isArray((apiListing as Record<string, unknown>).property_neighborhoods) ? (apiListing as Record<string, unknown>).property_neighborhoods as string[] : [],
                         property_amenities: Array.isArray((apiListing as Record<string, unknown>).property_amenities) ? (apiListing as Record<string, unknown>).property_amenities as PropertyAmenity[] : [],
                         property_description: (apiListing as Record<string, unknown>).property_description as string ?? '',
@@ -1127,12 +1127,7 @@ const PropertyDetails = () => {
                             }
                             return undefined;
                         })(),
-                        propertyAddress:
-                            overrideListingAddress ??
-                            streetFromApi ??
-                            (typeof pub.propertyAddress === 'string' && pub.propertyAddress.trim()
-                                ? pub.propertyAddress.trim()
-                                : null),
+                        propertyAddress: resolvedListingAddress,
                         virtualTourUrl: (() => {
                             const raw = (apiListing as Record<string, unknown>).virtualTourUrl;
                             return typeof raw === 'string' && raw.trim() ? raw.trim() : null;
