@@ -96,11 +96,10 @@
    MINIMALIST DATE PICKER - CLEAN & SIMPLE
    ============================================ */
 
-/* Calendar popover container - Fixed width to accommodate both months */
+/* Calendar popover container - Fixed width to comfortably fit two months without clipping */
 .booking-calendar-popover {
-  max-width: 100%;
-  width: 100%;
-  overflow-x: visible;
+  width: 500px !important;
+  max-width: calc(100vw - 24px) !important;
   box-sizing: border-box;
 }
 
@@ -592,6 +591,11 @@
 
 /* Mobile - single month, larger touch targets */
 @media (max-width: 767px) {
+  .booking-calendar-popover {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
   .rdrMonthAndYearWrapper {
     position: relative !important;
     top: 0 !important;

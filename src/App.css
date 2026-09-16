@@ -101,14 +101,6 @@ body::-webkit-scrollbar {
     padding: 0.75rem;
   }
 
-  .booking-calendar-popover {
-    left: 0;
-    right: 0;
-    width: calc(100vw - 2rem);
-    max-width: 360px;
-    margin: 0 auto;
-  }
-
   .property-card {
     min-width: 0;
   }
