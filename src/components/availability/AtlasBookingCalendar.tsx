@@ -449,8 +449,8 @@ export const AtlasBookingCalendar: React.FC<AtlasBookingCalendarProps> = ({
       if (!anchor || !pop) return;
 
       const anchorRect = anchor.getBoundingClientRect();
-      const popWidth = pop.offsetWidth || 500;
-      const popHeight = pop.offsetHeight || 420;
+      const popWidth = pop.offsetWidth || 390;
+      const popHeight = pop.offsetHeight || 350;
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
       const MARGIN = 8; // px from viewport edges
@@ -462,14 +462,16 @@ export const AtlasBookingCalendar: React.FC<AtlasBookingCalendarProps> = ({
       const navBottom = navEl ? navEl.getBoundingClientRect().bottom : 0;
       const topMin = Math.max(MARGIN, (navBottom > 0 ? navBottom : 0) + MARGIN);
 
-      // Move calendar to the right side: align its right edge with the date container (.lv-date-pair)
-      const container =
-        anchor.closest('.lv-date-pair') ||
+      // Move calendar to the right side: align with the left edge of the booking column
+      // so it does not spill over to the left side ("this side" / main content area).
+      const bookingAside =
+        anchor.closest('.pp-booking-col') ||
         anchor.closest('.lv-booking-form') ||
+        anchor.closest('.lv-date-pair') ||
         anchor;
-      const targetRight = container.getBoundingClientRect().right;
+      const asideRect = bookingAside.getBoundingClientRect();
 
-      let left = targetRight - popWidth;
+      let left = asideRect.left;
       if (left + popWidth > viewportWidth - MARGIN) {
         left = viewportWidth - popWidth - MARGIN;
       }

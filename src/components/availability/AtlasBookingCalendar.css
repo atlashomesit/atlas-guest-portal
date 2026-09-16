@@ -12,18 +12,18 @@
 .bc-presets {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 8px;
+  gap: 4px;
+  margin-bottom: 5px;
 }
 .bc-chip {
-  height: 26px;
-  padding: 0 10px;
+  height: 23px;
+  padding: 0 7px;
   border-radius: var(--radius-pill, 999px);
   border: 1px solid var(--border-strong, #e5cfc0);
   background: transparent;
   color: var(--text-primary, #1a1a2e);
   font-family: inherit;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
   cursor: pointer;
   transition: all 160ms ease;
@@ -44,7 +44,7 @@
 /* Nav header */
 .bc-months-wrapper {
   position: relative;
-  margin-top: 4px;
+  margin-top: 2px;
 }
 .bc-nav {
   display: flex;
@@ -59,8 +59,8 @@
 }
 .bc-nav-btn {
   pointer-events: auto;
-  width: 28px;
-  height: 28px;
+  width: 25px;
+  height: 25px;
   border-radius: 999px;
   border: 1px solid var(--border-strong, #e5cfc0);
   background: var(--bg-surface, #ffffff);
@@ -85,24 +85,24 @@
 .bc-months {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  column-gap: 16px;
+  column-gap: 12px;
 }
 .bc-months-1 { grid-template-columns: minmax(0, 1fr); }
 .bc-month { min-width: 0; }
 .bc-month-title {
   font-family: var(--font-sans, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
-  font-size: 15px;
+  font-size: 13.5px;
   font-weight: 600;
   color: var(--text-primary, #1a1a2e);
   letter-spacing: -0.01em;
   text-align: center;
-  padding: 4px 30px 8px;
+  padding: 3px 26px 5px;
   line-height: 1.25;
 }
 .bc-month-year {
   color: var(--text-primary, #1a1a2e);
   font-weight: 600;
-  margin-left: 4px;
+  margin-left: 3px;
 }
 
 /* Day-of-week header */
@@ -113,12 +113,12 @@
 }
 .bc-dow {
   text-align: center;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
   color: var(--text-muted, #475569);
   text-transform: uppercase;
-  padding-bottom: 4px;
+  padding-bottom: 2px;
 }
 
 /* Grid */
@@ -129,7 +129,7 @@
 }
 .bc-cell-wrap {
   position: relative;
-  height: 42px;
+  height: 36px;
   min-width: 0;
 }
 .bc-empty { pointer-events: none; }
@@ -156,7 +156,7 @@
   left: 2px;
   right: 2px;
   background: var(--brand-primary, #b8472f);
-  border-radius: 10px;
+  border-radius: 7px;
   z-index: 1;
   box-shadow: 0 2px 6px rgba(196, 90, 63, 0.22);
 }
@@ -178,18 +178,18 @@
   gap: 1px;
   color: var(--text-primary);
   font-family: inherit;
-  border-radius: 10px;
+  border-radius: 7px;
   transition: background 140ms ease;
 }
 .bc-num {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   line-height: 1;
   font-feature-settings: "tnum" 1;
   letter-spacing: -0.01em;
 }
 .bc-price {
-  font-size: 8px;
+  font-size: 7.5px;
   color: var(--text-muted, #475569);
   line-height: 1;
   font-feature-settings: "tnum" 1;
@@ -270,11 +270,11 @@
 .bc-legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  padding-top: 10px;
-  margin-top: 8px;
+  gap: 8px;
+  padding-top: 6px;
+  margin-top: 6px;
   border-top: 1px solid var(--border-subtle, #f0ddd0);
-  font-size: 11.5px;
+  font-size: 10.5px;
   color: var(--text-muted, #475569);
 }
 .bc-legend-item {
@@ -329,13 +329,13 @@
   z-index: 100;
   background: var(--bg-surface, #ffffff);
   border: 1px solid var(--border-subtle, #f0ddd0);
-  border-radius: 16px;
+  border-radius: 14px;
   box-shadow: 0 16px 48px rgba(26, 26, 46, 0.16), 0 4px 16px rgba(26, 26, 46, 0.06);
-  padding: 14px 16px 12px;
+  padding: 10px 12px 8px;
   /* Compact two-month calendar footprint */
-  min-width: 480px;
+  min-width: 380px;
   width: max-content;
-  max-width: min(540px, calc(100vw - 16px));
+  max-width: min(420px, calc(100vw - 16px));
   max-height: calc(100vh - 130px);
   overflow-y: auto;
 }
