@@ -181,7 +181,7 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
       aria-labelledby={labelId}
       id={contentId}
       tabIndex={-1}
-      className={`booking-calendar-popover${popoverClassName ? ` ${popoverClassName}` : ''} absolute top-full left-0 mt-2 z-[80] w-[max-content] max-w-[min(560px,calc(100vw-24px))] rounded-[16px] border border-[var(--border-subtle)] bg-[var(--bg-surface)] shadow-[var(--shadow-level-3)] pointer-events-auto`}
+      className={`booking-calendar-popover${popoverClassName ? ` ${popoverClassName}` : ''} absolute top-full left-0 mt-2 z-[80] w-[max-content] max-w-[min(540px,calc(100vw-24px))] rounded-[16px] border border-[var(--border-subtle)] bg-[var(--bg-surface)] shadow-[var(--shadow-level-3)] pointer-events-auto`}
       onClick={(event) => event.stopPropagation()}
     >
       <div

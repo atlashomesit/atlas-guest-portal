@@ -88,10 +88,12 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
   const calendarLabelId = React.useId();
   const dateErrorId = React.useId();
   const { booking, updateBooking } = useBooking();
-  const [monthsToShow, setMonthsToShow] = React.useState(1);
+  const [monthsToShow, setMonthsToShow] = React.useState(() =>
+    typeof window !== 'undefined' && window.innerWidth >= 768 ? 2 : 1
+  );
   React.useEffect(() => {
     const updateMonths = () => {
-      setMonthsToShow(typeof window !== 'undefined' && window.innerWidth >= 1280 ? 2 : 1);
+      setMonthsToShow(typeof window !== 'undefined' && window.innerWidth >= 768 ? 2 : 1);
     };
     updateMonths();
     window.addEventListener('resize', updateMonths);
