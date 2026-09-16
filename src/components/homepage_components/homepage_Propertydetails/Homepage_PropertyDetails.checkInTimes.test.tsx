@@ -70,7 +70,7 @@ vi.mock('@/utils/listingResolver', () => ({
   normalizeListingPayload: vi.fn((raw) => raw),
 }));
 
-let mockUseTenantListings = vi.fn();
+const mockUseTenantListings = vi.fn();
 vi.mock('@/hooks/useTenantListings', () => ({
   useTenantListings: () => mockUseTenantListings(),
 }));
