@@ -42,20 +42,29 @@
 }
 
 /* Nav header */
+.bc-months-wrapper {
+  position: relative;
+  margin-top: 8px;
+}
 .bc-nav {
   display: flex;
-  justify-content: flex-end;
-  gap: 6px;
-  margin-bottom: 4px;
-  position: relative;
+  justify-content: space-between;
+  align-items: center;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+  z-index: 2;
 }
 .bc-nav-btn {
+  pointer-events: auto;
   width: 32px;
   height: 32px;
   border-radius: 999px;
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--border-strong, #e5cfc0);
   background: var(--bg-surface, #ffffff);
-  color: var(--text-primary);
+  color: var(--text-primary, #1a1a2e);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -65,6 +74,7 @@
 .bc-nav-btn:hover:not(:disabled) {
   border-color: var(--brand-primary, #b8472f);
   color: var(--brand-primary, #b8472f);
+  background: var(--bg-primary, #fff8e7);
 }
 .bc-nav-btn:disabled {
   opacity: 0.35;
@@ -76,23 +86,23 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   column-gap: 28px;
-  margin-top: 8px;
 }
 .bc-months-1 { grid-template-columns: minmax(0, 1fr); }
 .bc-month { min-width: 0; }
 .bc-month-title {
-  font-family: var(--font-display, "Cormorant Garamond", Georgia, serif);
-  font-size: 24px;
-  font-weight: 500;
-  color: var(--text-primary);
-  letter-spacing: -0.005em;
+  font-family: var(--font-sans, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text-primary, #1a1a2e);
+  letter-spacing: -0.01em;
   text-align: center;
-  padding: 4px 0 14px;
-  line-height: 1;
+  padding: 6px 36px 14px;
+  line-height: 1.3;
 }
 .bc-month-year {
-  color: var(--text-muted, #475569);
-  font-weight: 400;
+  color: var(--text-primary, #1a1a2e);
+  font-weight: 600;
+  margin-left: 4px;
 }
 
 /* Day-of-week header */
@@ -316,16 +326,18 @@
 .bc-popover {
   /* JS sets position:fixed + top/left via inline style; these are fallbacks */
   position: fixed;
-  z-index: 50;
+  z-index: 100;
   background: var(--bg-surface, #ffffff);
   border: 1px solid var(--border-subtle, #f0ddd0);
   border-radius: 20px;
-  box-shadow: 0 12px 32px rgba(26, 26, 46, 0.10), 0 4px 12px rgba(26, 26, 46, 0.04);
+  box-shadow: 0 16px 48px rgba(26, 26, 46, 0.16), 0 4px 16px rgba(26, 26, 46, 0.06);
   padding: 20px 20px 16px;
   /* Two months + gap + padding → need ~580px minimum so cells aren't cramped */
   min-width: 580px;
   width: max-content;
   max-width: min(640px, calc(100vw - 16px));
+  max-height: calc(100vh - 130px);
+  overflow-y: auto;
 }
 
 /* On narrow viewports collapse to 1 month and anchor as bottom sheet */
@@ -346,6 +358,8 @@
     min-width: unset;
     max-width: 100vw;
     width: 100vw;
+    max-height: 85vh;
+    overflow-y: auto;
   }
 }
 

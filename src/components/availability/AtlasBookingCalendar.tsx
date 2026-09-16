@@ -15,6 +15,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import { createPortal } from 'react-dom';
 import { addDays, format, isSameDay, startOfMonth } from 'date-fns';
 import { type AtlasDateRangePickerValue } from '@/components/date/AtlasDateRangePicker';
 import { toCalendarISO } from '@/utils/date';
@@ -449,12 +450,17 @@ export const AtlasBookingCalendar: React.FC<AtlasBookingCalendarProps> = ({
 
       const anchorRect = anchor.getBoundingClientRect();
       const popWidth = pop.offsetWidth || 580;
+      const popHeight = pop.offsetHeight || 500;
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
       const MARGIN = 8; // px from viewport edges
 
-      // Top: just below anchor (use fixed positioning so scrolling doesn't break it)
-      const top = anchorRect.bottom + MARGIN;
+      // Measure fixed/sticky navbar so the popover never renders underneath it
+      const navEl =
+        document.getElementById('navbar_container') ||
+        document.querySelector('header');
+      const navBottom = navEl ? navEl.getBoundingClientRect().bottom : 0;
+      const topMin = Math.max(MARGIN, (navBottom > 0 ? navBottom : 0) + MARGIN);
 
       // Prefer right-aligned to the anchor's right edge; shift left if it would overflow
       let left = anchorRect.right - popWidth;
@@ -463,12 +469,24 @@ export const AtlasBookingCalendar: React.FC<AtlasBookingCalendarProps> = ({
         left = viewportWidth - popWidth - MARGIN;
       }
 
-      // If the popover would go below the viewport, flip it above the anchor
-      const popHeight = pop.offsetHeight || 500;
-      const finalTop =
-        top + popHeight > viewportHeight - MARGIN
-          ? Math.max(MARGIN, anchorRect.top - popHeight - MARGIN)
-          : top;
+      // Vertical positioning: choose best fit between navbar and viewport bottom
+      const spaceBelow = viewportHeight - MARGIN - (anchorRect.bottom + MARGIN);
+      const spaceAbove = anchorRect.top - MARGIN - topMin;
+
+      let finalTop: number;
+      if (spaceBelow >= popHeight) {
+        // Fits comfortably below the anchor
+        finalTop = anchorRect.bottom + MARGIN;
+      } else if (spaceAbove >= popHeight) {
+        // Fits comfortably above the anchor without colliding with the navbar
+        finalTop = anchorRect.top - popHeight - MARGIN;
+      } else if (spaceBelow >= spaceAbove) {
+        // More room below than above: align to bottom of viewport or below anchor
+        finalTop = Math.max(topMin, viewportHeight - popHeight - MARGIN);
+      } else {
+        // More room above: clamp to topMin so it never goes behind navbar
+        finalTop = Math.max(topMin, anchorRect.top - popHeight - MARGIN);
+      }
 
       setPositionStyle({
         position: 'fixed',
@@ -496,6 +514,7 @@ export const AtlasBookingCalendar: React.FC<AtlasBookingCalendarProps> = ({
 
   const canPrev =
     !(viewYear === today.getFullYear() && viewMonth <= today.getMonth());
+  const canNext = new Date(viewYear, viewMonth + 1, 1) <= maxDate;
 
   const goPrev = () => {
     if (!canPrev) return;
@@ -504,8 +523,8 @@ export const AtlasBookingCalendar: React.FC<AtlasBookingCalendarProps> = ({
   };
 
   const goNext = () => {
+    if (!canNext) return;
     const next = new Date(viewYear, viewMonth + 1, 1);
-    if (next > maxDate) return;
     onShownDateChange(startOfMonth(next));
   };
 
@@ -569,6 +588,10 @@ export const AtlasBookingCalendar: React.FC<AtlasBookingCalendarProps> = ({
         anchorRef.current &&
         !anchorRef.current.contains(target)
       ) {
+        const anchorParent = anchorRef.current.closest('.lv-date-pair');
+        if (anchorParent && anchorParent.contains(target)) {
+          return;
+        }
         onClose();
       }
     };
@@ -695,7 +718,7 @@ export const AtlasBookingCalendar: React.FC<AtlasBookingCalendarProps> = ({
 
   if (!open) return null;
 
-  return (
+  const popoverNode = (
     <div ref={popoverRef} className="bc-popover" style={positionStyle} role="dialog" aria-label="Select dates">
       <div className="bc-root">
         {/* Quick presets */}
@@ -712,65 +735,67 @@ export const AtlasBookingCalendar: React.FC<AtlasBookingCalendarProps> = ({
           ))}
         </div>
 
-        {/* Navigation */}
-        <div className="bc-nav">
-          <button
-            type="button"
-            className="bc-nav-btn"
-            onClick={goPrev}
-            disabled={!canPrev}
-            aria-label="Previous month"
-          >
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="15 18 9 12 15 6" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            className="bc-nav-btn"
-            onClick={goNext}
-            aria-label="Next month"
-          >
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="9 18 15 12 9 6" />
-            </svg>
-          </button>
-        </div>
+        {/* Two months with integrated navigation */}
+        <div className="bc-months-wrapper">
+          <div className="bc-nav">
+            <button
+              type="button"
+              className="bc-nav-btn bc-nav-prev"
+              onClick={goPrev}
+              disabled={!canPrev}
+              aria-label="Previous month"
+            >
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className="bc-nav-btn bc-nav-next"
+              onClick={goNext}
+              disabled={!canNext}
+              aria-label="Next month"
+            >
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </button>
+          </div>
 
-        {/* Two months */}
-        <div className="bc-months bc-months-2">
-          <MonthGrid
-            year={viewYear}
-            month={viewMonth}
-            range={range}
-            hover={hover}
-            onPick={handlePick}
-            setHover={setHover}
-            today={today}
-            disabledDay={disabledDay}
-            dateStatusMap={dateStatusMap}
-            calendarDailyPrices={calendarDailyPrices}
-            fallbackPrice={fallbackPrice}
-            pricingLoading={pricingLoading}
-            focusedDate={focusedDate}
-            onKeyDown={handleGridKeyDown}
-          />
-          <MonthGrid
-            year={m2.year}
-            month={m2.month}
-            range={range}
-            hover={hover}
-            onPick={handlePick}
-            setHover={setHover}
-            today={today}
-            disabledDay={disabledDay}
-            dateStatusMap={dateStatusMap}
-            calendarDailyPrices={calendarDailyPrices}
-            fallbackPrice={fallbackPrice}
-            pricingLoading={pricingLoading}
-            focusedDate={focusedDate}
-            onKeyDown={handleGridKeyDown}
-          />
+          <div className="bc-months bc-months-2">
+            <MonthGrid
+              year={viewYear}
+              month={viewMonth}
+              range={range}
+              hover={hover}
+              onPick={handlePick}
+              setHover={setHover}
+              today={today}
+              disabledDay={disabledDay}
+              dateStatusMap={dateStatusMap}
+              calendarDailyPrices={calendarDailyPrices}
+              fallbackPrice={fallbackPrice}
+              pricingLoading={pricingLoading}
+              focusedDate={focusedDate}
+              onKeyDown={handleGridKeyDown}
+            />
+            <MonthGrid
+              year={m2.year}
+              month={m2.month}
+              range={range}
+              hover={hover}
+              onPick={handlePick}
+              setHover={setHover}
+              today={today}
+              disabledDay={disabledDay}
+              dateStatusMap={dateStatusMap}
+              calendarDailyPrices={calendarDailyPrices}
+              fallbackPrice={fallbackPrice}
+              pricingLoading={pricingLoading}
+              focusedDate={focusedDate}
+              onKeyDown={handleGridKeyDown}
+            />
+          </div>
         </div>
 
         {/* Legend */}
@@ -795,6 +820,8 @@ export const AtlasBookingCalendar: React.FC<AtlasBookingCalendarProps> = ({
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(popoverNode, document.body) : null;
 };
 
 export default AtlasBookingCalendar;
