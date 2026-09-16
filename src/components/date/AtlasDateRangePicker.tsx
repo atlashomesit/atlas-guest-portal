@@ -430,19 +430,19 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
       open={open}
       popoverClassName={popoverClassName}
     >
-      <div className={`mx-5 mt-4 mb-2 rounded-lg px-4 py-2 text-sm font-semibold ${statusConfig.bg} ${statusConfig.color}`} aria-live="polite">
-        <span className={`mr-2 inline-block h-2.5 w-2.5 rounded-full ${statusConfig.dot}`} aria-hidden />
+      <div className={`mx-3 mt-2 mb-1.5 rounded-md px-3 py-1.5 text-xs font-semibold ${statusConfig.bg} ${statusConfig.color}`} aria-live="polite">
+        <span className={`mr-1.5 inline-block h-2 w-2 rounded-full ${statusConfig.dot}`} aria-hidden />
         {statusConfig.label}
       </div>
       {/* TASK-1712: Quick-preset pills */}
-      <div className="mx-5 mb-3 flex flex-wrap gap-1.5" role="group" aria-label="Quick date presets">
+      <div className="mx-3 mb-2 flex flex-wrap gap-1" role="group" aria-label="Quick date presets">
         {quickPresets.map((preset) => (
           <button
             key={preset.label}
             type="button"
             disabled={preset.disabled}
             onClick={() => handlePresetClick(preset.start, preset.end)}
-            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors
+            className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors
               ${preset.disabled
                 ? 'cursor-not-allowed text-[#d6c2a8] ring-1 ring-inset ring-[#f0e6dc]'
                 : 'cursor-pointer bg-white text-[#475569] ring-1 ring-inset ring-[#f0e6dc] hover:bg-[#ffe8d6] hover:text-[#c2410c] hover:ring-[#c2410c] active:bg-[#ffe8d6]'
@@ -453,7 +453,7 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
         ))}
       </div>
       {validationError && (
-        <div className="mx-5 mt-4 mb-2 rounded-lg bg-red-50 px-4 py-2 text-sm font-medium text-red-700" role="alert">
+        <div className="mx-3 mt-2 mb-1.5 rounded-md bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700" role="alert">
           {validationError}
         </div>
       )}

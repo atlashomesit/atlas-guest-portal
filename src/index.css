@@ -183,49 +183,49 @@
   background: transparent;
 }
 
-/* Minimal weekday headers - perfect grid alignment */
+/* Minimal weekday headers - compact grid alignment */
 .rdrWeekDays {
-  padding: 4px 0 2px 0 !important;
+  padding: 2px 0 1px 0 !important;
   background: transparent !important;
   display: grid;
-  grid-template-columns: repeat(7, 40px);
-  grid-auto-rows: 32px;
+  grid-template-columns: repeat(7, 32px);
+  grid-auto-rows: 24px;
   gap: 0;
   width: 100%;
   border-bottom: none;
 }
 
 .rdrWeekDay {
-  font-size: 11px;
-  font-weight: 500;
+  font-size: 10.5px;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: #6b7280;
-  padding: 8px 0;
+  padding: 4px 0;
   text-align: center;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-/* Minimal date grid - perfect alignment, ensure all dates visible */
+/* Minimal date grid - compact alignment, ensure all dates visible */
 .rdrDays {
   padding: 0 !important;
   max-width: 100%;
   width: 100%;
   overflow: visible;
   display: grid;
-  grid-template-columns: repeat(7, 40px);
-  grid-auto-rows: 40px;
+  grid-template-columns: repeat(7, 32px);
+  grid-auto-rows: 32px;
   gap: 0;
   min-width: 0;
   margin: 0;
 }
 
-/* Date cell container - ensure no clipping, no overlap */
+/* Date cell container - compact size */
 .rdrDay {
-  aspect-ratio: 1;
-  min-height: 40px;
+  height: 32px;
+  min-height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -244,7 +244,7 @@
   justify-content: center;
   font-weight: 400;
   color: #111827;
-  font-size: 15px;
+  font-size: 13px;
   outline: none;
 }
 
@@ -252,12 +252,12 @@
   display: flex !important;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  min-width: 36px;
-  min-height: 36px;
-  max-width: 36px;
-  max-height: 36px;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  max-width: 28px;
+  max-height: 28px;
   border-radius: 50% !important;
   transition: background-color 0.12s ease;
   font-weight: 400;
@@ -280,6 +280,25 @@
   color: #111827 !important;
 }
 
+/* Selected dates in hero calendar */
+.rdrDayNumber span.hero-date-selected,
+.rdrDay .rdrDayNumber span.hero-date-selected {
+  background: var(--cta-primary, #b8472f) !important;
+  color: #ffffff !important;
+  font-weight: 600 !important;
+  border-radius: 50% !important;
+  box-shadow: 0 1px 3px rgba(184, 71, 47, 0.25) !important;
+}
+
+/* In-range text in hero calendar */
+.rdrDayNumber span.hero-date-inrange,
+.rdrDay .rdrDayNumber span.hero-date-inrange {
+  background: transparent !important;
+  color: var(--text-primary, #1a1a2e) !important;
+  font-weight: 500 !important;
+  border-radius: 0 !important;
+}
+
 /* Minimal hover state - just subtle background */
 .rdrDay:not(.rdrDayPassive):not(.rdrDayDisabled) .rdrDayNumber span:hover {
   background: #f9fafb;
@@ -294,7 +313,7 @@
 .rdrDayToday .rdrDayNumber span::after {
   content: '';
   position: absolute;
-  bottom: 4px;
+  bottom: 2px;
   left: 50%;
   transform: translateX(-50%);
   width: 4px;
@@ -308,69 +327,37 @@
   background: transparent !important;
 }
 
-.rdrInRange .rdrDayNumber span {
-  background: #f7f7f7 !important;
+.rdrInRange ~ .rdrDayNumber span {
+  background: #ffe4d6 !important;
   color: #111827 !important;
   border: none !important;
   margin: 0 !important;
   padding: 0 !important;
-  border-radius: 50% !important;
+  border-radius: 0 !important;
 }
 
-/* Range start - simple underline, NO background, NO overlap */
-.rdrStartEdge {
-  background: transparent !important;
-  margin: 0 !important;
-  padding: 0 !important;
-}
-
-.rdrStartEdge .rdrDayNumber span,
-.rdrDay.rdrStartEdge .rdrDayNumber span {
-  background: #111827 !important;
-  color: white !important;
-  font-weight: 500 !important;
-  border: none !important;
-  border-radius: 50% !important;
-  box-shadow: none !important;
-  margin: 0 !important;
-  padding: 0 !important;
-}
-
-/* Range end - simple underline, NO background, NO overlap */
+/* Range start and end */
+.rdrStartEdge,
 .rdrEndEdge {
   background: transparent !important;
   margin: 0 !important;
   padding: 0 !important;
 }
 
-.rdrEndEdge .rdrDayNumber span,
-.rdrDay.rdrEndEdge .rdrDayNumber span {
-  background: #111827 !important;
+.rdrStartEdge ~ .rdrDayNumber span,
+.rdrDay.rdrStartEdge ~ .rdrDayNumber span,
+.rdrEndEdge ~ .rdrDayNumber span,
+.rdrDay.rdrEndEdge ~ .rdrDayNumber span,
+.rdrSelected ~ .rdrDayNumber span,
+.rdrDaySelected ~ .rdrDayNumber span {
+  background: var(--cta-primary, #b8472f) !important;
   color: white !important;
-  font-weight: 500 !important;
+  font-weight: 600 !important;
   border: none !important;
   border-radius: 50% !important;
-  box-shadow: none !important;
+  box-shadow: 0 1px 3px rgba(184, 71, 47, 0.25) !important;
   margin: 0 !important;
   padding: 0 !important;
-}
-
-/* Single day selected (start = end) */
-.rdrStartEdge.rdrEndEdge .rdrDayNumber span {
-  border: none !important;
-  border-radius: 50% !important;
-  background: #111827 !important;
-  color: white !important;
-}
-
-/* Fallback for any selected state */
-.rdrSelected .rdrDayNumber span,
-.rdrDaySelected .rdrDayNumber span {
-  color: white !important;
-  background: #111827 !important;
-  border: none !important;
-  font-weight: 500 !important;
-  border-radius: 50% !important;
 }
 
 /* Preview states - minimal, NO backgrounds */

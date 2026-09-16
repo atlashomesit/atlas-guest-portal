@@ -87,10 +87,15 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
   const calendarLabelId = React.useId();
   const dateErrorId = React.useId();
   const { booking, updateBooking } = useBooking();
-  const monthsToShow = React.useMemo(
-    () => (typeof window !== 'undefined' && window.innerWidth < 768 ? 1 : 2),
-    [],
-  );
+  const [monthsToShow, setMonthsToShow] = React.useState(1);
+  React.useEffect(() => {
+    const updateMonths = () => {
+      setMonthsToShow(typeof window !== 'undefined' && window.innerWidth >= 1280 ? 2 : 1);
+    };
+    updateMonths();
+    window.addEventListener('resize', updateMonths);
+    return () => window.removeEventListener('resize', updateMonths);
+  }, []);
 
   // BOUNDARY: both sources here are INSTANTS — BookingContext's wire value is an IST-midnight
   // ISO instant, and a `?checkIn=YYYY-MM-DD` param parses as UTC midnight. `startOfDay` read
@@ -630,31 +635,45 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
           activeField={activeField}
           dayContentRenderer={(day) => {
             const dayStart = startOfCalendarDay(day);
+            const dayTime = dayStart.getTime();
             const selectionStart = dateRange.startDate ? startOfCalendarDay(dateRange.startDate).getTime() : null;
             const selectionEnd = dateRange.endDate ? startOfCalendarDay(dateRange.endDate).getTime() : null;
-            const isRangeStart = selectionStart !== null && dayStart.getTime() === selectionStart;
-            const isRangeEnd = selectionEnd !== null && dayStart.getTime() === selectionEnd;
+            const hasValidRange = selectionStart !== null && selectionEnd !== null && selectionEnd > selectionStart;
+            const isRangeStart = selectionStart !== null && dayTime === selectionStart;
+            const isRangeEnd = selectionEnd !== null && dayTime === selectionEnd;
+            const isInRange = hasValidRange && dayTime > selectionStart && dayTime < selectionEnd;
+            const isSelected = isRangeStart || isRangeEnd;
             const isDisabled = dayStart < today;
 
-         return (
-  <div className="relative flex h-full w-full items-center justify-center">
-    <span
-      data-testid={`hero-date-${toCalendarISO(day)}`}
-      className={`relative z-10 flex items-center justify-center text-sm font-medium transition ${
-        isRangeStart || isRangeEnd
-          ? 'bg-[var(--cta-primary)] text-[var(--text-on-cta)] rounded-xl px-3 py-3 shadow-sm'
-          : isDisabled
-          ? 'text-[var(--border-strong)] cursor-not-allowed opacity-50'
-          : 'text-[var(--brand)]'
-      }`}
-      style={{ minHeight: 40, minWidth: 40 }}
-    >
-      {format(day, 'd')}
-    </span>
-  </div>
-);
-
-
+            return (
+              <div className="relative flex h-full w-full items-center justify-center">
+                {/* Continuous underlay band for range */}
+                {hasValidRange && isRangeStart && (
+                  <span className="absolute inset-y-0.5 left-1/2 right-0 bg-[#ffe4d6] z-0 pointer-events-none" aria-hidden="true" />
+                )}
+                {hasValidRange && isInRange && (
+                  <span className="absolute inset-y-0.5 inset-x-0 bg-[#ffe4d6] z-0 pointer-events-none" aria-hidden="true" />
+                )}
+                {hasValidRange && isRangeEnd && (
+                  <span className="absolute inset-y-0.5 left-0 right-1/2 bg-[#ffe4d6] z-0 pointer-events-none" aria-hidden="true" />
+                )}
+                <span
+                  data-testid={`hero-date-${toCalendarISO(day)}`}
+                  className={`relative z-10 flex items-center justify-center text-xs font-medium transition ${
+                    isSelected
+                      ? 'hero-date-selected bg-[var(--cta-primary)] text-white font-semibold rounded-full shadow-sm'
+                      : isInRange
+                      ? 'hero-date-inrange text-[var(--text-primary)] font-medium'
+                      : isDisabled
+                      ? 'text-[var(--border-strong)] cursor-not-allowed opacity-40'
+                      : 'text-[var(--text-primary)] hover:bg-[#f3f4f6] rounded-full'
+                  }`}
+                  style={{ width: 28, height: 28 }}
+                >
+                  {format(day, 'd')}
+                </span>
+              </div>
+            );
           }}
         />
 
